@@ -31,7 +31,7 @@ export function ArtistNotificationsBenefitsSection({
               <h3 className='max-w-[18ch] text-[1.2rem] font-semibold leading-[1.1] tracking-[-0.04em] text-primary-token'>
                 {item.title}
               </h3>
-              <p className='mt-3 max-w-[32ch] text-[14px] leading-[1.65] text-secondary-token'>
+              <p className='mt-3 max-w-[32ch] text-sm leading-[1.65] text-secondary-token'>
                 {item.body}
               </p>
             </article>

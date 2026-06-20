@@ -62,20 +62,20 @@ export function ErrorDisplay({
         </div>
         <div className='min-w-0 flex-1'>
           <div>
-            <p className='text-[13px] font-medium leading-5 text-primary-token'>
+            <p className='text-app font-medium leading-5 text-primary-token'>
               Message paused
             </p>
-            <p className='text-[12.5px] leading-5 text-secondary-token'>
+            <p className='text-xs leading-5 text-secondary-token'>
               {chatError.message}
             </p>
-            <p className='text-[12px] leading-5 text-tertiary-token'>
+            <p className='text-xs leading-5 text-tertiary-token'>
               {getNextStepMessage(chatError.type)}
             </p>
           </div>
 
           {supportCode && (
             <div className='mt-1 flex flex-wrap items-center gap-2 text-xs text-tertiary-token'>
-              <span className='text-[11px] font-medium tracking-[-0.01em] text-secondary-token'>
+              <span className='text-2xs font-medium tracking-[-0.01em] text-secondary-token'>
                 Reference
               </span>
               <span className='font-mono text-primary-token'>

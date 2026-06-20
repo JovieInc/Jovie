@@ -36,7 +36,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
 
       {/* Name + verified badge */}
       <div className='flex items-center gap-1'>
-        <p className='text-[15px] font-semibold text-primary-token'>
+        <p className='text-mid font-semibold text-primary-token'>
           {displayName}
         </p>
         <span className='inline-flex rounded-full bg-white/10 p-0.5 text-sky-400'>
@@ -45,7 +45,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
       </div>
 
       {/* Subtitle */}
-      <p className='mt-1 text-[11px] font-normal uppercase tracking-[0.2em] text-white/40'>
+      <p className='mt-1 text-2xs font-normal uppercase tracking-[0.2em] text-white/40'>
         {primaryGenre}
       </p>
 
@@ -59,7 +59,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
       {/* Big CTA — matches TwoStepNotificationsCTA */}
       <div className='mt-auto w-full px-5 pb-6'>
         <div
-          className='flex w-full items-center justify-center gap-2.5 rounded-xl py-4 text-[15px] font-semibold'
+          className='flex w-full items-center justify-center gap-2.5 rounded-xl py-4 text-mid font-semibold'
           style={{
             backgroundColor: 'var(--linear-text-primary)',
             color: 'var(--linear-bg-page)',

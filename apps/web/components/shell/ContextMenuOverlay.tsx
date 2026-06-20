@@ -147,7 +147,7 @@ export function ContextMenuOverlay({
                 onClose();
               }}
               className={cn(
-                'relative group/mi w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12.5px] font-caption text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle',
+                'relative group/mi w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-xs font-caption text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle',
                 item.disabled
                   ? 'opacity-50 cursor-not-allowed text-secondary-token'
                   : item.tone === 'danger'
@@ -170,7 +170,7 @@ export function ContextMenuOverlay({
               )}
               <span className='flex-1 truncate'>{item.label}</span>
               {sc && (
-                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-[10px] font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
+                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-3xs font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
                   {sc.keys}
                 </kbd>
               )}

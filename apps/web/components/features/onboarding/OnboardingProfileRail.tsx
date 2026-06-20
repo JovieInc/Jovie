@@ -272,7 +272,7 @@ function DspMatchStrip({
         </span>
       ))}
       {overflow > 0 ? (
-        <span className='inline-flex h-7 items-center rounded-full bg-white px-2 text-[11.5px] font-semibold text-black'>
+        <span className='inline-flex h-7 items-center rounded-full bg-white px-2 text-2xs font-semibold text-black'>
           +{overflow} others
         </span>
       ) : null}

@@ -49,7 +49,7 @@ export function ShellMetadataChip({
   return (
     <span
       className={cn(
-        'inline-flex h-[18px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded border pl-1.5 pr-2 font-caption text-[10px] tracking-normal',
+        'inline-flex h-[18px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded border pl-1.5 pr-2 font-caption text-3xs tracking-normal',
         TONE_CLASSES[tone],
         className
       )}

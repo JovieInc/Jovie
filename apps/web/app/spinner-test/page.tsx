@@ -75,12 +75,12 @@ export default function SpinnerTestPage() {
             </div>
           </div>
 
-          <p className='text-[13px] leading-5 text-secondary-token'>
+          <p className='text-app leading-5 text-secondary-token'>
             This route exists to verify the tail-weighted spinner treatment in
             isolation.
           </p>
 
-          <p className='text-[12px] text-tertiary-token'>
+          <p className='text-xs text-tertiary-token'>
             View at /spinner-test
           </p>
         </div>

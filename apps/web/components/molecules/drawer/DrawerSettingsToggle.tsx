@@ -61,7 +61,7 @@ export function DrawerSettingsToggle({
         className={cn(
           'select-none text-secondary-token',
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
-          density === 'compact' ? 'text-[11.5px] font-[500]' : 'text-[12px]'
+          density === 'compact' ? 'text-2xs font-[500]' : 'text-xs'
         )}
       >
         {label}

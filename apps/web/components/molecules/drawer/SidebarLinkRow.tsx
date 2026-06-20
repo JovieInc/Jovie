@@ -173,7 +173,7 @@ export function SidebarLinkRow({
             {label}
           </span>
           {badge && (
-            <span className='shrink-0 text-[10px] text-tertiary-token'>
+            <span className='shrink-0 text-3xs text-tertiary-token'>
               {badge}
             </span>
           )}

@@ -105,8 +105,8 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'block text-[13px] font-semibold leading-[1.15] [overflow-wrap:anywhere]'
-              : 'block text-[12.5px] font-semibold leading-4 [overflow-wrap:anywhere]'
+              ? 'block text-app font-semibold leading-[1.15] [overflow-wrap:anywhere]'
+              : 'block text-xs font-semibold leading-4 [overflow-wrap:anywhere]'
           }
         >
           {title}
@@ -114,8 +114,8 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'mt-0.5 block max-w-[25ch] text-[11.5px] leading-4 text-white/54 [overflow-wrap:anywhere]'
-              : 'mt-0.5 block text-[11px] leading-3.5 text-white/50 [overflow-wrap:anywhere]'
+              ? 'mt-0.5 block max-w-[25ch] text-2xs leading-4 text-white/54 [overflow-wrap:anywhere]'
+              : 'mt-0.5 block text-2xs leading-3.5 text-white/50 [overflow-wrap:anywhere]'
           }
         >
           {description}

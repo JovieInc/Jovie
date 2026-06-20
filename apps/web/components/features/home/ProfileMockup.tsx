@@ -139,7 +139,7 @@ export function ProfileMockup({
             <div className='text-base font-semibold text-primary-token mb-0.5'>
               {displayName}
             </div>
-            <div className='text-[13px] text-tertiary-token'>
+            <div className='text-app text-tertiary-token'>
               {displayTagline}
             </div>
           </div>
@@ -157,7 +157,7 @@ export function ProfileMockup({
                 aria-hidden='true'
               />
               <div className='min-w-0'>
-                <div className='text-[13px] font-medium text-primary-token truncate'>
+                <div className='text-app font-medium text-primary-token truncate'>
                   {release.title}
                 </div>
                 <div className='text-xs text-tertiary-token'>
@@ -174,7 +174,7 @@ export function ProfileMockup({
           <div
             aria-hidden={isListen}
             className={cn(
-              'absolute inset-0 flex items-center justify-center rounded-lg bg-btn-primary px-3.5 text-center text-[13px] font-medium text-btn-primary-foreground transition-opacity duration-cinematic',
+              'absolute inset-0 flex items-center justify-center rounded-lg bg-btn-primary px-3.5 text-center text-app font-medium text-btn-primary-foreground transition-opacity duration-cinematic',
               isListen ? 'pointer-events-none opacity-0' : 'opacity-100'
             )}
           >
@@ -185,7 +185,7 @@ export function ProfileMockup({
           <div
             aria-hidden={!isListen}
             className={cn(
-              'absolute inset-0 flex items-center justify-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3.5 text-center text-[13px] font-medium text-primary-token transition-opacity duration-cinematic',
+              'absolute inset-0 flex items-center justify-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3.5 text-center text-app font-medium text-primary-token transition-opacity duration-cinematic',
               isListen ? 'opacity-100' : 'pointer-events-none opacity-0'
             )}
           >
@@ -208,7 +208,7 @@ export function ProfileMockup({
         </div>
 
         {/* Label */}
-        <div className='mt-2 text-center text-[11px] text-tertiary-token transition-opacity duration-cinematic'>
+        <div className='mt-2 text-center text-2xs text-tertiary-token transition-opacity duration-cinematic'>
           {isListen
             ? 'Return visitor · preferred streaming platform'
             : 'New visitor · email / sms notification opt-in'}

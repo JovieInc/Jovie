@@ -154,7 +154,7 @@ function Badge({
 
   const sizeClasses =
     size === 'sm'
-      ? 'min-w-[16px] h-[16px] px-1 text-[9px]'
+      ? 'min-w-[16px] h-[16px] px-1 text-3xs'
       : 'min-w-[24px] h-[20px] px-2 text-xs';
 
   return (

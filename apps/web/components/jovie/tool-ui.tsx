@@ -211,7 +211,7 @@ function ToolActivityRow({
         {showVerboseDetails ? (
           <details
             data-testid='chat-tool-verbose'
-            className='mt-1.5 text-[10.5px] leading-4 text-tertiary-token'
+            className='mt-1.5 text-3xs leading-4 text-tertiary-token'
           >
             <summary className='cursor-pointer select-none text-secondary-token'>
               Verbose tool details

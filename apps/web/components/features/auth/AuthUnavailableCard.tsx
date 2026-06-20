@@ -77,7 +77,7 @@ export function AuthUnavailableCard({
       )}
 
       {showSignupLegal ? (
-        <p className='mt-4 text-[12px] leading-[1.6] tracking-[-0.01em] text-white/50'>
+        <p className='mt-4 text-xs leading-[1.6] tracking-[-0.01em] text-white/50'>
           By signing up, you agree to our{' '}
           <Link
             href={APP_ROUTES.LEGAL_TERMS}

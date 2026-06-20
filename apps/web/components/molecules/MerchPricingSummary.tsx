@@ -23,7 +23,7 @@ export function MerchPricingSummary({
       <span
         className={cn(
           'rounded-md bg-surface-1 px-1.5 py-1 text-secondary-token',
-          compact ? 'text-[10px]' : 'text-[10.5px]'
+          compact ? 'text-3xs' : 'text-3xs'
         )}
       >
         <span className='text-tertiary-token'>Sale </span>
@@ -32,7 +32,7 @@ export function MerchPricingSummary({
       <span
         className={cn(
           'rounded-md bg-surface-1 px-1.5 py-1 text-secondary-token',
-          compact ? 'text-[10px]' : 'text-[10.5px]'
+          compact ? 'text-3xs' : 'text-3xs'
         )}
       >
         <span className='text-tertiary-token'>Profit </span>

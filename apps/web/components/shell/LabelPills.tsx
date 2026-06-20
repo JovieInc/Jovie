@@ -15,7 +15,7 @@ export function LabelPill({ children, className }: LabelPillProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption text-tertiary-token bg-(--surface-1)/40 border border-(--linear-app-shell-border)/50 whitespace-nowrap',
+        'inline-flex items-center h-[18px] px-1.5 rounded text-3xs font-caption text-tertiary-token bg-(--surface-1)/40 border border-(--linear-app-shell-border)/50 whitespace-nowrap',
         className
       )}
     >
@@ -52,7 +52,7 @@ export function LabelPills({ labels, className }: LabelPillsProps) {
         <>
           <span
             aria-hidden='true'
-            className='inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption text-quaternary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)/50 group-hover/labels:hidden'
+            className='inline-flex items-center h-[18px] px-1.5 rounded text-3xs font-caption text-quaternary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)/50 group-hover/labels:hidden'
           >
             +{rest.length}
           </span>

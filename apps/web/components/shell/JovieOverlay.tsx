@@ -75,15 +75,15 @@ export function JovieOverlay({
               />
             </span>
             <div className='flex-1 min-w-0'>
-              <div className='text-[14px] font-semibold text-primary-token leading-tight'>
+              <div className='text-sm font-semibold text-primary-token leading-tight'>
                 Listening
               </div>
-              <div className='text-[11.5px] text-tertiary-token leading-tight mt-0.5'>
+              <div className='text-2xs text-tertiary-token leading-tight mt-0.5'>
                 &ldquo;play Take Me Over&rdquo; · &ldquo;find the extended
                 mix&rdquo;
               </div>
             </div>
-            <kbd className='text-[10px] text-quaternary-token tabular-nums shrink-0'>
+            <kbd className='text-3xs text-quaternary-token tabular-nums shrink-0'>
               hold ⌘J
             </kbd>
           </div>

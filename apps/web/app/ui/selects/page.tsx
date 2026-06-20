@@ -17,7 +17,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -34,7 +34,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-tertiary-token'>{title}</span>
+      <span className='text-2xs text-tertiary-token'>{title}</span>
       {children}
     </div>
   );
@@ -44,7 +44,7 @@ export default function SelectsPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Select</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — 32px trigger height, 6px radius, shared dropdown
         content styles
       </p>
@@ -145,7 +145,7 @@ export default function SelectsPage() {
         <Stack title='Assignee'>
           <p
             id='label-assignee'
-            className='text-[13px] font-[450] text-primary-token'
+            className='text-app font-[450] text-primary-token'
           >
             Assignee
           </p>
@@ -163,7 +163,7 @@ export default function SelectsPage() {
         <Stack title='Priority'>
           <p
             id='label-priority'
-            className='text-[13px] font-[450] text-primary-token'
+            className='text-app font-[450] text-primary-token'
           >
             Priority
           </p>
@@ -182,7 +182,7 @@ export default function SelectsPage() {
         <Stack title='Status'>
           <p
             id='label-status'
-            className='text-[13px] font-[450] text-primary-token'
+            className='text-app font-[450] text-primary-token'
           >
             Status
           </p>

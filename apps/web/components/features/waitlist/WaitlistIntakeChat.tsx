@@ -293,10 +293,10 @@ export function WaitlistIntakeChat({
         <header className='flex h-11 items-center justify-between'>
           <div className='inline-flex items-center gap-2'>
             <BrandLogo size={20} tone='white' aria-hidden />
-            <span className='text-[15px] font-semibold text-white'>Jovie</span>
+            <span className='text-mid font-semibold text-white'>Jovie</span>
           </div>
           {userEmail ? (
-            <span className='hidden truncate text-[12px] text-white/42 sm:block'>
+            <span className='hidden truncate text-xs text-white/42 sm:block'>
               {userEmail}
             </span>
           ) : null}
@@ -305,10 +305,10 @@ export function WaitlistIntakeChat({
         <section className='grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch'>
           <div className='flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0c0f] shadow-[0_24px_90px_rgba(0,0,0,0.34)]'>
             <div className='border-b border-white/[0.07] px-4 py-3 sm:px-5'>
-              <h1 className='text-[18px] font-semibold leading-6 text-white'>
+              <h1 className='text-lg font-semibold leading-6 text-white'>
                 Request Access
               </h1>
-              <p className='mt-1 text-[13px] leading-5 text-white/52'>
+              <p className='mt-1 text-app leading-5 text-white/52'>
                 Answer a few launch questions. We save only the fields needed to
                 decide access.
               </p>
@@ -329,7 +329,7 @@ export function WaitlistIntakeChat({
                 >
                   <div
                     className={cn(
-                      'max-w-[78%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-6',
+                      'max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-6',
                       message.role === 'user'
                         ? 'bg-white text-black'
                         : 'border border-white/[0.08] bg-white/[0.035] text-white/76'
@@ -342,7 +342,7 @@ export function WaitlistIntakeChat({
 
               {saving ? (
                 <div className='flex justify-start'>
-                  <div className='inline-flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3.5 py-2.5 text-[14px] text-white/64'>
+                  <div className='inline-flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3.5 py-2.5 text-sm text-white/64'>
                     <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
                     Saving Your Request
                   </div>
@@ -355,7 +355,7 @@ export function WaitlistIntakeChat({
               className='border-t border-white/[0.07] p-3 sm:p-4'
             >
               {error ? (
-                <p className='mb-2 text-[13px] text-red-300' role='alert'>
+                <p className='mb-2 text-app text-red-300' role='alert'>
                   {error}
                 </p>
               ) : null}
@@ -366,14 +366,14 @@ export function WaitlistIntakeChat({
                   placeholder={step?.placeholder}
                   disabled={saving}
                   aria-label={step?.prompt ?? 'Your answer'}
-                  className='h-11 min-w-0 flex-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-4 text-[14px] text-white outline-none placeholder:text-white/32 focus:border-white/24'
+                  className='h-11 min-w-0 flex-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-4 text-sm text-white outline-none placeholder:text-white/32 focus:border-white/24'
                 />
                 {step?.optional ? (
                   <button
                     type='button'
                     onClick={() => commitAnswer('', true)}
                     disabled={saving}
-                    className='inline-flex h-11 items-center rounded-full border border-white/[0.1] px-4 text-[13px] font-semibold text-white/70 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed'
+                    className='inline-flex h-11 items-center rounded-full border border-white/[0.1] px-4 text-app font-semibold text-white/70 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed'
                   >
                     Skip
                   </button>
@@ -395,10 +395,10 @@ export function WaitlistIntakeChat({
           </div>
 
           <aside className='hidden rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 lg:block'>
-            <h2 className='text-[14px] font-semibold text-white'>
+            <h2 className='text-sm font-semibold text-white'>
               Saved Context
             </h2>
-            <dl className='mt-4 space-y-3 text-[13px]'>
+            <dl className='mt-4 space-y-3 text-app'>
               <ContextRow label='Handle' value={answers.handle} />
               <ContextRow label='Social' value={answers.primarySocialUrl} />
               <ContextRow label='Spotify' value={answers.spotifyUrl} />

@@ -73,7 +73,7 @@ export function CopyableUrlRow({
     sm: {
       container: 'h-[22px] gap-1 rounded-full px-2',
       icon: 'h-[11px] w-[11px]',
-      value: 'text-[10.5px]',
+      value: 'text-3xs',
       button: 'h-4 w-4 rounded-full',
       glyph: 'h-[10px] w-[10px]',
     },
@@ -87,7 +87,7 @@ export function CopyableUrlRow({
     lg: {
       container: 'h-8 gap-1.5 rounded-full px-3',
       icon: 'h-3.5 w-3.5',
-      value: 'text-[11.5px]',
+      value: 'text-2xs',
       button: 'h-5.5 w-5.5 rounded-full',
       glyph: 'h-3.5 w-3.5',
     },

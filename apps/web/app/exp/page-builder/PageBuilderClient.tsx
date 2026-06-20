@@ -536,7 +536,7 @@ function DesignStudioItemCard({
                 {item.description}
               </p>
             </div>
-            <span className='shrink-0 rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-white/55'>
+            <span className='shrink-0 rounded-md bg-white/[0.06] px-2 py-1 text-2xs text-white/55'>
               {DESIGN_STUDIO_CATEGORY_LABELS[item.category]}
             </span>
           </div>
@@ -572,7 +572,7 @@ function DesignStudioItemCard({
           {item.componentPaths.slice(0, 4).map(path => (
             <code
               key={path}
-              className='rounded bg-black/35 px-2 py-1 text-[10px] text-white/45'
+              className='rounded bg-black/35 px-2 py-1 text-3xs text-white/45'
             >
               {path}
             </code>
@@ -597,7 +597,7 @@ function ScreenshotScenarioCard({
             {scenario.route}
           </p>
         </div>
-        <span className='rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-white/55'>
+        <span className='rounded-md bg-white/[0.06] px-2 py-1 text-2xs text-white/55'>
           {scenario.viewport}
         </span>
       </div>

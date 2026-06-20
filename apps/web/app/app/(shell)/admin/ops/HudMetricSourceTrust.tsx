@@ -45,7 +45,7 @@ export function HudMetricSourceTrust({
       data-testid={`hud-source-trust-${source.key}`}
     >
       <div className='flex items-center justify-between gap-2'>
-        <p className={`text-[11px] leading-4 ${statusTone}`}>
+        <p className={`text-2xs leading-4 ${statusTone}`}>
           {showFreshness ? (
             <>
               {stale ? <span className='font-medium'>Stale · </span> : null}
@@ -60,7 +60,7 @@ export function HudMetricSourceTrust({
             <button
               type='button'
               onClick={onRetry}
-              className='inline-flex items-center gap-1 text-[11px] font-medium text-secondary-token transition-colors hover:text-primary-token'
+              className='inline-flex items-center gap-1 text-2xs font-medium text-secondary-token transition-colors hover:text-primary-token'
               data-testid={`hud-source-retry-${source.key}`}
             >
               <RefreshCw className='h-3 w-3' aria-hidden='true' />
@@ -72,7 +72,7 @@ export function HudMetricSourceTrust({
               href={source.dashboardUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='inline-flex items-center gap-1 text-[11px] font-medium text-secondary-token transition-colors hover:text-primary-token'
+              className='inline-flex items-center gap-1 text-2xs font-medium text-secondary-token transition-colors hover:text-primary-token'
               data-testid={`hud-source-link-${source.key}`}
             >
               {linkLabel}
@@ -82,12 +82,12 @@ export function HudMetricSourceTrust({
         </div>
       </div>
       {showReason && source.errorMessage ? (
-        <p className='text-[11px] leading-4 text-secondary-token'>
+        <p className='text-2xs leading-4 text-secondary-token'>
           {source.errorMessage}
         </p>
       ) : null}
       {source.nextStep ? (
-        <p className='text-[11px] leading-4 text-secondary-token'>
+        <p className='text-2xs leading-4 text-secondary-token'>
           {source.nextStep}
         </p>
       ) : null}

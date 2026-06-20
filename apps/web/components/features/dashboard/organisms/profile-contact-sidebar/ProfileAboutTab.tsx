@@ -124,7 +124,7 @@ function EditableBio({
       onKeyDown={handleKeyDown}
       maxLength={512}
       rows={4}
-      className='w-full resize-none rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5 text-[12.5px] leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
+      className='w-full resize-none rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5 text-xs leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
       placeholder='Write your bio...'
     />
   );
@@ -369,12 +369,12 @@ function PressPhotosSection({
                 />
                 {/* DSP source badge */}
                 {photo.sourcePlatform && (
-                  <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-medium capitalize text-white'>
+                  <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white'>
                     {photo.sourcePlatform.replace('_', ' ')}
                   </span>
                 )}
                 {/* Hidden label */}
-                <span className='absolute bottom-8 left-0 right-0 text-center text-[9px] font-medium text-white drop-shadow-sm'>
+                <span className='absolute bottom-8 left-0 right-0 text-center text-3xs font-medium text-white drop-shadow-sm'>
                   Hidden until approved
                 </span>
                 {/* Delete button */}
@@ -437,7 +437,7 @@ function PressPhotosSection({
                   sizes='(max-width: 768px) 45vw, 160px'
                   className='object-cover'
                 />
-                <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-medium capitalize text-white'>
+                <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white'>
                   {photo.status}
                 </span>
                 {onDelete && (
@@ -605,7 +605,7 @@ export function ProfileAboutTab({
           <DetailLabel>Bio</DetailLabel>
           {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
           {!onBioChange && bio && (
-            <p className='whitespace-pre-wrap text-[12.5px] leading-relaxed text-secondary-token'>
+            <p className='whitespace-pre-wrap text-xs leading-relaxed text-secondary-token'>
               {bio}
             </p>
           )}

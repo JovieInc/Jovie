@@ -175,7 +175,7 @@ export function PaySection({
     return (
       <div className={cn('w-full max-w-sm', className)}>
         <div className={CARD_CLASSES}>
-          <h3 className='text-[15px] font-semibold tracking-tight text-center text-primary-token mb-1'>
+          <h3 className='text-mid font-semibold tracking-tight text-center text-primary-token mb-1'>
             Choose payment method
           </h3>
           <p className='text-center text-xs text-secondary-token mb-5'>

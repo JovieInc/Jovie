@@ -92,7 +92,7 @@ function ButtonChipVisual({
       aria-label={`${chipLabel} preview`}
       className='flex h-full min-h-[9rem] items-center justify-center rounded-[0.9rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,255,255,0.08),transparent_38%),#070a0f]'
     >
-      <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-4 py-2.5 text-[12px] font-semibold text-black shadow-[0_14px_26px_rgba(0,0,0,0.22)]'>
+      <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-4 py-2.5 text-xs font-semibold text-black shadow-[0_14px_26px_rgba(0,0,0,0.22)]'>
         <Icon className='h-3.5 w-3.5' strokeWidth={2} />
         {chipLabel}
       </div>
@@ -126,7 +126,7 @@ function IconBadgeVisual({
         <span className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white text-black shadow-[0_16px_28px_rgba(0,0,0,0.22)]'>
           <Icon className='h-5 w-5' strokeWidth={2} />
         </span>
-        <p className='text-[12px] font-medium tracking-normal text-white/76'>
+        <p className='text-xs font-medium tracking-normal text-white/76'>
           {badgeLabel}
         </p>
       </div>
@@ -148,14 +148,14 @@ function MockPopoverVisual({
       className='flex h-full min-h-[10rem] items-center justify-center rounded-[0.9rem] bg-[radial-gradient(circle_at_50%_15%,rgba(20,184,166,0.09),transparent_40%),#070a0f] p-4'
     >
       <div className='w-full max-w-[15rem] rounded-[0.9rem] border border-white/[0.07] bg-[#10141d] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'>
-        <div className='inline-flex rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black'>
+        <div className='inline-flex rounded-full border border-white/10 bg-white px-3 py-1.5 text-2xs font-semibold text-black'>
           {popoverLabel}
         </div>
         <div className='mt-3 space-y-2 rounded-[0.8rem] bg-[#090d14] p-2.5'>
           {popoverItems.map(item => (
             <div
               key={item}
-              className='rounded-[0.6rem] border border-white/[0.06] bg-white/[0.035] px-3 py-2 text-[11px] font-medium text-white/72'
+              className='rounded-[0.6rem] border border-white/[0.06] bg-white/[0.035] px-3 py-2 text-2xs font-medium text-white/72'
             >
               {item}
             </div>
@@ -214,10 +214,10 @@ function AudienceQualityFilterVisual() {
                 <Icon aria-hidden='true' className='h-3.5 w-3.5' />
               </span>
               <span className='min-w-0'>
-                <span className='block text-[10px] font-semibold leading-tight text-white/76 sm:text-[11px]'>
+                <span className='block text-3xs font-semibold leading-tight text-white/76 sm:text-2xs'>
                   {label}
                 </span>
-                <span className='block text-[10px] leading-tight text-white/64'>
+                <span className='block text-3xs leading-tight text-white/64'>
                   {detail}
                 </span>
               </span>
@@ -237,7 +237,7 @@ function AudienceQualityFilterVisual() {
             <span className='flex h-7 w-7 items-center justify-center rounded-full bg-emerald-300 text-black'>
               <CheckCircle2 aria-hidden='true' className='h-3.5 w-3.5' />
             </span>
-            <span className='text-[12px] font-semibold text-white'>
+            <span className='text-xs font-semibold text-white'>
               Actual Fans
             </span>
           </div>
@@ -332,7 +332,7 @@ function ArtistProfilePowerFeatureTile({
           <h3 className='max-w-[20ch] text-[1.08rem] font-semibold tracking-normal text-white sm:text-[1.16rem]'>
             {tile.title}
           </h3>
-          <p className='mt-2.5 max-w-[36ch] text-[13px] leading-[1.58] text-white/54'>
+          <p className='mt-2.5 max-w-[36ch] text-app leading-[1.58] text-white/54'>
             {tile.body}
           </p>
         </div>

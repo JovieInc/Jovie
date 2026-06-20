@@ -128,7 +128,7 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('prev');
               }}
-              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-[12px] font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-xs font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
             >
               Prev
             </button>
@@ -139,7 +139,7 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-[12px] font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-xs font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
             >
               Next
             </button>
@@ -280,31 +280,31 @@ function SellOutProof({
       </div>
 
       <div className='flex h-full flex-col rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-        <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
+        <p className='text-xs font-semibold tracking-[-0.02em] text-white'>
           {proof.drawerTitle}
         </p>
-        <p className='mt-1 text-[11px] text-white/44'>{proof.drawerSubtitle}</p>
+        <p className='mt-1 text-2xs text-white/44'>{proof.drawerSubtitle}</p>
         <div className='mt-2.5 divide-y divide-white/6'>
           {proof.drawerRows.map(row => (
             <div
               key={row.id}
               className='grid grid-cols-[2.45rem_minmax(0,1fr)_auto] items-center gap-2 py-2.25'
             >
-              <span className='text-[11px] font-medium leading-[1.15] tracking-[-0.01em] text-white/52'>
+              <span className='text-2xs font-medium leading-[1.15] tracking-[-0.01em] text-white/52'>
                 {row.month}
-                <span className='block text-[14px] font-semibold tracking-[-0.04em] text-white'>
+                <span className='block text-sm font-semibold tracking-[-0.04em] text-white'>
                   {row.day}
                 </span>
               </span>
               <span className='min-w-0'>
-                <span className='block truncate text-[12.5px] font-semibold text-white'>
+                <span className='block truncate text-xs font-semibold text-white'>
                   {row.venue}
                 </span>
-                <span className='block truncate text-[11px] text-white/44'>
+                <span className='block truncate text-2xs text-white/44'>
                   {row.location}
                 </span>
               </span>
-              <span className='text-[11px] font-medium text-white/64'>
+              <span className='text-2xs font-medium text-white/64'>
                 {row.ctaLabel}
               </span>
             </div>
@@ -324,16 +324,16 @@ function GetPaidProof({
     <div className='grid gap-2 sm:grid-cols-[0.9fr_1.1fr]'>
       <div className='flex flex-col justify-between rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:pt-3.5'>
         <div>
-          <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-white/48'>
             {proof.drawerTitle}
           </p>
-          <p className='mt-1 text-[13px] font-semibold tracking-[-0.03em] text-white'>
+          <p className='mt-1 text-app font-semibold tracking-[-0.03em] text-white'>
             {proof.drawerSubtitle}
           </p>
         </div>
 
         <div className='mt-3 space-y-1.5'>
-          <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-white/48'>
             {proof.chooseAmountLabel}
           </p>
           <div className='grid gap-1.5'>
@@ -341,7 +341,7 @@ function GetPaidProof({
               <div
                 key={row.id}
                 className={cn(
-                  'flex items-center justify-between rounded-[0.82rem] border px-3 py-1.75 text-[12px]',
+                  'flex items-center justify-between rounded-[0.82rem] border px-3 py-1.75 text-xs',
                   row.featured
                     ? 'border-white/18 bg-white text-black'
                     : 'border-white/8 bg-white/[0.03] text-white'
@@ -352,7 +352,7 @@ function GetPaidProof({
                 </span>
                 <span
                   className={cn(
-                    'text-[10px] font-medium',
+                    'text-3xs font-medium',
                     row.featured ? 'text-black/62' : 'text-white/52'
                   )}
                 >
@@ -363,7 +363,7 @@ function GetPaidProof({
           </div>
         </div>
 
-        <span className='mt-3 inline-flex w-fit rounded-full bg-white px-3.5 py-2 text-[11px] font-semibold text-black'>
+        <span className='mt-3 inline-flex w-fit rounded-full bg-white px-3.5 py-2 text-2xs font-semibold text-black'>
           {proof.ctaLabel}
         </span>
       </div>
@@ -389,7 +389,7 @@ function ShareProof({
   return (
     <div className='flex justify-center sm:pt-2'>
       <div className='relative ml-auto flex w-full max-w-[15.5rem] flex-col items-center rounded-[1.2rem] bg-[#fbfaf6] px-4 py-4.5 text-center text-black shadow-[0_16px_32px_rgba(0,0,0,0.14)]'>
-        <p className='text-[11px] font-semibold tracking-[0.02em] text-black/72'>
+        <p className='text-2xs font-semibold tracking-[0.02em] text-black/72'>
           {proof.title}
         </p>
 
@@ -407,10 +407,10 @@ function ShareProof({
           </div>
         </div>
 
-        <p className='mt-3.5 font-mono text-[11.5px] font-semibold tracking-[-0.02em] text-black'>
+        <p className='mt-3.5 font-mono text-2xs font-semibold tracking-[-0.02em] text-black'>
           {proof.url}
         </p>
-        <p className='mt-2 text-[11px] font-medium text-black/56'>
+        <p className='mt-2 text-2xs font-medium text-black/56'>
           {proof.subtitle}
         </p>
       </div>

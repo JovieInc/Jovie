@@ -198,7 +198,7 @@ function DesktopSurfaceCard({
           <button
             type='button'
             onClick={onAction}
-            className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
+            className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
           >
             <span>{actionLabel}</span>
             <ChevronRight className='h-4 w-4' />
@@ -339,7 +339,7 @@ export function ProfileDesktopSurface({
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
   const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-subtle hover:bg-white/88';
+    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-app font-semibold tracking-[-0.01em] text-black transition-colors duration-subtle hover:bg-white/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -426,7 +426,7 @@ export function ProfileDesktopSurface({
                     />
                   ) : null}
                 </Link>
-                <p className='line-clamp-2 max-w-[34rem] text-[17px] leading-8 text-white/76'>
+                <p className='line-clamp-2 max-w-[34rem] text-base leading-8 text-white/76'>
                   {heroSubtitle}
                 </p>
               </div>
@@ -481,10 +481,10 @@ export function ProfileDesktopSurface({
                     className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-white/[0.025] px-3 py-3'
                   >
                     <div className='rounded-[13px] border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
-                      <div className='text-[10px] font-semibold tracking-[0.01em] text-white/58'>
+                      <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
                         {formatMonth(tourDate.startDate)}
                       </div>
-                      <div className='mt-1 text-[22px] font-semibold leading-none tracking-[-0.05em] text-white'>
+                      <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white'>
                         {formatDay(tourDate.startDate)}
                       </div>
                     </div>
@@ -542,10 +542,10 @@ export function ProfileDesktopSurface({
                       />
                     </div>
                     <div className='min-w-0'>
-                      <p className='truncate text-[17px] font-medium tracking-[-0.03em] text-white'>
+                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white'>
                         {release.title}
                       </p>
-                      <p className='truncate text-[13px] text-white/44'>
+                      <p className='truncate text-app text-white/44'>
                         {formatReleaseMeta(
                           release.releaseType,
                           release.releaseDate
@@ -580,7 +580,7 @@ export function ProfileDesktopSurface({
                 className='flex min-h-[58px] w-full items-center justify-between gap-4 rounded-[18px] border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
               >
                 <span className='min-w-0'>
-                  <span className='block truncate text-[15px] font-semibold tracking-[-0.015em] text-white'>
+                  <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white'>
                     Release Alerts
                   </span>
                   <span className='block truncate text-xs leading-5 text-white/48'>
@@ -637,7 +637,7 @@ export function ProfileDesktopSurface({
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
                   <div className='space-y-1'>
-                    <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
+                    <p className='text-app font-semibold tracking-[-0.01em] text-white/44'>
                       Sent by {artist.name}
                     </p>
                     <p className='text-sm leading-5 text-white/58'>
@@ -755,10 +755,10 @@ export function ProfileDesktopSurface({
                 className='grid grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-4 rounded-[20px] bg-white/[0.025] px-4 py-3'
               >
                 <div className='rounded-[14px] border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
-                  <div className='text-[10px] font-semibold tracking-[0.01em] text-white/58'>
+                  <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
                     {formatMonth(tourDate.startDate)}
                   </div>
-                  <div className='mt-1 text-[26px] font-semibold leading-none tracking-[-0.05em] text-white'>
+                  <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white'>
                     {formatDay(tourDate.startDate)}
                   </div>
                 </div>
@@ -829,7 +829,7 @@ export function ProfileDesktopSurface({
                   onClick={() => onModeSelect(tab.mode)}
                   data-testid={`profile-primary-tab-${tab.mode}`}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
+                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
                       ? 'text-white'
                       : 'text-white/50 hover:text-white/78'

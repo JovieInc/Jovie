@@ -121,11 +121,11 @@ function buildCardStyles(
       ? 'h-12 w-12 rounded-[12px]'
       : 'h-11 w-11 rounded-xl',
     titleClassName: isShowcase
-      ? 'text-[14px] font-semibold leading-[1.12] text-white'
+      ? 'text-sm font-semibold leading-[1.12] text-white'
       : 'text-app font-semibold leading-[1.1] text-white/92',
     metaClassName: isShowcase
-      ? 'text-[11.5px] text-white/56'
-      : 'text-[10.5px] text-white/52',
+      ? 'text-2xs text-white/56'
+      : 'text-3xs text-white/52',
   };
 }
 
@@ -182,15 +182,15 @@ function ReleaseCard({
         <div className='relative z-10 flex min-h-[198px] flex-col justify-end p-4 [@media(max-height:880px)]:min-h-[172px] [@media(max-height:880px)]:p-3.5 [@media(max-height:760px)]:min-h-[156px] [@media(max-height:760px)]:p-3'>
           <div className='flex min-w-0 items-end justify-between gap-3'>
             <div className='min-w-0 flex-1'>
-              <p className='line-clamp-2 text-[17px] font-semibold leading-[1.08] text-white [overflow-wrap:anywhere] [@media(max-height:880px)]:text-[16px] [@media(max-height:760px)]:text-[15px]'>
+              <p className='line-clamp-2 text-base font-semibold leading-[1.08] text-white [overflow-wrap:anywhere] [@media(max-height:880px)]:text-base [@media(max-height:760px)]:text-mid'>
                 {state.release.title}
               </p>
               <div className='mt-1 space-y-0.5'>
-                <p className='truncate text-[12px] font-semibold leading-4 text-white/72'>
+                <p className='truncate text-xs font-semibold leading-4 text-white/72'>
                   {artist.name}
                 </p>
                 {state.collaboratorLine ? (
-                  <p className='truncate font-caption text-[11.5px] leading-4 text-white/58'>
+                  <p className='truncate font-caption text-2xs leading-4 text-white/58'>
                     {state.collaboratorLine}
                   </p>
                 ) : null}
@@ -297,7 +297,7 @@ function TourCard({
           styles.artClassName
         )}
       >
-        <span className='text-[9px] font-semibold uppercase tracking-[0.14em] text-white/48'>
+        <span className='text-3xs font-semibold uppercase tracking-[0.14em] text-white/48'>
           {getMonthLabel(state.tourDate.startDate)}
         </span>
         <span className='mt-1 text-xl font-bold tracking-[-0.06em]'>

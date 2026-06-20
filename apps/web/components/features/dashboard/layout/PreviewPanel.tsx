@@ -386,7 +386,7 @@ export function PreviewPanel() {
                   <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                       <span>Preview</span>
-                      <span className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-[-0.01em]'>
+                      <span className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-3xs tracking-[-0.01em]'>
                         {username ? `@${username}` : 'Profile'}
                       </span>
                     </div>
@@ -504,7 +504,7 @@ export function PreviewPanel() {
 
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-3')}>
               <div className='space-y-0.5'>
-                <p className='text-[10.5px] font-caption leading-none text-tertiary-token'>
+                <p className='text-3xs font-caption leading-none text-tertiary-token'>
                   Profile snapshot
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -523,7 +523,7 @@ export function PreviewPanel() {
 
               <div className='grid grid-cols-3 divide-x divide-(--linear-app-frame-seam)'>
                 <div className='space-y-px pr-3'>
-                  <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
+                  <p className='text-3xs font-medium leading-[14px] text-tertiary-token'>
                     Visible
                   </p>
                   <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
@@ -531,7 +531,7 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='space-y-px px-3'>
-                  <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
+                  <p className='text-3xs font-medium leading-[14px] text-tertiary-token'>
                     Hidden
                   </p>
                   <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
@@ -539,7 +539,7 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='space-y-px pl-3'>
-                  <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
+                  <p className='text-3xs font-medium leading-[14px] text-tertiary-token'>
                     DSPs
                   </p>
                   <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>

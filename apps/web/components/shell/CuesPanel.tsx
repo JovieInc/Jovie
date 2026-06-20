@@ -41,12 +41,12 @@ const CueRow = memo(function CueRow({
       type='button'
       onClick={() => onSeek?.(c.at)}
       disabled={disabled}
-      className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
+      className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
     >
       <span className='relative w-9 shrink-0'>
         <span
           className={cn(
-            'absolute inset-0 grid place-items-start tabular-nums text-[10.5px] text-quaternary-token',
+            'absolute inset-0 grid place-items-start tabular-nums text-3xs text-quaternary-token',
             onSeek &&
               'opacity-100 group-hover/cue:opacity-0 transition-opacity duration-subtle ease-subtle'
           )}
@@ -64,7 +64,7 @@ const CueRow = memo(function CueRow({
         )}
       </span>
       <span className='flex-1 text-left truncate'>{c.label}</span>
-      <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token capitalize'>
+      <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token capitalize'>
         {c.kind}
       </span>
     </button>
@@ -104,10 +104,10 @@ export function CuesPanel({
   return (
     <div className={cn('px-4 py-4', className)}>
       <div className='flex items-center justify-between pb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {title}
         </p>
-        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+        <span className='text-3xs tabular-nums text-tertiary-token'>
           {cues.length}
         </span>
       </div>

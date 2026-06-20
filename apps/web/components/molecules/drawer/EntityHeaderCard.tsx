@@ -178,7 +178,7 @@ export function EntityHeaderCard({
             reserve={shouldReserveEyebrow}
             lineCount={1}
             size='xs'
-            className='text-[10.5px] font-caption leading-none tracking-[0.03em] text-tertiary-token'
+            className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
           >
             {eyebrow}
           </StableHeaderTextSlot>

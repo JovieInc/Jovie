@@ -47,7 +47,7 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
             {formatActionLabel(action.label)}
           </span>
           {action.timestamp ? (
-            <span className='ml-2 whitespace-nowrap text-[10.5px] text-secondary-token'>
+            <span className='ml-2 whitespace-nowrap text-3xs text-secondary-token'>
               {formatTimeAgo(action.timestamp)}
             </span>
           ) : null}

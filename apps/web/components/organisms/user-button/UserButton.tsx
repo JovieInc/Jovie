@@ -129,7 +129,7 @@ function buildDropdownItems({
                   <Badge
                     variant='secondary'
                     size='sm'
-                    className='shrink-0 rounded-full px-1.5 py-0 text-[10px] font-medium'
+                    className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
                   >
                     Pro
                   </Badge>
@@ -311,7 +311,7 @@ function buildDropdownItems({
       type: 'custom',
       id: 'version',
       render: () => (
-        <div className='px-2.5 py-1.5 text-[11px] leading-4 text-tertiary-token select-none'>
+        <div className='px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'>
           Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`

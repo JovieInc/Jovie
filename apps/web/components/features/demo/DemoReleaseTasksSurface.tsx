@@ -137,10 +137,10 @@ export function DemoReleaseTasksSurface() {
         <div className='border-b border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))] px-6 py-5'>
           <div className='flex items-start justify-between gap-4'>
             <div>
-              <p className='text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+              <p className='text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
                 Release Tasks
               </p>
-              <h2 className='mt-2 text-[24px] font-[580] tracking-[-0.03em] text-primary-token'>
+              <h2 className='mt-2 text-2xl font-[580] tracking-[-0.03em] text-primary-token'>
                 Revival
               </h2>
               <p className='mt-2 max-w-[34rem] text-sm leading-6 text-secondary-token'>
@@ -149,27 +149,27 @@ export function DemoReleaseTasksSurface() {
               </p>
             </div>
 
-            <div className='rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/72'>
+            <div className='rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-2xs text-white/72'>
               Sep 12 Release
             </div>
           </div>
 
           <div className='mt-5 grid gap-3 sm:grid-cols-3'>
             <div className='rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
-              <p className='text-[11px] text-tertiary-token'>Tasks Ready</p>
-              <p className='mt-2 text-[22px] font-[580] tracking-[-0.03em] text-primary-token'>
+              <p className='text-2xs text-tertiary-token'>Tasks Ready</p>
+              <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token'>
                 {TASKS.length}
               </p>
             </div>
             <div className='rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
-              <p className='text-[11px] text-tertiary-token'>Done</p>
-              <p className='mt-2 text-[22px] font-[580] tracking-[-0.03em] text-primary-token'>
+              <p className='text-2xs text-tertiary-token'>Done</p>
+              <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token'>
                 {doneCount}
               </p>
             </div>
             <div className='rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
-              <p className='text-[11px] text-tertiary-token'>Next Review</p>
-              <p className='mt-2 flex items-center gap-2 text-[14px] font-semibold text-primary-token'>
+              <p className='text-2xs text-tertiary-token'>Next Review</p>
+              <p className='mt-2 flex items-center gap-2 text-sm font-semibold text-primary-token'>
                 <CalendarDays className='h-4 w-4 text-tertiary-token' />
                 Today at 4:00 PM
               </p>
@@ -197,7 +197,7 @@ export function DemoReleaseTasksSurface() {
                   className='rounded-[1rem] border border-subtle bg-surface-0'
                 >
                   <div className='px-4 pt-3'>
-                    <div className='mb-2 inline-flex items-center gap-2 text-[11px] text-tertiary-token'>
+                    <div className='mb-2 inline-flex items-center gap-2 text-2xs text-tertiary-token'>
                       <Icon className='h-3.5 w-3.5' />
                       {group.category}
                     </div>

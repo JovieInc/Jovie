@@ -22,7 +22,7 @@ import { Mark } from '@/lib/brand/primitives';
 
 /** Shared menu item styling for smart link and profile drawers */
 export const SMART_LINK_MENU_ITEM_CLASS =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
+  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
 export const SMART_LINK_MENU_ICON_CLASS = 'h-[16px] w-[16px] text-white/40';
 
 /** Hook for the share action used across all smart link pages */

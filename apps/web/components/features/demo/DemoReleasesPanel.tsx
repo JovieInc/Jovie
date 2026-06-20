@@ -112,7 +112,7 @@ export function DemoReleasesPanel({
               <button
                 type='button'
                 onClick={() => toggleGroup(group.status)}
-                className='flex min-w-0 flex-1 items-center gap-2 text-[12.5px] text-tertiary-token [font-weight:var(--font-weight-medium)]'
+                className='flex min-w-0 flex-1 items-center gap-2 text-xs text-tertiary-token [font-weight:var(--font-weight-medium)]'
                 aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
               >
                 <ChevronRight
@@ -127,7 +127,7 @@ export function DemoReleasesPanel({
                   <AlertTriangle className='size-3 text-yellow-500/80' />
                 )}
                 <span className='truncate'>{STATUS_LABEL[group.status]}</span>
-                <span className='text-[11px] text-quaternary-token'>
+                <span className='text-2xs text-quaternary-token'>
                   {group.releases.length}
                 </span>
               </button>
@@ -181,7 +181,7 @@ export function DemoReleasesPanel({
                     )}
 
                     {/* Release ID */}
-                    <span className='max-sm:hidden w-[54px] shrink-0 font-mono text-[12px] text-quaternary-token'>
+                    <span className='max-sm:hidden w-[54px] shrink-0 font-mono text-xs text-quaternary-token'>
                       {release.displayId}
                     </span>
 
@@ -190,10 +190,10 @@ export function DemoReleasesPanel({
 
                     {/* Title + artist inline */}
                     <div className='min-w-0 flex flex-1 items-baseline gap-2'>
-                      <span className='truncate text-[12.5px] font-medium text-primary-token'>
+                      <span className='truncate text-xs font-medium text-primary-token'>
                         {release.title}
                       </span>
-                      <span className='truncate text-[12px] text-tertiary-token'>
+                      <span className='truncate text-xs text-tertiary-token'>
                         {release.artist}
                       </span>
                     </div>
@@ -203,7 +203,7 @@ export function DemoReleasesPanel({
                       {release.labels.slice(0, 2).map(label => (
                         <span
                           key={label.id}
-                          className='flex items-center gap-1.5 rounded-sm bg-surface-1 px-1.5 py-0.5 text-[10px] text-secondary-token [font-weight:var(--font-weight-medium)]'
+                          className='flex items-center gap-1.5 rounded-sm bg-surface-1 px-1.5 py-0.5 text-3xs text-secondary-token [font-weight:var(--font-weight-medium)]'
                         >
                           <span
                             className='size-1.5 rounded-full'
@@ -223,7 +223,7 @@ export function DemoReleasesPanel({
                     <DemoAvatar assignee={release.assignee} size={16} />
 
                     {/* Date */}
-                    <span className='max-xl:hidden w-16 shrink-0 text-right text-[12px] text-quaternary-token'>
+                    <span className='max-xl:hidden w-16 shrink-0 text-right text-xs text-quaternary-token'>
                       {release.releaseDate}
                     </span>
                   </div>

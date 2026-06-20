@@ -82,7 +82,7 @@ function MobileNavCta({
       href={href}
       className={cn(
         'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
-        'text-[17px] font-semibold',
+        'text-base font-semibold',
         'transition-colors duration-subtle ease-subtle'
       )}
       style={CTA_BUTTON_STYLE}
@@ -242,7 +242,7 @@ export function MobileNav({
                     href={link.href}
                     className={cn(
                       'flex items-center h-[52px] px-4 rounded-xl',
-                      'text-[17px] font-medium',
+                      'text-base font-medium',
                       'text-primary-token',
                       'transition-colors duration-subtle ease-subtle',
                       'hover:bg-(--linear-bg-hover)',

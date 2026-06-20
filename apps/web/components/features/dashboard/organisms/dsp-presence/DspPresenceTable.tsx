@@ -172,7 +172,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
       enableVirtualization={false}
       rowHeight={44}
       minWidth='720px'
-      className='text-[12.5px] text-primary-token'
+      className='text-xs text-primary-token'
       containerClassName='h-full'
     />
   );

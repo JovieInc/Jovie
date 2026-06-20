@@ -37,7 +37,7 @@ export function FeatureRow({
                 {bullets.map(bullet => (
                   <li
                     key={bullet}
-                    className='flex items-start gap-2.5 text-[15px] leading-[1.6] text-secondary-token'
+                    className='flex items-start gap-2.5 text-mid leading-[1.6] text-secondary-token'
                   >
                     <span
                       aria-hidden='true'

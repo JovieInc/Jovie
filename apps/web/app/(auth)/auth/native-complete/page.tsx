@@ -150,12 +150,12 @@ function NativeCompleteContent() {
   return (
     <main className='grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>
       <section className='w-full max-w-sm px-6 py-7 text-center'>
-        <h1 className='text-[22px] font-semibold leading-7'>
+        <h1 className='text-xl font-semibold leading-7'>
           {state === 'error'
             ? 'Sign-in did not complete'
             : 'Completing sign-in'}
         </h1>
-        <p className='mt-3 text-[14px] leading-5 text-white/64'>
+        <p className='mt-3 text-sm leading-5 text-white/64'>
           {state === 'error'
             ? 'Close this window and start sign-in again from Jovie.'
             : 'Jovie will open your workspace in a moment.'}

@@ -126,10 +126,10 @@ function ListenContent() {
           key={dsp.name}
           className='flex items-center justify-between rounded-full bg-surface-1 px-3 py-2.5'
         >
-          <span className='text-[12px] font-medium text-primary-token'>
+          <span className='text-xs font-medium text-primary-token'>
             {dsp.name}
           </span>
-          <span className='text-[10px] text-tertiary-token'>{dsp.action}</span>
+          <span className='text-3xs text-tertiary-token'>{dsp.action}</span>
         </div>
       ))}
     </div>
@@ -139,7 +139,7 @@ function ListenContent() {
 function PayContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
+      <p className='text-3xs font-medium uppercase tracking-[0.15em] text-tertiary-token'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
@@ -153,7 +153,7 @@ function PayContent() {
             }`}
           >
             <span
-              className={`text-[10px] font-medium uppercase tracking-wider ${
+              className={`text-3xs font-medium uppercase tracking-wider ${
                 i === 1 ? 'text-secondary-token' : 'text-tertiary-token'
               }`}
             >
@@ -175,16 +175,16 @@ function TourContent() {
     <div className='flex h-full flex-col justify-center gap-3'>
       <div className='flex w-full items-center justify-between rounded-full bg-surface-1 px-3 py-2.5'>
         <div className='min-w-0'>
-          <p className='text-[13px] font-medium text-primary-token truncate'>
+          <p className='text-app font-medium text-primary-token truncate'>
             {show.venue}
           </p>
-          <p className='text-[11px] text-tertiary-token'>{show.city}</p>
+          <p className='text-2xs text-tertiary-token'>{show.city}</p>
         </div>
-        <span className='shrink-0 text-[11px] font-medium text-secondary-token'>
+        <span className='shrink-0 text-2xs font-medium text-secondary-token'>
           {show.date}
         </span>
       </div>
-      <span className='text-[12px] font-medium text-tertiary-token'>
+      <span className='text-xs font-medium text-tertiary-token'>
         See more dates
       </span>
     </div>
@@ -204,14 +204,14 @@ function ProfileContent() {
           }}
         />
         <div className='min-w-0 flex-1'>
-          <p className='text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary-token'>
+          <p className='text-3xs font-medium uppercase tracking-[0.12em] text-tertiary-token'>
             Out now
           </p>
-          <p className='text-[13px] font-semibold text-primary-token truncate'>
+          <p className='text-app font-semibold text-primary-token truncate'>
             New Single
           </p>
         </div>
-        <span className='shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'>
+        <span className='shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-xs font-semibold text-btn-primary-foreground shadow-sm'>
           Listen
         </span>
       </div>

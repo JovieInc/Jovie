@@ -56,7 +56,7 @@ export function HomePhoneFrame({
             data-testid='home-phone-status-bar'
             className='pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-7 pt-4 text-white'
           >
-            <span className='text-[15px] font-semibold tracking-[-0.02em]'>
+            <span className='text-mid font-semibold tracking-[-0.02em]'>
               9:41
             </span>
             <div className='flex items-center gap-2.5'>

@@ -99,13 +99,13 @@ export function SidebarInstallBanner() {
             <p className='text-2xs font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
               {title}
             </p>
-            <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted/80'>
+            <p className='mt-0.5 text-3xs leading-[1.35] text-sidebar-muted/80'>
               An improved version of Jovie is available. Reload to update.
             </p>
             <button
               type='button'
               onClick={reload}
-              className='mt-1 inline-flex min-h-6 items-center rounded-full bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+              className='mt-1 inline-flex min-h-6 items-center rounded-full bg-transparent px-1.5 text-3xs font-medium text-sidebar-item-foreground/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
             >
               Reload
             </button>

@@ -121,7 +121,7 @@ function InputRow({
     <div className='flex items-end gap-2 px-4 py-3'>
       <div className='flex min-h-[28px] flex-1 items-end'>
         <span
-          className='min-h-[28px] w-full text-[14px] leading-[1.5] text-white/90 font-[Inter,system-ui,sans-serif] whitespace-pre-wrap break-words'
+          className='min-h-[28px] w-full text-sm leading-[1.5] text-white/90 font-[Inter,system-ui,sans-serif] whitespace-pre-wrap break-words'
           aria-hidden='true'
         >
           {value || <span className='text-white/28'>{placeholder}</span>}
@@ -170,7 +170,7 @@ function TabBar({ activeTab }: TabBarProps) {
         <span
           key={tab}
           className={cn(
-            'px-2 py-2 text-[12px] cursor-default select-none',
+            'px-2 py-2 text-xs cursor-default select-none',
             tab === activeTab
               ? 'border-b border-white/60 text-white/90 font-[500] -mb-px'
               : 'text-white/38'
@@ -207,13 +207,13 @@ function ReleaseRow({ label, type, year, artBg, isActive }: ReleaseRowProps) {
       />
       <div className='min-w-0 flex-1'>
         <p
-          className='truncate text-[13px] text-white/90 leading-tight'
+          className='truncate text-app text-white/90 leading-tight'
           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
         >
           {label}
         </p>
         <p
-          className='text-[11px] text-white/38 leading-tight mt-0.5'
+          className='text-2xs text-white/38 leading-tight mt-0.5'
           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
         >
           {type} · {year}
@@ -230,7 +230,7 @@ interface StatStripProps {
 function StatStrip({ stats }: StatStripProps) {
   return (
     <p
-      className='text-[11px] leading-relaxed text-white/40'
+      className='text-2xs leading-relaxed text-white/40'
       style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
       {stats.map((stat, i) => (
@@ -242,7 +242,7 @@ function StatStrip({ stats }: StatStripProps) {
             />
           )}
           {stat.solid ? (
-            <span className='rounded px-1.5 py-0.5 text-[10px] font-[500] bg-white/10 text-white/70'>
+            <span className='rounded px-1.5 py-0.5 text-3xs font-[500] bg-white/10 text-white/70'>
               {stat.label}
             </span>
           ) : (
@@ -272,7 +272,7 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
         />
         <div className='flex min-w-0 flex-col justify-center gap-1 pt-1'>
           <p
-            className='text-[10px] uppercase tracking-[0.08em] text-white/40'
+            className='text-3xs uppercase tracking-[0.08em] text-white/40'
             style={{
               fontFamily:
                 'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
@@ -282,7 +282,7 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
             {eyebrow}
           </p>
           <p
-            className='text-[15px] font-[500] text-white/90 leading-snug'
+            className='text-mid font-[500] text-white/90 leading-snug'
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
           >
             {title}

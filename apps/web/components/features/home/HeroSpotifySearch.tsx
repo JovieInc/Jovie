@@ -458,7 +458,7 @@ export function HeroSpotifySearch() {
                       ) : null}
                     </div>
                     {artist.isClaimed && (
-                      <span className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-[10px] font-semibold text-brand-spotify'>
+                      <span className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-3xs font-semibold text-brand-spotify'>
                         On Jovie
                       </span>
                     )}

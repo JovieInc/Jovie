@@ -338,7 +338,7 @@ export function TrackSidebar({
                     <span className='tabular-nums'>{trackLabel}.</span>
                     {track.releaseTitle}
                     {track.isExplicit ? (
-                      <span className='rounded-[4px] bg-surface-1 px-1 text-[9px] font-caption text-tertiary-token'>
+                      <span className='rounded-[4px] bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
                         E
                       </span>
                     ) : null}
@@ -356,14 +356,14 @@ export function TrackSidebar({
                   />
                 }
                 meta={
-                  <div className='flex items-center gap-2 text-[10.5px] text-tertiary-token'>
+                  <div className='flex items-center gap-2 text-3xs text-tertiary-token'>
                     {track.durationMs == null ? null : (
                       <span className='tabular-nums'>
                         {formatDuration(track.durationMs)}
                       </span>
                     )}
                     {track.isrc ? (
-                      <span className='font-mono text-[9.5px] tracking-[0.02em]'>
+                      <span className='font-mono text-3xs tracking-[0.02em]'>
                         {track.isrc}
                       </span>
                     ) : null}
@@ -450,7 +450,7 @@ export function TrackSidebar({
                       disabled={!isThisTrack}
                       className='h-[3px] w-full'
                     />
-                    <div className='flex items-center justify-between text-[10px] tabular-nums text-tertiary-token'>
+                    <div className='flex items-center justify-between text-3xs tabular-nums text-tertiary-token'>
                       <span>
                         {formatDuration(Math.round(currentTime) * 1000)}
                       </span>

@@ -126,7 +126,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
       </div>
 
       <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
+        <p className='text-3xs uppercase tracking-[0.15em] text-secondary-token'>
           Powered by Jovie
         </p>
       </div>
@@ -174,11 +174,11 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
         <h3 className='text-lg font-semibold tracking-tight text-primary-token'>
           {mode.headline}
         </h3>
-        <span className='shrink-0 rounded-full border border-subtle px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-secondary-token'>
+        <span className='shrink-0 rounded-full border border-subtle px-2.5 py-1 text-3xs font-medium uppercase tracking-[0.08em] text-secondary-token'>
           {mode.outcome}
         </span>
       </div>
-      <p className='mt-2 text-[14px] leading-[1.6] text-secondary-token'>
+      <p className='mt-2 text-sm leading-[1.6] text-secondary-token'>
         {mode.description}
       </p>
       <div className='mt-4 flex items-center justify-end'>

@@ -43,11 +43,11 @@ function MetricTile({
       className={METRIC_TILE_CLASSNAME}
       data-testid={`drawer-analytics-metric-${id}`}
     >
-      <p className='text-[10.5px] font-caption leading-[14px] text-tertiary-token'>
+      <p className='text-3xs font-caption leading-[14px] text-tertiary-token'>
         {label}
       </p>
       <p
-        className='mt-1 tabular-nums text-[20px] font-[620] leading-none tracking-[-0.03em] text-primary-token'
+        className='mt-1 tabular-nums text-xl font-[620] leading-none tracking-[-0.03em] text-primary-token'
         data-testid={`drawer-analytics-metric-value-${id}`}
       >
         {value}
@@ -56,7 +56,7 @@ function MetricTile({
         <p
           aria-hidden={hint ? undefined : true}
           className={cn(
-            'mt-1 min-h-[13px] text-[10px] leading-[13px] text-tertiary-token',
+            'mt-1 min-h-[13px] text-3xs leading-[13px] text-tertiary-token',
             !hint && 'invisible'
           )}
         >

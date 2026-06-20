@@ -135,10 +135,10 @@ export function LyricsView({
                 strokeWidth={2.25}
               />
             </div>
-            <h2 className='text-[18px] font-display text-primary-token'>
+            <h2 className='text-lg font-display text-primary-token'>
               No lyrics yet
             </h2>
-            <p className='mt-2 text-[13px] leading-[1.55] text-tertiary-token'>
+            <p className='mt-2 text-app leading-[1.55] text-tertiary-token'>
               Jovie will time them automatically and you can fine-tune timings
               line by line.
             </p>
@@ -147,7 +147,7 @@ export function LyricsView({
                 <button
                   type='button'
                   onClick={onTranscribe}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full bg-white text-black text-[12.5px] font-caption transition-[filter] duration-subtle ease-subtle hover:brightness-110'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full bg-white text-black text-xs font-caption transition-[filter] duration-subtle ease-subtle hover:brightness-110'
                 >
                   <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
                   Transcribe with Jovie
@@ -157,7 +157,7 @@ export function LyricsView({
                 <button
                   type='button'
                   onClick={onPaste}
-                  className='inline-flex items-center h-8 px-4 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 text-[12.5px] font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token hover:bg-surface-1'
+                  className='inline-flex items-center h-8 px-4 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 text-xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token hover:bg-surface-1'
                 >
                   Paste lyrics
                 </button>

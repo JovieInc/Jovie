@@ -43,7 +43,7 @@ export const AmountSelector = memo(function AmountSelector({
     >
       <span
         className={cn(
-          'text-[10px] font-medium tracking-[0.08em]',
+          'text-3xs font-medium tracking-[0.08em]',
           isSelected
             ? 'text-[var(--profile-pearl-primary-fg)]/72'
             : 'text-secondary-token'

@@ -31,7 +31,7 @@ function MenuSection({
 }) {
   return (
     <div className='mb-10'>
-      <p className='mb-3 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <p className='mb-3 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {label}
       </p>
       {children}
@@ -45,7 +45,7 @@ export function DropdownShowcase() {
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>
         Dropdown Menu
       </h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — 8px radius, 4px item radius, font weight 450,
         near-white text in dark mode
       </p>
@@ -291,11 +291,11 @@ function SearchableMenu() {
           placeholder='Search...'
           value={query}
           onChange={e => setQuery(e.target.value)}
-          className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-3 text-[13px] text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
+          className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-3 text-app text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
         />
       </div>
       {filtered.length === 0 ? (
-        <div className='py-6 text-center text-[13px] text-tertiary-token'>
+        <div className='py-6 text-center text-app text-tertiary-token'>
           No results
         </div>
       ) : (

@@ -291,7 +291,7 @@ export function AiDemo({
           {contextChips.map(chip => (
             <span
               key={chip}
-              className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] text-tertiary-token'
+              className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-3xs text-tertiary-token'
             >
               {chip}
             </span>
@@ -300,7 +300,7 @@ export function AiDemo({
       ) : null}
 
       <div className='border-b border-subtle px-4 py-3'>
-        <p className='font-mono text-[12px] text-tertiary-token'>
+        <p className='font-mono text-xs text-tertiary-token'>
           {currentDemo.prompt}
         </p>
       </div>
@@ -310,7 +310,7 @@ export function AiDemo({
       >
         <output
           aria-live='polite'
-          className='block text-[13px] leading-[1.75] text-secondary-token'
+          className='block text-app leading-[1.75] text-secondary-token'
         >
           {currentDemo.segments.map((segment, index) => {
             if (index >= visibleCount) return null;

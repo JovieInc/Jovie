@@ -71,7 +71,7 @@ export function ArtistProfileHowItWorks({
                   className='h-4 w-4 text-tertiary-token'
                   strokeWidth={1.85}
                 />
-                <span className='text-[13px] font-medium text-primary-token'>
+                <span className='text-app font-medium text-primary-token'>
                   {howItWorks.claim.searchValue}
                 </span>
               </div>
@@ -84,20 +84,20 @@ export function ArtistProfileHowItWorks({
                     <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
                   </span>
                   <div className='min-w-0 flex-1'>
-                    <p className='truncate text-[13px] font-semibold text-primary-token'>
+                    <p className='truncate text-app font-semibold text-primary-token'>
                       {howItWorks.claim.resultName}
                     </p>
-                    <p className='text-[11px] text-secondary-token'>
+                    <p className='text-2xs text-secondary-token'>
                       {howItWorks.claim.resultSubtitle}
                     </p>
                   </div>
-                  <span className='rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-black'>
+                  <span className='rounded-full bg-white px-3 py-1.5 text-2xs font-semibold text-black'>
                     {howItWorks.claim.ctaLabel}
                   </span>
                 </div>
               </DrawerSurfaceCard>
               <div className='flex items-center justify-between rounded-[0.95rem] border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3'>
-                <p className='font-mono text-[12px] font-medium tracking-[-0.02em] text-secondary-token'>
+                <p className='font-mono text-xs font-medium tracking-[-0.02em] text-secondary-token'>
                   {howItWorks.claim.profilePath}
                 </p>
                 <CheckCircle2
@@ -107,10 +107,10 @@ export function ArtistProfileHowItWorks({
               </div>
             </div>
             <div>
-              <p className='text-[15px] font-semibold tracking-[-0.03em] text-primary-token'>
+              <p className='text-mid font-semibold tracking-[-0.03em] text-primary-token'>
                 {howItWorks.steps[0]?.title}
               </p>
-              <p className='mt-1.5 text-[13px] leading-[1.6] text-secondary-token'>
+              <p className='mt-1.5 text-app leading-[1.6] text-secondary-token'>
                 {howItWorks.steps[0]?.description}
               </p>
             </div>
@@ -124,14 +124,14 @@ export function ArtistProfileHowItWorks({
             >
               <div className='flex items-center justify-between gap-3'>
                 <div>
-                  <p className='text-[13px] font-semibold text-primary-token'>
+                  <p className='text-app font-semibold text-primary-token'>
                     Importing {howItWorks.sync.artistName}
                   </p>
-                  <p className='mt-1 text-[11px] text-secondary-token'>
+                  <p className='mt-1 text-2xs text-secondary-token'>
                     Matching providers and pulling the catalog into place.
                   </p>
                 </div>
-                <p className='text-[12px] font-semibold text-primary-token'>
+                <p className='text-xs font-semibold text-primary-token'>
                   {progress}%
                 </p>
               </div>
@@ -152,13 +152,13 @@ export function ArtistProfileHowItWorks({
                         provider={provider.provider}
                         className='h-4.5 w-4.5'
                       />
-                      <p className='text-[13px] font-medium text-primary-token'>
+                      <p className='text-app font-medium text-primary-token'>
                         {getProviderLabel(provider.provider)}
                       </p>
                     </div>
                     <span
                       className={cn(
-                        'rounded-full px-2.5 py-1 text-[10px] font-semibold',
+                        'rounded-full px-2.5 py-1 text-3xs font-semibold',
                         provider.status === 'Ingesting'
                           ? 'border border-accent/18 bg-[#20172e] text-[#d7b8ff]'
                           : 'bg-white/6 text-secondary-token'
@@ -169,15 +169,15 @@ export function ArtistProfileHowItWorks({
                   </div>
                 ))}
               </div>
-              <p className='mt-3 text-[12px] font-medium tracking-[-0.02em] text-secondary-token'>
+              <p className='mt-3 text-xs font-medium tracking-[-0.02em] text-secondary-token'>
                 {howItWorks.sync.otherProvidersLabel}
               </p>
             </DrawerSurfaceCard>
             <div>
-              <p className='text-[15px] font-semibold tracking-[-0.03em] text-primary-token'>
+              <p className='text-mid font-semibold tracking-[-0.03em] text-primary-token'>
                 {howItWorks.steps[1]?.title}
               </p>
-              <p className='mt-1.5 text-[13px] leading-[1.6] text-secondary-token'>
+              <p className='mt-1.5 text-app leading-[1.6] text-secondary-token'>
                 {howItWorks.steps[1]?.description}
               </p>
             </div>
@@ -225,7 +225,7 @@ export function ArtistProfileHowItWorks({
                       {howItWorks.share.deepLinks.map(link => (
                         <p
                           key={link}
-                          className='font-mono text-[11px] tracking-[-0.01em] text-primary-token'
+                          className='font-mono text-2xs tracking-[-0.01em] text-primary-token'
                         >
                           {link}
                         </p>
@@ -236,10 +236,10 @@ export function ArtistProfileHowItWorks({
               </div>
             </div>
             <div>
-              <p className='text-[15px] font-semibold tracking-[-0.03em] text-primary-token'>
+              <p className='text-mid font-semibold tracking-[-0.03em] text-primary-token'>
                 {howItWorks.steps[2]?.title}
               </p>
-              <p className='mt-1.5 text-[13px] leading-[1.6] text-secondary-token'>
+              <p className='mt-1.5 text-app leading-[1.6] text-secondary-token'>
                 {howItWorks.steps[2]?.description}
               </p>
             </div>
@@ -276,7 +276,7 @@ function HoverPopover({
           onMouseLeave={() => setOpen(false)}
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
-          className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-1.5 text-[11px] font-medium text-secondary-token transition-colors hover:bg-surface-1'
+          className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token transition-colors hover:bg-surface-1'
         >
           {label === 'QR code' ? (
             <QrCode className='h-3.5 w-3.5' strokeWidth={1.85} />

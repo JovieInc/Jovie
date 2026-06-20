@@ -190,7 +190,7 @@ export function CookieBannerSection() {
                 <Shield className='h-3.5 w-3.5' aria-hidden='true' />
               </div>
               <div className='min-w-0 flex-1'>
-                <p className='text-[12px] leading-[1.5] text-secondary-token'>
+                <p className='text-xs leading-[1.5] text-secondary-token'>
                   We use cookies for essential functionality and to improve your
                   experience.{' '}
                   <Link
@@ -212,7 +212,7 @@ export function CookieBannerSection() {
                 {saveError ? (
                   <p
                     role='alert'
-                    className='mt-2 text-[11px] leading-snug text-secondary-token'
+                    className='mt-2 text-2xs leading-snug text-secondary-token'
                   >
                     {saveError}
                   </p>

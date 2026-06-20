@@ -36,7 +36,7 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout — tighter and calmer so the rail reads as one system.
-    'peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-[10px] border border-transparent px-2.5 text-left text-[12.5px] leading-[1.15] tracking-normal outline-none',
+    'peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-[10px] border border-transparent px-2.5 text-left text-xs leading-[1.15] tracking-normal outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
@@ -218,7 +218,7 @@ export const SidebarMenuBadge = React.forwardRef<
     className={cn(
       'absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-sidebar-accent/45 px-1.5 text-2xs font-medium tabular-nums text-sidebar-item-icon select-none pointer-events-none',
       'peer-hover/menu-button:text-sidebar-item-foreground peer-data-[active=true]/menu-button:text-sidebar-item-foreground',
-      'peer-data-[size=sm]/menu-button:text-[10px]',
+      'peer-data-[size=sm]/menu-button:text-3xs',
       'peer-data-[size=default]/menu-button:text-2xs',
       'peer-data-[size=lg]/menu-button:text-xs',
       'group-data-[collapsible=icon]:hidden',

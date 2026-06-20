@@ -68,7 +68,7 @@ export function InterstitialClient({
         <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
           <CheckCircle2 className='h-6 w-6 text-success' aria-hidden='true' />
         </div>
-        <p className='text-[13px] font-semibold text-primary-token'>
+        <p className='text-app font-semibold text-primary-token'>
           Verified. Redirecting...
         </p>
       </div>
@@ -78,20 +78,20 @@ export function InterstitialClient({
   return (
     <div className='space-y-4'>
       <noscript>
-        <p className='mb-4 text-[13px] text-error'>
+        <p className='mb-4 text-app text-error'>
           JavaScript is required to continue to this link.
         </p>
       </noscript>
 
       <ContentSurfaceCard surface='nested' className='space-y-1.5 p-4'>
-        <p className='text-[11px] uppercase tracking-[0.14em] text-tertiary-token'>
+        <p className='text-2xs uppercase tracking-[0.14em] text-tertiary-token'>
           Destination
         </p>
-        <p className='text-[13px] font-semibold text-primary-token'>
+        <p className='text-app font-semibold text-primary-token'>
           {titleAlias}
         </p>
         {domain === 'External Site' ? null : (
-          <p className='text-[12px] text-tertiary-token'>Domain: {domain}</p>
+          <p className='text-xs text-tertiary-token'>Domain: {domain}</p>
         )}
       </ContentSurfaceCard>
 
@@ -102,7 +102,7 @@ export function InterstitialClient({
           aria-live='assertive'
           className='border-error/20 bg-error-subtle p-4'
         >
-          <p className='text-[13px] text-primary-token'>{error}</p>
+          <p className='text-app text-primary-token'>{error}</p>
         </ContentSurfaceCard>
       ) : null}
 
@@ -115,7 +115,7 @@ export function InterstitialClient({
         Continue to link
       </Button>
 
-      <p className='text-center text-[12px] text-tertiary-token'>
+      <p className='text-center text-xs text-tertiary-token'>
         By continuing, you acknowledge this link leads to external content.
       </p>
     </div>

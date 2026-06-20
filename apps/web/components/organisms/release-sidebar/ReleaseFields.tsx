@@ -57,7 +57,7 @@ export function ReleaseFields({
         )}
       </div>
       {revealDate && (
-        <p className='text-[10.5px] leading-[14px] text-quaternary-token'>
+        <p className='text-3xs leading-[14px] text-quaternary-token'>
           <span className='font-[500]'>Reveals</span>{' '}
           {formatReleaseDate(revealDate)}
         </p>

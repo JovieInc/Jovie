@@ -164,18 +164,18 @@ export function SoundsLandingPage({
       returnLabel={`Back to ${artist.name}`}
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-          <h1 className='text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+          <h1 className='text-3xl font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
             {release.title}
           </h1>
           {artist.handle ? (
             <Link
               href={`/${artist.handle}`}
-              className='mt-1 block text-[14px] font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
+              className='mt-1 block text-sm font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
             >
               {artist.name}
             </Link>
           ) : (
-            <p className='mt-1 text-[14px] font-[450] text-white/70 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+            <p className='mt-1 text-sm font-[450] text-white/70 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
               {artist.name}
             </p>
           )}

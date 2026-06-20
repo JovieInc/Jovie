@@ -40,7 +40,7 @@ export function ContentSectionHeader({
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
         <h2
           className={cn(
-            'truncate text-[12.5px] font-semibold tracking-[-0.012em] text-primary-token',
+            'truncate text-xs font-semibold tracking-[-0.012em] text-primary-token',
             titleClassName
           )}
         >
@@ -49,7 +49,7 @@ export function ContentSectionHeader({
         {subtitle ? (
           <p
             className={cn(
-              'text-[11.5px] leading-[15px] text-tertiary-token',
+              'text-2xs leading-[15px] text-tertiary-token',
               subtitleClassName
             )}
           >

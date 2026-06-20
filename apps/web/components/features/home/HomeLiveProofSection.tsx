@@ -60,13 +60,13 @@ function ProofCard({
         </div>
 
         <div className='homepage-proof-caption'>
-          <p className='text-[12px] font-[540] text-white/56'>
+          <p className='text-xs font-[540] text-white/56'>
             jov.ie/{creator.handle}
           </p>
           <p className='mt-2 text-[1.55rem] font-[620] tracking-[-0.03em] text-primary-token'>
             {creator.name}
           </p>
-          <p className='mt-2 max-w-[26rem] text-[13px] leading-[1.65] text-white/64'>
+          <p className='mt-2 max-w-[26rem] text-app leading-[1.65] text-white/64'>
             {getSupportingLine(creator)}
           </p>
         </div>
@@ -100,7 +100,7 @@ export function HomeLiveProofSection({
             >
               See it live.
             </h2>
-            <p className='mt-4 max-w-[31rem] text-[15px] leading-[1.7] text-secondary-token sm:text-[16px]'>
+            <p className='mt-4 max-w-[31rem] text-mid leading-[1.7] text-secondary-token sm:text-base'>
               Real artist profiles. Real release moments.
             </p>
           </div>

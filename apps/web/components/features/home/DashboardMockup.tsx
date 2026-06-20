@@ -68,11 +68,11 @@ export function DashboardMockup({
         className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2 max-md:hidden'
         style={{ borderBottom: '1px solid var(--linear-border-subtle)' }}
       >
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
+        <span className='text-3xs font-medium uppercase tracking-[0.08em] text-quaternary-token'>
           Release
         </span>
         <span />
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
+        <span className='text-3xs font-medium uppercase tracking-[0.08em] text-quaternary-token'>
           Smart link
         </span>
       </div>
@@ -115,7 +115,7 @@ export function DashboardMockup({
                     {release.title}
                   </p>
                   {release.isNew && (
-                    <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400'>
+                    <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider text-amber-400'>
                       New
                     </span>
                   )}
@@ -183,7 +183,7 @@ export function DashboardMockup({
                       {release.title}
                     </p>
                     {release.isNew && (
-                      <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400'>
+                      <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider text-amber-400'>
                         New
                       </span>
                     )}

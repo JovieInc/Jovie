@@ -57,10 +57,10 @@ export function GoLiveInSixtySection() {
                   strokeWidth={1.7}
                 />
               </div>
-              <h3 className='text-[14px] font-medium leading-6 tracking-[-0.01em] text-white'>
+              <h3 className='text-sm font-medium leading-6 tracking-[-0.01em] text-white'>
                 {index + 1}. {title}
               </h3>
-              <p className='mt-2.5 text-[13px] leading-6 text-white/52'>
+              <p className='mt-2.5 text-app leading-6 text-white/52'>
                 {body}
               </p>
             </div>

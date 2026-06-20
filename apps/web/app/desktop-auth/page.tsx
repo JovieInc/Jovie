@@ -101,7 +101,7 @@ function DesktopAuthContent() {
           {isWaitingInBrowser ? null : (
             <button
               type='button'
-              className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
+              className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-app font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
               disabled={!authUrl || openState === 'opening'}
               onClick={openAuthUrl}
             >
@@ -113,7 +113,7 @@ function DesktopAuthContent() {
           {isWaitingInBrowser || !authUrl ? (
             <button
               type='button'
-              className='inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 px-4 text-[13px] font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
+              className='inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 px-4 text-app font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
               onClick={() => {
                 closeDesktopAuthWindow().catch(() => {});
               }}
@@ -125,7 +125,7 @@ function DesktopAuthContent() {
         <p
           aria-live='polite'
           role='status'
-          className='mt-3 min-h-5 text-[12px] leading-5 text-white/56'
+          className='mt-3 min-h-5 text-xs leading-5 text-white/56'
         >
           {authUrl ? statusText : 'Start sign-in again from Jovie.'}
         </p>

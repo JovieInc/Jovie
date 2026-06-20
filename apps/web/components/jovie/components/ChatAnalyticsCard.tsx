@@ -25,10 +25,10 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
           <Sparkles className='h-4 w-4' strokeWidth={2.2} />
         </div>
         <div className='min-w-0'>
-          <p className='text-[14px] font-semibold leading-5 text-primary-token'>
+          <p className='text-sm font-semibold leading-5 text-primary-token'>
             {result.title}
           </p>
-          <p className='mt-1 text-[12px] leading-5 text-tertiary-token'>
+          <p className='mt-1 text-xs leading-5 text-tertiary-token'>
             {result.totalActive} active{' '}
             {result.totalActive === 1 ? 'signal' : 'signals'}
           </p>
@@ -52,15 +52,15 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
               <span className='flex h-4 w-4 shrink-0 items-center justify-center text-black/55'>
                 <InsightCategoryIcon category={insight.category} size='sm' />
               </span>
-              <span className='text-[11.5px] font-medium capitalize leading-4 text-black/55'>
+              <span className='text-2xs font-medium capitalize leading-4 text-black/55'>
                 {insight.category.replaceAll('_', ' ')}
               </span>
             </div>
             <div className='mt-4 min-w-0'>
-              <p className='text-pretty text-[17px] font-semibold leading-[1.18] text-black'>
+              <p className='text-pretty text-base font-semibold leading-[1.18] text-black'>
                 {insight.title}
               </p>
-              <p className='mt-3 line-clamp-2 text-[12.5px] leading-5 text-black/60'>
+              <p className='mt-3 line-clamp-2 text-xs leading-5 text-black/60'>
                 {insight.actionSuggestion ?? insight.description}
               </p>
             </div>

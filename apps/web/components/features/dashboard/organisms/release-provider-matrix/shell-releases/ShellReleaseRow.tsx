@@ -36,8 +36,8 @@ import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
 export type ShellRowLockReason = 'scheduled' | 'cap' | null;
 export const shellReleaseRowTypography = {
-  title: 'truncate text-[13px] font-caption text-primary-token leading-[1.2]',
-  subtitle: 'truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5',
+  title: 'truncate text-app font-caption text-primary-token leading-[1.2]',
+  subtitle: 'truncate text-2xs text-tertiary-token leading-[1.3] mt-0.5',
 } as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────

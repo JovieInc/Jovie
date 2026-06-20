@@ -135,12 +135,12 @@ export default function AuthV1Page() {
           <JovieMark className='h-8 w-8 text-primary-token opacity-30 mb-7' />
 
           <h1
-            className='text-[24px] font-semibold leading-tight'
+            className='text-2xl font-semibold leading-tight'
             style={{ letterSpacing: '-0.02em' }}
           >
             {heading}
           </h1>
-          <p className='mt-2 text-[13px] text-tertiary-token max-w-[320px]'>
+          <p className='mt-2 text-app text-tertiary-token max-w-[320px]'>
             {description}
           </p>
 
@@ -175,7 +175,7 @@ export default function AuthV1Page() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder='you@artistdomain.com'
-                    className='w-full h-10 px-4 rounded-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[13.5px] text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-subtle ease-out'
+                    className='w-full h-10 px-4 rounded-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-app text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-subtle ease-out'
                   />
                   <ContinueButton submitting={submitting}>
                     Continue
@@ -193,7 +193,7 @@ export default function AuthV1Page() {
                 <button
                   type='button'
                   onClick={() => setStep('email')}
-                  className='text-[11.5px] text-tertiary-token hover:text-primary-token mt-1 transition-colors duration-subtle ease-out'
+                  className='text-2xs text-tertiary-token hover:text-primary-token mt-1 transition-colors duration-subtle ease-out'
                 >
                   Use a different email
                 </button>
@@ -201,7 +201,7 @@ export default function AuthV1Page() {
             )}
 
             {step === 'success' && (
-              <div className='inline-flex items-center gap-2 text-[12.5px] text-tertiary-token'>
+              <div className='inline-flex items-center gap-2 text-xs text-tertiary-token'>
                 <Loader2
                   className='h-3.5 w-3.5 animate-spin'
                   strokeWidth={2.25}
@@ -212,7 +212,7 @@ export default function AuthV1Page() {
           </div>
 
           {step === 'email' && (
-            <p className='mt-8 text-[12px] text-tertiary-token'>
+            <p className='mt-8 text-xs text-tertiary-token'>
               {mode === 'signup' ? (
                 <>
                   Already have an account?{' '}
@@ -243,7 +243,7 @@ export default function AuthV1Page() {
         {/* Legal — aligned to the bento wrapper's bottom (p-6 = 24px),
             not the page edge. Sitting flush with the page bottom made
             the left column feel optically heavy. */}
-        <p className='absolute bottom-6 left-0 right-0 text-center text-[10.5px] text-quaternary-token px-6'>
+        <p className='absolute bottom-6 left-0 right-0 text-center text-3xs text-quaternary-token px-6'>
           By continuing you agree to the{' '}
           <a
             href='https://jov.ie/terms'
@@ -274,16 +274,16 @@ function BentoShowcase() {
   return (
     <div className='flex-1 flex flex-col rounded-[var(--linear-app-shell-radius,12px)] border border-(--linear-app-shell-border) bg-(--surface-1)/60 px-12 py-14 overflow-hidden'>
       <div className='shrink-0'>
-        <span className='text-[10.5px] uppercase tracking-[0.14em] font-bold text-white/20'>
+        <span className='text-3xs uppercase tracking-[0.14em] font-bold text-white/20'>
           Meet Jovie
         </span>
         <h2
-          className='mt-2 text-[28px] font-semibold leading-tight text-primary-token max-w-[420px]'
+          className='mt-2 text-3xl font-semibold leading-tight text-primary-token max-w-[420px]'
           style={{ letterSpacing: '-0.02em' }}
         >
           Built for artists.
         </h2>
-        <p className='mt-3 text-[13.5px] text-tertiary-token max-w-[400px] leading-relaxed'>
+        <p className='mt-3 text-app text-tertiary-token max-w-[400px] leading-relaxed'>
           Release more music with less work.
         </p>
       </div>
@@ -297,7 +297,7 @@ function BentoShowcase() {
           render as the real SVGs (HomeTrustSection's inline-strip mode
           falls back to placeholder shapes for Black Hole + disco:wax). */}
       <div className='shrink-0 mt-8 pt-6 border-t border-(--linear-app-shell-border)/70'>
-        <p className='text-[10.5px] uppercase tracking-[0.14em] font-bold text-white/20 mb-5'>
+        <p className='text-3xs uppercase tracking-[0.14em] font-bold text-white/20 mb-5'>
           Trusted by artists on
         </p>
         <div className='flex items-center justify-between gap-x-8 text-white/68'>
@@ -423,7 +423,7 @@ function OtpInput({
           onPaste={onPaste}
           onFocus={e => e.currentTarget.select()}
           aria-label={`Digit ${i + 1} of 6`}
-          className='h-11 w-full min-w-0 rounded-xl bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[17px] tabular-nums font-mono text-center text-primary-token outline-none focus:border-cyan-400/50 transition-colors duration-subtle ease-out'
+          className='h-11 w-full min-w-0 rounded-xl bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-base tabular-nums font-mono text-center text-primary-token outline-none focus:border-cyan-400/50 transition-colors duration-subtle ease-out'
         />
       ))}
     </div>
@@ -464,7 +464,7 @@ function OrDivider() {
   return (
     <div className='flex items-center gap-3 my-1' aria-hidden='true'>
       <span className='flex-1 h-px bg-(--linear-app-shell-border)/70' />
-      <span className='text-[10.5px] uppercase tracking-[0.14em] font-bold text-white/20'>
+      <span className='text-3xs uppercase tracking-[0.14em] font-bold text-white/20'>
         or
       </span>
       <span className='flex-1 h-px bg-(--linear-app-shell-border)/70' />

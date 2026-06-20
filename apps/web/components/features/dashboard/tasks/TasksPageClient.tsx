@@ -667,10 +667,10 @@ function TaskDocumentPanel({
                 <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-secondary-token'>
                   <FileText className='h-5 w-5' />
                 </div>
-                <h2 className='mt-5 text-[21px] font-semibold tracking-[-0.03em] text-primary-token'>
+                <h2 className='mt-5 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
                   Pick a task from the list to see what it needs.
                 </h2>
-                <p className='mt-2 text-[13px] leading-relaxed text-tertiary-token'>
+                <p className='mt-2 text-app leading-relaxed text-tertiary-token'>
                   Open a task to review its status, metadata, due state, and
                   body in the detail pane.
                 </p>
@@ -1135,7 +1135,7 @@ function MobileTaskListItem({
         <span className='block truncate text-sm font-semibold leading-[1.25] text-primary-token'>
           {task.title}
         </span>
-        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-secondary-token'>
+        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-secondary-token'>
           <span className='truncate'>{stage.label}</span>
           <span className='text-tertiary-token'>J-{task.taskNumber}</span>
           <span className='inline-flex items-center gap-1'>
@@ -1148,7 +1148,7 @@ function MobileTaskListItem({
           <span className='truncate'>{assignee.label}</span>
         </span>
         {task.releaseTitle ? (
-          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-[10.5px] text-tertiary-token'>
+          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-3xs text-tertiary-token'>
             <Disc3 className='h-3 w-3 shrink-0' />
             <span className='min-w-0 truncate'>{task.releaseTitle}</span>
           </span>

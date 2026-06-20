@@ -360,14 +360,14 @@ function Composer({
         }}
         className='flex items-center gap-2 h-12 pl-3 pr-1.5 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 focus-within:border-white/20 focus-within:bg-surface-1 transition-colors duration-subtle ease-out'
       >
-        <span className='text-[14px] text-tertiary-token tabular-nums'>
+        <span className='text-sm text-tertiary-token tabular-nums'>
           jov.ie/
         </span>
         <FocusOnMountInput
           value={handle}
           onChange={setHandle}
           placeholder='you'
-          className='flex-1 bg-transparent text-[14px] text-primary-token placeholder:text-quaternary-token outline-none'
+          className='flex-1 bg-transparent text-sm text-primary-token placeholder:text-quaternary-token outline-none'
         />
         <button
           type='submit'
@@ -375,7 +375,7 @@ function Composer({
           aria-hidden={!hasHandle}
           tabIndex={hasHandle ? 0 : -1}
           className={cn(
-            'h-9 rounded-full bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] flex items-center gap-1.5 transition-[opacity,transform,width,padding] duration-subtle ease-out',
+            'h-9 rounded-full bg-white text-black text-xs font-caption tracking-[-0.005em] flex items-center gap-1.5 transition-[opacity,transform,width,padding] duration-subtle ease-out',
             hasHandle
               ? 'opacity-100 translate-x-0 px-3.5 hover:brightness-110 active:scale-[0.98]'
               : 'opacity-0 -translate-x-2 px-0 w-0 overflow-hidden pointer-events-none'
@@ -447,7 +447,7 @@ function Composer({
       <button
         type='button'
         onClick={onConnectSpotify}
-        className='w-full h-12 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 hover:border-cyan-500/30 text-[13px] font-caption text-secondary-token hover:text-primary-token transition-colors duration-subtle ease-out flex items-center justify-center gap-2'
+        className='w-full h-12 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 hover:border-cyan-500/30 text-app font-caption text-secondary-token hover:text-primary-token transition-colors duration-subtle ease-out flex items-center justify-center gap-2'
       >
         <span className='h-4 w-4 rounded-full bg-emerald-500' />
         Connect Spotify
@@ -479,7 +479,7 @@ function Composer({
         <button
           type='button'
           onClick={() => onPickPlan(true)}
-          className='flex-1 h-11 rounded-xl bg-white text-black text-[13px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out flex items-center justify-center gap-1.5'
+          className='flex-1 h-11 rounded-xl bg-white text-black text-app font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out flex items-center justify-center gap-1.5'
         >
           Yes, start the trial{' '}
           <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -487,7 +487,7 @@ function Composer({
         <button
           type='button'
           onClick={() => onPickPlan(false)}
-          className='h-11 px-4 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 text-[13px] font-caption text-secondary-token hover:text-primary-token transition-colors duration-subtle ease-out'
+          className='h-11 px-4 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 text-app font-caption text-secondary-token hover:text-primary-token transition-colors duration-subtle ease-out'
         >
           Not yet
         </button>
@@ -497,7 +497,7 @@ function Composer({
 
   // building / ready / waitlist — chat is read-only.
   return (
-    <div className='h-12 grid place-items-center text-[12px] text-quaternary-token'>
+    <div className='h-12 grid place-items-center text-xs text-quaternary-token'>
       {/* Quiet placeholder — Jovie is finishing up. */}
       <span>—</span>
     </div>
@@ -518,7 +518,7 @@ function ChipRow({
           key={c}
           type='button'
           onClick={() => onPick(c)}
-          className='h-9 px-3 rounded-lg border border-(--linear-app-shell-border) bg-surface-1/40 hover:bg-surface-1 hover:border-cyan-500/30 hover:text-primary-token text-[12.5px] font-caption text-secondary-token transition-colors duration-subtle ease-out'
+          className='h-9 px-3 rounded-lg border border-(--linear-app-shell-border) bg-surface-1/40 hover:bg-surface-1 hover:border-cyan-500/30 hover:text-primary-token text-xs font-caption text-secondary-token transition-colors duration-subtle ease-out'
         >
           {c}
         </button>
@@ -553,7 +553,7 @@ function FreeText({
           value={value}
           onChange={setValue}
           placeholder={placeholder}
-          className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
+          className='flex-1 bg-transparent text-app text-primary-token placeholder:text-tertiary-token outline-none'
         />
         <button
           type='button'
@@ -582,7 +582,7 @@ function FreeText({
                 setValue(c);
                 setTimeout(onSubmit, 50);
               }}
-              className='h-7 px-2.5 rounded-md border border-(--linear-app-shell-border) bg-surface-1/30 hover:bg-surface-1 text-[11.5px] text-tertiary-token hover:text-secondary-token transition-colors duration-subtle ease-out'
+              className='h-7 px-2.5 rounded-md border border-(--linear-app-shell-border) bg-surface-1/30 hover:bg-surface-1 text-2xs text-tertiary-token hover:text-secondary-token transition-colors duration-subtle ease-out'
             >
               {c}
             </button>
@@ -607,7 +607,7 @@ function ChatBubble({ msg }: { msg: Msg }) {
           <JovieMark className='h-3.5 w-3.5 text-cyan-400' />
         </div>
         <div className='flex-1 min-w-0'>
-          <div className='text-[13.5px] leading-[1.55] text-primary-token tracking-[-0.005em]'>
+          <div className='text-app leading-[1.55] text-primary-token tracking-[-0.005em]'>
             {msg.text}
           </div>
         </div>
@@ -619,7 +619,7 @@ function ChatBubble({ msg }: { msg: Msg }) {
       className='flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-subtle'
       style={{ animationTimingFunction: EASE_CINEMATIC }}
     >
-      <div className='max-w-[80%] rounded-2xl rounded-br-md bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 text-[13.5px] text-cyan-50/95 tracking-[-0.005em]'>
+      <div className='max-w-[80%] rounded-2xl rounded-br-md bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 text-app text-cyan-50/95 tracking-[-0.005em]'>
         {msg.text}
       </div>
     </div>
@@ -674,25 +674,25 @@ function RightRail({
       }}
     >
       <div className='p-5 space-y-4'>
-        <div className='text-[10px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium'>
+        <div className='text-3xs uppercase tracking-[0.12em] text-quaternary-token/85 font-medium'>
           Profile preview
         </div>
         <div className='rounded-xl border border-(--linear-app-shell-border) bg-surface-1/40 p-4'>
           <div className='flex items-center gap-3'>
-            <div className='h-12 w-12 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 grid place-items-center text-[16px] font-caption text-secondary-token'>
+            <div className='h-12 w-12 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 grid place-items-center text-base font-caption text-secondary-token'>
               {(handle.replace('@', '').charAt(0) || 'J').toUpperCase()}
             </div>
             <div className='min-w-0 flex-1'>
-              <div className='text-[14px] font-caption text-primary-token tracking-[-0.012em] truncate'>
+              <div className='text-sm font-caption text-primary-token tracking-[-0.012em] truncate'>
                 @{handle.replace('@', '') || '—'}
               </div>
-              <div className='text-[11.5px] text-tertiary-token truncate'>
+              <div className='text-2xs text-tertiary-token truncate'>
                 jov.ie/{handle.replace('@', '') || 'you'}
               </div>
             </div>
           </div>
           {career && (
-            <div className='mt-3 inline-flex items-center h-[20px] px-2 rounded text-[10.5px] uppercase tracking-[0.06em] text-cyan-300/90 border border-cyan-500/30 bg-cyan-500/10'>
+            <div className='mt-3 inline-flex items-center h-[20px] px-2 rounded text-3xs uppercase tracking-[0.06em] text-cyan-300/90 border border-cyan-500/30 bg-cyan-500/10'>
               {career}
             </div>
           )}
@@ -702,7 +702,7 @@ function RightRail({
           className='space-y-2 transition-opacity duration-cinematic ease-out'
           style={{ opacity: spotifyReady ? 1 : 0 }}
         >
-          <div className='text-[10px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium pt-2'>
+          <div className='text-3xs uppercase tracking-[0.12em] text-quaternary-token/85 font-medium pt-2'>
             Catalog (12)
           </div>
           <ul className='space-y-1'>
@@ -715,7 +715,7 @@ function RightRail({
               <li
                 key={t}
                 className={cn(
-                  'flex items-center gap-2.5 h-8 rounded-md px-2 text-[12px]',
+                  'flex items-center gap-2.5 h-8 rounded-md px-2 text-xs',
                   picked === t
                     ? 'bg-cyan-500/10 text-cyan-100/95 border border-cyan-500/20'
                     : 'text-secondary-token border border-transparent'
@@ -756,7 +756,7 @@ function SidebarShim({
     >
       <div className='flex items-center gap-2.5 h-7 pl-3 pr-2'>
         <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
-        <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token'>
+        <span className='text-app font-semibold tracking-[-0.02em] text-primary-token'>
           Jovie
         </span>
       </div>
@@ -764,7 +764,7 @@ function SidebarShim({
         {['Inbox', 'Tasks'].map(label => (
           <div
             key={label}
-            className='flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md text-[13px] text-secondary-token'
+            className='flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md text-app text-secondary-token'
           >
             <span className='h-3.5 w-3.5 rounded-sm bg-surface-1' />
             {label}
@@ -772,12 +772,12 @@ function SidebarShim({
         ))}
       </nav>
       <div className='mt-5 px-3 pb-1'>
-        <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
+        <span className='text-3xs font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
           Artists
         </span>
       </div>
       <div className='px-1'>
-        <div className='flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md text-[13px] font-caption text-primary-token bg-cyan-500/10 shadow-[inset_2px_0_0_0_rgb(34_211_238)]'>
+        <div className='flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md text-app font-caption text-primary-token bg-cyan-500/10 shadow-[inset_2px_0_0_0_rgb(34_211_238)]'>
           <span className='h-2 w-2 rounded-full bg-cyan-400 ml-[3px]' />@
           {handle.replace('@', '') || 'you'}
         </div>
@@ -797,14 +797,14 @@ function AudioBarShim({ visible, title }: { visible: boolean; title: string }) {
     >
       <div className='h-14 px-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-t border-(--linear-app-shell-border)/50'>
         <div className='flex items-center gap-2 min-w-0'>
-          <span className='h-9 w-9 rounded-md bg-surface-1 grid place-items-center text-[12px] text-tertiary-token'>
+          <span className='h-9 w-9 rounded-md bg-surface-1 grid place-items-center text-xs text-tertiary-token'>
             {title.charAt(0)}
           </span>
           <div className='min-w-0'>
-            <div className='truncate text-[12.5px] font-caption text-primary-token'>
+            <div className='truncate text-xs font-caption text-primary-token'>
               {title}
             </div>
-            <div className='truncate text-[10.5px] text-tertiary-token'>
+            <div className='truncate text-3xs text-tertiary-token'>
               You · just added
             </div>
           </div>
@@ -830,20 +830,20 @@ function ReadyCard({ handle }: { handle: string }) {
       className='mt-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5 animate-in fade-in slide-in-from-bottom-2 duration-cinematic'
       style={{ animationTimingFunction: EASE_CINEMATIC }}
     >
-      <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.12em] text-cyan-300/85 font-medium'>
+      <div className='flex items-center gap-2 text-3xs uppercase tracking-[0.12em] text-cyan-300/85 font-medium'>
         <Sparkles className='h-3 w-3' strokeWidth={2.5} />
         Welcome home
       </div>
-      <h3 className='mt-2 text-[18px] font-display tracking-[-0.02em] text-primary-token'>
+      <h3 className='mt-2 text-lg font-display tracking-[-0.02em] text-primary-token'>
         jov.ie/{name} is live.
       </h3>
-      <p className='mt-2 text-[13px] text-secondary-token leading-[1.55]'>
+      <p className='mt-2 text-app text-secondary-token leading-[1.55]'>
         Your dashboard is shaped from this conversation. First three tasks are
         queued. Sidebar&apos;s open on the left.
       </p>
       <Link
         href='/exp/shell-v1'
-        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
+        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white text-black text-xs font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
       >
         <LayoutDashboard className='h-3.5 w-3.5' strokeWidth={2.5} />
         Open dashboard
@@ -859,18 +859,18 @@ function WaitlistCard() {
       className='mt-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 animate-in fade-in slide-in-from-bottom-2 duration-cinematic'
       style={{ animationTimingFunction: EASE_CINEMATIC }}
     >
-      <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.12em] text-amber-300/90 font-medium'>
+      <div className='flex items-center gap-2 text-3xs uppercase tracking-[0.12em] text-amber-300/90 font-medium'>
         Saved for later
       </div>
-      <h3 className='mt-2 text-[18px] font-display tracking-[-0.02em] text-primary-token'>
+      <h3 className='mt-2 text-lg font-display tracking-[-0.02em] text-primary-token'>
         On the early-access list.
       </h3>
-      <p className='mt-2 text-[13px] text-secondary-token leading-[1.55]'>
+      <p className='mt-2 text-app text-secondary-token leading-[1.55]'>
         Your transcript is saved. When I&apos;m ready to help where you&apos;re
         at — the gaps you mentioned are exactly what we&apos;re tracking —
         I&apos;ll send you a personal invite.
       </p>
-      <p className='mt-3 text-[11.5px] text-tertiary-token'>
+      <p className='mt-3 text-2xs text-tertiary-token'>
         Admin view: this conversation feeds the feature-request queue.
       </p>
     </div>

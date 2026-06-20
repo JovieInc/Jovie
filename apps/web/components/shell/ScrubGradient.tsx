@@ -12,7 +12,7 @@ const WAVE_CY = WAVE_TOP + WAVE_H / 2;
 const WAVE_AMP = WAVE_H / 2 - 1;
 
 const TIME_LABEL =
-  'text-[10px] tabular-nums text-quaternary-token w-8 shrink-0';
+  'text-3xs tabular-nums text-quaternary-token w-8 shrink-0';
 
 export interface ScrubCue {
   /** Position as a percent (0–100) of the track duration. */

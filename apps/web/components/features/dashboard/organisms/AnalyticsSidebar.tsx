@@ -110,7 +110,7 @@ function FunnelStage({
   return (
     <div className='space-y-1.5 px-3.5 py-2.5'>
       <div className='flex items-baseline justify-between gap-2'>
-        <span className='text-[12px] font-caption text-secondary-token'>
+        <span className='text-xs font-caption text-secondary-token'>
           {label}
         </span>
         <span className='flex items-baseline gap-1.5'>

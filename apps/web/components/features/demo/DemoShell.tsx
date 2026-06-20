@@ -140,7 +140,7 @@ export function DemoShell({
                       >
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
-                        <span className='rounded-sm border border-default bg-surface-2 px-1 py-px text-[10px] leading-none text-secondary-token [font-weight:var(--font-weight-medium)]'>
+                        <span className='rounded-sm border border-default bg-surface-2 px-1 py-px text-3xs leading-none text-secondary-token [font-weight:var(--font-weight-medium)]'>
                           2
                         </span>
                       </SidebarMenuButton>
@@ -321,7 +321,7 @@ export function DemoShell({
             <SidebarFooter className='px-2 pb-3.5 pt-1'>
               <a
                 href={APP_ROUTES.SIGNUP}
-                className='flex h-7 items-center justify-center rounded-sm bg-surface-2 text-[13px] text-secondary-token [font-weight:var(--font-weight-medium)]'
+                className='flex h-7 items-center justify-center rounded-sm bg-surface-2 text-app text-secondary-token [font-weight:var(--font-weight-medium)]'
               >
                 Sign up for Jovie
               </a>
@@ -331,7 +331,7 @@ export function DemoShell({
         header={
           <>
             <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-(--linear-app-header-padding-x)'>
-              <div className='flex min-w-0 items-center gap-1 text-[13px]'>
+              <div className='flex min-w-0 items-center gap-1 text-app'>
                 <span className='truncate text-tertiary-token'>
                   {DEMO_ARTIST_NAME}
                 </span>

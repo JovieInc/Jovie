@@ -37,7 +37,7 @@ export default function ParallaxPage() {
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>
         Zoom Parallax
       </h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Scroll-driven image collage powered by a lightweight DOM animation loop
         and Next.js image optimization.
       </p>

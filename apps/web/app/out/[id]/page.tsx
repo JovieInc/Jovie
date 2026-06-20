@@ -54,13 +54,13 @@ function MissingLinkState() {
             />
           </div>
 
-          <p className='text-[13px] leading-5 text-tertiary-token'>
+          <p className='text-app leading-5 text-tertiary-token'>
             Check the URL or ask the sender for a fresh link.
           </p>
 
           <Link
             href='/'
-            className='inline-flex h-9 items-center justify-center rounded-lg bg-[var(--color-btn-primary-bg)] px-4 text-[13px] font-medium text-[var(--color-btn-primary-fg)] transition-colors duration-100 hover:bg-[var(--color-btn-primary-hover)]'
+            className='inline-flex h-9 items-center justify-center rounded-lg bg-[var(--color-btn-primary-bg)] px-4 text-app font-medium text-[var(--color-btn-primary-fg)] transition-colors duration-100 hover:bg-[var(--color-btn-primary-hover)]'
           >
             Return Home
           </Link>
@@ -152,7 +152,7 @@ export default async function InterstitialPage({
             }
           />
 
-          <p className='text-center text-[12px] text-tertiary-token'>
+          <p className='text-center text-xs text-tertiary-token'>
             This confirmation helps protect against automated access.
           </p>
         </div>

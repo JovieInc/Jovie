@@ -282,7 +282,7 @@ export function CmdKPalette({
               className='flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
               aria-label='Command Palette Search'
             />
-            <span className='hidden shrink-0 px-1 text-[11px] font-medium text-quaternary-token sm:inline'>
+            <span className='hidden shrink-0 px-1 text-2xs font-medium text-quaternary-token sm:inline'>
               Esc
             </span>
           </div>

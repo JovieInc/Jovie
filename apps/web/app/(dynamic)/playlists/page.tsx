@@ -46,10 +46,10 @@ export default async function PlaylistsIndexPage() {
 
   return (
     <div className='mx-auto max-w-6xl px-4 py-16'>
-      <h1 className='text-[48px] font-[510] leading-[1.0] tracking-[-1.056px] text-white'>
+      <h1 className='text-5xl font-[510] leading-[1.0] tracking-[-1.056px] text-white'>
         Playlists
       </h1>
-      <p className='mt-4 text-[15px] font-[400] leading-[1.6] tracking-[-0.165px] text-white/60'>
+      <p className='mt-4 text-mid font-[400] leading-[1.6] tracking-[-0.165px] text-white/60'>
         Hyper-specific. Expertly curated. Featuring independent artists.
       </p>
 

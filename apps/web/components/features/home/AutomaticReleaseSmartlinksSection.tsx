@@ -53,7 +53,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 Connect Spotify once. Every new release gets a smart link across
                 every platform — automatically.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 Zero manual work
               </span>
             </div>

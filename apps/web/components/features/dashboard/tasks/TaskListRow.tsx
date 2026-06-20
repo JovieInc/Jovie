@@ -134,7 +134,7 @@ export const TaskListRow = memo(function TaskListRow({
       <div className='min-w-0 flex-1'>
         <p
           className={cn(
-            'truncate text-[12.75px] font-semibold leading-[17px] text-primary-token',
+            'truncate text-app font-semibold leading-[17px] text-primary-token',
             isDone && 'text-secondary-token',
             isCancelled && 'text-tertiary-token'
           )}
@@ -144,7 +144,7 @@ export const TaskListRow = memo(function TaskListRow({
 
         <div
           data-testid={`task-list-row-meta-${task.id}`}
-          className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-[10.5px] leading-none text-secondary-token'
+          className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-3xs leading-none text-secondary-token'
         >
           <span className='shrink-0 truncate text-tertiary-token'>
             {stage.label}

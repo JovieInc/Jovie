@@ -78,7 +78,7 @@ function DrawerHandle() {
 
 function DrawerTitle({ title }: Readonly<{ title: string }>) {
   return (
-    <p className='mb-[14px] px-1 text-[17px] font-semibold tracking-[-0.02em] text-white'>
+    <p className='mb-[14px] px-1 text-base font-semibold tracking-[-0.02em] text-white'>
       {title}
     </p>
   );
@@ -106,7 +106,7 @@ function PayDrawerPreview({
             >
               <span
                 className={cn(
-                  'text-[16px] font-semibold tracking-[-0.02em]',
+                  'text-base font-semibold tracking-[-0.02em]',
                   featured ? 'text-black' : 'text-white'
                 )}
               >
@@ -114,7 +114,7 @@ function PayDrawerPreview({
               </span>
               <span
                 className={cn(
-                  'text-[12px] font-medium',
+                  'text-xs font-medium',
                   featured ? 'text-black/60' : 'text-white/56'
                 )}
               >
@@ -124,7 +124,7 @@ function PayDrawerPreview({
           );
         })}
       </div>
-      <div className='mt-[14px] block w-full rounded-[14px] bg-[#f5f5f7] py-[14px] text-center text-[14px] font-semibold tracking-[-0.01em] text-black'>
+      <div className='mt-[14px] block w-full rounded-[14px] bg-[#f5f5f7] py-[14px] text-center text-sm font-semibold tracking-[-0.01em] text-black'>
         {card.ctaLabel}
       </div>
     </div>
@@ -147,21 +147,21 @@ function TourDrawerPreview({
               index === 0 ? 'pt-1.5' : 'border-t border-white/[0.08]'
             )}
           >
-            <span className='text-[11px] font-medium uppercase leading-[1.1] tracking-[0.02em] text-white/56'>
+            <span className='text-2xs font-medium uppercase leading-[1.1] tracking-[0.02em] text-white/56'>
               {row.month}
-              <strong className='mt-0.5 block text-[18px] font-semibold normal-case tracking-[-0.02em] text-white'>
+              <strong className='mt-0.5 block text-lg font-semibold normal-case tracking-[-0.02em] text-white'>
                 {row.day}
               </strong>
             </span>
             <span className='min-w-0'>
-              <span className='block truncate text-[14px] font-semibold tracking-[-0.02em] text-white'>
+              <span className='block truncate text-sm font-semibold tracking-[-0.02em] text-white'>
                 {row.venue}
               </span>
-              <span className='mt-0.5 block truncate text-[12px] text-white/56'>
+              <span className='mt-0.5 block truncate text-xs text-white/56'>
                 {row.location}
               </span>
             </span>
-            <span className='text-[12px] font-medium text-white/62'>
+            <span className='text-xs font-medium text-white/62'>
               {row.ctaLabel}
             </span>
           </div>

@@ -60,7 +60,7 @@ export const ReleaseTaskRow = React.memo(function ReleaseTaskRow({
         className='h-3.5 w-3.5'
       />
 
-      <ReleaseTaskTitleText className='flex-1 text-[11.5px]' isDone={isDone}>
+      <ReleaseTaskTitleText className='flex-1 text-2xs' isDone={isDone}>
         {task.title}
         {isAi && (
           <ReleaseTaskAutoBadge

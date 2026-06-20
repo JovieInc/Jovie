@@ -41,7 +41,7 @@ export default function UserCreationFailedPage() {
             </Button>
           </div>
 
-          <p className='text-[11px] text-tertiary-token'>
+          <p className='text-2xs text-tertiary-token'>
             Error code: USER_CREATION_FAILED
           </p>
         </div>

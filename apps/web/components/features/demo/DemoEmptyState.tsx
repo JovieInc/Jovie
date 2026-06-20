@@ -88,13 +88,13 @@ export function DemoEmptyState({ tab }: { readonly tab: DemoTab }) {
           <Icon className='size-5 text-tertiary-token' />
         </div>
         <div className='space-y-1'>
-          <h3 className='text-[15px] text-primary-token [font-weight:var(--font-weight-medium)]'>
+          <h3 className='text-mid text-primary-token [font-weight:var(--font-weight-medium)]'>
             {config.label}
           </h3>
-          <p className='text-[13px] text-secondary-token leading-relaxed'>
+          <p className='text-app text-secondary-token leading-relaxed'>
             {config.description}
           </p>
-          <p className='text-[12px] text-tertiary-token pt-1'>Coming soon</p>
+          <p className='text-xs text-tertiary-token pt-1'>Coming soon</p>
         </div>
       </div>
     </div>

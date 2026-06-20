@@ -187,7 +187,7 @@ function StackLayoutContent({
 export function AuthLayout({
   children,
   formTitle,
-  formTitleClassName = 'text-[18px] leading-[22px] font-medium text-primary-token text-center',
+  formTitleClassName = 'text-lg leading-[22px] font-medium text-primary-token text-center',
   footerPrompt = 'No account?',
   footerLinkText = 'Create your account',
   footerLinkHref = APP_ROUTES.SIGNUP,

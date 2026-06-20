@@ -419,7 +419,7 @@ export function OnboardingTurnstile({
                 >
                   {getHeading(state.status)}
                 </p>
-                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
+                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-xs'>
                   {panelCopy}
                 </p>
               </div>

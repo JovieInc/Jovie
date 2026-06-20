@@ -61,7 +61,7 @@ function SectionIntro({
 }>) {
   return (
     <div className={cn('space-y-1', body ? 'mb-4' : 'mb-3')}>
-      <p className='text-[13px] font-semibold tracking-[-0.015em] text-white/56'>
+      <p className='text-app font-semibold tracking-[-0.015em] text-white/56'>
         {title}
       </p>
       {body ? (
@@ -105,11 +105,11 @@ function PreviewAlertsPanel({
         </div>
 
         <div className='space-y-1.5'>
-          <p className='text-[20px] font-semibold tracking-[-0.014em] text-white'>
+          <p className='text-xl font-semibold tracking-[-0.014em] text-white'>
             {resolvedTitle}
           </p>
           {resolvedBody ? (
-            <p className='max-w-[28ch] text-[13px] leading-5 text-white/58'>
+            <p className='max-w-[28ch] text-app leading-5 text-white/58'>
               {resolvedBody}
             </p>
           ) : null}
@@ -269,10 +269,10 @@ function ProfileEmptyState({
 }>) {
   return (
     <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
-      <p className='text-[17px] font-semibold tracking-[-0.018em] text-white'>
+      <p className='text-base font-semibold tracking-[-0.018em] text-white'>
         {title}
       </p>
-      <p className='mt-2 max-w-[25ch] text-[12.5px] leading-5 text-white/52'>
+      <p className='mt-2 max-w-[25ch] text-xs leading-5 text-white/52'>
         {body}
       </p>
       <div className='mt-5'>
@@ -341,10 +341,10 @@ function AlertsSettingsRow({
       className='flex min-h-[58px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
     >
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[14px] font-medium tracking-[-0.005em] text-white'>
+        <p className='truncate text-sm font-medium tracking-[-0.005em] text-white'>
           {label}
         </p>
-        <p className='truncate text-[11.5px] leading-4 text-white/50'>
+        <p className='truncate text-2xs leading-4 text-white/50'>
           {description}
         </p>
       </div>
@@ -374,10 +374,10 @@ function AlertsSettingsView({
       data-testid='profile-alerts-settings'
     >
       <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-        <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+        <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
           Alerts
         </h2>
-        <span className='text-[13px] font-medium text-white/52'>
+        <span className='text-app font-medium text-white/52'>
           {isSubscribed ? 'On' : 'Off'}
         </span>
       </div>
@@ -418,12 +418,12 @@ function AlertsSettingsView({
           type='button'
           onClick={onUnsubscribe}
           disabled={isUnsubscribing}
-          className='mt-5 w-full px-4 py-3 text-center text-[14px] font-semibold text-white/72 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:text-white/36'
+          className='mt-5 w-full px-4 py-3 text-center text-sm font-semibold text-white/72 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:text-white/36'
         >
           {isUnsubscribing ? 'Turning off...' : 'Turn off alerts'}
         </button>
       ) : (
-        <p className='px-4 pt-4 text-[12px] leading-5 text-white/42'>
+        <p className='px-4 pt-4 text-xs leading-5 text-white/42'>
           Alert preferences appear here after alerts are enabled.
         </p>
       )}
@@ -508,7 +508,7 @@ export function ProfilePrimaryTabPanel({
         >
           <div>
             <div className='px-4 pb-2 pt-3'>
-              <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+              <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
                 Music
               </h2>
             </div>
@@ -529,7 +529,7 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
             Music
           </h2>
         </div>
@@ -551,7 +551,7 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-tour'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-[20px] font-semibold leading-none tracking-[-0.014em] text-white'>
+          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
             Events
           </h2>
         </div>

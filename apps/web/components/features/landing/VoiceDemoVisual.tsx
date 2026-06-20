@@ -93,7 +93,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
         )}
       </div>
 
-      <div className='mt-3 text-[10px] text-tertiary-token'>
+      <div className='mt-3 text-3xs text-tertiary-token'>
         Powered by ElevenLabs • Consent-first • 1-click train
       </div>
 

@@ -93,10 +93,10 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
               )}
             </div>
             <div className='min-w-0'>
-              <div className='truncate text-[13px] font-caption text-primary-token leading-tight'>
+              <div className='truncate text-app font-caption text-primary-token leading-tight'>
                 {trackTitle}
               </div>
-              <div className='truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
+              <div className='truncate text-2xs text-tertiary-token leading-tight mt-0.5'>
                 {artistName}
               </div>
             </div>
@@ -150,7 +150,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
           </div>
 
           <div className='flex items-center gap-2 min-w-0'>
-            <span className='text-[10px] tabular-nums text-quaternary-token w-8 text-right shrink-0'>
+            <span className='text-3xs tabular-nums text-quaternary-token w-8 text-right shrink-0'>
               {formatTime(safeTime)}
             </span>
             <div className='relative flex-1 h-[3px] rounded-full bg-tertiary-token/30 overflow-hidden'>
@@ -159,7 +159,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
                 style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
               />
             </div>
-            <span className='text-[10px] tabular-nums text-quaternary-token w-8 shrink-0'>
+            <span className='text-3xs tabular-nums text-quaternary-token w-8 shrink-0'>
               {formatTime(safeDuration)}
             </span>
           </div>

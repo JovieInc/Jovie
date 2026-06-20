@@ -448,7 +448,7 @@ export function AdminFeedbackTable({
               className='space-y-1.5'
               surface='card'
             >
-              <div className='rounded-md bg-surface-0 px-2.5 py-2 text-[12.5px] leading-[19px] whitespace-pre-wrap text-primary-token'>
+              <div className='rounded-md bg-surface-0 px-2.5 py-2 text-xs leading-[19px] whitespace-pre-wrap text-primary-token'>
                 {selected.message}
               </div>
             </DrawerSection>
@@ -460,7 +460,7 @@ export function AdminFeedbackTable({
               surface='card'
             >
               <div className='overflow-auto rounded-md bg-surface-0 p-0'>
-                <pre className='p-2.5 text-[10.5px] leading-[16px] text-secondary-token'>
+                <pre className='p-2.5 text-3xs leading-[16px] text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
                 </pre>
               </div>

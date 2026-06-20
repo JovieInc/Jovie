@@ -33,7 +33,7 @@ export function HeroScrollSection() {
                 <ClaimHandleForm size='hero' />
               </div>
 
-              <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
+              <p className='mt-3.5 text-2xs tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
                 Private launch access with your artist page and next release
                 ready to go.
               </p>

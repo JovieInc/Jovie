@@ -9,7 +9,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -26,7 +26,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-tertiary-token'>{title}</span>
+      <span className='text-2xs text-tertiary-token'>{title}</span>
       {children}
     </div>
   );
@@ -36,7 +36,7 @@ export default function SwitchesPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Switch</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app toggle — compact 28×16px track, smooth thumb
         transition
       </p>
@@ -68,7 +68,7 @@ export default function SwitchesPage() {
             <Switch id='notifications' aria-label='Enable notifications' />
             <label
               htmlFor='notifications'
-              className='text-[13px] font-[510] text-primary-token'
+              className='text-app font-[510] text-primary-token'
             >
               Enable notifications
             </label>
@@ -83,7 +83,7 @@ export default function SwitchesPage() {
             />
             <label
               htmlFor='auto-assign'
-              className='text-[13px] font-[510] text-primary-token'
+              className='text-app font-[510] text-primary-token'
             >
               Auto-assign issues
             </label>
@@ -98,7 +98,7 @@ export default function SwitchesPage() {
             />
             <label
               htmlFor='disabled-setting'
-              className='text-[13px] font-[510] text-primary-token opacity-50'
+              className='text-app font-[510] text-primary-token opacity-50'
             >
               Disabled setting
             </label>
@@ -121,7 +121,7 @@ export default function SwitchesPage() {
               >
                 <label
                   htmlFor={`setting-${item.label}`}
-                  className='text-[13px] font-[450] text-primary-token'
+                  className='text-app font-[450] text-primary-token'
                 >
                   {item.label}
                 </label>

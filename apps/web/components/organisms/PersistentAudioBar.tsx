@@ -283,7 +283,7 @@ export function PersistentAudioBar({
         <div className='min-w-0 shrink-0 w-[120px] lg:w-[180px]'>
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-caption leading-[1.2] text-primary-token'
+            className='text-xs font-caption leading-[1.2] text-primary-token'
           >
             {playbackState.trackTitle ?? ''}
           </TruncatedText>
@@ -301,7 +301,7 @@ export function PersistentAudioBar({
 
         {/* Seek area */}
         <div className='flex flex-1 items-center gap-2 min-w-0'>
-          <span className='text-[10px] tabular-nums text-quaternary-token shrink-0 w-8 text-right'>
+          <span className='text-3xs tabular-nums text-quaternary-token shrink-0 w-8 text-right'>
             {currentTimeFormatted}
           </span>
           <SeekBar
@@ -311,11 +311,11 @@ export function PersistentAudioBar({
             disabled={isLoading}
             className='h-[3px] flex-1 min-w-[60px] bg-surface-1'
           />
-          <span className='text-[10px] tabular-nums text-quaternary-token shrink-0 w-8'>
+          <span className='text-3xs tabular-nums text-quaternary-token shrink-0 w-8'>
             {durationFormatted}
           </span>
           {isPreview ? (
-            <span className='text-[9px] text-tertiary-token shrink-0'>
+            <span className='text-3xs text-tertiary-token shrink-0'>
               Preview
             </span>
           ) : null}

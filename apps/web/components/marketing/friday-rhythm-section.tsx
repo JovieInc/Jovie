@@ -260,7 +260,7 @@ function FridayRhythmContent({
           <span className='block'>Make Every Friday</span>
           <span className='block'>Count</span>
         </h2>
-        <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-[16px]'>
+        <p className='mt-5 max-w-[34rem] text-mid leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-base'>
           Jovie turns each release week into a command center for singles,
           presaves, merch, videos, recaps, and follow-up.
         </p>
@@ -304,7 +304,7 @@ function FridayRhythmContent({
       <div className='mx-auto mt-10 flex flex-col items-center gap-5 text-center'>
         <p
           aria-live={mode === 'mobile' ? 'polite' : 'off'}
-          className='text-[15px] leading-6 text-white/56'
+          className='text-mid leading-6 text-white/56'
         >
           <span className='font-medium text-white'>
             {activeFridays} Fridays.
@@ -326,7 +326,7 @@ function RhythmReleaseKey() {
   return (
     <ul
       aria-label='Friday release mix'
-      className='relative z-10 mx-auto mt-5 flex max-w-[44rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] leading-none text-white/38'
+      className='relative z-10 mx-auto mt-5 flex max-w-[44rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-2xs leading-none text-white/38'
     >
       {FRIDAY_RELEASE_KINDS.map(kind => (
         <li key={kind.key} className='flex items-center gap-1.5'>
@@ -470,7 +470,7 @@ function RhythmModeButton({
     <button
       aria-pressed={active}
       className={cn(
-        'rounded-full px-4 py-2 text-[12px] font-medium transition-colors duration-subtle',
+        'rounded-full px-4 py-2 text-xs font-medium transition-colors duration-subtle',
         active ? 'bg-white text-black' : 'text-white/58 hover:text-white'
       )}
       onClick={onClick}

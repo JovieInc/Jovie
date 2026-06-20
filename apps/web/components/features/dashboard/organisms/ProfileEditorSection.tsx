@@ -63,7 +63,7 @@ function ProfileIdentityFieldRow({
           className={cn(
             'w-full rounded-md border border-transparent px-3 py-2.5 text-center transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 active:bg-surface-2',
             tone === 'primary'
-              ? 'min-h-[52px] text-[17px] font-semibold tracking-[-0.02em] text-primary-token'
+              ? 'min-h-[52px] text-base font-semibold tracking-[-0.02em] text-primary-token'
               : 'min-h-[44px] text-app font-caption tracking-[-0.01em] text-secondary-token'
           )}
           onClick={onEdit}

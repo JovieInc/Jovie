@@ -222,7 +222,7 @@ export function ReleaseDspLinks({
                         side='top'
                       >
                         <span
-                          className='hidden text-[10px] text-tertiary-token md:inline'
+                          className='hidden text-3xs text-tertiary-token md:inline'
                           title={verifiedLabel ?? undefined}
                         >
                           {formatTimeAgo(provider.updatedAt)}
@@ -241,7 +241,7 @@ export function ReleaseDspLinks({
       {/* Missing providers — visually muted, warning affordance */}
       {unresolvedProviders.length > 0 && (
         <div className='mt-3 space-y-1.5'>
-          <div className='flex items-center gap-1.5 px-2 text-[10px] font-medium uppercase tracking-wide text-tertiary-token'>
+          <div className='flex items-center gap-1.5 px-2 text-3xs font-medium uppercase tracking-wide text-tertiary-token'>
             <AlertTriangle className='h-3 w-3' aria-hidden='true' />
             <span>Missing</span>
           </div>
@@ -270,7 +270,7 @@ export function ReleaseDspLinks({
                     <span className='text-app font-[460] text-secondary-token'>
                       {label}
                     </span>
-                    <span className='shrink-0 text-[10px] text-tertiary-token'>
+                    <span className='shrink-0 text-3xs text-tertiary-token'>
                       Missing
                     </span>
                   </div>

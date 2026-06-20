@@ -313,7 +313,7 @@ function TrackListRow({
   }
 
   const titleNode = (
-    <p className='truncate text-[12.5px] font-caption leading-tight text-primary-token'>
+    <p className='truncate text-xs font-caption leading-tight text-primary-token'>
       {track.title}
     </p>
   );

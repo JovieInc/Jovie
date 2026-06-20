@@ -49,8 +49,8 @@ function DaysOldBadge({ daysOld }: Readonly<{ readonly daysOld: number }>) {
       title={`${daysOld} days old${isOverdue ? ' — overdue' : ''}`}
       className={
         isOverdue
-          ? 'text-[11px] font-semibold tabular-nums text-red-400 no-underline'
-          : 'text-[11px] tabular-nums text-tertiary-token no-underline'
+          ? 'text-2xs font-semibold tabular-nums text-red-400 no-underline'
+          : 'text-2xs tabular-nums text-tertiary-token no-underline'
       }
     >
       {daysOld}d
@@ -77,7 +77,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
           rel='noopener noreferrer'
           className='group flex items-center gap-1.5'
         >
-          <p className='truncate text-[13px] font-semibold text-primary-token transition-colors group-hover:text-warning'>
+          <p className='truncate text-app font-semibold text-primary-token transition-colors group-hover:text-warning'>
             {issue.title}
           </p>
           <ExternalLink
@@ -85,14 +85,14 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
             aria-hidden='true'
           />
         </a>
-        <p className='mt-0.5 text-[11px] text-tertiary-token'>
+        <p className='mt-0.5 text-2xs text-tertiary-token'>
           {issue.identifier}
         </p>
       </div>
 
       {/* Priority badge */}
       <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${priorityConfig.className}`}
+        className={`shrink-0 rounded px-1.5 py-0.5 text-3xs font-semibold ${priorityConfig.className}`}
       >
         {priorityConfig.label}
       </span>
@@ -225,11 +225,11 @@ export function TimActionRequiredSection() {
             className='h-2 w-2 shrink-0 rounded-full bg-warning'
             aria-hidden='true'
           />
-          <p className='text-[12px] font-caption text-tertiary-token'>
+          <p className='text-xs font-caption text-tertiary-token'>
             Tim Action Required
           </p>
           {!isLoading && visibleIssues.length > 0 ? (
-            <span className='ml-auto text-[11px] tabular-nums text-tertiary-token'>
+            <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
               {visibleIssues.length}
             </span>
           ) : null}
