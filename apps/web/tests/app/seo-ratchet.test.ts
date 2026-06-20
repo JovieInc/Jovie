@@ -327,7 +327,7 @@ describe('seo-ratchet live surface validators', () => {
     'Sitemap: https://jov.ie/sitemap.xml',
     'Host: https://jov.ie',
     '',
-    ...baseline.robots.requiredAiCrawlers.flatMap(crawler => [
+    ...ratchetBaseline.robots.requiredAiCrawlers.flatMap(crawler => [
       `User-agent: ${crawler}`,
       'Allow: /',
       'Allow: /llms.txt',
@@ -349,7 +349,7 @@ describe('seo-ratchet live surface validators', () => {
 
   it('accepts production-shaped robots.txt bodies', () => {
     const violations = validateRobotsTxtSurface(productionRobots, {
-      requiredAiCrawlers: baseline.robots.requiredAiCrawlers,
+      requiredAiCrawlers: ratchetBaseline.robots.requiredAiCrawlers,
     });
 
     expect(violations).toEqual([]);
