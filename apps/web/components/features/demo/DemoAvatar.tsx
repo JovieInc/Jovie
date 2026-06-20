@@ -9,7 +9,7 @@ export function DemoAvatar({
 }) {
   return (
     <div
-      className='inline-flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium text-white'
+      className='inline-flex shrink-0 items-center justify-center rounded-full text-3xs font-medium text-white'
       style={{
         width: size,
         height: size,
