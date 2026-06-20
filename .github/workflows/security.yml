@@ -116,3 +116,32 @@ jobs:
         with:
           sarif_file: 'scorecard-results.sarif'
           category: 'ossf-scorecard'
+
+  commit-signature-check:
+    name: Commit Signature Verification
+    runs-on: ubuntu-latest
+    # Run on every push to main so unsigned agent-authored merges are surfaced immediately.
+    # This is observability only — blocking unsigned commits requires enabling
+    # "Require signed commits" in branch protection settings (human/admin action).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    steps:
+      - name: Verify commit is signed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          response=$(gh api "repos/${REPO}/commits/${COMMIT_SHA}" \
+            --jq '{verified: .commit.verification.verified, reason: .commit.verification.reason}')
+          verified=$(echo "$response" | jq -r '.verified')
+          reason=$(echo "$response" | jq -r '.reason')
+          echo "commit=${COMMIT_SHA}: verified=${verified}, reason=${reason}"
+          if [ "$verified" = "true" ]; then
+            echo "✅ Commit is cryptographically signed and verified."
+          else
+            printf '⚠️ Unsigned commit merged to main (reason: %s)\n' "$reason"
+            echo "::warning title=Unsigned commit::SHA ${COMMIT_SHA} reached main without a cryptographic signature (reason: ${reason}). Enable branch-protection \"Require signed commits\" to block unsigned merges — see https://github.com/${REPO}/settings/branches"
+          fi
