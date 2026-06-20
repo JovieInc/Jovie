@@ -24,13 +24,13 @@ export function ProfileMerchCard({
     <Link
       href={href}
       className={cn(
-        'group block min-w-0 rounded-[8px] border border-white/10 bg-white/[0.055] p-2 text-left text-white transition-[background-color,border-color] duration-subtle hover:border-white/18 hover:bg-white/[0.075] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70',
+        'group block min-w-0 rounded-lg border border-white/10 bg-white/[0.055] p-2 text-left text-white transition-[background-color,border-color] duration-subtle hover:border-white/18 hover:bg-white/[0.075] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70',
         className
       )}
       data-testid='profile-merch-card'
     >
-      <div className='flex min-h-[112px] gap-3'>
-        <div className='relative h-28 w-24 shrink-0 overflow-hidden rounded-[6px] bg-black/40'>
+      <div className='flex min-h-28 gap-3'>
+        <div className='relative h-28 w-24 shrink-0 overflow-hidden rounded-md bg-black/40'>
           {imageUrl ? (
             <Image
               src={imageUrl}
@@ -47,14 +47,14 @@ export function ProfileMerchCard({
         </div>
         <div className='flex min-w-0 flex-1 flex-col justify-between py-0.5'>
           <div className='min-w-0'>
-            <div className='mb-1 flex items-center gap-1.5 text-[10px] font-semibold leading-none text-white/58 [letter-spacing:0]'>
+            <div className='mb-1 flex items-center gap-1.5 text-3xs font-semibold leading-none text-white/58 [letter-spacing:0]'>
               <ShoppingBag className='h-3 w-3 shrink-0' />
               <span>Merch</span>
             </div>
-            <h3 className='line-clamp-2 text-[15px] font-semibold leading-tight text-white [letter-spacing:0]'>
+            <h3 className='line-clamp-2 text-mid font-semibold leading-tight text-white [letter-spacing:0]'>
               {card.title}
             </h3>
-            <p className='mt-1 line-clamp-2 text-[12px] leading-snug text-white/62'>
+            <p className='mt-1 line-clamp-2 text-xs leading-snug text-white/62'>
               {card.productType}
             </p>
           </div>
@@ -67,12 +67,12 @@ export function ProfileMerchCard({
               );
               return (
                 <div className='min-w-0'>
-                  <span className='text-[13px] font-semibold text-white'>
+                  <span className='text-app font-semibold text-white'>
                     {p.isOnSale ? (
                       <>
                         <span className='text-emerald-400'>Sale </span>
                         {p.displayPrice}
-                        <span className='ml-1 text-[10px] line-through text-white/50'>
+                        <span className='ml-1 text-3xs line-through text-white/50'>
                           {p.originalPrice}
                         </span>
                       </>
@@ -81,14 +81,14 @@ export function ProfileMerchCard({
                     )}
                   </span>
                   {p.creatorProfit ? (
-                    <p className='mt-0.5 text-[11px] text-white/58'>
+                    <p className='mt-0.5 text-2xs text-white/58'>
                       Profit {p.creatorProfit}
                     </p>
                   ) : null}
                 </div>
               );
             })()}
-            <span className='rounded-full border border-white/12 px-2 py-1 text-[11px] font-medium text-white/78'>
+            <span className='rounded-full border border-white/12 px-2 py-1 text-2xs font-medium text-white/78'>
               Buy
             </span>
           </div>

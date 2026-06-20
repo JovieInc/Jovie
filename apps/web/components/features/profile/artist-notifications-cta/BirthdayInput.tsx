@@ -110,7 +110,7 @@ export function BirthdayInput({
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   ariaLabel={`${group.label} digit ${index - group.digits[0].index + 1}`}
-                  boxSizeClassName='min-h-[44px] w-9 text-[1.3rem] sm:h-[48px] sm:w-10 sm:text-[1.35rem]'
+                  boxSizeClassName='min-h-11 w-9 text-[1.3rem] sm:h-12 sm:w-10 sm:text-[1.35rem]'
                   textSizeClassName='text-[1.3rem] sm:text-[1.35rem]'
                 />
               ))}
