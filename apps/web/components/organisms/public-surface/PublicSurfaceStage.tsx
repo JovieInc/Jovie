@@ -16,7 +16,7 @@ export function PublicSurfaceStage({
   return (
     <div
       className={cn(
-        'relative mx-auto flex h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:h-auto md:min-h-[100dvh] md:items-center md:px-6 md:py-8',
+        'relative mx-auto flex h-[100dvh] w-full max-w-170 items-stretch justify-center md:h-auto md:min-h-[100dvh] md:items-center md:px-6 md:py-8',
         className
       )}
     >

@@ -61,7 +61,7 @@ describe('EntityHeaderCard', () => {
     expect(title).toBeInTheDocument();
     expect(title.parentElement?.nextElementSibling).toHaveClass(
       'invisible',
-      'min-h-[16px]'
+      'min-h-4'
     );
   });
 });

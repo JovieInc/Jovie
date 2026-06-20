@@ -280,7 +280,7 @@ export function PersistentAudioBar({
         )}
 
         {/* Track info */}
-        <div className='min-w-0 shrink-0 w-[120px] lg:w-[180px]'>
+        <div className='min-w-0 shrink-0 w-30 lg:w-45'>
           <TruncatedText
             lines={1}
             className='text-xs font-caption leading-[1.2] text-primary-token'
@@ -309,7 +309,7 @@ export function PersistentAudioBar({
             duration={playbackState.duration}
             onSeek={seek}
             disabled={isLoading}
-            className='h-[3px] flex-1 min-w-[60px] bg-surface-1'
+            className='h-[3px] flex-1 min-w-15 bg-surface-1'
           />
           <span className='text-3xs tabular-nums text-quaternary-token shrink-0 w-8'>
             {durationFormatted}

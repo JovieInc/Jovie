@@ -253,7 +253,7 @@ export function ReleaseDspLinks({
                 <div
                   key={`missing-${key}`}
                   className={cn(
-                    'group flex min-h-[32px] items-center justify-between rounded-[10px] border border-dashed border-subtle bg-transparent px-2 py-1.5 opacity-75',
+                    'group flex min-h-8 items-center justify-between rounded-[10px] border border-dashed border-subtle bg-transparent px-2 py-1.5 opacity-75',
                     'transition-[background-color,opacity] duration-150 lg:hover:opacity-100'
                   )}
                   data-dsp-status='missing'
@@ -375,12 +375,12 @@ export function ReleaseDspLinks({
               disabled={
                 !isValidUrl(newLinkUrl) || !selectedProvider || isAddingDspLink
               }
-              className='min-w-[68px]'
+              className='min-w-17'
             >
               {isAddingDspLink ? 'Adding...' : 'Add'}
             </DrawerButton>
           </div>
-          <p className='min-h-[16px] text-2xs leading-[15px] text-tertiary-token'>
+          <p className='min-h-4 text-2xs leading-[15px] text-tertiary-token'>
             {!selectedProvider || !isValidUrl(newLinkUrl)
               ? 'Choose a provider and paste a valid URL to add this link.'
               : 'Your draft will stay in place if the save fails.'}

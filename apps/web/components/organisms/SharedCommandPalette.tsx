@@ -369,7 +369,7 @@ export function InlinePalette({
         aria-label='Slash command suggestions'
         className={cn(
           'min-h-0 flex-1 overflow-y-auto p-[5px]',
-          variant === 'inline' && 'max-h-[260px]'
+          variant === 'inline' && 'max-h-65'
         )}
       >
         <PaletteList

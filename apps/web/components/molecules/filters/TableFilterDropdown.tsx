@@ -86,7 +86,7 @@ function TableFilterSection<T extends string>({
   }, [category.options, search]);
 
   return (
-    <div className='flex max-h-[320px] min-h-[220px] min-w-[260px] flex-col overflow-hidden'>
+    <div className='flex max-h-80 min-h-55 min-w-65 flex-col overflow-hidden'>
       <div
         data-menu-header
         className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)]'
@@ -171,7 +171,7 @@ function TableFilterSubmenu<T extends string>({
           label={category.label}
           trailingVisual={
             category.selectedIds.length > 0 ? (
-              <span className='inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[6px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_30%,transparent)] px-[5px] text-3xs tabular-nums text-tertiary-token'>
+              <span className='inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-md border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_30%,transparent)] px-[5px] text-3xs tabular-nums text-tertiary-token'>
                 {category.selectedIds.length}
               </span>
             ) : null
@@ -245,7 +245,7 @@ export function TableFilterDropdown<T extends string = string>({
         data-menu-surface='toolbar'
         className={cn(
           TOOLBAR_MENU_CONTENT_CLASS,
-          'flex min-w-[240px] max-w-[calc(100vw-16px)] flex-col'
+          'flex min-w-60 max-w-[calc(100vw-16px)] flex-col'
         )}
         onCloseAutoFocus={event => event.preventDefault()}
       >

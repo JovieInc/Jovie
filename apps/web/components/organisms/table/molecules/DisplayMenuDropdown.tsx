@@ -151,7 +151,7 @@ export function DisplayMenuDropdown({
   return (
     <Popover>
       <PopoverTrigger asChild>{trigger ?? defaultTrigger}</PopoverTrigger>
-      <PopoverContent align='end' className='w-[280px]'>
+      <PopoverContent align='end' className='w-70'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-subtle px-2.5 py-1.5'>
           <span className='text-app font-semibold text-primary-token'>

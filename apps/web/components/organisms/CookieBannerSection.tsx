@@ -182,7 +182,7 @@ export function CookieBannerSection() {
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'
-          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-[340px] sm:max-w-[380px]'
+          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95'
         >
           <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
             <div className='flex items-start gap-3'>

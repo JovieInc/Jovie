@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex min-h-[40px] min-w-0 items-center gap-1.5 bg-transparent px-app-header py-1.5';
+  'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-app-header py-1.5';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -38,7 +38,7 @@ export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
   'w-7 justify-center px-0 text-tertiary-token';
 
 export const TABLE_TOOLBAR_SHELL_CLASS =
-  'flex h-11 min-h-[44px] min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'flex h-11 min-h-11 min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 export const TABLE_TOOLBAR_OVERLAY_CLASS = cn(
   'absolute inset-x-0 top-0 z-10',
@@ -52,12 +52,12 @@ export const TABLE_TOOLBAR_RIGHT_CLASS =
 
 export const TABLE_TOOLBAR_MENU_BUTTON_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-  'min-w-[88px] justify-center text-secondary-token'
+  'min-w-22 justify-center text-secondary-token'
 );
 
 export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-  'min-w-[112px] justify-between gap-1.5 rounded-full px-2.5 text-secondary-token'
+  'min-w-28 justify-between gap-1.5 rounded-full px-2.5 text-secondary-token'
 );
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =

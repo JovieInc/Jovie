@@ -106,7 +106,7 @@ describe('DrawerAnalyticsSummaryCard', () => {
     );
     expect(screen.getByTestId('analytics-card-footer')).toHaveClass(
       'invisible',
-      'min-h-[40px]'
+      'min-h-10'
     );
   });
 

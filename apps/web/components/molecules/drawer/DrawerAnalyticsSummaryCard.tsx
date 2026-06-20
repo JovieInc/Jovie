@@ -27,7 +27,7 @@ export interface DrawerAnalyticsSummaryCardProps {
 
 const METRIC_TILE_CLASSNAME = 'px-3 py-2.5';
 const STABLE_ANALYTICS_BODY_CLASSNAME = 'min-h-[106px]';
-const STABLE_ANALYTICS_FOOTER_CLASSNAME = 'min-h-[40px]';
+const STABLE_ANALYTICS_FOOTER_CLASSNAME = 'min-h-10';
 
 function MetricTile({
   label,
@@ -109,7 +109,7 @@ function DrawerAnalyticsSummaryBody({
 
   if (state === 'error') {
     return (
-      <div className='flex min-h-[72px] items-center'>
+      <div className='flex min-h-18 items-center'>
         <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
           {errorMessage}
         </p>
@@ -129,7 +129,7 @@ function DrawerAnalyticsSummaryBody({
 
   if (emptyMessage) {
     return (
-      <div className='flex min-h-[72px] items-center'>
+      <div className='flex min-h-18 items-center'>
         <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
           {emptyMessage}
         </p>

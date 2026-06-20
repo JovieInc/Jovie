@@ -81,7 +81,7 @@ function MobileNavCta({
     <Link
       href={href}
       className={cn(
-        'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
+        'group flex items-center justify-center gap-2 h-13 rounded-xl',
         'text-base font-semibold',
         'transition-colors duration-subtle ease-subtle'
       )}
@@ -241,7 +241,7 @@ export function MobileNav({
                     key={`${link.href}-${link.label}`}
                     href={link.href}
                     className={cn(
-                      'flex items-center h-[52px] px-4 rounded-xl',
+                      'flex items-center h-13 px-4 rounded-xl',
                       'text-base font-medium',
                       'text-primary-token',
                       'transition-colors duration-subtle ease-subtle',

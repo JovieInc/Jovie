@@ -348,10 +348,10 @@ export function TrackSidebar({
                   <DrawerMediaThumb
                     src={track.releaseArtworkUrl}
                     alt={`${track.releaseTitle} artwork`}
-                    sizeClassName='h-[72px] w-[72px] rounded-[10px]'
+                    sizeClassName='h-18 w-18 rounded-[10px]'
                     sizes='72px'
                     fallback={
-                      <div className='h-[72px] w-[72px] rounded-[10px] bg-surface-1' />
+                      <div className='h-18 w-18 rounded-[10px] bg-surface-1' />
                     }
                   />
                 }

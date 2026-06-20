@@ -144,7 +144,7 @@ export function ReleaseTrackList({
         ).map(id => (
           <div
             key={id}
-            className='flex items-center gap-3 rounded-[12px] px-1 py-2.5'
+            className='flex items-center gap-3 rounded-xl px-1 py-2.5'
             data-testid='release-track-skeleton'
           >
             <div className='h-8 w-8 rounded-full skeleton' />
@@ -161,7 +161,7 @@ export function ReleaseTrackList({
   if (hasError) {
     return (
       <DrawerEmptyState
-        className='min-h-[48px] px-0'
+        className='min-h-12 px-0'
         message='Failed to load tracks.'
         tone='error'
       />
@@ -171,7 +171,7 @@ export function ReleaseTrackList({
   if (!tracks || tracks.length === 0) {
     return (
       <DrawerEmptyState
-        className='min-h-[48px] px-0'
+        className='min-h-12 px-0'
         message='No track data available.'
       />
     );
