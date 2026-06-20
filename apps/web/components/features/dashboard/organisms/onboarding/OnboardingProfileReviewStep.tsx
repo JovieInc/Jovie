@@ -374,7 +374,7 @@ export function OnboardingProfileReviewStep({
                     </p>
                   )}
                   {avatarQuality?.status === 'low' ? (
-                    <div className='mt-2 flex max-w-[320px] items-start gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-xs text-secondary-token'>
+                    <div className='mt-2 flex max-w-80 items-start gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-xs text-secondary-token'>
                       <AlertCircle
                         className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
                         aria-hidden='true'
@@ -396,7 +396,7 @@ export function OnboardingProfileReviewStep({
                       <div
                         className={cn(
                           AUTH_SURFACE.fieldShell,
-                          'mx-auto max-w-[280px] justify-center px-3 py-2.5'
+                          'mx-auto max-w-70 justify-center px-3 py-2.5'
                         )}
                       >
                         <input

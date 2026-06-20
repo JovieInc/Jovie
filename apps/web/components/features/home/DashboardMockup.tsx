@@ -60,7 +60,7 @@ export function DashboardMockup({
         <div className='flex-1 text-center text-xs text-tertiary-token'>
           Jovie - Release Flow
         </div>
-        <div className='w-[52px]' />
+        <div className='w-13' />
       </div>
 
       {/* Column headers */}
@@ -193,7 +193,7 @@ export function DashboardMockup({
                   </p>
                 </div>
               </div>
-              <div className='mt-2 ml-[52px] flex items-center gap-1.5'>
+              <div className='mt-2 ml-13 flex items-center gap-1.5'>
                 <svg
                   width='11'
                   height='11'

@@ -122,7 +122,7 @@ function HomeAlertsCard({
         </span>
       </span>
       <span
-        className='relative inline-flex h-[28px] w-[48px] shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-[3px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
+        className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-[3px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
         aria-hidden='true'
         data-testid='profile-home-alerts-switch'
       >
@@ -269,7 +269,7 @@ export function ProfileHomeRail({
 
   return (
     <div
-      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-[320px]'
+      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
       data-feature-state={featuredState.kind}
     >

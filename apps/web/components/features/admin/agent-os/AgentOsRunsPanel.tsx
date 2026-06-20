@@ -126,7 +126,7 @@ function AgentRunDetailPopover({
         align='end'
         side='top'
         sideOffset={6}
-        className='w-[340px] rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-3 shadow-popover'
+        className='w-85 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-3 shadow-popover'
       >
         <div className='space-y-3'>
           <div className='min-w-0'>
@@ -385,7 +385,7 @@ const AGENT_OS_COLUMNS: ColumnDef<AgentRunArtifact, unknown>[] = [
     header: 'Run',
     cell: renderRunCell,
     size: 300,
-    meta: { className: 'min-w-[240px]' },
+    meta: { className: 'min-w-60' },
   }),
   columnHelper.display({
     id: 'status',
@@ -579,7 +579,7 @@ export function AgentOsRunsPanel({
                 getRowTestId={artifact => `agent-os-run-${artifact.id}`}
                 enableVirtualization={false}
                 minWidth='700px'
-                containerClassName='max-h-[460px]'
+                containerClassName='max-h-115'
               />
             </div>
           )}

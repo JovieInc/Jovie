@@ -77,8 +77,8 @@ function SplitLayoutContent({
     <div className='relative z-10 flex w-full flex-1 items-stretch justify-center'>
       {/* max-w constrains the split layout on ultra-wide displays so the form
           column doesn't strand at the left with an enormous dead-space right panel */}
-      <div className='grid w-full max-w-[1440px] gap-2 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:items-stretch'>
-        <div className='flex min-h-0 flex-col items-center justify-center px-4 sm:px-8 lg:max-w-[480px] lg:px-10'>
+      <div className='grid w-full max-w-360 gap-2 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:items-stretch'>
+        <div className='flex min-h-0 flex-col items-center justify-center px-4 sm:px-8 lg:max-w-120 lg:px-10'>
           {showFormTitle && formTitle ? (
             <h1
               className={cn(
@@ -98,7 +98,7 @@ function SplitLayoutContent({
             tabIndex={-1}
             className='w-full scroll-mt-4'
           >
-            <div className='mx-auto w-full max-w-[420px]'>{children}</div>
+            <div className='mx-auto w-full max-w-105'>{children}</div>
           </main>
 
           {showFooterPrompt && !isKeyboardVisible ? (

@@ -18,7 +18,7 @@ export function AudienceMemberActivityFeed({
   if (actions.length === 0) {
     return (
       <DrawerEmptyState
-        className='min-h-[104px]'
+        className='min-h-26'
         message='Activity will appear here as this contact interacts with your profile.'
       />
     );
@@ -75,7 +75,7 @@ function ActivityItem({
         <p className='truncate text-xs leading-4 text-primary-token'>{label}</p>
         <div className='mt-0.5 flex items-center gap-1.5 text-3xs text-tertiary-token'>
           {action.sourceLabel ? (
-            <span className='max-w-[140px] truncate rounded bg-surface-0 px-1 text-secondary-token'>
+            <span className='max-w-35 truncate rounded bg-surface-0 px-1 text-secondary-token'>
               {action.sourceLabel}
             </span>
           ) : null}

@@ -20,7 +20,7 @@ const PROFILE_INPUT_CLASS =
 const PROFILE_LABEL_COLUMN_WIDTH = '168px';
 const PROFILE_ROW_CLASS =
   'grid gap-2 py-3 sm:grid-cols-[var(--profile-label-column-width)_minmax(0,1fr)] sm:items-start sm:gap-x-5';
-const PROFILE_FIELD_COLUMN_CLASS = 'w-full sm:max-w-[420px]';
+const PROFILE_FIELD_COLUMN_CLASS = 'w-full sm:max-w-105';
 const PROFILE_LAYOUT_VARS = {
   '--profile-label-column-width': PROFILE_LABEL_COLUMN_WIDTH,
 } as CSSProperties;

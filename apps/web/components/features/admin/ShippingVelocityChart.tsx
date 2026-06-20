@@ -59,7 +59,7 @@ const SKELETON_LINE_KEYS = ['skel-a', 'skel-b', 'skel-c'];
 function ChartSkeleton() {
   return (
     <div
-      className='h-[200px] w-full rounded-lg bg-surface-0'
+      className='h-50 w-full rounded-lg bg-surface-0'
       aria-hidden='true'
     >
       <svg
@@ -418,7 +418,7 @@ export function ShippingVelocityChart({
       {isLoading ? (
         <ChartSkeleton />
       ) : error ? (
-        <div className='flex h-[200px] flex-col items-center justify-center gap-2'>
+        <div className='flex h-50 flex-col items-center justify-center gap-2'>
           <p className='text-app text-secondary-token'>{error}</p>
           {cachedAt ? (
             <p className='text-2xs text-tertiary-token'>
@@ -436,7 +436,7 @@ export function ShippingVelocityChart({
           </button>
         </div>
       ) : isEmpty ? (
-        <div className='flex h-[200px] items-center justify-center'>
+        <div className='flex h-50 items-center justify-center'>
           <p className='text-app text-tertiary-token'>
             No PRs in this period
           </p>

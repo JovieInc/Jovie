@@ -43,7 +43,7 @@ export function useWaitlistColumns({
             {entry.fullName}
           </span>
         ),
-        width: 'w-[180px]',
+        width: 'w-45',
       },
       {
         id: 'email',
@@ -56,7 +56,7 @@ export function useWaitlistColumns({
             {entry.email}
           </a>
         ),
-        width: 'w-[220px]',
+        width: 'w-55',
         hideOnMobile: true,
       },
       {
@@ -74,7 +74,7 @@ export function useWaitlistColumns({
             <span className='text-tertiary-token'>—</span>
           );
         },
-        width: 'w-[140px]',
+        width: 'w-35',
         hideOnMobile: true,
       },
       {
@@ -93,14 +93,14 @@ export function useWaitlistColumns({
                 href={entry.primarySocialUrlNormalized}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-accent hover:underline text-xs line-clamp-1 overflow-hidden text-ellipsis max-w-[220px]'
+                className='text-accent hover:underline text-xs line-clamp-1 overflow-hidden text-ellipsis max-w-55'
               >
                 {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
               </a>
             </div>
           );
         },
-        width: 'w-[280px]',
+        width: 'w-70',
         hideOnMobile: true,
       },
       {
@@ -112,14 +112,14 @@ export function useWaitlistColumns({
               href={entry.spotifyUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-accent hover:underline text-xs line-clamp-1 overflow-hidden text-ellipsis max-w-[220px] block'
+              className='text-accent hover:underline text-xs line-clamp-1 overflow-hidden text-ellipsis max-w-55 block'
             >
               {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
             </a>
           ) : (
             <span className='text-tertiary-token'>—</span>
           ),
-        width: 'w-[200px]',
+        width: 'w-50',
         hideOnMobile: true,
       },
       {
@@ -148,7 +148,7 @@ export function useWaitlistColumns({
             <span className='text-secondary-token'>{entry.heardAbout}</span>
           );
         },
-        width: 'w-[160px]',
+        width: 'w-40',
         hideOnMobile: true,
       },
       {
@@ -169,7 +169,7 @@ export function useWaitlistColumns({
         header: 'Created',
         cell: entry =>
           entry.createdAt ? dateFormatter.format(entry.createdAt) : '—',
-        width: 'w-[160px]',
+        width: 'w-40',
         hideOnMobile: true,
       },
       {
@@ -206,7 +206,7 @@ export function useWaitlistColumns({
           );
         },
         align: 'right',
-        width: 'w-[120px]',
+        width: 'w-30',
       },
     ],
     [approveStatuses, onApprove]

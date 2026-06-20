@@ -117,7 +117,7 @@ export function AudienceMemberReferrers({
   if (sources.length === 0) {
     return (
       <DrawerEmptyState
-        className='min-h-[88px]'
+        className='min-h-22'
         message='No source data yet.'
       />
     );

@@ -161,7 +161,7 @@ function SignalCard({
   }
 
   return (
-    <div className='pointer-events-none absolute left-[300px] top-[88px] z-20 w-[410px] rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 p-3 shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur'>
+    <div className='pointer-events-none absolute left-75 top-22 z-20 w-[410px] rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 p-3 shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur'>
       <div className='mb-2 flex items-center gap-3'>
         <ArtworkThumb
           src='/img/releases/the-deep-end.jpg'
@@ -205,7 +205,7 @@ function ApprovalStatus({
   }
 
   return (
-    <div className='pointer-events-none absolute left-[300px] bottom-[36px] z-20 flex items-center gap-2 rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 px-3 py-2 text-xs text-secondary-token shadow-[0_12px_35px_rgba(0,0,0,0.32)]'>
+    <div className='pointer-events-none absolute left-75 bottom-9 z-20 flex items-center gap-2 rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 px-3 py-2 text-xs text-secondary-token shadow-[0_12px_35px_rgba(0,0,0,0.32)]'>
       <span className='relative grid size-5 place-items-center rounded-full bg-primary-token text-(--linear-app-content-surface)'>
         <Check className='size-3' />
         {activeScene === 'approval-execution' ? (

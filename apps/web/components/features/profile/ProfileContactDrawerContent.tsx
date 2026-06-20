@@ -44,7 +44,7 @@ function TerritoryPills({
         <PopoverContent
           side='top'
           align='start'
-          className='w-auto min-w-[180px] rounded-[18px] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
+          className='w-auto min-w-45 rounded-[18px] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
         >
           <p className='text-2xs font-semibold tracking-[0.08em] text-white/42'>
             Territories

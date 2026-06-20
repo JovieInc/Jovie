@@ -103,11 +103,11 @@ export function AutomaticReleaseSmartlinksSection() {
                   <div className='flex-1 text-center text-[var(--linear-caption-size)] text-tertiary-token'>
                     Jovie Dashboard
                   </div>
-                  <div className='w-[52px]' />
+                  <div className='w-13' />
                 </div>
 
                 {/* Demo capture from the shared /demo route */}
-                <div className='relative h-[420px] overflow-hidden'>
+                <div className='relative h-105 overflow-hidden'>
                   <MarketingPhoneImage
                     scenarioId='dashboard-releases-desktop'
                     altOverride='Jovie releases dashboard showing the live shared releases workspace'
@@ -130,7 +130,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
               {/* Smart Link Card — beside the table */}
               <div
-                className='hidden md:flex flex-col w-[272px] shrink-0 overflow-hidden rounded-t-2xl rounded-b-none'
+                className='hidden md:flex flex-col w-68 shrink-0 overflow-hidden rounded-t-2xl rounded-b-none'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-0)',
                   color: 'var(--linear-text-primary)',

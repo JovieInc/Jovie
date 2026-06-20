@@ -32,7 +32,7 @@ export function PhoneMockupPreview({
       {/* Phone frame - simplified */}
       <div
         className={cn(
-          'relative w-full max-w-[300px] mx-auto',
+          'relative w-full max-w-75 mx-auto',
           'aspect-9/19 rounded-[28px]',
           'bg-surface-1 border border-(--linear-app-frame-seam)',
           'overflow-hidden'

@@ -135,7 +135,7 @@ const meta: Meta<typeof DashboardAudienceTable> = {
     Story => (
       <DashboardDataProvider value={mockDashboardData}>
         <TableMetaProvider>
-          <div className='h-[720px] bg-surface-1 text-primary-token'>
+          <div className='h-180 bg-surface-1 text-primary-token'>
             <Story />
           </div>
         </TableMetaProvider>

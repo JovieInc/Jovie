@@ -81,7 +81,7 @@ function PreviewPanelEmpty({
 
               <DrawerEmptyState message='Loading profile preview…' />
 
-              <div className='mx-auto w-full max-w-[320px]'>
+              <div className='mx-auto w-full max-w-80'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
                   <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
@@ -381,7 +381,7 @@ export function PreviewPanel() {
                 </div>
               </div>
 
-              <div className='mx-auto w-full max-w-[320px]'>
+              <div className='mx-auto w-full max-w-80'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
                   <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
@@ -391,7 +391,7 @@ export function PreviewPanel() {
                       </span>
                     </div>
 
-                    <div className='relative aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-3xl border border-(--linear-app-frame-seam) bg-surface-0'>
+                    <div className='relative aspect-[9/19.5] max-h-185 overflow-hidden rounded-3xl border border-(--linear-app-frame-seam) bg-surface-0'>
                       <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
                         <div className='h-1.5 w-24 rounded-full bg-black/55' />
                       </div>

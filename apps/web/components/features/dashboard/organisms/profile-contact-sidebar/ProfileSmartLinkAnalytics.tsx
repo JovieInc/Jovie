@@ -98,7 +98,7 @@ export function ProfileSmartLinkAnalytics({
   const content = (
     <>
       {/* Analytics metrics */}
-      <div className='min-h-[76px] px-3 pb-3 pt-3'>
+      <div className='min-h-19 px-3 pb-3 pt-3'>
         {showSkeleton && (
           <div className='grid grid-cols-2 gap-3'>
             <div className='space-y-1'>
@@ -116,7 +116,7 @@ export function ProfileSmartLinkAnalytics({
 
         {!showSkeleton && isError && (
           <DrawerEmptyState
-            className='min-h-[52px] px-0 py-0'
+            className='min-h-13 px-0 py-0'
             message='Analytics unavailable'
           />
         )}

@@ -25,14 +25,14 @@ const ROOT_CLASSNAME = {
 
 const CONTENT_CLASSNAME = {
   standalone:
-    'mx-auto flex min-h-screen w-full max-w-[1440px] gap-5 px-4 py-8 max-lg:flex-col sm:px-6 lg:gap-10 lg:px-8',
+    'mx-auto flex min-h-screen w-full max-w-360 gap-5 px-4 py-8 max-lg:flex-col sm:px-6 lg:gap-10 lg:px-8',
   embedded:
-    'mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 gap-5 px-4 py-6 max-lg:flex-col sm:px-6 lg:gap-8 lg:px-8',
+    'mx-auto flex min-h-0 w-full max-w-360 flex-1 gap-5 px-4 py-6 max-lg:flex-col sm:px-6 lg:gap-8 lg:px-8',
 } as const;
 
 const STAGE_HEIGHT_CLASSNAME = {
-  default: 'min-h-[520px]',
-  tall: 'min-h-[560px]',
+  default: 'min-h-130',
+  tall: 'min-h-140',
 } as const;
 
 const STAGE_VARIANT_CLASSNAME = {
@@ -69,7 +69,7 @@ export function OnboardingExperienceShell({
     >
       {topBar ? (
         <div className='shrink-0'>
-          <div className='mx-auto w-full max-w-[1440px] px-4 pt-4 sm:px-6 lg:px-8'>
+          <div className='mx-auto w-full max-w-360 px-4 pt-4 sm:px-6 lg:px-8'>
             {topBar}
           </div>
         </div>
@@ -77,7 +77,7 @@ export function OnboardingExperienceShell({
 
       <div className={CONTENT_CLASSNAME[mode]}>
         {sidebar ? (
-          <aside className='shrink-0 max-lg:w-full lg:w-[220px] xl:w-[240px] 2xl:w-[260px]'>
+          <aside className='shrink-0 max-lg:w-full lg:w-55 xl:w-60 2xl:w-65'>
             <div className='sticky top-8'>
               {sidebarTitle ? (
                 <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-4'>
@@ -113,7 +113,7 @@ export function OnboardingExperienceShell({
 
       {footer ? (
         <div className='shrink-0'>
-          <div className='mx-auto w-full max-w-[1440px] px-4 pb-6 sm:px-6 lg:px-8'>
+          <div className='mx-auto w-full max-w-360 px-4 pb-6 sm:px-6 lg:px-8'>
             {footer}
           </div>
         </div>

@@ -28,7 +28,7 @@ export function HomePhoneFrame({
         className='pointer-events-none absolute inset-x-[10%] top-[4%] h-[18%] rounded-full bg-[radial-gradient(circle,rgba(176,197,255,0.18),rgba(176,197,255,0.05)_48%,transparent_76%)] blur-3xl'
       />
 
-      <div className='homepage-phone-device relative w-full rounded-[2.65rem] p-[8px] shadow-[0_28px_84px_rgba(0,0,0,0.42)]'>
+      <div className='homepage-phone-device relative w-full rounded-[2.65rem] p-2 shadow-[0_28px_84px_rgba(0,0,0,0.42)]'>
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-[1px] rounded-[2.55rem] border border-white/12'
@@ -39,11 +39,11 @@ export function HomePhoneFrame({
         />
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute left-[11%] right-[11%] top-[10px] h-[24px] rounded-full bg-black'
+          className='pointer-events-none absolute left-[11%] right-[11%] top-[10px] h-6 rounded-full bg-black'
         />
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-[8px] rounded-[2.3rem] bg-[linear-gradient(165deg,rgba(255,255,255,0.14),rgba(255,255,255,0)_22%)] opacity-90'
+          className='pointer-events-none absolute inset-2 rounded-[2.3rem] bg-[linear-gradient(165deg,rgba(255,255,255,0.14),rgba(255,255,255,0)_22%)] opacity-90'
         />
 
         <div className='homepage-phone-screen relative aspect-[430/950] overflow-hidden rounded-[2.2rem] bg-black'>
@@ -69,13 +69,13 @@ export function HomePhoneFrame({
                   />
                 ))}
               </div>
-              <div className='relative h-[12px] w-[18px]'>
+              <div className='relative h-3 w-[18px]'>
                 <span className='absolute inset-0 rounded-full border-[1.8px] border-white/96' />
-                <span className='absolute left-[4px] right-[4px] top-[4px] h-[4px] rounded-full bg-white' />
+                <span className='absolute left-1 right-1 top-1 h-1 rounded-full bg-white' />
               </div>
-              <div className='relative h-[12px] w-[24px] rounded-[4px] border-[1.8px] border-white/92'>
-                <span className='absolute inset-[2px] rounded-[2px] bg-white' />
-                <span className='absolute -right-[3px] top-[3px] h-[4px] w-[2px] rounded-r-full bg-white/92' />
+              <div className='relative h-3 w-6 rounded-[4px] border-[1.8px] border-white/92'>
+                <span className='absolute inset-[2px] rounded-xs bg-white' />
+                <span className='absolute -right-[3px] top-[3px] h-1 w-[2px] rounded-r-full bg-white/92' />
               </div>
             </div>
           </div>
@@ -84,7 +84,7 @@ export function HomePhoneFrame({
 
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute bottom-[14px] left-1/2 h-[4px] w-[28%] -translate-x-1/2 rounded-full bg-white/22'
+          className='pointer-events-none absolute bottom-[14px] left-1/2 h-1 w-[28%] -translate-x-1/2 rounded-full bg-white/22'
         />
       </div>
     </div>

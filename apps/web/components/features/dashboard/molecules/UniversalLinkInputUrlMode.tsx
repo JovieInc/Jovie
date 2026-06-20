@@ -133,7 +133,7 @@ export function UniversalLinkInputUrlMode({
         className={cn(
           'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-[border-color,box-shadow]',
           isDropdownOpen
-            ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
+            ? 'rounded-t-xl border-2 border-b-0 border-accent'
             : 'rounded-xl border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
           disabled && 'opacity-50'
         )}

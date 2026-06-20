@@ -129,7 +129,7 @@ const overdueCount = TASKS.filter(
 
 export function DemoReleaseTasksSurface() {
   return (
-    <div className='mx-auto w-full max-w-[860px] px-6 py-8'>
+    <div className='mx-auto w-full max-w-215 px-6 py-8'>
       <section
         data-testid='demo-showcase-release-tasks'
         className='overflow-hidden rounded-[1.5rem] border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'

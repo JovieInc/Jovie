@@ -26,7 +26,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
   return (
     <div
       className={cn(
-        'relative flex w-full max-w-[420px] flex-col items-center rounded-3xl border border-subtle bg-surface-1/60 p-6 backdrop-blur',
+        'relative flex w-full max-w-105 flex-col items-center rounded-3xl border border-subtle bg-surface-1/60 p-6 backdrop-blur',
         className
       )}
       data-testid='voice-demo-visual'

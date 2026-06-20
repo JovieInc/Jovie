@@ -51,7 +51,7 @@ const PAIRS: ReadonlyArray<readonly [BentoCard, BentoCard]> = [
 export function HomeBentoPairs() {
   return (
     <section className='border-t border-black/[0.08] bg-[#f5f5f7] px-6 py-32 sm:py-36'>
-      <div className='mx-auto max-w-[1200px]'>
+      <div className='mx-auto max-w-300'>
         <p className='mb-[18px] font-[var(--marketing-font-body)] text-sm font-medium text-black/55'>
           What it does
         </p>
@@ -78,7 +78,7 @@ function BentoCardView({ card }: { readonly card: BentoCard }) {
   return (
     <article className='flex flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white shadow-[0_18px_70px_-56px_rgba(0,0,0,0.45)]'>
       <div
-        className='relative h-[320px] overflow-hidden border-b border-black/[0.06]'
+        className='relative h-80 overflow-hidden border-b border-black/[0.06]'
         style={{
           background:
             'radial-gradient(120% 80% at 50% 0%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 60%), linear-gradient(180deg, #ffffff, #f6f6f7)',
@@ -157,7 +157,7 @@ function TourPreview() {
   return (
     <div className='absolute inset-0 flex items-center justify-center px-8'>
       <PreviewHalo color='var(--geist-pink-solid)' />
-      <ul className='relative w-full max-w-[280px] space-y-2'>
+      <ul className='relative w-full max-w-70 space-y-2'>
         {cities.map(c => (
           <li
             key={c.city}

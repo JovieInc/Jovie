@@ -83,7 +83,7 @@ export function DemoEmptyState({ tab }: { readonly tab: DemoTab }) {
 
   return (
     <div className='flex h-full items-center justify-center'>
-      <div className='flex flex-col items-center gap-3 text-center max-w-[280px]'>
+      <div className='flex flex-col items-center gap-3 text-center max-w-70'>
         <div className='flex size-12 items-center justify-center rounded-xl bg-[rgba(255,255,255,0.04)] border border-subtle'>
           <Icon className='size-5 text-tertiary-token' />
         </div>

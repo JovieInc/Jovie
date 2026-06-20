@@ -232,7 +232,7 @@ function SuggestedMatchRow({
         <PopoverContent
           side='left'
           sideOffset={8}
-          className='hidden w-[240px] rounded-[10px] border-subtle bg-surface-0 p-3 lg:block'
+          className='hidden w-60 rounded-[10px] border-subtle bg-surface-0 p-3 lg:block'
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >

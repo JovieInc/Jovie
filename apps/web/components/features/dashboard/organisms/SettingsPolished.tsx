@@ -414,7 +414,7 @@ export function SettingsPolished({
 
     return (
       <div
-        className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+        className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
         data-testid='settings-polished'
       >
         <div className='lg:sticky lg:top-4 lg:self-start'>
@@ -444,7 +444,7 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+      className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
       data-testid='settings-polished'
     >
       <div className='lg:sticky lg:top-4 lg:self-start'>

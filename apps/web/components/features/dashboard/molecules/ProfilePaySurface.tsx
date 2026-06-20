@@ -68,8 +68,8 @@ function QrPreviewPanel({
       className={cn(
         'shrink-0 rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-0',
         isDrawer
-          ? 'flex h-[156px] w-[156px] items-center justify-center p-3'
-          : 'flex h-[148px] w-[148px] items-center justify-center p-3'
+          ? 'flex h-39 w-39 items-center justify-center p-3'
+          : 'flex h-37 w-37 items-center justify-center p-3'
       )}
     >
       {qrPreviewUrl ? (

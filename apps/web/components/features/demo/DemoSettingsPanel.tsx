@@ -124,7 +124,7 @@ export function DemoSettingsPanel() {
 
 function AudienceQualityCaptureCard() {
   return (
-    <div className='mx-auto max-w-[880px] px-4 py-4 sm:px-5 sm:py-5'>
+    <div className='mx-auto max-w-220 px-4 py-4 sm:px-5 sm:py-5'>
       <div
         className='overflow-hidden rounded-[24px] border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
         data-testid='demo-settings-audience-quality-capture'
@@ -206,7 +206,7 @@ function AudienceQualityCaptureCard() {
 
 function SyncSettingsCaptureCard() {
   return (
-    <div className='mx-auto max-w-[760px] px-4 py-4 sm:px-5 sm:py-5'>
+    <div className='mx-auto max-w-190 px-4 py-4 sm:px-5 sm:py-5'>
       <div
         className='overflow-hidden rounded-[24px] border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
         data-testid='demo-settings-sync-capture'
@@ -349,7 +349,7 @@ function SyncSurfacePill({
   value: string;
 }>) {
   return (
-    <div className='rounded-[16px] border border-subtle bg-surface-1 px-3 py-3'>
+    <div className='rounded-2xl border border-subtle bg-surface-1 px-3 py-3'>
       <p className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
         {label}
       </p>

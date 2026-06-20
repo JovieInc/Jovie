@@ -126,7 +126,7 @@ function PreviewAlertsPanel({
         state.kind === 'name' ||
         state.kind === 'birthday' ? (
           <div className='space-y-3'>
-            <div className='rounded-[22px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm text-white/72'>
+            <div className='rounded-3xl border border-white/12 bg-white/[0.06] px-4 py-3 text-sm text-white/72'>
               {state.value || state.label}
             </div>
             <div className='inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-black'>
@@ -141,7 +141,7 @@ function PreviewAlertsPanel({
               {OTP_SLOT_KEYS.map((slotKey, index) => (
                 <div
                   key={`otp-${slotKey}`}
-                  className='flex h-11 items-center justify-center rounded-[16px] border border-white/12 bg-white/[0.06] text-sm font-semibold text-white/78'
+                  className='flex h-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] text-sm font-semibold text-white/78'
                 >
                   {state.value?.[index] ?? ''}
                 </div>

@@ -154,8 +154,8 @@ function Badge({
 
   const sizeClasses =
     size === 'sm'
-      ? 'min-w-[16px] h-[16px] px-1 text-3xs'
-      : 'min-w-[24px] h-[20px] px-2 text-xs';
+      ? 'min-w-4 h-4 px-1 text-3xs'
+      : 'min-w-6 h-5 px-2 text-xs';
 
   return (
     <span
@@ -350,7 +350,7 @@ export function LiquidGlassMenu({
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+                  'relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
                   active
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -387,7 +387,7 @@ export function LiquidGlassMenu({
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
             className={cn(
-              'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+              'relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
               isExpanded
                 ? 'text-primary-token'
                 : 'text-tertiary-token hover:text-secondary-token'
@@ -410,7 +410,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
+              className='relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='sr-only'>Search</span>

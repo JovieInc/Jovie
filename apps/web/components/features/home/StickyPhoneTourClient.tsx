@@ -95,7 +95,7 @@ export function StickyPhoneTourClient({
       modes.map(mode => (
         <p
           key={mode.id}
-          className='max-w-[400px] marketing-lead-linear text-secondary-token'
+          className='max-w-100 marketing-lead-linear text-secondary-token'
         >
           {mode.description}
         </p>
@@ -129,7 +129,7 @@ export function StickyPhoneTourClient({
           <div className={PHONE_TOUR_CONTAINER_CLASS}>
             <div className='relative'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
-                <div className='relative min-h-[320px]'>
+                <div className='relative min-h-80'>
                   <span className='inline-flex items-center gap-1.5 self-start rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
                     {introBadge}
                   </span>

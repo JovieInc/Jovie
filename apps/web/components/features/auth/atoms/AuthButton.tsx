@@ -12,7 +12,7 @@ const authButtonVariants = cva(
     'disabled:opacity-70 disabled:cursor-not-allowed',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
     // Mobile-optimized height matching Linear
-    'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px]',
+    'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-10',
     // Keep hover states visual, never positional
     'transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out',
     // Press feedback stays visual, not positional

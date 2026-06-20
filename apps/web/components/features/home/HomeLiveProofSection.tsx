@@ -92,7 +92,7 @@ export function HomeLiveProofSection({
       aria-labelledby='homepage-live-proof-heading'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='max-w-[34rem]'>
             <h2
               id='homepage-live-proof-heading'

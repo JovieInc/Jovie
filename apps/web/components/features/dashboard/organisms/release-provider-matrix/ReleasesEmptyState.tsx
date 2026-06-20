@@ -16,7 +16,7 @@ export function ReleasesEmptyState({
   onRetryEnrichment,
 }: ReleasesEmptyStateProps) {
   const emptyCardClassName =
-    'flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center';
+    'flex min-h-53 flex-col items-center justify-center px-5 py-9 text-center';
 
   // During enrichment: show progress message
   if (enrichmentStatus === 'enriching') {

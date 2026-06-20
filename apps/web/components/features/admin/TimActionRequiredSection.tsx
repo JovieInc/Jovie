@@ -241,7 +241,7 @@ export function TimActionRequiredSection() {
             {[1, 2].map(i => (
               <div
                 key={i}
-                className='h-[52px] animate-pulse rounded-xl border border-subtle bg-surface-0'
+                className='h-13 animate-pulse rounded-xl border border-subtle bg-surface-0'
                 aria-hidden='true'
               />
             ))}

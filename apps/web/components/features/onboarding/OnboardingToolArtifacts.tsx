@@ -192,7 +192,7 @@ function StatusShell({
   return (
     <div
       className={cn(
-        'w-full max-w-[440px] px-1 py-2 text-primary-token',
+        'w-full max-w-110 px-1 py-2 text-primary-token',
         tone === 'error' && 'text-error'
       )}
       role={tone === 'error' ? 'alert' : 'status'}
@@ -336,7 +336,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
   return (
     <div
-      className='h-[168px] w-full max-w-[440px] px-1 py-1'
+      className='h-42 w-full max-w-110 px-1 py-1'
       data-testid='onboarding-artist-picker'
     >
       <div className='min-w-0 px-0.5'>
@@ -569,7 +569,7 @@ export function OnboardingHandleCheckCard({
   return (
     <div
       className={cn(
-        'w-full max-w-[440px] px-1 py-2 text-primary-token',
+        'w-full max-w-110 px-1 py-2 text-primary-token',
         available === false && 'text-error'
       )}
       data-testid='onboarding-handle-check'

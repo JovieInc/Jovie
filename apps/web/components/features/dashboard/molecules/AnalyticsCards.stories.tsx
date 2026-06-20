@@ -192,7 +192,7 @@ export const ResponsiveLayout: Story = {
 
       <div>
         <h3 className='text-lg font-semibold mb-2'>Tablet View (2 columns)</h3>
-        <div className='w-[768px] mx-auto'>
+        <div className='w-192 mx-auto'>
           <MockAnalyticsCards
             totalClicks={1250}
             spotifyClicks={750}
