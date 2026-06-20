@@ -117,9 +117,7 @@ function buildCardStyles(
         : 'flex min-h-16 items-center gap-3 px-3 py-2.5',
       className
     ),
-    artClassName: isShowcase
-      ? 'h-12 w-12 rounded-xl'
-      : 'h-11 w-11 rounded-xl',
+    artClassName: isShowcase ? 'h-12 w-12 rounded-xl' : 'h-11 w-11 rounded-xl',
     titleClassName: isShowcase
       ? 'text-sm font-semibold leading-[1.12] text-white'
       : 'text-app font-semibold leading-[1.1] text-white/92',

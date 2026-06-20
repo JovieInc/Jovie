@@ -215,10 +215,7 @@ export function ArtistHero({
               className={`${heroPearlClassName} inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-mid font-semibold tracking-[-0.015em] text-white/92 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
               aria-label={`Listen to ${artist.name}`}
             >
-              <Play
-                className='mr-2 h-4 w-4 fill-current'
-                aria-hidden='true'
-              />
+              <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
               Play
             </button>
           </div>
@@ -229,10 +226,7 @@ export function ArtistHero({
                   const content = (
                     <>
                       {primaryActionKind === 'tickets' ? (
-                        <Ticket
-                          className='mr-2 h-4 w-4'
-                          aria-hidden='true'
-                        />
+                        <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
                       ) : null}
                       {primaryAction.label}
                     </>
