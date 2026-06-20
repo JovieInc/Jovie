@@ -26,7 +26,7 @@ interface VerificationGateListProps {
 export function VerificationGateList({ gates }: VerificationGateListProps) {
   if (gates.length === 0) {
     return (
-      <div className='border-subtle border-t py-3 text-[12px] text-tertiary-token'>
+      <div className='border-subtle border-t py-3 text-xs text-tertiary-token'>
         No gates recorded.
       </div>
     );
@@ -45,17 +45,17 @@ export function VerificationGateList({ gates }: VerificationGateListProps) {
                 className='size-3.5 shrink-0 text-tertiary-token'
                 aria-hidden='true'
               />
-              <p className='truncate text-[12.5px] font-[540] text-primary-token'>
+              <p className='truncate text-xs font-[540] text-primary-token'>
                 {formatGateName(gate.name)}
               </p>
             </div>
-            <p className='mt-1 text-[11.5px] leading-4 text-tertiary-token'>
+            <p className='mt-1 text-2xs leading-4 text-tertiary-token'>
               {gate.summary ??
                 (gate.required ? 'Required gate.' : 'Optional gate.')}
             </p>
           </div>
           <div className='flex items-center gap-2 sm:justify-end'>
-            <span className='text-[11px] text-tertiary-token'>
+            <span className='text-2xs text-tertiary-token'>
               {gate.required ? 'Required' : 'Optional'}
             </span>
             <VerificationStatusPill status={gate.status} />
