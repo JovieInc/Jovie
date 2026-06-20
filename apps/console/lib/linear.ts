@@ -14,6 +14,8 @@ export interface TasteIssue {
   readonly priority: number;
   readonly priorityLabel: string;
   readonly createdAt: string;
+  /** Raw issue description markdown from Linear. Used by sweep script to extract capture targets. */
+  readonly description: string | null;
   /** One-line description of why this is blocked, pulled from the first line of the description. */
   readonly blockingReason: string;
 }
@@ -165,6 +167,7 @@ export async function fetchTasteInbox(
         priority: n.priority,
         priorityLabel: n.priorityLabel,
         createdAt: n.createdAt,
+        description: n.description,
         blockingReason: extractBlockingReason(n.description),
       };
     })
