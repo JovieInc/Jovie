@@ -11,6 +11,7 @@ import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { logger } from '@/lib/utils/logger';
 import { generateDistributionDraftsForRun } from '../distribution-drafts';
+import { syncStoreListingForRun } from '../store-listing';
 import type { ReleaseToRevenueRunStepOutputs } from '../types';
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '../types';
 
@@ -48,9 +49,13 @@ export async function initializeReleaseToRevenueRun(
     return;
   }
 
-  const distributionDrafts = await generateDistributionDraftsForRun({
-    stepOutputs,
-  });
+  const [distributionDrafts, storeListing] = await Promise.all([
+    generateDistributionDraftsForRun({ stepOutputs }),
+    syncStoreListingForRun({
+      workflowRunId: input.workflowRunId,
+      stepOutputs,
+    }),
+  ]);
 
   await db
     .update(workflowRuns)
@@ -60,6 +65,7 @@ export async function initializeReleaseToRevenueRun(
       stepOutputs: {
         ...stepOutputs,
         distributionDrafts,
+        storeListing,
       },
       updatedAt: new Date(),
     })
@@ -75,5 +81,6 @@ export async function initializeReleaseToRevenueRun(
     releaseId: stepOutputs.releaseId,
     title: stepOutputs.release.title,
     draftCount: distributionDrafts.items.length,
+    merchCardIds: storeListing.merchCardIds,
   });
 }

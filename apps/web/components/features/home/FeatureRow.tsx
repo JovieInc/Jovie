@@ -26,7 +26,7 @@ export function FeatureRow({
         <div className='mx-auto max-w-[var(--linear-content-max)]'>
           <div className='reveal-on-scroll grid items-center gap-10 lg:grid-cols-2 lg:gap-16'>
             {/* Left: text */}
-            <div className='max-w-[480px]'>
+            <div className='max-w-120'>
               <h2 className='marketing-h2-linear text-primary-token'>
                 {heading}
               </h2>
@@ -37,7 +37,7 @@ export function FeatureRow({
                 {bullets.map(bullet => (
                   <li
                     key={bullet}
-                    className='flex items-start gap-2.5 text-[15px] leading-[1.6] text-secondary-token'
+                    className='flex items-start gap-2.5 text-mid leading-[1.6] text-secondary-token'
                   >
                     <span
                       aria-hidden='true'

@@ -52,7 +52,7 @@ export function DashboardEarningsDemo() {
             key={card.label}
             className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
           >
-            <p className='text-[11px] text-tertiary-token'>{card.label}</p>
+            <p className='text-2xs text-tertiary-token'>{card.label}</p>
             <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
               {card.value}
             </p>
@@ -83,7 +83,7 @@ export function DashboardEarningsDemo() {
                       transition: `height 0.6s var(--ds-motion-cinematic-easing) ${i * 60}ms`,
                     }}
                   />
-                  <span className='text-[10px] text-tertiary-token'>
+                  <span className='text-3xs text-tertiary-token'>
                     {m.month}
                   </span>
                 </div>
@@ -118,7 +118,7 @@ export function DashboardEarningsDemo() {
                       </span>
                     )}
                   </p>
-                  <p className='text-[10px] text-tertiary-token'>{tip.time}</p>
+                  <p className='text-3xs text-tertiary-token'>{tip.time}</p>
                 </div>
                 <span className='text-xs font-semibold tabular-nums text-success'>
                   {tip.amount}
