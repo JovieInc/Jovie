@@ -35,6 +35,16 @@ const isCI = !!process.env.CI;
 const usesManagedLocalWebServer = !process.env.BASE_URL;
 const shouldThrottleManagedTestAuthRun =
   isCI && usesManagedLocalWebServer && useTestAuthBypass;
+// GitHub-hosted runners have ~7 GiB RAM; an 8 GiB Node heap plus Chromium OOMs mid-run.
+const smokeWebServerHeapMb = isCI ? 4096 : 8192;
+
+function buildSmokeWebServerNodeOptions(): string {
+  const withoutHeap = (process.env.NODE_OPTIONS ?? '')
+    .replace(/--max-old-space-size=\d+/g, '')
+    .trim();
+
+  return `${withoutHeap} --max-old-space-size=${smokeWebServerHeapMb}`.trim();
+}
 
 function getWorkers(defaultWorkers: number): number {
   const explicitWorkers = process.env.PLAYWRIGHT_WORKERS;
@@ -107,8 +117,7 @@ export default defineConfig({
                   NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
                 }
               : {}),
-            NODE_OPTIONS:
-              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
+            NODE_OPTIONS: buildSmokeWebServerNodeOptions(),
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: true,
