@@ -13,11 +13,11 @@ const TEXT_SLOT_HEIGHT_CLASSNAME: Record<
     2: 'min-h-8',
   },
   sm: {
-    1: 'min-h-[18px]',
+    1: 'min-h-5',
     2: 'min-h-9',
   },
   md: {
-    1: 'min-h-[22px]',
+    1: 'min-h-6',
     2: 'min-h-11',
   },
 };
@@ -112,7 +112,7 @@ export function StableHeaderChipRail({
     >
       <div
         className={cn(
-          'flex min-h-[22px] max-w-full items-center gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap pr-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 [&_*]:whitespace-nowrap',
+          'flex min-h-6 max-w-full items-center gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap pr-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 [&_*]:whitespace-nowrap',
           '[mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent)] [-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent)]',
           contentClassName
         )}

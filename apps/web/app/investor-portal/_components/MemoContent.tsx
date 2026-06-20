@@ -61,7 +61,7 @@ export function MemoContent({
           {/* Main prose — light mode applies white bg + dark text */}
           <article
             className={`investor-prose min-w-0 flex-1 rounded-[var(--radius-xl)] transition-colors duration-200 ${
-              isLight ? 'bg-[#fafaf9] p-6' : ''
+              isLight ? 'bg-(--color-badge-text) p-6' : ''
             }`}
             style={{
               fontSize: '15px',

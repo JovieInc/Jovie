@@ -171,7 +171,7 @@ function TableFilterSubmenu<T extends string>({
           label={category.label}
           trailingVisual={
             category.selectedIds.length > 0 ? (
-              <span className='inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-md border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_30%,transparent)] px-[5px] text-3xs tabular-nums text-tertiary-token'>
+              <span className='inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_30%,transparent)] px-1 text-3xs tabular-nums text-tertiary-token'>
                 {category.selectedIds.length}
               </span>
             ) : null

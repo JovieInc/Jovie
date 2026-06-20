@@ -32,7 +32,7 @@ export function ContentSectionHeader({
         'flex min-w-0 shrink-0 items-center justify-between gap-2 px-(--linear-app-header-padding-x)',
         variant === 'default' && 'border-b border-subtle bg-transparent',
         density === 'compact'
-          ? 'min-h-[38px] py-1.5'
+          ? 'min-h-10 py-1.5'
           : 'min-h-(--linear-app-header-height) py-1.5',
         className
       )}

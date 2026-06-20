@@ -219,7 +219,7 @@ export function MobileNav({
               id='mobile-nav-panel'
               className={cn(
                 'fixed inset-x-0 bottom-0 z-[100]',
-                'rounded-t-[20px]',
+                'rounded-t-3xl',
                 'transition-[opacity,transform] duration-cinematic ease-cinematic',
                 'translate-y-0 opacity-100 pointer-events-auto'
               )}
@@ -229,7 +229,7 @@ export function MobileNav({
               {/* Grabber handle */}
               <div className='flex justify-center pt-3 pb-2' aria-hidden='true'>
                 <div
-                  className='w-9 h-[5px] rounded-full'
+                  className='w-9 h-1 rounded-full'
                   style={GRABBER_STYLE}
                 />
               </div>

@@ -102,7 +102,7 @@ describe('DrawerAnalyticsSummaryCard', () => {
     );
 
     expect(screen.getByTestId('analytics-card-body')).toHaveClass(
-      'min-h-[106px]'
+      'min-h-27'
     );
     expect(screen.getByTestId('analytics-card-footer')).toHaveClass(
       'invisible',
@@ -124,7 +124,7 @@ describe('DrawerAnalyticsSummaryCard', () => {
     const metric = screen.getByTestId('drawer-analytics-metric-profile-views');
     expect(metric.querySelector('p[aria-hidden="true"]')).toHaveClass(
       'invisible',
-      'min-h-[13px]'
+      'min-h-3'
     );
   });
 });

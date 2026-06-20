@@ -162,7 +162,7 @@ export function DevSmartLinkPreview() {
             Released (Smart Link)
           </h2>
           <div
-            className='w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'
+            className='w-98 overflow-hidden rounded-pill ring-1 ring-white/10'
             style={{ height: 844 }}
           >
             <div className='h-full [&_.profile-viewport]:!h-full [&_.profile-viewport]:!min-h-0'>
@@ -176,7 +176,7 @@ export function DevSmartLinkPreview() {
             Unreleased (Presave)
           </h2>
           <div
-            className='w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'
+            className='w-98 overflow-hidden rounded-pill ring-1 ring-white/10'
             style={{ height: 844 }}
           >
             <div className='h-full [&_.profile-viewport]:!h-full [&_.profile-viewport]:!min-h-0'>
@@ -188,7 +188,7 @@ export function DevSmartLinkPreview() {
         <div className='flex flex-col items-center gap-3'>
           <h2 className='text-sm font-medium text-white/50'>Use This Sound</h2>
           <div
-            className='w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'
+            className='w-98 overflow-hidden rounded-pill ring-1 ring-white/10'
             style={{ height: 844 }}
           >
             <div className='h-full [&_.profile-viewport]:!h-full [&_.profile-viewport]:!min-h-0'>

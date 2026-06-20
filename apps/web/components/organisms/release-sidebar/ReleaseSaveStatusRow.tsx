@@ -17,7 +17,7 @@ interface ReleaseSaveStatusRowProps {
 export function ReleaseSaveStatusRow({
   status,
   feedback = null,
-  minHeightClassName = 'min-h-[22px]',
+  minHeightClassName = 'min-h-6',
 }: ReleaseSaveStatusRowProps) {
   if (status === 'idle' && !feedback) {
     return <div className={minHeightClassName} />;

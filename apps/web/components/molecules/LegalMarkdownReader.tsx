@@ -26,7 +26,7 @@ const LEGAL_MARKDOWN_STYLES = cn(
   '[&_ul.contains-task-list]:list-none [&_ul.contains-task-list]:pl-0',
   '[&_li.task-list-item]:flex [&_li.task-list-item]:items-start [&_li.task-list-item]:gap-2 [&_li.task-list-item]:pl-0',
   '[&_li.task-list-item_input]:mt-[0.45rem] [&_li.task-list-item_input]:h-3.5 [&_li.task-list-item_input]:w-3.5 [&_li.task-list-item_input]:shrink-0 [&_li.task-list-item_input]:accent-neutral-950 dark:[&_li.task-list-item_input]:accent-white',
-  '[&_code]:rounded-[5px] [&_code]:bg-neutral-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.92em] [&_code]:text-neutral-900 dark:[&_code]:bg-white/10 dark:[&_code]:text-neutral-100',
+  '[&_code]:rounded-md [&_code]:bg-neutral-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.92em] [&_code]:text-neutral-900 dark:[&_code]:bg-white/10 dark:[&_code]:text-neutral-100',
   '[&_pre]:my-7 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-neutral-200 [&_pre]:bg-neutral-950 [&_pre]:p-4 dark:[&_pre]:border-white/10 dark:[&_pre]:bg-black',
   '[&_pre_code]:block [&_pre_code]:min-w-max [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-app [&_pre_code]:leading-6 [&_pre_code]:text-neutral-100',
   '[&_table]:my-7 [&_table]:block [&_table]:w-full [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:border-separate [&_table]:border-spacing-0 [&_table]:text-left [&_table]:text-sm',

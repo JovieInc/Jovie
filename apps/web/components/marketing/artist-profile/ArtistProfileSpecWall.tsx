@@ -60,7 +60,7 @@ function ScreenshotCrop({
   return (
     <div
       className={cn(
-        'relative h-full w-full overflow-hidden rounded-[0.85rem] bg-[#05070a] ring-1 ring-inset ring-white/[0.07]',
+        'relative h-full w-full overflow-hidden rounded-[0.85rem] bg-(--color-bg-base) ring-1 ring-inset ring-white/[0.07]',
         className
       )}
     >
@@ -147,11 +147,11 @@ function MockPopoverVisual({
       aria-label={`${popoverLabel} preview`}
       className='flex h-full min-h-[10rem] items-center justify-center rounded-[0.9rem] bg-[radial-gradient(circle_at_50%_15%,rgba(20,184,166,0.09),transparent_40%),#070a0f] p-4'
     >
-      <div className='w-full max-w-[15rem] rounded-[0.9rem] border border-white/[0.07] bg-[#10141d] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'>
+      <div className='w-full max-w-[15rem] rounded-[0.9rem] border border-white/[0.07] bg-(--color-bg-input) p-3 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'>
         <div className='inline-flex rounded-full border border-white/10 bg-white px-3 py-1.5 text-2xs font-semibold text-black'>
           {popoverLabel}
         </div>
-        <div className='mt-3 space-y-2 rounded-[0.8rem] bg-[#090d14] p-2.5'>
+        <div className='mt-3 space-y-2 rounded-[0.8rem] bg-(--color-bg-surface-0) p-2.5'>
           {popoverItems.map(item => (
             <div
               key={item}
@@ -270,7 +270,7 @@ function ArtistProfilePowerFeatureTile({
       )}
       style={style}
     >
-      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-[#07090d] p-4'>
+      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-(--color-bg-base) p-4'>
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--tile-accent)]/60 to-transparent opacity-80'

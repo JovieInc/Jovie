@@ -71,11 +71,11 @@ export function CopyableUrlRow({
 
   const sizeClasses = {
     sm: {
-      container: 'h-[22px] gap-1 rounded-full px-2',
-      icon: 'h-[11px] w-[11px]',
+      container: 'h-6 gap-1 rounded-full px-2',
+      icon: 'h-3 w-3',
       value: 'text-3xs',
       button: 'h-4 w-4 rounded-full',
-      glyph: 'h-[10px] w-[10px]',
+      glyph: 'h-3 w-3',
     },
     md: {
       container: 'h-7 gap-1.5 rounded-full px-2.5',

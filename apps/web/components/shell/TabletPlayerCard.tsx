@@ -153,7 +153,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <span className='text-3xs tabular-nums text-quaternary-token w-8 text-right shrink-0'>
               {formatTime(safeTime)}
             </span>
-            <div className='relative flex-1 h-[3px] rounded-full bg-tertiary-token/30 overflow-hidden'>
+            <div className='relative flex-1 h-1 rounded-full bg-tertiary-token/30 overflow-hidden'>
               <div
                 className='absolute inset-y-0 left-0 bg-primary-token rounded-full'
                 style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}

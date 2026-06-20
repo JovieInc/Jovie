@@ -236,7 +236,7 @@ export function ArtistProfileReactivationVisual({
   return (
     <div className={cn('mx-auto max-w-[27rem]', className)}>
       <div className='rounded-[1.5rem] bg-white/[0.02] p-2.5 shadow-[0_24px_64px_rgba(0,0,0,0.22)]'>
-        <div className='rounded-[1.25rem] bg-[#07090d] px-4 py-4'>
+        <div className='rounded-[1.25rem] bg-(--color-bg-base) px-4 py-4'>
           <div className='flex items-start gap-3'>
             <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black'>
               <BellRing className='h-4 w-4' strokeWidth={1.9} />

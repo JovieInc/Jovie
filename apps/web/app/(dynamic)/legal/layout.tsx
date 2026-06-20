@@ -10,7 +10,7 @@ export default function LegalLayout({
 }>) {
   return (
     <PublicPageShell
-      className='bg-white text-neutral-950 dark:bg-[#0a0a0b] dark:text-neutral-50'
+      className='bg-white text-neutral-950 dark:bg-(--color-bg-surface-0) dark:text-neutral-50'
       headerVariant='minimal'
       logoSize='sm'
       mainClassName='py-16 sm:py-20'

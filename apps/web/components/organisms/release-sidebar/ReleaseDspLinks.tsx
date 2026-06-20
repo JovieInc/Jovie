@@ -253,7 +253,7 @@ export function ReleaseDspLinks({
                 <div
                   key={`missing-${key}`}
                   className={cn(
-                    'group flex min-h-8 items-center justify-between rounded-[10px] border border-dashed border-subtle bg-transparent px-2 py-1.5 opacity-75',
+                    'group flex min-h-8 items-center justify-between rounded-lg border border-dashed border-subtle bg-transparent px-2 py-1.5 opacity-75',
                     'transition-[background-color,opacity] duration-150 lg:hover:opacity-100'
                   )}
                   data-dsp-status='missing'
@@ -322,7 +322,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-[30px] w-full rounded-md border-subtle bg-surface-0 text-xs'>
+              <SelectTrigger className='h-8 w-full rounded-md border-subtle bg-surface-0 text-xs'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>

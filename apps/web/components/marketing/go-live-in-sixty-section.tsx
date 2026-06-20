@@ -27,7 +27,7 @@ export function GoLiveInSixtySection() {
   return (
     <section
       aria-labelledby='go-live-sixty-heading'
-      className='relative isolate overflow-hidden bg-[#020303] py-24 text-white sm:py-28 lg:py-[7.5rem]'
+      className='relative isolate overflow-hidden bg-(--color-bg-hover) py-24 text-white sm:py-28 lg:py-[7.5rem]'
       data-testid='go-live-sixty-section'
     >
       <div

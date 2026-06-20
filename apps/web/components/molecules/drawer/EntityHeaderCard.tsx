@@ -84,7 +84,7 @@ function EntityHeaderMetaSlot({
     <div
       aria-hidden={meta ? undefined : true}
       className={cn(
-        'flex min-h-[22px] flex-wrap items-center gap-1 pt-0.5',
+        'flex min-h-6 flex-wrap items-center gap-1 pt-0.5',
         !meta && 'invisible',
         metaClassName
       )}

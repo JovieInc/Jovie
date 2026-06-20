@@ -1268,7 +1268,7 @@ export function ViewToggle({
         type='button'
         onClick={() => onView('grid')}
         className={cn(
-          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-subtle ease-out',
+          'h-6 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-out',
           view === 'grid'
             ? 'bg-surface-2/80 text-primary-token'
             : 'text-quaternary-token hover:text-primary-token'
@@ -1281,7 +1281,7 @@ export function ViewToggle({
         type='button'
         onClick={() => onView('table')}
         className={cn(
-          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-subtle ease-out',
+          'h-6 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-out',
           view === 'table'
             ? 'bg-surface-2/80 text-primary-token'
             : 'text-quaternary-token hover:text-primary-token'
@@ -1359,7 +1359,7 @@ function AssetCard({
   return (
     <div
       className={cn(
-        'group relative flex flex-col overflow-hidden rounded-[10px] border bg-(--linear-app-content-surface) text-left transition-colors duration-subtle ease-out focus-within:ring-1 focus-within:ring-cyan-400/40',
+        'group relative flex flex-col overflow-hidden rounded-lg border bg-(--linear-app-content-surface) text-left transition-colors duration-subtle ease-out focus-within:ring-1 focus-within:ring-cyan-400/40',
         selected
           ? 'border-cyan-400/50'
           : 'border-(--linear-app-shell-border) hover:border-white/15'
@@ -1368,7 +1368,7 @@ function AssetCard({
       {selected && (
         <span
           aria-hidden
-          className='pointer-events-none absolute inset-0 rounded-[10px]'
+          className='pointer-events-none absolute inset-0 rounded-lg'
           style={{
             boxShadow:
               'inset 2px 0 0 0 rgb(103 232 249), inset 0 0 0 1px rgb(103 232 249 / 0.08)',
@@ -1555,7 +1555,7 @@ export function Table({
                   fill={fav ? 'currentColor' : 'none'}
                 />
               </button>
-              <span className='h-8 w-9 rounded-[4px] overflow-hidden bg-black'>
+              <span className='h-8 w-9 rounded-xs overflow-hidden bg-black'>
                 <span
                   className='block h-full w-full bg-center bg-cover'
                   style={{ backgroundImage: `url("${a.poster}")` }}
@@ -1677,7 +1677,7 @@ export function Drawer({
           </div>
 
           <div className='p-3'>
-            <div className='rounded-[8px] overflow-hidden border border-(--linear-app-shell-border) bg-black'>
+            <div className='rounded-lg overflow-hidden border border-(--linear-app-shell-border) bg-black'>
               <Poster asset={asset} />
             </div>
           </div>

@@ -651,7 +651,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 reserveInlinePickerSpace
                   ? 'relative z-[80] flex w-full justify-center'
                   : 'absolute bottom-full left-0 right-0 z-[80] flex justify-center',
-                statusBanner ? 'mb-[34px]' : 'mb-4'
+                statusBanner ? 'mb-9' : 'mb-4'
               )}
             >
               <div

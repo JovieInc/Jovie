@@ -301,10 +301,10 @@ function BentoShowcase() {
           Trusted by artists on
         </p>
         <div className='flex items-center justify-between gap-x-8 text-white/68'>
-          <AwalLogo className='h-[22px] w-auto select-none' />
-          <TheOrchardLogo className='h-[30px] w-auto select-none' />
+          <AwalLogo className='h-6 w-auto select-none' />
+          <TheOrchardLogo className='h-8 w-auto select-none' />
           <ArmadaMusicLogo className='h-6 w-auto select-none' />
-          <BlackHoleRecordingsLogo className='h-[18px] w-auto select-none' />
+          <BlackHoleRecordingsLogo className='h-5 w-auto select-none' />
         </div>
       </div>
     </div>

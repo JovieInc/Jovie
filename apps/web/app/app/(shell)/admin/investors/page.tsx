@@ -148,7 +148,7 @@ async function InvestorPipelineTable() {
             <InvestorTableHeaderCell className='w-50'>
               Label
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[150px]'>
+            <InvestorTableHeaderCell className='w-38'>
               Investor
             </InvestorTableHeaderCell>
             <InvestorTableHeaderCell className='w-25'>
@@ -160,7 +160,7 @@ async function InvestorPipelineTable() {
             <InvestorTableHeaderCell className='w-16'>
               Views
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[110px]'>
+            <InvestorTableHeaderCell className='w-28'>
               Last viewed
             </InvestorTableHeaderCell>
             <InvestorTableHeaderCell className='w-18'>
@@ -179,7 +179,7 @@ async function InvestorPipelineTable() {
                   <TokenDisplay token={link.token} />
                 </div>
               </InvestorTableCell>
-              <InvestorTableCell className='w-[150px]'>
+              <InvestorTableCell className='w-38'>
                 {link.investorName || 'Unknown investor'}
               </InvestorTableCell>
               <InvestorTableCell className='w-25'>
@@ -191,7 +191,7 @@ async function InvestorPipelineTable() {
               <InvestorTableCell className='w-16'>
                 {link.viewCount}
               </InvestorTableCell>
-              <InvestorTableCell className='w-[110px]'>
+              <InvestorTableCell className='w-28'>
                 {link.lastViewed
                   ? new Date(link.lastViewed).toLocaleDateString()
                   : 'No views yet'}

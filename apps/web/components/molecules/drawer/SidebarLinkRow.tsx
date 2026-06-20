@@ -154,7 +154,7 @@ export function SidebarLinkRow({
         className={cn(
           'group flex min-h-8 items-center justify-between bg-transparent',
           isTrackVariant
-            ? 'rounded-[10px] border border-transparent px-2 py-1.5 shadow-none active:bg-surface-0 lg:hover:bg-surface-0 focus-within:bg-surface-0'
+            ? 'rounded-lg border border-transparent px-2 py-1.5 shadow-none active:bg-surface-0 lg:hover:bg-surface-0 focus-within:bg-surface-0'
             : 'rounded-md px-2 py-1 lg:px-2 lg:py-1 active:bg-surface-1 lg:hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           'transition-[background-color,box-shadow,border-color] duration-150',
           !isVisible && 'opacity-60',

@@ -145,7 +145,7 @@ export function ContributionGraph({
       >
         <div
           aria-hidden='true'
-          className='grid min-w-0 gap-[2px] text-3xs leading-none sm:gap-1'
+          className='grid min-w-0 gap-1 text-3xs leading-none sm:gap-1'
           style={{
             gridTemplateColumns: `clamp(1.5rem, 3vw, 2rem) repeat(${WEEK_COUNT}, minmax(0, 1fr))`,
             gridTemplateRows: '1rem repeat(7, minmax(0, 1fr))',
@@ -210,7 +210,7 @@ export function ContributionGraph({
               >
                 <div
                   className={cn(
-                    'h-full w-full rounded-[3px]',
+                    'h-full w-full rounded-xs',
                     getLevelClassName(day.level, day.inYear),
                     isFriday && !isActive && day.inYear && 'bg-white/[0.055]',
                     isActive &&
@@ -240,7 +240,7 @@ export function ContributionGraph({
               <span
                 key={level}
                 className={cn(
-                  'h-3 w-3 rounded-[3px]',
+                  'h-3 w-3 rounded-xs',
                   getLevelClassName(level, true)
                 )}
               />

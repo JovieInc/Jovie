@@ -170,7 +170,7 @@ export function ContextMenuOverlay({
               )}
               <span className='flex-1 truncate'>{item.label}</span>
               {sc && (
-                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-3xs font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
+                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-xs text-3xs font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
                   {sc.keys}
                 </kbd>
               )}

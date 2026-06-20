@@ -101,7 +101,7 @@ function SendButton() {
       <Send
         size={13}
         strokeWidth={1.8}
-        className='text-[#1a1a1e] translate-x-[0.5px]'
+        className='text-(--color-bg-surface-2) translate-x-[0.5px]'
         aria-hidden='true'
       />
     </span>
@@ -201,7 +201,7 @@ function ReleaseRow({ label, type, year, artBg, isActive }: ReleaseRowProps) {
       )}
     >
       <div
-        className='h-8 w-8 shrink-0 rounded-[4px]'
+        className='h-8 w-8 shrink-0 rounded-xs'
         style={{ background: artBg }}
         aria-hidden='true'
       />
@@ -237,7 +237,7 @@ function StatStrip({ stats }: StatStripProps) {
         <span key={stat.key}>
           {i > 0 && (
             <span
-              className='mx-1.5 inline-block h-[3px] w-[3px] rounded-full bg-white/20 align-middle'
+              className='mx-1.5 inline-block h-1 w-1 rounded-full bg-white/20 align-middle'
               aria-hidden='true'
             />
           )}
@@ -266,7 +266,7 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
     <div className='flex flex-1 flex-col justify-center gap-3 px-5 py-5'>
       <div className='flex items-start gap-4'>
         <div
-          className='h-18 w-18 shrink-0 rounded-[8px] shadow-[0_2px_8px_rgba(0,0,0,0.4)]'
+          className='h-18 w-18 shrink-0 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.4)]'
           style={{ background: artBg }}
           aria-hidden='true'
         />

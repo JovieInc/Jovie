@@ -242,7 +242,7 @@ export default async function PlaylistPage({
         <div className='mx-auto flex flex-col items-center'>
           {/* Cover Art */}
           {playlist.coverImageUrl && (
-            <div className='aspect-square w-[300px] overflow-hidden rounded-lg shadow-2xl'>
+            <div className='aspect-square w-75 overflow-hidden rounded-lg shadow-2xl'>
               <Image
                 src={playlist.coverImageUrl}
                 alt={playlist.title}
@@ -297,7 +297,7 @@ export default async function PlaylistPage({
             >
               <SocialIcon
                 platform='spotify'
-                className='h-5 w-5 text-[#1DB954]'
+                className='h-5 w-5 text-(--color-accent-green)'
                 aria-hidden
               />
               Open in Spotify
@@ -340,7 +340,7 @@ export default async function PlaylistPage({
                       href={`https://open.spotify.com/track/${track.spotifyTrackId}`}
                       target='_blank'
                       rel='noopener noreferrer'
-                      className='flex-shrink-0 p-2 text-white/20 hover:text-[#1DB954]'
+                      className='flex-shrink-0 p-2 text-white/20 hover:text-(--color-accent-green)'
                       aria-label={`Play ${track.trackName} on Spotify`}
                     >
                       <span className='sr-only'>
