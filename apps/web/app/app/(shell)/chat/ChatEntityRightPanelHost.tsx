@@ -11,7 +11,6 @@ import {
   Link as LinkIcon,
   MessageSquareText,
   Music2,
-  Smartphone,
   UserRound,
   X,
 } from 'lucide-react';
@@ -19,7 +18,13 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks/ReleaseTaskChecklist';
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
@@ -28,15 +33,13 @@ import {
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   EntityCard,
-  entityCardArtStyle,
-  KIND_PRESETS,
 } from '@/components/organisms/entity-card';
 import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '@/components/organisms/table';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
-import { APP_ROUTES, buildReleaseTasksRoute } from '@/constants/routes';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
@@ -64,6 +67,7 @@ interface ChatEntityRightPanelHostProps {
   readonly enablePreviewPanel: boolean;
   readonly enableChatEntityPanels?: boolean;
   readonly profileId?: string | null;
+  readonly profileSpotifyArtistId?: string | null;
   readonly profileContext?: ChatProfileContextSummary | null;
   readonly threadTitle?: string | null;
 }
@@ -135,10 +139,12 @@ function ChatProfileContextCard({
   profile,
   target,
   onDismiss,
+  onOpenProfilePreview,
 }: Readonly<{
   profile: ChatProfileContextSummary | null | undefined;
   target: ChatRailContextTarget;
   onDismiss: (focusKey: string) => void;
+  onOpenProfilePreview?: () => void;
 }>) {
   const title =
     profile?.displayName?.trim() ||
@@ -160,27 +166,33 @@ function ChatProfileContextCard({
     <div
       data-testid='chat-rail-context-card'
       data-context-kind='profile'
-      className='system-b-chat-entity-context-card group'
+      className='system-b-chat-entity-context-card group flex w-full items-stretch'
     >
-      <div className='system-b-chat-entity-context-avatar'>
-        {profile?.avatarUrl ? (
-          <Image
-            src={profile.avatarUrl}
-            alt=''
-            fill
-            sizes='36px'
-            className='object-cover'
-          />
-        ) : (
-          <div className='flex h-full w-full items-center justify-center'>
-            {profile ? getProfileInitials(profile) : 'P'}
-          </div>
-        )}
-      </div>
-      <div className='system-b-chat-entity-context-copy'>
-        <p className='system-b-chat-entity-context-title'>{title}</p>
-        <p className='system-b-chat-entity-context-meta'>{meta}</p>
-      </div>
+      <button
+        type='button'
+        className='flex min-w-0 flex-1 items-center gap-0 border-0 bg-transparent p-0 text-left'
+        onClick={() => onOpenProfilePreview?.()}
+      >
+        <div className='system-b-chat-entity-context-avatar'>
+          {profile?.avatarUrl ? (
+            <Image
+              src={profile.avatarUrl}
+              alt=''
+              fill
+              sizes='36px'
+              className='object-cover'
+            />
+          ) : (
+            <div className='flex h-full w-full items-center justify-center'>
+              {profile ? getProfileInitials(profile) : 'P'}
+            </div>
+          )}
+        </div>
+        <div className='system-b-chat-entity-context-copy'>
+          <p className='system-b-chat-entity-context-title'>{title}</p>
+          <p className='system-b-chat-entity-context-meta'>{meta}</p>
+        </div>
+      </button>
       <Button
         type='button'
         variant='ghost'
@@ -245,11 +257,58 @@ function ChatRailEntityCard({
 function ChatEntityContextCard({
   target,
   onDismiss,
+  onOpenProfilePreview,
+  profileSpotifyArtistId,
 }: Readonly<{
   target: ChatRailContextTarget;
   onDismiss: (focusKey: string) => void;
+  onOpenProfilePreview?: () => void;
+  profileSpotifyArtistId?: string | null;
 }>) {
   const title = target.label?.trim() || contextKindLabel(target.kind);
+  const opensProfilePreview =
+    target.kind === 'artist' &&
+    Boolean(profileSpotifyArtistId) &&
+    target.id === profileSpotifyArtistId;
+
+  const dismissLabel = `Dismiss ${contextKindLabel(target.kind)} context`;
+
+  if (opensProfilePreview) {
+    return (
+      <div
+        data-testid='chat-rail-context-card'
+        data-context-kind={target.kind}
+        className='system-b-chat-entity-context-card group flex w-full items-stretch'
+      >
+        <button
+          type='button'
+          className='flex min-w-0 flex-1 items-center gap-0 border-0 bg-transparent p-0 text-left'
+          onClick={() => onOpenProfilePreview?.()}
+        >
+          <div className='system-b-chat-entity-context-icon'>
+            <ChatRailContextIcon kind={target.kind} />
+          </div>
+          <div className='system-b-chat-entity-context-copy'>
+            <p className='system-b-chat-entity-context-title'>{title}</p>
+            <p className='system-b-chat-entity-context-meta'>
+              {contextKindLabel(target.kind)} Context
+            </p>
+          </div>
+        </button>
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon'
+          aria-label={dismissLabel}
+          onClick={() => onDismiss(target.focusKey)}
+          className='system-b-chat-entity-context-dismiss'
+        >
+          <X className='h-3.5 w-3.5' />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid='chat-rail-context-card'
@@ -269,7 +328,7 @@ function ChatEntityContextCard({
         type='button'
         variant='ghost'
         size='icon'
-        aria-label={`Dismiss ${contextKindLabel(target.kind)} Context`}
+        aria-label={dismissLabel}
         onClick={() => onDismiss(target.focusKey)}
         className='system-b-chat-entity-context-dismiss'
       >
@@ -419,12 +478,16 @@ function ChatRailContextCards({
   targets,
   profileContext,
   profileId,
+  profileSpotifyArtistId,
   onDismiss,
+  onOpenProfilePreview,
 }: Readonly<{
   targets: readonly ChatRailContextTarget[];
   profileContext?: ChatProfileContextSummary | null;
   profileId?: string | null;
+  profileSpotifyArtistId?: string | null;
   onDismiss: (focusKey: string) => void;
+  onOpenProfilePreview?: () => void;
 }>) {
   if (targets.length === 0) {
     return null;
@@ -440,6 +503,7 @@ function ChatRailContextCards({
               profile={profileContext}
               target={target}
               onDismiss={onDismiss}
+              onOpenProfilePreview={onOpenProfilePreview}
             />
           ) : target.kind === 'release' && profileId ? (
             <ChatReleaseContextCard
@@ -460,6 +524,8 @@ function ChatRailContextCards({
               key={target.focusKey}
               target={target}
               onDismiss={onDismiss}
+              onOpenProfilePreview={onOpenProfilePreview}
+              profileSpotifyArtistId={profileSpotifyArtistId}
             />
           )
         )}
@@ -506,7 +572,6 @@ function ChatReleaseEntityPanel({
     usePlanGate();
   const [showTasksUpgrade, setShowTasksUpgrade] = useState(true);
   const releaseDate = formatReleaseDate(release?.releaseDate);
-  const releaseArtStyle = entityCardArtStyle(KIND_PRESETS.music.accent);
   const visibleProviders = release?.providers.filter(provider => provider.url);
   const hasMedia =
     Boolean(release?.artworkUrl) ||
@@ -571,10 +636,7 @@ function ChatReleaseEntityPanel({
           <div className='min-h-0 flex-1 overflow-y-auto'>
             <div className='px-4 py-4'>
               <div className='system-b-chat-release-summary'>
-                <div
-                  className='system-b-chat-release-artwork'
-                  style={releaseArtStyle}
-                >
+                <div className='system-b-chat-release-artwork'>
                   {release.artworkUrl ? (
                     <Image
                       src={release.artworkUrl}
@@ -940,174 +1002,23 @@ function ChatTourDateEntityPanelLoader({
   );
 }
 
-function ChatProfileBentoPanel({
-  profile,
-  onClose,
-}: Readonly<{
-  profile: ChatProfileContextSummary | null | undefined;
-  onClose: () => void;
-}>) {
-  const displayName =
-    profile?.displayName?.trim() || profile?.username?.trim() || 'Profile';
-  const username = profile?.username?.trim() || null;
-  const publicHref = username ? `/${username}` : APP_ROUTES.PROFILE;
-  const completion =
-    typeof profile?.completionPercentage === 'number'
-      ? Math.round(profile.completionPercentage)
-      : null;
-
-  const contextMenuItems = useMemo<ContextMenuItemType[]>(
-    () =>
-      buildChatContextMenuItems({
-        title: displayName,
-        href: publicHref,
-        onDismiss: onClose,
-      }),
-    [displayName, onClose, publicHref]
-  );
-
-  return (
-    <TableContextMenu items={contextMenuItems}>
-      <aside
-        className='system-b-chat-entity-panel-surface'
-        data-testid='chat-profile-bento-panel'
-      >
-        <div className='system-b-chat-entity-panel-header'>
-          <div className='system-b-chat-entity-panel-header-copy'>
-            <p className='system-b-chat-entity-panel-eyebrow'>Profile</p>
-            <h2 className='system-b-chat-entity-panel-title'>{displayName}</h2>
-          </div>
-          <Button
-            type='button'
-            variant='ghost'
-            size='icon'
-            aria-label='Close Profile Panel'
-            onClick={onClose}
-            className='system-b-chat-entity-panel-close'
-          >
-            <X className='h-4 w-4' />
-          </Button>
-        </div>
-
-        <div className='min-h-0 flex-1 overflow-y-auto p-4'>
-          <div className='system-b-chat-profile-preview-card'>
-            <div className='system-b-chat-profile-preview-header'>
-              <div className='system-b-chat-profile-preview-avatar'>
-                {profile?.avatarUrl ? (
-                  <Image
-                    src={profile.avatarUrl}
-                    alt=''
-                    fill
-                    sizes='56px'
-                    className='object-cover'
-                  />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center'>
-                    {profile ? getProfileInitials(profile) : 'P'}
-                  </div>
-                )}
-              </div>
-              <div className='system-b-chat-profile-preview-copy'>
-                <h3 className='system-b-chat-profile-preview-name'>
-                  {displayName}
-                </h3>
-                {username ? (
-                  <p className='system-b-chat-profile-preview-handle'>
-                    /{username}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className='system-b-chat-profile-preview-stats'>
-              {completion !== null ? (
-                <span className='system-b-chat-profile-preview-stat'>
-                  {completion}% Complete
-                </span>
-              ) : null}
-              <span className='system-b-chat-profile-preview-stat'>
-                {profile?.hasMusicLinks ? 'Music Connected' : 'Music Links'}
-              </span>
-              <span className='system-b-chat-profile-preview-stat'>
-                {profile?.hasSocialLinks ? 'Social Connected' : 'Social Links'}
-              </span>
-            </div>
-
-            <div className='system-b-chat-profile-preview-phone'>
-              <div className='system-b-chat-profile-preview-phone-screen'>
-                <div className='system-b-chat-profile-preview-phone-notch' />
-                <div className='system-b-chat-profile-preview-phone-card'>
-                  <div className='system-b-chat-profile-preview-phone-avatar'>
-                    {profile?.avatarUrl ? (
-                      <Image
-                        src={profile.avatarUrl}
-                        alt=''
-                        fill
-                        sizes='48px'
-                        className='object-cover'
-                      />
-                    ) : (
-                      <div className='system-b-chat-profile-preview-phone-initials'>
-                        {profile ? getProfileInitials(profile) : 'P'}
-                      </div>
-                    )}
-                  </div>
-                  <div className='system-b-chat-profile-preview-phone-line' />
-                  <div className='system-b-chat-profile-preview-phone-line system-b-chat-profile-preview-phone-line-short' />
-                </div>
-                <div className='system-b-chat-profile-preview-phone-actions'>
-                  <div className='system-b-chat-profile-preview-phone-button' />
-                  <div className='system-b-chat-profile-preview-phone-button system-b-chat-profile-preview-phone-button-muted' />
-                </div>
-              </div>
-            </div>
-
-            <Smartphone
-              className='system-b-chat-profile-preview-device-icon'
-              aria-hidden='true'
-            />
-          </div>
-
-          <div className='mt-4 space-y-1'>
-            <Link
-              href={publicHref}
-              className='system-b-chat-profile-preview-link'
-            >
-              <span>Open Public Profile</span>
-              <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
-            </Link>
-            <Link
-              href={APP_ROUTES.LIBRARY}
-              className='system-b-chat-profile-preview-link'
-            >
-              <span>Library</span>
-              <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
-            </Link>
-            <Link
-              href={APP_ROUTES.TASKS}
-              className='system-b-chat-profile-preview-link'
-            >
-              <span>Tasks</span>
-              <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
-            </Link>
-          </div>
-        </div>
-      </aside>
-    </TableContextMenu>
-  );
-}
-
 export function ChatEntityRightPanelHost({
   enablePreviewPanel,
   enableChatEntityPanels = false,
   profileId,
+  profileSpotifyArtistId,
   profileContext,
   threadTitle,
 }: Readonly<ChatEntityRightPanelHostProps>) {
-  const { close: closePreviewPanel, isOpen: isPreviewPanelOpen } =
+  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
     usePreviewPanelState();
   const { target, contextTargets, close, dismissContext } =
     useChatEntityPanel();
+
+  const handleOpenProfilePreview = useCallback(() => {
+    close();
+    openPreviewPanel();
+  }, [close, openPreviewPanel]);
 
   const panel = useMemo(() => {
     const contextCards =
@@ -1116,7 +1027,9 @@ export function ChatEntityRightPanelHost({
           targets={contextTargets}
           profileContext={profileContext}
           profileId={profileId}
+          profileSpotifyArtistId={profileSpotifyArtistId}
           onDismiss={dismissContext}
+          onOpenProfilePreview={handleOpenProfilePreview}
         />
       ) : null;
     let entityPanel: ReactNode = null;
@@ -1152,6 +1065,13 @@ export function ChatEntityRightPanelHost({
       }
     }
 
+    const liveProfilePreview =
+      enablePreviewPanel && isPreviewPanelOpen ? (
+        <ErrorBoundary fallback={null}>
+          <ProfileContactSidebar />
+        </ErrorBoundary>
+      ) : null;
+
     if (contextCards && entityPanel) {
       return (
         <aside
@@ -1177,6 +1097,24 @@ export function ChatEntityRightPanelHost({
       );
     }
 
+    if (contextCards && liveProfilePreview) {
+      return (
+        <aside
+          className={cn(CHAT_ENTITY_RIGHT_PANEL_SHELL_CLASSNAME, 'flex-col')}
+          data-testid='chat-rail-context-and-profile-preview'
+        >
+          <div className='system-b-chat-entity-panel-context-divider shrink-0'>
+            {contextCards}
+          </div>
+          <div className='min-h-0 flex-1'>{liveProfilePreview}</div>
+        </aside>
+      );
+    }
+
+    if (liveProfilePreview) {
+      return liveProfilePreview;
+    }
+
     if (contextCards) {
       return (
         <aside
@@ -1194,31 +1132,17 @@ export function ChatEntityRightPanelHost({
       return null;
     }
 
-    if (!enablePreviewPanel || !isPreviewPanelOpen) {
-      return null;
-    }
-
-    return (
-      <ErrorBoundary fallback={null}>
-        {profileContext ? (
-          <ChatProfileBentoPanel
-            profile={profileContext}
-            onClose={closePreviewPanel}
-          />
-        ) : (
-          <ProfileContactSidebar />
-        )}
-      </ErrorBoundary>
-    );
+    return null;
   }, [
     close,
-    closePreviewPanel,
     contextTargets,
     dismissContext,
     enableChatEntityPanels,
     enablePreviewPanel,
+    handleOpenProfilePreview,
     isPreviewPanelOpen,
     profileId,
+    profileSpotifyArtistId,
     profileContext,
     target,
     threadTitle,
