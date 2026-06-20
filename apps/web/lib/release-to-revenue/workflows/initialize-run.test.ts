@@ -30,6 +30,14 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+const mockSyncStoreListingForRun = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ merchCardIds: ['card-1'] })
+);
+
+vi.mock('../store-listing', () => ({
+  syncStoreListingForRun: mockSyncStoreListingForRun,
+}));
+
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '../types';
 import { initializeReleaseToRevenueRun } from './initialize-run';
 
@@ -59,6 +67,13 @@ describe('initializeReleaseToRevenueRun', () => {
 
     await initializeReleaseToRevenueRun({ workflowRunId: 'run-1' });
 
+    expect(mockSyncStoreListingForRun).toHaveBeenCalledWith({
+      workflowRunId: 'run-1',
+      stepOutputs: {
+        releaseId: 'release-1',
+        release: { title: 'Launch Track' },
+      },
+    });
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'waiting_for_approval',

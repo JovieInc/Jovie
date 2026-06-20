@@ -40,12 +40,36 @@ export interface ResolvedDesignPartnerConfig
   readonly userId: string;
 }
 
+export interface ReleaseToRevenueStoreListing {
+  /** Merch cards published as the release store listing for this autopilot run. */
+  readonly merchCardIds: readonly string[];
+}
+
 export interface ReleaseToRevenueRunStepOutputs {
   readonly releaseId: string | null;
   readonly triggerSource: ReleaseToRevenueTriggerSource;
   readonly triggeredAt: string;
   readonly designPartner: ResolvedDesignPartnerConfig;
   readonly release: ReleaseToRevenueReleaseMetadata;
+  readonly storeListing?: ReleaseToRevenueStoreListing;
+}
+
+export interface ReleaseGmvPerRunRow {
+  readonly workflowRunId: string;
+  readonly releaseId: string | null;
+  readonly releaseTitle: string;
+  readonly triggeredAt: string;
+  readonly merchCardIds: readonly string[];
+  readonly orderCount: number;
+  /** Store GMV in cents (paid Printful-backed order subtotals). */
+  readonly gmvCents: number;
+}
+
+export interface DesignPartnerReleaseGmvSnapshot {
+  readonly creatorUsername: string;
+  readonly generatedAtIso: string;
+  readonly releases: readonly ReleaseGmvPerRunRow[];
+  readonly totalGmvCents: number;
 }
 
 export interface ManualReleaseTriggerInput {
