@@ -792,30 +792,106 @@ describe('proxy.ts path categorization', () => {
 // ============================================================================
 
 describe('default-deny security', () => {
-  it('documents that DB errors default to onboarding state (deny dashboard access)', () => {
-    // In proxy-state.ts getUserState(), when the DB query fails:
-    //   return { ...NEEDS_ONBOARDING_STATE };
-    // This ensures database failures don't accidentally grant active access
-    const NEEDS_ONBOARDING_STATE = {
-      needsWaitlist: false,
-      needsOnboarding: true,
-      isActive: false,
-    };
+  const defaultOnboardingProxyState = {
+    needsWaitlist: false,
+    needsOnboarding: true,
+    isActive: false,
+    isBanned: false,
+  };
 
-    expect(NEEDS_ONBOARDING_STATE.needsOnboarding).toBe(true);
-    expect(NEEDS_ONBOARDING_STATE.isActive).toBe(false);
+  async function loadProxyStateForDefaultDenyTest() {
+    vi.resetModules();
+
+    const mockLimit = vi.fn();
+    const mockDbSelect = vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: mockLimit,
+          }),
+        }),
+      }),
+    });
+
+    vi.doMock('server-only', () => ({}));
+    vi.doMock('@sentry/nextjs', () => ({
+      addBreadcrumb: vi.fn(),
+      captureException: vi.fn(),
+      captureMessage: vi.fn(),
+      getClient: vi.fn().mockReturnValue(null),
+      withScope: vi.fn((callback: (scope: unknown) => void) =>
+        callback({ setExtra: vi.fn(), setTag: vi.fn() })
+      ),
+    }));
+    vi.doMock('@/lib/db', () => ({
+      db: { select: mockDbSelect },
+    }));
+    vi.doMock('@/lib/db/schema/auth', () => ({
+      users: {
+        id: 'id',
+        clerkId: 'clerkId',
+        userStatus: 'userStatus',
+        deletedAt: 'deletedAt',
+        activeProfileId: 'activeProfileId',
+      },
+    }));
+    vi.doMock('@/lib/db/schema/profiles', () => ({
+      creatorProfiles: {
+        id: 'id',
+        username: 'username',
+        usernameNormalized: 'usernameNormalized',
+        displayName: 'displayName',
+        isPublic: 'isPublic',
+        onboardingCompletedAt: 'onboardingCompletedAt',
+      },
+    }));
+    vi.doMock('@/lib/db/client/retry', () => ({
+      isRetryableError: vi.fn().mockReturnValue(false),
+      withRetry: vi.fn((operation: () => Promise<unknown>) => operation()),
+    }));
+    vi.doMock('@/lib/error-tracking', () => ({
+      captureError: vi.fn().mockResolvedValue(undefined),
+      captureWarning: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.doMock('@/lib/redis', () => ({
+      getRedis: vi.fn().mockReturnValue(null),
+    }));
+    vi.doMock('@/lib/waitlist/settings', () => ({
+      isWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
+    }));
+
+    const { getUserState } = await import('@/lib/auth/proxy-state');
+
+    return { getUserState, mockLimit };
+  }
+
+  it('defaults DB errors to onboarding state and denies dashboard access', async () => {
+    const { getUserState, mockLimit } =
+      await loadProxyStateForDefaultDenyTest();
+    mockLimit.mockRejectedValue(new Error('database unavailable'));
+
+    const state = await getUserState('clerk_default_deny_db_error');
+
+    expect(state).toEqual(defaultOnboardingProxyState);
   });
 
-  it('documents that missing clerkUserId defaults to onboarding intake', () => {
-    // getUserState() returns NEEDS_ONBOARDING_STATE when called with
-    // empty/missing clerkUserId
-    const NEEDS_ONBOARDING_STATE = {
+  it('defaults missing clerkUserId to onboarding intake', async () => {
+    const { getUserState, mockLimit } =
+      await loadProxyStateForDefaultDenyTest();
+
+    const state = await getUserState('');
+
+    expect(state).toEqual(defaultOnboardingProxyState);
+    expect(mockLimit).not.toHaveBeenCalled();
+  });
+
+  it('documents the default onboarding proxy state shape', () => {
+    expect(defaultOnboardingProxyState).toEqual({
       needsWaitlist: false,
       needsOnboarding: true,
       isActive: false,
-    };
-
-    expect(NEEDS_ONBOARDING_STATE.needsOnboarding).toBe(true);
+      isBanned: false,
+    });
   });
 
   it.todo(
