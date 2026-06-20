@@ -110,7 +110,17 @@ describe('buildDistributionDrafts', () => {
   });
 });
 
-describe('approveDistributionDraft', () => {
+function mockPersistedRun(stepOutputs: ReleaseToRevenueRunStepOutputs) {
+  mockOwnedRun(stepOutputs);
+
+  const updateWhere = vi.fn().mockResolvedValue(undefined);
+  const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+  mockDb.update.mockReturnValue({ set: updateSet });
+
+  return updateSet;
+}
+
+describe('distribution draft decisions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -123,14 +133,10 @@ describe('approveDistributionDraft', () => {
       platform: 'instagram',
     });
     const draftToApprove = drafts.items[0];
-    mockOwnedRun({
+    const updateSet = mockPersistedRun({
       ...baseStepOutputs,
       distributionDrafts: drafts,
     });
-
-    const updateWhere = vi.fn().mockResolvedValue(undefined);
-    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
-    mockDb.update.mockReturnValue({ set: updateSet });
 
     const result = await approveDistributionDraft({
       runId: 'run-1',
@@ -160,12 +166,6 @@ describe('approveDistributionDraft', () => {
     expect(approved?.status).toBe('dispatched');
     expect(untouched?.status).toBe('pending');
   });
-});
-
-describe('rejectDistributionDraft', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
 
   it('discards a pending draft without dispatching it', async () => {
     const drafts = buildDistributionDrafts({
@@ -175,14 +175,10 @@ describe('rejectDistributionDraft', () => {
       platform: 'instagram',
     });
     const draftToReject = drafts.items[1];
-    mockOwnedRun({
+    mockPersistedRun({
       ...baseStepOutputs,
       distributionDrafts: drafts,
     });
-
-    const updateWhere = vi.fn().mockResolvedValue(undefined);
-    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
-    mockDb.update.mockReturnValue({ set: updateSet });
 
     const result = await rejectDistributionDraft({
       runId: 'run-1',

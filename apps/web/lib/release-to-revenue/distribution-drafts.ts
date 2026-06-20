@@ -286,11 +286,35 @@ export function dispatchDistributionDraft(
   };
 }
 
-export async function approveDistributionDraft(input: {
+type DistributionDraftDecision = 'approve' | 'reject';
+
+function resolveDecidedDraft(
+  draft: ReleaseDistributionDraft,
+  decision: DistributionDraftDecision
+): ReleaseDistributionDraft {
+  if (decision === 'approve') {
+    return dispatchDistributionDraft({
+      ...draft,
+      decidedAt: new Date().toISOString(),
+    });
+  }
+
+  return {
+    ...draft,
+    status: 'rejected',
+    decidedAt: new Date().toISOString(),
+  };
+}
+
+async function decideDistributionDraft(input: {
   readonly runId: string;
   readonly draftId: string;
   readonly userId: string;
+  readonly decision: DistributionDraftDecision;
 }): Promise<DecideDistributionDraftResult> {
+  const terminalStatus =
+    input.decision === 'approve' ? 'dispatched' : 'rejected';
+
   const run = await loadOwnedRun(input);
   if (!run) {
     return { ok: false, code: 'not-found' };
@@ -302,7 +326,7 @@ export async function approveDistributionDraft(input: {
     return { ok: false, code: 'draft-not-found' };
   }
 
-  if (draft.status === 'dispatched') {
+  if (draft.status === terminalStatus) {
     return { ok: true, draft, runStatus: run.status };
   }
 
@@ -310,18 +334,11 @@ export async function approveDistributionDraft(input: {
     return { ok: false, code: 'already-decided' };
   }
 
-  const decidedAt = new Date().toISOString();
-  const approvedDraft: ReleaseDistributionDraft = {
-    ...draft,
-    status: 'approved',
-    decidedAt,
-  };
-  const dispatchedDraft = dispatchDistributionDraft(approvedDraft);
-
+  const decidedDraft = resolveDecidedDraft(draft, input.decision);
   const nextStepOutputs = updateDraftInStepOutputs(
     run.stepOutputs,
     input.draftId,
-    () => dispatchedDraft
+    () => decidedDraft
   );
   if (!nextStepOutputs) {
     return { ok: false, code: 'draft-not-found' };
@@ -339,9 +356,17 @@ export async function approveDistributionDraft(input: {
 
   return {
     ok: true,
-    draft: dispatchedDraft,
+    draft: decidedDraft,
     runStatus: nextRunStatus,
   };
+}
+
+export async function approveDistributionDraft(input: {
+  readonly runId: string;
+  readonly draftId: string;
+  readonly userId: string;
+}): Promise<DecideDistributionDraftResult> {
+  return decideDistributionDraft({ ...input, decision: 'approve' });
 }
 
 export async function rejectDistributionDraft(input: {
@@ -349,55 +374,7 @@ export async function rejectDistributionDraft(input: {
   readonly draftId: string;
   readonly userId: string;
 }): Promise<DecideDistributionDraftResult> {
-  const run = await loadOwnedRun(input);
-  if (!run) {
-    return { ok: false, code: 'not-found' };
-  }
-
-  const drafts = run.stepOutputs.distributionDrafts;
-  const draft = drafts?.items.find(item => item.id === input.draftId);
-  if (!draft) {
-    return { ok: false, code: 'draft-not-found' };
-  }
-
-  if (draft.status === 'rejected') {
-    return { ok: true, draft, runStatus: run.status };
-  }
-
-  if (draft.status !== 'pending') {
-    return { ok: false, code: 'already-decided' };
-  }
-
-  const rejectedDraft: ReleaseDistributionDraft = {
-    ...draft,
-    status: 'rejected',
-    decidedAt: new Date().toISOString(),
-  };
-
-  const nextStepOutputs = updateDraftInStepOutputs(
-    run.stepOutputs,
-    input.draftId,
-    () => rejectedDraft
-  );
-  if (!nextStepOutputs) {
-    return { ok: false, code: 'draft-not-found' };
-  }
-
-  const nextRunStatus = allDraftsTerminal(nextStepOutputs.distributionDrafts)
-    ? 'completed'
-    : 'waiting_for_approval';
-
-  await persistStepOutputs({
-    runId: input.runId,
-    stepOutputs: nextStepOutputs,
-    nextRunStatus,
-  });
-
-  return {
-    ok: true,
-    draft: rejectedDraft,
-    runStatus: nextRunStatus,
-  };
+  return decideDistributionDraft({ ...input, decision: 'reject' });
 }
 
 export const DISTRIBUTION_DRAFT_EXPECTED_COUNTS = {
