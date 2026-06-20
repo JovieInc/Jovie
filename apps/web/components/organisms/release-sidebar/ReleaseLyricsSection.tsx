@@ -231,7 +231,7 @@ export function ReleaseLyricsSection({
           }}
           rows={draftLyrics ? 10 : 4}
           disabled={!isEditable || isSaving}
-          className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
+          className='min-h-35 resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
         />
         {/* Auto-save status indicator */}
         <div className='min-h-[22px]'>

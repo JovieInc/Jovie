@@ -112,7 +112,7 @@ function EntityHeaderFooterSlot({
     <div
       aria-hidden={footer ? undefined : true}
       className={cn(
-        'min-h-[28px] pt-1',
+        'min-h-7 pt-1',
         !footer && 'invisible',
         footerClassName
       )}

@@ -9,7 +9,7 @@ export function DropdownEmptyState({
 }: Readonly<DropdownEmptyStateProps>) {
   return (
     <div className='px-1.5 py-1.5'>
-      <div className='flex min-h-[68px] items-center rounded-md bg-surface-1 px-2.5'>
+      <div className='flex min-h-17 items-center rounded-md bg-surface-1 px-2.5'>
         <p className='text-xs leading-[17px] text-secondary-token'>
           {message}
         </p>

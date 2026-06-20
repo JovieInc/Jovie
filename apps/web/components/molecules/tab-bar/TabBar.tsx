@@ -167,7 +167,7 @@ export function TabBar<T extends string>({
                 onClick={() => onValueChange(option.value)}
                 className={cn(
                   triggerClass,
-                  usesFillDistribution && 'min-w-[72px] flex-1',
+                  usesFillDistribution && 'min-w-18 flex-1',
                   value === option.value && activeClass,
                   option.disabled && 'opacity-45 pointer-events-none',
                   triggerClassName
@@ -211,7 +211,7 @@ export function TabBar<T extends string>({
                   {overflowLabelText}
                 </TooltipContent>
               </Tooltip>
-              <DropdownMenuContent align='start' className='min-w-[120px]'>
+              <DropdownMenuContent align='start' className='min-w-30'>
                 <DropdownMenuRadioGroup
                   value={value}
                   onValueChange={v => {
@@ -319,7 +319,7 @@ function LegacyTabBar<T extends string>({
           onClick={() => onValueChange(option.value)}
           className={cn(
             triggerClass,
-            usesFillDistribution && 'min-w-[72px] flex-1',
+            usesFillDistribution && 'min-w-18 flex-1',
             value === option.value && activeClass,
             option.disabled && 'opacity-45 pointer-events-none',
             triggerClassName

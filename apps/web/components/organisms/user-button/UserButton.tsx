@@ -454,7 +454,7 @@ export function UserButton({
             open={isMenuOpen}
             onOpenChange={setIsMenuOpen}
             disabled
-            contentClassName='w-[240px]'
+            contentClassName='w-60'
           />
         </div>
       );
@@ -550,7 +550,7 @@ export function UserButton({
         align={trigger ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName='w-[240px]'
+        contentClassName='w-60'
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

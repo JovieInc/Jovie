@@ -231,7 +231,7 @@ export function ArtistSearchCommandPalette({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-[500px]'
+        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-125'
         hideClose
       >
         <DialogPrimitive.Title className='sr-only'>
@@ -248,7 +248,7 @@ export function ArtistSearchCommandPalette({
           {/* Search input */}
           <div className='border-b border-(--linear-app-frame-seam) px-4 py-3'>
             <div
-              className='flex items-center gap-3 rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'
+              className='flex items-center gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'
               style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.03)' }}
             >
               <div
@@ -276,7 +276,7 @@ export function ArtistSearchCommandPalette({
           </div>
 
           {/* Results */}
-          <Command.List className='max-h-[300px] overflow-y-auto px-2 py-2'>
+          <Command.List className='max-h-75 overflow-y-auto px-2 py-2'>
             {search.state === 'loading' && search.results.length === 0 && (
               <output
                 className='block p-3 space-y-2'
@@ -285,7 +285,7 @@ export function ArtistSearchCommandPalette({
                 {SKELETON_KEYS.map((key, index) => (
                   <div
                     key={key}
-                    className='flex items-center gap-3 rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-4 py-2.5'
+                    className='flex items-center gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-4 py-2.5'
                   >
                     <div className='w-10 h-10 rounded-full skeleton shrink-0' />
                     <div className='flex-1 space-y-1.5'>
@@ -337,7 +337,7 @@ export function ArtistSearchCommandPalette({
                     value={`${artist.name} ${artist.id}`}
                     onSelect={() => handleSelect(artist)}
                     className={cn(
-                      'mb-1 flex cursor-pointer items-center gap-3 rounded-[12px] border border-transparent px-4 py-2.5 transition-colors last:mb-0',
+                      'mb-1 flex cursor-pointer items-center gap-3 rounded-xl border border-transparent px-4 py-2.5 transition-colors last:mb-0',
                       'data-[selected=true]:border-(--linear-app-frame-seam) data-[selected=true]:bg-surface-1 hover:bg-surface-2/50'
                     )}
                   >
@@ -377,7 +377,7 @@ export function ArtistSearchCommandPalette({
               <span>Or paste a link</span>
               <div className='flex-1 h-px bg-subtle' />
             </div>
-            <div className='flex items-center gap-2 rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+            <div className='flex items-center gap-2 rounded-xl border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
               <input
                 type='url'
                 value={manualUrl}

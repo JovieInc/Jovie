@@ -50,7 +50,7 @@ export function DrawerSettingsToggle({
           : 'border-(--linear-app-frame-seam) bg-surface-0',
         !disabled &&
           'hover:border-default hover:bg-surface-1 focus-within:border-default focus-within:bg-surface-1',
-        density === 'compact' ? 'min-h-[28px]' : 'min-h-[36px] lg:min-h-0',
+        density === 'compact' ? 'min-h-7' : 'min-h-9 lg:min-h-0',
         density === 'compact' ? 'px-2' : 'px-2.5',
         disabled && 'opacity-60',
         className

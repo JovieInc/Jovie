@@ -71,7 +71,7 @@ export function ProfileSwitcher() {
             />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align='start' sideOffset={4} className='w-[220px]'>
+        <DropdownMenuContent align='start' sideOffset={4} className='w-55'>
           {creatorProfiles.map(profile => {
             const isActive = profile.id === selectedProfile?.id;
             const isSwitching = switchingProfileId === profile.id;
