@@ -39,7 +39,7 @@ export function ClientFaqAccordion({
               type='button'
               aria-expanded={isOpen}
               aria-controls={panelId}
-              className='focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-5 text-left text-[17px] font-semibold leading-[1.35] tracking-[-0.018em] text-primary-token transition-opacity duration-subtle hover:opacity-90'
+              className='focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-5 text-left text-base font-semibold leading-[1.35] tracking-[-0.018em] text-primary-token transition-opacity duration-subtle hover:opacity-90'
               onClick={() => {
                 const nextIndex = isOpen ? null : index;
                 setOpenIndex(nextIndex);
@@ -80,7 +80,7 @@ export function ClientFaqAccordion({
               )}
             >
               <div className='min-h-0 overflow-hidden'>
-                <p className='pb-5 pr-10 text-[15px] leading-7 text-secondary-token'>
+                <p className='pb-5 pr-10 text-mid leading-7 text-secondary-token'>
                   {item.answer}
                 </p>
               </div>

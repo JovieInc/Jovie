@@ -77,11 +77,11 @@ describe('DrawerHero', () => {
 
     expect(screen.getByRole('heading', { name: 'Test' })).toHaveClass(
       'line-clamp-2',
-      'min-h-[44px]'
+      'min-h-11'
     );
     expect(screen.getByTestId('drawer-hero-subtitle-slot')).toHaveClass(
       'invisible',
-      'min-h-[16px]'
+      'min-h-4'
     );
     expect(screen.getByTestId('drawer-hero-meta-slot')).toHaveClass(
       'invisible'

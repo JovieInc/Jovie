@@ -11,7 +11,7 @@ vi.mock('@/hooks/useHapticFeedback', () => ({
 }));
 
 describe('OtpInput — hero size', () => {
-  it('renders digit boxes at hero dimensions (h-8 w-[26px])', () => {
+  it('renders digit boxes at hero dimensions (h-8 w-7)', () => {
     render(<OtpInput size='hero' aria-label='Enter code' />);
 
     const firstCell = screen.getByLabelText('Digit 1 of 6');
@@ -19,7 +19,7 @@ describe('OtpInput — hero size', () => {
     // is the nearest ancestor with boxSize classes. Assert both dimensions.
     const shell = firstCell.closest('div');
     expect(shell?.className).toMatch(/\bh-8\b/);
-    expect(shell?.className).toMatch(/w-\[26px\]/);
+    expect(shell?.className).toMatch(/\bw-7\b/);
   });
 
   it('still supports the default and compact sizes', () => {

@@ -165,7 +165,7 @@ export function ChangelogEmailSignup() {
               type='button'
               data-testid='changelog-reveal-button'
               onClick={expandComposer}
-              className='flex min-h-[56px] w-full items-center justify-between gap-3 px-5 text-left text-sm font-medium text-primary-token'
+              className='flex min-h-14 w-full items-center justify-between gap-3 px-5 text-left text-sm font-medium text-primary-token'
             >
               <span>Subscribe</span>
               <span className='inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-sm'>

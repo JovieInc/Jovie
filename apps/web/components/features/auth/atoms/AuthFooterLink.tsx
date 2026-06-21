@@ -13,7 +13,7 @@ export function AuthFooterLink({
   linkText,
 }: Readonly<AuthFooterLinkProps>) {
   return (
-    <div className='text-center text-[13px] font-normal text-[#6b6f76] dark:text-[#969799]'>
+    <div className='text-center text-app font-normal text-(--color-text-quaternary-token) dark:text-(--color-accent-gray)'>
       {prompt} <AuthLink href={href}>{linkText}</AuthLink>
     </div>
   );

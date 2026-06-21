@@ -73,7 +73,7 @@ const INVESTOR_TABLE_SKELETON_COLUMNS = [
   },
   {
     id: 'lastViewed',
-    header: 'Last viewed',
+    header: 'Last Viewed',
     size: 110,
     minSize: 96,
   },
@@ -142,28 +142,28 @@ async function InvestorPipelineTable() {
       className='overflow-hidden p-0'
       data-testid='admin-investors-table'
     >
-      <InvestorTable minWidth='min-w-[760px]'>
+      <InvestorTable minWidth='min-w-investor-table'>
         <InvestorTableHead>
           <InvestorTableHeaderRow>
-            <InvestorTableHeaderCell className='w-[200px]'>
+            <InvestorTableHeaderCell className='w-investor-label'>
               Label
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[150px]'>
+            <InvestorTableHeaderCell className='w-investor-name'>
               Investor
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[100px]'>
+            <InvestorTableHeaderCell className='w-investor-stage'>
               Stage
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[64px]'>
+            <InvestorTableHeaderCell className='w-16'>
               Score
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[64px]'>
+            <InvestorTableHeaderCell className='w-16'>
               Views
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[110px]'>
+            <InvestorTableHeaderCell className='w-investor-date'>
               Last viewed
             </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-[72px]'>
+            <InvestorTableHeaderCell className='w-investor-status'>
               Status
             </InvestorTableHeaderCell>
           </InvestorTableHeaderRow>
@@ -171,7 +171,7 @@ async function InvestorPipelineTable() {
         <InvestorTableBody>
           {links.map(link => (
             <InvestorTableRow key={link.id}>
-              <InvestorTableCell className='w-[200px]'>
+              <InvestorTableCell className='w-investor-label'>
                 <div className='flex min-w-0 flex-col gap-0.5'>
                   <span className='truncate font-semibold text-primary-token'>
                     {link.label}
@@ -179,24 +179,24 @@ async function InvestorPipelineTable() {
                   <TokenDisplay token={link.token} />
                 </div>
               </InvestorTableCell>
-              <InvestorTableCell className='w-[150px]'>
+              <InvestorTableCell className='w-investor-name'>
                 {link.investorName || 'Unknown investor'}
               </InvestorTableCell>
-              <InvestorTableCell className='w-[100px]'>
+              <InvestorTableCell className='w-investor-stage'>
                 <StageBadge stage={link.stage} />
               </InvestorTableCell>
-              <InvestorTableCell className='w-[64px]'>
+              <InvestorTableCell className='w-16'>
                 <ScoreBadge score={link.engagementScore} />
               </InvestorTableCell>
-              <InvestorTableCell className='w-[64px]'>
+              <InvestorTableCell className='w-16'>
                 {link.viewCount}
               </InvestorTableCell>
-              <InvestorTableCell className='w-[110px]'>
+              <InvestorTableCell className='w-investor-date'>
                 {link.lastViewed
                   ? new Date(link.lastViewed).toLocaleDateString()
                   : 'No views yet'}
               </InvestorTableCell>
-              <InvestorTableCell className='w-[72px]'>
+              <InvestorTableCell className='w-investor-status'>
                 <StatusBadge isActive={link.isActive} />
               </InvestorTableCell>
             </InvestorTableRow>
@@ -218,7 +218,7 @@ function StageBadge({ stage }: Readonly<{ stage: string }>) {
     shared: { label: 'Shared', variant: 'secondary' },
     viewed: { label: 'Viewed', variant: 'default' },
     engaged: { label: 'Engaged', variant: 'warning' },
-    meeting_booked: { label: 'Meeting booked', variant: 'default' },
+    meeting_booked: { label: 'Meeting Booked', variant: 'default' },
     committed: { label: 'Committed', variant: 'success' },
     wired: { label: 'Wired', variant: 'success' },
     passed: { label: 'Passed', variant: 'destructive' },

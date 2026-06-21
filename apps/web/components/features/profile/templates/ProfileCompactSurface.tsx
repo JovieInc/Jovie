@@ -623,6 +623,7 @@ export function ProfileCompactSurface({
                   <Link
                     data-testid='profile-identity-link'
                     href={profileHref}
+                    prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
                     className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-[color:var(--profile-status-pill-fg)] drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >

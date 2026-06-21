@@ -50,7 +50,7 @@ describe('SettingsUsageStatsSection', () => {
     render(<SettingsUsageStatsSection />);
 
     expect(screen.getByTestId('settings-usage-panel').className).toContain(
-      'min-h-[342px]'
+      'min-h-86'
     );
   });
 
@@ -65,7 +65,7 @@ describe('SettingsUsageStatsSection', () => {
 
     expect(screen.getByText('No usage recorded')).toBeInTheDocument();
     expect(screen.getByTestId('settings-usage-panel').className).toContain(
-      'min-h-[342px]'
+      'min-h-86'
     );
   });
 
@@ -80,7 +80,7 @@ describe('SettingsUsageStatsSection', () => {
 
     expect(screen.getByText('Usage unavailable')).toBeInTheDocument();
     expect(screen.getByTestId('settings-usage-panel').className).toContain(
-      'min-h-[342px]'
+      'min-h-86'
     );
   });
 

@@ -13,7 +13,7 @@ describe('PaySelector System B style guard', () => {
   it('keeps amount preset state changes visually stable', async () => {
     const source = await readFile(sourcePath, 'utf8');
     const presetButtonClass = source.match(
-      /'flex h-\[92px\] items-center justify-center[^']+'/
+      /'flex h-23 items-center justify-center[^']+'/
     )?.[0];
 
     expect(presetButtonClass).toBeDefined();

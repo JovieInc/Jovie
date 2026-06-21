@@ -98,7 +98,7 @@ export function DspMatchCard({
         <div className='flex items-center gap-3'>
           {/* Provider Icon or Artist Image */}
           {externalArtistImageUrl ? (
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
+            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
               <Image
                 src={externalArtistImageUrl}
                 alt={externalArtistName}
@@ -109,7 +109,7 @@ export function DspMatchCard({
               />
             </div>
           ) : (
-            <div className='flex h-10 w-10 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
+            <div className='flex h-10 w-10 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
               <DspProviderIcon provider={providerId} size='lg' />
             </div>
           )}

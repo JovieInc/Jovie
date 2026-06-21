@@ -124,7 +124,7 @@ export function FilterSubmenu<T extends string = string>({
         collisionPadding={8}
         className={cn(
           LINEAR_SURFACE.popover,
-          'flex max-h-[260px] min-w-[196px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+          'flex max-h-65 min-w-49 max-w-[calc(100vw-16px)] flex-col overflow-hidden'
         )}
       >
         <FilterSearchInput

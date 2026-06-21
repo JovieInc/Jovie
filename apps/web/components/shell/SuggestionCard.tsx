@@ -53,7 +53,7 @@ export function SuggestionCard({
   return (
     <article
       className={cn(
-        'group/sug relative min-h-[148px] w-full overflow-hidden rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface)',
+        'group/sug relative min-h-37 w-full overflow-hidden rounded-2xl border border-white/[0.05] bg-(--linear-app-content-surface)',
         className
       )}
       style={{
@@ -64,10 +64,10 @@ export function SuggestionCard({
     >
       <div className='grid min-h-[inherit] grid-cols-1 items-center gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-7'>
         <div className='min-w-0'>
-          <h2 className='text-pretty text-[16px] font-semibold leading-[1.3] text-primary-token sm:text-[17px]'>
+          <h2 className='text-pretty text-base font-semibold leading-[1.3] text-primary-token sm:text-base'>
             {title}
           </h2>
-          <p className='mt-2 max-w-[48ch] text-pretty text-[12.5px] leading-[1.55] text-tertiary-token'>
+          <p className='mt-2 max-w-[48ch] text-pretty text-xs leading-[1.55] text-tertiary-token'>
             {body}
           </p>
         </div>
@@ -77,7 +77,7 @@ export function SuggestionCard({
             <button
               type='button'
               onClick={onDismiss}
-              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
+              className='inline-flex items-center h-7 px-3 rounded-full text-2xs text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
             >
               {dismissLabel}
             </button>
@@ -86,7 +86,7 @@ export function SuggestionCard({
             type='button'
             onClick={onAct}
             disabled={!onAct}
-            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,box-shadow,opacity] duration-subtle ease-out'
+            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-xs font-medium bg-white text-black hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,box-shadow,opacity] duration-subtle ease-out'
           >
             {actionLabel}
             <ArrowRight className='h-3 w-3' strokeWidth={2.5} />

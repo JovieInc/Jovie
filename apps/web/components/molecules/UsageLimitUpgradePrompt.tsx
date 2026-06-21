@@ -89,7 +89,7 @@ export function UsageLimitUpgradePrompt({
               ? `${featureName} limit reached`
               : `${current} of ${limit} ${featureName} used`}
           </p>
-          <p className='mt-0.5 text-[12px] text-secondary-token'>
+          <p className='mt-0.5 text-xs text-secondary-token'>
             Upgrade for {upgradeCopy}.
           </p>
         </div>

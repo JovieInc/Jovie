@@ -10,6 +10,7 @@ import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
+import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
@@ -536,7 +537,7 @@ export function HeaderNav({
             isMarketingGlass,
           })
         )}
-        aria-label='Primary navigation'
+        aria-label='Primary Navigation'
       >
         <div className={containerClass}>
           {/* Logo section - left aligned with Linear padding */}
@@ -601,6 +602,7 @@ export function HeaderNav({
                 includePublicLogin={includePublicLoginInMobileNav}
                 publicCtaHref={mobilePublicCtaHref}
                 publicCtaLabel={mobilePublicCtaLabel}
+                authenticatedUserSlot={<UserButton />}
               />
             </div>
           )}

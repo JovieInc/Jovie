@@ -36,7 +36,7 @@ describe('DrawerSurfaceCard', () => {
     expect(className).toContain('border-subtle');
     expect(className).toContain('bg-surface-1');
     expect(className).toContain('shadow-none');
-    expect(className).toContain('rounded-[10px]');
+    expect(className).toContain('rounded-lg');
   });
 
   it('drawer and sidebar cards use border-only elevation (no shadow)', () => {

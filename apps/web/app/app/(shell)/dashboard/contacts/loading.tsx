@@ -27,37 +27,37 @@ function createLoadingHeader(width: string) {
 const CONTACTS_LOADING_COLUMNS = [
   contactLoadingColumnHelper.accessor('role', {
     id: 'role',
-    header: createLoadingHeader('w-[112px]'),
+    header: createLoadingHeader('w-28'),
     size: 180,
     minSize: 180,
   }),
   contactLoadingColumnHelper.accessor('name', {
     id: 'name',
-    header: createLoadingHeader('w-[128px]'),
+    header: createLoadingHeader('w-32'),
     size: 200,
     minSize: 200,
   }),
   contactLoadingColumnHelper.accessor('territories', {
     id: 'territories',
-    header: createLoadingHeader('w-[96px]'),
+    header: createLoadingHeader('w-24'),
     size: 140,
     minSize: 140,
   }),
   contactLoadingColumnHelper.accessor('email', {
     id: 'email',
-    header: createLoadingHeader('w-[144px]'),
+    header: createLoadingHeader('w-36'),
     size: 200,
     minSize: 200,
   }),
   contactLoadingColumnHelper.accessor('phone', {
     id: 'phone',
-    header: createLoadingHeader('w-[96px]'),
+    header: createLoadingHeader('w-24'),
     size: 160,
     minSize: 160,
   }),
   contactLoadingColumnHelper.accessor('actions', {
     id: 'actions',
-    header: createLoadingHeader('w-[24px]'),
+    header: createLoadingHeader('w-6'),
     size: 48,
     minSize: 48,
   }),

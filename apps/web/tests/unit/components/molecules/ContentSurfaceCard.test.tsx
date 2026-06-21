@@ -25,7 +25,7 @@ describe('ContentSurfaceCard', () => {
     );
 
     const card = screen.getByTestId('nested-card');
-    expect(card.className).toContain('rounded-[10px]');
+    expect(card.className).toContain('rounded-lg');
     expect(card.className).toContain('shadow-none');
   });
 });

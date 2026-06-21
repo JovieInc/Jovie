@@ -125,7 +125,7 @@ export const CompactPadding: Story = {
 
 export const AllVariants: Story = {
   render: () => (
-    <div className='grid grid-cols-2 gap-4 w-[600px]'>
+    <div className='grid grid-cols-2 gap-4 w-150'>
       <DashboardCard variant='default'>
         <p className='font-medium'>Default</p>
       </DashboardCard>

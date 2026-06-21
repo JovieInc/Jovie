@@ -110,7 +110,7 @@ function FunnelStage({
   return (
     <div className='space-y-1.5 px-3.5 py-2.5'>
       <div className='flex items-baseline justify-between gap-2'>
-        <span className='text-[12px] font-caption text-secondary-token'>
+        <span className='text-xs font-caption text-secondary-token'>
           {label}
         </span>
         <span className='flex items-baseline gap-1.5'>
@@ -194,7 +194,7 @@ function RankedList({
 }) {
   if (loading) {
     return (
-      <ul className='min-h-[196px] space-y-1'>
+      <ul className='min-h-49 space-y-1'>
         {[1, 2, 3, 4, 5].map(i => (
           <li
             key={i}
@@ -213,7 +213,7 @@ function RankedList({
 
   if (items.length === 0) {
     return (
-      <div className='flex min-h-[196px] flex-col items-center justify-center text-center'>
+      <div className='flex min-h-49 flex-col items-center justify-center text-center'>
         <IconComponent className='mb-1.5 h-4 w-4 text-quaternary-token' />
         <p className='text-xs text-tertiary-token'>{emptyMessage}</p>
       </div>
@@ -221,7 +221,7 @@ function RankedList({
   }
 
   return (
-    <ul className='min-h-[196px] space-y-0.5'>
+    <ul className='min-h-49 space-y-0.5'>
       {items.map((item, index) => (
         <li
           key={item.key}

@@ -14,7 +14,7 @@ import { useChatUsageQuery } from '@/lib/queries';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { cn } from '@/lib/utils';
 
-const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-[342px]';
+const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-86';
 
 interface UsagePanelShellProps {
   readonly children: ReactNode;

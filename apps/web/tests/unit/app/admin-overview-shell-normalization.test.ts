@@ -44,6 +44,6 @@ describe('admin overview shell normalization (JOV-2525)', () => {
     expect(source).toContain("variant='hero'");
     expect(source).not.toContain('function HeroMetric');
     expect(source).toContain('AdminHeroMetrics');
-    expect(source).toContain('min-h-[75px]');
+    expect(source).toContain('min-h-19');
   });
 });

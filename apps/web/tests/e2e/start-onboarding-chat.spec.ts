@@ -8,7 +8,7 @@ type StreamChunk = Record<string, unknown>;
 
 const CHAT_PANEL = '[data-testid="onboarding-chat"]';
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
-const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat message input" i]';
 const TEST_AVATAR_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeElEQVR4nO3PQQ3AIADAQMD+/5w9QnJ4QKZsZu2cJwAAAAAAAAAAAAAAANxq7g7wG7iBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9gB9bYCfQMD+LwAAAAASUVORK5CYII=';
 const IGNORABLE_CONSOLE_ERRORS = [
@@ -66,38 +66,14 @@ function collectConsoleFailures(page: Page) {
 async function suppressDevToolbar(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem('__dev_toolbar_hidden', '1');
-
-    const resetToolbarHeight = () => {
-      document.documentElement?.style.setProperty(
-        '--dev-toolbar-height',
-        '0px'
-      );
-    };
-
-    resetToolbarHeight();
-
-    const hideToolbar = () => {
-      resetToolbarHeight();
-      if (
-        !document.head ||
-        document.getElementById('jovie-e2e-hide-dev-toolbar')
-      ) {
-        return;
-      }
-      const style = document.createElement('style');
-      style.id = 'jovie-e2e-hide-dev-toolbar';
-      style.textContent = '[data-testid="dev-toolbar"]{display:none!important}';
-      document.head.appendChild(style);
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', hideToolbar, {
-        once: true,
-      });
-    } else {
-      hideToolbar();
-    }
   });
+}
+
+async function sendComposerMessage(page: Page, text: string) {
+  await page.locator(COMPOSER_TEXTAREA).fill(text);
+  const sendButton = page.getByRole('button', { name: 'Send message' });
+  await expect(sendButton).toBeEnabled();
+  await sendButton.click();
 }
 
 function relevantConsoleFailures(failures: readonly string[]) {
@@ -448,8 +424,7 @@ test.describe('canonical /start onboarding chat', () => {
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
-    await page.locator(COMPOSER_TEXTAREA).fill('yes music artist and writer');
-    await page.getByRole('button', { name: 'Send message' }).click();
+    await sendComposerMessage(page, 'yes music artist and writer');
 
     const bubble = page.getByTestId('chat-user-bubble').first();
     await expect(bubble).toBeVisible();
@@ -487,9 +462,7 @@ test.describe('canonical /start onboarding chat', () => {
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
-    const textarea = page.locator(COMPOSER_TEXTAREA);
-    await textarea.fill('I am Test Artist');
-    await page.getByRole('button', { name: 'Send message' }).click();
+    await sendComposerMessage(page, 'I am Test Artist');
 
     await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
     await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
@@ -532,8 +505,7 @@ test.describe('canonical /start onboarding chat', () => {
     await waitForHydration(page);
 
     const textarea = page.locator(COMPOSER_TEXTAREA);
-    await textarea.fill('Test Artist');
-    await page.getByRole('button', { name: 'Send message' }).click();
+    await sendComposerMessage(page, 'Test Artist');
 
     const alert = page.getByRole('alert').filter({ hasText: 'Message paused' });
     await expect(alert).toBeVisible();
