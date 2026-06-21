@@ -68,7 +68,7 @@ export function InterstitialClient({
         <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
           <CheckCircle2 className='h-6 w-6 text-success' aria-hidden='true' />
         </div>
-        <p className='text-[13px] font-semibold text-primary-token'>
+        <p className='text-app font-semibold text-primary-token'>
           Verified. Redirecting...
         </p>
       </div>
@@ -78,7 +78,7 @@ export function InterstitialClient({
   return (
     <div className='space-y-4'>
       <noscript>
-        <p className='mb-4 text-[13px] text-error'>
+        <p className='mb-4 text-app text-error'>
           JavaScript is required to continue to this link.
         </p>
       </noscript>
@@ -87,7 +87,7 @@ export function InterstitialClient({
         <p className='text-[11px] uppercase tracking-[0.14em] text-tertiary-token'>
           Destination
         </p>
-        <p className='text-[13px] font-semibold text-primary-token'>
+        <p className='text-app font-semibold text-primary-token'>
           {titleAlias}
         </p>
         {domain === 'External Site' ? null : (
@@ -102,7 +102,7 @@ export function InterstitialClient({
           aria-live='assertive'
           className='border-error/20 bg-error-subtle p-4'
         >
-          <p className='text-[13px] text-primary-token'>{error}</p>
+          <p className='text-app text-primary-token'>{error}</p>
         </ContentSurfaceCard>
       ) : null}
 
