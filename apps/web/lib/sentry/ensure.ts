@@ -4,7 +4,15 @@ import { env } from '@/lib/env-server';
 
 let initializationPromise: Promise<void> | null = null;
 
+function isSecureVercelDeployment(): boolean {
+  return env.VERCEL_ENV === 'preview' || env.VERCEL_ENV === 'production';
+}
+
 function shouldSkipLocalSentry(): boolean {
+  if (isSecureVercelDeployment()) {
+    return false;
+  }
+
   const isLocalRuntime =
     env.NODE_ENV === 'development' ||
     env.NODE_ENV === 'test' ||

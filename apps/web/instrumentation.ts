@@ -17,7 +17,18 @@ const runtimeImport = new Function('specifier', 'return import(specifier)') as <
   specifier: string
 ) => Promise<T>;
 
+function isSecureVercelDeployment(): boolean {
+  return (
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.VERCEL_ENV === 'production'
+  );
+}
+
 function isLocalTestRuntime(): boolean {
+  if (isSecureVercelDeployment()) {
+    return false;
+  }
+
   return (
     process.env.NODE_ENV === 'test' ||
     process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
