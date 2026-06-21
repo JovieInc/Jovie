@@ -34,7 +34,7 @@ import {
 } from '@/lib/flags/profile-variant';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { buildProfileAeoContent } from '@/lib/profile/aeo-content';
-import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback-data';
 import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,

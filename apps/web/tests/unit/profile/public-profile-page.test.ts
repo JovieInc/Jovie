@@ -121,6 +121,12 @@ describe('Public Profile Page Logic', () => {
       expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
         'captureError('
       );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        '@/lib/profile/featured-playlist-fallback-data'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+        "from '@/lib/profile/featured-playlist-fallback';"
+      );
     });
   });
 

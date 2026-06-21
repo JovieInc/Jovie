@@ -1,14 +1,7 @@
 import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
-import {
-  resolveNotFoundPathname,
-  resolveNotFoundVariant,
-} from '@/lib/routing/not-found-context';
 
-export default async function NotFound() {
-  const pathname = await resolveNotFoundPathname();
-  const variant = resolveNotFoundVariant(pathname);
-
+export default function NotFound() {
   return (
     <PublicPageShell
       headerVariant='minimal'
@@ -19,7 +12,7 @@ export default async function NotFound() {
         className='profile-viewport system-b-public-profile-not-found-container'
       >
         <div className='system-b-public-profile-not-found-content'>
-          <NotFoundPageContent variant={variant} surface='profile' />
+          <NotFoundPageContent variant='generic' surface='profile' />
         </div>
       </div>
     </PublicPageShell>
