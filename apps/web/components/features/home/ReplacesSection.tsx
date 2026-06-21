@@ -28,14 +28,14 @@ export function ReplacesSection() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-page'>
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-linear-content'>
           {/* Header */}
           <div className='reveal-on-scroll flex flex-col items-center text-center gap-5 mb-16'>
             <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
               Why switch
             </span>
             <h2 className='marketing-h2-linear text-primary-token'>
-              One tool instead of three.
+              One Tool Instead Of Three.
             </h2>
             <p className='max-w-lg marketing-lead-linear text-secondary-token'>
               Most artists juggle a link page, a smart link service, and an
