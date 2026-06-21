@@ -11,6 +11,7 @@ import { TIM_WHITE_PROFILE } from './tim-white';
 
 const BLUR_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWExYTFhIi8+PC9zdmc+';
+const IMAGE_PLACEHOLDER = 'blur';
 
 const HOVER_MEDIA_QUERY = '(hover: hover) and (pointer: fine)';
 
@@ -312,10 +313,10 @@ export function SeeItInActionCarousel({
       />
 
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-linear-content'>
           <div className='flex flex-col items-center gap-5 text-center reveal-on-scroll'>
             <h2 className='marketing-h2-linear text-primary-token'>
-              See it in action
+              See It In Action
             </h2>
             <p className='max-w-2xl marketing-lead-linear text-secondary-token'>
               Tim White&apos;s profile, releases, and smart links all powered by
@@ -342,7 +343,7 @@ export function SeeItInActionCarousel({
                     alt={`${PROFILE.name} profile photo`}
                     fill
                     sizes='96px'
-                    placeholder='blur'
+                    placeholder={IMAGE_PLACEHOLDER}
                     blurDataURL={BLUR_DATA_URL}
                     className='object-cover'
                   />
