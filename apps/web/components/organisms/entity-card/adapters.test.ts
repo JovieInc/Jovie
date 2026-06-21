@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import {
+  chatReleaseContextToEntityCard,
+  chatTourDateContextToEntityCard,
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
@@ -97,6 +99,69 @@ describe('releaseToEntityCard', () => {
     );
     expect(model.kind).toBe('video');
     expect(model.cta?.label).toBe('Watch');
+  });
+});
+
+describe('chatReleaseContextToEntityCard', () => {
+  it('maps release artwork and type into a compact context model', () => {
+    const model = chatReleaseContextToEntityCard(
+      {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        artworkUrl: 'https://cdn.test/art.jpg',
+        releaseType: 'single',
+      },
+      { fallbackTitle: 'Release' }
+    );
+
+    expect(model.kind).toBe('music');
+    expect(model.title).toBe('Lost In The Light');
+    expect(model.imageUrl).toBe('https://cdn.test/art.jpg');
+    expect(model.meta).toBe('Single Context');
+    expect(model.href).toBeUndefined();
+    expect(model.cta).toBeUndefined();
+  });
+
+  it('uses loading meta while release data is unresolved', () => {
+    const model = chatReleaseContextToEntityCard(null, {
+      fallbackTitle: 'Lost In The Light',
+      loading: true,
+    });
+
+    expect(model.title).toBe('Lost In The Light');
+    expect(model.meta).toBe('Loading Release');
+  });
+});
+
+describe('chatTourDateContextToEntityCard', () => {
+  it('maps tour dates to a date-pill context model without navigation', () => {
+    const model = chatTourDateContextToEntityCard(
+      {
+        id: 'evt-1',
+        title: 'Brooklyn Steel',
+        venueName: 'Brooklyn Steel',
+        city: 'Brooklyn, NY',
+        startDate: '2026-06-12T23:30:00.000Z',
+      },
+      { fallbackTitle: 'Tour date' }
+    );
+
+    expect(model.kind).toBe('show');
+    expect(model.title).toBe('Brooklyn Steel');
+    expect(model.datePill).toEqual({ month: 'Jun', day: '12' });
+    expect(model.meta).toBe('Tour Date Context');
+    expect(model.href).toBeNull();
+    expect(model.cta).toBeNull();
+  });
+
+  it('uses loading meta while event data is unresolved', () => {
+    const model = chatTourDateContextToEntityCard(null, {
+      fallbackTitle: 'Brooklyn Steel',
+      loading: true,
+    });
+
+    expect(model.title).toBe('Brooklyn Steel');
+    expect(model.meta).toBe('Loading Tour Date');
   });
 });
 
