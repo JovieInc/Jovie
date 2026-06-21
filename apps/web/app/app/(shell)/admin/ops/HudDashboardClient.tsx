@@ -30,6 +30,7 @@ import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
+import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
 import {
@@ -662,6 +663,21 @@ export interface HudDashboardClientProps {
   readonly initialShippingData?: DailyBucket[];
   /** ISO timestamp of when shipping data was last cached. */
   readonly initialShippingCachedAt?: string;
+  /** When true and agentRuns empty, show dev fixtures on Agent OS panel. */
+  readonly useFixtureAgentRuns?: boolean;
+}
+
+function resolveAgentOsArtifacts(
+  metrics: HudMetrics,
+  useFixtureAgentRuns: boolean
+): AgentRunArtifact[] {
+  if (metrics.agentRuns.length > 0) {
+    return [...metrics.agentRuns];
+  }
+  if (useFixtureAgentRuns) {
+    return [...AGENT_OS_ADMIN_FIXTURE_ARTIFACTS];
+  }
+  return [];
 }
 
 function makeItemKey(item: HudMetrics['aiOps']['blockers'][number]): string {
@@ -689,10 +705,15 @@ export function HudDashboardClient({
   kioskToken = null,
   initialShippingData,
   initialShippingCachedAt,
+  useFixtureAgentRuns = false,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
     initialMetrics,
     kioskToken
+  );
+  const agentOsArtifacts = resolveAgentOsArtifacts(
+    metrics,
+    useFixtureAgentRuns
   );
 
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
@@ -828,7 +849,7 @@ export function HudDashboardClient({
 
         {metrics.accessMode === 'admin' ? (
           <AgentOsRunsPanel
-            artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS}
+            artifacts={agentOsArtifacts}
             summary={aiOpsSummary}
             status={<HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />}
             deploymentsPanel={
@@ -1203,7 +1224,7 @@ export function HudDashboardClient({
       </ContentSurfaceCard>
 
       {isShell && metrics.accessMode === 'admin' ? (
-        <AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />
+        <AgentOsRunsPanel artifacts={agentOsArtifacts} />
       ) : null}
 
       <ContentSurfaceCard

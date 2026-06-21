@@ -182,6 +182,7 @@ export default async function AdminOpsPage({
           presentationMode='admin-kiosk'
           initialShippingData={shippingPrefetch?.data}
           initialShippingCachedAt={shippingPrefetch?.cachedAt}
+          useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
         />
       </div>
     );
@@ -295,6 +296,7 @@ export default async function AdminOpsPage({
         presentationMode='shell'
         initialShippingData={shippingPrefetch?.data}
         initialShippingCachedAt={shippingPrefetch?.cachedAt}
+        useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
       />
     </AdminPage>
   );

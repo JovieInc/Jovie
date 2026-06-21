@@ -189,6 +189,8 @@ export const ServerEnvSchema = z.object({
   // Upstash Redis
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+  // Redis URL for optional caching
+  REDIS_URL: z.string().url().optional(),
 
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
   SESSION_SECRET: z.string().min(32).optional(),
@@ -234,6 +236,14 @@ export const ServerEnvSchema = z.object({
 
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
+  // Hermes HUD events ingest authentication
+  HERMES_HUD_API_KEY: z.string().optional(),
+  HUD_AGENT_RUNS_FIXTURES: z
+    .string()
+    .optional()
+    .describe(
+      'Set to 1 to show fixture Agent OS runs when live ingest is empty'
+    ),
 
   // OpenAI (for vision model fallback in asset extraction)
   OPENAI_API_KEY: z.string().optional(),
