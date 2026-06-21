@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.54.1] - 2026-06-21
+
+> [internal] Restores changelog email subscription by wiring the invisible Turnstile bot-protection widget; fixes empty-token submit that caused production 403 rejections.
+
+### Fixed
+
+- **[internal] Changelog email subscribe Turnstile wiring**: `ChangelogEmailSignup` now mounts the reusable `InvisibleTurnstile` atom and guards client-side submit until a valid token arrives, preventing the empty-token `403` that made changelog subscriptions non-functional when `TURNSTILE_SECRET_KEY` is configured in production.
+- **[internal] `InvisibleTurnstile` component**: new reusable atom (`components/atoms/InvisibleTurnstile.tsx`) that renders an execute-mode Cloudflare Turnstile widget off-screen, issues a deterministic bypass token in dev/E2E, and exposes `isTurnstileClientBypassed` / `isTurnstileClientConfigured` for consumers. 4 unit tests cover managed render, E2E bypass, missing site key, and external reset.
+
 ## [26.6.54] - 2026-06-20
 
 > [internal] Design-taste jury loop: change-aware screenshot planning, multi-juror consensus, and auto-filed issue manifests with reference comps; repo hygiene removes leaked competitor-analysis doc and adds blocking brand-scrub CI guard.
