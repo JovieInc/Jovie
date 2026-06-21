@@ -60,7 +60,7 @@ export function MemoContent({
         <div className='flex gap-10'>
           {/* Main prose — light mode applies white bg + dark text */}
           <article
-            className={`investor-prose min-w-0 flex-1 rounded-[var(--radius-xl)] transition-colors duration-subtle ${
+            className={`investor-prose min-w-0 flex-1 rounded-xl transition-colors duration-subtle ${
               isLight ? 'bg-paper p-6' : ''
             }`}
             style={{
