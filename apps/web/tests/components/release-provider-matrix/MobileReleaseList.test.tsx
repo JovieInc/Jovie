@@ -120,11 +120,9 @@ describe('MobileReleaseList', () => {
     expect(screen.getByText('Summer Lights').className).toContain(
       'font-caption'
     );
-    expect(screen.getByText('Summer Lights').className).toContain(
-      'text-[13px]'
-    );
+    expect(screen.getByText('Summer Lights').className).toContain('text-app');
     expect(screen.getByText('Jovie Artist').parentElement?.className).toContain(
-      'text-[11px]'
+      'text-2xs'
     );
 
     const badge = screen.getByText('Single');

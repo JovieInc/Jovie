@@ -101,17 +101,17 @@ export function DemoSettingsPanel() {
         <SettingsSection title='Preferences' bordered>
           <div className='px-4 py-3'>
             <ToggleRow
-              label='Auto-sync new releases'
+              label='Automatic New Releases'
               description='Automatically create smart links when new releases are detected'
               defaultChecked
             />
             <ToggleRow
-              label='Email notifications'
+              label='Email Notifications'
               description='Get notified when platforms sync or require attention'
               defaultChecked
             />
             <ToggleRow
-              label='Public profile'
+              label='Public Profile'
               description='Allow your artist page to be discoverable'
               defaultChecked={false}
             />
@@ -153,19 +153,19 @@ function AudienceQualityCaptureCard() {
           <div className='border-b border-subtle p-5 md:border-b-0 md:border-r'>
             <div className='space-y-3'>
               <QualitySignalRow
-                label='Filter self visits'
+                label='Filter Self Visits'
                 detail='Hide your own scans, test taps, and internal traffic.'
                 value='On'
                 tone='success'
               />
               <QualitySignalRow
-                label='Filter low signal'
+                label='Filter Low Signal'
                 detail='Suppress anonymous taps with weak downstream intent.'
                 value='On'
                 tone='success'
               />
               <QualitySignalRow
-                label='Filter junk traffic'
+                label='Filter Junk Traffic'
                 detail='Catch suspicious spikes, repeat loops, and broken crawlers.'
                 value='Auto'
                 tone='neutral'
@@ -189,12 +189,12 @@ function AudienceQualityCaptureCard() {
               </div>
 
               <div className='mt-4 space-y-2'>
-                <FilterRule label='Merch table scans' value='Trusted source' />
+                <FilterRule label='Merch Table Scans' value='Trusted source' />
                 <FilterRule
-                  label='Profile revisit within 20m'
+                  label='Profile Revisit Within Twenty Minutes'
                   value='Collapsed'
                 />
-                <FilterRule label='Anonymous bounce' value='Excluded' />
+                <FilterRule label='Anonymous Bounce' value='Excluded' />
               </div>
             </div>
           </div>
@@ -216,7 +216,7 @@ function SyncSettingsCaptureCard() {
             Settings
           </p>
           <h2 className='mt-2 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
-            Always in sync
+            Always In Sync
           </h2>
           <p className='mt-1 max-w-[34rem] text-app leading-[1.55] text-secondary-token'>
             Keep new music and profile surfaces current automatically, without
@@ -240,9 +240,9 @@ function SyncSettingsCaptureCard() {
           </div>
 
           <div className='grid gap-2 sm:grid-cols-3'>
-            <SyncSurfacePill label='Latest release' value='Live' />
-            <SyncSurfacePill label='Top tracks' value='Auto' />
-            <SyncSurfacePill label='Profile pages' value='Updated' />
+            <SyncSurfacePill label='Latest Release' value='Live' />
+            <SyncSurfacePill label='Top Tracks' value='Auto' />
+            <SyncSurfacePill label='Profile Pages' value='Updated' />
           </div>
 
           <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
@@ -280,10 +280,10 @@ function AlwaysInSyncToggle() {
   return (
     <div className='inline-flex items-center gap-3'>
       <span className='text-xs font-semibold text-primary-token'>
-        Always in sync
+        Always In Sync
       </span>
       <span className='flex h-7 w-12 items-center rounded-full bg-[color:var(--color-accent)] px-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'>
-        <span className='ml-auto h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)]' />
+        <span className='ml-auto h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] dark:bg-white' />
       </span>
     </div>
   );
@@ -304,9 +304,7 @@ function QualitySignalRow({
     <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-app font-semibold text-primary-token'>
-            {label}
-          </p>
+          <p className='text-app font-semibold text-primary-token'>{label}</p>
           <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
             {detail}
           </p>
@@ -353,9 +351,7 @@ function SyncSurfacePill({
       <p className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
         {label}
       </p>
-      <p className='mt-1 text-sm font-semibold text-primary-token'>
-        {value}
-      </p>
+      <p className='mt-1 text-sm font-semibold text-primary-token'>{value}</p>
     </div>
   );
 }

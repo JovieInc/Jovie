@@ -211,7 +211,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
         itemId={id}
         actions={swipeActions}
         actionsWidth={180}
-        className='rounded-[10px]'
+        className='rounded-lg'
       >
         <LinkPill
           platformIcon={link.platform.icon}

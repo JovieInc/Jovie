@@ -57,7 +57,7 @@ function MobileHeader({
         MOBILE_HEADER_PADDING
       )}
     >
-      <h1 className='text-[17px] font-semibold leading-tight tracking-[-0.018em] text-primary-token'>
+      <h1 className='text-base font-semibold leading-tight tracking-[-0.018em] text-primary-token'>
         {breadcrumbSuffix ?? currentLabel}
       </h1>
       <div className='flex items-center gap-2'>

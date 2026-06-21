@@ -18,7 +18,7 @@ export default function AdminLoading() {
               key => (
                 <div
                   key={key}
-                  className='h-[172px] rounded-xl border border-subtle bg-surface-1 skeleton'
+                  className='h-43 rounded-xl border border-subtle bg-surface-1 skeleton'
                 />
               )
             )}

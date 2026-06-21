@@ -46,7 +46,7 @@ export function FeatureAccordion({ items }: FeatureAccordionProps) {
               aria-labelledby={triggerId}
               hidden={!isOpen}
             >
-              <p className='px-4 pt-3 pb-1 text-[13px] leading-relaxed text-tertiary-token'>
+              <p className='px-4 pt-3 pb-1 text-app leading-relaxed text-tertiary-token'>
                 {item.description}
               </p>
             </section>

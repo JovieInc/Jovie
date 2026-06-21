@@ -35,6 +35,7 @@ export const ServerEnvSchema = z.object({
     .enum(['development', 'production', 'test'])
     .optional()
     .default('development'),
+  CI: z.string().optional(),
   VITEST: z.string().optional(),
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
   NEXT_PUBLIC_APP_VERSION: z.string().optional(),
@@ -243,6 +244,8 @@ export const ServerEnvSchema = z.object({
 
   // Braintrust observability (LLM tracing + evals)
   BRAINTRUST_API_KEY: z.string().optional(),
+  /** Set to `1` to allow local Sentry bootstrap in dev/test/E2E. */
+  JOVIE_ENABLE_LOCAL_SENTRY: z.enum(['0', '1']).optional(),
 
   // Agnost AI analytics (Vercel AI SDK telemetry via OpenTelemetry)
   AGNOST_ORG_ID: z.string().uuid().optional(),
@@ -342,6 +345,7 @@ export const ServerEnvSchema = z.object({
  */
 export const ENV_KEYS = [
   'NODE_ENV',
+  'CI',
   'VITEST',
   'VERCEL_ENV',
   'NEXT_PUBLIC_APP_VERSION',
@@ -463,6 +467,7 @@ export const ENV_KEYS = [
   'ELEVENLABS_API_KEY',
   'ELEVENLABS_WEBHOOK_SECRET',
   'BRAINTRUST_API_KEY',
+  'JOVIE_ENABLE_LOCAL_SENTRY',
   'AGNOST_ORG_ID',
   'JOVIE_ENABLE_AGNOST',
   'AGENT_OS_WORKFLOWS_ENABLED',

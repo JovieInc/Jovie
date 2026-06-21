@@ -89,7 +89,7 @@ export default function VoiceLandingPage() {
             <h2 className='marketing-h2-linear mt-3 text-primary-token'>
               Your voice. Trained. Ready.
             </h2>
-            <p className='mt-3 text-[15px] leading-7 text-secondary-token'>
+            <p className='mt-3 text-mid leading-7 text-secondary-token'>
               Async, consent-first, and built on the same infra that powers
               Jovie&apos;s creator automation.
             </p>
@@ -128,7 +128,7 @@ export default function VoiceLandingPage() {
                 <h3 className='mt-3 text-lg font-semibold text-primary-token'>
                   {step.title}
                 </h3>
-                <p className='mt-2 text-[14px] leading-6 text-secondary-token'>
+                <p className='mt-2 text-sm leading-6 text-secondary-token'>
                   {step.desc}
                 </p>
               </article>
@@ -145,7 +145,7 @@ export default function VoiceLandingPage() {
               <h3 className='text-xl font-semibold'>
                 Built for creators who care about consent.
               </h3>
-              <ul className='mt-6 space-y-3 text-[15px] leading-7 text-secondary-token'>
+              <ul className='mt-6 space-y-3 text-mid leading-7 text-secondary-token'>
                 <li>• Explicit opt-in recorded before any training run.</li>
                 <li>
                   • Models stay private to your account until you publish a

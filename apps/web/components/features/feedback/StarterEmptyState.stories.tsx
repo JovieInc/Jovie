@@ -78,7 +78,7 @@ export const NoActions: Story = {
 
 export const InDashboard: Story = {
   render: () => (
-    <div className='w-[500px] p-6 border border-subtle rounded-xl bg-surface'>
+    <div className='w-125 p-6 border border-subtle rounded-xl bg-surface'>
       <h2 className='text-lg font-semibold mb-4'>Your Links</h2>
       <StarterEmptyState
         title='No links yet'

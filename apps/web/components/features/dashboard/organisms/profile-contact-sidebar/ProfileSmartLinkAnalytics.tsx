@@ -43,7 +43,7 @@ function ProfileSmartLinkControl({
         aria-hidden='true'
       />
       <span
-        className='min-w-0 flex-1 truncate font-mono text-[10.5px] leading-none tracking-[-0.01em] text-secondary-token'
+        className='min-w-0 flex-1 truncate font-mono text-3xs leading-none tracking-[-0.01em] text-secondary-token'
         title={profileUrl}
       >
         {smartLinkLabel}
@@ -98,25 +98,25 @@ export function ProfileSmartLinkAnalytics({
   const content = (
     <>
       {/* Analytics metrics */}
-      <div className='min-h-[76px] px-3 pb-3 pt-3'>
+      <div className='min-h-19 px-3 pb-3 pt-3'>
         {showSkeleton && (
           <div className='grid grid-cols-2 gap-3'>
             <div className='space-y-1'>
-              <div className='h-[9px] w-12 rounded skeleton' />
+              <div className='h-2 w-12 rounded skeleton' />
               <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-[9px] w-10 rounded skeleton' />
+              <div className='h-2 w-10 rounded skeleton' />
             </div>
             <div className='space-y-1'>
-              <div className='h-[9px] w-12 rounded skeleton' />
+              <div className='h-2 w-12 rounded skeleton' />
               <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-[9px] w-10 rounded skeleton' />
+              <div className='h-2 w-10 rounded skeleton' />
             </div>
           </div>
         )}
 
         {!showSkeleton && isError && (
           <DrawerEmptyState
-            className='min-h-[52px] px-0 py-0'
+            className='min-h-13 px-0 py-0'
             message='Analytics unavailable'
           />
         )}
@@ -178,7 +178,7 @@ function AnalyticsMetric({
 }) {
   return (
     <div className={cn('space-y-px', className)}>
-      <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
+      <p className='text-3xs font-medium leading-[14px] text-tertiary-token'>
         {label}
       </p>
       <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>

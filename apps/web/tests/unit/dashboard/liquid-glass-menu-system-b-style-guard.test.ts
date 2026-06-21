@@ -30,6 +30,6 @@ describe('dashboard LiquidGlassMenu System B guard', () => {
     expect(source).toContain('transition-opacity');
     expect(source).toContain('active:bg-surface-2');
     expect(source).toContain('active:text-primary-token');
-    expect(source).toContain('min-w-[64px]');
+    expect(source).toContain('min-w-16');
   });
 });

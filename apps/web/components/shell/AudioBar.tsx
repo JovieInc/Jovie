@@ -229,7 +229,7 @@ export function AudioBar({
     >
       <div />
       {/* Center column: waveform drawer above (collapsible), transport below. */}
-      <div className='flex flex-col items-center justify-center min-h-[52px]'>
+      <div className='flex flex-col items-center justify-center min-h-13'>
         <div
           aria-hidden={!waveformOn}
           className='w-full overflow-hidden'

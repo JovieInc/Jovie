@@ -222,7 +222,7 @@ export function ReleaseAudioAssetPanel({
           disabled={!isEditable || isUploading}
           tabIndex={disabledTabIndex}
           className={cn(
-            'flex min-h-[118px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-3 py-4 text-center transition-[background-color,border-color,color] duration-subtle ease-subtle',
+            'flex min-h-30 w-full flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-3 py-4 text-center transition-[background-color,border-color,color] duration-subtle ease-subtle',
             isDragging &&
               'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-border-focus)_8%,var(--linear-bg-surface-0))]',
             isEditable &&

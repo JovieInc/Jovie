@@ -10,7 +10,7 @@ const contentSurfaceCardVariants = cva(
         default: 'rounded-xl',
         details: 'rounded-xl',
         marketing: 'rounded-xl',
-        nested: 'rounded-[10px]',
+        nested: 'rounded-lg',
         settings: 'rounded-xl',
         table: 'rounded-xl',
       },

@@ -36,7 +36,7 @@ export function ReleaseTaskExplainerPopover({
         sideOffset={4}
         className='w-72 rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3 shadow-lg'
       >
-        <p className='text-[11.5px] leading-relaxed text-secondary-token'>
+        <p className='text-2xs leading-relaxed text-secondary-token'>
           {explainerText}
         </p>
         {learnMoreUrl && (

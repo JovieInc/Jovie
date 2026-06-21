@@ -39,7 +39,7 @@ export function HomepageOutcomeCards({
     <section
       data-testid='homepage-outcome-cards'
       className={cn(
-        'homepage-outcome-section relative w-full bg-[#f5f5f7]',
+        'homepage-outcome-section relative w-full bg-(--color-bg-base)',
         className
       )}
       aria-labelledby='homepage-outcome-cards-heading'

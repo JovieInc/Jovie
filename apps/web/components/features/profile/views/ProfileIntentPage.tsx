@@ -40,7 +40,7 @@ export function ProfileIntentPage({
   const entry = PROFILE_VIEW_REGISTRY[mode];
 
   return (
-    <main className='mx-auto flex min-h-dvh w-full max-w-(--profile-shell-max-width) flex-col overflow-x-hidden bg-[color:var(--profile-drawer-bg)] text-primary-token'>
+    <main className='profile-intent-page mx-auto flex min-h-dvh w-full max-w-(--profile-shell-max-width) flex-col overflow-x-hidden bg-[color:var(--profile-drawer-bg)] text-primary-token'>
       <header className='relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2.5 px-5 pb-3 pt-5'>
         <Link
           href={`/${artistHandle}`}

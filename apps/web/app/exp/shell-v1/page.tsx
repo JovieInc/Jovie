@@ -661,9 +661,9 @@ const RELEASES: Release[] = [
     waveformSeed: 31,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 28, kind: 'verse', label: 'Verse 1' },
+      { at: 28, kind: 'verse', label: 'Verse 1' }, // ui-casing-allow: numbered section
       { at: 70, kind: 'chorus', label: 'Chorus' },
-      { at: 110, kind: 'verse', label: 'Verse 2' },
+      { at: 110, kind: 'verse', label: 'Verse 2' }, // ui-casing-allow: numbered section
       { at: 150, kind: 'outro', label: 'Outro' },
     ],
   },
@@ -1302,7 +1302,7 @@ const TRACKS: Track[] = [
     waveformSeed: 1,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 26, kind: 'verse', label: 'Verse 1' },
+      { at: 26, kind: 'verse', label: 'Verse 1' }, // ui-casing-allow: numbered section
       { at: 52, kind: 'chorus', label: 'Chorus' },
       { at: 88, kind: 'drop', label: 'Drop' },
     ],
@@ -1514,7 +1514,7 @@ const TASKS: Task[] = [
     id: 'J-128',
     title: 'Confirm artwork for The Deep End',
     description:
-      'Final mastered files came back. Need to approve the cover art crop for the Spotify Canvas before the smart link goes live next Friday.',
+      'Final mastered files came back. Need to approve the cover art crop for the Spotify Canvas before the smart link goes live next Friday.', // ui-casing-allow: multi-sentence body copy
     status: 'in_progress',
     priority: 'high',
     assignee: 'you',
@@ -1857,18 +1857,18 @@ function ShellV1ExperimentContent() {
         },
       },
       {
-        label: 'Open release',
+        label: 'Open Release',
         icon: ExternalLink,
         onSelect: () => setSelectedReleaseId(release.id),
       },
       {
-        label: 'Pin to top',
+        label: 'Pin To Top',
         icon: Pin,
         onSelect: noop(`pin ${release.id}`),
       },
       { kind: 'separator' },
       {
-        label: 'Copy smart link',
+        label: 'Copy Smart Link',
         icon: LinkIcon,
         shortcut: '⌘L',
         onSelect: noop(`copy link ${release.id}`),
@@ -1911,13 +1911,13 @@ function ShellV1ExperimentContent() {
           },
         },
         {
-          label: 'Pin to top',
+          label: 'Pin To Top',
           icon: Pin,
           onSelect: noop(`pin ${release.id}`),
         },
         { kind: 'separator' },
         {
-          label: 'Copy smart link',
+          label: 'Copy Smart Link',
           icon: LinkIcon,
           shortcut: '⌘L',
           onSelect: noop(`copy link ${release.id}`),
@@ -1936,7 +1936,7 @@ function ShellV1ExperimentContent() {
         },
         { kind: 'separator' },
         {
-          label: 'Close drawer',
+          label: 'Close Drawer',
           icon: X,
           shortcut: 'closeOverlay',
           onSelect: () => setSelectedReleaseId(null),
@@ -1959,19 +1959,19 @@ function ShellV1ExperimentContent() {
         },
       },
       {
-        label: 'Add to release',
+        label: 'Add To Release',
         icon: UserPlus,
         onSelect: noop(`add ${track.id} to release`),
       },
       {
-        label: 'Edit metadata',
+        label: 'Edit Metadata',
         icon: Pencil,
         shortcut: '⌘E',
         onSelect: noop(`edit ${track.id}`),
       },
       { kind: 'separator' },
       {
-        label: 'Copy share link',
+        label: 'Copy Share Link',
         icon: LinkIcon,
         shortcut: '⌘L',
         onSelect: noop(`copy link ${track.id}`),
@@ -1995,18 +1995,18 @@ function ShellV1ExperimentContent() {
   const onThreadContextMenu = (e: React.MouseEvent, thread: Thread) => {
     openContextMenu(e, [
       {
-        label: 'Open thread',
+        label: 'Open Thread',
         icon: ExternalLink,
         onSelect: () => openThread(thread.id),
       },
       { kind: 'separator' },
       {
-        label: 'Copy as Markdown',
+        label: 'Copy As Markdown',
         icon: Copy,
         onSelect: noop(`copy md ${thread.id}`),
       },
       {
-        label: 'Copy thread ID',
+        label: 'Copy Thread ID',
         icon: Copy,
         onSelect: noop(`copy id ${thread.id}`),
       },
@@ -2067,13 +2067,13 @@ function ShellV1ExperimentContent() {
       },
       { kind: 'separator' },
       {
-        label: 'Open release',
+        label: 'Open Release',
         icon: ExternalLink,
         disabled: !task.releaseId,
         onSelect: () => task.releaseId && setSelectedReleaseId(task.releaseId),
       },
       {
-        label: 'Copy task ID',
+        label: 'Copy Task ID',
         icon: Copy,
         onSelect: noop(`copy id ${task.id}`),
       },
@@ -2769,7 +2769,7 @@ function ShellV1ExperimentContent() {
                 the direction the bar will travel when revealed (up from the
                 bottom edge). */}
             <Tooltip
-              label='Show audio bar'
+              label='Show Audio Bar'
               shortcut={SHORTCUTS.toggleBar}
               side='top'
             >
@@ -2890,7 +2890,7 @@ function ShellV1ExperimentContent() {
         <button
           type='button'
           onClick={() => setView('demo')}
-          aria-label='Exit screening room (Esc)'
+          aria-label='Exit Screening Room (Esc)'
           title='Exit screening room (Esc)'
           className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-out'
           style={{
@@ -3540,11 +3540,11 @@ function CanvasSubheader({
           );
         })}
         {onAddView && (
-          <Tooltip label='Save current filter as a view'>
+          <Tooltip label='Save Current Filter As A View'>
             <button
               type='button'
               onClick={onAddView}
-              aria-label='Add view'
+              aria-label='Add View'
               className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/50 transition-colors duration-subtle ease-out'
             >
               <Plus className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -3591,7 +3591,7 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
     >
       <ShellDropdown.Label>Status</ShellDropdown.Label>
       <ShellDropdown.RadioGroup value={status} onValueChange={setStatus}>
-        <ShellDropdown.RadioItem value='all' label='Any status' />
+        <ShellDropdown.RadioItem value='all' label='Any Status' />
         <ShellDropdown.RadioItem value='live' label='Live' />
         <ShellDropdown.RadioItem value='scheduled' label='Scheduled' />
         <ShellDropdown.RadioItem value='draft' label='Draft' />
@@ -3601,7 +3601,7 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
           <ShellDropdown.Separator />
           <ShellDropdown.Label>Kind</ShellDropdown.Label>
           <ShellDropdown.RadioGroup value={kind} onValueChange={setKind}>
-            <ShellDropdown.RadioItem value='all' label='Any kind' />
+            <ShellDropdown.RadioItem value='all' label='Any Kind' />
             <ShellDropdown.RadioItem value='single' label='Single' />
             <ShellDropdown.RadioItem value='ep' label='EP' />
             <ShellDropdown.RadioItem value='album' label='Album' />
@@ -3612,7 +3612,7 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
       <ShellDropdown.Sub>
         <ShellDropdown.SubTrigger
           icon={Calendar}
-          label='Date range'
+          label='Date Range'
           description={
             dateRange === 'any'
               ? 'Any date'
@@ -3628,21 +3628,24 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
             value={dateRange}
             onValueChange={setDateRange}
           >
-            <ShellDropdown.RadioItem value='any' label='Any date' />
-            <ShellDropdown.RadioItem value='7d' label='Last 7 days' />
-            <ShellDropdown.RadioItem value='30d' label='Last 30 days' />
-            <ShellDropdown.RadioItem value='90d' label='Last 90 days' />
+            <ShellDropdown.RadioItem value='any' label='Any Date' />
+            <ShellDropdown.RadioItem
+              value='7d'
+              label='Last 7 Days' // ui-casing-allow: numeric range label
+            />
+            <ShellDropdown.RadioItem value='30d' label='Last 30 Days' />
+            <ShellDropdown.RadioItem value='90d' label='Last 90 Days' />
           </ShellDropdown.RadioGroup>
         </ShellDropdown.SubContent>
       </ShellDropdown.Sub>
       <ShellDropdown.Separator />
       <ShellDropdown.CheckboxItem
-        label='Include drafts'
+        label='Include Drafts'
         checked={includeDrafts}
         onCheckedChange={setIncludeDrafts}
       />
       <ShellDropdown.CheckboxItem
-        label='Include archived'
+        label='Include Archived'
         checked={includeArchived}
         onCheckedChange={setIncludeArchived}
       />
@@ -3659,13 +3662,13 @@ function CanvasSortDropdown({ view }: { view: CanvasView }) {
     view === 'tasks'
       ? [
           { value: 'priority', label: 'Priority' },
-          { value: 'dueDate', label: 'Due date' },
+          { value: 'dueDate', label: 'Due Date' },
           { value: 'updatedAt', label: 'Updated' },
         ]
       : [
-          { value: 'releaseDate', label: 'Release date' },
+          { value: 'releaseDate', label: 'Release Date' },
           { value: 'title', label: 'Title' },
-          { value: 'streams', label: 'Weekly streams' },
+          { value: 'streams', label: 'Weekly Streams' },
           { value: 'addedAt', label: 'Added' },
         ];
   return (
@@ -3686,7 +3689,7 @@ function CanvasSortDropdown({ view }: { view: CanvasView }) {
         </Tooltip>
       }
     >
-      <ShellDropdown.Label>Sort by</ShellDropdown.Label>
+      <ShellDropdown.Label>Sort By</ShellDropdown.Label>
       <ShellDropdown.RadioGroup value={sortKey} onValueChange={setSortKey}>
         {fields.map(f => (
           <ShellDropdown.RadioItem
@@ -3762,12 +3765,12 @@ function subviewsForView(
       { id: 'all', label: 'All', count: tasks.length },
       {
         id: 'mine',
-        label: 'Assigned to me',
+        label: 'Assigned To Me',
         count: tasks.filter(t => t.assignee === 'you').length,
       },
       {
         id: 'jovie',
-        label: 'Assigned to Jovie',
+        label: 'Assigned To Jovie',
         count: tasks.filter(t => t.assignee === 'jovie').length,
       },
     ];
@@ -3925,7 +3928,7 @@ function Header({
                 ? 'text-primary-token bg-surface-1'
                 : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1'
             )}
-            aria-label='Toggle right rail'
+            aria-label='Toggle Right Rail'
             aria-pressed={rightRailOpen}
           >
             <PanelRight className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -3959,11 +3962,11 @@ function pageActionForView(view: CanvasView): {
     case 'library':
       return { label: 'Generate', icon: Sparkles };
     case 'releases':
-      return { label: 'New release', icon: Plus };
+      return { label: 'New Release', icon: Plus };
     case 'tracks':
       return { label: 'Upload', icon: Plus };
     case 'tasks':
-      return { label: 'New task', icon: Plus };
+      return { label: 'New Task', icon: Plus };
     default:
       return null;
   }
@@ -3986,7 +3989,7 @@ function UserMenu({
         <button
           type='button'
           className='w-full text-left flex-1 min-w-0'
-          aria-label='Account menu'
+          aria-label='Account Menu'
         >
           {children}
         </button>
@@ -4002,7 +4005,7 @@ function UserMenu({
         <ShellDropdown.Item icon={Shield} label='Admin' />
       )}
       <ShellDropdown.Separator />
-      <ShellDropdown.Item icon={LogOut} label='Sign out' tone='danger' />
+      <ShellDropdown.Item icon={LogOut} label='Sign Out' tone='danger' />
     </ShellDropdown>
   );
 }
@@ -4109,7 +4112,7 @@ function DashboardHome() {
           }}
           isLoading={false}
           isSubmitting={false}
-          placeholder='Ask Jovie'
+          placeholder='Ask Jovie' // ui-casing-allow: brand placeholder
         />
       </div>
     </div>
@@ -4396,11 +4399,11 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: 'channels',
     label: 'Channels',
-    description: 'Spotify, Apple Music, social posting',
+    description: 'Spotify, Apple Music, social posting', // ui-casing-allow: integration list copy
   },
   {
     id: 'danger',
-    label: 'Danger zone',
+    label: 'Danger Zone',
     description: 'Delete account, reset workspace',
   },
 ];
@@ -4558,7 +4561,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
                 <button
                   type='button'
                   onClick={onComplete}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
                 >
                   Open Jovie
                   <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
@@ -4590,7 +4593,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           className='text-sm font-medium text-tertiary-token'
           style={{ letterSpacing: '-0.01em' }}
         >
-          Welcome to Jovie
+          Welcome To Jovie
         </h1>
       </div>
 
@@ -4639,9 +4642,7 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
       <h1 className='text-2xl font-display tracking-[-0.018em] leading-tight text-primary-token'>
         {meta.label}
       </h1>
-      <p className='mt-1.5 text-xs text-tertiary-token'>
-        {meta.description}
-      </p>
+      <p className='mt-1.5 text-xs text-tertiary-token'>{meta.description}</p>
 
       {/* Single card per section. Rows stack inside with hairline
           dividers — no per-row card chrome. Danger keeps the same
@@ -4663,9 +4664,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
   tone?: 'default' | 'danger';
 }> {
   const valueText = (value: string) => (
-    <span className='text-xs text-tertiary-token tabular-nums'>
-      {value}
-    </span>
+    <span className='text-xs text-tertiary-token tabular-nums'>{value}</span>
   );
   const editBtn = (
     <button
@@ -4689,7 +4688,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: editBtn,
         },
         {
-          label: 'Two-factor authentication',
+          label: 'Two-factor Authentication', // ui-casing-allow: hyphenated settings label
           description: 'Required for production workspaces',
           control: (
             <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
@@ -4699,7 +4698,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           ),
         },
         {
-          label: 'Active sessions',
+          label: 'Active Sessions',
           description: '3 devices · 1 in this browser',
           control: editBtn,
         },
@@ -4708,11 +4707,11 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
       return [
         {
           label: 'Handle',
-          description: 'jov.ie/timwhite — public artist URL',
+          description: 'jov.ie/timwhite — public artist URL', // ui-casing-allow: public URL copy
           control: valueText('@timwhite'),
         },
         {
-          label: 'Display name',
+          label: 'Display Name',
           control: valueText('Tim White'),
         },
         {
@@ -4721,7 +4720,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: editBtn,
         },
         {
-          label: 'External links',
+          label: 'External Links',
           description: '5 links · drag to reorder',
           control: editBtn,
         },
@@ -4729,7 +4728,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'workspace':
       return [
         {
-          label: 'Workspace name',
+          label: 'Workspace Name',
           control: valueText('Tim White Music'),
         },
         {
@@ -4738,7 +4737,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: editBtn,
         },
         {
-          label: 'Default release timezone',
+          label: 'Default Release Timezone',
           control: valueText('Pacific Time'),
         },
       ];
@@ -4750,14 +4749,14 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-xs font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
             >
               Upgrade to Pro
             </button>
           ),
         },
         {
-          label: 'Payment method',
+          label: 'Payment Method',
           control: valueText('—'),
         },
         {
@@ -4769,8 +4768,8 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'channels':
       return [
         {
-          label: 'Spotify for Artists',
-          description: 'Auto-pitch playlists, push Canvas, sync streams',
+          label: 'Spotify For Artists',
+          description: 'Auto-pitch playlists, push Canvas, sync streams', // ui-casing-allow: feature list copy
           control: (
             <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
               <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
@@ -4779,7 +4778,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           ),
         },
         {
-          label: 'Apple Music for Artists',
+          label: 'Apple Music For Artists',
           description: 'Pull listener insights, schedule promo content',
           control: (
             <button
@@ -4806,7 +4805,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'danger':
       return [
         {
-          label: 'Reset workspace',
+          label: 'Reset Workspace',
           description: 'Wipe all releases, tracks, and tasks. Cannot undo.',
           control: (
             <button
@@ -4819,8 +4818,8 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           tone: 'danger',
         },
         {
-          label: 'Delete account',
-          description: 'Permanently delete your Jovie account. Cannot undo.',
+          label: 'Delete Account',
+          description: 'Permanently delete your Jovie account. Cannot undo.', // ui-casing-allow: destructive action copy
           control: (
             <button
               type='button'
@@ -5169,7 +5168,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         trigger={
           <button
             type='button'
-            aria-label='Release actions'
+            aria-label='Release Actions'
             className={cn(
               'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
@@ -5180,10 +5179,10 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         }
       >
         <ShellDropdown.Item icon={Play} label='Play' shortcut='Space' />
-        <ShellDropdown.Item icon={ExternalLink} label='Open release' />
+        <ShellDropdown.Item icon={ExternalLink} label='Open Release' />
         <ShellDropdown.Separator />
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={Disc3} label='Move to release…' />
+          <ShellDropdown.SubTrigger icon={Disc3} label='Move To Release…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter releases…'
@@ -5194,7 +5193,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
           </ShellDropdown.SubContent>
         </ShellDropdown.Sub>
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={Users} label='Change artist…' />
+          <ShellDropdown.SubTrigger icon={Users} label='Change Artist…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter artists…'
@@ -5207,11 +5206,11 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         <ShellDropdown.Separator />
         <ShellDropdown.Item
           icon={LinkIcon}
-          label='Copy smart link'
+          label='Copy Smart Link'
           shortcut='⌘L'
         />
         <ShellDropdown.Item icon={Copy} label='Duplicate' shortcut='⌘D' />
-        <ShellDropdown.Item icon={Pin} label='Pin to top' />
+        <ShellDropdown.Item icon={Pin} label='Pin To Top' />
         <ShellDropdown.Separator />
         <ShellDropdown.Item icon={Archive} label='Archive' tone='danger' />
       </ShellDropdown>
@@ -5516,10 +5515,10 @@ const MOCK_DRAWER_LYRICS: readonly { at: number; text: string }[] = [
 
 type RangeKey = '24h' | '7d' | '30d' | '90d' | 'YTD';
 const RANGES: Array<{ key: RangeKey; label: string; days: number }> = [
-  { key: '24h', label: '24h', days: 1 },
-  { key: '7d', label: '7d', days: 7 },
-  { key: '30d', label: '30d', days: 30 },
-  { key: '90d', label: '90d', days: 90 },
+  { key: '24h', label: '24h', days: 1 }, // ui-casing-allow: compact range pill
+  { key: '7d', label: '7d', days: 7 }, // ui-casing-allow: compact range pill
+  { key: '30d', label: '30d', days: 30 }, // ui-casing-allow: compact range pill
+  { key: '90d', label: '90d', days: 90 }, // ui-casing-allow: compact range pill
   { key: 'YTD', label: 'YTD', days: 120 },
 ];
 
@@ -5615,15 +5614,15 @@ const PROVIDERS: Provider[] = [
   },
   {
     id: 'jiosaavn',
-    label: 'JioSaavn',
+    label: 'JioSaavn', // ui-casing-allow: DSP brand lockup
     group: 'streaming',
     initial: 'J',
     hue: 28,
   },
-  { id: 'kkbox', label: 'KKBox', group: 'streaming', initial: 'K', hue: 195 },
+  { id: 'kkbox', label: 'KKBox', group: 'streaming', initial: 'K', hue: 195 }, // ui-casing-allow: DSP brand lockup
   {
     id: 'netease',
-    label: 'NetEase Cloud Music',
+    label: 'NetEase Cloud Music', // ui-casing-allow: DSP brand lockup
     group: 'streaming',
     initial: 'N',
     hue: 0,
@@ -5651,7 +5650,7 @@ const PROVIDERS: Provider[] = [
   },
   {
     id: 'iheart',
-    label: 'iHeartRadio',
+    label: 'iHeartRadio', // ui-casing-allow: DSP brand lockup
     group: 'discovery',
     initial: 'I',
     hue: 330,
@@ -5681,8 +5680,8 @@ const PROVIDERS: Provider[] = [
     initial: 'B',
     hue: 50,
   },
-  { id: 'medianet', label: 'MediaNet', group: 'store', initial: 'M', hue: 215 },
-  { id: '7digital', label: '7Digital', group: 'store', initial: '7', hue: 240 },
+  { id: 'medianet', label: 'MediaNet', group: 'store', initial: 'M', hue: 215 }, // ui-casing-allow: DSP brand lockup
+  { id: '7digital', label: '7Digital', group: 'store', initial: '7', hue: 240 }, // ui-casing-allow: DSP brand lockup
   { id: 'napster', label: 'Napster', group: 'store', initial: 'N', hue: 195 },
 ];
 const PROVIDER_GROUP_LABEL: Record<ProviderGroup, string> = {
@@ -5755,7 +5754,7 @@ function DrawerDistribution({ release }: { release: Release }) {
             type='button'
             onClick={() => setFilter('')}
             className='inline-flex items-center justify-center h-4 w-4 rounded text-quaternary-token hover:text-primary-token'
-            aria-label='Clear filter'
+            aria-label='Clear Filter'
           >
             <X className='h-3 w-3' strokeWidth={2.25} />
           </button>
@@ -5853,16 +5852,16 @@ function DrawerActivityTab({
           }
           meta={release.pitchReady ? 'Send' : 'Build'}
         />
-        <ActivityHoverRow icon={LinkIcon} label='Smart link' meta='Copy' />
-        <ActivityHoverRow icon={Copy} label='Duplicate release' meta='⌘D' />
+        <ActivityHoverRow icon={LinkIcon} label='Smart Link' meta='Copy' />
+        <ActivityHoverRow icon={Copy} label='Duplicate Release' meta='⌘D' />
         <ActivityHoverRow
           icon={ExternalLink}
-          label='Open public page'
+          label='Open Public Page'
           meta='Open'
         />
         <ActivityHoverRow
           icon={Archive}
-          label='Archive release'
+          label='Archive Release'
           meta=''
           danger
         />
@@ -5882,7 +5881,7 @@ function DrawerDetailsTab({ release }: { release: Release }) {
     { label: 'Album', value: release.album },
     { label: 'Type', value: release.type },
     {
-      label: 'Release date',
+      label: 'Release Date',
       value: new Date(release.releaseDate).toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -6661,7 +6660,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
         trigger={
           <button
             type='button'
-            aria-label='Task actions'
+            aria-label='Task Actions'
             className={cn(
               'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
@@ -6672,7 +6671,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
         }
       >
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={UserPlus} label='Assign to…' />
+          <ShellDropdown.SubTrigger icon={UserPlus} label='Assign To…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter people…'
@@ -6683,7 +6682,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
           </ShellDropdown.SubContent>
         </ShellDropdown.Sub>
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={LinkIcon} label='Link to…' />
+          <ShellDropdown.SubTrigger icon={LinkIcon} label='Link To…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter entities…'
@@ -6705,9 +6704,9 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
           </ShellDropdown.SubContent>
         </ShellDropdown.Sub>
         <ShellDropdown.Separator />
-        <ShellDropdown.Item icon={Pin} label='Pin task' />
-        <ShellDropdown.Item icon={Copy} label='Copy task ID' shortcut='⌘⇧.' />
-        <ShellDropdown.Item icon={LinkIcon} label='Copy link' shortcut='⌘L' />
+        <ShellDropdown.Item icon={Pin} label='Pin Task' />
+        <ShellDropdown.Item icon={Copy} label='Copy Task ID' shortcut='⌘⇧.' />
+        <ShellDropdown.Item icon={LinkIcon} label='Copy Link' shortcut='⌘L' />
         <ShellDropdown.Separator />
         <ShellDropdown.Item icon={Archive} label='Archive' />
         <ShellDropdown.Item icon={Trash2} label='Delete' tone='danger' />
