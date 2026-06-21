@@ -354,8 +354,8 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         featuredPlaylistFallback={featuredPlaylistFallback}
         releases={releases}
         merchCards={merchCards}
+        homeAeoSlot={<ProfileAeoContent content={aeoContent} />}
       />
-      <ProfileAeoContent content={aeoContent} />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}

@@ -2,6 +2,7 @@
 
 import {
   type CSSProperties,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -82,6 +83,7 @@ interface ProfileCompactTemplateProps {
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly homeAeoSlot?: ReactNode;
   readonly visualVariant?: 'default';
 }
 
@@ -220,6 +222,7 @@ export function ProfileCompactTemplate({
   merchCards = [],
   hideJovieBranding = false,
   hideMoreMenu = false,
+  homeAeoSlot,
   visualVariant = 'default',
 }: ProfileCompactTemplateProps) {
   // alertOptInVariant starts as the ISR-rendered default ('button').
@@ -770,6 +773,7 @@ export function ProfileCompactTemplate({
                 revealNotificationsRef.current?.();
               }}
               releases={releases}
+              homeAeoSlot={homeAeoSlot}
             />
           </div>
         }

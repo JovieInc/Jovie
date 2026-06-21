@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ProfileMode } from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
@@ -46,6 +47,7 @@ export interface StaticArtistPageProps {
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly homeAeoSlot?: ReactNode;
 }
 
 export function StaticArtistPage({
@@ -78,6 +80,7 @@ export function StaticArtistPage({
   merchCards,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  homeAeoSlot,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -137,6 +140,7 @@ export function StaticArtistPage({
       merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
+      homeAeoSlot={homeAeoSlot}
     />
   );
 }

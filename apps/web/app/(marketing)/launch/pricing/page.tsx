@@ -55,7 +55,7 @@ function FeatureList({ features }: FeatureListProps) {
       {features.map(feat => (
         <li
           key={feat}
-          className='flex items-center gap-2 text-sm text-secondary-token'
+          className='flex items-center gap-2 text-sm text-primary-token'
         >
           <Check className='w-3.5 h-3.5 shrink-0' aria-hidden='true' />
           {feat}
@@ -71,7 +71,7 @@ export default function PricingPage() {
       <MarketingHero variant='centered'>
         <h1 id='pricing-heading' className='marketing-h2-linear max-w-170'>
           Simple pricing.{' '}
-          <span className='text-secondary-token'>No surprises.</span>
+          <span className='text-primary-token'>No surprises.</span>
         </h1>
       </MarketingHero>
 
