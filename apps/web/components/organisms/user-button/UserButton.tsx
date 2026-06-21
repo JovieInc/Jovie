@@ -160,7 +160,7 @@ function buildDropdownItems({
     items.push({
       type: 'action',
       id: 'download-ios',
-      label: 'Install Ios Alpha',
+      label: 'Install iOS Alpha',
       icon: Smartphone,
       onClick: () => {
         const href =
