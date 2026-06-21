@@ -403,6 +403,11 @@ export function OnboardingTurnstile({
       // collapses in one clean step instead of shrinking twice.
       verifiedMoment ||
       Boolean(instruction));
+  const shouldExposeWidgetContent = state.status === 'interactive';
+  const shouldShowWidgetSkeleton =
+    shouldShowWidgetFrame &&
+    !shouldExposeWidgetContent &&
+    state.status !== 'verified';
   const tone = getStatusTone(state.status);
 
   return (
@@ -475,7 +480,7 @@ export function OnboardingTurnstile({
           data-testid='onboarding-turnstile-widget-frame'
           aria-hidden={!shouldShowWidgetFrame ? 'true' : undefined}
         >
-          {shouldShowWidgetFrame && state.status !== 'verified' ? (
+          {shouldShowWidgetSkeleton ? (
             <Skeleton
               aria-hidden='true'
               data-testid='onboarding-turnstile-widget-skeleton'
@@ -486,7 +491,12 @@ export function OnboardingTurnstile({
           <div
             ref={containerRef}
             id={`cf-turnstile-${widgetDomId}`}
-            className='relative min-h-16'
+            className={cn(
+              'relative min-h-16',
+              shouldExposeWidgetContent
+                ? '[&>div]:visible'
+                : '[&>div]:invisible'
+            )}
           />
         </div>
       ) : null}
