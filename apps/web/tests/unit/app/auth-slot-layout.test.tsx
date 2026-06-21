@@ -42,13 +42,22 @@ afterEach(() => {
 
 describe('@auth parallel slot layout', () => {
   it('returns null for the default slot without resolving Clerk keys', async () => {
+    const { default: AuthSlotDefault } = await import(
+      '../../../app/@auth/default'
+    );
     const { default: AuthSlotLayout } = await import(
       '../../../app/@auth/layout'
     );
 
-    const { container } = render(await AuthSlotLayout({ children: null }));
+    const { container: nullChildrenContainer } = render(
+      await AuthSlotLayout({ children: null })
+    );
+    expect(nullChildrenContainer).toBeEmptyDOMElement();
 
-    expect(container).toBeEmptyDOMElement();
+    const { container: defaultSlotContainer } = render(
+      await AuthSlotLayout({ children: <AuthSlotDefault /> })
+    );
+    expect(defaultSlotContainer).toBeEmptyDOMElement();
     expect(resolvePublishableKeyStaticFirstMock).not.toHaveBeenCalled();
   });
 

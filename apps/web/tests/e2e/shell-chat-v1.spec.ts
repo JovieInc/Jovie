@@ -443,7 +443,12 @@ test('chat route slash picker clears active transcript content in populated thre
     await expect(composer).toHaveAttribute('data-surface-mode', 'root');
     await assertSlashMenuClearsThreadContent(page);
 
-    await input.fill('/tak');
+    // Slash-picker scroll/layout passes can remount the composer; re-resolve locators.
+    const { composer: composerAfterPicker, input: inputAfterPicker } =
+      shellChatFrameLocators(page);
+    await expect(composerAfterPicker).toBeVisible({ timeout: 30_000 });
+    await expect(inputAfterPicker).toBeVisible({ timeout: 30_000 });
+    await inputAfterPicker.fill('/tak');
     await assertSlashMenuClearsThreadContent(page);
 
     const afterBox = await composer.boundingBox();
