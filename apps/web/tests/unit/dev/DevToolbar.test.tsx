@@ -601,7 +601,7 @@ describe('DevToolbar', () => {
       // The flag now lives in the Overrides section — find its new row.
       const newLabel = screen.getByText('claim handle');
       const newRow = newLabel.closest('[class*="rounded-sm"]');
-      expect(newRow?.className).toContain('bg-[var(--color-accent)]/10');
+      expect(newRow?.className).toContain('bg-accent/10');
     });
   });
 
