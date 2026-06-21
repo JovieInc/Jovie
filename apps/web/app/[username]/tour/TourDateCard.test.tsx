@@ -91,6 +91,7 @@ describe('TourDateCard', () => {
     expect(
       screen.getByRole('button', { name: /add to calendar/i })
     ).toBeInTheDocument();
+    expect(screen.getByText('Sold Out')).toBeInTheDocument();
   });
 
   it('renders Get Tickets as the primary CTA when tickets are available', () => {

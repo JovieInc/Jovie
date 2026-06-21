@@ -241,6 +241,19 @@ describe('tourDateToEntityCard', () => {
     expect(model.secondaryCta).toBeNull();
   });
 
+  it('marks sold-out dates with a status pill and Add To Calendar as primary (no secondary)', () => {
+    const model = tourDateToEntityCard({
+      ...tourDate,
+      ticketStatus: 'sold_out',
+    });
+    expect(model.status).toEqual({ label: 'Sold Out', tone: 'scheduled' });
+    // Primary CTA becomes Add To Calendar (no ticket purchase possible)
+    expect(model.cta?.label).toBe('Add To Calendar');
+    expect(model.cta?.disabled).toBe(false);
+    // No secondary CTA — there is only one action for sold-out shows
+    expect(model.secondaryCta).toBeNull();
+  });
+
   it('uses a near-you eyebrow and blue accent when requested', () => {
     const model = tourDateToEntityCard(tourDate, {
       isNearYou: true,
