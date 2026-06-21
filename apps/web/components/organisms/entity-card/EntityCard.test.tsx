@@ -75,6 +75,18 @@ describe('EntityCard', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
+  it('bleeds big-treatment artwork to the card edges for bento rails', () => {
+    render(<EntityCard model={merchModel} treatment='big' surface='pearl' />);
+
+    const card = screen.getByTestId('entity-card-merch');
+    const artwork = card.querySelector(':scope > div');
+    const body = card.querySelector(':scope > div + div');
+
+    expect(card).toHaveClass('p-0');
+    expect(artwork).toHaveClass('border-0');
+    expect(body).toHaveClass('p-3');
+  });
+
   it('renders a plain container when there is no href or cta target', () => {
     const noLink: EntityCardModel = {
       id: 'x',

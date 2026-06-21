@@ -181,6 +181,7 @@ export function EntityCard({
   const accent = model.accent ?? preset.accent;
   const Icon = preset.icon;
   const isPearl = surface === 'pearl';
+  const isBig = treatment === 'big';
 
   const isInteractive =
     model.interactive === true ||
@@ -202,7 +203,7 @@ export function EntityCard({
       onClick={onClick}
       className={cn(
         'group flex min-w-0 flex-col text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
-        treatment === 'big' ? 'gap-0 overflow-hidden p-0' : 'gap-3 p-3',
+        isBig ? 'gap-0 overflow-hidden p-0' : 'gap-3 p-3',
         isPearl
           ? 'rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl hover:bg-(--profile-pearl-bg-hover)'
           : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',
@@ -211,9 +212,13 @@ export function EntityCard({
     >
       <div
         className={cn(
-          'relative flex w-full shrink-0 items-center justify-center overflow-hidden border border-subtle',
+          'relative flex w-full shrink-0 items-center justify-center overflow-hidden',
+          isBig ? 'border-0' : 'border border-subtle',
           size.artClass,
-          treatment === 'big' && 'rounded-none border-0'
+          isBig &&
+            (isPearl
+              ? 'rounded-t-[var(--profile-inner-radius)]'
+              : 'rounded-t-2xl')
         )}
         style={artStyle}
       >
@@ -245,7 +250,7 @@ export function EntityCard({
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-col gap-1.5',
-          treatment === 'big' && 'p-3'
+          isBig && 'p-3 pt-2.5'
         )}
       >
         <div className='flex min-w-0 items-center justify-between gap-2'>
