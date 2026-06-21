@@ -282,7 +282,7 @@ function AlwaysInSyncToggle() {
       <span className='text-xs font-semibold text-primary-token'>
         Always In Sync
       </span>
-      <span className='flex h-7 w-12 items-center rounded-full bg-[color:var(--color-accent)] px-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'>
+      <span className='flex h-7 w-12 items-center rounded-full bg-accent px-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'>
         <span className='ml-auto h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] dark:bg-white' />
       </span>
     </div>
