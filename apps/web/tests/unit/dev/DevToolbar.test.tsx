@@ -100,8 +100,8 @@ describe('DevToolbar', () => {
       expect(isDevToolbarSuppressedPath('/demo')).toBe(true);
       expect(isDevToolbarSuppressedPath('/demo/video')).toBe(true);
       expect(isDevToolbarSuppressedPath('/demo/founder-video')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/start')).toBe(true);
       expect(isDevToolbarSuppressedPath('/app/dashboard/releases')).toBe(false);
-      expect(isDevToolbarSuppressedPath('/start')).toBe(false);
     });
   });
 
@@ -117,36 +117,36 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
       renderToolbar();
       expect(
-        screen.getByRole('button', { name: 'Show dev toolbar' })
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
       ).toBeInTheDocument();
     });
 
     it('shows the full toolbar when the Dev pill is clicked', () => {
       localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Show dev toolbar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Show Dev Toolbar' }));
       expect(screen.getByText('development')).toBeInTheDocument();
     });
 
     it('persists hidden=false to localStorage when shown', () => {
       localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Show dev toolbar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Show Dev Toolbar' }));
       expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('0');
     });
 
     it('hides the toolbar when the X button is clicked', () => {
       renderToolbar();
       expect(screen.getByText('development')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Hide Dev Toolbar' }));
       expect(
-        screen.getByRole('button', { name: 'Show dev toolbar' })
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
       ).toBeInTheDocument();
     });
 
     it('persists hidden=true to localStorage when hidden via X', () => {
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Hide Dev Toolbar' }));
       expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('1');
     });
 
@@ -160,13 +160,13 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
       renderToolbar();
       expect(
-        screen.getByRole('button', { name: 'Show dev toolbar' })
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
       ).toBeInTheDocument();
     });
 
     it('resets --dev-toolbar-height CSS variable when toolbar is hidden', () => {
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Hide Dev Toolbar' }));
       expect(
         document.documentElement.style.getPropertyValue('--dev-toolbar-height')
       ).toBe('0px');
@@ -180,7 +180,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
       renderToolbar();
       expect(
-        screen.getByRole('button', { name: 'Show dev toolbar' })
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
       ).toBeInTheDocument();
 
       fireEvent.keyDown(document, {
@@ -203,7 +203,7 @@ describe('DevToolbar', () => {
       });
 
       expect(
-        screen.getByRole('button', { name: 'Show dev toolbar' })
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
       ).toBeInTheDocument();
     });
 
@@ -227,13 +227,13 @@ describe('DevToolbar', () => {
       // Just Shift+D (no meta/ctrl)
       fireEvent.keyDown(document, { key: 'd', shiftKey: true });
       expect(
-        screen.getByRole('button', { name: 'Show dev toolbar' })
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
       ).toBeInTheDocument();
 
       // Cmd+D (no shift)
       fireEvent.keyDown(document, { key: 'd', metaKey: true });
       expect(
-        screen.getByRole('button', { name: 'Show dev toolbar' })
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
       ).toBeInTheDocument();
     });
 
@@ -253,8 +253,8 @@ describe('DevToolbar', () => {
     it('shows shortcut hint on pill button title', () => {
       localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
       renderToolbar();
-      const pill = screen.getByRole('button', { name: 'Show dev toolbar' });
-      expect(pill).toHaveAttribute('title', 'Show dev toolbar (⌘⇧D)');
+      const pill = screen.getByRole('button', { name: 'Show Dev Toolbar' });
+      expect(pill).toHaveAttribute('title', 'Show Dev Toolbar (⌘⇧D)');
     });
 
     it('closes expanded panel on Escape without hiding toolbar', () => {
@@ -263,14 +263,14 @@ describe('DevToolbar', () => {
 
       // Panel should be expanded
       expect(
-        screen.getByRole('button', { name: 'Collapse dev toolbar' })
+        screen.getByRole('button', { name: 'Collapse Dev Toolbar' })
       ).toBeInTheDocument();
 
       fireEvent.keyDown(document, { key: 'Escape' });
 
       // Panel collapsed, but toolbar still visible
       expect(
-        screen.getByRole('button', { name: 'Expand dev toolbar' })
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
       ).toBeInTheDocument();
       expect(screen.getByText('development')).toBeInTheDocument();
       expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('0');
@@ -350,7 +350,7 @@ describe('DevToolbar', () => {
 
       expect(screen.getByText('1 of 5')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear Search' }));
 
       expect(screen.getByText('5 of 5')).toBeInTheDocument();
     });
@@ -396,7 +396,7 @@ describe('DevToolbar', () => {
       expect(toggle).toBeInTheDocument();
       expect(toggle).toHaveAttribute('aria-pressed', 'false');
       expect(
-        screen.getByRole('button', { name: 'Expand dev toolbar' })
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
       ).toBeInTheDocument();
     });
 
@@ -557,7 +557,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Copy route' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Copy Route' }));
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/');
     });
 
@@ -637,14 +637,14 @@ describe('DevToolbar', () => {
 
       // Panel should be collapsed
       expect(
-        screen.getByRole('button', { name: 'Expand dev toolbar' })
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
       ).toBeInTheDocument();
 
       fireEvent.click(screen.getByText('1 override'));
 
       // Panel should now be expanded
       expect(
-        screen.getByRole('button', { name: 'Collapse dev toolbar' })
+        screen.getByRole('button', { name: 'Collapse Dev Toolbar' })
       ).toBeInTheDocument();
     });
   });
@@ -657,13 +657,13 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       expect(
-        screen.getByRole('button', { name: 'Dark theme' })
+        screen.getByRole('button', { name: 'Dark Theme' })
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: 'Light theme' })
+        screen.getByRole('button', { name: 'Light Theme' })
       ).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: 'System theme' })
+        screen.getByRole('button', { name: 'System Theme' })
       ).toBeInTheDocument();
     });
 
@@ -671,7 +671,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Light theme' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Light Theme' }));
       expect(mockSetTheme).toHaveBeenCalledWith('light');
     });
   });
@@ -720,7 +720,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      const adminLink = screen.getByRole('link', { name: 'Admin panel' });
+      const adminLink = screen.getByRole('link', { name: 'Admin Panel' });
       expect(adminLink).toHaveAttribute('href', '/app/admin');
     });
   });
@@ -922,12 +922,12 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Expand dev toolbar' })
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
       );
       expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('1');
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Collapse dev toolbar' })
+        screen.getByRole('button', { name: 'Collapse Dev Toolbar' })
       );
       expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('0');
     });
@@ -959,13 +959,13 @@ describe('DevToolbar', () => {
     it('renders button with correct aria-label', () => {
       renderToolbar();
       expect(
-        screen.getByRole('button', { name: 'Clear session' })
+        screen.getByRole('button', { name: 'Clear Session' })
       ).toBeInTheDocument();
     });
 
     it('calls /api/dev/clear-session on click', () => {
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear Session' }));
       expect(fetchSpy).toHaveBeenCalledWith('/api/dev/clear-session', {
         method: 'POST',
       });
@@ -978,7 +978,7 @@ describe('DevToolbar', () => {
       localStorage.setItem('jovie-theme', 'dark');
 
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear Session' }));
 
       // Wait for non-toolbar keys to be cleared (proves async handler completed)
       await vi.waitFor(() => {
@@ -994,7 +994,7 @@ describe('DevToolbar', () => {
       sessionStorage.setItem('test-key', 'test-value');
 
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear Session' }));
 
       await vi.waitFor(() => {
         expect(sessionStorage.getItem('test-key')).toBeNull();
@@ -1005,7 +1005,7 @@ describe('DevToolbar', () => {
       fetchSpy.mockRejectedValueOnce(new Error('Network error'));
 
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear Session' }));
 
       await vi.waitFor(() => {
         expect(screen.getByText('Failed')).toBeInTheDocument();
@@ -1018,7 +1018,7 @@ describe('DevToolbar', () => {
       });
 
       renderToolbar();
-      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear Session' }));
 
       await vi.waitFor(() => {
         expect(screen.getByText('Failed')).toBeInTheDocument();

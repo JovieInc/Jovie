@@ -95,6 +95,6 @@ describe('TaskListRow', () => {
 
     const dueChip = getByText('Due tomorrow').closest('span');
     expect(dueChip).toHaveClass('uppercase');
-    expect(dueChip?.parentElement?.className).toContain('h-[18px]');
+    expect(dueChip?.parentElement?.className).toContain('h-5');
   });
 });

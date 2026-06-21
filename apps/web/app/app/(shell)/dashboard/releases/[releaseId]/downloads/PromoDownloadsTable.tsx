@@ -143,7 +143,7 @@ export function PromoDownloadsTable({
     return (
       <div
         aria-hidden='true'
-        className='min-h-[220px] rounded-lg border border-subtle bg-surface-1 skeleton'
+        className='min-h-55 rounded-lg border border-subtle bg-surface-1 skeleton'
       />
     );
   }
@@ -167,7 +167,7 @@ export function PromoDownloadsTable({
         getRowId={file => file.id}
         enableVirtualization={false}
         minWidth='100%'
-        className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-normal'
+        className='text-xs [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-normal'
       />
     </div>
   );

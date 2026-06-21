@@ -16,6 +16,7 @@ interface EntityCardProps {
   readonly className?: string;
   readonly priority?: boolean;
   readonly dataTestId?: string;
+  readonly onClick?: () => void;
 }
 
 type SizeConfig = {
@@ -30,22 +31,22 @@ type SizeConfig = {
 // divergent layouts. "Adapt to real estate" = scale + reveal, single design.
 const SIZE: Record<EntityTreatment, SizeConfig> = {
   compact: {
-    artClass: 'aspect-square rounded-[12px]',
-    titleClass: 'text-[14px]',
+    artClass: 'aspect-square rounded-xl',
+    titleClass: 'text-sm',
     showStatus: false,
     showMeta: true,
     ctaBlock: false,
   },
   detailed: {
-    artClass: 'aspect-square rounded-[12px]',
-    titleClass: 'text-[15px]',
+    artClass: 'aspect-square rounded-xl',
+    titleClass: 'text-mid',
     showStatus: true,
     showMeta: true,
     ctaBlock: false,
   },
   big: {
-    artClass: 'aspect-[4/5] rounded-[16px]',
-    titleClass: 'text-[20px]',
+    artClass: 'aspect-[4/5] rounded-2xl',
+    titleClass: 'text-xl',
     showStatus: true,
     showMeta: true,
     ctaBlock: true,
@@ -58,6 +59,7 @@ function CardShell({
   testId,
   className,
   style,
+  onClick,
   children,
 }: Readonly<{
   href?: string | null;
@@ -65,6 +67,7 @@ function CardShell({
   testId?: string;
   className: string;
   style?: CSSProperties;
+  onClick?: () => void;
   children: ReactNode;
 }>) {
   if (href?.startsWith('/')) {
@@ -75,6 +78,7 @@ function CardShell({
         className={className}
         style={style}
         data-testid={testId}
+        onClick={onClick}
       >
         {children}
       </Link>
@@ -89,6 +93,7 @@ function CardShell({
         className={className}
         style={style}
         data-testid={testId}
+        onClick={onClick}
       >
         {children}
       </a>
@@ -108,6 +113,7 @@ export function EntityCard({
   className,
   priority = false,
   dataTestId,
+  onClick,
 }: EntityCardProps) {
   const size = SIZE[treatment];
   const preset = KIND_PRESETS[model.kind];
@@ -127,18 +133,21 @@ export function EntityCard({
       href={cardHref}
       external={cardExternal}
       testId={dataTestId ?? `entity-card-${model.kind}`}
+      onClick={onClick}
       className={cn(
-        'group flex min-w-0 flex-col gap-3 p-3 text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
+        'group flex min-w-0 flex-col text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
+        treatment === 'big' ? 'gap-0 overflow-hidden p-0' : 'gap-3 p-3',
         isPearl
           ? 'rounded-[var(--profile-inner-radius)] border border-[color:var(--profile-pearl-border)] bg-[color:var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-2xl hover:bg-[color:var(--profile-pearl-bg-hover)]'
-          : 'rounded-[16px] border border-subtle bg-surface-1 shadow-card hover:border-default',
+          : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',
         className
       )}
     >
       <div
         className={cn(
           'relative flex w-full shrink-0 items-center justify-center overflow-hidden border border-subtle',
-          size.artClass
+          size.artClass,
+          treatment === 'big' && 'rounded-none border-0'
         )}
         style={artStyle}
       >
@@ -155,7 +164,7 @@ export function EntityCard({
           />
         ) : model.datePill ? (
           <div className='flex flex-col items-center justify-center text-primary-token'>
-            <span className='text-[11px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+            <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
               {model.datePill.month}
             </span>
             <span className='text-[34px] font-[680] leading-none tracking-[-0.02em] tabular-nums'>
@@ -167,14 +176,19 @@ export function EntityCard({
         )}
       </div>
 
-      <div className='flex min-w-0 flex-1 flex-col gap-1.5'>
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-col gap-1.5',
+          treatment === 'big' && 'p-3'
+        )}
+      >
         <div className='flex min-w-0 items-center justify-between gap-2'>
-          <span className='inline-flex min-w-0 items-center gap-1.5 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token'>
+          <span className='inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token'>
             <Icon className='h-3 w-3 shrink-0' aria-hidden='true' />
             <span className='truncate'>{model.eyebrow ?? preset.eyebrow}</span>
           </span>
           {size.showStatus && model.status ? (
-            <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em] text-secondary-token'>
+            <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-[0.06em] text-secondary-token'>
               <span
                 className='h-1.5 w-1.5 shrink-0 rounded-full'
                 style={{ background: statusDotVar(model.status.tone) }}
@@ -208,11 +222,11 @@ export function EntityCard({
         >
           {model.price ? (
             <div className='min-w-0'>
-              <span className='text-[14px] font-[680] text-primary-token'>
+              <span className='text-sm font-[680] text-primary-token'>
                 {model.price.original ? (
                   <>
                     {model.price.display}
-                    <span className='ml-1 text-[11px] font-medium text-tertiary-token line-through'>
+                    <span className='ml-1 text-2xs font-medium text-tertiary-token line-through'>
                       {model.price.original}
                     </span>
                   </>
@@ -221,7 +235,7 @@ export function EntityCard({
                 )}
               </span>
               {model.price.profit ? (
-                <p className='text-[11px] text-tertiary-token'>
+                <p className='text-2xs text-tertiary-token'>
                   Profit {model.price.profit}
                 </p>
               ) : null}
@@ -233,7 +247,7 @@ export function EntityCard({
           {model.cta ? (
             <span
               className={cn(
-                'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-[12px] font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:border-(--linear-btn-primary-hover) group-hover:bg-btn-primary-hover',
+                'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:border-(--linear-btn-primary-hover) group-hover:bg-btn-primary-hover',
                 size.ctaBlock ? 'h-11 w-full' : 'h-8'
               )}
             >

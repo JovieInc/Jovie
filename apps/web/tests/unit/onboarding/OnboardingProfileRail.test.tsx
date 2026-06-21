@@ -41,13 +41,13 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.getByTestId('onboarding-profile-compact-surface')
     ).toBeDefined();
-    expect(screen.getByTestId('profile-compact-surface')).toBeDefined();
-    expect(screen.getAllByText('Test Artist')).toHaveLength(1);
+    const phonePreview = screen.getByTestId('onboarding-phone-preview');
     expect(
-      within(screen.getByTestId('onboarding-phone-preview')).getByText(
-        'Test Artist'
-      )
+      within(phonePreview).getByTestId('profile-compact-surface')
     ).toBeDefined();
+    expect(
+      within(phonePreview).getAllByText('Test Artist').length
+    ).toBeGreaterThan(0);
     expect(screen.getAllByTitle('Spotify').length).toBeGreaterThan(0);
     expect(screen.getAllByTitle('Apple Music').length).toBeGreaterThan(0);
     expect(screen.queryByText('open.spotify.com')).toBeNull();

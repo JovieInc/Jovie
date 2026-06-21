@@ -669,6 +669,43 @@ describe('proxy.ts middleware', () => {
         })
       );
     });
+
+    it('forces Clerk bypass for local public no-auth smoke requests', async () => {
+      const previousSmoke = process.env.PUBLIC_NOAUTH_SMOKE;
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+      mocks.shouldBypassClerkForRequest.mockReturnValueOnce(true);
+
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: '/api/chat',
+          method: 'POST',
+          hostname: '127.0.0.1',
+          headers: {
+            'x-forwarded-host': '127.0.0.1:3102',
+            'x-forwarded-proto': 'http',
+          },
+        });
+
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeLessThan(300);
+        expect(mocks.shouldBypassClerkForRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            allowAuthRouteBypass: true,
+            forceBypass: true,
+            pathname: '/api/chat',
+          })
+        );
+        expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
+      } finally {
+        if (previousSmoke === undefined) {
+          delete process.env.PUBLIC_NOAUTH_SMOKE;
+        } else {
+          process.env.PUBLIC_NOAUTH_SMOKE = previousSmoke;
+        }
+      }
+    });
   });
 
   describe('staging Clerk contract', () => {

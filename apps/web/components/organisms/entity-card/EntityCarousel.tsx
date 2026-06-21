@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { EntityCard } from './EntityCard';
 import type { EntityCardModel, EntitySurface } from './types';
@@ -7,6 +10,8 @@ interface EntityCarouselProps {
   readonly surface?: EntitySurface;
   readonly className?: string;
   readonly dataTestId?: string;
+  readonly onCardImpression?: (index: number, model: EntityCardModel) => void;
+  readonly onCardClick?: (index: number, model: EntityCardModel) => void;
 }
 
 /**
@@ -24,7 +29,65 @@ export function EntityCarousel({
   surface = 'pearl',
   className,
   dataTestId,
+  onCardImpression,
+  onCardClick,
 }: EntityCarouselProps) {
+  const itemRefs = useRef<Array<HTMLLIElement | null>>([]);
+  const trackedImpressionKeys = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!onCardImpression || items.length === 0) {
+      return;
+    }
+
+    if (typeof IntersectionObserver === 'undefined') {
+      for (const [index, model] of items.entries()) {
+        const key = `${model.kind}-${model.id}-${index}`;
+        if (trackedImpressionKeys.current.has(key)) {
+          continue;
+        }
+        trackedImpressionKeys.current.add(key);
+        onCardImpression(index, model);
+      }
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) {
+            continue;
+          }
+
+          const index = Number(
+            entry.target.getAttribute('data-carousel-index')
+          );
+          const model = items[index];
+          if (!model) {
+            continue;
+          }
+
+          const key = `${model.kind}-${model.id}-${index}`;
+          if (trackedImpressionKeys.current.has(key)) {
+            continue;
+          }
+
+          trackedImpressionKeys.current.add(key);
+          onCardImpression(index, model);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    for (const node of itemRefs.current) {
+      if (node) {
+        observer.observe(node);
+      }
+    }
+
+    return () => observer.disconnect();
+  }, [items, onCardImpression]);
+
   if (items.length === 0) {
     return null;
   }
@@ -42,6 +105,10 @@ export function EntityCarousel({
         return (
           <li
             key={`${model.kind}-${model.id}`}
+            ref={node => {
+              itemRefs.current[index] = node;
+            }}
+            data-carousel-index={index}
             className={cn(
               'flex shrink-0 snap-start',
               isFeatured ? 'w-[260px]' : 'w-[180px]'
@@ -53,6 +120,9 @@ export function EntityCarousel({
               surface={surface}
               priority={isFeatured}
               className='w-full'
+              onClick={
+                onCardClick ? () => onCardClick(index, model) : undefined
+              }
             />
           </li>
         );

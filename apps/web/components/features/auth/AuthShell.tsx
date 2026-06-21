@@ -13,11 +13,13 @@ import {
   buildAuthRouteUrl,
   getDefaultSignUpFallbackRedirectUrl,
 } from '@/lib/auth/build-auth-route-url';
+import { parseClerkError } from '@/lib/auth/clerk-errors';
 import { CLERK_COMPONENT_OPTIONS } from '@/lib/auth/clerk-options';
 import {
   getEnabledAuthOAuthProviders,
   type PrimaryAuthOAuthProvider,
 } from '@/lib/auth/oauth-providers';
+import { ClerkCaptchaMount } from './ClerkCaptchaMount';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
 export type AuthShellMode = 'sign-in' | 'sign-up';
@@ -168,8 +170,12 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         if (!result || result.error) {
           throw result?.error ?? new Error('Missing Clerk auth resource');
         }
-      } catch {
-        setOauthError(getAuthStartErrorMessage(mode));
+      } catch (error) {
+        setOauthError(
+          error && typeof error === 'object' && 'errors' in error
+            ? parseClerkError(error)
+            : getAuthStartErrorMessage(mode)
+        );
         setPendingProvider(null);
       }
     },
@@ -200,6 +206,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         data-auth-shell-providers='0'
         className='relative min-h-72'
       >
+        <ClerkCaptchaMount />
         <AuthProvidersUnavailable mode={mode} />
         <AuthLegalText mode={mode} />
       </div>
@@ -213,6 +220,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       data-auth-shell-ready={isAuthStartReady ? 'true' : 'false'}
       className='relative min-h-96'
     >
+      <ClerkCaptchaMount />
       {showStablePlaceholder ? (
         <AuthStableStartPlaceholder
           mode={mode}

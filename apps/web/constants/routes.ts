@@ -110,10 +110,12 @@ export const APP_ROUTES = {
   ADMIN_AGENT_RUN: '/app/admin/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
   ADMIN_COSTS: '/app/admin/costs',
+  ADMIN_SYSTEM: '/app/admin/system',
   FEATURE_FLAGS: '/app/feature-flags',
 
   // System
   UNAVAILABLE: '/unavailable',
+  USER_CREATION_ERROR: '/error/user-creation-failed',
   DESIGN_STUDIO: '/exp/page-builder',
   /** Legacy HUD URL — redirects to /app/admin/ops (admin) or /hud-tv (token). */
   HUD: '/hud',

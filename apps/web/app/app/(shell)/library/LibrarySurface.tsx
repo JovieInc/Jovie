@@ -1416,7 +1416,7 @@ function EmptyCatalog() {
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
         title='No Library Items'
         description='Releases, merch, images, videos, and audio will appear here as they land.'
-        className='m-3 min-h-[360px]'
+        className='m-3 min-h-90'
         action={
           <Link
             href={APP_ROUTES.RELEASES}
@@ -1438,7 +1438,7 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
     <TableEmptyState
       title='No Assets Match'
       description='No library items match the selected view or filters.'
-      className='m-3 min-h-[300px]'
+      className='m-3 min-h-75'
       action={
         <button
           type='button'
@@ -1491,7 +1491,7 @@ function PreviewActionButton({
         aria-hidden='true'
         className={cn(
           'pointer-events-none inline-flex shrink-0 opacity-0',
-          compact ? 'h-7 w-7' : 'h-8 w-[92px]'
+          compact ? 'h-7 w-7' : 'h-8 w-23'
         )}
       />
     ) : null;

@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.6.54] - 2026-06-19
+## [26.6.54] - 2026-06-21
 
-> [internal] Repo hygiene: remove competitor-analysis doc leaked into public repo; add blocking CI guard.
+> [internal] Design-taste jury loop: change-aware screenshot planning, multi-juror consensus, and auto-filed issue manifests with reference comps; repo hygiene removes leaked competitor-analysis doc and adds blocking brand-scrub CI guard. Restores changelog email subscription by wiring invisible Turnstile bot protection.
 
 ### Removed
 
@@ -15,7 +15,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- [internal] **Design-taste jury loop (JOV-10939)**: surgical change-aware capture planning skips non-UI pushes and regenerates only affected screenshot scenarios; per-surface benchmark references (Apple Health, Linear, Superhuman, Raycast, Frame.io, Mobbin/21st.dev/Godly); three-juror consensus engine (System B lead, product-density, marketing-restraint) emitting ranked findings tagged `ship` or `taste`; objective findings auto-file Visual QA issues with reference comps; taste findings queue to Tim; every consensus call writes to gbrain so the jury gate narrows over time.
 - **[internal] Brand-scrub CI gate** (`scripts/brand-scrub.py` + `.github/workflows/brand-scrub.yml`): blocking check on every PR that (a) rejects new files under `docs/plans/`, `docs/ideation/`, and similar strategy-doc paths, and (b) flags known competitor brand names in file content. 14 unit tests cover both rules.
+
+### Fixed
+
+- **[internal] Changelog email subscribe Turnstile wiring**: `ChangelogEmailSignup` now mounts the reusable `InvisibleTurnstile` atom and guards client-side submit until a valid token arrives, preventing the empty-token `403` that made changelog subscriptions non-functional when `TURNSTILE_SECRET_KEY` is configured in production.
+- **[internal] `InvisibleTurnstile` component**: new reusable atom (`components/atoms/InvisibleTurnstile.tsx`) that renders an execute-mode Cloudflare Turnstile widget off-screen, issues a deterministic bypass token in dev/E2E, and exposes `isTurnstileClientBypassed` / `isTurnstileClientConfigured` for consumers. 4 unit tests cover managed render, E2E bypass, missing site key, and external reset.
 
 ## [26.6.53] - 2026-06-15
 

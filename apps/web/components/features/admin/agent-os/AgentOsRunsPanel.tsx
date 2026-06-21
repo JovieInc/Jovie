@@ -64,7 +64,7 @@ const HUMAN_GATE_BADGES: Record<
   AgentRunArtifact['humanGate']['status'],
   { readonly label: string; readonly variant: BadgeVariant }
 > = {
-  not_required: { label: 'Not required', variant: 'secondary' },
+  not_required: { label: 'Not Required', variant: 'secondary' },
   pending: { label: 'Review Required', variant: 'warning' },
   approved: { label: 'Approved', variant: 'success' },
   rejected: { label: 'Rejected', variant: 'destructive' },
@@ -366,9 +366,7 @@ function renderGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
 
 function renderHumanGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
   if (!row.original.humanApprovalRequired) {
-    return (
-      <span className='text-xs text-tertiary-token'>Not required</span>
-    );
+    return <span className='text-xs text-tertiary-token'>Not required</span>;
   }
   const humanGateBadge = HUMAN_GATE_BADGES[row.original.humanGate.status];
 

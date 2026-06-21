@@ -7,6 +7,7 @@ import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
 import { cn } from '@/lib/utils';
+import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
 /**
  * Cloudflare Turnstile widget for the onboarding chat (JOV-2132 PR 3).
@@ -186,16 +187,31 @@ export function OnboardingTurnstile({
   const headingId = useId();
   const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
+  const [localAutomationBypass, setLocalAutomationBypass] = useState<
+    boolean | null
+  >(null);
   // True only while the brief "Verified" confirmation is held open after a
   // *visible* challenge. Silent (invisible-first) verifications never set it,
   // so the panel stays collapsed when the user never saw a challenge.
   const [verifiedMoment, setVerifiedMoment] = useState(false);
+  const [interactiveChallengeRequested, setInteractiveChallengeRequested] =
+    useState(false);
+  const [interactiveChallengeVisible, setInteractiveChallengeVisible] =
+    useState(false);
   const panelVisibleRef = useRef(false);
   const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const shouldBypassTurnstile =
+  const hasStaticBypass =
     process.env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
     publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1';
+  const shouldBypassTurnstile =
+    hasStaticBypass || localAutomationBypass === true;
+  const isRuntimeBypassPending =
+    !hasStaticBypass && localAutomationBypass === null;
+
+  useEffect(() => {
+    setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
+  }, []);
 
   const commitState = useCallback(
     (nextState: OnboardingTurnstileState) => {
@@ -222,7 +238,7 @@ export function OnboardingTurnstile({
   }, []);
 
   const render = useCallback(() => {
-    if (shouldBypassTurnstile || !siteKey) return; // local fallback handled server-side
+    if (isRuntimeBypassPending || shouldBypassTurnstile || !siteKey) return;
     const turnstile = getTurnstile();
     if (!containerRef.current || !turnstile) return;
     if (widgetIdRef.current) return; // already rendered
@@ -235,6 +251,8 @@ export function OnboardingTurnstile({
         theme: 'dark',
         callback: token => {
           onToken(token);
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           // Only celebrate when the user actually saw a challenge. Silent
           // invisible-first verifications collapse straight away (no UI churn).
           if (panelVisibleRef.current && !reducedMotion) {
@@ -242,33 +260,47 @@ export function OnboardingTurnstile({
           }
           commitState({ status: 'verified' });
         },
-        'error-callback': code =>
+        'error-callback': code => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'error',
             message: `Verification failed (${code}). Retry the check or refresh the page.`,
-          }),
+          });
+        },
         'expired-callback': () => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'expired',
             message: 'Verification expired. Complete the check again to send.',
           });
         },
-        'timeout-callback': () =>
+        'timeout-callback': () => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'timeout',
             message: 'Verification timed out. Retry the check to send.',
-          }),
-        'unsupported-callback': () =>
+          });
+        },
+        'unsupported-callback': () => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'unsupported',
             message:
               'This browser cannot complete the security check. Try another browser or disable restrictive extensions.',
-          }),
-        'before-interactive-callback': () =>
+          });
+        },
+        'before-interactive-callback': () => {
+          setInteractiveChallengeRequested(true);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'interactive',
             message: 'Required before your first message.',
-          }),
+          });
+        },
         'after-interactive-callback': () =>
           commitState({
             status: 'loading',
@@ -282,7 +314,14 @@ export function OnboardingTurnstile({
       });
       console.error('[onboarding] turnstile render error', err);
     }
-  }, [commitState, onToken, reducedMotion, shouldBypassTurnstile, siteKey]);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    onToken,
+    reducedMotion,
+    shouldBypassTurnstile,
+    siteKey,
+  ]);
 
   useEffect(() => {
     if (!verifiedMoment) return;
@@ -297,6 +336,8 @@ export function OnboardingTurnstile({
     (message = 'Verification reset. Complete the check to retry.') => {
       clearWidget();
       setVerifiedMoment(false);
+      setInteractiveChallengeRequested(false);
+      setInteractiveChallengeVisible(false);
       commitState({ status: 'loading', message });
       render();
     },
@@ -304,6 +345,7 @@ export function OnboardingTurnstile({
   );
 
   useEffect(() => {
+    if (isRuntimeBypassPending) return;
     if (shouldBypassTurnstile) {
       onToken(LOCAL_DEV_BYPASS_TOKEN);
       commitState({ status: 'bypassed' });
@@ -330,7 +372,14 @@ export function OnboardingTurnstile({
         }
       }
     };
-  }, [commitState, onToken, render, shouldBypassTurnstile, siteKey]);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    onToken,
+    render,
+    shouldBypassTurnstile,
+    siteKey,
+  ]);
 
   useEffect(() => {
     if (lastResetSignalRef.current === resetSignal) return;
@@ -344,6 +393,40 @@ export function OnboardingTurnstile({
     panelRef.current?.focus({ preventScroll: true });
   }, [focusSignal]);
 
+  useEffect(() => {
+    if (!interactiveChallengeRequested || interactiveChallengeVisible) return;
+    const target = containerRef.current;
+    if (!target) return;
+
+    let frameId: number | null = null;
+    let observer: MutationObserver | null = null;
+
+    const revealAfterPaint = () => {
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        setInteractiveChallengeVisible(true);
+      });
+    };
+
+    if (target.firstElementChild) {
+      revealAfterPaint();
+    } else {
+      observer = new MutationObserver(() => {
+        if (target.firstElementChild) {
+          observer?.disconnect();
+          observer = null;
+          revealAfterPaint();
+        }
+      });
+      observer.observe(target, { childList: true });
+    }
+
+    return () => {
+      observer?.disconnect();
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
+  }, [interactiveChallengeRequested, interactiveChallengeVisible]);
+
   const shouldShowPanel =
     isOnboardingTurnstilePanelVisible(state, instruction, siteKey) ||
     verifiedMoment;
@@ -355,7 +438,7 @@ export function OnboardingTurnstile({
     panelVisibleRef.current = shouldShowPanel;
   }, [shouldShowPanel]);
 
-  if (shouldBypassTurnstile) {
+  if (isRuntimeBypassPending || shouldBypassTurnstile) {
     // No Turnstile UI in dev. The server-side dev-mode skip still owns trust.
     return null;
   }
@@ -376,6 +459,13 @@ export function OnboardingTurnstile({
       // collapses in one clean step instead of shrinking twice.
       verifiedMoment ||
       Boolean(instruction));
+  const shouldExposeWidgetContent =
+    interactiveChallengeVisible &&
+    (state.status === 'interactive' || state.status === 'loading');
+  const shouldShowWidgetSkeleton =
+    shouldShowWidgetFrame &&
+    !shouldExposeWidgetContent &&
+    state.status !== 'verified';
   const tone = getStatusTone(state.status);
 
   return (
@@ -405,7 +495,7 @@ export function OnboardingTurnstile({
               data-testid='onboarding-turnstile-icon'
               data-turnstile-icon={state.status}
               className={cn(
-                'mt-px flex size-7 shrink-0 items-center justify-center rounded-[8px] border transition-colors duration-subtle',
+                'mt-px flex size-7 shrink-0 items-center justify-center rounded-lg border transition-colors duration-subtle',
                 TONE_BADGE_CLASSES[tone]
               )}
             >
@@ -419,7 +509,7 @@ export function OnboardingTurnstile({
                 >
                   {getHeading(state.status)}
                 </p>
-                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
+                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-xs'>
                   {panelCopy}
                 </p>
               </div>
@@ -441,14 +531,14 @@ export function OnboardingTurnstile({
         <div
           className={cn(
             shouldShowWidgetFrame
-              ? 'relative mt-2 overflow-hidden rounded-[8px] border border-subtle bg-surface-0 p-1.5'
+              ? 'relative mt-2 overflow-hidden rounded-lg border border-subtle bg-surface-0 p-1.5'
               : 'sr-only h-0 overflow-hidden',
             !shouldShowPanel && 'sr-only h-0 overflow-hidden'
           )}
           data-testid='onboarding-turnstile-widget-frame'
           aria-hidden={!shouldShowWidgetFrame ? 'true' : undefined}
         >
-          {shouldShowWidgetFrame && state.status !== 'verified' ? (
+          {shouldShowWidgetSkeleton ? (
             <Skeleton
               aria-hidden='true'
               data-testid='onboarding-turnstile-widget-skeleton'
@@ -459,7 +549,12 @@ export function OnboardingTurnstile({
           <div
             ref={containerRef}
             id={`cf-turnstile-${widgetDomId}`}
-            className='relative min-h-[64px]'
+            className={cn(
+              'relative min-h-16',
+              shouldExposeWidgetContent
+                ? '[&>div]:visible'
+                : '[&>div]:invisible'
+            )}
           />
         </div>
       ) : null}

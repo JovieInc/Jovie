@@ -4,7 +4,6 @@ import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
 import {
   type EntityCardModel,
-  EntityCarousel,
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
@@ -26,6 +25,8 @@ import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
+import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
+import type { PublicRelease } from './releases/types';
 
 interface ProfileHomeRailProps {
   readonly artist: Artist;
@@ -44,6 +45,7 @@ interface ProfileHomeRailProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  readonly releases?: readonly PublicRelease[];
 }
 
 function getUpcomingTourDates(
@@ -86,8 +88,8 @@ function HomeAlertsCard({
   const sharedProps = {
     className:
       variant === 'bento'
-        ? 'group flex min-h-18 w-full min-w-0 items-center gap-3 rounded-[var(--profile-inner-radius)] border border-white/10 bg-white/[0.045] px-3.5 py-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-22px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
-        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
+        ? 'group flex min-h-16 w-full min-w-0 items-center gap-3 rounded-(--profile-inner-radius) border border-white/10 bg-white/5 px-3.5 py-3 text-left text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90'
+        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 text-left text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90',
     'data-testid':
       variant === 'bento'
         ? 'profile-home-alerts-fallback-card'
@@ -107,7 +109,7 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'block text-app font-semibold leading-[1.15] [overflow-wrap:anywhere]'
+              ? 'block text-app font-semibold leading-tight [overflow-wrap:anywhere]'
               : 'block text-xs font-semibold leading-4 [overflow-wrap:anywhere]'
           }
         >
@@ -116,7 +118,7 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'mt-0.5 block max-w-[25ch] text-2xs leading-4 text-white/54 [overflow-wrap:anywhere]'
+              ? 'mt-0.5 block max-w-64 text-2xs leading-4 text-white/55 [overflow-wrap:anywhere]'
               : 'mt-0.5 block text-2xs leading-3.5 text-white/50 [overflow-wrap:anywhere]'
           }
         >
@@ -124,11 +126,11 @@ function HomeAlertsCard({
         </span>
       </span>
       <span
-        className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
+        className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/12 bg-white/15 p-1 shadow-sm transition-colors duration-subtle group-hover:bg-white/20'
         aria-hidden='true'
         data-testid='profile-home-alerts-switch'
       >
-        <span className='block h-6 w-6 rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
+        <span className='block h-6 w-6 rounded-full bg-white dark:bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
       </span>
     </>
   );
@@ -167,6 +169,7 @@ export function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
   merchCards = [],
+  releases = [],
 }: Readonly<ProfileHomeRailProps>) {
   // Re-evaluate visibility at the release boundary so the rail's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
@@ -202,10 +205,19 @@ export function ProfileHomeRail({
     const hasFeaturedRelease = Boolean(
       releaseVisibility?.show && latestRelease
     );
+    const featuredReleaseSlug =
+      hasFeaturedRelease && latestRelease ? latestRelease.slug : null;
+    const featuredReleaseId =
+      featuredReleaseSlug === null
+        ? null
+        : (releases.find(release => release.slug === featuredReleaseSlug)?.id ??
+          null);
+
     if (hasFeaturedRelease && latestRelease) {
       items.push(
         releaseToEntityCard(
           {
+            id: featuredReleaseId ?? undefined,
             title: latestRelease.title,
             slug: latestRelease.slug,
             artworkUrl: latestRelease.artworkUrl,
@@ -233,6 +245,14 @@ export function ProfileHomeRail({
           external: true,
         },
       });
+    }
+
+    // Back catalog: include non-featured releases in the same carousel.
+    for (const release of releases) {
+      if (release.slug === '' || release.slug === featuredReleaseSlug) {
+        continue;
+      }
+      items.push(releaseToEntityCard(release, { handle: artist.handle, now }));
     }
 
     // Shoppable merch (revenue) next.
@@ -265,6 +285,7 @@ export function ProfileHomeRail({
     merchCards,
     nearbyTourDateId,
     now,
+    releases,
     releaseVisibility?.show,
     upcomingTourDates,
   ]);
@@ -292,10 +313,11 @@ export function ProfileHomeRail({
       data-testid='profile-home-rail'
     >
       {alertsCard}
-      <EntityCarousel
+      <ReleaseCatalogCarousel
         items={carouselItems}
-        surface='pearl'
-        dataTestId='profile-home-carousel'
+        artistHandle={artist.handle}
+        artistId={artist.id}
+        analyticsEnabled={renderMode !== 'preview'}
       />
     </div>
   );

@@ -116,10 +116,10 @@ export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
         />
       </div>
       <div className='min-w-0 flex-1'>
-        <div className='truncate text-[12px] font-caption text-primary-token leading-[1.2]'>
+        <div className='truncate text-xs font-caption text-primary-token leading-[1.2]'>
           {trackTitle}
         </div>
-        <div className='truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5'>
+        <div className='truncate text-2xs text-tertiary-token leading-[1.3] mt-0.5'>
           {artistName}
         </div>
       </div>

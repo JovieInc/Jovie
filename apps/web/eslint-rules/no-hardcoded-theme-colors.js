@@ -1,20 +1,29 @@
 /**
  * ESLint rule: no-hardcoded-theme-colors
  *
- * Flags bare `text-black` and `bg-white` Tailwind classes that appear WITHOUT
- * a `dark:` counterpart in the same class string.  These cause black-on-black
- * (or white-on-white) contrast failures when the app renders in dark mode.
+ * Flags Tailwind class utilities that bypass System B semantic tokens:
+ *
+ *   bare text-black / text-white — raw absolute colors without a dark: counterpart
+ *   bare bg-white   / bg-black  — same, but for backgrounds
+ *   text-[#hex]  / bg-[#hex] / border-[#hex] — arbitrary hex is always banned
  *
  * Compliant patterns:
- *   'text-black dark:text-white'  — has a dark counterpart ✓
+ *   'text-black dark:text-white'  — paired for both themes ✓
  *   'dark:text-white'             — dark-only, explicit intent ✓
  *   'text-primary-token'          — semantic token, auto-adapts ✓
+ *   'bg-white/5'                  — opacity-modified overlay (intentional) ✓
  *
  * Flagged patterns:
- *   'text-black'                  — no dark: counterpart, invisible in dark mode ✗
- *   'bg-white px-4'               — bg-white without dark:bg-* ✗
+ *   'text-black'                  — invisible in dark mode ✗
+ *   'bg-white px-4'               — white bg traps dark text in dark mode ✗
+ *   'text-white'                  — invisible in light mode without dark: pair ✗
+ *   'bg-black'                    — may be invisible in dark mode without dark: pair ✗
+ *   'text-[#fff]'                 — arbitrary hex bypasses token system ✗
+ *   'bg-[#000000]'                — arbitrary hex bypasses token system ✗
+ *   'border-[#aabbcc]'            — arbitrary hex bypasses token system ✗
  *
  * @see .claude/rules/ui.md
+ * @see DESIGN.md → "Use tokens, not raw colors"
  * @see apps/web/contrast-ratchet.baseline.json  — ratchet guard for legacy violations
  */
 
@@ -36,17 +45,18 @@ function isAllowedFile(filename) {
   return ALLOWED_PATH_FRAGMENTS.some(fragment => normalized.includes(fragment));
 }
 
-// Patterns that indicate an intentional always-dark or always-light surface
-// (e.g. gradient overlays, frosted glass, brand pill buttons).
-// These are heuristics — we look for opacity modifiers that signal an overlay.
-function hasOpacityModifier(value) {
-  // e.g. bg-white/5, text-black/20, bg-white/[0.03]
-  return /(?:text-black|bg-white)\s*\//.test(value);
+/**
+ * Check whether a class string contains the token in its opacity-modified form
+ * (e.g. text-black/20, bg-white/5, bg-black/[0.03]).  These are intentional
+ * overlay patterns, not absolute colors, so we leave them alone.
+ */
+function hasOpacityVariant(classString, token) {
+  return new RegExp(`(?:^|\\s)${token.replace('-', '\\-')}/`).test(classString);
 }
 
 /**
- * Returns a violation message when a class string contains a bare
- * `text-black` or `bg-white` without a matching `dark:` counterpart.
+ * Returns a violation descriptor when a class string contains a bare
+ * raw-color token without the required dark: counterpart.
  * Returns null when the string is safe.
  */
 function findHardcodedThemeColorViolation(classString) {
@@ -54,32 +64,47 @@ function findHardcodedThemeColorViolation(classString) {
     return null;
   }
 
-  // Allow opacity-modified variants — these are intentional overlay patterns
-  // (bg-white/5, text-black/20) and not absolute colors.
-  if (hasOpacityModifier(classString)) {
-    return null;
-  }
-
-  // Bare text-black without a dark:text-* in the same string
+  // ── bare text-black ───────────────────────────────────────────────────────
   if (
+    !hasOpacityVariant(classString, 'text-black') &&
     /(?:^|\s)text-black(?:\s|$)/.test(classString) &&
     !classString.includes('dark:text-')
   ) {
-    return {
-      messageId: 'bareTextBlack',
-      data: { value: 'text-black' },
-    };
+    return { messageId: 'bareTextBlack' };
   }
 
-  // Bare bg-white without a dark:bg-* in the same string
+  // ── bare text-white ───────────────────────────────────────────────────────
   if (
+    !hasOpacityVariant(classString, 'text-white') &&
+    /(?:^|\s)text-white(?:\s|$)/.test(classString) &&
+    !classString.includes('dark:text-')
+  ) {
+    return { messageId: 'bareTextWhite' };
+  }
+
+  // ── bare bg-white ─────────────────────────────────────────────────────────
+  if (
+    !hasOpacityVariant(classString, 'bg-white') &&
     /(?:^|\s)bg-white(?:\s|$)/.test(classString) &&
     !classString.includes('dark:bg-')
   ) {
-    return {
-      messageId: 'bareBgWhite',
-      data: { value: 'bg-white' },
-    };
+    return { messageId: 'bareBgWhite' };
+  }
+
+  // ── bare bg-black ─────────────────────────────────────────────────────────
+  if (
+    !hasOpacityVariant(classString, 'bg-black') &&
+    /(?:^|\s)bg-black(?:\s|$)/.test(classString) &&
+    !classString.includes('dark:bg-')
+  ) {
+    return { messageId: 'bareBgBlack' };
+  }
+
+  // ── arbitrary hex colors ─────────────────────────────────────────────────
+  // text-[#hex], bg-[#hex], border-[#hex] always bypass the token system.
+  // There is no "paired dark:" exception — use a semantic token instead.
+  if (/(?:text|bg|border)-\[#[0-9a-fA-F]/.test(classString)) {
+    return { messageId: 'arbitraryHexColor' };
   }
 
   return null;
@@ -138,18 +163,30 @@ module.exports = {
     type: 'suggestion',
     docs: {
       description:
-        'Disallow bare text-black / bg-white without a dark: counterpart — prevents black-on-black contrast failures in dark mode',
+        'Disallow raw Tailwind color utilities (text-black/white, bg-white/black, arbitrary hex) without System B semantic tokens or dark: counterparts — prevents invisible-text contrast failures across themes',
       recommended: false,
     },
     messages: {
       bareTextBlack:
         '`text-black` without a `dark:text-*` counterpart causes invisible text in dark mode. ' +
-        'Use a semantic token (`text-primary-token`) or pair with `dark:text-white`. ' +
-        'See contrast-ratchet.baseline.json for the current violation count.',
+        'Use a semantic token (`text-foreground`) or pair with `dark:text-white`. ' +
+        'See DESIGN.md → "Use tokens, not raw colors".',
+      bareTextWhite:
+        '`text-white` without a `dark:text-*` counterpart may cause invisible text in light mode. ' +
+        'Use a semantic token (`text-foreground`) or pair with `dark:text-black`. ' +
+        'See DESIGN.md → "Use tokens, not raw colors".',
       bareBgWhite:
         '`bg-white` without a `dark:bg-*` counterpart may cause invisible text in dark mode. ' +
-        'Use a semantic token (`bg-surface-1`) or pair with `dark:bg-{dark-surface}`. ' +
-        'See contrast-ratchet.baseline.json for the current violation count.',
+        'Use a semantic token (`bg-background` or `bg-surface-1`) or pair with `dark:bg-{dark-surface}`. ' +
+        'See DESIGN.md → "Use tokens, not raw colors".',
+      bareBgBlack:
+        '`bg-black` without a `dark:bg-*` counterpart may be invisible in dark mode. ' +
+        'Use a semantic token (`bg-background`) or pair with `dark:bg-{light-surface}`. ' +
+        'See DESIGN.md → "Use tokens, not raw colors".',
+      arbitraryHexColor:
+        'Arbitrary hex color (e.g. `text-[#fff]`, `bg-[#000]`) bypasses the System B token layer. ' +
+        'Use a semantic token (`text-foreground`, `bg-surface-1`, `border-border`) instead. ' +
+        'See DESIGN.md → "Use tokens, not raw colors".',
     },
     schema: [],
   },
@@ -183,7 +220,6 @@ module.exports = {
             context.report({
               node: valueNode,
               messageId: violation.messageId,
-              data: violation.data,
             });
           }
         }

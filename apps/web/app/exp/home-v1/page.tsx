@@ -231,7 +231,10 @@ function Nav({ variant }: { variant: Variant }) {
     >
       <div className='flex items-center gap-2.5'>
         <JovieMark
-          className={cn('h-5 w-5', onCream ? 'text-(--color-bg-surface-0)' : 'text-white')}
+          className={cn(
+            'h-5 w-5',
+            onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
+          )}
         />
         <span className='text-mid font-semibold tracking-[-0.018em]'>
           Jovie
@@ -366,12 +369,12 @@ function ProductComposer({
           value={draft}
           onChange={e => onDraft(e.target.value)}
           placeholder='Plan a release. Generate album art. Pitch playlists. Anything.'
-          aria-label='Tell Jovie what you need'
+          aria-label='Tell Jovie What You Need'
           className='flex-1 bg-transparent text-mid text-white placeholder:text-white/35 outline-none'
         />
         <button
           type='button'
-          aria-label='Push-to-talk'
+          aria-label='Push-to-talk' // ui-casing-allow: hyphenated aria label
           className='shrink-0 h-9 w-9 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/[0.07] transition-colors duration-subtle ease-out'
         >
           <Mic className='h-4 w-4' strokeWidth={2.25} />
@@ -488,9 +491,9 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
           >
             Release
             <br />
-            more music
+            More Music
             <br />
-            with less work.
+            With Less Work.
           </h1>
           <p className='mt-6 text-sm lg:text-mid leading-[1.55] text-(--color-bg-surface-0)/72 max-w-[50ch]'>
             {SUBHEAD}
@@ -508,7 +511,7 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
               type='text'
               value={draft}
               onChange={e => onDraft(e.target.value)}
-              placeholder='ASK JOVIE…'
+              placeholder='ASK JOVIE…' // ui-casing-allow: uppercase placeholder
               className='flex-1 h-12 px-4 bg-transparent text-app uppercase tracking-[0.04em] placeholder:text-(--color-bg-surface-0)/35 outline-none'
             />
             <button
@@ -645,13 +648,13 @@ function Composer({
           type='text'
           value={draft}
           onChange={e => onDraft(e.target.value)}
-          placeholder='Ask Jovie…'
-          aria-label='Tell Jovie what you need'
+          placeholder='Ask Jovie…' // ui-casing-allow: brand placeholder
+          aria-label='Tell Jovie What You Need'
           className='flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none'
         />
         <button
           type='button'
-          aria-label='Push-to-talk'
+          aria-label='Push-to-talk' // ui-casing-allow: hyphenated aria label
           className='shrink-0 h-8 w-8 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/8 transition-colors duration-subtle ease-out'
         >
           <Mic className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -735,7 +738,7 @@ function ScrollCue({
     <button
       type='button'
       onClick={onClick}
-      aria-label='Scroll to next section'
+      aria-label='Scroll To Next Section'
       className={cn(
         'absolute bottom-7 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 h-8 px-3 rounded-full text-2xs uppercase tracking-[0.14em] font-medium transition-colors duration-subtle ease-out',
         tone === 'dark'
@@ -988,7 +991,7 @@ function FinalCta({ variant }: { variant: Variant }) {
           )}
           style={{ letterSpacing: '-0.022em' }}
         >
-          Spend less time managing. More time creating.
+          Spend Less Time Managing. More Time Creating.
         </h2>
         <div className='mt-8 inline-flex items-center gap-2'>
           <Link
@@ -1043,7 +1046,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/terms'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-(--color-bg-surface-0)' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Terms
@@ -1052,7 +1057,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/privacy'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-(--color-bg-surface-0)' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Privacy
@@ -1061,7 +1068,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-(--color-bg-surface-0)' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Home (live)

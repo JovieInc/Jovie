@@ -150,7 +150,7 @@ export function ArtistProfileModeSwitcher({
             </h2>
           </div>
           <div className='min-h-[1.75rem]'>
-            <p className='mt-2 text-[14px] font-medium leading-[1.4] tracking-[-0.011em] text-secondary-token sm:text-[15px]'>
+            <p className='mt-2 text-sm font-medium leading-[1.4] tracking-[-0.011em] text-secondary-token sm:text-mid'>
               {phoneSubcaption}
             </p>
           </div>
@@ -261,7 +261,7 @@ export function ArtistProfileModeSwitcher({
           {activeMode ? (
             <motion.p
               key={activeMode.id}
-              className='absolute inset-x-0 text-balance text-[14px] font-medium leading-[1.34] tracking-normal text-white/86 sm:text-[15px]'
+              className='absolute inset-x-0 text-balance text-sm font-medium leading-[1.34] tracking-normal text-white/86 sm:text-mid'
               initial={false}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -388,7 +388,7 @@ function AnimatedProfileModeTabs({
                   event.preventDefault();
                 }
               }}
-              className='relative z-10 flex min-h-11 min-w-0 items-center justify-center rounded-full px-1.5 text-center text-[10px] font-semibold tracking-normal text-white/50 transition-colors duration-150 hover:text-white/78 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[state=active]:text-black sm:px-3.5 sm:text-[12px]'
+              className='relative z-10 flex min-h-11 min-w-0 items-center justify-center rounded-full px-1.5 text-center text-3xs font-semibold tracking-normal text-white/50 transition-colors duration-150 hover:text-white/78 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[state=active]:text-black sm:px-3.5 sm:text-xs'
             >
               {isActive ? (
                 <motion.span

@@ -139,11 +139,23 @@ describe('AuthShell — app-owned SSO + email-code contract', () => {
     }
   });
 
+  it('mounts the invisible Clerk Smart CAPTCHA element for custom auth flows', () => {
+    const { container } = render(<AuthShell mode='sign-up' />);
+
+    const captcha = container.querySelector('#clerk-captcha');
+    expect(captcha).not.toBeNull();
+    expect(captcha).toHaveAttribute('data-cl-size', 'invisible');
+    expect(captcha).toHaveAttribute('data-cl-theme', 'dark');
+    expect(captcha).toHaveAttribute('data-auth-clerk-captcha');
+    expect(captcha).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('renders stable full-label provider slots before Clerk is ready', () => {
     authResourceState.signInLoaded = false;
 
     const { container } = render(<AuthShell mode='sign-in' />);
 
+    expect(container.querySelector('#clerk-captcha')).not.toBeNull();
     expect(
       container.querySelector('[data-auth-provider-slot="google"]')
     ).toHaveTextContent('Continue with Google');
@@ -303,6 +315,34 @@ describe('AuthShell — app-owned SSO + email-code contract', () => {
       'Could not start sign-in. Please try again.'
     );
     expect(googleButton).toBeEnabled();
+  });
+
+  it('surfaces bot protection errors inline when email sign-up is blocked', async () => {
+    const user = userEvent.setup();
+    signUpCreateMock.mockResolvedValueOnce({
+      error: { errors: [{ code: 'bot_traffic_detected' }] },
+    });
+
+    const { container } = render(<AuthShell mode='sign-up' />);
+
+    const emailInput = await waitFor(() => {
+      const input = container.querySelector<HTMLInputElement>(
+        'input[type="email"][name="emailAddress"]'
+      );
+      expect(input).not.toBeNull();
+      return input as HTMLInputElement;
+    });
+
+    await user.type(emailInput, 'bot@example.com');
+    await user.click(
+      screen.getByRole('button', { name: /continue with email/i })
+    );
+
+    expect(
+      await screen.findByText(
+        'Unable to verify your request. Please try again or use a different browser.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('/signin cross-link points to /support (Need help), not /waitlist', async () => {

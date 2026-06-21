@@ -792,30 +792,27 @@ describe('proxy.ts path categorization', () => {
 // ============================================================================
 
 describe('default-deny security', () => {
-  it('documents that DB errors default to waitlist state (deny access)', () => {
-    // In proxy-state.ts getUserState(), when the DB query fails:
-    //   return { ...DEFAULT_WAITLIST_STATE };
-    // This ensures database failures don't accidentally grant access
-    const DEFAULT_WAITLIST_STATE = {
-      needsWaitlist: true,
-      needsOnboarding: false,
+  it('documents that DB errors default to onboarding state (deny dashboard access)', () => {
+    const DEFAULT_ONBOARDING_STATE = {
+      needsWaitlist: false,
+      needsOnboarding: true,
       isActive: false,
+      isBanned: false,
     };
 
-    expect(DEFAULT_WAITLIST_STATE.needsWaitlist).toBe(true);
-    expect(DEFAULT_WAITLIST_STATE.isActive).toBe(false);
+    expect(DEFAULT_ONBOARDING_STATE.needsOnboarding).toBe(true);
+    expect(DEFAULT_ONBOARDING_STATE.isActive).toBe(false);
   });
 
-  it('documents that missing clerkUserId defaults to waitlist state', () => {
-    // getUserState() returns DEFAULT_WAITLIST_STATE when called with
-    // empty/missing clerkUserId
-    const DEFAULT_WAITLIST_STATE = {
-      needsWaitlist: true,
-      needsOnboarding: false,
+  it('documents that missing clerkUserId defaults to onboarding intake', () => {
+    const DEFAULT_ONBOARDING_STATE = {
+      needsWaitlist: false,
+      needsOnboarding: true,
       isActive: false,
+      isBanned: false,
     };
 
-    expect(DEFAULT_WAITLIST_STATE.needsWaitlist).toBe(true);
+    expect(DEFAULT_ONBOARDING_STATE.needsOnboarding).toBe(true);
   });
 
   it.todo(

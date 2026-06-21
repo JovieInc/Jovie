@@ -500,6 +500,9 @@ export function ProfileCompactTemplate({
   useEffect(() => {
     if (requestedMode === getModeFromUrl()) {
       initialLocationModeAlignedRef.current = true;
+      globalThis.document?.documentElement.removeAttribute(
+        'data-profile-initial-mode'
+      );
     }
   }, [requestedMode]);
 

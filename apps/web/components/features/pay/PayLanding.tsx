@@ -76,7 +76,7 @@ function HowItWorksSection() {
   return (
     <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>How it works</p>
@@ -149,7 +149,7 @@ function BenefitsSection() {
   return (
     <section className='relative z-10 bg-base pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='marketing-divider mb-14' />
 
           <div className='homepage-section-intro'>
@@ -206,7 +206,7 @@ function SocialProofSection() {
   return (
     <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>Built for real-world artists</p>

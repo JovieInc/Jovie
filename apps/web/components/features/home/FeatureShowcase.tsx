@@ -70,14 +70,14 @@ function BentoCard({
         <h3 className='marketing-h2-linear text-primary-token'>
           {card.heading}
         </h3>
-        <p className='marketing-lead-linear mt-3 max-w-[420px] text-secondary-token'>
+        <p className='marketing-lead-linear mt-3 max-w-105 text-secondary-token'>
           {card.description}
         </p>
         <ul className='mt-5 flex flex-col gap-2.5'>
           {card.bullets.map(bullet => (
             <li
               key={bullet}
-              className='flex items-start gap-2.5 text-[15px] leading-[1.6] text-secondary-token'
+              className='flex items-start gap-2.5 text-mid leading-[1.6] text-secondary-token'
             >
               <span
                 aria-hidden='true'
@@ -121,7 +121,7 @@ export function FeatureShowcase() {
       <Container size='homepage'>
         <div className='mx-auto max-w-[var(--linear-content-max)]'>
           {/* Section header */}
-          <div className='reveal-on-scroll mb-12 max-w-[600px] lg:mb-16'>
+          <div className='reveal-on-scroll mb-12 max-w-150 lg:mb-16'>
             <p className='homepage-section-eyebrow'>The platform</p>
             <h2 className='marketing-h2-linear mt-5 text-primary-token'>
               Everything your music needs.

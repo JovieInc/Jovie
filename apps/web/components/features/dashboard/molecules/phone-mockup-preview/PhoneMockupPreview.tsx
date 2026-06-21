@@ -32,8 +32,8 @@ export function PhoneMockupPreview({
       {/* Phone frame - simplified */}
       <div
         className={cn(
-          'relative w-full max-w-[300px] mx-auto',
-          'aspect-9/19 rounded-[28px]',
+          'relative w-full max-w-75 mx-auto',
+          'aspect-9/19 rounded-3xl',
           'bg-surface-1 border border-(--linear-app-frame-seam)',
           'overflow-hidden'
         )}
@@ -41,7 +41,7 @@ export function PhoneMockupPreview({
         {/* Phone screen */}
         <div
           className={cn(
-            'relative w-full h-full rounded-[24px] overflow-hidden',
+            'relative w-full h-full rounded-3xl overflow-hidden',
             'border border-(--linear-app-frame-seam) bg-surface-0',
             'transition-colors duration-300'
           )}
@@ -146,7 +146,7 @@ export function PhoneMockupPreview({
                     aria-hidden='true'
                     tabIndex={-1}
                     className={cn(
-                      'relative block rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-4 hover:bg-surface-1',
+                      'relative block rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 p-4 hover:bg-surface-1',
                       'transition-all duration-200',
                       'overflow-hidden',
                       activeLink === link.id && 'ring-2 ring-primary-500/20'
@@ -155,7 +155,7 @@ export function PhoneMockupPreview({
                     <div className='flex items-center gap-3'>
                       <div
                         className={cn(
-                          'shrink-0 w-10 h-10 rounded-[10px]',
+                          'shrink-0 w-10 h-10 rounded-lg',
                           'flex items-center justify-center',
                           'bg-surface-0',
                           'text-primary-token',
@@ -202,7 +202,7 @@ export function PhoneMockupPreview({
                 ))
               ) : (
                 <div className='h-full flex flex-col items-center justify-center text-center p-6'>
-                  <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
+                  <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
                     <Link2
                       className='w-6 h-6 text-tertiary-token'
                       aria-hidden='true'

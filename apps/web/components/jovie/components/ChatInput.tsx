@@ -162,13 +162,13 @@ function DictationStatusBanner({
     return (
       <div
         role='alert'
-        className='flex items-center justify-between gap-3 px-3 py-2 text-[12px] text-tertiary-token'
+        className='flex items-center justify-between gap-3 px-3 py-2 text-xs text-tertiary-token'
       >
         <span>{dictationErrorMessage(error)}</span>
         <button
           type='button'
           onClick={onDismissError}
-          className='shrink-0 rounded-md px-2 py-1 text-[11px] text-primary-token hover:bg-surface-1/60'
+          className='shrink-0 rounded-md px-2 py-1 text-2xs text-primary-token hover:bg-surface-1/60'
         >
           Dismiss
         </button>
@@ -184,10 +184,8 @@ function DictationStatusBanner({
     >
       <DictationWaveform active bars={16} className='h-6 w-28' />
       <div className='min-w-0'>
-        <div className='text-[12px] font-medium text-primary-token'>
-          Listening
-        </div>
-        <div className='text-[11px] text-tertiary-token'>
+        <div className='text-xs font-medium text-primary-token'>Listening</div>
+        <div className='text-2xs text-tertiary-token'>
           Speak now — release the mic when finished
         </div>
       </div>
@@ -639,7 +637,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     return (
       <form
         onSubmit={handleFormSubmit}
-        aria-label='Compose a message — type / for skills and references'
+        aria-label='Compose A Message — Type / For Skills And References'
         className='relative z-10 w-full focus-within:outline-none'
       >
         <div className={dockClass}>
@@ -651,7 +649,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 reserveInlinePickerSpace
                   ? 'relative z-[80] flex w-full justify-center'
                   : 'absolute bottom-full left-0 right-0 z-[80] flex justify-center',
-                statusBanner ? 'mb-[34px]' : 'mb-4'
+                statusBanner ? 'mb-9' : 'mb-4'
               )}
             >
               <div
@@ -710,7 +708,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           >
             {showEntitySurface && !isStacked ? (
               <div className='flex w-full'>
-                <aside className='system-b-chat-composer-seam flex w-[264px] shrink-0 flex-col border-r'>
+                <aside className='system-b-chat-composer-seam flex w-66 shrink-0 flex-col border-r'>
                   <SlashCommandMenu
                     profileId={pickerProfileId}
                     state={picker.state}
@@ -1053,12 +1051,12 @@ function InputRow({
         className={cn(
           'relative',
           useHeroPill
-            ? 'flex min-h-[52px] items-center gap-1.5 px-3 py-1.5 sm:min-h-[56px] sm:px-3'
+            ? 'flex min-h-13 items-center gap-1.5 px-3 py-1.5 sm:min-h-14 sm:px-3'
             : [
                 'grid gap-2',
                 isHero
-                  ? 'min-h-[88px] grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
-                  : 'min-h-[56px] grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
+                  ? 'min-h-22 grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
+                  : 'min-h-14 grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
               ]
         )}
       >
@@ -1125,7 +1123,7 @@ function InputRow({
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             maxLength={MAX_MESSAGE_LENGTH + 100}
-            aria-label='Chat message input'
+            aria-label='Chat Message Input'
             aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
             // WAI-ARIA combobox pattern: the textarea is the input that
             // controls the listbox rendered by SlashCommandMenu. Focus stays

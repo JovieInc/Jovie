@@ -81,11 +81,11 @@ export function ReleaseEditDialog({
             {/* Release info header */}
             <DrawerSurfaceCard
               variant='card'
-              className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3.5'
+              className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3.5'
             >
               <EntityHeaderCard
                 image={
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
                     <ImageWithFallback
                       src={release.artworkUrl}
                       alt={`${release.title} artwork`}
@@ -127,7 +127,7 @@ export function ReleaseEditDialog({
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     variant='card'
-                    className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-2.5'
+                    className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-2.5'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>

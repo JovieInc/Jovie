@@ -126,7 +126,7 @@ export function PerformanceCard({
   return (
     <div className={className}>
       <div className='flex items-center justify-between mb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {title}
         </p>
         {surfacedRanges.length > 1 && (
@@ -148,7 +148,7 @@ export function PerformanceCard({
                     setHoverIdx(null);
                   }}
                   className={cn(
-                    'h-5 px-2 rounded-full text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
+                    'h-5 px-2 rounded-full text-3xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
                     on
                       ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10'
                       : 'text-tertiary-token hover:text-primary-token'
@@ -163,17 +163,17 @@ export function PerformanceCard({
       </div>
 
       <div className='flex items-baseline gap-2'>
-        <span className='text-[20px] font-semibold text-primary-token tabular-nums'>
+        <span className='text-xl font-semibold text-primary-token tabular-nums'>
           {headlineValue.toLocaleString()}
         </span>
-        <span className='text-[11px] text-tertiary-token'>{valueLabel}</span>
-        <span className='text-[11px] text-quaternary-token tabular-nums'>
+        <span className='text-2xs text-tertiary-token'>{valueLabel}</span>
+        <span className='text-2xs text-quaternary-token tabular-nums'>
           · {dayLabel}
         </span>
         {hoverIdx === null && (
           <span
             className={cn(
-              'ml-auto inline-flex items-center gap-0.5 text-[11px] tabular-nums',
+              'ml-auto inline-flex items-center gap-0.5 text-2xs tabular-nums',
               trendFlat
                 ? 'text-tertiary-token'
                 : trendUp

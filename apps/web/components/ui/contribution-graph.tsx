@@ -145,7 +145,7 @@ export function ContributionGraph({
       >
         <div
           aria-hidden='true'
-          className='grid min-w-0 gap-[2px] text-[10px] leading-none sm:gap-1'
+          className='grid min-w-0 gap-1 text-3xs leading-none sm:gap-1'
           style={{
             gridTemplateColumns: `clamp(1.5rem, 3vw, 2rem) repeat(${WEEK_COUNT}, minmax(0, 1fr))`,
             gridTemplateRows: '1rem repeat(7, minmax(0, 1fr))',
@@ -155,7 +155,7 @@ export function ContributionGraph({
             <span
               key={month.id}
               className={cn(
-                'self-end text-left text-[10px] font-normal leading-none text-white/24',
+                'self-end text-left text-3xs font-normal leading-none text-white/24',
                 month.monthIndex % 3 !== 0 && 'hidden sm:block'
               )}
               style={{ gridColumnStart: month.columnStart, gridRowStart: 1 }}
@@ -168,7 +168,7 @@ export function ContributionGraph({
             <span
               key={day}
               className={cn(
-                'self-center text-left text-[10px] font-normal leading-none text-white/24',
+                'self-center text-left text-3xs font-normal leading-none text-white/24',
                 !isWorkday(dayIndex) && 'opacity-0',
                 day === 'Fri' && 'text-white/42'
               )}
@@ -210,7 +210,7 @@ export function ContributionGraph({
               >
                 <div
                   className={cn(
-                    'h-full w-full rounded-[3px]',
+                    'h-full w-full rounded-xs',
                     getLevelClassName(day.level, day.inYear),
                     isFriday && !isActive && day.inYear && 'bg-white/[0.055]',
                     isActive &&
@@ -233,14 +233,14 @@ export function ContributionGraph({
       </div>
 
       {showLegend ? (
-        <div className='mt-4 flex items-center justify-end gap-2 text-[11px] text-white/40'>
+        <div className='mt-4 flex items-center justify-end gap-2 text-2xs text-white/40'>
           <span>Less</span>
           <div className='flex items-center gap-1'>
             {LEVELS.map(level => (
               <span
                 key={level}
                 className={cn(
-                  'h-3 w-3 rounded-[3px]',
+                  'h-3 w-3 rounded-xs',
                   getLevelClassName(level, true)
                 )}
               />
