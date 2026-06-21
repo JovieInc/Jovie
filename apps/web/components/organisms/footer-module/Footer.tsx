@@ -29,8 +29,8 @@ const FOOTER_COLUMNS = [
     id: 'account',
     heading: 'Account',
     links: [
-      { href: APP_ROUTES.SIGNIN, label: 'Log in' },
-      { href: APP_ROUTES.SIGNUP, label: 'Get started' },
+      { href: APP_ROUTES.SIGNIN, label: 'Log In' },
+      { href: APP_ROUTES.SIGNUP, label: 'Get Started' },
     ],
   },
   {
@@ -90,8 +90,8 @@ export function Footer({
             variant={config.colorVariant}
             ariaLabel='Legal'
             links={PROFILE_LEGAL_LINKS}
-            className='gap-2 text-[10px] leading-4'
-            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
+            className='gap-2 text-3xs leading-4'
+            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />
         </div>
 
@@ -100,8 +100,8 @@ export function Footer({
             variant={config.colorVariant}
             ariaLabel='Legal'
             links={PROFILE_LEGAL_LINKS}
-            className='gap-2 text-[10px] leading-4'
-            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
+            className='gap-2 text-3xs leading-4'
+            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />
         </div>
       </footer>
@@ -114,7 +114,7 @@ export function Footer({
       <footer
         className={className}
         style={{ backgroundColor: 'var(--linear-bg-footer)' }}
-        aria-label='Site footer'
+        aria-label='Site Footer'
       >
         <div
           aria-hidden='true'

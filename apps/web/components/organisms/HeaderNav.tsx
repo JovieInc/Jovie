@@ -72,7 +72,7 @@ function PublicAuthActions({
         <Button
           asChild
           variant='whitePill'
-          className='focus-ring-themed hidden h-[36px] px-4 text-[13px] sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px]'
+          className='focus-ring-themed hidden h-9 px-4 text-app sm:inline-flex sm:h-10 sm:px-5 sm:text-sm'
         >
           <Link href={APP_ROUTES.SIGNIN}>Sign in</Link>
         </Button>

@@ -351,7 +351,7 @@ function ReleaseEntityHeader({
                   <DrawerMediaThumb
                     src={release.artworkUrl}
                     alt={artworkAlt}
-                    sizeClassName='h-[68px] w-[68px] rounded-[10px]'
+                    sizeClassName='h-17 w-17 rounded-xl'
                     sizes='68px'
                     fallback={
                       <Icon
@@ -370,7 +370,7 @@ function ReleaseEntityHeader({
                 disabled={!previewUrl}
                 aria-pressed={isPlaying}
                 className={cn(
-                  'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
+                  'absolute inset-0 flex items-center justify-center rounded-xl transition-[background-color,opacity] duration-subtle',
                   'bg-black/0 opacity-0',
                   'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                   'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
@@ -379,9 +379,9 @@ function ReleaseEntityHeader({
                 aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
               >
                 {isPlaying ? (
-                  <Pause className='h-5 w-5 text-white drop-shadow-sm' />
+                  <Pause className='h-5 w-5 text-white dark:text-white drop-shadow-sm' />
                 ) : (
-                  <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
+                  <Play className='h-5 w-5 translate-x-px text-white dark:text-white drop-shadow-sm' />
                 )}
               </button>
             </div>
@@ -487,10 +487,10 @@ function ReleaseActivitySection({
               <Activity className='size-3' aria-hidden='true' />
             </span>
             <div className='min-w-0 flex-1'>
-              <p className='truncate text-[12px] font-caption text-primary-token'>
+              <p className='truncate text-xs font-caption text-primary-token'>
                 {row.label} Link updated
               </p>
-              <p className='mt-0.5 text-[10.5px] text-tertiary-token'>
+              <p className='mt-0.5 text-3xs text-tertiary-token'>
                 {formatTimeAgo(row.updatedAt)}
               </p>
             </div>

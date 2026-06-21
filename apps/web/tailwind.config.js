@@ -63,6 +63,7 @@ module.exports = {
         'button-md': 'var(--linear-button-height-md)',
         'app-control-x': 'var(--linear-app-control-padding-x)',
         'app-header': 'var(--linear-app-header-padding-x)',
+        'profile-notification-icon': 'var(--profile-notification-icon-size)',
       },
 
       // App-specific fixed layout tokens
@@ -84,6 +85,8 @@ module.exports = {
         DEFAULT: 'var(--radius-default)', // 4px — buttons (Linear exact)
         xl: 'var(--radius-xl)', // 10px — large cards
         '3xl': 'var(--radius-3xl)', // 14px — large modals
+        dialog: 'var(--app-dialog-radius)',
+        'sidebar-floating': 'var(--app-shell-sidebar-floating-radius)',
         pill: 'var(--radius-pill)', // 48px — pill buttons
         // Legacy linear-prefixed aliases
         'linear-sm': 'var(--linear-radius-sm)',
@@ -177,6 +180,7 @@ module.exports = {
         'brand-audiomack': 'var(--color-brand-audiomack)',
         'brand-audiomack-hover': 'var(--color-brand-audiomack-hover)',
         'brand-audiomack-subtle': 'var(--color-brand-audiomack-subtle)',
+        'brand-venmo': 'var(--color-brand-venmo)',
       },
 
       // Border colors with better naming (avoids border-border-subtle)

@@ -43,6 +43,9 @@
   --profile-drawer-radius-mobile: 22px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
+  --profile-notification-icon-size: 17px;
+  --app-dialog-radius: var(--profile-inner-radius);
+  --app-shell-sidebar-floating-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
@@ -1037,6 +1040,7 @@ html[data-profile-initial-mode]
 
   /* Instagram */
   --color-brand-instagram: oklch(61.9% 0.2 14.6);
+  --color-brand-venmo: #008cff;
 
   /* Deezer */
   --color-brand-deezer: oklch(78% 0.15 75);
@@ -1108,6 +1112,7 @@ html[data-profile-initial-mode]
 
   /* Instagram */
   --color-brand-instagram: oklch(70% 0.2 14.6);
+  --color-brand-venmo: #008cff;
 
   /* Deezer */
   --color-brand-deezer: oklch(82% 0.15 75);
