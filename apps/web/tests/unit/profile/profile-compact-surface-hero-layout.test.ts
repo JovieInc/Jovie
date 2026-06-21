@@ -28,16 +28,13 @@ describe('ProfileCompactSurface home hero layout', () => {
     );
   });
 
-  it('keeps short-viewport hero caps while the home rail flex-scrolls', () => {
+  it('keeps compact-viewport hero caps and lets home content scroll only there', () => {
     const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
 
-    expect(contents).toMatch(/\[@media\(max-height:760px\)\]:flex-none/);
-    expect(contents).toMatch(/\[@media\(max-height:760px\)\]:h-45/);
+    expect(contents).toMatch(/\[@media\(max-height:820px\)\]:flex-none/);
+    expect(contents).toMatch(/\[@media\(max-height:820px\)\]:h-45/);
     expect(contents).toMatch(
-      /homeContentColumnClassName\s*=\s*'min-h-0 flex-1'/
-    );
-    expect(contents).toMatch(
-      /homeContentScrollClassName\s*=\s*'min-h-0 flex-1'/
+      /homeContentColumnClassName[\s\S]*\[@media\(max-height:820px\)\]:flex-1/
     );
   });
 
