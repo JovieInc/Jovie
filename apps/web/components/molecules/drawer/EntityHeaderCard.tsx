@@ -84,7 +84,7 @@ function EntityHeaderMetaSlot({
     <div
       aria-hidden={meta ? undefined : true}
       className={cn(
-        'flex min-h-[22px] flex-wrap items-center gap-1 pt-0.5',
+        'flex min-h-6 flex-wrap items-center gap-1 pt-0.5',
         !meta && 'invisible',
         metaClassName
       )}
@@ -111,11 +111,7 @@ function EntityHeaderFooterSlot({
   return (
     <div
       aria-hidden={footer ? undefined : true}
-      className={cn(
-        'min-h-[28px] pt-1',
-        !footer && 'invisible',
-        footerClassName
-      )}
+      className={cn('min-h-7 pt-1', !footer && 'invisible', footerClassName)}
     >
       {footer ?? '\u00a0'}
     </div>
@@ -178,7 +174,7 @@ export function EntityHeaderCard({
             reserve={shouldReserveEyebrow}
             lineCount={1}
             size='xs'
-            className='text-[10.5px] font-caption leading-none tracking-[0.03em] text-tertiary-token'
+            className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
           >
             {eyebrow}
           </StableHeaderTextSlot>

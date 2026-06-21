@@ -15,7 +15,7 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
   return (
     <div
       className={cn(
-        'min-h-[38px] shrink-0 bg-transparent px-3 py-1.5',
+        'min-h-10 shrink-0 bg-transparent px-3 py-1.5',
         'flex items-center justify-between gap-3',
         className
       )}
