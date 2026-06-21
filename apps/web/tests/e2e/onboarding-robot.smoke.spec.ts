@@ -27,7 +27,15 @@ test.describe('Onboarding Robot PR Smoke', () => {
       ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED,
     ]);
 
-    await page.locator(COMPOSER_TEXTAREA).fill('I am launching a test artist');
+    await expect(
+      page.locator('[data-testid="chat-composer-surface"]')
+    ).toBeVisible({
+      timeout: 30_000,
+    });
+    const textarea = page.locator(COMPOSER_TEXTAREA);
+    await expect(textarea).toBeVisible({ timeout: 30_000 });
+    await expect(textarea).toBeEnabled({ timeout: 30_000 });
+    await textarea.fill('I am launching a test artist');
     await page.getByRole('button', { name: 'Send message' }).click();
 
     await expect(
