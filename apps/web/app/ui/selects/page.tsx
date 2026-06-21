@@ -145,7 +145,7 @@ export default function SelectsPage() {
         <Stack title='Assignee'>
           <p
             id='label-assignee'
-            className='text-[13px] font-[450] text-primary-token'
+            className='text-[13px] font-book text-primary-token'
           >
             Assignee
           </p>
@@ -163,7 +163,7 @@ export default function SelectsPage() {
         <Stack title='Priority'>
           <p
             id='label-priority'
-            className='text-[13px] font-[450] text-primary-token'
+            className='text-[13px] font-book text-primary-token'
           >
             Priority
           </p>
@@ -182,7 +182,7 @@ export default function SelectsPage() {
         <Stack title='Status'>
           <p
             id='label-status'
-            className='text-[13px] font-[450] text-primary-token'
+            className='text-[13px] font-book text-primary-token'
           >
             Status
           </p>
