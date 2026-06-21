@@ -50,8 +50,8 @@ export function ProductScreenshotFrame({
     <div
       data-testid={`product-screenshot-frame-${scenarioId}`}
       className={cn(
-        'relative overflow-hidden border border-[rgba(189,189,244,0.09)] bg-[rgba(157,157,255,0.04)] shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
-        isPhone ? 'rounded-[28px] p-1.5' : 'rounded-[12px] p-1',
+        'relative overflow-hidden border border-(--color-bg-button) bg-(--color-accent-hover) shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
+        isPhone ? 'rounded-3xl p-1.5' : 'rounded-xl p-1',
         fill && 'h-full w-full',
         className
       )}
@@ -74,8 +74,8 @@ export function ProductScreenshotFrame({
         quality={85}
         aria-hidden={ariaHidden}
         className={cn(
-          'block h-full w-full bg-[#06070a] object-contain',
-          isPhone ? 'rounded-[22px]' : 'rounded-[8px]'
+          'block h-full w-full bg-(--color-bg-base) object-contain',
+          isPhone ? 'rounded-3xl' : 'rounded-lg'
         )}
       />
     </div>

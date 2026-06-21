@@ -45,7 +45,7 @@ function ToggleSwitch({
         <span
           className={cn(
             'h-3 w-3 rounded-full transition-[background-color,transform]',
-            checked ? 'bg-btn-primary-foreground' : 'bg-white',
+            checked ? 'bg-btn-primary-foreground' : 'bg-white dark:bg-white',
             checked && 'translate-x-3'
           )}
         />
@@ -151,7 +151,7 @@ export function DisplayMenuDropdown({
   return (
     <Popover>
       <PopoverTrigger asChild>{trigger ?? defaultTrigger}</PopoverTrigger>
-      <PopoverContent align='end' className='w-[280px]'>
+      <PopoverContent align='end' className='w-70'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-subtle px-2.5 py-1.5'>
           <span className='text-app font-semibold text-primary-token'>

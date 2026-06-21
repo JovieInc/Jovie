@@ -269,7 +269,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                     <HelpCircle className='h-3.5 w-3.5' />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side='top' className='max-w-[200px]'>
+                <TooltipContent side='top' className='max-w-50'>
                   <p className='text-app'>
                     Total page views, including repeat visits from the same
                     person
@@ -296,7 +296,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                     <HelpCircle className='h-3.5 w-3.5' />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side='top' className='max-w-[200px]'>
+                <TooltipContent side='top' className='max-w-50'>
                   <p className='text-app'>
                     Individual people who visited your profile, counted once per
                     person
@@ -328,7 +328,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     <div
       ref={containerRef}
       data-testid='dashboard-analytics-cards'
-      className='space-y-1 min-h-[140px]'
+      className='space-y-1 min-h-35'
     >
       <div className='flex flex-wrap items-center justify-between gap-2'>
         <div className='space-y-0.5'>

@@ -97,18 +97,18 @@ export function ThreadView({
       >
         <div className='mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[9rem] pt-5 sm:pt-6'>
           <header>
-            <h1 className='text-[24px] font-semibold leading-tight text-primary-token'>
+            <h1 className='text-2xl font-semibold leading-tight text-primary-token'>
               {thread.title}
             </h1>
             {thread.entityKind && thread.entityId && (
-              <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+              <p className='mt-1.5 text-xs text-tertiary-token'>
                 Linked to {thread.entityKind} ·{' '}
                 <span className='text-secondary-token'>{thread.entityId}</span>
               </p>
             )}
           </header>
 
-          <div className='mt-8 space-y-4 text-[13.5px] leading-relaxed'>
+          <div className='mt-8 space-y-4 text-app leading-relaxed'>
             {children}
           </div>
         </div>

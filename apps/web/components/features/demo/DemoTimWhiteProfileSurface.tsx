@@ -379,16 +379,16 @@ function DemoShowcaseShell({
   return (
     <DemoClientProviders>
       <div data-testid={testId}>
-        <div className='min-h-screen bg-surface-0 px-5 py-8 text-white sm:px-6 lg:px-8'>
+        <div className='min-h-screen bg-surface-0 px-5 py-8 text-white dark:text-white sm:px-6 lg:px-8'>
           <div className='mx-auto max-w-300'>
             <div className='max-w-[42rem]'>
-              <p className='text-2xs font-[600] tracking-[0.14em] text-white/42'>
+              <p className='text-2xs font-[600] tracking-[0.14em] text-white/42 dark:text-white/42'>
                 Tim White Showcase
               </p>
-              <h1 className='mt-3 text-[clamp(2rem,4vw,3.2rem)] font-[630] tracking-[-0.06em] text-white'>
+              <h1 className='mt-3 text-[clamp(2rem,4vw,3.2rem)] font-[630] tracking-[-0.06em] text-white dark:text-white'>
                 {title}
               </h1>
-              <p className='mt-3 max-w-[38rem] text-sm leading-[1.7] text-white/62'>
+              <p className='mt-3 max-w-[38rem] text-sm leading-[1.7] text-white/62 dark:text-white/62'>
                 {subtitle}
               </p>
             </div>
@@ -412,11 +412,11 @@ function ShowcaseBoardCard({
   return (
     <article className='rounded-3xl border border-white/8 bg-white/[0.03] p-4 shadow-[0_28px_84px_rgba(0,0,0,0.32)]'>
       <div className='mb-4'>
-        <h2 className='text-lg font-[620] tracking-[-0.04em] text-white'>
+        <h2 className='text-lg font-[620] tracking-[-0.04em] text-white dark:text-white'>
           {title}
         </h2>
         {description ? (
-          <p className='mt-1 text-xs leading-[1.55] text-white/56'>
+          <p className='mt-1 text-xs leading-[1.55] text-white/56 dark:text-white/56'>
             {description}
           </p>
         ) : null}
@@ -495,7 +495,7 @@ function ActionCardShowcaseBoard() {
   const cardShowcaseItems = [
     {
       id: 'release-live',
-      label: 'Latest release',
+      label: 'Latest Release',
       description:
         'Real release metadata with album art and collaborator copy.',
       card: renderActionCardPreview({
@@ -520,7 +520,7 @@ function ActionCardShowcaseBoard() {
     },
     {
       id: 'tour-nearby',
-      label: 'Nearby tour',
+      label: 'Nearby Tour',
       description: 'Geo-aware nearby date when there is no release to feature.',
       card: renderActionCardPreview({
         dataTestId: 'tim-white-cards-tour-nearby',
@@ -531,7 +531,7 @@ function ActionCardShowcaseBoard() {
     },
     {
       id: 'tour-next',
-      label: 'Next tour',
+      label: 'Next Tour',
       description:
         'Fallback upcoming date when the viewer is not near a venue.',
       card: renderActionCardPreview({
@@ -544,7 +544,7 @@ function ActionCardShowcaseBoard() {
     },
     {
       id: 'playlist-fallback',
-      label: 'Playlist fallback',
+      label: 'Playlist Fallback',
       description: 'Real playlist fallback when there is no release or tour.',
       card: renderActionCardPreview({
         dataTestId: 'tim-white-cards-playlist-fallback',
@@ -555,7 +555,7 @@ function ActionCardShowcaseBoard() {
     },
     {
       id: 'alerts-fallback',
-      label: 'Alerts fallback',
+      label: 'Alerts Fallback',
       description:
         'Useful fallback when no release, tour date, playlist, or merch item can lead.',
       card: renderAlertsFallbackPreview('tim-white-cards-alerts-fallback'),
@@ -632,7 +632,7 @@ function SingleStatePhonePreview({
           presentation='full-phone'
           hideJovieBranding
           hideMoreMenu
-          phoneClassName='max-w-[24rem]'
+          phoneClassName='[--homepage-phone-frame-width:24rem]'
           referenceImageSrc={referenceImageSrc}
         />
       </div>
@@ -654,7 +654,7 @@ function MoreMenuPhonePreview() {
         subtitle='Use the state query param to pin one Tim White profile state for screenshots or focused review.'
       >
         <div className='flex items-center justify-center'>
-          <HomePhoneFrame className='homepage-showcase-phone-frame max-w-[24rem]'>
+          <HomePhoneFrame className='homepage-showcase-phone-frame [--homepage-phone-frame-width:24rem]'>
             <div
               className='homepage-showcase-surface relative h-full w-full bg-black/96'
               style={profileAccentStyle}
@@ -751,13 +751,15 @@ export function DemoTimWhiteProfileSurface() {
               <div className='rounded-3xl border border-white/8 bg-white/[0.04] p-4'>
                 <div className='flex items-start justify-between gap-3'>
                   <div>
-                    <p className='text-xs font-semibold text-white/50'>About</p>
-                    <h2 className='mt-1 text-xl font-[600] tracking-[-0.03em] text-white'>
-                      Share press photos
+                    <p className='text-xs font-semibold text-white/50 dark:text-white/50'>
+                      About
+                    </p>
+                    <h2 className='mt-1 text-xl font-[600] tracking-[-0.03em] text-white dark:text-white'>
+                      Share Press Photos
                     </h2>
                   </div>
                   <div className='rounded-2xl border border-white/8 bg-surface-0 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)]'>
-                    <div className='rounded-xl bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white'>
+                    <div className='rounded-xl bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white dark:text-white'>
                       Download press photos
                     </div>
                   </div>

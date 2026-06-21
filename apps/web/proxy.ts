@@ -739,6 +739,13 @@ export default async function middleware(
   const pathname = req.nextUrl.pathname;
 
   const hostname = req.nextUrl.hostname;
+  const isSecureVercelDeployment =
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'preview';
+  const isLocalPublicNoAuthSmokeRequest =
+    process.env.PUBLIC_NOAUTH_SMOKE === '1' &&
+    !isSecureVercelDeployment &&
+    isLocalDevelopmentAutomationHostname(hostname);
 
   // Clerk FAPI proxy (extracted)
   const clerkProxyRes = await handleClerkFapiProxy(req);
@@ -822,9 +829,11 @@ export default async function middleware(
     shouldForceBypassClerk ||
     shouldDisableClerkProxyOnPrivateOrigin ||
     process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
+    isLocalPublicNoAuthSmokeRequest;
   const shouldForceBypassClerkForRequest =
-    shouldForceBypassClerk && !shouldDisableClerkProxyOnPrivateOrigin;
+    (shouldForceBypassClerk && !shouldDisableClerkProxyOnPrivateOrigin) ||
+    isLocalPublicNoAuthSmokeRequest;
 
   if (
     shouldBypassClerkForRequest({

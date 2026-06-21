@@ -65,12 +65,12 @@ export function DashboardPreview({
 
       {/* Mobile Frame Preview */}
       <div className='flex justify-center'>
-        <div className='relative w-[280px] rounded-[28px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
+        <div className='relative w-70 rounded-3xl border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
           {/* Top notch */}
-          <div className='absolute left-1/2 top-2 z-10 h-3 w-20 -translate-x-1/2 rounded-b-[10px] bg-surface-1'></div>
+          <div className='absolute left-1/2 top-2 z-10 h-3 w-20 -translate-x-1/2 rounded-b-lg bg-surface-1'></div>
 
           <div
-            className='relative overflow-hidden rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-0'
+            className='relative overflow-hidden rounded-3xl border border-(--linear-app-frame-seam) bg-surface-0'
             style={{ height: '500px' }}
           >
             {/* Status Bar Mockup */}

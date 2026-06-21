@@ -21,7 +21,7 @@ export function TypeBadge({ label, className }: TypeBadgeProps) {
   return (
     <span
       className={cn(
-        'shrink-0 inline-flex items-center h-[16px] px-1.5 rounded text-[9.5px] font-medium uppercase tracking-[0.06em] border border-(--linear-app-shell-border) text-tertiary-token bg-surface-1/40',
+        'shrink-0 inline-flex items-center h-4 px-1.5 rounded text-3xs font-medium uppercase tracking-[0.06em] border border-(--linear-app-shell-border) text-tertiary-token bg-surface-1/40',
         className
       )}
     >

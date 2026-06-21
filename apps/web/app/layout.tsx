@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import Script from 'next/script';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
@@ -161,6 +160,11 @@ export default async function RootLayout({
 }>) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
   const isTestAuthBypassRuntime = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const isSecureVercelDeployment =
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'preview';
+  const isPublicNoAuthSmokeRuntime =
+    process.env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureVercelDeployment;
   const clerkMockEnabled = process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
   const clerkProxyDisabled =
     process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
@@ -217,7 +221,11 @@ export default async function RootLayout({
       data-clerk-mock={clerkMockEnabled ? '1' : undefined}
       data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
       data-e2e-mode={
-        isE2EClientRuntime || isTestAuthBypassRuntime ? '1' : undefined
+        isE2EClientRuntime ||
+        isTestAuthBypassRuntime ||
+        isPublicNoAuthSmokeRuntime
+          ? '1'
+          : undefined
       }
       data-demo-recording={isDemoRecording ? '1' : undefined}
       data-dev-chrome-disabled={shouldRenderDevChrome ? undefined : '1'}
@@ -225,8 +233,10 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
-        <Script src='/electron-runtime-init.js' strategy='beforeInteractive' />
-        <Script src='/theme-init.js' strategy='beforeInteractive' />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
+        <script src='/electron-runtime-init.js' />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
+        <script src='/theme-init.js' />
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (

@@ -61,7 +61,7 @@ function ChartSkeleton() {
     <div className='h-50 w-full rounded-lg bg-surface-0' aria-hidden='true'>
       <svg
         role='img'
-        aria-label='Loading chart'
+        aria-label='Loading Chart'
         width='100%'
         height='100%'
         viewBox='0 0 400 200'
@@ -355,7 +355,7 @@ export function ShippingVelocityChart({
               type='button'
               onClick={() => handleLineClick('merged')}
               className='flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100'
-              aria-label='Toggle merged series spotlight'
+              aria-label='Toggle Merged Series Spotlight'
             >
               <span
                 className='block h-1 w-3 rounded-full'
@@ -367,7 +367,7 @@ export function ShippingVelocityChart({
               type='button'
               onClick={() => handleLineClick('opened')}
               className='flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100'
-              aria-label='Toggle opened series spotlight'
+              aria-label='Toggle Opened Series Spotlight'
             >
               <span
                 className='block h-1 w-3 rounded-full'
@@ -380,7 +380,7 @@ export function ShippingVelocityChart({
               onClick={() => setShowClosed(prev => !prev)}
               className='flex items-center gap-1 transition-opacity hover:opacity-100'
               style={{ opacity: showClosed ? 0.8 : 0.4 }}
-              aria-label='Toggle closed series visibility'
+              aria-label='Toggle Closed Series Visibility'
             >
               <span
                 className='block h-1 w-3 rounded-full'

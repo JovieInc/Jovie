@@ -424,6 +424,14 @@ module.exports = [
       '@jovie/no-ad-hoc-currency': 'off',
     },
   },
+  // Experimental shell routes — not production UI; label-casing ratchet deferred (#11251).
+  {
+    files: ['**/app/exp/**/*.{ts,tsx}'],
+    rules: {
+      '@jovie/canonical-ui-label-casing': 'off',
+      '@jovie/no-hardcoded-theme-colors': 'off',
+    },
+  },
   {
     files: ['**/*.{js,jsx,mjs,mts,cts}'],
     languageOptions: {

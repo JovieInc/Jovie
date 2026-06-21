@@ -5,6 +5,7 @@ import {
   ShoppingBag,
   Ticket,
 } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import type { EntityAccent, EntityKind, EntityStatusTone } from './types';
 
 interface KindPreset {
@@ -50,6 +51,13 @@ export const KIND_PRESETS: Record<EntityKind, KindPreset> = {
 /** CSS custom-property reference for a Carbon accent. */
 export function accentVar(accent: EntityAccent): string {
   return `var(--color-accent-${accent})`;
+}
+
+/** Shared EntityCard artwork ambient background. */
+export function entityCardArtStyle(accent: EntityAccent): CSSProperties {
+  return {
+    background: `radial-gradient(120% 120% at 32% 22%, color-mix(in oklab, ${accentVar(accent)} 22%, transparent), transparent 62%), linear-gradient(155deg, var(--color-bg-surface-2), var(--color-bg-surface-1))`,
+  };
 }
 
 /** Color for a status dot, sourced from design tokens. */

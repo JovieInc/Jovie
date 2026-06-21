@@ -118,18 +118,28 @@ describe('OnboardingTurnstile', () => {
 
   it('bypasses verification in runtime E2E mode', async () => {
     vi.stubEnv('NODE_ENV', 'test');
-    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', '');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
     document.documentElement.dataset.e2eMode = '1';
     const onToken = vi.fn();
     const onStateChange = vi.fn();
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
 
     render(
       <OnboardingTurnstile onToken={onToken} onStateChange={onStateChange} />
     );
 
+    expect(screen.queryByTestId('next-script')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(onToken).toHaveBeenCalledWith('local-dev-turnstile-bypass');
     });
+    expect(renderMock).not.toHaveBeenCalled();
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'bypassed' })
     );
@@ -329,11 +339,14 @@ describe('OnboardingTurnstile', () => {
     );
   });
 
-  it('shows a shimmer placeholder in the widget frame during a challenge', async () => {
+  it('masks Cloudflare content until a challenge becomes interactive', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
     const renderMock = vi.fn(
-      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+      (target: HTMLElement, _options: TurnstileOptions) => {
+        target.append(document.createElement('div'));
+        return 'widget-1';
+      }
     );
     window.turnstile = {
       render: renderMock,
@@ -341,20 +354,36 @@ describe('OnboardingTurnstile', () => {
       remove: vi.fn(),
     };
 
-    render(<OnboardingTurnstile onToken={vi.fn()} onStateChange={vi.fn()} />);
+    render(
+      <OnboardingTurnstile
+        instruction='Verify you are human to send'
+        onToken={vi.fn()}
+        onStateChange={vi.fn()}
+      />
+    );
 
     await waitFor(() => expect(renderMock).toHaveBeenCalled());
     const options = renderMock.mock.calls[0]?.[1];
+    const widgetTarget = document.querySelector('[id^="cf-turnstile-"]');
 
-    // Silent loading: no challenge UI, so no shimmer.
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-skeleton')
+    ).toBeInTheDocument();
+    expect(widgetTarget?.className).toContain('[&>div]:invisible');
+
+    act(() => options?.['before-interactive-callback']?.());
+    await waitFor(() =>
+      expect(widgetTarget?.className).toContain('[&>div]:visible')
+    );
     expect(
       screen.queryByTestId('onboarding-turnstile-widget-skeleton')
     ).not.toBeInTheDocument();
 
-    act(() => options?.['before-interactive-callback']?.());
+    act(() => options?.['after-interactive-callback']?.());
+    expect(widgetTarget?.className).toContain('[&>div]:visible');
     expect(
-      screen.getByTestId('onboarding-turnstile-widget-skeleton')
-    ).toBeInTheDocument();
+      screen.queryByTestId('onboarding-turnstile-widget-skeleton')
+    ).not.toBeInTheDocument();
   });
 
   it('holds a brief Verified confirmation after a visible challenge, then collapses', async () => {

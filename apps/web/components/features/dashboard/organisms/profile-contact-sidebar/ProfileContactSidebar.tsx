@@ -186,7 +186,7 @@ function ProfileSidebarHeaderCard({
             <DrawerMediaThumb
               src={previewData.avatarUrl}
               alt={primaryLabel}
-              sizeClassName='h-[60px] w-[60px] rounded-[14px]'
+              sizeClassName='h-15 w-15 rounded-xl'
               sizes='60px'
               fallback={
                 <span className='text-lg font-semibold text-secondary-token'>
@@ -673,11 +673,11 @@ export function ProfileContactSidebar() {
           <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
-                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-2 w-12 rounded skeleton' />
                 <div className='h-4 w-8 rounded skeleton' />
               </div>
               <div className='space-y-1'>
-                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-2 w-12 rounded skeleton' />
                 <div className='h-4 w-8 rounded skeleton' />
               </div>
             </div>
@@ -693,7 +693,7 @@ export function ProfileContactSidebar() {
             {[1, 2, 3, 4, 5].map(i => (
               <div
                 key={i}
-                className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
+                className='flex items-center gap-3 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
               >
                 <div className='h-8 w-8 shrink-0 rounded-lg skeleton' />
                 <div className='flex-1 h-4 rounded skeleton' />
@@ -756,14 +756,14 @@ export function ProfileContactSidebar() {
                 <AppIconButton
                   type='button'
                   onClick={() => handleAddLink(resolvedCategory)}
-                  className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
+                  className='h-7 w-7 rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
                   ariaLabel={`Add ${PROFILE_TAB_OPTIONS_BASE.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
                 >
                   <Plus className='h-3.5 w-3.5' />
                 </AppIconButton>
               ) : undefined
             }
-            actionsClassName='h-[26px] w-[26px]'
+            actionsClassName='h-7 w-7'
             overflowMode='scroll'
             distribution='fill'
           />

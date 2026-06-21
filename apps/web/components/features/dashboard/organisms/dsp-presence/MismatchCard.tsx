@@ -183,7 +183,7 @@ export function MismatchCard({
         <Button
           variant='outline'
           size='sm'
-          className='h-7 min-w-[52px] text-xs max-sm:h-10 max-sm:flex-1'
+          className='h-7 min-w-13 text-xs max-sm:h-10 max-sm:flex-1'
           onClick={() => handleAction('dismissed')}
         >
           Mine
@@ -191,7 +191,7 @@ export function MismatchCard({
         <Button
           variant='destructive'
           size='sm'
-          className='h-7 min-w-[68px] text-xs max-sm:h-10 max-sm:flex-1'
+          className='h-7 min-w-17 text-xs max-sm:h-10 max-sm:flex-1'
           onClick={() => handleAction('confirmed_mismatch')}
         >
           Not Mine

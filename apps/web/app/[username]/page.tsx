@@ -21,7 +21,7 @@ import {
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
-import { captureError } from '@/lib/error-tracking';
+import { buildEntitySameAs } from '@/lib/entity/sameAs';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
 import {
   getMerchMvpEnabled,
@@ -29,7 +29,7 @@ import {
 } from '@/lib/flags/profile-variant';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { buildProfileAeoContent } from '@/lib/profile/aeo-content';
-import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback-data';
 import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,
@@ -96,15 +96,15 @@ async function getPublicReleases(
   try {
     return await getReleasesForProfileLite(profileId);
   } catch (error) {
-    try {
-      await captureError('Error fetching public profile releases', error, {
+    logger.error(
+      'Error fetching public profile releases',
+      {
+        error,
         profileId,
         route: '/[username]',
-      });
-    } catch {
-      // Best-effort telemetry only; do not block page rendering.
-    }
-
+      },
+      'public-profile'
+    );
     return [];
   }
 }
@@ -118,15 +118,15 @@ async function getPublicMerchCards(profileId: string) {
 
     return await getLiveMerchCardsForProfile(profileId);
   } catch (error) {
-    try {
-      await captureError('Error fetching public profile merch cards', error, {
+    logger.error(
+      'Error fetching public profile merch cards',
+      {
+        error,
         profileId,
         route: '/[username]',
-      });
-    } catch {
-      // Best-effort telemetry only; do not block page rendering.
-    }
-
+      },
+      'public-profile'
+    );
     return [];
   }
 }

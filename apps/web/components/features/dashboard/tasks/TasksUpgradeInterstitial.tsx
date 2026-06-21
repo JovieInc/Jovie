@@ -32,8 +32,8 @@ function TasksUpgradeContent({
       className={cn(
         'mx-auto flex w-full flex-col items-center justify-center text-center',
         compact
-          ? 'rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 px-5 py-8'
-          : 'max-w-xl rounded-[24px] border border-subtle bg-surface-1 px-8 py-14'
+          ? 'rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 px-5 py-8'
+          : 'max-w-xl rounded-3xl border border-subtle bg-surface-1 px-8 py-14'
       )}
       data-testid={testId}
     >

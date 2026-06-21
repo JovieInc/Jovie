@@ -352,7 +352,7 @@ describe('ChatInput', () => {
     expect(surface.style.borderRadius).toBe('36px');
 
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-[52px]'
+      'min-h-13'
     );
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
@@ -381,7 +381,7 @@ describe('ChatInput', () => {
     expect(surface.style.borderRadius).toBe('36px');
 
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-[88px]'
+      'min-h-22'
     );
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
       'grid'
@@ -416,9 +416,9 @@ describe('ChatInput', () => {
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
     const container = inlineField.parentElement;
-    expect(container?.className).toContain('min-h-[88px]');
+    expect(container?.className).toContain('min-h-22');
     expect(container?.className).toContain('grid');
-    expect(container?.className).not.toContain('min-h-[52px]');
+    expect(container?.className).not.toContain('min-h-13');
   });
 
   it('keeps a quiet disabled dictation control when speech input is unavailable', () => {

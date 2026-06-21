@@ -63,6 +63,10 @@ ruleTester.run('canonical-ui-label-casing', rule, {
     },
     {
       filename,
+      code: `<Button>Install iOS Alpha</Button>`,
+    },
+    {
+      filename,
       code: `
         function Example() {
           return (

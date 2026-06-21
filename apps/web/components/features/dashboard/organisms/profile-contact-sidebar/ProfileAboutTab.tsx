@@ -102,7 +102,7 @@ function EditableBio({
           setDraft(value ?? '');
           setEditing(true);
         }}
-        className='w-full cursor-text rounded-[10px] px-1 py-0.5 text-left transition-colors hover:bg-surface-0'
+        className='w-full cursor-text rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-surface-0'
       >
         {value ? (
           <p className='text-app leading-relaxed text-secondary-token whitespace-pre-wrap'>
@@ -124,7 +124,7 @@ function EditableBio({
       onKeyDown={handleKeyDown}
       maxLength={512}
       rows={4}
-      className='w-full resize-none rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5 text-[12.5px] leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
+      className='w-full resize-none rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5 text-xs leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
       placeholder='Write your bio...'
     />
   );
@@ -154,7 +154,7 @@ function LocationField({
           trigger={
             <button
               type='button'
-              className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+              className='flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
               <Icon
                 className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -183,7 +183,7 @@ function LocationField({
         trigger={
           <button
             type='button'
-            className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-0 hover:text-secondary-token'
+            className='flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-0 hover:text-secondary-token'
           >
             <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
             <span>Add your {addLabel.toLowerCase()}</span>
@@ -358,7 +358,7 @@ function PressPhotosSection({
             {draftPhotos.map(photo => (
               <div
                 key={photo.id}
-                className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-dashed border-(--linear-app-frame-seam) bg-surface-0'
+                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-dashed border-(--linear-app-frame-seam) bg-surface-0'
               >
                 <Image
                   src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
@@ -369,12 +369,12 @@ function PressPhotosSection({
                 />
                 {/* DSP source badge */}
                 {photo.sourcePlatform && (
-                  <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-medium capitalize text-white'>
+                  <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white'>
                     {photo.sourcePlatform.replace('_', ' ')}
                   </span>
                 )}
                 {/* Hidden label */}
-                <span className='absolute bottom-8 left-0 right-0 text-center text-[9px] font-medium text-white drop-shadow-sm'>
+                <span className='absolute bottom-8 left-0 right-0 text-center text-3xs font-medium text-white drop-shadow-sm'>
                   Hidden until approved
                 </span>
                 {/* Delete button */}
@@ -428,7 +428,7 @@ function PressPhotosSection({
             {otherStatusPhotos.map(photo => (
               <div
                 key={photo.id}
-                className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0'
+                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-0'
               >
                 <Image
                   src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
@@ -437,7 +437,7 @@ function PressPhotosSection({
                   sizes='(max-width: 768px) 45vw, 160px'
                   className='object-cover'
                 />
-                <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-medium capitalize text-white'>
+                <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white'>
                   {photo.status}
                 </span>
                 {onDelete && (
@@ -472,7 +472,7 @@ function PressPhotosSection({
             {publishedPhotos.map(photo => (
               <div
                 key={photo.id}
-                className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0'
+                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-0'
               >
                 <Image
                   src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
@@ -504,7 +504,7 @@ function PressPhotosSection({
             onClick={() => fileInputRef.current?.click()}
             disabled={!canUpload || isUploading}
             className={cn(
-              'relative flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-3 text-center transition-colors',
+              'relative flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-3 text-center transition-colors',
               canUpload
                 ? 'hover:border-default hover:bg-surface-1'
                 : 'cursor-not-allowed opacity-60'
@@ -605,7 +605,7 @@ export function ProfileAboutTab({
           <DetailLabel>Bio</DetailLabel>
           {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
           {!onBioChange && bio && (
-            <p className='whitespace-pre-wrap text-[12.5px] leading-relaxed text-secondary-token'>
+            <p className='whitespace-pre-wrap text-xs leading-relaxed text-secondary-token'>
               {bio}
             </p>
           )}

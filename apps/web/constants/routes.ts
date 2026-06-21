@@ -115,6 +115,7 @@ export const APP_ROUTES = {
 
   // System
   UNAVAILABLE: '/unavailable',
+  USER_CREATION_ERROR: '/error/user-creation-failed',
   DESIGN_STUDIO: '/exp/page-builder',
   /** Legacy HUD URL — redirects to /app/admin/ops (admin) or /hud-tv (token). */
   HUD: '/hud',

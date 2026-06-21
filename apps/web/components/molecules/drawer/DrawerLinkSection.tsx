@@ -59,7 +59,7 @@ export function DrawerLinkSection({
       {showHeaderRow && (
         <div
           className={cn(
-            'flex min-h-[32px] items-center gap-2 px-1 lg:min-h-0',
+            'flex min-h-8 items-center gap-2 px-1 lg:min-h-0',
             showHeading ? 'justify-between' : 'justify-end'
           )}
         >
@@ -90,7 +90,7 @@ export function DrawerLinkSection({
       {isEmpty ? (
         <DrawerEmptyState
           message={emptyMessage}
-          className='min-h-[72px]'
+          className='min-h-18'
           testId={emptyStateTestId}
         />
       ) : (

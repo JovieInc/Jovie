@@ -43,6 +43,9 @@
   --profile-drawer-radius-mobile: 22px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
+  --profile-notification-icon-size: 17px;
+  --app-dialog-radius: var(--profile-inner-radius);
+  --app-shell-sidebar-floating-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
@@ -202,15 +205,113 @@
   max-width: min(var(--profile-shell-max-width), 100%);
 }
 
+:where(.profile-aeo-content) {
+  --profile-aeo-text: var(--color-text-tooltip);
+  --profile-aeo-muted: var(--color-text-tooltip);
+  --profile-aeo-border: var(--color-border-subtle);
+  background: var(--system-b-cinematic-black);
+  color: var(--profile-aeo-text);
+  color-scheme: dark;
+}
+
+:where(.profile-aeo-content__heading),
+:where(.profile-aeo-content__subheading),
+:where(.profile-aeo-content__term),
+:where(.profile-aeo-content__source) {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__body),
+:where(.profile-aeo-content__answer) {
+  color: var(--profile-aeo-muted);
+}
+
+:where(.profile-aeo-content__faq-list) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__faq-list > *) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__source) {
+  text-decoration-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__source:hover) {
+  color: var(--profile-aeo-text);
+  text-decoration-color: var(--profile-aeo-text);
+}
+
+/* Mobile public profiles are a fixed one-screen shell. Keep the AEO copy in the
+   static DOM, but out of mobile layout so it cannot add page scroll below the
+   compact profile. Desktop keeps the readable AEO section. */
+@media (max-width: 767px) {
+  .profile-viewport ~ .profile-aeo-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* Short-viewport home hero: reserve room for the showcase release card below. */
 [data-testid="profile-compact-surface"][data-mode="profile"] {
-  @media (max-height: 880px) and (min-height: 761px) {
-    --cover-height: clamp(214px, 36svh, 218px);
-  }
-
   @media (max-height: 760px) {
     --cover-height: 178px;
   }
+}
+
+/* Query-mode profile URLs are served from the ISR home shell, then hydrate into
+   the requested mode from window.location. Match the mode header on first paint
+   so hydration does not move the compact profile frame. */
+html[data-profile-initial-mode]
+[data-testid="profile-compact-surface"][data-mode="profile"] {
+  --cover-height: calc(3.5rem + max(env(safe-area-inset-top), 0px));
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  [data-testid="profile-cover"] {
+  height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
+  max-height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
+  border-bottom: 1px solid rgb(255 255 255 / 0.075);
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-chrome {
+  padding-top: max(env(safe-area-inset-top), 10px) !important;
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-media,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-gradient,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-fade,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  [data-testid="profile-hero-identity-block"] {
+  display: none !important;
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-mode-backdrop,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-mode-title {
+  display: block !important;
 }
 
 @media (min-width: 768px) {
@@ -290,6 +391,8 @@
   --color-bg-button: #e3e5e8;
   --color-bg-tooltip: #101012;
   /* Linear dark background for light mode tooltips */
+  --color-bg-paper: #f7f8f8;
+  /* Paper surface for explicit light reading modes embedded in app shells */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: lch(9.894% 0 282);
@@ -510,6 +613,8 @@
   /* Same as surface-3 */
   --color-bg-tooltip: #2a2c32;
   /* Matches surface-3 in dark mode */
+  --color-bg-paper: #f7f8f8;
+  /* Paper surface remains light for explicit light reading modes */
 
   /* Text hierarchy - inverted for dark mode
      Extracted from Linear.app live (2026-02-15):
@@ -949,6 +1054,7 @@
 
   /* Instagram */
   --color-brand-instagram: oklch(61.9% 0.2 14.6);
+  --color-brand-venmo: #008cff;
 
   /* Deezer */
   --color-brand-deezer: oklch(78% 0.15 75);
@@ -1020,6 +1126,7 @@
 
   /* Instagram */
   --color-brand-instagram: oklch(70% 0.2 14.6);
+  --color-brand-venmo: #008cff;
 
   /* Deezer */
   --color-brand-deezer: oklch(82% 0.15 75);
@@ -1521,6 +1628,104 @@
   /* Map Linear page bg and focus ring */
   --color-bg-page: var(--linear-bg-page);
   --color-border-focus: var(--linear-border-focus);
+}
+
+.linear-marketing.dark,
+.home-viewport.dark,
+.system-b-root-not-found-page.dark {
+  --linear-text-primary: #f7f8f8;
+  --linear-text-secondary: #d0d6e0;
+  --linear-text-tertiary: #8a8f98;
+  --linear-text-quaternary: #62666d;
+  --linear-bg-page: #06070a;
+  --linear-bg-surface-0: #0a0b0e;
+  --linear-bg-surface-1: #101216;
+  --linear-bg-surface-2: #161a20;
+  --linear-bg-button: #2a2c32;
+  --linear-bg-footer: #06070a;
+  --linear-border-subtle: rgba(255, 255, 255, 0.07);
+  --linear-border-default: rgba(255, 255, 255, 0.11);
+  --linear-border-strong: rgba(255, 255, 255, 0.18);
+
+  --color-text-primary-token: var(--linear-text-primary);
+  --color-text-secondary-token: var(--linear-text-secondary);
+  --color-text-tertiary-token: var(--linear-text-tertiary);
+  --color-text-quaternary-token: var(--linear-text-quaternary);
+  --color-bg-base: var(--linear-bg-page);
+  --color-bg-surface-0: var(--linear-bg-surface-0);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-2: var(--linear-bg-surface-2);
+  --color-bg-page: var(--linear-bg-page);
+  --color-bg-elevated: var(--linear-bg-surface-0);
+  --color-bg-input: var(--linear-bg-surface-1);
+  --color-bg-button: var(--linear-bg-button);
+  --color-bg-hover: rgba(255, 255, 255, 0.04);
+  --color-bg-active: var(--linear-bg-surface-2);
+  --color-bg-tooltip: var(--linear-bg-button);
+  --color-border-subtle: var(--linear-border-subtle);
+  --color-border-default: var(--linear-border-default);
+  --color-border-strong: var(--linear-border-strong);
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-button);
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-surface-button: var(--color-bg-button);
+  --color-surface-tooltip: var(--color-bg-tooltip);
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-muted-token: var(--color-text-secondary-token);
+  --color-foreground: var(--color-text-primary-token);
+  --color-muted-foreground: var(--color-text-secondary-token);
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --public-shell-bg: var(--color-bg-base);
+  --public-shell-text: var(--color-text-primary-token);
+
+  color-scheme: dark;
+}
+
+.profile-intent-page {
+  --color-text-primary-token: #f7f8f8;
+  --color-text-secondary-token: #d0d6e0;
+  --color-text-tertiary-token: #8a8f98;
+  --color-text-quaternary-token: #62666d;
+  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-panel-border: rgba(255, 255, 255, 0.09);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 36%,
+    transparent 100%
+  );
+
+  color-scheme: dark;
+}
+
+html:not(.dark) .profile-intent-page :where(a, button, span),
+html:not(.dark) [data-testid^="profile-mode-drawer"] :where(a, button, span) {
+  transition: none !important;
+}
+
+html:not(.dark) .linear-marketing :where(a, button, span),
+html:not(.dark) [data-testid="header-nav"] a[href="/signin"],
+html:not(.dark) [data-testid="not-found"] :where(a, button, span),
+html:not(.dark) .smart-link-powered-by {
+  transition: none !important;
+}
+
+html:not(.dark) .smart-link-powered-by {
+  color: rgb(64 64 64) !important;
 }
 
 /* Marketing typography: headings and buttons use Satoshi (display font) */
@@ -2237,9 +2442,25 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: color-mix(in oklab, var(--system-b-text-primary) 70%, transparent);
 }
 
+:where(.system-b-root-not-found-page) {
+  --linear-bg-header: var(--system-b-cinematic-black);
+  --linear-border-default: var(--color-border-subtle);
+}
+
 /* ============================================
    SYSTEM B ROOT NOT FOUND PRIMITIVES
    ============================================ */
+
+:where(.system-b-root-not-found-page) {
+  --system-b-primary-bg: var(--color-text-tooltip);
+  --system-b-primary-fg: var(--system-b-cinematic-black);
+  --system-b-text-primary: var(--color-text-tooltip);
+  --system-b-root-not-found-muted: var(--color-text-tooltip);
+  --color-btn-primary-hover: var(--color-text-tooltip);
+  background: var(--system-b-cinematic-black);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
+}
 
 :where(.system-b-root-not-found-main) {
   padding-top: var(--system-b-header-height);
@@ -2296,7 +2517,7 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-root-not-found-description) {
   max-width: calc(var(--space-24) * 3 + var(--space-4));
   margin: 0 auto var(--space-8);
-  color: var(--color-text-tertiary-token);
+  color: var(--system-b-root-not-found-muted);
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
 }
@@ -2338,12 +2559,12 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-root-not-found-action-secondary) {
   border: var(--space-px) solid var(--color-border-subtle);
   background: transparent;
-  color: var(--color-text-tertiary-token);
+  color: var(--system-b-root-not-found-muted);
 }
 
 :where(.system-b-root-not-found-action-secondary:hover) {
   border-color: var(--color-border-default);
-  background: var(--color-bg-surface-0);
+  background: var(--color-bg-tooltip);
   color: var(--system-b-text-primary);
 }
 
@@ -2902,6 +3123,11 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   );
   color: var(--color-text-quaternary-token);
   opacity: 0.42;
+}
+
+html:not(.dark) .system-b-claim-handle-row,
+html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
+  transition: none !important;
 }
 
 .system-b-claim-handle-helper {
@@ -3913,8 +4139,11 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-chat-entity-panel-eyebrow) {
   color: var(--color-text-tertiary-token);
-  font-size: var(--text-2xs);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
   line-height: 1rem;
+  text-transform: uppercase;
 }
 
 :where(.system-b-chat-entity-panel-title) {
@@ -3960,15 +4189,18 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   min-width: 0;
   align-items: center;
   gap: var(--space-3);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--color-bg-surface-1);
   padding: var(--space-2-5) var(--space-3);
+  box-shadow: var(--shadow-card);
   text-align: left;
-  transition-property: background-color, color;
+  transition-property: background-color, border-color;
   transition-duration: 150ms;
 }
 
 :where(.system-b-chat-entity-context-card:hover) {
-  background: var(--system-b-bg-surface-1);
+  border-color: var(--color-border-default);
 }
 
 :where(.system-b-chat-entity-context-copy) {
@@ -4014,10 +4246,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   height: calc(var(--space-8) + var(--space-1));
   flex-shrink: 0;
   overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 54%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-2);
   color: var(--color-text-secondary-token);
   font-size: var(--text-nav);
   font-weight: var(--font-weight-semibold);
@@ -4030,10 +4261,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 64%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-2);
   color: var(--color-text-tertiary-token);
 }
 
@@ -4049,10 +4279,8 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   height: var(--space-16);
   flex-shrink: 0;
   overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
 }
 
 :where(.system-b-chat-release-copy) {
@@ -4080,14 +4308,16 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-chat-entity-meta-pill) {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 48%, transparent);
-  border-radius: var(--radius-md);
-  background: var(--system-b-bg-surface-1);
-  padding: var(--space-1) var(--space-1-5);
+  gap: var(--space-1-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface-0);
+  padding: var(--space-0-5) var(--space-2);
   color: var(--color-text-secondary-token);
-  font-size: var(--text-2xs);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 :where(.system-b-chat-entity-action-link) {
@@ -4113,8 +4343,10 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-chat-entity-audio-card),
 :where(.system-b-chat-entity-note-card) {
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-1);
+  box-shadow: var(--shadow-card);
   padding: var(--space-2-5) var(--space-3);
   color: var(--color-text-secondary-token);
   font-size: var(--text-nav);
@@ -4178,14 +4410,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   position: relative;
   min-height: 18.75rem;
   overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 70%, transparent);
-  border-radius: var(--radius-lg);
-  background: color-mix(
-    in oklab,
-    var(--system-b-bg-surface-1) 86%,
-    var(--system-b-app-content-surface) 14%
-  );
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--color-bg-surface-1);
   padding: var(--space-5) var(--space-4);
   box-shadow: var(--shadow-card);
 }
@@ -9078,7 +9305,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-kicker) {
   margin: 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
@@ -9110,7 +9337,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-hero-note) {
   margin: var(--space-5) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
 }
 
@@ -9414,7 +9641,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-release-callout p) {
   margin: var(--space-1) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-xs);
 }
 
@@ -9743,7 +9970,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
     color-mix(in oklab, var(--system-b-text-primary) 10%, transparent);
   border-radius: var(--radius-md);
   padding: var(--space-1) var(--space-2);
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-xs);
 }
 
@@ -9895,8 +10122,8 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-launch-final a:first-child) {
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
+  background: var(--system-b-text-primary);
+  color: var(--system-b-cinematic-black);
 }
 
 :where(.system-b-launch-final a:not(:first-child)) {
@@ -10039,7 +10266,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-note) {
   max-width: 31rem;
   margin: var(--space-5) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
@@ -10079,8 +10306,8 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-primary-link) {
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
+  background: var(--system-b-text-primary);
+  color: var(--system-b-cinematic-black);
 }
 
 :where(.system-b-pricing-secondary-link),
@@ -10139,7 +10366,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-story-label),
 :where(.system-b-pricing-category-cell) {
   margin: 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 50%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 54%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
@@ -10242,7 +10469,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-page .marketing-pricing-plan-card__price span) {
-  color: color-mix(in oklab, var(--system-b-text-primary) 48%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 54%, transparent);
   font-size: var(--text-base);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
@@ -10343,7 +10570,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   min-height: var(--space-6);
   align-items: center;
   gap: var(--space-2);
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
@@ -10534,7 +10761,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-pricing-plan-price span),
 :where(.system-b-pricing-plan-annual) {
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-normal);
 }
@@ -10587,7 +10814,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-pricing-footnote) {
   margin: var(--space-4) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 50%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 54%, transparent);
   font-size: var(--text-xs);
   text-align: center;
 }
@@ -10808,8 +11035,8 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-brand-primary-link) {
   border: 1px solid transparent;
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
+  background: var(--system-b-text-primary);
+  color: var(--system-b-cinematic-black);
   padding-inline: var(--space-5);
 }
 

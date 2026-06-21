@@ -27,7 +27,7 @@ describe('dashboard universal link suggestion System B guard', () => {
       expect(offenders, `${sourcePath} leaked ${offenders.join(', ')}`).toEqual(
         []
       );
-      expect(source).toContain('min-h-[44px]');
+      expect(source).toContain('min-h-11');
       expect(source).toContain('transition-[background-color,color]');
       expect(source).toContain('active:bg-surface-2');
     }

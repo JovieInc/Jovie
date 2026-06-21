@@ -616,7 +616,7 @@ describe('ReleaseSidebar inspector cards', () => {
     const header = screen.getByTestId('release-header-card');
     expect(
       within(header).getByRole('heading', { name: mockRelease.title })
-    ).toHaveClass('line-clamp-2', 'min-h-[44px]');
+    ).toHaveClass('line-clamp-2', 'min-h-11');
     expect(
       screen.getByTestId('drawer-hero-meta-slot').firstElementChild
     ).toHaveClass('overflow-x-auto', 'whitespace-nowrap');

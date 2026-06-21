@@ -64,7 +64,7 @@ const HUMAN_GATE_BADGES: Record<
   AgentRunArtifact['humanGate']['status'],
   { readonly label: string; readonly variant: BadgeVariant }
 > = {
-  not_required: { label: 'Not required', variant: 'secondary' },
+  not_required: { label: 'Not Required', variant: 'secondary' },
   pending: { label: 'Review Required', variant: 'warning' },
   approved: { label: 'Approved', variant: 'success' },
   rejected: { label: 'Rejected', variant: 'destructive' },

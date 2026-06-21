@@ -472,7 +472,7 @@ describe('DashboardNav', () => {
     expect(tasksLink.className).toContain(
       'grid-cols-[22px_minmax(0,1fr)_34px]'
     );
-    expect(tasksLink.className).toContain('text-[12.5px]');
+    expect(tasksLink.className).toContain('text-xs');
     expect(getByText('7')).toBeDefined();
   });
 

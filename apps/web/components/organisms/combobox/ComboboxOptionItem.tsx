@@ -35,7 +35,7 @@ function OptionImage({
         className='h-8 w-8 rounded-full bg-surface-2 flex-shrink-0 flex items-center justify-center'
         aria-hidden='true'
       >
-        <span className='text-[10px] font-medium text-secondary-token select-none leading-none'>
+        <span className='text-3xs font-medium text-secondary-token select-none leading-none'>
           {getInitials(name)}
         </span>
       </div>
@@ -51,7 +51,7 @@ function OptionImage({
         height={32}
         sizes='32px'
         className={cn(
-          'h-8 w-8 rounded-full object-cover transition-opacity duration-200',
+          'h-8 w-8 rounded-full object-cover transition-opacity duration-subtle',
           isLoaded ? 'opacity-100' : 'opacity-0'
         )}
         loading='lazy'
@@ -100,7 +100,7 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
             <span
               className={clsx(
                 'absolute inset-y-0 right-0 flex items-center pr-4',
-                active ? 'text-white' : 'text-indigo-600'
+                active ? 'text-white dark:text-white' : 'text-indigo-600'
               )}
               aria-hidden='true'
             >

@@ -145,8 +145,11 @@ _NOT_JUST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Em-dash patterns (— or --)
-_EM_DASH_PATTERN = re.compile(r"—|--")
+# Em-dash patterns (— or prose --).
+# Excludes CSS custom properties (--variable-name) and Markdown table separators
+# (|---|---) by requiring -- is not preceded by another dash and not followed by
+# a word character or another dash.
+_EM_DASH_PATTERN = re.compile(r"—|(?<!-)--(?![a-zA-Z0-9_\-])")
 
 # Preprocessing patterns to strip non-prose regions before scoring
 _FRONTMATTER_PATTERN = re.compile(r"^---.*?---\s*", re.DOTALL)

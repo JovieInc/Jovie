@@ -667,10 +667,10 @@ function TaskDocumentPanel({
                 <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-secondary-token'>
                   <FileText className='h-5 w-5' />
                 </div>
-                <h2 className='mt-5 text-[21px] font-semibold tracking-[-0.03em] text-primary-token'>
+                <h2 className='mt-5 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
                   Pick a task from the list to see what it needs.
                 </h2>
-                <p className='mt-2 text-[13px] leading-relaxed text-tertiary-token'>
+                <p className='mt-2 text-app leading-relaxed text-tertiary-token'>
                   Open a task to review its status, metadata, due state, and
                   body in the detail pane.
                 </p>
@@ -839,7 +839,7 @@ function TaskDocumentPanel({
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
                 placeholder='Start writing...'
-                className='min-h-[520px] w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+                className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
                 style={{ boxShadow: 'none' }}
               />
               {showDescriptionHelper && descriptionHelper ? (
@@ -925,7 +925,7 @@ function TaskEmptyState({
           ? 'Try widening the filters or search query.'
           : 'Create your first task, or tasks will appear automatically when you set up a release.'
       }
-      className='min-h-[360px]'
+      className='min-h-90'
       action={
         hasFilters ? (
           <Button
@@ -1000,7 +1000,7 @@ function TaskErrorState({
       <TableEmptyState
         title="Couldn't Load Tasks"
         description='Try reloading the task list.'
-        className='min-h-[240px] max-w-[28rem]'
+        className='min-h-60 max-w-[28rem]'
         action={
           <Button type='button' variant='secondary' size='sm' onClick={onRetry}>
             Retry
@@ -1076,7 +1076,7 @@ function MobileTaskSection({
         <h2 className='text-2xs font-semibold text-tertiary-token'>{title}</h2>
         <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
       </div>
-      <div className='space-y-1 overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
+      <div className='space-y-1 overflow-hidden rounded-2xl bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
         {tasks.map(task => (
           <MobileTaskListItem
             key={task.id}
@@ -1135,7 +1135,7 @@ function MobileTaskListItem({
         <span className='block truncate text-sm font-semibold leading-[1.25] text-primary-token'>
           {task.title}
         </span>
-        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-secondary-token'>
+        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-secondary-token'>
           <span className='truncate'>{stage.label}</span>
           <span className='text-tertiary-token'>J-{task.taskNumber}</span>
           <span className='inline-flex items-center gap-1'>
@@ -1148,7 +1148,7 @@ function MobileTaskListItem({
           <span className='truncate'>{assignee.label}</span>
         </span>
         {task.releaseTitle ? (
-          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-[10.5px] text-tertiary-token'>
+          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-3xs text-tertiary-token'>
             <Disc3 className='h-3 w-3 shrink-0' />
             <span className='min-w-0 truncate'>{task.releaseTitle}</span>
           </span>

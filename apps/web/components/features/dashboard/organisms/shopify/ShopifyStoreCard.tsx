@@ -124,7 +124,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
           <h3 className='text-app font-caption text-primary-token'>Shop</h3>
         </div>
 
-        <p className='text-[12.5px] leading-5 text-secondary-token'>
+        <p className='text-xs leading-5 text-secondary-token'>
           Link your Shopify store to add a shop button on your public profile.
           Fans will be redirected to your store with Jovie attribution.
         </p>
