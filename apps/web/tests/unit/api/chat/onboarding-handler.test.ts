@@ -344,6 +344,40 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
   });
 
+  it('ignores spoofed forwarded hosts for public smoke Turnstile bypass', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ nodeEnv: 'production' });
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    hoisted.checkGateForUserMock.mockResolvedValue(false);
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
+
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      {
+        mode: 'onboarding',
+        turnstileToken: 'local-dev-turnstile-bypass',
+        messages: [userMessage('hi')],
+      },
+      '',
+      {
+        host: 'jov.ie',
+        'x-forwarded-host': '127.0.0.1:3102',
+      }
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-spoofed-host'
+    );
+
+    expect(result?.status).toBe(503);
+    const body = await result?.json();
+    expect(body.errorCode).toBe('TURNSTILE_NOT_CONFIGURED');
+    expect(hoisted.isTurnstileConfiguredMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+  });
+
   it('keeps Turnstile fail-closed in secure env even when mock flags are set', async () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'preview' });

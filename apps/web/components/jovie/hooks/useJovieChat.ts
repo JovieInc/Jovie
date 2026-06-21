@@ -314,6 +314,7 @@ export function useJovieChat({
   useEffect(() => {
     adoptServerConversationIdRef.current = adoptServerConversationId;
   }, [adoptServerConversationId]);
+  const lastConversationLoadFailureRef = useRef<string | null>(null);
 
   // Determine whether to poll: only while we're actively waiting for a title
   // and haven't exceeded the max poll duration.
@@ -520,16 +521,24 @@ export function useJovieChat({
   }, [activeConversationId, dispatchTimelineEvent, isLoadingConversation]);
 
   useEffect(() => {
-    if (!activeConversationId || !isConversationQueryError) return;
+    if (!activeConversationId || !isConversationQueryError) {
+      lastConversationLoadFailureRef.current = null;
+      return;
+    }
+
+    const errorMessage =
+      existingConversationError instanceof Error
+        ? existingConversationError.message
+        : 'Conversation failed to load';
+    const failureKey = `${activeConversationId}:${errorMessage}`;
+    if (lastConversationLoadFailureRef.current === failureKey) return;
+    lastConversationLoadFailureRef.current = failureKey;
 
     dispatchTimelineEvent({
       type: 'conversation.load.failed',
       conversationId: activeConversationId,
       requestId: activeConversationId,
-      error:
-        existingConversationError instanceof Error
-          ? existingConversationError.message
-          : 'Conversation failed to load',
+      error: errorMessage,
       now: Date.now(),
     });
   }, [
@@ -554,6 +563,7 @@ export function useJovieChat({
       messages: persistedTimelineMessages,
       receivedAt: Date.now(),
     });
+    lastConversationLoadFailureRef.current = null;
     loadedConversationIdsRef.current.add(activeConversationId);
   }, [
     activeConversationId,

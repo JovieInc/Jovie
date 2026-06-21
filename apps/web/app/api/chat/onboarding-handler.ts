@@ -16,6 +16,7 @@ import type { ChatTelemetry } from '@/lib/chat/types';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { getEntitlements } from '@/lib/entitlements/registry';
+import { publicEnv } from '@/lib/env-public';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
@@ -119,13 +120,15 @@ function extractAsn(req: Request): string | null {
 }
 
 function extractRequestHostname(req: Request): string | null {
-  const rawHost =
-    req.headers.get('x-forwarded-host') ??
-    req.headers.get('host') ??
-    req.headers.get('origin') ??
-    req.headers.get('referer');
+  const rawHost = req.headers.get('host');
   const normalized = rawHost?.split(',')[0]?.trim();
-  if (!normalized) return null;
+  if (!normalized) {
+    try {
+      return new URL(req.url).hostname;
+    } catch {
+      return null;
+    }
+  }
 
   if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
     try {
@@ -140,12 +143,11 @@ function extractRequestHostname(req: Request): string | null {
 
 function isSecureTurnstileEnvironment(req: Request): boolean {
   const isSecureVercelDeployment =
-    process.env.VERCEL_ENV === 'production' ||
-    process.env.VERCEL_ENV === 'preview';
+    env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview';
   if (isSecureVercelDeployment) return true;
 
   const isLocalPublicSmoke =
-    process.env.PUBLIC_NOAUTH_SMOKE === '1' &&
+    env.PUBLIC_NOAUTH_SMOKE === '1' &&
     isLocalDevelopmentAutomationHostname(extractRequestHostname(req));
   if (isLocalPublicSmoke) return false;
 
@@ -157,9 +159,9 @@ function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
 
   return (
     env.NODE_ENV === 'development' ||
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-    (process.env.PUBLIC_NOAUTH_SMOKE === '1' &&
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    (env.PUBLIC_NOAUTH_SMOKE === '1' &&
       isLocalDevelopmentAutomationHostname(extractRequestHostname(req)))
   );
 }
