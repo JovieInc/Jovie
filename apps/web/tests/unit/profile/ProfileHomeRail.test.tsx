@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import type { Artist } from '@/types/db';
 
 function makeArtist(overrides: Partial<Artist> = {}): Artist {
@@ -32,6 +33,22 @@ function makeRelease(
     revealDate: null,
     releaseType: 'single',
     metadata: null,
+    ...overrides,
+  };
+}
+
+function makePublicRelease(
+  overrides: Partial<PublicRelease> = {}
+): PublicRelease {
+  return {
+    id: 'catalog-release',
+    title: 'Back Catalog',
+    slug: 'back-catalog',
+    releaseType: 'single',
+    releaseDate: '2025-01-10T07:00:00.000Z',
+    revealDate: null,
+    artworkUrl: '/img/releases/back-catalog.jpg',
+    artistNames: ['Tim White'],
     ...overrides,
   };
 }
@@ -83,6 +100,41 @@ describe('ProfileHomeRail', () => {
     expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'The Deep End' })
+    ).toBeInTheDocument();
+  });
+
+  it('adds back-catalog releases without duplicating the featured release', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={makeRelease()}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+        releases={[
+          makePublicRelease({
+            id: 'release-featured',
+            title: 'The Deep End',
+            slug: 'the-deep-end',
+          }),
+          makePublicRelease({
+            id: 'release-catalog',
+            title: 'Under Lights',
+            slug: 'under-lights',
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('heading', { name: 'The Deep End' })
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', { name: 'Under Lights' })
     ).toBeInTheDocument();
   });
 
