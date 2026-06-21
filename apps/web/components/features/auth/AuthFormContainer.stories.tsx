@@ -22,7 +22,7 @@ const SampleForm = () => (
       <input
         type='email'
         placeholder='you@example.com'
-        className='w-full px-3 py-2 border border-subtle rounded-[--radius-xl] bg-surface-0 text-primary-token placeholder:text-tertiary-token'
+        className='w-full px-3 py-2 border border-subtle rounded-xl bg-surface-0 text-primary-token placeholder:text-tertiary-token'
       />
     </div>
     <div className='space-y-2'>
@@ -35,12 +35,12 @@ const SampleForm = () => (
       <input
         type='password'
         placeholder='••••••••'
-        className='w-full px-3 py-2 border border-subtle rounded-[--radius-xl] bg-surface-0 text-primary-token placeholder:text-tertiary-token'
+        className='w-full px-3 py-2 border border-subtle rounded-xl bg-surface-0 text-primary-token placeholder:text-tertiary-token'
       />
     </div>
     <button
       type='button'
-      className='w-full py-2 bg-btn-primary text-btn-primary-foreground rounded-[--radius-xl] font-medium'
+      className='w-full py-2 bg-btn-primary text-btn-primary-foreground rounded-xl font-medium'
     >
       Sign In
     </button>
