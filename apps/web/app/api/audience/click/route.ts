@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Pro feature: exclude the artist's own clicks from analytics
+    // Exclude authenticated owner self-clicks from audience analytics
     if (await shouldExcludeSelfByProfileId(profileId)) {
       return NextResponse.json(
         { success: true, fingerprint: 'self-filtered' },
