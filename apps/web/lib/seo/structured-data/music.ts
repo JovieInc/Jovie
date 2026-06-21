@@ -163,7 +163,7 @@ export function generateMusicStructuredData(
 
   const listenActions = buildListenActions(
     content.providerLinks,
-    PROVIDER_CONFIG as Record<string, { label: string }>
+    PROVIDER_CONFIG
   );
   const flatCredits = buildFlatCredits(content.credits);
   const trackListSchema = buildTrackListSchema(

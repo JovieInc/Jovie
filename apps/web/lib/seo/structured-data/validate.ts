@@ -72,7 +72,7 @@ export function validateProfileRichResults(
     const startDate = event.startDate;
     if (
       typeof startDate === 'string' &&
-      !/[+-]\d{2}:\d{2}|Z$/.test(startDate)
+      !/(?:[+-]\d{2}:\d{2}|Z)$/.test(startDate)
     ) {
       errors.push(
         `MusicEvent[${index}]: startDate must include timezone offset`

@@ -304,9 +304,7 @@ function QualitySignalRow({
     <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-app font-semibold text-primary-token'>
-            {label}
-          </p>
+          <p className='text-app font-semibold text-primary-token'>{label}</p>
           <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
             {detail}
           </p>
@@ -353,9 +351,7 @@ function SyncSurfacePill({
       <p className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
         {label}
       </p>
-      <p className='mt-1 text-sm font-semibold text-primary-token'>
-        {value}
-      </p>
+      <p className='mt-1 text-sm font-semibold text-primary-token'>{value}</p>
     </div>
   );
 }

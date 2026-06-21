@@ -366,9 +366,7 @@ function renderGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
 
 function renderHumanGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
   if (!row.original.humanApprovalRequired) {
-    return (
-      <span className='text-xs text-tertiary-token'>Not required</span>
-    );
+    return <span className='text-xs text-tertiary-token'>Not required</span>;
   }
   const humanGateBadge = HUMAN_GATE_BADGES[row.original.humanGate.status];
 

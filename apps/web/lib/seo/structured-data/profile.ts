@@ -3,17 +3,201 @@ import {
   buildBreadcrumbObject,
   buildListenActions,
 } from '@/lib/constants/schemas';
-import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
   buildEntitySameAs,
   type EntityIdentityLink,
 } from '@/lib/entity/sameAs';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
 import { resolveArtistEntityType } from './artist-entity';
 import { formatSchemaEventStartDate } from './event-date';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
 export const MAX_EVENT_SCHEMAS = 5;
+
+const SOCIAL_PLATFORMS = new Set([
+  'instagram',
+  'twitter',
+  'facebook',
+  'youtube',
+  'tiktok',
+  'spotify',
+]);
+
+const DSP_PLATFORMS: Record<string, string> = {
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  youtube: 'YouTube',
+  soundcloud: 'SoundCloud',
+  deezer: 'Deezer',
+  tidal: 'Tidal',
+};
+
+function buildUniqueSocialUrls(
+  profile: CreatorProfile,
+  links: LegacySocialLink[],
+  identityLinks: EntityIdentityLink[]
+): string[] {
+  const socialUrls = links
+    .filter(link => SOCIAL_PLATFORMS.has((link.platform ?? '').toLowerCase()))
+    .map(link => link.url);
+
+  if (profile.spotify_url) socialUrls.push(profile.spotify_url);
+  if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
+  if (profile.youtube_url) socialUrls.push(profile.youtube_url);
+
+  const entitySameAs = buildEntitySameAs(
+    {
+      musicbrainzId: profile.musicbrainz_id,
+      spotifyUrl: profile.spotify_url,
+      appleMusicUrl: profile.apple_music_url,
+      youtubeUrl: profile.youtube_url,
+    },
+    identityLinks,
+    links.map(link => ({ platform: link.platform, url: link.url }))
+  );
+
+  return [...new Set([...socialUrls, ...entitySameAs])];
+}
+
+function buildDspListenActions(
+  profile: CreatorProfile,
+  links: LegacySocialLink[]
+): ReturnType<typeof buildListenActions> {
+  const dspUrls = new Map<string, { url: string; name: string }>();
+  if (profile.spotify_url) {
+    dspUrls.set('spotify', { url: profile.spotify_url, name: 'Spotify' });
+  }
+  if (profile.apple_music_url) {
+    dspUrls.set('apple_music', {
+      url: profile.apple_music_url,
+      name: 'Apple Music',
+    });
+  }
+  if (profile.youtube_url) {
+    dspUrls.set('youtube', { url: profile.youtube_url, name: 'YouTube' });
+  }
+  for (const link of links) {
+    const platform = link.platform?.toLowerCase() ?? '';
+    if (DSP_PLATFORMS[platform] && link.url && !dspUrls.has(platform)) {
+      dspUrls.set(platform, { url: link.url, name: DSP_PLATFORMS[platform] });
+    }
+  }
+  return buildListenActions(
+    [...dspUrls.entries()].map(([id, d]) => ({ providerId: id, url: d.url }))
+  );
+}
+
+function buildArtistEntitySchema(
+  profile: CreatorProfile,
+  artistName: string,
+  profileUrl: string,
+  genres: string[] | null,
+  uniqueSocialUrls: string[],
+  listenActions: ReturnType<typeof buildListenActions>
+): Record<string, unknown> {
+  return {
+    '@type': resolveArtistEntityType(profile.creator_type),
+    '@id': `${profileUrl}#musicgroup`,
+    name: artistName,
+    description: profile.bio || `Music by ${artistName}`,
+    url: profileUrl,
+    sameAs: uniqueSocialUrls,
+    genre: genres && genres.length > 0 ? genres : ['Music'],
+    ...(profile.avatar_url && {
+      image: {
+        '@type': 'ImageObject',
+        url: profile.avatar_url,
+        name: `${artistName} profile photo`,
+      },
+    }),
+    ...(profile.location && {
+      location: {
+        '@type': 'Place',
+        name: profile.location,
+      },
+    }),
+    ...(profile.active_since_year && {
+      foundingDate: String(profile.active_since_year),
+    }),
+    ...(profile.is_verified && {
+      additionalProperty: {
+        '@type': 'PropertyValue',
+        name: 'verified',
+        value: true,
+      },
+    }),
+    ...(listenActions.length > 0 && { potentialAction: listenActions }),
+  };
+}
+
+function buildProfilePageSchema(
+  profile: CreatorProfile,
+  artistName: string,
+  profileUrl: string
+): Record<string, unknown> {
+  return {
+    '@type': 'ProfilePage',
+    '@id': `${profileUrl}#profilepage`,
+    mainEntity: { '@id': `${profileUrl}#musicgroup` },
+    url: profileUrl,
+    name: `${artistName} | Jovie`,
+    ...(profile.created_at && { dateCreated: profile.created_at }),
+    ...(profile.updated_at && { dateModified: profile.updated_at }),
+  };
+}
+
+function buildMusicEventSchema(
+  tourDate: TourDateViewModel,
+  artistName: string,
+  profileUrl: string
+): Record<string, unknown> {
+  const { eventStatus, availability } = mapTicketStatus(tourDate.ticketStatus);
+  const eventName = tourDate.title || `${artistName} at ${tourDate.venueName}`;
+
+  const locationParts: Record<string, unknown> = {
+    '@type': 'Place',
+    name: tourDate.venueName,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: tourDate.city,
+      ...(tourDate.region && { addressRegion: tourDate.region }),
+      addressCountry: tourDate.country,
+    },
+  };
+
+  if (tourDate.latitude != null && tourDate.longitude != null) {
+    locationParts.geo = {
+      '@type': 'GeoCoordinates',
+      latitude: tourDate.latitude,
+      longitude: tourDate.longitude,
+    };
+  }
+
+  const event: Record<string, unknown> = {
+    '@type': 'MusicEvent',
+    '@id': `${profileUrl}#event-${tourDate.id}`,
+    name: eventName,
+    startDate: formatSchemaEventStartDate(
+      tourDate.startDate,
+      tourDate.timezone
+    ),
+    location: locationParts,
+    performer: { '@id': `${profileUrl}#musicgroup` },
+    eventStatus,
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+  };
+
+  if (tourDate.ticketUrl && availability) {
+    event.offers = {
+      '@type': 'Offer',
+      url: tourDate.ticketUrl,
+      availability,
+    };
+  }
+
+  return event;
+}
 
 function mapTicketStatus(status: string): {
   eventStatus: string;
@@ -54,156 +238,28 @@ export function generateProfileStructuredData(
     profile.username_normalized || profile.username.toLowerCase();
   const profileUrl = `${BASE_URL}/${normalizedUsername}`;
 
-  const socialUrls = links
-    .filter(link =>
-      [
-        'instagram',
-        'twitter',
-        'facebook',
-        'youtube',
-        'tiktok',
-        'spotify',
-      ].includes((link.platform ?? '').toLowerCase())
-    )
-    .map(link => link.url);
-
-  if (profile.spotify_url) socialUrls.push(profile.spotify_url);
-  if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
-  if (profile.youtube_url) socialUrls.push(profile.youtube_url);
-
-  const entitySameAs = buildEntitySameAs(
-    {
-      musicbrainzId: profile.musicbrainz_id,
-      spotifyUrl: profile.spotify_url,
-      appleMusicUrl: profile.apple_music_url,
-      youtubeUrl: profile.youtube_url,
-    },
-    identityLinks,
-    links.map(link => ({ platform: link.platform, url: link.url }))
+  const uniqueSocialUrls = buildUniqueSocialUrls(profile, links, identityLinks);
+  const listenActions = buildDspListenActions(profile, links);
+  const artistEntitySchema = buildArtistEntitySchema(
+    profile,
+    artistName,
+    profileUrl,
+    genres,
+    uniqueSocialUrls,
+    listenActions
   );
-  const uniqueSocialUrls = [...new Set([...socialUrls, ...entitySameAs])];
-
-  const DSP_PLATFORMS: Record<string, string> = {
-    spotify: 'Spotify',
-    apple_music: 'Apple Music',
-    youtube: 'YouTube',
-    soundcloud: 'SoundCloud',
-    deezer: 'Deezer',
-    tidal: 'Tidal',
-  };
-  const dspUrls = new Map<string, { url: string; name: string }>();
-  if (profile.spotify_url)
-    dspUrls.set('spotify', { url: profile.spotify_url, name: 'Spotify' });
-  if (profile.apple_music_url)
-    dspUrls.set('apple_music', {
-      url: profile.apple_music_url,
-      name: 'Apple Music',
-    });
-  if (profile.youtube_url)
-    dspUrls.set('youtube', { url: profile.youtube_url, name: 'YouTube' });
-  for (const link of links) {
-    const platform = link.platform?.toLowerCase() ?? '';
-    if (DSP_PLATFORMS[platform] && link.url && !dspUrls.has(platform)) {
-      dspUrls.set(platform, { url: link.url, name: DSP_PLATFORMS[platform] });
-    }
-  }
-  const listenActions = buildListenActions(
-    [...dspUrls.entries()].map(([id, d]) => ({ providerId: id, url: d.url }))
+  const profilePageSchema = buildProfilePageSchema(
+    profile,
+    artistName,
+    profileUrl
   );
-
-  const artistEntitySchema: Record<string, unknown> = {
-    '@type': resolveArtistEntityType(profile.creator_type),
-    '@id': `${profileUrl}#musicgroup`,
-    name: artistName,
-    description: profile.bio || `Music by ${artistName}`,
-    url: profileUrl,
-    sameAs: uniqueSocialUrls,
-    genre: genres && genres.length > 0 ? genres : ['Music'],
-    ...(profile.avatar_url && {
-      image: {
-        '@type': 'ImageObject',
-        url: profile.avatar_url,
-        name: `${artistName} profile photo`,
-      },
-    }),
-    ...(profile.location && {
-      location: {
-        '@type': 'Place',
-        name: profile.location,
-      },
-    }),
-    ...(profile.active_since_year && {
-      foundingDate: String(profile.active_since_year),
-    }),
-    ...(profile.is_verified && {
-      additionalProperty: {
-        '@type': 'PropertyValue',
-        name: 'verified',
-        value: true,
-      },
-    }),
-    ...(listenActions.length > 0 && { potentialAction: listenActions }),
-  };
-
-  const profilePageSchema: Record<string, unknown> = {
-    '@type': 'ProfilePage',
-    '@id': `${profileUrl}#profilepage`,
-    mainEntity: { '@id': `${profileUrl}#musicgroup` },
-    url: profileUrl,
-    name: `${artistName} | Jovie`,
-    ...(profile.created_at && { dateCreated: profile.created_at }),
-    ...(profile.updated_at && { dateModified: profile.updated_at }),
-  };
-
   const breadcrumbSchema = buildBreadcrumbObject([
     { name: 'Home', url: BASE_URL },
     { name: artistName, url: profileUrl },
   ]);
-
-  const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => {
-    const { eventStatus, availability } = mapTicketStatus(td.ticketStatus);
-    const eventName = td.title || `${artistName} at ${td.venueName}`;
-
-    const locationParts: Record<string, unknown> = {
-      '@type': 'Place',
-      name: td.venueName,
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: td.city,
-        ...(td.region && { addressRegion: td.region }),
-        addressCountry: td.country,
-      },
-    };
-
-    if (td.latitude != null && td.longitude != null) {
-      locationParts.geo = {
-        '@type': 'GeoCoordinates',
-        latitude: td.latitude,
-        longitude: td.longitude,
-      };
-    }
-
-    const event: Record<string, unknown> = {
-      '@type': 'MusicEvent',
-      '@id': `${profileUrl}#event-${td.id}`,
-      name: eventName,
-      startDate: formatSchemaEventStartDate(td.startDate, td.timezone),
-      location: locationParts,
-      performer: { '@id': `${profileUrl}#musicgroup` },
-      eventStatus,
-      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-    };
-
-    if (td.ticketUrl && availability) {
-      event.offers = {
-        '@type': 'Offer',
-        url: td.ticketUrl,
-        availability,
-      };
-    }
-
-    return event;
-  });
+  const eventSchemas = tourDates
+    .slice(0, MAX_EVENT_SCHEMAS)
+    .map(tourDate => buildMusicEventSchema(tourDate, artistName, profileUrl));
 
   return {
     '@context': 'https://schema.org',

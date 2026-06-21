@@ -1039,9 +1039,7 @@ export function DevToolbar({
                 >
                   <div className='border-b border-[var(--color-border-subtle)] px-3 py-2'>
                     <div className='flex items-center justify-between gap-2'>
-                      <span className='text-2xs font-medium'>
-                        Test Persona
-                      </span>
+                      <span className='text-2xs font-medium'>Test Persona</span>
                       {personaLoading && (
                         <Loader2
                           size={11}
