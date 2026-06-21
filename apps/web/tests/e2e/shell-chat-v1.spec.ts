@@ -211,7 +211,7 @@ function shellChatFrameLocators(page: Page): ShellChatLocators {
   const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
   const chatContent = shellScroll.locator('[data-testid="chat-content"]');
   const composer = shellFrame.locator('[data-testid="chat-composer-surface"]');
-  const input = composer.locator('[aria-label="Chat message input"]');
+  const input = composer.getByRole('textbox', { name: /chat message input/i });
 
   return { chatContent, composer, input, shellFrame, shellScroll };
 }
