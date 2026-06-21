@@ -115,7 +115,7 @@ function GlassHighlight({
     <div
       className={cn(
         'absolute inset-0 pointer-events-none',
-        rounded && 'rounded-lg'
+        rounded && 'rounded-xl'
       )}
       style={
         subtle
@@ -136,7 +136,7 @@ function GlassBlur({
 }) {
   return (
     <div
-      className={cn('absolute inset-0', rounded && 'rounded-lg')}
+      className={cn('absolute inset-0', rounded && 'rounded-xl')}
       style={intense ? GLASS_LAYER_STYLES.blur : GLASS_LAYER_STYLES.blurLight}
       aria-hidden='true'
     />
@@ -153,12 +153,12 @@ function Badge({
   if (count <= 0) return null;
 
   const sizeClasses =
-    size === 'sm' ? 'min-w-4 h-4 px-1 text-3xs' : 'min-w-6 h-5 px-2 text-xs';
+    size === 'sm' ? 'min-w-4 h-4 px-1 text-[9px]' : 'min-w-6 h-5 px-2 text-xs';
 
   return (
     <span
       className={cn(
-        'flex items-center justify-center font-caption rounded-full bg-accent text-on-accent',
+        'flex items-center justify-center font-caption rounded-full bg-accent text-white',
         sizeClasses
       )}
     >
