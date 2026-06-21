@@ -194,6 +194,8 @@ export function OnboardingTurnstile({
   // *visible* challenge. Silent (invisible-first) verifications never set it,
   // so the panel stays collapsed when the user never saw a challenge.
   const [verifiedMoment, setVerifiedMoment] = useState(false);
+  const [interactiveChallengeRequested, setInteractiveChallengeRequested] =
+    useState(false);
   const [interactiveChallengeVisible, setInteractiveChallengeVisible] =
     useState(false);
   const panelVisibleRef = useRef(false);
@@ -249,6 +251,7 @@ export function OnboardingTurnstile({
         theme: 'dark',
         callback: token => {
           onToken(token);
+          setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
           // Only celebrate when the user actually saw a challenge. Silent
           // invisible-first verifications collapse straight away (no UI churn).
@@ -258,6 +261,7 @@ export function OnboardingTurnstile({
           commitState({ status: 'verified' });
         },
         'error-callback': code => {
+          setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
           commitState({
             status: 'error',
@@ -265,6 +269,7 @@ export function OnboardingTurnstile({
           });
         },
         'expired-callback': () => {
+          setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
           commitState({
             status: 'expired',
@@ -272,6 +277,7 @@ export function OnboardingTurnstile({
           });
         },
         'timeout-callback': () => {
+          setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
           commitState({
             status: 'timeout',
@@ -279,6 +285,7 @@ export function OnboardingTurnstile({
           });
         },
         'unsupported-callback': () => {
+          setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
           commitState({
             status: 'unsupported',
@@ -287,7 +294,8 @@ export function OnboardingTurnstile({
           });
         },
         'before-interactive-callback': () => {
-          setInteractiveChallengeVisible(true);
+          setInteractiveChallengeRequested(true);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'interactive',
             message: 'Required before your first message.',
@@ -328,6 +336,7 @@ export function OnboardingTurnstile({
     (message = 'Verification reset. Complete the check to retry.') => {
       clearWidget();
       setVerifiedMoment(false);
+      setInteractiveChallengeRequested(false);
       setInteractiveChallengeVisible(false);
       commitState({ status: 'loading', message });
       render();
@@ -384,6 +393,40 @@ export function OnboardingTurnstile({
     panelRef.current?.focus({ preventScroll: true });
   }, [focusSignal]);
 
+  useEffect(() => {
+    if (!interactiveChallengeRequested || interactiveChallengeVisible) return;
+    const target = containerRef.current;
+    if (!target) return;
+
+    let frameId: number | null = null;
+    let observer: MutationObserver | null = null;
+
+    const revealAfterPaint = () => {
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        setInteractiveChallengeVisible(true);
+      });
+    };
+
+    if (target.firstElementChild) {
+      revealAfterPaint();
+    } else {
+      observer = new MutationObserver(() => {
+        if (target.firstElementChild) {
+          observer?.disconnect();
+          observer = null;
+          revealAfterPaint();
+        }
+      });
+      observer.observe(target, { childList: true });
+    }
+
+    return () => {
+      observer?.disconnect();
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
+  }, [interactiveChallengeRequested, interactiveChallengeVisible]);
+
   const shouldShowPanel =
     isOnboardingTurnstilePanelVisible(state, instruction, siteKey) ||
     verifiedMoment;
@@ -417,8 +460,8 @@ export function OnboardingTurnstile({
       verifiedMoment ||
       Boolean(instruction));
   const shouldExposeWidgetContent =
-    state.status === 'interactive' ||
-    (state.status === 'loading' && interactiveChallengeVisible);
+    interactiveChallengeVisible &&
+    (state.status === 'interactive' || state.status === 'loading');
   const shouldShowWidgetSkeleton =
     shouldShowWidgetFrame &&
     !shouldExposeWidgetContent &&
