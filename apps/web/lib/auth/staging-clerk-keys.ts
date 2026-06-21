@@ -255,22 +255,15 @@ export async function resolvePublishableKeyStaticFirst(): Promise<
     return undefined;
   }
 
-  const hasStagingOverride =
-    Boolean(process.env.CLERK_PUBLISHABLE_KEY_STAGING) ||
-    Boolean(process.env.CLERK_SECRET_KEY_STAGING);
+  // Preview/local/CI: use deployment-scoped runtime env keys only.
+  // Never call headers() here — it opts ISR profile routes into dynamic rendering
+  // and breaks public-route CI (standalone server, no middleware injection).
+  // Preview deployments already receive the correct Clerk pair via env vars;
+  // per-request host routing is only needed on VERCEL_ENV=production above.
   const runtimePk = runtimePublicEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
   const runtimeSk = process.env.CLERK_SECRET_KEY || undefined;
-
-  // Preview/local/CI: use the runtime key pair when host routing is not needed.
-  // Calling headers() here opts ISR profile routes into dynamic rendering and
-  // breaks public-route CI (standalone server, no middleware injection).
-  if (!hasStagingOverride) {
-    if (runtimePk && runtimeSk) {
-      return runtimePk;
-    }
-    return undefined;
+  if (runtimePk && runtimeSk) {
+    return runtimePk;
   }
-
-  // Staging override keys require per-request host routing.
-  return resolvePublishableKeyFromHeaders();
+  return undefined;
 }
