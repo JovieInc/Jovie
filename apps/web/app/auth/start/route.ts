@@ -62,6 +62,32 @@ function getStringParam(url: URL, key: string): string | null {
   return trimmed || null;
 }
 
+function getRedirectOrigin(request: Request): string {
+  const requestUrl = new URL(request.url);
+  const host =
+    request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ||
+    request.headers.get('host')?.trim();
+  if (!host) return requestUrl.origin;
+
+  const protocol =
+    request.headers
+      .get('x-forwarded-proto')
+      ?.split(',')[0]
+      ?.trim()
+      ?.replace(/:$/, '') || requestUrl.protocol.replace(/:$/, '');
+
+  return `${protocol}://${host}`;
+}
+
+async function getOptionalAuthUserId(): Promise<string | null> {
+  try {
+    const { userId } = await auth();
+    return userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function trackAuthEvent(
   event: Parameters<typeof createAuthAnalyticsEvent>[0],
   input: {
@@ -156,6 +182,7 @@ export async function GET(request: Request) {
 
   try {
     const state = createState();
+    const redirectOrigin = getRedirectOrigin(request);
     const record = await createStoredAuthState({
       client: rawClient,
       intent: rawIntent,
@@ -172,15 +199,15 @@ export async function GET(request: Request) {
       returnTo,
     });
 
-    const { userId } = await auth();
+    const userId = await getOptionalAuthUserId();
     if (userId) {
       return NextResponse.redirect(
-        new URL(buildAuthCallbackPath(record.state), request.url),
+        new URL(buildAuthCallbackPath(record.state), redirectOrigin),
         { headers: NO_STORE_HEADERS }
       );
     }
 
-    const authPage = new URL(getAuthPageForIntent(rawIntent), request.url);
+    const authPage = new URL(getAuthPageForIntent(rawIntent), redirectOrigin);
     authPage.searchParams.set('auth_state', record.state);
     void trackAuthEvent('auth_provider_opened', {
       client: rawClient,

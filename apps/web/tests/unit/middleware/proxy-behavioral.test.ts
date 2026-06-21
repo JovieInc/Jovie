@@ -502,6 +502,10 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toBe(
         'https://localhost:3112/signin?redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron'
       );
+      expect(res.headers.get('Content-Security-Policy')).toBe(
+        "default-src 'self'"
+      );
+      expect(res.headers.get('x-nonce')).toBeTruthy();
       expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
     });
 

@@ -156,6 +156,28 @@ describe('shouldBypassClerkForRequest', () => {
     ).toBe(false);
   });
 
+  it('bypasses native auth start in mock lanes even when dev-browser cookies are missing', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        allowAuthRouteBypass: true,
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/auth/start',
+      })
+    ).toBe(true);
+  });
+
+  it('keeps Clerk enabled for native auth start in mock lanes when a session exists', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        allowAuthRouteBypass: true,
+        cookies: [{ name: '__session', value: 'sess_123' }],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/auth/start',
+      })
+    ).toBe(false);
+  });
+
   it('bypasses auth routes in mock lanes without an active Clerk session', () => {
     expect(
       shouldBypassClerkForRequest({
