@@ -101,12 +101,10 @@ describe('DrawerAnalyticsSummaryCard', () => {
       />
     );
 
-    expect(screen.getByTestId('analytics-card-body')).toHaveClass(
-      'min-h-[106px]'
-    );
+    expect(screen.getByTestId('analytics-card-body')).toHaveClass('min-h-27');
     expect(screen.getByTestId('analytics-card-footer')).toHaveClass(
       'invisible',
-      'min-h-[40px]'
+      'min-h-10'
     );
   });
 
@@ -124,7 +122,7 @@ describe('DrawerAnalyticsSummaryCard', () => {
     const metric = screen.getByTestId('drawer-analytics-metric-profile-views');
     expect(metric.querySelector('p[aria-hidden="true"]')).toHaveClass(
       'invisible',
-      'min-h-[13px]'
+      'min-h-3'
     );
   });
 });

@@ -65,12 +65,12 @@ export const SidebarBottomNowPlaying = React.memo(
         </div>
         <div className='min-w-0 flex-1'>
           <div
-            className='truncate text-[12px] font-caption text-primary-token leading-tight'
+            className='truncate text-xs font-caption text-primary-token leading-tight'
             style={{ letterSpacing: '-0.005em' }}
           >
             {trackTitle}
           </div>
-          <div className='truncate text-[10.5px] text-tertiary-token leading-tight mt-0.5'>
+          <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
             {artistName}
           </div>
         </div>

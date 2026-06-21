@@ -122,7 +122,7 @@ function HomepageV2Hero() {
               </Link>
             </div>
 
-            <p className='mt-5 text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
+            <p className='mt-5 text-app font-medium tracking-[-0.01em] text-tertiary-token'>
               {HOMEPAGE_V2_COPY.hero.microproof}
             </p>
           </div>
@@ -145,7 +145,7 @@ function HomepageV2Hero() {
                 }}
               >
                 <ArtistProfilePhoneFrame>
-                  <div className='relative h-full w-full overflow-hidden bg-[#07080c]'>
+                  <div className='relative h-full w-full overflow-hidden bg-(--color-bg-base)'>
                     <div
                       className='pointer-events-none absolute left-0 top-0 origin-top-left scale-[0.41] sm:scale-[0.455]'
                       style={{
@@ -259,7 +259,7 @@ export function HomepageV2SystemOverview() {
               {!card.href && card.status ? (
                 <p
                   data-testid='homepage-v2-release-pages-preview'
-                  className='mt-5 inline-flex rounded-full border border-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/46'
+                  className='mt-5 inline-flex rounded-full border border-white/[0.08] px-3 py-1.5 text-xs font-medium text-white/46'
                 >
                   {card.status}
                 </p>
@@ -423,13 +423,13 @@ function HomepageV2SocialProof() {
                 />
                 <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(8,9,12,0.05),rgba(8,9,12,0.8)_100%)]' />
                 <div className='absolute inset-x-0 bottom-0 z-10 p-5'>
-                  <p className='font-mono text-[12px] tracking-[-0.02em] text-white/68'>
+                  <p className='font-mono text-xs tracking-[-0.02em] text-white/68'>
                     jov.ie/{card.handle}
                   </p>
-                  <p className='mt-2 text-[20px] font-medium tracking-[-0.02em] text-white'>
+                  <p className='mt-2 text-xl font-medium tracking-[-0.02em] text-white'>
                     {card.name}
                   </p>
-                  <p className='mt-2 text-[13px] leading-[1.6] text-white/72'>
+                  <p className='mt-2 text-app leading-[1.6] text-white/72'>
                     {card.supportingLine}
                   </p>
                 </div>

@@ -222,7 +222,7 @@ function OnboardingShellStatus({
   return (
     <p
       className={cn(
-        'pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border bg-surface-0 px-3 py-1.5 text-[12px] leading-5 shadow-card sm:right-4 sm:top-4',
+        'pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border bg-surface-0 px-3 py-1.5 text-xs leading-5 shadow-card sm:right-4 sm:top-4',
         'border-red-500/20 text-error'
       )}
       role='alert'

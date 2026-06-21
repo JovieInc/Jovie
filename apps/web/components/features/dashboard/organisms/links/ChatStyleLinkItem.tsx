@@ -182,11 +182,11 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         itemId={id}
         actions={swipeActions}
         actionsWidth={180}
-        className='rounded-[10px]'
+        className='rounded-lg'
       >
         <div
           className={cn(
-            'flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-3 sm:gap-3 sm:px-4',
+            'flex items-center gap-2 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-3 sm:gap-3 sm:px-4',
             'transition-[border-color,box-shadow,opacity] duration-subtle',
             !visible && 'opacity-50',
             isLastAdded && 'ring-2 ring-accent ring-offset-2 ring-offset-base'
@@ -202,7 +202,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                 'hover:text-secondary-token active:cursor-grabbing active:text-primary-token',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               )}
-              aria-label='Drag to reorder'
+              aria-label='Drag To Reorder'
               {...listeners}
             >
               <GripVertical className='h-5 w-5 sm:h-4 sm:w-4' />
@@ -211,7 +211,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Platform icon - larger on mobile */}
           <div
-            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] sm:h-10 sm:w-10 sm:rounded-lg'
+            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-lg'
             style={{
               backgroundColor: brandColor,
               color: getContrastTextOnBrand(brandColor),
@@ -264,10 +264,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                   ref={floatingRefs.setFloating}
                   tabIndex={-1}
                   style={floatingStyles}
-                  className={cn(
-                    'z-100 min-w-[176px]',
-                    dropdownMenuContentClasses
-                  )}
+                  className={cn('z-100 min-w-44', dropdownMenuContentClasses)}
                   {...getFloatingProps()}
                 >
                   {menuItems.map((item, itemIndex) => (
@@ -281,7 +278,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                       }}
                       className={cn(
                         MENU_ITEM_BASE,
-                        'min-h-[44px] w-full text-left active:bg-surface-2',
+                        'min-h-11 w-full text-left active:bg-surface-2',
                         item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                       )}
                       {...getItemProps()}

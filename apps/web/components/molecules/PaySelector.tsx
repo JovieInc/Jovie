@@ -142,14 +142,14 @@ export function PaySelector({
         <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
         <div className='space-y-4'>
-          <div className='min-h-[160px]' data-testid='pay-selector-amount-slot'>
-            <div className='min-h-[92px]'>
+          <div className='min-h-40' data-testid='pay-selector-amount-slot'>
+            <div className='min-h-23'>
               {customMode ? (
-                <div className='flex min-h-[92px] items-center'>
+                <div className='flex min-h-23 items-center'>
                   <label className='w-full'>
                     <span className='sr-only'>Custom amount</span>
-                    <div className='flex h-[92px] items-center rounded-[22px] border border-white/12 bg-white/[0.03] px-4.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
-                      <span className='mr-3 text-[26px] font-medium tracking-[-0.04em] text-white/42'>
+                    <div className='flex h-23 items-center rounded-3xl border border-white/12 bg-white/[0.03] px-4.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
+                      <span className='mr-3 text-2xl font-medium tracking-[-0.04em] text-white/42'>
                         $
                       </span>
                       <input
@@ -163,7 +163,7 @@ export function PaySelector({
                           );
                         }}
                         placeholder='0.00'
-                        className='h-full w-full bg-transparent text-[30px] font-semibold tracking-[-0.05em] text-white outline-none placeholder:text-white/18'
+                        className='h-full w-full bg-transparent text-3xl font-semibold tracking-[-0.05em] text-white outline-none placeholder:text-white/18'
                         aria-label='Custom amount'
                       />
                     </div>
@@ -184,13 +184,13 @@ export function PaySelector({
                         aria-label={`Select ${formatAmountForScreenReader(amount)} payment amount`}
                         onClick={() => handleAmountSelect(idx)}
                         className={cn(
-                          'flex h-[92px] items-center justify-center rounded-[22px] border text-center transition-[border-color,background-color,box-shadow,color,opacity] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          'flex h-23 items-center justify-center rounded-3xl border text-center transition-[border-color,background-color,box-shadow,color,opacity] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isSelected
-                            ? 'border-white bg-white text-[#121216] shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
+                            ? 'border-white bg-white text-(--color-bg-input) shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
                             : 'border-white/10 bg-white/[0.02] text-white hover:border-white/18 hover:bg-white/[0.04]'
                         )}
                       >
-                        <span className='text-[19px] font-medium tracking-[-0.03em]'>
+                        <span className='text-lg font-medium tracking-[-0.03em]'>
                           {formatAmountForScreenReader(amount)}
                         </span>
                       </button>
@@ -204,7 +204,7 @@ export function PaySelector({
               <button
                 type='button'
                 onClick={handleCustomToggle}
-                className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/52 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/52 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-pressed={customMode}
                 aria-controls='pay-selector-heading'
               >
@@ -218,7 +218,7 @@ export function PaySelector({
             type='button'
             onClick={handleContinue}
             disabled={isLoading || !canContinue}
-            className='flex h-[50px] w-full items-center justify-center gap-2.5 rounded-full bg-white px-5 text-[16px] font-semibold tracking-[-0.025em] text-[#101013] transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
+            className='flex h-13 w-full items-center justify-center gap-2.5 rounded-full bg-white px-5 text-base font-semibold tracking-[-0.025em] text-(--color-bg-tooltip) transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
             aria-label={`${primaryLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
           >
             {paymentLabel === 'Venmo' ? (
@@ -237,7 +237,7 @@ export function PaySelector({
               <button
                 type='button'
                 onClick={() => setShowOtherOptions(open => !open)}
-                className='flex w-full items-center gap-3.5 text-[13px] font-medium tracking-[-0.015em] text-white/48 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='flex w-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-white/48 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-expanded={showOtherOptions}
               >
                 <span className='h-px flex-1 bg-white/8' />
@@ -264,7 +264,7 @@ export function PaySelector({
                     type='button'
                     onClick={handleContinue}
                     disabled={isLoading || !canContinue}
-                    className='flex h-[48px] w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-[14px] font-medium tracking-[-0.015em] text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
+                    className='flex h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-sm font-medium tracking-[-0.015em] text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={`Continue with ${paymentLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
                   >
                     {paymentLabel === 'Venmo' ? (
@@ -327,7 +327,7 @@ export function PaySelector({
 
       <Button
         onClick={handleContinue}
-        className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-[15px] font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-subtle hover:border-white/14'
+        className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-mid font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-subtle hover:border-white/14'
         size='lg'
         disabled={isLoading}
         variant='primary'

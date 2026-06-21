@@ -68,7 +68,7 @@ export function LibraryShareAssetCard({
 
       <div className={isList ? 'min-w-0 flex-1 py-1' : 'space-y-3 p-4'}>
         <div>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-2xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
             {asset.releaseType}
           </p>
           <h2 className='mt-1 truncate text-base font-semibold text-primary-token'>

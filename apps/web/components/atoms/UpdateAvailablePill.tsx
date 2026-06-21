@@ -46,7 +46,7 @@ export function UpdateAvailablePill() {
       ) : (
         <Download className='h-3 w-3 shrink-0' aria-hidden='true' />
       )}
-      <span className='whitespace-nowrap text-[11.5px] font-medium leading-none'>
+      <span className='whitespace-nowrap text-2xs font-medium leading-none'>
         {updating ? 'Updating…' : 'Update'}
       </span>
     </button>

@@ -17,6 +17,9 @@
 #   DRY_RUN=1   classify and print only; apply no labels
 set -euo pipefail
 
+# shellcheck source=lib/gh-retry.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
+
 REPO="${REPO:-JovieInc/Jovie}"
 DRY_RUN="${DRY_RUN:-0}"
 # Branches that are agent-owned (safe to rebase/force-push in a fix agent).
@@ -24,11 +27,11 @@ AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/)'
 
 label() {  # label <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would +$2 on #$1"; return 0; }
-  gh pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
+  gh_retry pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
-SNAP="$(gh pr list -R "$REPO" --state open --limit 100 \
+SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
   --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
   [ .[] | {
     n: .number,

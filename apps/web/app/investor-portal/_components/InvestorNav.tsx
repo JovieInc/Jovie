@@ -66,7 +66,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
     <>
       {/* Desktop sidebar */}
       <nav
-        className='max-lg:hidden w-[200px] flex-shrink-0 flex-col border-r border-subtle bg-surface-0 px-3 py-6 lg:flex'
+        className='max-lg:hidden w-50 flex-shrink-0 flex-col border-r border-subtle bg-surface-0 px-3 py-6 lg:flex'
         aria-label='Investor Portal Navigation'
       >
         {/* Branding */}
