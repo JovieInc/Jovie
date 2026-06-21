@@ -11,6 +11,11 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  InvisibleTurnstile,
+  isTurnstileClientBypassed,
+  isTurnstileClientConfigured,
+} from '@/components/atoms/InvisibleTurnstile';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
@@ -37,9 +42,13 @@ export function ChangelogEmailSignup() {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const shellRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const turnstileRequired =
+    isTurnstileClientConfigured() && !isTurnstileClientBypassed();
 
   const visualState = getRevealVisualState(status, isExpanded);
 
@@ -89,6 +98,13 @@ export function ChangelogEmailSignup() {
       return;
     }
 
+    if (turnstileRequired && !turnstileToken) {
+      setStatus('error');
+      setErrorMessage('Security check is still loading. Please try again.');
+      setIsExpanded(true);
+      return;
+    }
+
     setStatus('submitting');
     setErrorMessage('');
 
@@ -98,7 +114,7 @@ export function ChangelogEmailSignup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
-          turnstileToken: '',
+          turnstileToken,
           source: 'changelog_page',
         }),
       });
@@ -111,12 +127,14 @@ export function ChangelogEmailSignup() {
 
       setStatus('success');
       setEmail('');
+      setTurnstileResetSignal(signal => signal + 1);
       setIsExpanded(true);
     } catch (err) {
       setStatus('error');
       setErrorMessage(
         err instanceof Error ? err.message : 'Something went wrong'
       );
+      setTurnstileResetSignal(signal => signal + 1);
       setIsExpanded(true);
     }
   }
@@ -134,6 +152,7 @@ export function ChangelogEmailSignup() {
     >
       <div className='mb-3 flex items-center gap-3'>
         <Mail className='h-5 w-5 opacity-50' />
+        {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- sentence-case marketing heading */}
         <h3 className='text-lg font-semibold tracking-tight'>
           Stay in the loop
         </h3>
@@ -168,7 +187,7 @@ export function ChangelogEmailSignup() {
               className='flex min-h-14 w-full items-center justify-between gap-3 px-5 text-left text-sm font-medium text-primary-token'
             >
               <span>Subscribe</span>
-              <span className='inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-sm'>
+              <span className='inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-sm dark:bg-white dark:text-black'>
                 <ArrowRight className='h-4 w-4' aria-hidden='true' />
               </span>
             </button>
@@ -184,7 +203,9 @@ export function ChangelogEmailSignup() {
                 ref={inputRef}
                 type='email'
                 inputSize='lg'
+                // eslint-disable-next-line @jovie/canonical-ui-label-casing -- natural aria-label phrasing
                 aria-label='Email address for product updates'
+                // eslint-disable-next-line @jovie/canonical-ui-label-casing -- email placeholder literal
                 placeholder='you@example.com'
                 value={email}
                 onChange={e => {
@@ -209,11 +230,19 @@ export function ChangelogEmailSignup() {
                 type='submit'
                 size='xl'
                 loading={status === 'submitting'}
+                disabled={
+                  status === 'submitting' ||
+                  (turnstileRequired && !turnstileToken)
+                }
                 className='rounded-full px-5'
               >
                 Subscribe
               </Button>
             </div>
+            <InvisibleTurnstile
+              onToken={setTurnstileToken}
+              resetSignal={turnstileResetSignal}
+            />
           </form>
 
           <div className='cta-reveal-panel cta-reveal-panel--status p-1'>

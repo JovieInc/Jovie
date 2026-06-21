@@ -143,6 +143,27 @@ describe('POST /api/changelog/subscribe', () => {
     expect(mockVerifyTurnstileToken).not.toHaveBeenCalled();
   });
 
+  it('returns 403 when Turnstile is configured but the token is empty', async () => {
+    mockVerifyTurnstileToken.mockResolvedValue({
+      success: false,
+      reason: 'missing_token',
+    });
+
+    const { POST } = await import('@/app/api/changelog/subscribe/route');
+    const response = await POST(
+      buildRequest({
+        email: 'test@example.com',
+        turnstileToken: '',
+      }) as never
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'Bot verification failed. Please try again.',
+    });
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
   it('returns 503 when Turnstile verification is unavailable', async () => {
     mockVerifyTurnstileToken.mockResolvedValue({
       success: false,
