@@ -189,8 +189,6 @@ export const ServerEnvSchema = z.object({
   // Upstash Redis
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
-  // Redis URL for optional caching
-  REDIS_URL: z.string().url().optional(),
 
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
   SESSION_SECRET: z.string().min(32).optional(),
@@ -473,6 +471,8 @@ export const ENV_KEYS = [
   'VERCEL_PRODUCTION_DEPLOY_HOOK',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'HERMES_HUD_API_KEY',
+  'HUD_AGENT_RUNS_FIXTURES',
   'OPENAI_API_KEY',
   'ELEVENLABS_API_KEY',
   'ELEVENLABS_WEBHOOK_SECRET',
