@@ -23,7 +23,7 @@ export function FeatureRow({
   return (
     <section className='section-spacing-linear'>
       <Container size='homepage'>
-        <div className='mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='mx-auto max-w-linear-content'>
           <div className='reveal-on-scroll grid items-center gap-10 lg:grid-cols-2 lg:gap-16'>
             {/* Left: text */}
             <div className='max-w-120'>
