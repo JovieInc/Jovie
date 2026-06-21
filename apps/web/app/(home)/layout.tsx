@@ -17,7 +17,7 @@ export default function HomeLayout({
   // viewport height on its own. Header sits in flow above, footer below the
   // fold. Scrolling reveals the footer; the hero is the first paint.
   return (
-    <div className='home-viewport dark flex min-h-[100svh] flex-col overflow-x-clip bg-[var(--color-bg-base)] text-primary-token'>
+    <div className='home-viewport dark flex min-h-[100svh] flex-col overflow-x-clip bg-base text-primary-token'>
       <SkipToContent />
       <HomeScrollWatcher />
       <MarketingHeader

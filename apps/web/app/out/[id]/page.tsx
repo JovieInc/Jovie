@@ -60,7 +60,7 @@ function MissingLinkState() {
 
           <Link
             href='/'
-            className='inline-flex h-9 items-center justify-center rounded-lg bg-[var(--color-btn-primary-bg)] px-4 text-[13px] font-medium text-[var(--color-btn-primary-fg)] transition-colors duration-100 hover:bg-[var(--color-btn-primary-hover)]'
+            className='inline-flex h-9 items-center justify-center rounded-lg bg-btn-primary px-4 text-[13px] font-medium text-btn-primary-foreground transition-colors duration-100 hover:bg-btn-primary-hover'
           >
             Return Home
           </Link>
