@@ -31,7 +31,7 @@ export function ReleaseCreditsDrawer({
           <section key={group.role} aria-labelledby={`credits-${group.role}`}>
             <h3
               id={`credits-${group.role}`}
-              className='text-[11px] font-semibold uppercase tracking-[0.06em] text-white/35'
+              className='text-2xs font-semibold uppercase tracking-[0.06em] text-white/35'
             >
               {toSentenceCase(group.label)}
             </h3>
@@ -41,12 +41,12 @@ export function ReleaseCreditsDrawer({
                   {entry.handle ? (
                     <Link
                       href={`/${entry.handle}`}
-                      className='text-[14px] font-[470] text-white/88 transition-colors hover:text-white'
+                      className='text-sm font-[470] text-white/88 transition-colors hover:text-white'
                     >
                       {entry.name}
                     </Link>
                   ) : (
-                    <span className='text-[14px] font-[470] text-white/88'>
+                    <span className='text-sm font-[470] text-white/88'>
                       {entry.name}
                     </span>
                   )}

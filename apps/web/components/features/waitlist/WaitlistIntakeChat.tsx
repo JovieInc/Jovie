@@ -288,8 +288,8 @@ export function WaitlistIntakeChat({
   }
 
   return (
-    <div className='flex min-h-dvh w-full bg-[#06070a] text-white [color-scheme:dark]'>
-      <main className='mx-auto flex w-full max-w-[1040px] flex-col px-4 py-5 sm:px-6 lg:px-8'>
+    <div className='flex min-h-dvh w-full bg-(--color-bg-base) text-white [color-scheme:dark]'>
+      <main className='mx-auto flex w-full max-w-260 flex-col px-4 py-5 sm:px-6 lg:px-8'>
         <header className='flex h-11 items-center justify-between'>
           <div className='inline-flex items-center gap-2'>
             <BrandLogo size={20} tone='white' aria-hidden />
@@ -303,7 +303,7 @@ export function WaitlistIntakeChat({
         </header>
 
         <section className='grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch'>
-          <div className='flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0c0f] shadow-[0_24px_90px_rgba(0,0,0,0.34)]'>
+          <div className='flex min-h-140 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) shadow-[0_24px_90px_rgba(0,0,0,0.34)]'>
             <div className='border-b border-white/[0.07] px-4 py-3 sm:px-5'>
               <h1 className='text-lg font-semibold leading-6 text-white'>
                 Request Access
