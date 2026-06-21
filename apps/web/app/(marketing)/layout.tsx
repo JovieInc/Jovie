@@ -11,7 +11,7 @@ export default async function MarketingLayout({
 }>) {
   return (
     <PublicPageShell
-      className='linear-marketing overflow-x-clip bg-base text-primary-token'
+      className='dark linear-marketing overflow-x-clip bg-black text-primary-token'
       logoSize='xs'
     >
       {children}

@@ -98,7 +98,7 @@ export default function PricingPage() {
             </div>
             <Link
               href={freePlan.signupHref}
-              className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-surface-1'
+              className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
             >
               {freePlan.ctaLabel}
             </Link>
@@ -154,7 +154,7 @@ export default function PricingPage() {
               </div>
               <Link
                 href={maxPlan.signupHref}
-                className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-surface-1'
+                className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
               >
                 {maxPlan.ctaLabel}
               </Link>
