@@ -38,6 +38,12 @@ export default async function AuthSlotLayout({
     isMockPublishableKey(publishableKey);
 
   if (isClerkUnavailable) {
+    // Default slot is null on ISR/marketing routes — stay dark instead of
+    // painting an auth-unavailable modal over unrelated pages.
+    if (!children) {
+      return null;
+    }
+
     // Wrap the fallback card in the same modal shell the real flow uses, so
     // dev (Clerk mock) and prod both show a modal. Without this, the card
     // rendered in flow below the homepage and looked like a layout bug.

@@ -214,6 +214,7 @@ describe('staging Clerk key resolution', () => {
 
 describe('resolvePublishableKeyStaticFirst', () => {
   const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
+  const ORIGINAL_CLERK_MOCK = process.env.NEXT_PUBLIC_CLERK_MOCK;
 
   beforeEach(() => {
     headersMock.mockReset();
@@ -223,6 +224,7 @@ describe('resolvePublishableKeyStaticFirst', () => {
     process.env.CLERK_SECRET_KEY = 'sk_live_production_example';
     delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
     delete process.env.CLERK_SECRET_KEY_STAGING;
+    delete process.env.NEXT_PUBLIC_CLERK_MOCK;
   });
 
   afterEach(() => {
@@ -230,6 +232,11 @@ describe('resolvePublishableKeyStaticFirst', () => {
       delete process.env.VERCEL_ENV;
     } else {
       process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
+    }
+    if (ORIGINAL_CLERK_MOCK === undefined) {
+      delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    } else {
+      process.env.NEXT_PUBLIC_CLERK_MOCK = ORIGINAL_CLERK_MOCK;
     }
     if (
       process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ===
@@ -301,6 +308,15 @@ describe('resolvePublishableKeyStaticFirst', () => {
 
     const result = await resolvePublishableKeyStaticFirst();
     expect(result).toBeUndefined();
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the build-time key in Clerk mock mode without calling headers()', async () => {
+    process.env.VERCEL_ENV = 'development';
+    process.env.NEXT_PUBLIC_CLERK_MOCK = '1';
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
     expect(headersMock).not.toHaveBeenCalled();
   });
 

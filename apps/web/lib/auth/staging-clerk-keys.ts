@@ -203,6 +203,18 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
 export async function resolvePublishableKeyStaticFirst(): Promise<
   string | undefined
 > {
+  // Clerk mock / CI smoke: use build-time keys without headers(). The @auth
+  // parallel slot mounts on ISR profile routes; calling headers() there opts
+  // statically generated pages into dynamic rendering and 500s on standalone
+  // production servers (PR smoke lane).
+  if (publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1') {
+    const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    if (publishableKey && process.env.CLERK_SECRET_KEY) {
+      return publishableKey;
+    }
+    return undefined;
+  }
+
   if (process.env.VERCEL_ENV === 'production') {
     // A promoted staging deployment can also report VERCEL_ENV=production.
     // When staging-specific keys are present, inspect the request host so
