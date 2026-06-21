@@ -105,7 +105,7 @@ function CookieCategories({
         );
       })}
 
-      <p className='pt-2 text-center text-[10px] text-tertiary-token'>
+      <p className='pt-2 text-center text-3xs text-tertiary-token'>
         For more details, see our{' '}
         <Link
           href={APP_ROUTES.LEGAL_COOKIES}

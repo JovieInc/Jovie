@@ -96,7 +96,7 @@ function parseShortcut(shortcut: string): React.ReactNode {
     return (
       <span className='ml-2 inline-flex items-center gap-1'>
         <Kbd>{parts[0]}</Kbd>
-        <span className='text-[10px] text-tertiary-token'>then</span>
+        <span className='text-3xs text-tertiary-token'>then</span>
         <Kbd>{parts[1]}</Kbd>
       </span>
     );
@@ -207,7 +207,7 @@ export function EmptyState({
       {icon && (
         <div
           className={cn(
-            'mb-3 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1',
+            'mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-subtle bg-surface-1',
             styles.iconWrapper
           )}
           aria-hidden='true'

@@ -137,7 +137,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
               size='sm'
               onClick={handleActionClick}
               aria-label={`Message ${displayName}`}
-              className='pointer-events-auto relative z-10 min-h-[44px] min-w-[88px] px-3 text-xs'
+              className='pointer-events-auto relative z-10 min-h-11 min-w-22 px-3 text-xs'
             >
               Message
             </Button>

@@ -71,7 +71,7 @@ export function CreateProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-[400px]'>
+      <DialogContent className='sm:max-w-100'>
         <DialogHeader>
           <DialogTitle>Add Artist Profile</DialogTitle>
           <DialogDescription>
