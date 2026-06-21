@@ -67,7 +67,13 @@
     },
     {
       "path": "app/[username]/[slug]/[trackSlug]/page.tsx",
-      "checks": ["metadata-export", "json-ld"]
+      "checks": [
+        "metadata-export",
+        "canonical",
+        "openGraph",
+        "twitter",
+        "json-ld"
+      ]
     },
     {
       "path": "app/[username]/merch/[cardId]/page.tsx",

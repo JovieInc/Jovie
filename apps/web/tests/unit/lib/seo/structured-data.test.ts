@@ -125,6 +125,14 @@ describe('formatSchemaEventStartDate', () => {
     );
     expect(formatted).toMatch(/^2026-07-14T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   });
+
+  it('formats UTC startDate with explicit zero offset', () => {
+    const formatted = formatSchemaEventStartDate(
+      '2026-07-15T03:00:00.000Z',
+      'UTC'
+    );
+    expect(formatted).toMatch(/^2026-07-15T\d{2}:\d{2}:\d{2}\+00:00$/);
+  });
 });
 
 describe('generateProfileStructuredData', () => {
@@ -165,6 +173,33 @@ describe('generateProfileStructuredData', () => {
       '@type': 'Offer',
       url: 'https://tickets.example.com/td-1',
     });
+  });
+
+  it('omits sameAs when no valid social URLs exist', () => {
+    const data = generateProfileStructuredData(
+      {
+        ...BASE_PROFILE,
+        spotify_url: '',
+        apple_music_url: null,
+        youtube_url: null,
+        musicbrainz_id: null,
+      },
+      ['pop'],
+      [
+        {
+          id: 'empty-link',
+          artist_id: 'profile-123',
+          platform: 'instagram',
+          url: '   ',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      [],
+      []
+    );
+    const artist = findInGraph(data, 'MusicGroup');
+    expect(artist?.sameAs).toBeUndefined();
   });
 });
 
@@ -260,6 +295,7 @@ describe('generateMerchStructuredData', () => {
       retailPriceCents: 3200,
     });
     expect(withoutRating.aggregateRating).toBeUndefined();
+    expect(withoutRating.image).toBeUndefined();
 
     const withRating = generateMerchStructuredData({
       title: 'Tour Tee',

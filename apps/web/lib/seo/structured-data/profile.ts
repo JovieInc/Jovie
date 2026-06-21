@@ -33,28 +33,45 @@ const DSP_PLATFORMS: Record<string, string> = {
   tidal: 'Tidal',
 };
 
+function nonEmptyUrl(url: string | null | undefined): string | null {
+  const trimmed = url?.trim();
+  return trimmed ? trimmed : null;
+}
+
 function buildUniqueSocialUrls(
   profile: CreatorProfile,
   links: LegacySocialLink[],
   identityLinks: EntityIdentityLink[]
 ): string[] {
   const socialUrls = links
-    .filter(link => SOCIAL_PLATFORMS.has((link.platform ?? '').toLowerCase()))
-    .map(link => link.url);
+    .filter(
+      link =>
+        SOCIAL_PLATFORMS.has((link.platform ?? '').toLowerCase()) &&
+        typeof link.url === 'string' &&
+        link.url.trim().length > 0
+    )
+    .map(link => link.url.trim());
 
-  if (profile.spotify_url) socialUrls.push(profile.spotify_url);
-  if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
-  if (profile.youtube_url) socialUrls.push(profile.youtube_url);
+  const spotifyUrl = nonEmptyUrl(profile.spotify_url);
+  const appleMusicUrl = nonEmptyUrl(profile.apple_music_url);
+  const youtubeUrl = nonEmptyUrl(profile.youtube_url);
+
+  if (spotifyUrl) socialUrls.push(spotifyUrl);
+  if (appleMusicUrl) socialUrls.push(appleMusicUrl);
+  if (youtubeUrl) socialUrls.push(youtubeUrl);
 
   const entitySameAs = buildEntitySameAs(
     {
       musicbrainzId: profile.musicbrainz_id,
-      spotifyUrl: profile.spotify_url,
-      appleMusicUrl: profile.apple_music_url,
-      youtubeUrl: profile.youtube_url,
+      spotifyUrl,
+      appleMusicUrl,
+      youtubeUrl,
     },
     identityLinks,
-    links.map(link => ({ platform: link.platform, url: link.url }))
+    links.flatMap(link => {
+      const url = nonEmptyUrl(link.url);
+      return url ? [{ platform: link.platform, url }] : [];
+    })
   );
 
   return [...new Set([...socialUrls, ...entitySameAs])];
@@ -102,7 +119,7 @@ function buildArtistEntitySchema(
     name: artistName,
     description: profile.bio || `Music by ${artistName}`,
     url: profileUrl,
-    sameAs: uniqueSocialUrls,
+    ...(uniqueSocialUrls.length > 0 && { sameAs: uniqueSocialUrls }),
     genre: genres && genres.length > 0 ? genres : ['Music'],
     ...(profile.avatar_url && {
       image: {

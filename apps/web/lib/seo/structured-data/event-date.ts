@@ -48,9 +48,13 @@ export function formatSchemaEventStartDate(
 }
 
 function normalizeGmtOffset(offsetRaw: string): string {
+  if (offsetRaw === 'GMT' || offsetRaw === 'UTC') {
+    return '+00:00';
+  }
+
   const match = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(offsetRaw);
   if (!match) {
-    return 'Z';
+    return '+00:00';
   }
 
   const sign = match[1];

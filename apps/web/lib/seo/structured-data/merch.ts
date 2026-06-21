@@ -30,7 +30,7 @@ export function generateMerchStructuredData(
     '@type': 'Product',
     name: input.title,
     description: input.description,
-    image: input.imageUrl ? [input.imageUrl] : [],
+    ...(input.imageUrl ? { image: [input.imageUrl] } : {}),
     brand: {
       '@type': 'Brand',
       name: input.artistName,

@@ -454,6 +454,34 @@ describe('Public Profile Page Logic', () => {
       ).toBe(false);
     });
 
+    it('filters empty social URLs out of sameAs', () => {
+      const linksWithEmptyUrl = [
+        ...mockLinks,
+        {
+          id: 'link-empty',
+          artist_id: 'profile-123',
+          platform: 'instagram',
+          url: '   ',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ];
+
+      const data = generateProfileStructuredData(
+        {
+          ...profileFixture,
+          spotify_url: null,
+          apple_music_url: null,
+          youtube_url: null,
+        },
+        mockGenres,
+        linksWithEmptyUrl
+      );
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
+
+      expect(musicGroup.sameAs as string[]).not.toContain('   ');
+    });
+
     it('adds MusicEvent schemas for tour dates, capped at 5', () => {
       const tourDates: TourDateViewModel[] = Array.from(
         { length: 15 },
