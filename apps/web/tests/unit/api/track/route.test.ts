@@ -382,4 +382,42 @@ describe('POST /api/track', () => {
     );
     expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
+
+  it('decodes percent-encoded x-vercel-ip-city before storing click events', async () => {
+    const clickValuesMock = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+    });
+
+    hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
+      callback({
+        insert: vi.fn().mockReturnValue({
+          values: clickValuesMock,
+        }),
+      })
+    );
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'jv_cc={"essential":true,"analytics":false,"marketing":false}',
+        'x-vercel-ip-city': 'Los%20Angeles',
+        'x-vercel-ip-country': 'US',
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'listen',
+        target: 'https://open.spotify.com/artist/example',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+    expect(response.status).toBe(200);
+
+    expect(clickValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        city: 'Los Angeles',
+      })
+    );
+  });
 });

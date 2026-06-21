@@ -376,7 +376,8 @@ export async function POST(request: NextRequest) {
       httpReferer && isSameOriginReferrer(httpReferer, request.url)
         ? undefined
         : httpReferer;
-    const geoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
+    const rawGeoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
+    const geoCity = rawGeoCity ? decodeURIComponent(rawGeoCity) : undefined;
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry') ??
