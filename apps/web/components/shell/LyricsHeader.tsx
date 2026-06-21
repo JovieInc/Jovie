@@ -31,7 +31,7 @@ export function LyricsHeader({
   return (
     <div
       className={cn(
-        'shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-center gap-1.5 select-none text-[12.5px] font-caption',
+        'shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-center gap-1.5 select-none text-xs font-caption',
         className
       )}
     >

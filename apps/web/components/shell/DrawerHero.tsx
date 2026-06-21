@@ -135,7 +135,7 @@ function DrawerHeroMetaSlot({
     <div
       aria-hidden={meta ? undefined : true}
       className={cn(
-        'mt-2 flex min-h-[22px] items-center gap-1.5 flex-wrap',
+        'mt-2 flex min-h-6 items-center gap-1.5 flex-wrap',
         !meta && 'invisible',
         metaClassName
       )}
@@ -163,7 +163,7 @@ function DrawerHeroTrailingSlot({
     <div
       aria-hidden={trailing ? undefined : true}
       className={cn(
-        'mt-4 min-h-[32px]',
+        'mt-4 min-h-8',
         !trailing && 'invisible',
         trailingClassName
       )}
@@ -267,7 +267,7 @@ export function DrawerHero({
           <div className='flex items-start gap-2'>
             <h2
               className={cn(
-                'flex-1 min-w-0 text-[17px] font-semibold text-primary-token leading-tight',
+                'flex-1 min-w-0 text-base font-semibold text-primary-token leading-tight',
                 resolvedTitleLineClamp &&
                   STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp],
                 stableLayout &&
@@ -306,7 +306,7 @@ export function DrawerHero({
               lineCount={resolvedSubtitleLineClamp}
               size='xs'
               className={cn(
-                'mt-1 text-[12px] leading-[16px] text-tertiary-token',
+                'mt-1 text-xs leading-[16px] text-tertiary-token',
                 subtitleClassName
               )}
               testId='drawer-hero-subtitle-slot'

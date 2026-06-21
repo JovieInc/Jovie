@@ -26,7 +26,7 @@ export function IconBadge({
     >
       <Icon
         name={name}
-        className='h-[18px] w-[18px]'
+        className='h-5 w-5'
         style={{
           color: `var(${colorVar})`,
         }}

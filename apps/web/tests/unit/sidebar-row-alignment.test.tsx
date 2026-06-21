@@ -149,9 +149,9 @@ describe('Sidebar row alignment', () => {
     expect(rowClassName).toContain('px-2.5');
     expect(rowClassName).toContain('gap-x-2.5');
     expect(rowClassName).toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
-    expect(rowClassName).toContain('before:left-[22px]');
-    expect(rowClassName).toContain('after:left-[38px]');
-    expect(rowClassName).toContain('text-[12.5px]');
+    expect(rowClassName).toContain('before:left-6');
+    expect(rowClassName).toContain('after:left-10');
+    expect(rowClassName).toContain('text-xs');
     expect(rowClassName).toContain('font-normal');
     expect(rowClassName).toContain('hover:bg-sidebar-accent');
     expect(rowClassName).toContain('text-sidebar-muted/80');

@@ -352,7 +352,7 @@ describe('PersistentAudioBar', () => {
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
     const waveformSeek = within(expandedSurface).getByRole('slider', {
-      name: 'Seek track waveform',
+      name: 'Seek Track Waveform',
     });
 
     fireEvent.change(waveformSeek, { target: { value: '18' } });

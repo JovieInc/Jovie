@@ -80,18 +80,18 @@ export function InstallBanner({
             )}
             strokeWidth={2.25}
           />
-          <span className='text-[12px] font-medium text-primary-token'>
+          <span className='text-xs font-medium text-primary-token'>
             {title}
           </span>
         </div>
-        <p className='text-[11px] text-tertiary-token leading-snug mb-2.5'>
+        <p className='text-2xs text-tertiary-token leading-snug mb-2.5'>
           {description}
         </p>
         <button
           type='button'
           onClick={onCta}
           disabled={ctaDisabled}
-          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 transition-[filter,background-color,color] duration-subtle ease-subtle disabled:cursor-not-allowed disabled:opacity-60'
+          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-xs font-medium bg-white text-black hover:brightness-110 transition-[filter,background-color,color] duration-subtle ease-subtle disabled:cursor-not-allowed disabled:opacity-60'
         >
           {ctaLabel}
           {CtaIcon ? <CtaIcon className='h-3 w-3' strokeWidth={2.5} /> : null}

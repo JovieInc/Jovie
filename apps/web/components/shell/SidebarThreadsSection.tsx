@@ -166,7 +166,7 @@ function SidebarThreadStatusRow({
     <div
       className={cn(
         'grid grid-cols-[22px_minmax(0,1fr)] items-center gap-2 rounded-full px-2.5 text-tertiary-token',
-        tight ? 'h-6 text-[12px]' : 'h-7 text-[12.5px]'
+        tight ? 'h-6 text-xs' : 'h-7 text-xs'
       )}
     >
       <span className='grid h-3.5 w-3.5 shrink-0 place-items-center justify-self-center text-quaternary-token'>
@@ -230,7 +230,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       <span
         className={cn(
           'min-w-0 truncate text-left justify-self-start',
-          'text-[12.5px]',
+          'text-xs',
           unread && 'font-medium'
         )}
       >
@@ -324,11 +324,11 @@ export function SidebarThreadsSection({
   return (
     <div className='space-y-1.5'>
       <div className='flex items-center justify-between border-t border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] px-2.5 pb-0.5 pt-2'>
-        <span className='text-[10.5px] font-semibold uppercase tracking-[0.08em] text-quaternary-token'>
+        <span className='text-3xs font-semibold uppercase tracking-[0.08em] text-quaternary-token'>
           Conversations
         </span>
         {unreadCount > 0 && (
-          <span className='inline-flex items-center gap-1 text-[11px] font-medium text-quaternary-token'>
+          <span className='inline-flex items-center gap-1 text-2xs font-medium text-quaternary-token'>
             <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
             {unreadCount}
           </span>
@@ -356,7 +356,7 @@ export function SidebarThreadsSection({
           <div
             className={cn(
               'grid grid-cols-[minmax(0,1fr)_20px] items-center gap-2 rounded-full px-2.5 text-tertiary-token',
-              tight ? 'h-6 text-[12px]' : 'h-6.5 text-[12.5px]'
+              tight ? 'h-6 text-xs' : 'h-6.5 text-xs'
             )}
           >
             <span className='min-w-0 flex-1 truncate'>
