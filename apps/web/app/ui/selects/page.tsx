@@ -44,7 +44,7 @@ export default function SelectsPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Select</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — 32px trigger height, 6px radius, shared dropdown
         content styles
       </p>
@@ -145,7 +145,7 @@ export default function SelectsPage() {
         <Stack title='Assignee'>
           <p
             id='label-assignee'
-            className='text-[13px] font-book text-primary-token'
+            className='text-app font-book text-primary-token'
           >
             Assignee
           </p>
@@ -163,7 +163,7 @@ export default function SelectsPage() {
         <Stack title='Priority'>
           <p
             id='label-priority'
-            className='text-[13px] font-book text-primary-token'
+            className='text-app font-book text-primary-token'
           >
             Priority
           </p>
@@ -182,7 +182,7 @@ export default function SelectsPage() {
         <Stack title='Status'>
           <p
             id='label-status'
-            className='text-[13px] font-book text-primary-token'
+            className='text-app font-book text-primary-token'
           >
             Status
           </p>

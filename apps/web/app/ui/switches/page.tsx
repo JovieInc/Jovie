@@ -36,7 +36,7 @@ export default function SwitchesPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Switch</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app toggle — compact 28×16px track, smooth thumb
         transition
       </p>
@@ -68,7 +68,7 @@ export default function SwitchesPage() {
             <Switch id='notifications' aria-label='Enable Notifications' />
             <label
               htmlFor='notifications'
-              className='text-[13px] font-medium text-primary-token'
+              className='text-app font-medium text-primary-token'
             >
               Enable notifications
             </label>
@@ -83,7 +83,7 @@ export default function SwitchesPage() {
             />
             <label
               htmlFor='auto-assign'
-              className='text-[13px] font-medium text-primary-token'
+              className='text-app font-medium text-primary-token'
             >
               Auto-assign issues
             </label>
@@ -98,7 +98,7 @@ export default function SwitchesPage() {
             />
             <label
               htmlFor='disabled-setting'
-              className='text-[13px] font-medium text-primary-token opacity-50'
+              className='text-app font-medium text-primary-token opacity-50'
             >
               Disabled setting
             </label>
@@ -121,7 +121,7 @@ export default function SwitchesPage() {
               >
                 <label
                   htmlFor={`setting-${item.label}`}
-                  className='text-[13px] font-book text-primary-token'
+                  className='text-app font-book text-primary-token'
                 >
                   {item.label}
                 </label>

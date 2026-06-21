@@ -48,7 +48,7 @@ export default function DialogsPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Dialog</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — semi-transparent overlay, elevated surface, 8px
         radius, Linear typography
       </p>
@@ -159,7 +159,7 @@ export default function DialogsPage() {
                 <div className='flex flex-col gap-1.5'>
                   <label
                     htmlFor='issue-title'
-                    className='text-[13px] font-book text-primary-token'
+                    className='text-app font-book text-primary-token'
                   >
                     Title
                   </label>
@@ -167,13 +167,13 @@ export default function DialogsPage() {
                     id='issue-title'
                     type='text'
                     placeholder='Issue title'
-                    className='h-8 w-full rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 text-[13px] text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
+                    className='h-8 w-full rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 text-app text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
                   />
                 </div>
                 <div className='flex flex-col gap-1.5'>
                   <label
                     htmlFor='issue-description'
-                    className='text-[13px] font-book text-primary-token'
+                    className='text-app font-book text-primary-token'
                   >
                     Description
                   </label>
@@ -181,7 +181,7 @@ export default function DialogsPage() {
                     id='issue-description'
                     placeholder='Add a description...'
                     rows={3}
-                    className='w-full resize-none rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
+                    className='w-full resize-none rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 py-2 text-app text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
                   />
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function DialogsPage() {
                   type='text'
                   defaultValue='My Project'
                   aria-label='Project Name'
-                  className='h-8 w-full rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 text-[13px] text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
+                  className='h-8 w-full rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 text-app text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
                 />
               </div>
               <DialogFooter>
