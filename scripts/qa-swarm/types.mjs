@@ -1,4 +1,14 @@
-/** @typedef {'diff-review' | 'explore' | 'vision-critique' | 'design-jury' | 'test-gen' | 'flaky-hunter'} QaSwarmRecipeId */
+/** @type {const} */
+export const QA_SWARM_RECIPE_IDS = [
+  'diff-review',
+  'explore',
+  'vision-critique',
+  'design-jury',
+  'test-gen',
+  'flaky-hunter',
+];
+
+/** @typedef {typeof QA_SWARM_RECIPE_IDS[number]} QaSwarmRecipeId */
 
 /** @typedef {'P0' | 'P1' | 'P2'} QaFindingPriority */
 
@@ -35,14 +45,24 @@
 export const QA_FINDING_PRIORITIES = ['P0', 'P1', 'P2'];
 export const QA_FINDING_KINDS = ['objective', 'taste', 'flake', 'coverage'];
 
-const RECIPE_IDS = new Set([
-  'diff-review',
-  'explore',
-  'vision-critique',
-  'design-jury',
-  'test-gen',
-  'flaky-hunter',
-]);
+const RECIPE_IDS = new Set(QA_SWARM_RECIPE_IDS);
+
+function isOptionalString(value) {
+  return value === undefined || typeof value === 'string';
+}
+
+function isOptionalNumber(value) {
+  return (
+    value === undefined || (typeof value === 'number' && Number.isFinite(value))
+  );
+}
+
+function isOptionalMetadata(value) {
+  return (
+    value === undefined ||
+    (value !== null && typeof value === 'object' && !Array.isArray(value))
+  );
+}
 
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -66,7 +86,12 @@ export function isQaSwarmFinding(value) {
     QA_FINDING_PRIORITIES.includes(/** @type {string} */ (finding.priority)) &&
     QA_FINDING_KINDS.includes(/** @type {string} */ (finding.kind)) &&
     Array.isArray(finding.evidencePaths) &&
-    finding.evidencePaths.every(path => typeof path === 'string')
+    finding.evidencePaths.every(path => typeof path === 'string') &&
+    isOptionalString(finding.reproduction) &&
+    isOptionalString(finding.surface) &&
+    isOptionalNumber(finding.polishScore) &&
+    isOptionalString(finding.referenceComp) &&
+    isOptionalMetadata(finding.metadata)
   );
 }
 
@@ -83,7 +108,11 @@ export function isQaSwarmProposeInput(value) {
   return (
     RECIPE_IDS.has(/** @type {string} */ (input.recipeId)) &&
     Array.isArray(input.findings) &&
-    input.findings.every(isQaSwarmFinding)
+    input.findings.every(
+      finding =>
+        isQaSwarmFinding(finding) &&
+        finding.recipeId === /** @type {string} */ (input.recipeId)
+    )
   );
 }
 

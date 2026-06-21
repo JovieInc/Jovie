@@ -20,6 +20,11 @@ import {
   getRecipeByCommand,
   QA_SWARM_RECIPES,
 } from '../../qa-swarm/registry.mjs';
+import {
+  isQaSwarmFinding,
+  isQaSwarmProposeInput,
+  QA_SWARM_RECIPE_IDS,
+} from '../../qa-swarm/types.mjs';
 
 const tempRoots = [];
 
@@ -107,6 +112,21 @@ describe('qa-swarm autonomy', () => {
       priority: 'P0',
       kind: 'objective',
       evidencePaths: [],
+    };
+
+    expect(isP0Finding(finding)).toBe(true);
+    expect(shouldFastTrack(finding, true)).toBe(true);
+  });
+
+  it('fast-tracks flake findings that are P1-equivalent when Eve is enabled', () => {
+    const finding = {
+      id: 'flake-regression',
+      recipeId: 'flaky-hunter',
+      title: 'Repro flaky test',
+      summary: 'Intermittent CI timeout on analytics.',
+      priority: 'P1',
+      kind: 'flake',
+      evidencePaths: ['tests/e2e/dashboard.spec.ts'],
     };
 
     expect(isP0Finding(finding)).toBe(true);
@@ -260,6 +280,60 @@ describe('qa-swarm propose pipeline', () => {
     } finally {
       restore();
     }
+  });
+
+  it('validates propose input with matching recipe ids and typed optional fields', () => {
+    const findings = [
+      {
+        id: 'invalid-metadata',
+        recipeId: 'diff-review',
+        title: 'Title',
+        summary: 'Summary',
+        priority: 'P1',
+        kind: 'objective',
+        evidencePaths: ['path'],
+        reproduction: 123,
+      },
+    ];
+
+    expect(
+      isQaSwarmProposeInput({
+        recipeId: 'diff-review',
+        findings,
+      })
+    ).toBe(false);
+
+    expect(
+      isQaSwarmProposeInput({
+        recipeId: 'diff-review',
+        findings: [
+          {
+            id: 'bad-recipe-id',
+            recipeId: QA_SWARM_RECIPE_IDS[1],
+            title: 'Title',
+            summary: 'Summary',
+            priority: 'P1',
+            kind: 'objective',
+            evidencePaths: ['path'],
+          },
+        ],
+      })
+    ).toBe(false);
+
+    expect(
+      isQaSwarmFinding({
+        id: 'good',
+        recipeId: QA_SWARM_RECIPE_IDS[0],
+        title: 'Good',
+        summary: 'ok',
+        priority: 'P1',
+        kind: 'taste',
+        evidencePaths: ['path'],
+        metadata: {},
+        polishScore: 9,
+        surface: 'homepage',
+      })
+    ).toBe(true);
   });
 });
 

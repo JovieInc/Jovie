@@ -90,6 +90,7 @@ export function buildEnrichedIssueBody(finding, context) {
  * @param {string} input.description
  * @param {readonly string[]} [input.labels]
  * @param {string} [input.source]
+ * @param {string | Error} error
  */
 function queueLinearIssue(input, error) {
   const { contextRoot } = getQaSwarmPaths();

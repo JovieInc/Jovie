@@ -13,7 +13,8 @@ import { getRecipe } from './registry.mjs';
 import { assertFindings } from './types.mjs';
 
 function buildRunId() {
-  return `qa-swarm-${new Date().toISOString().replaceAll(/[:.]/g, '-')}`;
+  const safeRandom = Math.random().toString(36).slice(2, 8);
+  return `qa-swarm-${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${safeRandom}`;
 }
 
 /**

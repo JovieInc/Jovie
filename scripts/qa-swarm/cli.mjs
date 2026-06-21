@@ -75,7 +75,19 @@ async function main() {
     return;
   }
 
-  const raw = JSON.parse(readFileSync(options.inputPath, 'utf8'));
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(options.inputPath, 'utf8'));
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : `Could not read input file ${options.inputPath}`;
+    console.error(`Unable to read or parse '${options.inputPath}': ${message}`);
+    process.exitCode = 1;
+    return;
+  }
+
   const payload = {
     recipeId: options.recipe,
     findings: raw.findings ?? raw,

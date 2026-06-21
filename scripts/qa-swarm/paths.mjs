@@ -1,10 +1,25 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 export function getRepoRoot(cwd = process.cwd()) {
-  return path.resolve(cwd);
+  let current = path.resolve(cwd);
+  while (true) {
+    const hasGit = existsSync(path.join(current, '.git'));
+    const hasPackage = existsSync(path.join(current, 'package.json'));
+
+    if (hasGit || hasPackage) {
+      return current;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return path.resolve(cwd);
+    }
+    current = parent;
+  }
 }
 
 export function getQaSwarmPaths(repoRoot = getRepoRoot()) {

@@ -21,7 +21,9 @@ function slugify(value) {
 export function buildGbrainSlug(finding, context) {
   const recipe = getRecipe(context.recipeId);
   const date = new Date().toISOString().slice(0, 10);
-  return `qa-swarm/${recipe.id}/${date}/${slugify(finding.id)}`;
+  const runPart = context.runId ? `${slugify(context.runId)}/` : '';
+
+  return `qa-swarm/${recipe.id}/${date}/${runPart}${slugify(finding.id)}`;
 }
 
 /**

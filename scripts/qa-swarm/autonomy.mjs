@@ -36,7 +36,14 @@ export function shouldFastTrack(finding, eveEnabled) {
   }
 
   // P0 path must not depend on Eve curation.
-  return !eveEnabled || finding.priority === 'P0';
+  return !eveEnabled || isP0Finding(finding);
+}
+
+function safeFindingId(value) {
+  const normalized = String(value).trim();
+  return (
+    path.basename(normalized).replaceAll(/[^a-zA-Z0-9._-]/g, '_') || 'finding'
+  );
 }
 
 /**
@@ -51,7 +58,10 @@ export function writeRemediationManifest(finding, context) {
   const paths = getQaSwarmPaths();
   mkdirSync(paths.remediationRoot, { recursive: true });
 
-  const manifestPath = path.join(paths.remediationRoot, `${finding.id}.json`);
+  const manifestPath = path.join(
+    paths.remediationRoot,
+    `${safeFindingId(finding.id)}.json`
+  );
   const manifest = {
     kind: 'qa-swarm-remediation',
     recipeId: recipe.id,

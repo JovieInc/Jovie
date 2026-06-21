@@ -32,7 +32,7 @@ After collecting findings, write `findings.json` and run:
 ```bash
 node scripts/qa-swarm/cli.mjs propose \
   --recipe <recipe-id> \
-  --input /tmp/qa-swarm-findings.json \
+  --input .context/qa-swarm/runs/<run-id>/findings.json \
   [--dry-run] \
   [--eve-enabled]
 ```
