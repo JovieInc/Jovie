@@ -9,10 +9,14 @@ import { promisify } from 'node:util';
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
 
-test('desktop window enters the authenticated chat shell instead of the web root', async () => {
+test('desktop window enters the authenticated releases shell instead of the web root', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   assert.match(
+    mainSource,
+    /const APP_ENTRY_URL = buildAppUrl\('\/app\/library\?view=releases'\);/
+  );
+  assert.doesNotMatch(
     mainSource,
     /const APP_ENTRY_URL = buildAppUrl\('\/app\/chat'\);/
   );
@@ -36,10 +40,12 @@ test('desktop window enters the authenticated chat shell instead of the web root
   );
   assert.match(
     mainSource,
-    /app\.setName\(APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie'\);/
+    /const DESKTOP_APP_NAME = APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie';/
   );
+  assert.match(mainSource, /app\.setName\(DESKTOP_APP_NAME\);/);
   assert.match(mainSource, /APP_ENV === 'local'/);
-  assert.match(mainSource, /Jovie-Local/);
+  assert.match(mainSource, /Jovie Local/);
+  assert.match(mainSource, /Jovie Staging/);
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
   assert.match(
     mainSource,
@@ -155,15 +161,17 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   }
 });
 
-test('desktop production bundle declares the jovie auth protocol', async () => {
-  const builderConfig = await readFile(
-    join(desktopRoot, 'electron-builder.yml'),
-    'utf8'
-  );
+test('desktop mac bundles declare the jovie auth protocol', async () => {
+  for (const configPath of [
+    'electron-builder.yml',
+    'electron-builder.staging.yml',
+  ]) {
+    const builderConfig = await readFile(join(desktopRoot, configPath), 'utf8');
 
-  assert.match(builderConfig, /CFBundleURLTypes:/);
-  assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
-  assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
+    assert.match(builderConfig, /CFBundleURLTypes:/);
+    assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
+    assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
+  }
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {
@@ -264,6 +272,14 @@ test('desktop bridge exposes bounded dictation support', async () => {
     join(desktopRoot, 'src/preload.ts'),
     'utf8'
   );
+  const cspWatchdogSource = await readFile(
+    join(desktopRoot, 'src/desktop-csp-watchdog.ts'),
+    'utf8'
+  );
+  const securityReporterSource = await readFile(
+    join(desktopRoot, 'src/desktop-security-reporting.ts'),
+    'utf8'
+  );
 
   assert.match(
     mainSource,
@@ -277,13 +293,32 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
   assert.match(mainSource, /installDesktopCspWatchdog/);
+  assert.match(mainSource, /autoUpdater\.logger = null/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
-  assert.match(mainSource, /process\.platform === 'linux'/);
+  assert.match(mainSource, /function canNavigateBack\(webContents/);
+  assert.match(mainSource, /webContents\.navigationHistory\?\.canGoBack\(\)/);
+  assert.match(mainSource, /canNavigateBack\(win\.webContents\)/);
+  assert.match(mainSource, /function canCheckForDesktopUpdates\(\)/);
+  assert.match(mainSource, /process\.platform !== 'linux' && app\.isPackaged/);
+  assert.match(mainSource, /if \(!canCheckForDesktopUpdates\(\)\)/);
   assert.match(mainSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
   assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
   assert.match(mainSource, /!app\.isPackaged/);
   assert.match(mainSource, /reportDesktopSecurityEvent/);
+  assert.match(mainSource, /const reportDesktopCspEvent =/);
+  assert.match(mainSource, /APP_ENV === 'local' \? \(\) => undefined/);
+  assert.match(mainSource, /report: reportDesktopCspEvent/);
+  assert.doesNotMatch(
+    cspWatchdogSource,
+    /input\.report\('csp-header-missing'/
+  );
+  assert.match(cspWatchdogSource, /input\.report\('csp-header-weakened'/);
+  assert.match(
+    securityReporterSource,
+    /process\.env\.JOVIE_DESKTOP_SECURITY_CONSOLE !== '1'/
+  );
+  assert.match(securityReporterSource, /console\.error/);
   assert.match(preloadSource, /getDictationStatus/);
   assert.match(
     preloadSource,
@@ -378,7 +413,63 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
   );
 
   assert.match(smokeSource, /const callbackOrigin = parsed\.origin;/);
-  assert.match(smokeSource, /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/);
+  assert.match(
+    smokeSource,
+    /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/
+  );
+  assert.match(
+    smokeSource,
+    /const ELECTRON_APP_ROUTE = '\/app\/library\?view=releases&runtime=electron';/
+  );
+  assert.match(
+    smokeSource,
+    /const SMOKE_RELEASE_TITLE = 'Native Auth Smoke Release';/
+  );
+  assert.match(
+    smokeSource,
+    /function shouldOpenNativeCallbackViaSecondInstance/
+  );
+  assert.match(smokeSource, /function authUrlTargetsExpectedElectronRoute/);
+  assert.match(smokeSource, /function isExpectedDesktopAuthHandoffTarget/);
+  assert.match(
+    smokeSource,
+    /page\.context\(\)\.request\.get\(targetUrl,\s*\{\s*maxRedirects: 0,/
+  );
+  assert.doesNotMatch(smokeSource, /page\.goto\(targetUrl/);
+  assert.match(smokeSource, /function isExpectedElectronAppRoute/);
+  assert.match(
+    smokeSource,
+    /url\.pathname === '\/app\/library' &&\s*url\.searchParams\.get\('view'\) === 'releases' &&\s*url\.searchParams\.get\('runtime'\) === 'electron'/
+  );
+  assert.match(smokeSource, /state\.apiOk && state\.isExpectedRoute/);
+  assert.match(smokeSource, /const electronRendererIssues = \[\];/);
+  assert.match(smokeSource, /Runtime\.consoleAPICalled/);
+  assert.match(smokeSource, /Runtime\.exceptionThrown/);
+  assert.match(smokeSource, /Log\.entryAdded/);
+  assert.match(smokeSource, /function assertNoElectronRendererIssues/);
+  assert.match(smokeSource, /function isLocalDevelopmentRendererWarning/);
+  assert.match(smokeSource, /Clerk has been loaded with development keys/);
+  assert.match(
+    smokeSource,
+    /Electron Security Warning \(Insecure Content-Security-Policy\)/
+  );
+  assert.match(smokeSource, /unexpected Electron renderer console\/log issue/);
+  assert.match(smokeSource, /function assertCleanElectronReleasesSurface/);
+  assert.match(smokeSource, /function captureElectronReloadSurfaceEvidence/);
+  assert.match(smokeSource, /bodyText\.includes\(releaseTitle\)/);
+  assert.match(smokeSource, /!shell\.hasEmptyLibraryState/);
+  assert.match(smokeSource, /function shouldUseLocalDevAccessSetup/);
+  assert.match(smokeSource, /process\.env\.SMOKE_GRANT_APP_ACCESS === '1'/);
+  assert.match(smokeSource, /async function ensureLocalDevAccess/);
+  assert.match(smokeSource, /scripts\/grant-desktop-smoke-access\.ts/);
+  assert.match(smokeSource, /'--email',\s*getStableSmokeEmail\(\)/);
+  assert.doesNotMatch(smokeSource, /fetch\('\/api\/waitlist'/);
+  assert.doesNotMatch(smokeSource, /fetch\('\/api\/dev\/unwaitlist'/);
+  assert.match(
+    smokeSource,
+    /execFileSync\(\s*'pnpm',\s*\[\s*'--dir',\s*DESKTOP_ROOT,\s*'exec',\s*'electron',\s*'\.',\s*callbackUrl\s*\],\s*\{/
+  );
+  assert.doesNotMatch(smokeSource, /\/app\/chat\?runtime=electron/);
   assert.match(smokeSource, /async function waitForDesktopAuthHandoff/);
   assert.match(smokeSource, /state === 'opened'/);
   assert.match(smokeSource, /candidate\.textContent\?\.includes\('Cancel Sign-In'\)/);
@@ -406,6 +497,26 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
   );
 });
 
+test('hosted web providers keep Vercel Analytics out of Electron runtime', async () => {
+  const webRoot = join(dirname(desktopRoot), 'web');
+  const providersSource = await readFile(
+    join(webRoot, 'components/providers/CoreProviders.tsx'),
+    'utf8'
+  );
+
+  assert.match(providersSource, /function isElectronRuntime\(\): boolean/);
+  assert.match(
+    providersSource,
+    /document\.documentElement\.dataset\.desktopRuntime === 'electron'/
+  );
+  assert.match(providersSource, /\/JovieDesktop\\\//);
+  assert.match(
+    providersSource,
+    /new URLSearchParams\(window\.location\.search\)\.get\('runtime'\) ===\s*'electron'/
+  );
+  assert.match(providersSource, /!isElectronRuntimeApp &&/);
+});
+
 test('hosted web app has an early Electron runtime marker before first paint', async () => {
   const webRoot = join(desktopRoot, '..', 'web');
   const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
@@ -422,8 +533,9 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(rootLayout, /import Script from 'next\/script';/);
   assert.match(
     rootLayout,
-    /<Script src='\/electron-runtime-init\.js' strategy='beforeInteractive' \/>/
+    /src='\/electron-runtime-init\.js'\s+strategy='beforeInteractive'/
   );
+  assert.doesNotMatch(rootLayout, /<script src='\/electron-runtime-init\.js'/);
   assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
