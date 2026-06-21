@@ -3917,8 +3917,11 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-chat-entity-panel-eyebrow) {
   color: var(--color-text-tertiary-token);
-  font-size: var(--text-2xs);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
   line-height: 1rem;
+  text-transform: uppercase;
 }
 
 :where(.system-b-chat-entity-panel-title) {

@@ -685,6 +685,128 @@ describe('ChatEntityRightPanelHost', () => {
     expect(screen.getByText('Brooklyn Steel')).toBeInTheDocument();
   });
 
+  it('entity panel eyebrows carry the EntityCard-aligned CSS class on release panels', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({
+      data: {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        releaseType: 'single',
+        status: 'released',
+        slug: 'lost-in-the-light',
+        smartLinkPath: '/r/lost-in-the-light',
+        profileId: 'profile-1',
+        totalTracks: 1,
+        providers: [],
+      },
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenReleaseTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    const eyebrow = screen
+      .getByTestId('chat-release-entity-panel')
+      .querySelector('.system-b-chat-entity-panel-eyebrow');
+    expect(eyebrow).not.toBeNull();
+    expect(eyebrow?.textContent).toBe('Release');
+  });
+
+  it('entity panel eyebrows carry the EntityCard-aligned CSS class on contact panels', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseContactsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'contact-1',
+          creatorProfileId: 'profile-1',
+          role: 'manager',
+          personName: 'Pat Manager',
+          territories: ['NA'],
+          email: 'pat@example.com',
+          isActive: true,
+          sortOrder: 0,
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenContactTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    const eyebrow = screen
+      .getByTestId('chat-contact-entity-panel')
+      .querySelector('.system-b-chat-entity-panel-eyebrow');
+    expect(eyebrow).not.toBeNull();
+    expect(eyebrow?.textContent).toBe('Contact');
+  });
+
+  it('entity panel eyebrows carry the EntityCard-aligned CSS class on tour-date panels', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseEventsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'evt_brooklyn',
+          title: 'Brooklyn Steel',
+          subtitle: 'Brooklyn, NY · Bandsintown',
+          eventDate: '2026-06-12T23:30:00.000Z',
+          eventType: 'tour',
+          venue: 'Brooklyn Steel',
+          city: 'Brooklyn, NY',
+          provider: 'Bandsintown',
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenTourDateTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    const eyebrow = screen
+      .getByTestId('chat-tour-date-entity-panel')
+      .querySelector('.system-b-chat-entity-panel-eyebrow');
+    expect(eyebrow).not.toBeNull();
+    expect(eyebrow?.textContent).toBe('Tour date');
+  });
+
   it('keeps the right rail empty when flag is off (no panel for contact target)', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
