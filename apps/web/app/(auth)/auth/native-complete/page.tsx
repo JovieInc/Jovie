@@ -3,6 +3,7 @@
 import { useClerk, useSignIn } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { consumeDesktopAuthCompletion } from '@/lib/desktop/electron-bridge';
 import {
   completeDesktopNativeAuth,
@@ -19,6 +20,7 @@ type ClerkBrowserGlobal = {
 let completionKey: string | null = null;
 let completionPromise: ReturnType<typeof completeDesktopNativeAuth> | null =
   null;
+const DESKTOP_DEFAULT_RETURN_ROUTE = `${APP_ROUTES.RELEASES}?runtime=electron`;
 
 function getCompletionPromise(
   key: string,
@@ -49,7 +51,7 @@ function getStoredDesktopAuthReturnTo(): string {
     // Missing storage should fall back to the app shell.
   }
 
-  return '/app/chat?runtime=electron';
+  return DESKTOP_DEFAULT_RETURN_ROUTE;
 }
 
 function isRecoverableCompletionReplayError(error: unknown): boolean {
@@ -148,14 +150,14 @@ function NativeCompleteContent() {
   }, [clerk, router, signIn]);
 
   return (
-    <main className='grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>
+    <main className='grid min-h-dvh place-items-center bg-base px-6 text-primary-token [color-scheme:dark]'>
       <section className='w-full max-w-sm px-6 py-7 text-center'>
         <h1 className='text-[22px] font-semibold leading-7'>
           {state === 'error'
             ? 'Sign-in did not complete'
             : 'Completing sign-in'}
         </h1>
-        <p className='mt-3 text-[14px] leading-5 text-white/64'>
+        <p className='mt-3 text-[14px] leading-5 text-secondary-token'>
           {state === 'error'
             ? 'Close this window and start sign-in again from Jovie.'
             : 'Jovie will open your workspace in a moment.'}

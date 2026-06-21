@@ -26,6 +26,8 @@ const CLERK_REQUIRED_PREFIXES = [
   '/monitoring/',
 ] as const;
 
+const AUTH_ROUTE_BYPASS_EXACT_PATHS = [APP_ROUTES.AUTH_START] as const;
+
 const AUTHENTICATED_API_PREFIXES = [
   '/api/account',
   '/api/admin',
@@ -117,6 +119,18 @@ export function shouldBypassClerkForRequest(options: {
   }
 
   const allowAuthRouteBypass = options.allowAuthRouteBypass === true;
+  const cookies = Array.from(options.cookies);
+  const hasActiveSessionCookie = cookies.some(hasActiveClerkCookie);
+
+  if (
+    allowAuthRouteBypass &&
+    !hasActiveSessionCookie &&
+    AUTH_ROUTE_BYPASS_EXACT_PATHS.includes(
+      options.pathname as (typeof AUTH_ROUTE_BYPASS_EXACT_PATHS)[number]
+    )
+  ) {
+    return true;
+  }
 
   // Public API routes must be able to answer as signed-out requests without
   // entering Clerk's handshake/rewrite flow. Route handlers own auth for
@@ -133,10 +147,8 @@ export function shouldBypassClerkForRequest(options: {
     return false;
   }
 
-  for (const cookie of options.cookies) {
-    if (hasActiveClerkCookie(cookie)) {
-      return false;
-    }
+  if (hasActiveSessionCookie) {
+    return false;
   }
 
   return true;

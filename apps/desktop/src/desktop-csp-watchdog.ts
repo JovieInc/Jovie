@@ -87,7 +87,6 @@ export function installDesktopCspWatchdog(input: {
     });
 
     if (status === 'missing') {
-      input.report('csp-header-missing', responseUrl.pathname);
       headers['Content-Security-Policy'] = [SHELL_FALLBACK_CSP];
       callback({ cancel: false, responseHeaders: headers });
       return;

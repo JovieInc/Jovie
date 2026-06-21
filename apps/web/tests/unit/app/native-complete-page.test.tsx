@@ -79,11 +79,31 @@ describe('NativeCompletePage', () => {
       expect(completeDesktopNativeAuthMock).toHaveBeenCalledTimes(1);
     });
 
-    resolveCompletion({ returnTo: '/app/chat?runtime=electron' });
+    resolveCompletion({ returnTo: '/app/releases?runtime=electron' });
 
     await waitFor(() => {
       expect(routerReplaceMock).toHaveBeenCalledWith(
-        '/app/chat?runtime=electron'
+        '/app/releases?runtime=electron'
+      );
+    });
+  });
+
+  it('falls back to the desktop releases route when replay recovery has no stored return route', async () => {
+    clerkSession = { id: 'sess_123' };
+    clerkUser = { id: 'user_123' };
+    completeDesktopNativeAuthMock.mockRejectedValue(
+      new Error('missing-auth-completion')
+    );
+
+    const { default: NativeCompletePage } = await import(
+      '../../../app/(auth)/auth/native-complete/page'
+    );
+
+    render(<NativeCompletePage />);
+
+    await waitFor(() => {
+      expect(routerReplaceMock).toHaveBeenCalledWith(
+        '/app/releases?runtime=electron'
       );
     });
   });

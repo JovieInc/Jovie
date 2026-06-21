@@ -48,7 +48,10 @@ import {
   isDedicatedRootSegment,
   isProxyRewriteExempt,
 } from '@/lib/routing/proxy-routing';
-import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
+import {
+  buildContentSecurityPolicy,
+  SCRIPT_NONCE_HEADER,
+} from '@/lib/security/content-security-policy';
 import {
   isExplicitDevelopmentEnvironment,
   isLocalDevelopmentAutomationHostname,
@@ -135,6 +138,21 @@ function redirectSignedOutElectronAppShell(req: NextRequest): NextResponse {
   );
   const response = NextResponse.redirect(targetUrl);
   response.headers.set('Location', targetUrl.toString());
+  return withElectronRedirectCsp(response);
+}
+
+function withElectronRedirectCsp(response: NextResponse): NextResponse {
+  const nonce = generateNonce();
+  const allowTestRuntimeRelaxations =
+    process.env.E2E_ALLOW_DEV_CSP === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+
+  response.headers.set(SCRIPT_NONCE_HEADER, nonce);
+  response.headers.set(
+    'Content-Security-Policy',
+    buildContentSecurityPolicy({ nonce, allowTestRuntimeRelaxations })
+  );
+
   return response;
 }
 
