@@ -70,30 +70,30 @@ export const cardTokens = {
   // Sophisticated border system using design tokens
   border: {
     none: 'border-0',
-    subtle: 'border border-[var(--color-border-subtle)]',
-    default: 'border border-[var(--color-border-default)]',
-    strong: 'border border-[var(--color-border-strong)]',
-    accent: 'border border-[var(--color-accent)]',
+    subtle: 'border border-subtle',
+    default: 'border border-default',
+    strong: 'border border-strong',
+    accent: 'border border-accent',
   },
 
   // Interactive states - Linear-inspired responsiveness
   interactive: {
     hover: tw`
-      hover:bg-[var(--color-bg-surface-2)]
-      hover:border-[var(--color-border-default)]
+      hover:bg-surface-2
+      hover:border-default
       transition-all ${timing.normal} ${timing.easing}
     `,
 
     active: tw`
-      active:bg-[var(--color-bg-surface-3)]
+      active:bg-surface-3
     `,
 
     focus: tw`
       focus-visible:outline-none
       focus-visible:ring-2
-      focus-visible:ring-[var(--color-accent)]
+      focus-visible:ring-accent
       focus-visible:ring-offset-2
-      focus-visible:ring-offset-[var(--color-bg-base)]
+      focus-visible:ring-offset-base
     `,
   },
 
@@ -106,10 +106,10 @@ export const cardTokens = {
 
   // Status variants for feedback
   status: {
-    success: 'border-[var(--color-success)] bg-[var(--color-success-subtle)]',
-    warning: 'border-[var(--color-warning)] bg-[var(--color-warning-subtle)]',
-    error: 'border-[var(--color-error)] bg-[var(--color-error-subtle)]',
-    info: 'border-[var(--color-info)] bg-[var(--color-info-subtle)]',
+    success: 'border-success bg-success-subtle',
+    warning: 'border-warning bg-warning-subtle',
+    error: 'border-error bg-error-subtle',
+    info: 'border-info bg-info-subtle',
   },
 
   // Enhanced variant compositions with Linear-level sophistication
@@ -185,12 +185,12 @@ export const cardTokens = {
       rounded-2xl
       p-6 sm:p-8
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
-      hover:border-[var(--color-border-default)]
+      hover:border-default
     `,
 
     // Compact card - for dense layouts
     compact: tw`
-      bg-[var(--color-bg-surface-1)]
+      bg-surface-1
       rounded-lg
       p-4
       transition-[background-color,border-color]
@@ -201,7 +201,7 @@ export const cardTokens = {
       rounded-xl
       p-6
       transition-[background-color,border-color] ${timing.normal} ${timing.easing}
-      hover:bg-[var(--color-interactive-hover)]
+      hover:bg-interactive-hover
     `,
   },
 } as const;
