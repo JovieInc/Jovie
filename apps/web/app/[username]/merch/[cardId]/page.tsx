@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { after } from 'next/server';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
-import { BASE_URL } from '@/constants/app';
 import { getMerchMvpEnabled } from '@/lib/flags/profile-variant';
 import {
   getPublicMerchCard,
   incrementMerchCardView,
 } from '@/lib/merch/service';
+import { generateMerchStructuredData } from '@/lib/seo/structured-data';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
   USERNAME_MAX_LENGTH,
@@ -106,31 +106,15 @@ export default async function MerchProductPage({
     void incrementMerchCardView(card.id).catch(() => undefined);
   });
 
-  const productJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: card.title,
+  const productJsonLd = generateMerchStructuredData({
+    title: card.title,
     description: card.description,
-    image: imageUrl ? [imageUrl] : [],
-    sku: card.id,
-    brand: {
-      '@type': 'Brand',
-      name: artistName,
-    },
-    offers: {
-      '@type': 'Offer',
-      priceCurrency: 'USD',
-      price: (card.retailPriceCents / 100).toFixed(2),
-      availability: 'https://schema.org/InStock',
-      itemCondition: 'https://schema.org/NewCondition',
-      url: `${BASE_URL}/${handle}/merch/${card.id}`,
-      seller: {
-        '@type': 'Organization',
-        name: 'Jovie',
-        url: BASE_URL,
-      },
-    },
-  };
+    imageUrl: imageUrl || null,
+    artistName,
+    handle,
+    cardId: card.id,
+    retailPriceCents: card.retailPriceCents,
+  });
 
   return (
     <PublicPageShell

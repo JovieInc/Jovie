@@ -1,3 +1,5 @@
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
+import { BASE_URL } from '@/constants/app';
 import {
   buildBreadcrumbObject,
   buildListenActions,
@@ -5,7 +7,10 @@ import {
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { generateArtworkImageObject } from '@/lib/images/seo';
 import { msToIsoDuration, toDateOnlySafe } from '@/lib/utils/date';
-import type { SmartLinkCreditGroup } from './_lib/data';
+import {
+  resolveArtistEntityType,
+  resolveMusicContentSchemaType,
+} from './artist-entity';
 
 const RELEASE_TYPE_SCHEMA_MAP: Record<string, string> = {
   single: 'https://schema.org/SingleRelease',
@@ -29,7 +34,6 @@ type TrackListItem = {
   durationMs: number | null;
 };
 
-/** Build the image value for a music schema object. */
 function buildArtworkImageValue(
   artworkUrl: string,
   opts: {
@@ -52,10 +56,8 @@ function buildArtworkImageValue(
     : primaryImage;
 }
 
-/** Map credit groups to flattened schema.org Person references. */
 function buildFlatCredits(
-  credits: SmartLinkCreditGroup[] | null | undefined,
-  baseUrl: string
+  credits: SmartLinkCreditGroup[] | null | undefined
 ): Record<string, unknown> {
   if (!credits) return {};
 
@@ -68,7 +70,7 @@ function buildFlatCredits(
       creditProps[schemaProp].push({
         '@type': 'Person',
         name: entry.name,
-        ...(entry.handle && { url: `${baseUrl}/${entry.handle}` }),
+        ...(entry.handle && { url: `${BASE_URL}/${entry.handle}` }),
       });
     }
   }
@@ -80,7 +82,6 @@ function buildFlatCredits(
   return flatCredits;
 }
 
-/** Build an ItemList schema for an album's track listing. */
 function buildTrackListSchema(
   contentType: 'release' | 'track',
   trackList: TrackListItem[] | null | undefined,
@@ -110,6 +111,10 @@ function buildTrackListSchema(
   };
 }
 
+/**
+ * Generate a single @graph JSON-LD for music content SEO.
+ * Includes MusicAlbum/MusicRelease or MusicRecording + BreadcrumbList.
+ */
 export function generateMusicStructuredData(
   content: {
     type: 'release' | 'track';
@@ -131,19 +136,21 @@ export function generateMusicStructuredData(
     displayName: string | null;
     username: string;
     usernameNormalized: string;
+    creatorType?: 'artist' | 'podcaster' | 'influencer' | 'creator';
     /** Canonical entity graph sameAs — mirrors profile page MusicGroup */
     artistSameAs?: string[];
   },
-  baseUrl: string,
   trackList?: TrackListItem[] | null
 ) {
   const artistName = creator.displayName ?? creator.username;
-  const contentUrl = `${baseUrl}/${creator.usernameNormalized}/${content.slug}`;
-  const artistUrl = `${baseUrl}/${creator.usernameNormalized}`;
+  const contentUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
+  const artistUrl = `${BASE_URL}/${creator.usernameNormalized}`;
 
   const sameAs = content.providerLinks.map(link => link.url);
-  const schemaType =
-    content.type === 'release' ? 'MusicAlbum' : 'MusicRecording';
+  const schemaType = resolveMusicContentSchemaType(content.type);
+  const artistEntityType = resolveArtistEntityType(
+    creator.creatorType ?? 'artist'
+  );
 
   const imageValue = content.artworkUrl
     ? buildArtworkImageValue(content.artworkUrl, {
@@ -156,9 +163,9 @@ export function generateMusicStructuredData(
 
   const listenActions = buildListenActions(
     content.providerLinks,
-    PROVIDER_CONFIG as Record<string, { label: string }>
+    PROVIDER_CONFIG
   );
-  const flatCredits = buildFlatCredits(content.credits, baseUrl);
+  const flatCredits = buildFlatCredits(content.credits);
   const trackListSchema = buildTrackListSchema(
     content.type,
     trackList,
@@ -191,7 +198,7 @@ export function generateMusicStructuredData(
       },
     }),
     byArtist: {
-      '@type': 'MusicGroup',
+      '@type': artistEntityType,
       '@id': `${artistUrl}#musicgroup`,
       name: artistName,
       url: artistUrl,
@@ -221,7 +228,7 @@ export function generateMusicStructuredData(
     '@graph': [
       musicSchema,
       buildBreadcrumbObject([
-        { name: 'Home', url: baseUrl },
+        { name: 'Home', url: BASE_URL },
         { name: artistName, url: artistUrl },
         { name: content.title, url: contentUrl },
       ]),
