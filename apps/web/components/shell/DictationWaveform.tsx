@@ -32,7 +32,7 @@ export function DictationWaveform({
   return (
     <div
       className={cn(
-        'flex items-center justify-center gap-[3px] h-12 w-full',
+        'flex items-center justify-center gap-1 h-12 w-full',
         className
       )}
       aria-hidden='true'
@@ -47,7 +47,7 @@ export function DictationWaveform({
           <span
             // biome-ignore lint/suspicious/noArrayIndexKey: deterministic bar index, no list mutation
             key={i}
-            className='block w-[3px] rounded-full bg-cyan-300/85'
+            className='block w-1 rounded-full bg-cyan-300/85'
             style={{
               height: baseHeight,
               transformOrigin: 'center',

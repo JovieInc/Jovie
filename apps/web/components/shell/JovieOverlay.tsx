@@ -62,7 +62,7 @@ export function JovieOverlay({
       >
         <div
           className={cn(
-            'rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-[480px] max-w-full',
+            'rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-120 max-w-full',
             listening ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
@@ -75,15 +75,15 @@ export function JovieOverlay({
               />
             </span>
             <div className='flex-1 min-w-0'>
-              <div className='text-[14px] font-semibold text-primary-token leading-tight'>
+              <div className='text-sm font-semibold text-primary-token leading-tight'>
                 Listening
               </div>
-              <div className='text-[11.5px] text-tertiary-token leading-tight mt-0.5'>
+              <div className='text-2xs text-tertiary-token leading-tight mt-0.5'>
                 &ldquo;play Take Me Over&rdquo; · &ldquo;find the extended
                 mix&rdquo;
               </div>
             </div>
-            <kbd className='text-[10px] text-quaternary-token tabular-nums shrink-0'>
+            <kbd className='text-3xs text-quaternary-token tabular-nums shrink-0'>
               hold ⌘J
             </kbd>
           </div>
@@ -110,7 +110,7 @@ function DictationWaveform({ active }: { active: boolean }) {
         }
       `}</style>
       <div
-        className='flex items-center justify-center gap-[3px] h-12 w-full'
+        className='flex items-center justify-center gap-1 h-12 w-full'
         aria-hidden='true'
       >
         {Array.from({ length: BARS }, (_, i) => {
@@ -125,7 +125,7 @@ function DictationWaveform({ active }: { active: boolean }) {
             <span
               // biome-ignore lint/suspicious/noArrayIndexKey: deterministic 32-bar list with stable indices — index is the canonical identity
               key={i}
-              className='block w-[3px] rounded-full bg-cyan-300/85'
+              className='block w-1 rounded-full bg-cyan-300/85'
               style={{
                 height: baseHeight,
                 transformOrigin: 'center',
