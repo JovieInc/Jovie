@@ -240,6 +240,10 @@ async function collectLayoutMetrics(page: Page) {
       clientWidth: element.clientWidth,
     }));
 
+    const homeRail = document.querySelector<HTMLElement>(
+      '[data-testid="profile-home-rail"]'
+    );
+
     return {
       viewportWidth,
       viewportHeight,
@@ -249,6 +253,7 @@ async function collectLayoutMetrics(page: Page) {
       root: box(root),
       shell: box(activeShell),
       cover: box(cover),
+      homeRail: box(homeRail),
       desktopCover: box(desktopCover),
       desktopAlerts: box(desktopAlerts),
       desktopSecondaryGrid: box(desktopSecondaryGrid),
@@ -293,6 +298,24 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(
         viewport.isMobile ? 300 : 220
       );
+
+      if (
+        viewport.isMobile &&
+        viewport.height >= 800 &&
+        metrics.cover &&
+        metrics.homeRail &&
+        metrics.nav
+      ) {
+        const deadSpaceBelowCards = metrics.nav.top - metrics.homeRail.bottom;
+        expect(
+          deadSpaceBelowCards,
+          `${viewport.id} should not leave dead space below home cards`
+        ).toBeLessThanOrEqual(24);
+        expect(
+          metrics.cover.height,
+          `${viewport.id} tall mobile hero should grow past the old 432px cap`
+        ).toBeGreaterThan(440);
+      }
 
       for (const image of metrics.visibleLargeImages) {
         expect(

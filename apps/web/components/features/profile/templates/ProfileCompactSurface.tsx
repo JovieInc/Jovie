@@ -399,8 +399,14 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'h-[var(--cover-height)] max-h-108 [@media(max-height:880px)]:max-h-55 [@media(max-height:760px)]:h-45 [@media(max-height:760px)]:max-h-45'
+    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:h-45 [@media(max-height:760px)]:max-h-45'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
+  const homeContentColumnClassName = isHomeMode
+    ? 'shrink-0 [@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
+    : 'min-h-0 flex-1';
+  const homeContentScrollClassName = isHomeMode
+    ? '[@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
+    : 'min-h-0 flex-1';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
@@ -511,7 +517,8 @@ export function ProfileCompactSurface({
 
         <header
           className={cn(
-            'relative shrink-0 overflow-hidden',
+            'relative overflow-hidden',
+            isHomeMode ? 'min-h-0' : 'shrink-0',
             heroHeightClassName
           )}
           data-testid='profile-cover'
@@ -684,7 +691,8 @@ export function ProfileCompactSurface({
 
         <div
           className={cn(
-            'relative z-10 flex min-h-0 flex-1 flex-col px-[var(--page-pad)]',
+            'relative z-10 flex flex-col px-[var(--page-pad)]',
+            homeContentColumnClassName,
             isHomeMode ? 'pt-0' : 'pt-2'
           )}
         >
@@ -715,7 +723,8 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'min-h-0 flex-1 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [touch-action:pan-y] [will-change:scroll-position]',
+              'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [touch-action:pan-y] [will-change:scroll-position]',
+              homeContentScrollClassName,
               showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
               !isHomeMode &&
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
