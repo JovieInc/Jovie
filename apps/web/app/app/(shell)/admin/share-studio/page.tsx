@@ -153,7 +153,7 @@ function PayloadCard(
   });
 
   return (
-    <ContentSurfaceCard className='space-y-4 rounded-[14px] p-4'>
+    <ContentSurfaceCard className='space-y-4 rounded-xl p-4'>
       <div className='flex items-center justify-between gap-3'>
         <div>
           <p className='text-sm font-semibold text-primary-token'>
@@ -237,7 +237,7 @@ export default async function AdminShareStudioPage({
         description='Preview share payloads once blog, profile, release, and playlist content exists.'
         testId='admin-share-studio-page'
       >
-        <ContentSurfaceCard className='rounded-[14px] p-5 text-app text-secondary-token'>
+        <ContentSurfaceCard className='rounded-xl p-5 text-app text-secondary-token'>
           Share Studio needs at least one real blog post, public profile,
           release, and published playlist to render previews.
         </ContentSurfaceCard>

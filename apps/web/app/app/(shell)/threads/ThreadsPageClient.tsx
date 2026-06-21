@@ -137,7 +137,7 @@ export function ChatsPageClient() {
               placeholder='Search conversations'
               ariaLabel='Search Conversations'
               className='max-w-2xl flex-1'
-              inputClassName='text-[13px]'
+              inputClassName='text-app'
             />
             <div className='flex items-center gap-2'>
               {sidebarThreads.length > 0 ? (
@@ -155,7 +155,7 @@ export function ChatsPageClient() {
               </Button>
             </div>
           </div>
-          <div className='mt-2 flex items-center gap-3 text-[11px] text-tertiary-token'>
+          <div className='mt-2 flex items-center gap-3 text-2xs text-tertiary-token'>
             <span>{sidebarThreads.length} conversations</span>
             <span className='inline-flex items-center gap-1'>
               <Search className='h-3 w-3' />
@@ -185,12 +185,12 @@ export function ChatsPageClient() {
           ) : filteredThreads.length === 0 ? (
             <div className='grid min-h-[18rem] place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'>
               <div className='max-w-sm space-y-3'>
-                <p className='text-[14px] font-semibold text-primary-token'>
+                <p className='text-sm font-semibold text-primary-token'>
                   {normalizedQuery
                     ? `No conversations match "${trimmedQuery}".`
                     : 'No conversations yet'}
                 </p>
-                <p className='text-[13px] leading-6 text-secondary-token'>
+                <p className='text-app leading-6 text-secondary-token'>
                   {normalizedQuery
                     ? 'Clear the search or try a different phrase.'
                     : 'Start a new conversation and it will appear here.'}

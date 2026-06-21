@@ -47,8 +47,8 @@ describe('settings retargeting ads shell contract', () => {
     const page = readSource(RETARGETING_PAGE);
     const loading = readSource(RETARGETING_LOADING);
 
-    expect(page).toContain("className='min-h-[156px]'");
+    expect(page).toContain("className='min-h-39'");
     expect(page).toContain('No attributed subscribers yet');
-    expect(loading).toContain("className='min-h-[156px]'");
+    expect(loading).toContain("className='min-h-39'");
   });
 });

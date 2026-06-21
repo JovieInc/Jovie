@@ -54,7 +54,7 @@ export default function OnboardingLoading() {
       <div className='flex h-full flex-col items-center justify-center'>
         <div className='flex w-full max-w-md flex-col items-center text-center'>
           <div className='mb-8 space-y-2'>
-            <h1 className='text-[30px] font-semibold leading-[1.05] tracking-[-0.03em] text-primary-token sm:text-[36px]'>
+            <h1 className='text-3xl font-semibold leading-[1.05] tracking-[-0.03em] text-primary-token sm:text-4xl'>
               Preparing your setup
             </h1>
             <p className='text-mid leading-6 text-secondary-token'>
