@@ -36,12 +36,12 @@ export function MarketingFinalCTA({
     <section
       data-testid={testId}
       className={cn(
-        'relative isolate overflow-hidden bg-black px-[clamp(1.25rem,2.2vw,2rem)] py-[clamp(5rem,9vw,8rem)] text-white',
+        'relative isolate overflow-hidden bg-black px-[clamp(1.25rem,2.2vw,2rem)] py-[clamp(5rem,9vw,8rem)] text-(--color-text-tooltip) dark:bg-black',
         className
       )}
     >
       <div className='relative z-[2] mx-auto flex w-full max-w-[var(--homepage-section-max,80rem)] flex-col items-center text-center'>
-        <h2 className='font-display max-w-[20ch] text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'>
+        <h2 className='font-display max-w-[20ch] text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
           {title}
         </h2>
         {body ? (
@@ -53,7 +53,7 @@ export function MarketingFinalCTA({
           <Link
             href={ctaHref}
             prefetch={false}
-            className='inline-flex h-10 items-center rounded-full bg-(--color-text-tooltip) px-6 text-sm font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className='inline-flex h-10 items-center rounded-full bg-(--color-text-tooltip) px-6 text-sm font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black dark:text-black'
           >
             {ctaLabel}
           </Link>
