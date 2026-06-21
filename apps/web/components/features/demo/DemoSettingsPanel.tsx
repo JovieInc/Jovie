@@ -180,7 +180,7 @@ function AudienceQualityCaptureCard() {
                   <p className='text-app font-semibold text-primary-token'>
                     Advanced Quality Filtering
                   </p>
-                  <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
+                  <p className='mt-1 text-xs leading-normal text-secondary-token'>
                     Apply the same quality logic across audience views, exports,
                     and downstream automations.
                   </p>
@@ -231,7 +231,7 @@ function SyncSettingsCaptureCard() {
                 <p className='text-app font-semibold text-primary-token'>
                   Always in sync
                 </p>
-                <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
+                <p className='mt-1 text-xs leading-normal text-secondary-token'>
                   New releases, top tracks, and linked surfaces stay aligned.
                 </p>
               </div>
@@ -305,7 +305,7 @@ function QualitySignalRow({
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-app font-semibold text-primary-token'>{label}</p>
-          <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
+          <p className='mt-1 text-xs leading-normal text-secondary-token'>
             {detail}
           </p>
         </div>
