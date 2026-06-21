@@ -23,10 +23,10 @@ During the transition phase, this will point to the existing Supabase PostgreSQL
 
 ```
 # For Supabase
-DATABASE_URL=postgresql://postgres:password@db.project-id.supabase.co:5432/postgres
+DATABASE_URL=<standard-postgres-connection-string>
 
 # For Neon (future)
-DATABASE_URL=postgresql+neon://user:password@ep-cool-name-12345.us-east-1.aws.neon.tech/neondb
+DATABASE_URL=<neon-postgres-connection-string>
 ```
 
 ## Supabase Configuration
@@ -61,15 +61,9 @@ The public URL of your application.
 
 ### `IOS_TESTFLIGHT_PUBLIC_LINK`
 
-Optional internal TestFlight install URL used by authenticated, alpha-gated iOS
-download surfaces. Leave unset to keep the iOS alpha visible but not directly
-installable from web UI.
-
-### `MOBILE_CHAT_RUNTIME_ENABLED`
-
-Set to `true` on environments that should serve native iOS chat turns from
-`POST /api/mobile/v1/chat/turns`. Leave unset/false in production until the
-`ios_app_alpha_access` gate and mobile chat contract tests pass in CI.
+Optional internal TestFlight install URL used by authenticated iOS download
+surfaces. Leave unset to keep iOS visible but not directly installable from web
+UI.
 
 ## Feature Flags (Statsig)
 

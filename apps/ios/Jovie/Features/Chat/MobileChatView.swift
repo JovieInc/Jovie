@@ -72,7 +72,7 @@ struct MobileChatView: View {
           Text(
             repository.isOffline
               ? "Offline. Drafts stay on this device and cached history remains available."
-              : "Native chat is in alpha for internal testers."
+              : "Ask Jovie about your profile, releases, and next moves."
           )
           .font(JovieFont.body(size: 15))
           .foregroundStyle(JovieColor.textTertiary)
