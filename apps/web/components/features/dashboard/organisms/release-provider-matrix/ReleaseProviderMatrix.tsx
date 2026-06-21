@@ -342,10 +342,10 @@ function ConnectedReleaseEmptyState({
     <PageShell className='mt-2.5' data-testid='release-table-shell'>
       <DrawerSurfaceCard
         variant='card'
-        className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
+        className='flex min-h-53 flex-col items-center justify-center px-5 py-9 text-center'
         testId='releases-empty-state-connected'
       >
-        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
+        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-lg border border-subtle bg-surface-1'>
           <Icon
             name='Disc3'
             className='size-4 text-tertiary-token'

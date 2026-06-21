@@ -80,7 +80,7 @@ export function ContactTerritoryPicker({
             size='sm'
             variant='ghost'
             onClick={onAddCustomTerritory}
-            className='w-full sm:w-auto min-h-[44px]'
+            className='w-full sm:w-auto min-h-11'
           >
             Add
           </Button>

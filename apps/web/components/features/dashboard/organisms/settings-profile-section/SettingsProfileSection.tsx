@@ -16,11 +16,11 @@ import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
-  'block w-full rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
+  'block w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
 const PROFILE_LABEL_COLUMN_WIDTH = '168px';
 const PROFILE_ROW_CLASS =
   'grid gap-2 py-3 sm:grid-cols-[var(--profile-label-column-width)_minmax(0,1fr)] sm:items-start sm:gap-x-5';
-const PROFILE_FIELD_COLUMN_CLASS = 'w-full sm:max-w-[420px]';
+const PROFILE_FIELD_COLUMN_CLASS = 'w-full sm:max-w-105';
 const PROFILE_LAYOUT_VARS = {
   '--profile-label-column-width': PROFILE_LABEL_COLUMN_WIDTH,
 } as CSSProperties;
@@ -109,7 +109,7 @@ export function SettingsProfileSection({
         </div>
         {avatarQuality?.status === 'low' ? (
           <div className='pb-2 sm:pl-[calc(var(--profile-label-column-width)+1.25rem)]'>
-            <div className='flex items-start gap-3 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-secondary-token'>
+            <div className='flex items-start gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-secondary-token'>
               <AlertCircle
                 className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
                 aria-hidden='true'
@@ -152,7 +152,7 @@ export function SettingsProfileSection({
             </p>
           </div>
           <div className={`flex rounded-md ${PROFILE_FIELD_COLUMN_CLASS}`}>
-            <span className='inline-flex select-none items-center rounded-l-[10px] border border-r-0 border-subtle bg-surface-0 px-3 text-app text-secondary-token'>
+            <span className='inline-flex select-none items-center rounded-l-lg border border-r-0 border-subtle bg-surface-0 px-3 text-app text-secondary-token'>
               {profileDomain}/
             </span>
             <Input
@@ -165,7 +165,7 @@ export function SettingsProfileSection({
               onChange={e => handleFieldChange('username', e.target.value)}
               onBlur={() => flushSave()}
               placeholder='yourname'
-              className={`min-w-0 flex-1 rounded-none rounded-r-[10px] border-l-0 ${PROFILE_INPUT_CLASS}`}
+              className={`min-w-0 flex-1 rounded-none rounded-r-lg border-l-0 ${PROFILE_INPUT_CLASS}`}
             />
           </div>
         </div>

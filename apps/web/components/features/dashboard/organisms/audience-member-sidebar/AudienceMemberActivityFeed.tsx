@@ -18,7 +18,7 @@ export function AudienceMemberActivityFeed({
   if (actions.length === 0) {
     return (
       <DrawerEmptyState
-        className='min-h-[104px]'
+        className='min-h-26'
         message='Activity will appear here as this contact interacts with your profile.'
       />
     );
@@ -37,7 +37,7 @@ export function AudienceMemberActivityFeed({
   return (
     <div className='relative'>
       <div
-        className='absolute top-2.5 bottom-2.5 left-[11px] w-px bg-(--linear-border-subtle)'
+        className='absolute top-2.5 bottom-2.5 left-3 w-px bg-(--linear-border-subtle)'
         aria-hidden='true'
       />
 
@@ -68,14 +68,14 @@ function ActivityItem({
         className='relative z-10 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
         aria-hidden='true'
       >
-        <Icon name={icon} className='h-[11px] w-[11px]' />
+        <Icon name={icon} className='h-3 w-3' />
       </span>
 
       <div className='min-w-0 flex-1 pt-px'>
         <p className='truncate text-xs leading-4 text-primary-token'>{label}</p>
-        <div className='mt-0.5 flex items-center gap-1.5 text-[10.5px] text-tertiary-token'>
+        <div className='mt-0.5 flex items-center gap-1.5 text-3xs text-tertiary-token'>
           {action.sourceLabel ? (
-            <span className='max-w-[140px] truncate rounded bg-surface-0 px-1 text-secondary-token'>
+            <span className='max-w-35 truncate rounded bg-surface-0 px-1 text-secondary-token'>
               {action.sourceLabel}
             </span>
           ) : null}

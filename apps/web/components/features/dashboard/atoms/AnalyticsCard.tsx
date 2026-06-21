@@ -45,7 +45,7 @@ export function AnalyticsCard({
     const subtitle = children ?? metadata;
     return (
       <section className={order} aria-label={ariaLabel ?? `${title} metric`}>
-        <p className='text-[36px] font-bold leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
+        <p className='text-4xl font-bold leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
           {value}
         </p>
         <p className='mt-1.5 text-app font-book text-tertiary-token'>{title}</p>

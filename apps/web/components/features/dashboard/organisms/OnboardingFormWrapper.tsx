@@ -51,12 +51,12 @@ function OnboardingFormLoadingShell() {
                 <div className='h-4 w-3 skeleton rounded' />
                 <div className='h-5 flex-1 skeleton rounded-md' />
               </div>
-              <div className='min-h-[24px]' />
+              <div className='min-h-6' />
               <div className='h-11 w-full skeleton rounded-full' />
             </div>
           </div>
 
-          <div className='mt-6 min-h-[40px]' />
+          <div className='mt-6 min-h-10' />
         </div>
       </div>
     </OnboardingExperienceShell>
