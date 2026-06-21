@@ -52,6 +52,7 @@ const mockSyncStoreListingForRun = vi.hoisted(() =>
 vi.mock('../store-listing', () => ({
   syncStoreListingForRun: mockSyncStoreListingForRun,
 }));
+
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '../types';
 import { initializeReleaseToRevenueRun } from './initialize-run';
 
