@@ -309,7 +309,7 @@ export function ProfileHomeRail({
 
   return (
     <div
-      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
+      className='min-w-0 space-y-2 overflow-x-clip md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
     >
       {alertsCard}
