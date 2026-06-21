@@ -2,8 +2,6 @@ import 'server-only';
 
 import { createFingerprintEdge } from '@/lib/audience/fingerprint';
 import { withTimeout } from '@/lib/db/query-timeout';
-import { publicEnv } from '@/lib/env-public';
-import { env } from '@/lib/env-server';
 import { getRedis } from '@/lib/redis';
 
 // Timeout for audience-block DB queries. Matches proxy-state.ts budget — kept
@@ -95,13 +93,26 @@ function clearMemoryCache(cacheKey: string): void {
   memoryCache.delete(cacheKey);
 }
 
-function shouldSkipAudienceBlockTelemetry(): boolean {
+function isTestRuntime(): boolean {
+  return process.env.NODE_ENV === 'test';
+}
+
+function isPublicNoAuthSmoke(): boolean {
+  return process.env.PUBLIC_NOAUTH_SMOKE === '1';
+}
+
+function isE2ERuntime(): boolean {
   return (
-    env.CI === 'true' ||
-    env.NODE_ENV === 'test' ||
-    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
-    env.E2E_USE_TEST_AUTH_BYPASS === '1'
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
   );
+}
+
+function shouldSkipAudienceBlockTelemetry(): boolean {
+  // This module is shared by ISR-sensitive public routes and proxy checks.
+  // Keep env reads inline so typed server env imports cannot pull request-aware
+  // modules into static profile renders.
+  return process.env.CI === 'true' || isTestRuntime() || isE2ERuntime();
 }
 
 function loadSentry(): Promise<SentryModule> {
@@ -373,8 +384,8 @@ export async function checkProfileVisitorBlocked(
   ip: string | null,
   ua: string | null
 ): Promise<boolean> {
-  if (env.NODE_ENV === 'test') return false;
-  if (env.PUBLIC_NOAUTH_SMOKE === '1') return false;
+  if (isTestRuntime()) return false;
+  if (isPublicNoAuthSmoke()) return false;
 
   try {
     const normalizedUsername = normalizeUsername(username);
