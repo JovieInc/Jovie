@@ -217,7 +217,7 @@ export function PublicShareMenu({
     ) : (
       <button
         type='button'
-        className='inline-flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-app font-[510] text-secondary-token transition-colors duration-subtle hover:text-primary-token'
+        className='inline-flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
       >
         {title}
       </button>
