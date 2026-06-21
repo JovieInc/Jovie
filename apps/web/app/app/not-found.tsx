@@ -10,7 +10,7 @@ export default function AppNotFound() {
     >
       <div className='flex flex-col items-center text-center'>
         {/* Illustration — broken vinyl / missing track, Jovie-themed */}
-        <div className='mb-5 flex h-[72px] w-[72px] items-center justify-center rounded-2xl bg-surface-2'>
+        <div className='mb-5 flex h-18 w-18 items-center justify-center rounded-2xl bg-surface-2'>
           <svg
             width='36'
             height='36'

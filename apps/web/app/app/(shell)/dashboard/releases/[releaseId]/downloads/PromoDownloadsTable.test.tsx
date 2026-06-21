@@ -13,7 +13,7 @@ describe('PromoDownloadsTable', () => {
       />
     );
 
-    expect(container.firstElementChild).toHaveClass('min-h-[220px]');
+    expect(container.firstElementChild).toHaveClass('min-h-55');
     expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });

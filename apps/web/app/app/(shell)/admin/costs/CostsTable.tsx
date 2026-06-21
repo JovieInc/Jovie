@@ -43,7 +43,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
               ) : null}
             </div>
           ),
-          meta: { className: 'min-w-[280px]' },
+          meta: { className: 'min-w-70' },
         }),
         columnHelper.accessor('observed30dUsd', {
           header: '30d Spend (USD)',

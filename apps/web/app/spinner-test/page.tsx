@@ -23,7 +23,7 @@ export default function SpinnerTestPage() {
 
         <div className='space-y-5 px-5 py-5 text-center sm:px-6'>
           <div className='flex justify-center'>
-            <div className='rounded-[14px] border border-subtle bg-surface-0 p-6'>
+            <div className='rounded-xl border border-subtle bg-surface-0 p-6'>
               <svg
                 width='64'
                 height='64'
@@ -75,14 +75,12 @@ export default function SpinnerTestPage() {
             </div>
           </div>
 
-          <p className='text-[13px] leading-5 text-secondary-token'>
+          <p className='text-app leading-5 text-secondary-token'>
             This route exists to verify the tail-weighted spinner treatment in
             isolation.
           </p>
 
-          <p className='text-[12px] text-tertiary-token'>
-            View at /spinner-test
-          </p>
+          <p className='text-xs text-tertiary-token'>View at /spinner-test</p>
         </div>
       </ContentSurfaceCard>
     </StandaloneProductPage>
