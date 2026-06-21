@@ -110,11 +110,11 @@ export function ConfirmMatchDialog({
                 width={64}
                 height={64}
                 sizes='64px'
-                className='rounded-[10px] object-cover'
+                className='rounded-lg object-cover'
                 unoptimized={isExternalDspImage(externalArtistImageUrl)}
               />
             ) : (
-              <div className='flex h-16 w-16 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
+              <div className='flex h-16 w-16 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
                 <DspProviderIcon provider={providerId} size='lg' />
               </div>
             )}

@@ -24,7 +24,7 @@ describe('AnalyticsCard', () => {
     );
 
     const value = screen.getByText('$847.00');
-    expect(value).toHaveClass('text-[36px]');
+    expect(value).toHaveClass('text-4xl');
     expect(value).toHaveClass('font-bold');
     expect(value).toHaveClass('tracking-[-0.03em]');
     expect(

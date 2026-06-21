@@ -322,7 +322,7 @@ export function ReleaseFilterDropdown({
           sideOffset={4}
           className={cn(
             LINEAR_SURFACE.popover,
-            'flex max-h-[280px] min-w-[212px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+            'flex max-h-70 min-w-53 max-w-[calc(100vw-16px)] flex-col overflow-hidden'
           )}
           onCloseAutoFocus={e => e.preventDefault()}
         >
@@ -403,7 +403,7 @@ export function ReleaseFilterDropdown({
                       collisionPadding={8}
                       className={cn(
                         LINEAR_SURFACE.popover,
-                        'flex max-h-[300px] min-w-[196px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+                        'flex max-h-75 min-w-49 max-w-[calc(100vw-16px)] flex-col overflow-hidden'
                       )}
                     >
                       <FilterSearchInput

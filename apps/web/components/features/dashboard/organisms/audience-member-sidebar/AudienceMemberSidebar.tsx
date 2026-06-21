@@ -78,7 +78,7 @@ export function AudienceMemberSidebar({
               reserveMetaSlot
               metaOverflow='scroll'
               artwork={
-                <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-subtle bg-surface-0 text-sm font-semibold text-secondary-token'>
+                <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-sm font-semibold text-secondary-token'>
                   {primaryLabel.charAt(0).toUpperCase()}
                 </div>
               }

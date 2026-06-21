@@ -41,7 +41,7 @@ export interface PillIconProps {
 export function PillIcon({ platformIcon, style }: Readonly<PillIconProps>) {
   return (
     <span
-      className='flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 p-0.5 transition-colors'
+      className='flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 p-0.5 transition-colors'
       style={style}
       aria-hidden='true'
     >
