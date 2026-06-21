@@ -1,3 +1,5 @@
+import type { MouseEvent } from 'react';
+
 /** The four entity kinds a card can represent across profile + chat. */
 export type EntityKind = 'merch' | 'music' | 'video' | 'show';
 
@@ -43,6 +45,8 @@ export interface EntityCardCta {
   readonly label: string;
   readonly href?: string | null;
   readonly external?: boolean;
+  readonly onClick?: (event: MouseEvent<HTMLElement>) => void;
+  readonly disabled?: boolean;
 }
 
 /**
@@ -65,8 +69,16 @@ export interface EntityCardModel {
   readonly title: string;
   /** Secondary meta line (product type, release type · year, venue · city). */
   readonly meta?: string | null;
+  /** Tertiary meta line (doors time, timezone). */
+  readonly secondaryMeta?: string | null;
   readonly status?: EntityCardStatus | null;
   readonly price?: EntityCardPrice | null;
   readonly datePill?: EntityCardDatePill | null;
   readonly cta?: EntityCardCta | null;
+  readonly secondaryCta?: EntityCardCta | null;
+  /**
+   * When true, the card is not a whole-card link and CTAs render as real
+   * controls (for analytics, calendar fallback, sold-out/cancelled states).
+   */
+  readonly interactive?: boolean;
 }

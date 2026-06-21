@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
+  tourDateToEntityCard,
 } from './adapters';
 
 const merch: PublicMerchCard = {
@@ -177,6 +179,75 @@ describe('chatTourDateContextToEntityCard', () => {
 
     expect(model.title).toBe('Brooklyn Steel');
     expect(model.meta).toBe('Loading Tour Date');
+  });
+});
+
+const tourDate: TourDateViewModel = {
+  id: 'td-1',
+  profileId: 'profile-1',
+  externalId: null,
+  provider: 'manual',
+  eventType: 'tour',
+  confirmationStatus: 'confirmed',
+  reviewedAt: '2026-01-01T00:00:00.000Z',
+  title: null,
+  startDate: '2030-06-15T20:00:00.000Z',
+  startTime: '20:00',
+  timezone: 'America/New_York',
+  venueName: 'The Venue',
+  city: 'Brooklyn',
+  region: 'NY',
+  country: 'USA',
+  latitude: null,
+  longitude: null,
+  ticketUrl: 'https://example.com/tickets',
+  ticketStatus: 'available',
+  lastSyncedAt: null,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+describe('tourDateToEntityCard', () => {
+  it('maps venue, date pill, ticket CTA, and calendar secondary action', () => {
+    const model = tourDateToEntityCard(tourDate);
+    expect(model.kind).toBe('show');
+    expect(model.interactive).toBe(true);
+    expect(model.title).toBe('Live');
+    expect(model.meta).toBe('The Venue · Brooklyn, NY, USA');
+    expect(model.datePill).toEqual({ month: 'Jun', day: '15' });
+    expect(model.cta).toEqual({
+      label: 'Get Tickets',
+      href: 'https://example.com/tickets',
+      external: true,
+      disabled: false,
+    });
+    expect(model.secondaryCta).toEqual({
+      label: 'Add To Calendar',
+      href: null,
+    });
+  });
+
+  it('marks cancelled dates disabled without a secondary action', () => {
+    const model = tourDateToEntityCard({
+      ...tourDate,
+      ticketStatus: 'cancelled',
+    });
+    expect(model.cta).toEqual({
+      label: 'Cancelled',
+      href: null,
+      external: false,
+      disabled: true,
+    });
+    expect(model.secondaryCta).toBeNull();
+  });
+
+  it('uses a near-you eyebrow and blue accent when requested', () => {
+    const model = tourDateToEntityCard(tourDate, {
+      isNearYou: true,
+      distanceKm: 12.4,
+    });
+    expect(model.eyebrow).toBe('12 km away');
+    expect(model.accent).toBe('blue');
   });
 });
 

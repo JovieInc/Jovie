@@ -40,7 +40,19 @@ function makeTourDate(
   };
 }
 
-describe('TourDateCard — cancelled state', () => {
+describe('TourDateCard', () => {
+  it('renders via EntityCard with the shared show test id', () => {
+    const { container } = renderWithQueryClient(
+      <TourDateCard tourDate={makeTourDate()} handle='testartist' />
+    );
+
+    expect(
+      container.querySelector('[data-testid="entity-card-show"]')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Jun')).toBeInTheDocument();
+    expect(screen.getByText('15')).toBeInTheDocument();
+  });
+
   it('hides the Add to Calendar button when the date is cancelled', () => {
     renderWithQueryClient(
       <TourDateCard
@@ -79,5 +91,16 @@ describe('TourDateCard — cancelled state', () => {
     expect(
       screen.getByRole('button', { name: /add to calendar/i })
     ).toBeInTheDocument();
+  });
+
+  it('renders Get Tickets as the primary CTA when tickets are available', () => {
+    renderWithQueryClient(
+      <TourDateCard tourDate={makeTourDate()} handle='testartist' />
+    );
+
+    expect(screen.getByRole('link', { name: /get tickets/i })).toHaveAttribute(
+      'href',
+      'https://example.com/tickets'
+    );
   });
 });

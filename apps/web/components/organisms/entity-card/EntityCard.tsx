@@ -5,7 +5,12 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { cn } from '@/lib/utils';
 import { accentVar, KIND_PRESETS, statusDotVar } from './kind-presets';
-import type { EntityCardModel, EntitySurface, EntityTreatment } from './types';
+import type {
+  EntityCardCta,
+  EntityCardModel,
+  EntitySurface,
+  EntityTreatment,
+} from './types';
 
 interface EntityCardProps {
   readonly model: EntityCardModel;
@@ -52,6 +57,62 @@ const SIZE: Record<EntityTreatment, SizeConfig> = {
     ctaBlock: true,
   },
 };
+
+function EntityCtaControl({
+  cta,
+  block,
+}: Readonly<{
+  cta: EntityCardCta;
+  block: boolean;
+}>) {
+  const className = cn(
+    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+    block ? 'h-11 w-full' : 'h-8 min-w-0 flex-1',
+    cta.disabled &&
+      'cursor-not-allowed border-subtle bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-0'
+  );
+
+  if (cta.disabled || (!cta.href && !cta.onClick)) {
+    return (
+      <span className={className} aria-disabled={cta.disabled || undefined}>
+        {cta.label}
+      </span>
+    );
+  }
+
+  if (cta.href?.startsWith('/')) {
+    return (
+      <Link
+        href={cta.href}
+        prefetch={false}
+        onClick={cta.onClick}
+        className={className}
+      >
+        {cta.label}
+      </Link>
+    );
+  }
+
+  if (cta.href) {
+    return (
+      <a
+        href={cta.href}
+        target={cta.external ? '_blank' : undefined}
+        rel={cta.external ? 'noopener noreferrer' : undefined}
+        onClick={cta.onClick}
+        className={className}
+      >
+        {cta.label}
+      </a>
+    );
+  }
+
+  return (
+    <button type='button' onClick={cta.onClick} className={className}>
+      {cta.label}
+    </button>
+  );
+}
 
 function CardShell({
   href,
@@ -121,7 +182,12 @@ export function EntityCard({
   const Icon = preset.icon;
   const isPearl = surface === 'pearl';
 
-  const cardHref = model.href ?? model.cta?.href ?? null;
+  const isInteractive =
+    model.interactive === true ||
+    Boolean(model.cta?.onClick || model.secondaryCta);
+  const cardHref = isInteractive
+    ? null
+    : (model.href ?? model.cta?.href ?? null);
   const cardExternal = model.cta?.external;
 
   const artStyle: CSSProperties = {
@@ -201,7 +267,7 @@ export function EntityCard({
 
         <h3
           className={cn(
-            'min-w-0 font-semibold leading-tight tracking-tighter text-primary-token line-clamp-2',
+            'min-w-0 font-[590] leading-tight tracking-[-0.02em] text-primary-token line-clamp-2',
             size.titleClass
           )}
         >
@@ -214,46 +280,75 @@ export function EntityCard({
           </p>
         ) : null}
 
+        {size.showMeta && model.secondaryMeta ? (
+          <p className='min-w-0 truncate text-[11.5px] text-tertiary-token'>
+            {model.secondaryMeta}
+          </p>
+        ) : null}
+
         <div
           className={cn(
-            'mt-auto flex items-center gap-2 pt-1',
-            size.ctaBlock ? 'flex-col items-stretch' : 'justify-between'
+            'mt-auto flex gap-2 pt-1',
+            isInteractive
+              ? size.ctaBlock
+                ? 'flex-col items-stretch'
+                : 'flex-row items-stretch'
+              : cn(
+                  'items-center',
+                  size.ctaBlock ? 'flex-col items-stretch' : 'justify-between'
+                )
           )}
         >
-          {model.price ? (
-            <div className='min-w-0'>
-              <span className='text-sm font-bold text-primary-token'>
-                {model.price.original ? (
-                  <>
-                    {model.price.display}
-                    <span className='ml-1 text-2xs font-medium text-tertiary-token line-through'>
-                      {model.price.original}
-                    </span>
-                  </>
-                ) : (
-                  model.price.display
-                )}
-              </span>
-              {model.price.profit ? (
-                <p className='text-2xs text-tertiary-token'>
-                  Profit {model.price.profit}
-                </p>
+          {isInteractive ? (
+            <>
+              {model.cta ? (
+                <EntityCtaControl cta={model.cta} block={size.ctaBlock} />
               ) : null}
-            </div>
+              {model.secondaryCta ? (
+                <EntityCtaControl
+                  cta={model.secondaryCta}
+                  block={size.ctaBlock}
+                />
+              ) : null}
+            </>
           ) : (
-            <span aria-hidden='true' />
-          )}
-
-          {model.cta ? (
-            <span
-              className={cn(
-                'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:border-(--linear-btn-primary-hover) group-hover:bg-btn-primary-hover',
-                size.ctaBlock ? 'h-11 w-full' : 'h-8'
+            <>
+              {model.price ? (
+                <div className='min-w-0'>
+                  <span className='text-sm font-[680] text-primary-token'>
+                    {model.price.original ? (
+                      <>
+                        {model.price.display}
+                        <span className='ml-1 text-2xs font-medium text-tertiary-token line-through'>
+                          {model.price.original}
+                        </span>
+                      </>
+                    ) : (
+                      model.price.display
+                    )}
+                  </span>
+                  {model.price.profit ? (
+                    <p className='text-2xs text-tertiary-token'>
+                      Profit {model.price.profit}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <span aria-hidden='true' />
               )}
-            >
-              {model.cta.label}
-            </span>
-          ) : null}
+
+              {model.cta ? (
+                <span
+                  className={cn(
+                    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:border-(--linear-btn-primary-hover) group-hover:bg-btn-primary-hover',
+                    size.ctaBlock ? 'h-11 w-full' : 'h-8'
+                  )}
+                >
+                  {model.cta.label}
+                </span>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
     </CardShell>
