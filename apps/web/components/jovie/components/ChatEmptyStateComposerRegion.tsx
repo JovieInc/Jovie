@@ -25,7 +25,10 @@ export function ChatEmptyStateComposerRegion({
         }}
         data-testid='chat-empty-state-logo'
       >
-        <JovieMarkElectric className='h-full w-full' />
+        <JovieMarkElectric
+          className='h-full w-full'
+          idSeed='chat-empty-state-logo'
+        />
       </div>
       {above ? (
         <div className='absolute inset-x-0 bottom-1/2 z-10 mb-12 max-h-[min(46vh,24rem)] overflow-y-auto overscroll-contain px-1 pb-1'>
