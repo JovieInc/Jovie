@@ -1,4 +1,4 @@
 {
-  "count": 3527,
+  "count": 3525,
   "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count."
 }
