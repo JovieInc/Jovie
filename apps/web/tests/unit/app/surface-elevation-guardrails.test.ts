@@ -409,7 +409,7 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
     const rightDrawer = readFileSync(
-      join(ROOT, 'components/organisms/RightDrawer.tsx'),
+      join(ROOT, 'components/molecules/drawer/RightDrawer.tsx'),
       'utf-8'
     );
     const linearTokens = readFileSync(

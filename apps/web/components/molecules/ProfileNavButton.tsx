@@ -148,7 +148,7 @@ export function ProfileNavButton({
       <Link href={`/${artistHandle}`} data-testid='back-button'>
         <ArrowLeft
           className={cn(
-            'h-[17px] w-[17px] text-primary-token/78',
+            'h-4 w-4 text-primary-token/78',
             'transition-all duration-300 ease-out',
             'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-300'
           )}
