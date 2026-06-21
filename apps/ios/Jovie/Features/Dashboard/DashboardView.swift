@@ -305,6 +305,8 @@ struct DashboardView: View {
           copyURL(response.publicProfileURL)
         }
         .buttonStyle(JoviePillButtonStyle(filled: false))
+        .accessibilityIdentifier("dashboard-copy-url-button")
+        .accessibilityValue(didCopyURL ? "Copied" : "Copy URL")
 
         ShareLink(item: response.publicProfileURL ?? response.continueOnWebURL) {
           Text("Share")

@@ -235,11 +235,25 @@ final class JovieUITests: XCTestCase {
   }
 
   func testCopyURLButtonShowsCopiedState() throws {
-    // Pre-existing flake: tap timing is unreliable in CI; the "Copied" state
-    // sometimes resolves before the assertion fires, especially on slower runners.
-    // Tracked in JOV-1972. Skipped here instead of via -skip-testing: xcodebuild
-    // flag which is unreliable across Xcode versions.
-    throw XCTSkip("Pre-existing flake — tracked in JOV-1972")
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["dashboard-copy-url-button"]
+    }
+
+    let copyURLButton = app.buttons["dashboard-copy-url-button"]
+    XCTAssertTrue(
+      copyURLButton.waitForExistence(timeout: 3),
+      "Copy URL button did not appear.\n\(app.debugDescription)"
+    )
+
+    copyURLButton.tap()
+
+    let copiedState = NSPredicate(format: "label == %@ OR value == %@", "Copied", "Copied")
+    let copiedExpectation = expectation(for: copiedState, evaluatedWith: copyURLButton)
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [copiedExpectation], timeout: 2),
+      .completed,
+      "Copy URL button did not show copied state.\n\(app.debugDescription)"
+    )
   }
 
   func testLiveAuthViewRenders() throws {
