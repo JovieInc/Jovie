@@ -748,7 +748,7 @@ export function HudDashboardClient({
   // Operations / Reliability / Runway KPIs likewise scale down in shell.
   const secondaryValueClass = isShell
     ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
-    : 'text-4xl font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
+    : 'text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
 
   const aiOpsSummary = (
     <span>
