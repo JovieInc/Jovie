@@ -58,7 +58,7 @@ describe('GET /auth/start', () => {
     hoisted.createStoredAuthState.mockResolvedValue({
       client: 'electron',
       intent: 'sign_in',
-      returnTo: '/app/chat?runtime=electron',
+      returnTo: '/app/releases?runtime=electron',
       state: 'state_123',
       codeChallenge: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ',
       createdAt: 1_000,
@@ -70,7 +70,7 @@ describe('GET /auth/start', () => {
   it('redirects signed-in native auth starts to the same-origin callback', async () => {
     const response = await GET(
       new Request(
-        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Freleases%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
       )
     );
 
@@ -82,9 +82,46 @@ describe('GET /auth/start', () => {
       expect.objectContaining({
         client: 'electron',
         intent: 'sign_in',
-        returnTo: '/app/chat?runtime=electron',
+        returnTo: '/app/releases?runtime=electron',
         state: '00000000000040008000000000000123',
       })
+    );
+  });
+
+  it('falls back to browser sign-in when Clerk context is unavailable in local native auth', async () => {
+    hoisted.auth.mockRejectedValueOnce(new Error('missing middleware context'));
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Freleases%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3112/signin?auth_state=state_123'
+    );
+    expect(hoisted.createStoredAuthState).toHaveBeenCalled();
+  });
+
+  it('preserves the forwarded local app origin in native auth redirects', async () => {
+    hoisted.auth.mockRejectedValueOnce(new Error('missing middleware context'));
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Freleases%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
+        {
+          headers: {
+            host: '127.0.0.1:3112',
+            'x-forwarded-proto': 'http',
+          },
+        }
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://127.0.0.1:3112/signin?auth_state=state_123'
     );
   });
 
@@ -103,7 +140,7 @@ describe('GET /auth/start', () => {
 
     const response = await GET(
       new Request(
-        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Freleases%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
       )
     );
 
@@ -124,7 +161,7 @@ describe('GET /auth/start', () => {
 
     const response = await GET(
       new Request(
-        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Freleases%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
       )
     );
 
@@ -145,7 +182,7 @@ describe('GET /auth/start', () => {
 
     const response = await GET(
       new Request(
-        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Freleases%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
       )
     );
 

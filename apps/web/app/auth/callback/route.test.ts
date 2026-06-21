@@ -37,7 +37,7 @@ describe('GET /auth/callback', () => {
     hoisted.consumeStoredAuthState.mockResolvedValue({
       client: 'electron',
       intent: 'sign_in',
-      returnTo: '/app/chat?runtime=electron',
+      returnTo: '/app/releases?runtime=electron',
       state: 'state_123',
       codeChallenge: 'challenge_123',
       createdAt: 1_000,
@@ -49,7 +49,7 @@ describe('GET /auth/callback', () => {
       client: 'electron',
       state: 'state_123',
       userId: 'user_123',
-      returnTo: '/app/chat?runtime=electron',
+      returnTo: '/app/releases?runtime=electron',
       codeChallenge: 'challenge_123',
       createdAt: 2_000,
       expiresAt: 62_000,
@@ -75,7 +75,7 @@ describe('GET /auth/callback', () => {
       client: 'electron',
       state: 'state_123',
       userId: 'user_123',
-      returnTo: '/app/chat?runtime=electron',
+      returnTo: '/app/releases?runtime=electron',
       codeChallenge: 'challenge_123',
     });
     expect(

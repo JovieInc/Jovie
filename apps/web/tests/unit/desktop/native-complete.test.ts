@@ -16,7 +16,7 @@ describe('completeDesktopNativeAuth', () => {
       ok: true,
       json: async () => ({
         ticket: 'ticket_123',
-        returnTo: '/app/chat',
+        returnTo: '/app/releases',
       }),
     }));
     const signIn = {
@@ -35,7 +35,7 @@ describe('completeDesktopNativeAuth', () => {
         signIn,
         setActive,
       })
-    ).resolves.toEqual({ returnTo: '/app/chat' });
+    ).resolves.toEqual({ returnTo: '/app/releases' });
 
     expect(consumeCompletion).toHaveBeenCalledTimes(1);
     expect(fetchNativeExchange).toHaveBeenCalledWith(
@@ -57,7 +57,7 @@ describe('completeDesktopNativeAuth', () => {
     });
     expect(setActive).toHaveBeenCalledWith({
       session: 'sess_123',
-      redirectUrl: '/app/chat',
+      redirectUrl: '/app/releases',
     });
   });
 
@@ -149,7 +149,7 @@ describe('completeDesktopNativeAuth', () => {
       ok: true,
       json: async () => ({
         ticket: 'ticket_123',
-        returnTo: '/app/chat',
+        returnTo: '/app/releases',
         userId: 'user_123',
       }),
     }));
@@ -171,7 +171,7 @@ describe('completeDesktopNativeAuth', () => {
         getActiveSessionId: () => 'sess_123',
         getActiveUserId: () => 'user_123',
       })
-    ).resolves.toEqual({ returnTo: '/app/chat' });
+    ).resolves.toEqual({ returnTo: '/app/releases' });
 
     expect(reloadClerk).toHaveBeenCalledTimes(1);
     expect(setActive).not.toHaveBeenCalled();
@@ -192,7 +192,7 @@ describe('completeDesktopNativeAuth', () => {
         ok: true,
         json: async () => ({
           ticket: 'ticket_123',
-          returnTo: '/app/chat',
+          returnTo: '/app/releases',
           userId: 'user_123',
         }),
       }));
@@ -223,14 +223,14 @@ describe('completeDesktopNativeAuth', () => {
       });
 
       await vi.advanceTimersByTimeAsync(1);
-      await expect(result).resolves.toEqual({ returnTo: '/app/chat' });
+      await expect(result).resolves.toEqual({ returnTo: '/app/releases' });
 
       expect(setActive).toHaveBeenCalledWith({
         session: 'sess_123',
-        redirectUrl: '/app/chat',
+        redirectUrl: '/app/releases',
       });
       expect(reloadClerk).toHaveBeenCalledTimes(1);
-      expect(verifyReturnRoute).toHaveBeenCalledWith('/app/chat');
+      expect(verifyReturnRoute).toHaveBeenCalledWith('/app/releases');
     } finally {
       vi.useRealTimers();
     }
@@ -251,7 +251,7 @@ describe('completeDesktopNativeAuth', () => {
         ok: true,
         json: async () => ({
           ticket: 'ticket_123',
-          returnTo: '/app/chat',
+          returnTo: '/app/releases',
           userId: 'user_123',
         }),
       }));
@@ -282,7 +282,7 @@ describe('completeDesktopNativeAuth', () => {
       );
       await vi.advanceTimersByTimeAsync(501);
       await expectation;
-      expect(verifyReturnRoute).toHaveBeenCalledWith('/app/chat');
+      expect(verifyReturnRoute).toHaveBeenCalledWith('/app/releases');
     } finally {
       vi.useRealTimers();
     }
@@ -301,7 +301,7 @@ describe('completeDesktopNativeAuth', () => {
       ok: true,
       json: async () => ({
         ticket: 'ticket_123',
-        returnTo: '/app/chat',
+        returnTo: '/app/releases',
         userId: 'user_123',
       }),
     }));
