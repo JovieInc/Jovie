@@ -372,10 +372,12 @@ describe('OnboardingTurnstile', () => {
     expect(widgetTarget?.className).toContain('[&>div]:invisible');
 
     act(() => options?.['before-interactive-callback']?.());
+    await waitFor(() =>
+      expect(widgetTarget?.className).toContain('[&>div]:visible')
+    );
     expect(
       screen.queryByTestId('onboarding-turnstile-widget-skeleton')
     ).not.toBeInTheDocument();
-    expect(widgetTarget?.className).toContain('[&>div]:visible');
 
     act(() => options?.['after-interactive-callback']?.());
     expect(widgetTarget?.className).toContain('[&>div]:visible');
