@@ -8,6 +8,57 @@ export const REQUIRED_MERGE_STATUSES = [
   'Fork PR Gate',
 ];
 
+/** Canonical Graphite merge-queue policy (dashboard + repo guardrails). */
+export const GRAPHITE_QUEUE_POLICY = Object.freeze({
+  mergeStrategy: 'squash',
+  enqueueLabel: MERGE_QUEUE_LABEL,
+  optimisticBatching: true,
+  parallelBatchSize: 4,
+  bisectOnBatchFailure: true,
+  maxQueueDepth: 12,
+  perAgentEnqueueLimitPerHour: 6,
+  ciOptimization: true,
+  queueTimeoutMinutes: 60,
+  graphiteBypassActorId: 158384,
+  rulesetId: '10512119',
+});
+
+/**
+ * Allowed required-check contexts for main. These are aggregates — never pin
+ * individual CI jobs (ci-fast, Typecheck, Unit Tests, …) or a batch failure
+ * evicts siblings instead of bisecting to the culprit.
+ */
+export const ALLOWED_REQUIRED_CHECK_CONTEXTS = Object.freeze([
+  'CI / PR Ready',
+  'CI / Migration Guard',
+  'Fork PR Gate',
+  'PR Ready',
+  'Migration Guard',
+]);
+
+/** Individual job names that must never appear as branch-protection required checks. */
+export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
+  'CI / ci-fast',
+  'ci-fast',
+  'CI / Typecheck',
+  'Typecheck',
+  'CI / Lint',
+  'Lint',
+  'CI / Structural Contract',
+  'Structural Contract',
+  'CI / Unit Tests',
+  'Unit Tests',
+  'CI / Build (public routes)',
+  'Build (public routes)',
+  'CI / Guardrails (proxy)',
+  'Guardrails (proxy)',
+  'CI / CI Risk Classifier',
+  'CI Risk Classifier',
+]);
+
+const BRANCH_PROTECTION_RULESET_PATH = '.github/rulesets/branch-protection.yml';
+const CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
+
 const AGENT_BRANCH_RE =
   /^(codex|claude|codegen-bot|linear|agent|dependabot)\//i;
 const USER_AGENT_BRANCH_RE = /(^|\/)jov-[0-9]+([_-].*)?$/i;
@@ -312,6 +363,278 @@ function detectSerializationOverlap(candidateKeys, openPrs) {
     blockers,
   };
 }
+
+export function normalizeCheckContext(context = '') {
+  return context.trim();
+}
+
+export function normalizeRequiredCheckName(context = '') {
+  const normalized = normalizeCheckContext(context);
+  if (normalized.startsWith('CI / ')) {
+    return normalized.slice('CI / '.length);
+  }
+  return normalized;
+}
+
+/**
+ * Validate that branch protection pins only aggregate required checks.
+ *
+ * @param {readonly string[]} contexts
+ */
+export function validateAggregateRequiredChecks(contexts) {
+  const normalized = (contexts ?? []).map(normalizeCheckContext);
+  const missing = [];
+  const forbidden = [];
+  const unexpected = [];
+
+  for (const required of REQUIRED_MERGE_STATUSES) {
+    const hasContext =
+      normalized.includes(required) ||
+      normalized.includes(`CI / ${required}`) ||
+      normalized.some(
+        context => normalizeRequiredCheckName(context) === required
+      );
+    if (!hasContext) {
+      missing.push(required);
+    }
+  }
+
+  for (const context of normalized) {
+    const bare = normalizeRequiredCheckName(context);
+    if (FORBIDDEN_PINNED_JOB_CONTEXTS.includes(context)) {
+      forbidden.push(context);
+      continue;
+    }
+    if (FORBIDDEN_PINNED_JOB_CONTEXTS.includes(bare)) {
+      forbidden.push(context);
+      continue;
+    }
+    const allowed =
+      ALLOWED_REQUIRED_CHECK_CONTEXTS.includes(context) ||
+      ALLOWED_REQUIRED_CHECK_CONTEXTS.includes(bare) ||
+      REQUIRED_MERGE_STATUSES.includes(bare);
+    if (!allowed) {
+      unexpected.push(context);
+    }
+  }
+
+  return {
+    ok:
+      missing.length === 0 && forbidden.length === 0 && unexpected.length === 0,
+    missing,
+    forbidden,
+    unexpected,
+    contexts: normalized,
+  };
+}
+
+/**
+ * Parse required status-check contexts from branch-protection.yml source text.
+ *
+ * @param {string} yamlText
+ */
+export function parseRequiredStatusChecksFromYaml(yamlText = '') {
+  const section = yamlText.match(
+    /required_status_checks:\s*\n([\s\S]*?)(?=\n\s*#\s*─|\n\s*-\s*type:|\nbypass_actors:|\nrules:\s*$)/
+  );
+  if (!section) return [];
+  const contexts = [];
+  for (const match of section[1].matchAll(/context:\s*['"]?([^'"\n]+)['"]?/g)) {
+    contexts.push(normalizeCheckContext(match[1]));
+  }
+  return contexts;
+}
+
+export function branchProtectionHasNativeMergeQueueRule(yamlText = '') {
+  return /-\s*type:\s*['"]?merge_queue['"]?/i.test(yamlText);
+}
+
+export function ciWorkflowHasMergeGroupTrigger(yamlText = '') {
+  return /^\s*merge_group:\s*$/m.test(yamlText);
+}
+
+/**
+ * Validate repo-side merge-queue wiring against source-of-record files.
+ *
+ * @param {{
+ *   branchProtectionYaml: string,
+ *   ciWorkflowYaml: string,
+ * }} input
+ */
+export function validateMergeQueueRepoConfig(input) {
+  const errors = [];
+  const warnings = [];
+
+  if (branchProtectionHasNativeMergeQueueRule(input.branchProtectionYaml)) {
+    errors.push(
+      'branch-protection.yml must not enable GitHub native merge_queue (Graphite owns the queue)'
+    );
+  }
+
+  if (ciWorkflowHasMergeGroupTrigger(input.ciWorkflowYaml)) {
+    errors.push(
+      'ci.yml must not declare merge_group trigger (Graphite never creates merge_group events)'
+    );
+  }
+
+  const contexts = parseRequiredStatusChecksFromYaml(
+    input.branchProtectionYaml
+  );
+  const checks = validateAggregateRequiredChecks(contexts);
+  if (!checks.ok) {
+    if (checks.missing.length > 0) {
+      errors.push(
+        `missing required aggregate checks: ${checks.missing.join(', ')}`
+      );
+    }
+    if (checks.forbidden.length > 0) {
+      errors.push(
+        `forbidden pinned individual jobs: ${checks.forbidden.join(', ')}`
+      );
+    }
+    if (checks.unexpected.length > 0) {
+      errors.push(
+        `unexpected required checks: ${checks.unexpected.join(', ')}`
+      );
+    }
+  }
+
+  if (!/graphite-app/i.test(input.branchProtectionYaml)) {
+    warnings.push(
+      'branch-protection.yml should document graphite-app bypass actor for queue merges'
+    );
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    contexts,
+    checks,
+  };
+}
+
+/**
+ * Validate a live GitHub ruleset payload (gh api repos/.../rulesets/...).
+ *
+ * @param {Record<string, unknown>} ruleset
+ */
+export function validateLiveMergeQueueRuleset(ruleset) {
+  const errors = [];
+  const rules = Array.isArray(ruleset?.rules) ? ruleset.rules : [];
+
+  if (rules.some(rule => rule?.type === 'merge_queue')) {
+    errors.push('live ruleset still has native merge_queue rule');
+  }
+
+  const statusRule = rules.find(
+    rule => rule?.type === 'required_status_checks'
+  );
+  const parameters = statusRule?.parameters;
+  const contexts = Array.isArray(parameters)
+    ? parameters.map(entry => normalizeCheckContext(entry?.context ?? ''))
+    : Array.isArray(parameters?.required_status_checks)
+      ? parameters.required_status_checks.map(entry =>
+          normalizeCheckContext(entry?.context ?? '')
+        )
+      : [];
+
+  const checks = validateAggregateRequiredChecks(contexts);
+  if (!checks.ok) {
+    errors.push(
+      ...[
+        checks.missing.length
+          ? `live ruleset missing aggregates: ${checks.missing.join(', ')}`
+          : null,
+        checks.forbidden.length
+          ? `live ruleset pins individual jobs: ${checks.forbidden.join(', ')}`
+          : null,
+        checks.unexpected.length
+          ? `live ruleset has unexpected checks: ${checks.unexpected.join(', ')}`
+          : null,
+      ].filter(Boolean)
+    );
+  }
+
+  const bypassActors = Array.isArray(ruleset?.bypass_actors)
+    ? ruleset.bypass_actors
+    : [];
+  const hasGraphiteBypass = bypassActors.some(
+    actor =>
+      actor?.actor_id === GRAPHITE_QUEUE_POLICY.graphiteBypassActorId &&
+      actor?.actor_type === 'Integration'
+  );
+  if (!hasGraphiteBypass) {
+    errors.push(
+      `live ruleset missing graphite-app bypass actor (id ${GRAPHITE_QUEUE_POLICY.graphiteBypassActorId})`
+    );
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    contexts,
+    checks,
+    hasGraphiteBypass,
+  };
+}
+
+/**
+ * Graphite bisection: when a parallel batch fails, isolate the culprit PR and
+ * requeue siblings. Uses divide-and-conquer over batchPasses(subset).
+ *
+ * @param {readonly string[]} batch
+ * @param {(subset: readonly string[]) => boolean} batchPasses
+ */
+export function bisectBatchFailure(batch, batchPasses) {
+  let bisectSteps = 0;
+
+  function findCulprit(subset) {
+    bisectSteps += 1;
+    if (subset.length === 0) {
+      return null;
+    }
+    if (subset.length === 1) {
+      return batchPasses(subset) ? null : subset[0];
+    }
+    if (batchPasses(subset)) {
+      return null;
+    }
+
+    const mid = Math.ceil(subset.length / 2);
+    const left = subset.slice(0, mid);
+    const right = subset.slice(mid);
+
+    const leftCulprit = findCulprit(left);
+    if (leftCulprit) {
+      return leftCulprit;
+    }
+    return findCulprit(right);
+  }
+
+  if (batch.length === 0) {
+    return { culprit: null, requeued: [], bisectSteps: 0, batchFailed: false };
+  }
+
+  if (batchPasses(batch)) {
+    return { culprit: null, requeued: [], bisectSteps: 1, batchFailed: false };
+  }
+
+  const culprit = findCulprit([...batch]);
+  const requeued = culprit ? batch.filter(id => id !== culprit) : [];
+
+  return {
+    culprit,
+    requeued,
+    bisectSteps,
+    batchFailed: true,
+  };
+}
+
+export const MERGE_QUEUE_REPO_PATHS = Object.freeze({
+  branchProtection: BRANCH_PROTECTION_RULESET_PATH,
+  ciWorkflow: CI_WORKFLOW_PATH,
+});
 
 export function requiredStatusDecision(statuses) {
   const byName = new Map();
