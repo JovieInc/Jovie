@@ -192,7 +192,7 @@ function ReleasesListContent({
           <div className='text-app font-caption text-primary-token'>
             Connect Spotify to get started
           </div>
-          <p className='mt-1 text-xs text-tertiary-token leading-[1.5]'>
+          <p className='mt-1 text-xs text-tertiary-token leading-normal'>
             Sync your catalog from Spotify or add a release manually to start
             generating smart links.
           </p>
@@ -230,7 +230,7 @@ function ReleasesListContent({
           data-testid='shell-releases-empty-state-connected'
         >
           <h3 className='text-app font-caption text-primary-token'>
-            No releases yet
+            No Releases Yet
           </h3>
           <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
             {canCreateManualReleases
