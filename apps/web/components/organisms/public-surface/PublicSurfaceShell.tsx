@@ -22,7 +22,7 @@ export function PublicSurfaceShell({
   return (
     <div
       className={cn(
-        'profile-viewport relative h-[100dvh] overflow-clip bg-base text-primary-token md:h-auto md:min-h-[100dvh] md:overflow-x-hidden',
+        'profile-viewport relative h-dvh overflow-clip bg-base text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden',
         className
       )}
     >
