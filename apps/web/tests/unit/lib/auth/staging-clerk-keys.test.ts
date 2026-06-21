@@ -215,6 +215,7 @@ describe('staging Clerk key resolution', () => {
 describe('resolvePublishableKeyStaticFirst', () => {
   const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
   const ORIGINAL_CLERK_MOCK = process.env.NEXT_PUBLIC_CLERK_MOCK;
+  const ORIGINAL_E2E_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS;
 
   beforeEach(() => {
     headersMock.mockReset();
@@ -225,6 +226,7 @@ describe('resolvePublishableKeyStaticFirst', () => {
     delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
     delete process.env.CLERK_SECRET_KEY_STAGING;
     delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
   });
 
   afterEach(() => {
@@ -237,6 +239,11 @@ describe('resolvePublishableKeyStaticFirst', () => {
       delete process.env.NEXT_PUBLIC_CLERK_MOCK;
     } else {
       process.env.NEXT_PUBLIC_CLERK_MOCK = ORIGINAL_CLERK_MOCK;
+    }
+    if (ORIGINAL_E2E_BYPASS === undefined) {
+      delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+    } else {
+      process.env.E2E_USE_TEST_AUTH_BYPASS = ORIGINAL_E2E_BYPASS;
     }
     if (
       process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ===
@@ -314,6 +321,16 @@ describe('resolvePublishableKeyStaticFirst', () => {
   it('returns the build-time key in Clerk mock mode without calling headers()', async () => {
     process.env.VERCEL_ENV = 'development';
     process.env.NEXT_PUBLIC_CLERK_MOCK = '1';
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the runtime key for CI smoke bypass without calling headers()', async () => {
+    process.env.VERCEL_ENV = 'development';
+    delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
 
     const result = await resolvePublishableKeyStaticFirst();
     expect(result).toBe('pk_live_production_example');
