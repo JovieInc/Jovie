@@ -5,7 +5,9 @@ import { defineConfig, devices } from '@playwright/test';
  * This config bypasses Clerk authentication for faster test execution
  */
 const stableLocalServerCommand =
-  process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:local:playwright';
+  process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:fast';
+const webServerWarmupProfile =
+  process.env.E2E_WEB_SERVER_WARMUP || (process.env.CI ? 'full' : 'public');
 // Pin Doppler scope explicitly so worktrees never inherit whichever scope
 // happens to be active in the parent shell. See .claude/rules/environment.md.
 const webServerCommand = process.env.DATABASE_URL
@@ -71,6 +73,7 @@ export default defineConfig({
             NEXT_PUBLIC_CLERK_MOCK: '1',
             NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
             NEXT_DISABLE_TOOLBAR: '1',
+            E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
             E2E_FAST_ONBOARDING: '1',
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS || ''} --max-old-space-size=12288`.trim(),
