@@ -522,7 +522,7 @@ export function ProfileCompactSurface({
                 {resolvedHeroImageUrl ? (
                   <ImageWithFallback
                     src={resolvedHeroImageUrl}
-                    alt={renderMode === 'preview' ? '' : artist.name}
+                    alt={artist.name}
                     fill
                     priority
                     sizes='(max-width: 767px) 100vw, 430px'

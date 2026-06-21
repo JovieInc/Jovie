@@ -43,6 +43,19 @@ describe('server instrumentation guard', () => {
     expect(shouldSkipServerObservability()).toBe(false);
   });
 
+  it('keeps server observability enabled in production builds with auth bypass only', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.VERCEL_ENV;
+    delete process.env.JOVIE_ENABLE_LOCAL_SENTRY;
+
+    const { shouldSkipServerObservability } = await import('@/instrumentation');
+
+    expect(shouldSkipServerObservability()).toBe(false);
+  });
+
   it('captures request errors in edge runtime', async () => {
     process.env.CI = 'false';
     process.env.NODE_ENV = 'production';

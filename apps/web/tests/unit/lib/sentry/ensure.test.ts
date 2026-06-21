@@ -48,4 +48,19 @@ describe('ensureSentry', () => {
 
     expect(register).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps Sentry enabled in production builds with auth bypass only', async () => {
+    const register = vi.fn().mockResolvedValue(undefined);
+    vi.doMock('@/instrumentation', () => ({ register }));
+    process.env.NODE_ENV = 'production';
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.VERCEL_ENV;
+    delete process.env.JOVIE_ENABLE_LOCAL_SENTRY;
+
+    const { ensureSentry } = await import('@/lib/sentry/ensure');
+    await ensureSentry();
+
+    expect(register).toHaveBeenCalledTimes(1);
+  });
 });

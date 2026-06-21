@@ -797,7 +797,9 @@ export function OnboardingChat({
   const hasRequestedStarterVerificationRef = useRef(false);
   const pendingStarterPromptRef = useRef<string | null>(null);
   const wasAwaitingTurnstileRetryRef = useRef(false);
-  const [localAutomationBypass, setLocalAutomationBypass] = useState(false);
+  const [localAutomationBypass, setLocalAutomationBypass] = useState<
+    boolean | null
+  >(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
 
   const setComposerInput = useCallback((nextInput: string) => {
@@ -860,8 +862,9 @@ export function OnboardingChat({
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
   const requiresTurnstile =
-    process.env.NODE_ENV !== 'development' && !localAutomationBypass;
+    process.env.NODE_ENV !== 'development' && localAutomationBypass !== true;
   const isAwaitingFirstToken =
+    localAutomationBypass !== null &&
     requiresTurnstile &&
     !hasSentFirst &&
     !isTurnstileTokenUsable(turnstileToken, turnstileStatus);
@@ -884,7 +887,7 @@ export function OnboardingChat({
   const submitText = useCallback(
     (rawText: string) => {
       const text = composeMessage(chipTray.chips, rawText).trim();
-      if (!text || isBusy) return;
+      if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
         onTurnstileRequired?.('Verify you are human to send');
         return;
@@ -907,6 +910,7 @@ export function OnboardingChat({
       chipTray,
       isAwaitingFirstToken,
       isBusy,
+      localAutomationBypass,
       notifyJankSend,
       onTurnstileRequired,
       sendMessage,
@@ -988,6 +992,7 @@ export function OnboardingChat({
     if (
       !prompt ||
       hasAutoSubmittedStarterPromptRef.current ||
+      localAutomationBypass === null ||
       messages.length > 0 ||
       isBusy
     ) {
@@ -1008,6 +1013,7 @@ export function OnboardingChat({
   }, [
     isAwaitingFirstToken,
     isBusy,
+    localAutomationBypass,
     messages.length,
     onTurnstileRequired,
     submitText,

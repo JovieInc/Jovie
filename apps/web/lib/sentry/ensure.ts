@@ -16,8 +16,7 @@ function shouldSkipLocalSentry(): boolean {
   const isLocalRuntime =
     env.NODE_ENV === 'development' ||
     env.NODE_ENV === 'test' ||
-    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
-    env.E2E_USE_TEST_AUTH_BYPASS === '1';
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
   return isLocalRuntime && env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
 }
 

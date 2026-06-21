@@ -227,6 +227,7 @@ describe('OnboardingChat Turnstile gating', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.stubEnv('NODE_ENV', 'test');
+    delete document.documentElement.dataset.e2eMode;
     chatMocks.messages = [];
     chatMocks.onError = undefined;
     chatMocks.sendMessage.mockReset();
@@ -303,6 +304,24 @@ describe('OnboardingChat Turnstile gating', () => {
       text: 'Hey, I want to get access to Jovie.',
     });
     expect(screen.getByLabelText('Chat message input')).toHaveValue('');
+  });
+
+  it('waits for runtime automation bypass before starter auto-submit', async () => {
+    document.documentElement.dataset.e2eMode = '1';
+    const onTurnstileRequired = vi.fn();
+
+    render(
+      <TurnstileHarness
+        onTurnstileRequired={onTurnstileRequired}
+        starterPrompt='Hey, I want to get access to Jovie.'
+      />
+    );
+
+    await waitFor(() => expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1));
+    expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+      text: 'Hey, I want to get access to Jovie.',
+    });
+    expect(onTurnstileRequired).not.toHaveBeenCalled();
   });
 
   it('auto-submits the edited starter prompt after verification', async () => {
