@@ -40,7 +40,7 @@ export function MemoContent({
         <div className='mb-8 flex items-start justify-between'>
           <div>
             <h1
-              className='text-[length:var(--text-3xl)] font-bold text-[var(--color-text-primary-token)]'
+              className='text-[length:var(--text-3xl)] font-bold text-primary-token'
               style={{
                 letterSpacing: 'var(--tracking-tight)',
                 fontFeatureSettings: 'var(--font-features)',
@@ -48,7 +48,7 @@ export function MemoContent({
             >
               {title}
             </h1>
-            <p className='mt-1 text-[length:var(--text-sm)] text-[var(--color-text-quaternary-token)]'>
+            <p className='mt-1 text-[length:var(--text-sm)] text-quaternary-token'>
               {readingTime} min read
             </p>
           </div>
@@ -80,7 +80,7 @@ export function MemoContent({
               aria-label='Table Of Contents'
             >
               <div className='sticky top-8'>
-                <p className='mb-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-widest text-[var(--color-text-quaternary-token)]'>
+                <p className='mb-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-widest text-quaternary-token'>
                   On this page
                 </p>
                 <ul className='flex flex-col gap-1.5'>
@@ -88,7 +88,7 @@ export function MemoContent({
                     <li key={entry.id}>
                       <a
                         href={`#${entry.id}`}
-                        className='block text-[length:var(--text-xs)] leading-snug text-[var(--color-text-tertiary-token)] transition-colors hover:text-[var(--color-text-secondary-token)]'
+                        className='block text-[length:var(--text-xs)] leading-snug text-tertiary-token transition-colors hover:text-secondary-token'
                       >
                         {entry.title}
                       </a>
