@@ -1,3 +1,5 @@
+import { boundedFetch } from './bounded-fetch';
+
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
 // Labels that surface items in the Taste Inbox (created manually in Linear).
@@ -111,7 +113,7 @@ export async function fetchTasteInbox(
 
   let res: Response;
   try {
-    res = await fetch(LINEAR_GRAPHQL_URL, {
+    res = await boundedFetch(LINEAR_GRAPHQL_URL, {
       method: 'POST',
       headers: {
         Authorization: apiKey,
@@ -119,7 +121,7 @@ export async function fetchTasteInbox(
         'User-Agent': 'Jovie-Console/1.0',
       },
       body: JSON.stringify({ query }),
-      signal: AbortSignal.timeout(10_000),
+      context: 'linear:fetchTasteInbox',
     });
   } catch (err) {
     return {

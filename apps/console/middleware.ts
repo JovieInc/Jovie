@@ -17,7 +17,10 @@ function unauthorized(): NextResponse {
  * Skip auth for the /api/health probe so load balancers can reach it.
  */
 export function middleware(request: NextRequest): NextResponse {
-  if (request.nextUrl.pathname === '/api/health') {
+  if (
+    request.nextUrl.pathname === '/api/health' ||
+    request.nextUrl.pathname === '/api/slack/events'
+  ) {
     return NextResponse.next();
   }
 
