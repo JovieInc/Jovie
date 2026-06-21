@@ -16,7 +16,10 @@ import {
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
-import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
+import {
+  chatComposerInputLocator,
+  gotoAuthenticatedChatRoute,
+} from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -211,10 +214,7 @@ function shellChatFrameLocators(page: Page): ShellChatLocators {
   const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
   const chatContent = shellScroll.locator('[data-testid="chat-content"]');
   const composer = shellFrame.locator('[data-testid="chat-composer-surface"]');
-  const input = composer
-    .getByRole('combobox', { name: /chat message input/i })
-    .or(composer.getByRole('textbox', { name: /chat message input/i }))
-    .first();
+  const input = chatComposerInputLocator(composer);
 
   return { chatContent, composer, input, shellFrame, shellScroll };
 }
@@ -443,7 +443,12 @@ test('chat route slash picker clears active transcript content in populated thre
     await expect(composer).toHaveAttribute('data-surface-mode', 'root');
     await assertSlashMenuClearsThreadContent(page);
 
-    await input.fill('/tak');
+    // Slash-picker scroll/layout passes can remount the composer; re-resolve locators.
+    const { composer: composerAfterPicker, input: inputAfterPicker } =
+      shellChatFrameLocators(page);
+    await expect(composerAfterPicker).toBeVisible({ timeout: 30_000 });
+    await expect(inputAfterPicker).toBeVisible({ timeout: 30_000 });
+    await inputAfterPicker.fill('/tak');
     await assertSlashMenuClearsThreadContent(page);
 
     const afterBox = await composer.boundingBox();
