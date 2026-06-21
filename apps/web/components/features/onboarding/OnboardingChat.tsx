@@ -646,6 +646,7 @@ function ChatErrorStatusBanner({
 }
 
 interface ComposerStatusBannerProps extends ChatErrorStatusBannerProps {
+  readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
 }
@@ -655,6 +656,7 @@ function ComposerStatusBanner({
   handleRetry,
   isBusy,
   isSubmitted,
+  reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
 }: ComposerStatusBannerProps) {
@@ -663,7 +665,12 @@ function ComposerStatusBanner({
   return (
     <div className='divide-y divide-white/[0.065]'>
       {shouldShowTurnstileBanner ? (
-        <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
+        <div
+          className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
+          data-testid='onboarding-turnstile-slot'
+        >
+          {turnstilePanel}
+        </div>
       ) : null}
       <ChatErrorStatusBanner
         chatError={chatError}
@@ -779,8 +786,12 @@ export function OnboardingChat({
   turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
-  const [input, setInput] = useState('');
-  const latestInputRef = useRef('');
+  const initialStarterPrompt = starterPrompt
+    ? sanitizeHomepagePrompt(starterPrompt)
+    : '';
+  const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
+  const [input, setInput] = useState(initialStarterPrompt);
+  const latestInputRef = useRef(initialStarterPrompt);
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
@@ -792,10 +803,12 @@ export function OnboardingChat({
   const hasTrackedChatStartedRef = useRef(false);
   const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
-  const hasInjectedStarterPromptRef = useRef(false);
+  const hasInjectedStarterPromptRef = useRef(hasInitialStarterPrompt);
   const hasAutoSubmittedStarterPromptRef = useRef(false);
   const hasRequestedStarterVerificationRef = useRef(false);
-  const pendingStarterPromptRef = useRef<string | null>(null);
+  const pendingStarterPromptRef = useRef<string | null>(
+    hasInitialStarterPrompt ? initialStarterPrompt : null
+  );
   const wasAwaitingTurnstileRetryRef = useRef(false);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
@@ -1066,8 +1079,17 @@ export function OnboardingChat({
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 
+  const shouldReserveStarterVerification =
+    hasInitialStarterPrompt &&
+    messages.length === 0 &&
+    !hasSentFirst &&
+    chatError === null &&
+    !isTurnstileTokenUsable(turnstileToken, turnstileStatus) &&
+    localAutomationBypass !== true;
   const shouldShowTurnstileBanner =
-    Boolean(turnstilePanel) && turnstilePanelVisible && isAwaitingFirstToken;
+    Boolean(turnstilePanel) &&
+    (turnstilePanelVisible || shouldReserveStarterVerification) &&
+    (isAwaitingFirstToken || shouldReserveStarterVerification);
   const hasComposerStatusBanner =
     shouldShowTurnstileBanner || chatError !== null;
   const composerStatusBanner = hasComposerStatusBanner ? (
@@ -1076,6 +1098,7 @@ export function OnboardingChat({
       handleRetry={handleRetry}
       isBusy={isBusy}
       isSubmitted={isSubmitted}
+      reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
     />
