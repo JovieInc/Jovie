@@ -261,9 +261,9 @@
   }
 }
 
-/* Short-viewport home hero: reserve room for the showcase release card below. */
+/* Compact mobile home hero: reserve room for the showcase release card below. */
 [data-testid="profile-compact-surface"][data-mode="profile"] {
-  @media (max-height: 760px) {
+  @media (max-height: 820px) {
     --cover-height: 178px;
   }
 }
