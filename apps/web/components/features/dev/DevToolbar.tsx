@@ -934,7 +934,7 @@ export function DevToolbar({
             <Flag size={12} />
           </button>
 
-          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+          <div className='w-px h-4 mx-1 bg-subtle' />
 
           {/* Theme picker */}
           {[
@@ -958,7 +958,7 @@ export function DevToolbar({
             </button>
           ))}
 
-          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+          <div className='w-px h-4 mx-1 bg-subtle' />
 
           {sha && (
             <button
@@ -1234,7 +1234,7 @@ export function DevToolbar({
             promoteState !== 'idle' &&
             promoteState !== 'checking' && (
               <>
-                <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+                <div className='w-px h-4 mx-1 bg-subtle' />
                 <button
                   type='button'
                   onClick={handlePromote}
@@ -1258,7 +1258,7 @@ export function DevToolbar({
               </>
             )}
 
-          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+          <div className='w-px h-4 mx-1 bg-subtle' />
 
           {/* Expand/collapse + hide */}
           <button
@@ -1302,7 +1302,7 @@ function PlanToggleInner({
 
   return (
     <>
-      <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+      <div className='w-px h-4 mx-1 bg-subtle' />
       <div className='flex items-center gap-0.5'>
         <span className='text-3xs text-quaternary-token mr-0.5'>Plan</span>
         {(['free', 'pro', 'max'] as const).map(plan => (
