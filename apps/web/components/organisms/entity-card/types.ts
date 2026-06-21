@@ -51,6 +51,8 @@ export interface EntityCardCta {
  */
 export interface EntityCardModel {
   readonly id: string;
+  /** Database release id when the card represents catalog music. */
+  readonly releaseId?: string;
   readonly kind: EntityKind;
   /** Whole-card link target. Falls back to `cta.href` for hit area. */
   readonly href?: string | null;

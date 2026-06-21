@@ -16,6 +16,7 @@ interface EntityCardProps {
   readonly className?: string;
   readonly priority?: boolean;
   readonly dataTestId?: string;
+  readonly onClick?: () => void;
 }
 
 type SizeConfig = {
@@ -58,6 +59,7 @@ function CardShell({
   testId,
   className,
   style,
+  onClick,
   children,
 }: Readonly<{
   href?: string | null;
@@ -65,6 +67,7 @@ function CardShell({
   testId?: string;
   className: string;
   style?: CSSProperties;
+  onClick?: () => void;
   children: ReactNode;
 }>) {
   if (href?.startsWith('/')) {
@@ -75,6 +78,7 @@ function CardShell({
         className={className}
         style={style}
         data-testid={testId}
+        onClick={onClick}
       >
         {children}
       </Link>
@@ -89,6 +93,7 @@ function CardShell({
         className={className}
         style={style}
         data-testid={testId}
+        onClick={onClick}
       >
         {children}
       </a>
@@ -108,6 +113,7 @@ export function EntityCard({
   className,
   priority = false,
   dataTestId,
+  onClick,
 }: EntityCardProps) {
   const size = SIZE[treatment];
   const preset = KIND_PRESETS[model.kind];
@@ -127,6 +133,7 @@ export function EntityCard({
       href={cardHref}
       external={cardExternal}
       testId={dataTestId ?? `entity-card-${model.kind}`}
+      onClick={onClick}
       className={cn(
         'group flex min-w-0 flex-col gap-3 p-3 text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
         isPearl
