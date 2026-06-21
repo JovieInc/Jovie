@@ -52,7 +52,7 @@ export function NotificationsPageClient({ artist }: Props) {
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative flex h-[100dvh] items-center justify-center overflow-hidden bg-[color:var(--profile-stage-bg)] p-4 sm:p-6'
+        className='relative flex h-dvh items-center justify-center overflow-hidden bg-[color:var(--profile-stage-bg)] p-4 sm:p-6'
         data-testid='notifications-page'
         style={accentStyle}
       >
