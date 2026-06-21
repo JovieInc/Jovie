@@ -47,7 +47,9 @@ describe('DesktopAuthPage', () => {
     );
 
     expect(screen.getByTestId('desktop-auth-handoff')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue in Browser' }));
+    expect(
+      screen.getByRole('button', { name: 'Continue in Browser' })
+    ).toBeInTheDocument();
   });
 
   it('waits for an explicit continue click before opening browser auth', async () => {
