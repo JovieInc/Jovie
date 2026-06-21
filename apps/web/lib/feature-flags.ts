@@ -14,13 +14,12 @@
  */
 
 export const FEATURE_FLAGS = {
-  NEW_RELEASE_PAGE: false,
-  CANVAS_GRAIN: false,
-  CYAN_FOCUS_GLOW: false,
-  CHAT_COMPOSER_V2: false,
+  NEW_RELEASE_PAGE: true,
+  CANVAS_GRAIN: true,
+  CYAN_FOCUS_GLOW: true,
+  CHAT_COMPOSER_V2: true,
   // gh-9869: v0 studio-session memory loop (creator tag photo → person/context → studio-session → approval-gated opportunity).
-  // Default-off for safety (no write/social scopes). Enable via FEATURE_MEMORY_STUDIO_SESSION_V0=true for demo/dev.
-  MEMORY_STUDIO_SESSION_V0: false,
+  MEMORY_STUDIO_SESSION_V0: true,
 } as const satisfies Record<string, boolean>;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;

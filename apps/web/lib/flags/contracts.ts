@@ -34,20 +34,20 @@ export interface StatsigFeatureFlagsBootstrap {
 }
 
 export const APP_FLAG_DEFAULTS = {
-  BILLING_UPGRADE_DIRECT: false,
-  SMARTLINK_PRE_SAVE: false,
-  IOS_APPLE_MUSIC_PRIORITY: false,
-  SPOTIFY_OAUTH: false,
-  STRIPE_CONNECT_ENABLED: false,
-  PLAYLIST_ENGINE: false,
+  BILLING_UPGRADE_DIRECT: true,
+  SMARTLINK_PRE_SAVE: true,
+  IOS_APPLE_MUSIC_PRIORITY: true,
+  SPOTIFY_OAUTH: true,
+  STRIPE_CONNECT_ENABLED: true,
+  PLAYLIST_ENGINE: true,
   ALBUM_ART_GENERATION: true,
-  CHAT_JANK_MONITOR: false,
-  RELEASE_PLAN_DEMO: false,
-  RELEASE_TO_REVENUE_AUTOPILOT: false,
-  AI_CONNECTORS_BETA: false,
-  MERCH_MVP: false,
-  BULK_PRESS_PHOTO_IMPORT: false,
-  APPLE_WALLET_PROFILE_PASS: false,
+  CHAT_JANK_MONITOR: true,
+  RELEASE_PLAN_DEMO: true,
+  RELEASE_TO_REVENUE_AUTOPILOT: true,
+  AI_CONNECTORS_BETA: true,
+  MERCH_MVP: true,
+  BULK_PRESS_PHOTO_IMPORT: true,
+  APPLE_WALLET_PROFILE_PASS: true,
   // DESIGN_V1 and all its surface aliases are permanently enabled.
   // Statsig gate "design_v1" is also set to 100% rollout.
   // The true default here ensures the new design is on even if Statsig is
@@ -189,10 +189,10 @@ export type DesignV1AliasFlagName = (typeof DESIGN_V1_ALIAS_FLAGS)[number];
  * justification, or the flag-registration-guardrail test will fail.
  */
 export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
-  'PLAYLIST_ENGINE', // early prototype; not ready for remote control
+  'PLAYLIST_ENGINE', // internal v1 default-on feature; no remote gate
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
-  'RELEASE_PLAN_DEMO', // YC wedge demo page; on by default in dev/preview, off in production — see registry.ts for env-aware decide()
-  'RELEASE_TO_REVENUE_AUTOPILOT', // single design-partner GMV pilot; on in dev/preview, off in production — see registry.ts
+  'RELEASE_PLAN_DEMO', // internal v1 default-on feature; no remote gate
+  'RELEASE_TO_REVENUE_AUTOPILOT', // internal v1 default-on pilot surface; no remote gate
   'DESIGN_V1', // permanently enabled — new design is the only design
   'SHELL_CHAT_V1', // alias of DESIGN_V1 — permanently enabled
   'DESIGN_V1_RELEASES', // alias of DESIGN_V1 — permanently enabled

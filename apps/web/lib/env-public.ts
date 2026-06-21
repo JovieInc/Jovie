@@ -64,19 +64,19 @@ export const publicEnv = {
   },
   // Feature flags
   get NEXT_PUBLIC_FEATURE_TIPS() {
-    return process.env.NEXT_PUBLIC_FEATURE_TIPS || undefined;
+    return process.env.NEXT_PUBLIC_FEATURE_TIPS ?? 'true';
   },
   get NEXT_PUBLIC_SHOW_OPERATOR_BANNER() {
     return process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER || undefined;
   },
   get NEXT_PUBLIC_FEATURE_VOICE_INPUT() {
-    return process.env.NEXT_PUBLIC_FEATURE_VOICE_INPUT || undefined;
+    return process.env.NEXT_PUBLIC_FEATURE_VOICE_INPUT ?? 'true';
   },
   get NEXT_PUBLIC_FEATURE_GROWTH_PLAN() {
-    return process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN || undefined;
+    return process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN ?? 'true';
   },
   get NEXT_PUBLIC_FEATURE_MAX_PLAN() {
-    return process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN || undefined;
+    return process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN ?? 'true';
   },
   get NEXT_PUBLIC_E2E_MODE() {
     return (
@@ -87,7 +87,7 @@ export const publicEnv = {
     return process.env.NEXT_PUBLIC_DEMO_RECORDING || undefined;
   },
   get NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION() {
-    return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION || undefined;
+    return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION ?? 'true';
   },
   // SEO verification
   get NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION() {

@@ -401,12 +401,8 @@ export function ProfileCompactSurface({
   const heroHeightClassName = isHomeMode
     ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:h-45 [@media(max-height:760px)]:max-h-45'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
-  const homeContentColumnClassName = isHomeMode
-    ? 'shrink-0 [@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
-    : 'min-h-0 flex-1';
-  const homeContentScrollClassName = isHomeMode
-    ? '[@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
-    : 'min-h-0 flex-1';
+  const homeContentColumnClassName = 'min-h-0 flex-1';
+  const homeContentScrollClassName = 'min-h-0 flex-1';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
