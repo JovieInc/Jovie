@@ -57,8 +57,8 @@ const OUTCOME_COPY: Record<
     icon: Clock3,
   },
   pending: {
-    title: 'You Are On The Waitlist',
-    body: 'Your access request is saved. We will email you when your account is ready to continue.',
+    title: "You're on the list",
+    body: "We'll email you when your account is ready.",
     icon: Clock3,
   },
   save_failed: {
@@ -83,12 +83,12 @@ export function WaitlistOutcomeView({
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
 
   return (
-    <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-white shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
+    <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
       <div className='mb-5 flex items-center gap-3'>
         <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/74'>
           <Icon className='h-4 w-4' aria-hidden />
         </span>
-        <h1 className='text-xl font-semibold leading-6 text-white'>
+        <h1 className='text-xl font-semibold leading-6 text-primary-token'>
           {copy.title}
         </h1>
       </div>
@@ -98,7 +98,7 @@ export function WaitlistOutcomeView({
         {copy.actionHref && copy.actionLabel ? (
           <Link
             href={copy.actionHref}
-            className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed'
+            className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed dark:bg-white dark:text-black'
           >
             {copy.actionLabel}
             <ArrowRight className='h-3.5 w-3.5' aria-hidden />

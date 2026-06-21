@@ -45,7 +45,7 @@ const {
 vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: mockCachedAuth,
+  getOptionalAuth: mockCachedAuth,
   getCachedCurrentUser: mockCachedCurrentUser,
 }));
 
