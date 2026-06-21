@@ -648,7 +648,7 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the newest catalog release on Home when latestRelease is not provided', async () => {
+  it('shows catalog releases in the home carousel when latestRelease is not provided', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -661,7 +661,7 @@ describe('ProfileCompactTemplate', () => {
 
     const homeCard = screen.getByTestId('profile-home-carousel');
     expect(homeCard).toHaveTextContent("Don't Look Down");
-    expect(homeCard).not.toHaveTextContent('Holding On');
+    expect(homeCard).toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {

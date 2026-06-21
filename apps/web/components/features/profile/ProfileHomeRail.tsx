@@ -4,7 +4,6 @@ import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
 import {
   type EntityCardModel,
-  EntityCarousel,
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
@@ -26,6 +25,8 @@ import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
+import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
+import type { PublicRelease } from './releases/types';
 
 interface ProfileHomeRailProps {
   readonly artist: Artist;
@@ -44,6 +45,7 @@ interface ProfileHomeRailProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  readonly releases?: readonly PublicRelease[];
 }
 
 function getUpcomingTourDates(
@@ -128,7 +130,7 @@ function HomeAlertsCard({
         aria-hidden='true'
         data-testid='profile-home-alerts-switch'
       >
-        <span className='block h-6 w-6 rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
+        <span className='block h-6 w-6 rounded-full bg-white dark:bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
       </span>
     </>
   );
@@ -167,6 +169,7 @@ export function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
   merchCards = [],
+  releases = [],
 }: Readonly<ProfileHomeRailProps>) {
   // Re-evaluate visibility at the release boundary so the rail's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
@@ -202,10 +205,19 @@ export function ProfileHomeRail({
     const hasFeaturedRelease = Boolean(
       releaseVisibility?.show && latestRelease
     );
+    const featuredReleaseSlug =
+      hasFeaturedRelease && latestRelease ? latestRelease.slug : null;
+    const featuredReleaseId =
+      featuredReleaseSlug === null
+        ? null
+        : (releases.find(release => release.slug === featuredReleaseSlug)?.id ??
+          null);
+
     if (hasFeaturedRelease && latestRelease) {
       items.push(
         releaseToEntityCard(
           {
+            id: featuredReleaseId ?? undefined,
             title: latestRelease.title,
             slug: latestRelease.slug,
             artworkUrl: latestRelease.artworkUrl,
@@ -233,6 +245,14 @@ export function ProfileHomeRail({
           external: true,
         },
       });
+    }
+
+    // Back catalog: include non-featured releases in the same carousel.
+    for (const release of releases) {
+      if (release.slug === '' || release.slug === featuredReleaseSlug) {
+        continue;
+      }
+      items.push(releaseToEntityCard(release, { handle: artist.handle, now }));
     }
 
     // Shoppable merch (revenue) next.
@@ -265,6 +285,7 @@ export function ProfileHomeRail({
     merchCards,
     nearbyTourDateId,
     now,
+    releases,
     releaseVisibility?.show,
     upcomingTourDates,
   ]);
@@ -292,10 +313,11 @@ export function ProfileHomeRail({
       data-testid='profile-home-rail'
     >
       {alertsCard}
-      <EntityCarousel
+      <ReleaseCatalogCarousel
         items={carouselItems}
-        surface='pearl'
-        dataTestId='profile-home-carousel'
+        artistHandle={artist.handle}
+        artistId={artist.id}
+        analyticsEnabled={renderMode !== 'preview'}
       />
     </div>
   );
