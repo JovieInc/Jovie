@@ -255,22 +255,7 @@ export async function resolvePublishableKeyStaticFirst(): Promise<
     return undefined;
   }
 
-  const hasStagingOverride =
-    Boolean(process.env.CLERK_PUBLISHABLE_KEY_STAGING) ||
-    Boolean(process.env.CLERK_SECRET_KEY_STAGING);
-  const runtimePk = runtimePublicEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
-  const runtimeSk = process.env.CLERK_SECRET_KEY || undefined;
-
-  // Preview/local/CI: use the runtime key pair when host routing is not needed.
-  // Calling headers() here opts ISR profile routes into dynamic rendering and
-  // breaks public-route CI (standalone server, no middleware injection).
-  if (!hasStagingOverride) {
-    if (runtimePk && runtimeSk) {
-      return runtimePk;
-    }
-    return undefined;
-  }
-
-  // Staging override keys require per-request host routing.
+  // Staging, preview, and local: fall back to the per-request header so the
+  // correct environment-specific Clerk instance is used.
   return resolvePublishableKeyFromHeaders();
 }
