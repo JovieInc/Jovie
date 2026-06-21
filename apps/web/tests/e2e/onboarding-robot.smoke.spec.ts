@@ -28,7 +28,9 @@ test.describe('Onboarding Robot PR Smoke', () => {
       ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED,
     ]);
 
-    await chatComposerInputLocator(page).fill('I am launching a test artist');
+    const composerInput = chatComposerInputLocator(page);
+    await expect(composerInput).toBeVisible({ timeout: 30_000 });
+    await composerInput.fill('I am launching a test artist');
     await page.getByRole('button', { name: 'Send message' }).click();
 
     await expect(
