@@ -27,7 +27,6 @@ import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { buildEntitySameAs } from '@/lib/entity/sameAs';
-import { captureError } from '@/lib/error-tracking';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
 import {
   getMerchMvpEnabled,
@@ -301,15 +300,15 @@ async function getPublicReleases(
   try {
     return await getReleasesForProfileLite(profileId);
   } catch (error) {
-    try {
-      await captureError('Error fetching public profile releases', error, {
+    logger.error(
+      'Error fetching public profile releases',
+      {
+        error,
         profileId,
         route: '/[username]',
-      });
-    } catch {
-      // Best-effort telemetry only; do not block page rendering.
-    }
-
+      },
+      'public-profile'
+    );
     return [];
   }
 }
@@ -323,15 +322,15 @@ async function getPublicMerchCards(profileId: string) {
 
     return await getLiveMerchCardsForProfile(profileId);
   } catch (error) {
-    try {
-      await captureError('Error fetching public profile merch cards', error, {
+    logger.error(
+      'Error fetching public profile merch cards',
+      {
+        error,
         profileId,
         route: '/[username]',
-      });
-    } catch {
-      // Best-effort telemetry only; do not block page rendering.
-    }
-
+      },
+      'public-profile'
+    );
     return [];
   }
 }

@@ -104,6 +104,26 @@ const mockLinks = [
 const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
+  describe('public profile ISR boundary', () => {
+    it('keeps request-aware APIs out of the public profile server render', () => {
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        "from 'next/headers'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        'await headers'
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        'await cookies'
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        '@/lib/error-tracking'
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        'captureError('
+      );
+    });
+  });
+
   describe('public tour data loading', () => {
     it('uses the public-safe upcoming tour query helper', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
