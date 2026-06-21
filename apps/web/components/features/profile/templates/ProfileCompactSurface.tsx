@@ -742,6 +742,7 @@ export function ProfileCompactSurface({
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
                 merchCards={merchCards}
+                releases={releases}
               />
             ) : (
               <ProfilePrimaryTabPanel
