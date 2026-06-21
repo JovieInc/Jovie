@@ -16,6 +16,7 @@ import type { ChatTelemetry } from '@/lib/chat/types';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { getEntitlements } from '@/lib/entitlements/registry';
+import { publicEnv } from '@/lib/env-public';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
@@ -28,6 +29,7 @@ import {
   checkAnonymousChatRateLimit,
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
+import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
 import {
   isTurnstileConfigured,
   verifyTurnstileToken,
@@ -117,13 +119,50 @@ function extractAsn(req: Request): string | null {
   );
 }
 
-function shouldBypassTurnstileForLocalRuntime(): boolean {
-  if (isSecureEnv()) return false;
+function extractRequestHostname(req: Request): string | null {
+  const rawHost = req.headers.get('host');
+  const normalized = rawHost?.split(',')[0]?.trim();
+  if (!normalized) {
+    try {
+      return new URL(req.url).hostname;
+    } catch {
+      return null;
+    }
+  }
+
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    try {
+      return new URL(normalized).hostname;
+    } catch {
+      return null;
+    }
+  }
+
+  return normalized.replace(/:\d+$/, '');
+}
+
+function isSecureTurnstileEnvironment(req: Request): boolean {
+  const isSecureVercelDeployment =
+    env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview';
+  if (isSecureVercelDeployment) return true;
+
+  const isLocalPublicSmoke =
+    env.PUBLIC_NOAUTH_SMOKE === '1' &&
+    isLocalDevelopmentAutomationHostname(extractRequestHostname(req));
+  if (isLocalPublicSmoke) return false;
+
+  return isSecureEnv();
+}
+
+function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
+  if (isSecureTurnstileEnvironment(req)) return false;
 
   return (
     env.NODE_ENV === 'development' ||
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1'
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    (env.PUBLIC_NOAUTH_SMOKE === '1' &&
+      isLocalDevelopmentAutomationHostname(extractRequestHostname(req)))
   );
 }
 
@@ -163,7 +202,7 @@ export async function tryHandleAnonymousOnboardingChat(
   // Anonymous onboarding is a live route, not a default-off rollout. Reuse the
   // existing chat kill switch so unconfigured Statsig cannot disable /start.
   // Anonymous → pass `null` userId; Statsig falls back to public conditions.
-  const shouldBypassTurnstile = shouldBypassTurnstileForLocalRuntime();
+  const shouldBypassTurnstile = shouldBypassTurnstileForLocalRuntime(req);
   const chatDisabled = shouldBypassTurnstile
     ? false
     : await checkGateForUser(null, CHAT_DISABLED_GATE, false);

@@ -152,6 +152,23 @@ describe('cached auth utilities', () => {
       expect(result.userId).toBe('user_hdr');
       expect(mockAuth).not.toHaveBeenCalled();
     });
+
+    it('returns signed-out auth when Clerk middleware is missing', async () => {
+      mockAuth.mockRejectedValue(
+        new Error(
+          "Clerk: auth() was called but Clerk can't detect usage of clerkMiddleware()."
+        )
+      );
+
+      const { getCachedAuth } = await import('@/lib/auth/cached');
+      const result = await getCachedAuth();
+
+      expect(result).toEqual({
+        userId: null,
+        sessionId: null,
+        orgId: null,
+      });
+    });
   });
 
   describe('getOptionalAuth', () => {

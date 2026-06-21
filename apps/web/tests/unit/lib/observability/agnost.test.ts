@@ -22,6 +22,15 @@ describe('agnost telemetry guards', () => {
     expect(shouldEnableAgnost()).toBe(false);
   });
 
+  it('disables export in local E2E runtime', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'test';
+    process.env.NEXT_PUBLIC_E2E_MODE = '1';
+    process.env.JOVIE_ENABLE_AGNOST = '1';
+    const { shouldEnableAgnost } = await import('@/lib/observability/agnost');
+    expect(shouldEnableAgnost()).toBe(false);
+  });
+
   it('enables export in production with default org id', async () => {
     process.env.CI = 'false';
     process.env.NODE_ENV = 'production';

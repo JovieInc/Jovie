@@ -342,10 +342,10 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
             : 'self-end text-right sm:max-w-[15.5rem]'
         )}
       >
-        <h3 className='text-[1.4rem] font-semibold leading-[1.02] tracking-[-0.05em] text-black'>
+        <h3 className='text-[1.4rem] font-semibold leading-[1.02] tracking-[-0.05em] text-white dark:text-white'>
           {title}
         </h3>
-        <p className='mt-3 text-app leading-[1.58] tracking-[-0.02em] text-black/62'>
+        <p className='mt-3 text-app leading-[1.58] tracking-[-0.02em] text-white/72'>
           {body}
         </p>
       </div>
@@ -368,7 +368,7 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
         ref={ref}
         data-testid='artist-profile-monetization-card'
         className={cn(
-          'relative flex w-full shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-(--color-cell-hover) p-5 text-black shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
+          'relative flex w-full shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-black p-5 text-white dark:bg-black dark:text-white shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
           isCaptureCard
             ? 'min-h-[22.75rem] sm:min-h-[23.75rem] lg:min-h-[24.5rem]'
             : 'min-h-[27rem] sm:min-h-[29rem] lg:min-h-[30rem]'

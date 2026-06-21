@@ -9,6 +9,7 @@ import {
   FormError,
   OtpInput,
 } from '@/features/auth/atoms';
+import { isBotProtectionError, parseClerkError } from '@/lib/auth/clerk-errors';
 import type { AuthShellMode } from './AuthShell';
 
 /**
@@ -61,6 +62,10 @@ function readClerkError(error: unknown): ClerkErrorLike {
 }
 
 function getSendErrorMessage(mode: AuthShellMode, error: unknown): string {
+  if (isBotProtectionError(error)) {
+    return parseClerkError(error);
+  }
+
   const { code } = readClerkError(error);
 
   if (mode === 'sign-in' && code === 'form_identifier_not_found') {
@@ -79,6 +84,10 @@ function getSendErrorMessage(mode: AuthShellMode, error: unknown): string {
 }
 
 function getVerifyErrorMessage(error: unknown): string {
+  if (isBotProtectionError(error)) {
+    return parseClerkError(error);
+  }
+
   const { code } = readClerkError(error);
 
   if (code === 'form_code_incorrect') {

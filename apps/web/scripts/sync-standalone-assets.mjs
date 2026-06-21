@@ -226,6 +226,30 @@ function resolvePackageJson(packageName, paths) {
       throw error;
     }
 
+    for (const basePath of paths) {
+      for (const candidate of [
+        path.join(basePath, ...packageName.split('/'), 'package.json'),
+        path.join(
+          path.dirname(basePath),
+          ...packageName.split('/'),
+          'package.json'
+        ),
+        path.join(
+          path.dirname(path.dirname(basePath)),
+          ...packageName.split('/'),
+          'package.json'
+        ),
+        path.join(
+          basePath,
+          'node_modules',
+          ...packageName.split('/'),
+          'package.json'
+        ),
+      ]) {
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+
     return findPackageJsonFromEntry(
       require.resolve(packageName, { paths }),
       packageName
@@ -281,6 +305,121 @@ function copyRuntimePackageToStandalone(
       }
     }
   }
+}
+
+function copyPackageToNodeModulesRoot(
+  packageName,
+  destinationNodeModulesRoot,
+  resolveFrom,
+  copiedPackages
+) {
+  const destination = path.join(
+    destinationNodeModulesRoot,
+    ...packageName.split('/')
+  );
+  const copyKey = `${destinationNodeModulesRoot}:${packageName}`;
+  if (copiedPackages.has(copyKey)) return;
+
+  const packageJsonPath = resolvePackageJson(packageName, [
+    resolveFrom,
+    appNodeModulesRoot,
+    workspaceNodeModulesRoot,
+    path.dirname(require.resolve('next/package.json')),
+  ]);
+  const packageRoot = path.dirname(packageJsonPath);
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+
+  rmSync(destination, { force: true, recursive: true });
+  mkdirSync(path.dirname(destination), { recursive: true });
+  cpSync(packageRoot, destination, { recursive: true, dereference: true });
+  copiedPackages.add(copyKey);
+
+  hydratePackageDependencies(
+    destination,
+    packageJson,
+    copiedPackages,
+    packageRoot
+  );
+}
+
+function hydratePackageDependencies(
+  packageRoot,
+  packageJson = JSON.parse(
+    readFileSync(path.join(packageRoot, 'package.json'), 'utf8')
+  ),
+  copiedPackages = new Set(),
+  resolveFrom = packageRoot
+) {
+  const destinationNodeModulesRoot = path.join(packageRoot, 'node_modules');
+
+  for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) {
+    copyPackageToNodeModulesRoot(
+      dependencyName,
+      destinationNodeModulesRoot,
+      resolveFrom,
+      copiedPackages
+    );
+  }
+
+  for (const dependencyName of Object.keys(
+    packageJson.optionalDependencies ?? {}
+  )) {
+    try {
+      copyPackageToNodeModulesRoot(
+        dependencyName,
+        destinationNodeModulesRoot,
+        resolveFrom,
+        copiedPackages
+      );
+    } catch (error) {
+      if (!isOptionalRuntimePackageUnavailable(error)) {
+        throw error;
+      }
+    }
+  }
+}
+
+function hydrateSharpAliasesInStandaloneNextNodeModules() {
+  if (!existsSync(standaloneNextNodeModulesRoot)) return 0;
+
+  let hydrated = 0;
+  const copiedPackages = new Set();
+  for (const entry of readdirSync(standaloneNextNodeModulesRoot, {
+    withFileTypes: true,
+  })) {
+    if (!entry.isDirectory() || !/^sharp-[0-9a-f]{12,40}$/i.test(entry.name)) {
+      continue;
+    }
+
+    const packageRoot = path.join(standaloneNextNodeModulesRoot, entry.name);
+    const packageJsonPath = path.join(packageRoot, 'package.json');
+    if (!existsSync(packageJsonPath)) continue;
+
+    const realSharpPackageJsonPath = resolvePackageJson('sharp', [
+      appNodeModulesRoot,
+      workspaceNodeModulesRoot,
+      path.dirname(require.resolve('next/package.json')),
+    ]);
+    const realSharpPackageRoot = path.dirname(realSharpPackageJsonPath);
+    const realSharpPackageJson = JSON.parse(
+      readFileSync(realSharpPackageJsonPath, 'utf8')
+    );
+
+    hydratePackageDependencies(
+      packageRoot,
+      realSharpPackageJson,
+      copiedPackages,
+      realSharpPackageRoot
+    );
+    hydrated += 1;
+  }
+
+  if (hydrated > 0) {
+    console.log(
+      `Hydrated runtime dependencies for ${hydrated} hashed sharp standalone alias(es).`
+    );
+  }
+  return hydrated;
 }
 
 for (const target of copyTargets) {
@@ -446,3 +585,5 @@ if (symlinkCount > 0) {
 } else {
   console.log('Synced standalone public and static assets.');
 }
+
+hydrateSharpAliasesInStandaloneNextNodeModules();

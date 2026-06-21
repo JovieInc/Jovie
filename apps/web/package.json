@@ -55,6 +55,8 @@
     "test:coverage": "vitest run --coverage",
     "test:truth": "node scripts/test-truth-guard.mjs",
     "test:bug-to-test": "tsx scripts/check-bug-to-test-rule.ts",
+    "test:seo:ratchet": "vitest run tests/app/robots.test.ts tests/app/sitemap.test.ts tests/app/seo-ratchet.test.ts tests/unit/lib/seo/metadata-contract.test.ts tests/unit/lib/seo/robots-http-guard.test.ts",
+    "test:seo:http": "tsx scripts/seo-ratchet-guard.ts",
     "test:quarantine-ledger": "tsx scripts/check-quarantine-ledger.ts",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",

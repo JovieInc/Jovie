@@ -10,7 +10,6 @@
  */
 
 import crypto from 'node:crypto';
-import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env-server';
 
 // Token validity in milliseconds (5 minutes default)
@@ -126,21 +125,9 @@ export function generateTrackingToken(profileId: string): string | null {
   if (!isTrackingTokenEnabled()) {
     // Return a placeholder token in development
     if (env.NODE_ENV === 'development') {
-      Sentry.addBreadcrumb({
-        category: 'tracking-token',
-        message: 'TRACKING_TOKEN_SECRET not set - using dev token',
-        level: 'warning',
-        data: { profileId },
-      });
       return `${profileId}:${Date.now()}:dev`;
     }
 
-    Sentry.addBreadcrumb({
-      category: 'tracking-token',
-      message: 'TRACKING_TOKEN_SECRET not set - skipping token generation',
-      level: 'warning',
-      data: { profileId },
-    });
     return null;
   }
 

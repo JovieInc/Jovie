@@ -88,8 +88,8 @@ function HomeAlertsCard({
   const sharedProps = {
     className:
       variant === 'bento'
-        ? 'group flex min-h-18 w-full min-w-0 items-center gap-3 rounded-[var(--profile-inner-radius)] border border-white/10 bg-white/[0.045] px-3.5 py-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-22px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
-        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
+        ? 'group flex min-h-16 w-full min-w-0 items-center gap-3 rounded-(--profile-inner-radius) border border-white/10 bg-white/5 px-3.5 py-3 text-left text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90'
+        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 text-left text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90',
     'data-testid':
       variant === 'bento'
         ? 'profile-home-alerts-fallback-card'
@@ -109,7 +109,7 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'block text-app font-semibold leading-[1.15] [overflow-wrap:anywhere]'
+              ? 'block text-app font-semibold leading-tight [overflow-wrap:anywhere]'
               : 'block text-xs font-semibold leading-4 [overflow-wrap:anywhere]'
           }
         >
@@ -118,7 +118,7 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'mt-0.5 block max-w-[25ch] text-2xs leading-4 text-white/54 [overflow-wrap:anywhere]'
+              ? 'mt-0.5 block max-w-64 text-2xs leading-4 text-white/55 [overflow-wrap:anywhere]'
               : 'mt-0.5 block text-2xs leading-3.5 text-white/50 [overflow-wrap:anywhere]'
           }
         >
@@ -126,7 +126,7 @@ function HomeAlertsCard({
         </span>
       </span>
       <span
-        className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
+        className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/12 bg-white/15 p-1 shadow-sm transition-colors duration-subtle group-hover:bg-white/20'
         aria-hidden='true'
         data-testid='profile-home-alerts-switch'
       >

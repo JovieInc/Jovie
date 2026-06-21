@@ -93,12 +93,12 @@ describe('TipSection', () => {
       />
     );
 
-    expect(screen.getByText('Choose payment method')).toBeInTheDocument();
+    expect(screen.getByText('Choose Payment Method')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Pay with Apple Pay or Card' })
+      screen.getByRole('button', { name: 'Pay With Apple Pay Or Card' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Pay with Venmo' })
+      screen.getByRole('button', { name: 'Pay With Venmo' })
     ).toBeInTheDocument();
   });
 
@@ -112,14 +112,14 @@ describe('TipSection', () => {
       />
     );
 
-    const venmoButton = screen.getByRole('button', { name: 'Pay with Venmo' });
+    const venmoButton = screen.getByRole('button', { name: 'Pay With Venmo' });
     const venmoLogoClass = venmoButton
       .querySelector('svg')
       ?.getAttribute('class');
 
     expect(venmoButton.className).toContain('bg-btn-primary');
     expect(venmoButton.className).not.toContain('bg-[#008CFF]');
-    expect(venmoLogoClass).toContain('text-[#008CFF]');
+    expect(venmoLogoClass).toContain('text-brand-venmo');
   });
 
   it('keeps provider colors out of the payment method selector source', () => {
@@ -128,7 +128,9 @@ describe('TipSection', () => {
     expect(source).not.toContain('bg-[#008CFF]');
     expect(source).not.toContain('transition-opacity hover:opacity-90');
     expect(source).toContain('PAY_METHOD_BUTTON_CLASSES');
-    expect(source).toContain("VenmoLogo className='h-5 w-auto text-[#008CFF]'");
+    expect(source).toContain(
+      "VenmoLogo className='h-5 w-auto text-brand-venmo'"
+    );
   });
 
   it('calls onVenmoPayment with a properly constructed URL when Venmo is used', () => {
@@ -146,7 +148,7 @@ describe('TipSection', () => {
 
     // First, select the Venmo payment method
     const venmoMethodButton = screen.getByRole('button', {
-      name: 'Pay with Venmo',
+      name: 'Pay With Venmo',
     });
     fireEvent.click(venmoMethodButton);
 
@@ -189,24 +191,24 @@ describe('TipSection', () => {
 
     // Enter a specific payment method flow (Stripe)
     const stripeMethodButton = screen.getByRole('button', {
-      name: 'Pay with Apple Pay or Card',
+      name: 'Pay With Apple Pay Or Card',
     });
     fireEvent.click(stripeMethodButton);
 
     // After selecting a method, the generic payment method selection screen should no longer be visible
-    expect(screen.queryByText('Choose payment method')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose Payment Method')).not.toBeInTheDocument();
 
     // Click the back button to return to the payment method selection screen
     const backButton = screen.getByRole('button', { name: /back/i });
     fireEvent.click(backButton);
 
     // Verify that the payment method selection screen is shown again
-    expect(screen.getByText('Choose payment method')).toBeInTheDocument();
+    expect(screen.getByText('Choose Payment Method')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Pay with Apple Pay or Card' })
+      screen.getByRole('button', { name: 'Pay With Apple Pay Or Card' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Pay with Venmo' })
+      screen.getByRole('button', { name: 'Pay With Venmo' })
     ).toBeInTheDocument();
   });
 
@@ -220,7 +222,7 @@ describe('TipSection', () => {
     );
 
     // When Stripe is not available, the payment method selection should not be shown
-    expect(screen.queryByText('Choose payment method')).toBeNull();
+    expect(screen.queryByText('Choose Payment Method')).toBeNull();
 
     // Venmo payment flow should be available directly via the PaySelector continue button
     expect(
