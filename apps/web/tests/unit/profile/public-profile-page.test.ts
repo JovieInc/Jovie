@@ -104,6 +104,32 @@ const mockLinks = [
 const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
+  describe('public profile ISR boundary', () => {
+    it('keeps request-aware APIs out of the public profile server render', () => {
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        "from 'next/headers'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        'await headers'
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        'await cookies'
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        '@/lib/error-tracking'
+      );
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+        'captureError('
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        '@/lib/profile/featured-playlist-fallback-data'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+        "from '@/lib/profile/featured-playlist-fallback';"
+      );
+    });
+  });
+
   describe('public tour data loading', () => {
     it('uses the public-safe upcoming tour query helper', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
@@ -559,6 +585,25 @@ describe('Public Profile Page Logic', () => {
       );
 
       expect(events.length).toBe(0);
+    });
+  });
+
+  describe('FAQPage JSON-LD (AEO — JovieInc/Jovie#11029)', () => {
+    it('emits a FAQPage JSON-LD script tag when AEO content has FAQs', () => {
+      // The profile page source must conditionally emit a FAQPage script tag
+      // when aeoContent.faqs.length > 0. This feeds AI citation engines and
+      // Google FAQ rich results.
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'FAQPage'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'Question'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'Answer'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('aeoContent.faqs');
+    });
+
+    it('guards the FAQPage script tag behind a faqs.length > 0 check', () => {
+      // Prevents an empty FAQPage from being emitted for profiles with no data
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
+        /aeoContent\.faqs\.length\s*>\s*0/
+      );
     });
   });
 

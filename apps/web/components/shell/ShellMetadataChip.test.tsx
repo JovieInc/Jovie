@@ -9,7 +9,7 @@ describe('ShellMetadataChip', () => {
 
     const chip = container.firstElementChild as HTMLElement;
     expect(screen.getByText('Live')).toBeInTheDocument();
-    expect(chip.className).toContain('h-[18px]');
+    expect(chip.className).toContain('h-5');
     expect(chip.className).toContain('rounded');
   });
 

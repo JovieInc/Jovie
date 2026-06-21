@@ -83,7 +83,7 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-2xs font-caption text-tertiary-token'
+          className='group/add h-6.5 min-w-17 gap-1 rounded-full px-2 text-2xs font-caption text-tertiary-token'
         >
           <Icon name='Plus' className='h-3.5 w-3.5' aria-hidden='true' />
           <span className='line-clamp-1'>Add</span>
@@ -91,7 +91,7 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[280px] rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
+        className='w-70 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
@@ -152,7 +152,7 @@ export function AddProviderUrlPopover({
                 type='submit'
                 tone='primary'
                 disabled={!url.trim() || isSaving}
-                className='h-7 min-w-[60px] rounded-full px-2.5 text-2xs'
+                className='h-7 min-w-15 rounded-full px-2.5 text-2xs'
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </DrawerButton>

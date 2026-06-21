@@ -165,7 +165,7 @@ function ToolActivityRow({
           aria-hidden='true'
           data-testid='tool-activity-timeline-line'
           className={cn(
-            'absolute left-[7px] w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
+            'absolute left-2 w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
             index === 0 ? 'top-3.5' : 'top-0',
             index === count - 1 ? 'bottom-[calc(100%_-_14px)]' : 'bottom-0'
           )}
@@ -211,7 +211,7 @@ function ToolActivityRow({
         {showVerboseDetails ? (
           <details
             data-testid='chat-tool-verbose'
-            className='mt-1.5 text-[10.5px] leading-4 text-tertiary-token'
+            className='mt-1.5 text-3xs leading-4 text-tertiary-token'
           >
             <summary className='cursor-pointer select-none text-secondary-token'>
               Verbose tool details
@@ -250,7 +250,7 @@ function ToolActivityFeed({
       data-tool-count={events.length}
       className={cn(
         'w-full text-primary-token',
-        variant === 'inline' ? 'max-w-full' : 'max-w-[420px]',
+        variant === 'inline' ? 'max-w-full' : 'max-w-105',
         multiple ? 'space-y-0.5' : 'space-y-0'
       )}
     >

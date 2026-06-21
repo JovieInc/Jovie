@@ -50,11 +50,18 @@ async function resolveCachedAuth(options?: { acceptsSessionToken?: boolean }) {
     return result;
   }
 
-  const result = options?.acceptsSessionToken
-    ? await auth({ acceptsToken: 'session_token' })
-    : await auth();
-  await attachSentryContext(result.userId);
-  return result;
+  try {
+    const result = options?.acceptsSessionToken
+      ? await auth({ acceptsToken: 'session_token' })
+      : await auth();
+    await attachSentryContext(result.userId);
+    return result;
+  } catch (error) {
+    if (isMissingAuthRequestContext(error)) {
+      return NULL_AUTH_RESULT;
+    }
+    throw error;
+  }
 }
 
 /**

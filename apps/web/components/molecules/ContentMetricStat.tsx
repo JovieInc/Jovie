@@ -32,7 +32,7 @@ export function ContentMetricStat({
       </p>
       <p
         className={cn(
-          'text-[28px] font-[620] leading-none tracking-[-0.03em] text-primary-token tabular-nums',
+          'text-3xl font-[620] leading-none tracking-[-0.03em] text-primary-token tabular-nums',
           valueClassName
         )}
       >

@@ -119,7 +119,20 @@ vi.mock('@/lib/tracking/json-beacon', () => ({
 }));
 
 vi.mock('@/lib/utm', () => ({
-  appendUTMParamsToUrl: (url: string) => url,
+  // Minimal implementation: appends non-empty utm_* params as query string.
+  appendUTMParamsToUrl: (url: string, params: Record<string, string>) => {
+    const utmKeys = [
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_content',
+      'utm_term',
+    ];
+    const entries = utmKeys.filter(k => params[k]?.trim());
+    if (entries.length === 0) return url;
+    const qs = entries.map(k => `${k}=${params[k].trim()}`).join('&');
+    return url.includes('?') ? `${url}&${qs}` : `${url}?${qs}`;
+  },
   extractUTMParams: () => ({}),
 }));
 
@@ -179,11 +192,19 @@ describe('@critical ReleaseLandingPage', () => {
     const buttons = screen.getAllByTestId('provider-button');
     expect(buttons.length).toBe(2);
     expect(buttons[0].getAttribute('data-href')).toBe(
-      'https://open.spotify.com/track/1'
+      'https://open.spotify.com/track/1?utm_source=jovie'
     );
     expect(buttons[1].getAttribute('data-href')).toBe(
-      'https://music.apple.com/track/1'
+      'https://music.apple.com/track/1?utm_source=jovie'
     );
+  });
+
+  it('appends utm_source=jovie to provider links when no utmParams prop is given', () => {
+    render(<ReleaseLandingPage {...defaultProps} />);
+    const buttons = screen.getAllByTestId('provider-button');
+    for (const btn of buttons) {
+      expect(btn.getAttribute('data-href')).toContain('utm_source=jovie');
+    }
   });
 
   it('renders only one audio preview when a verified preview is available', () => {
@@ -296,7 +317,10 @@ describe('@critical ReleaseLandingPage', () => {
     // The mock captures the href value. In production, the real
     // SmartLinkProviderButton renders an <a> tag. This test documents
     // that the URL passes through without sanitization — a security
-    // invariant to monitor.
-    expect(btn.getAttribute('data-href')).toBe('javascript:alert(1)');
+    // invariant to monitor. UTM params are appended but the dangerous
+    // protocol still passes through unmodified.
+    expect(btn.getAttribute('data-href')).toBe(
+      'javascript:alert(1)?utm_source=jovie'
+    );
   });
 });

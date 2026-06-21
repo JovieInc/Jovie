@@ -40,7 +40,7 @@ export function InsightsSummaryWidget() {
           <span className='text-app font-caption text-primary-token'>
             AI Insights
           </span>
-          <span className='inline-flex min-w-[18px] items-center justify-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption leading-none text-secondary-token tabular-nums'>
+          <span className='inline-flex min-w-5 items-center justify-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption leading-none text-secondary-token tabular-nums'>
             {totalActive}
           </span>
         </div>

@@ -188,7 +188,7 @@ export function ProfileEditPreviewCard({
       </div>
 
       <div className='space-y-2 px-3 py-2'>
-        <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+        <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
           <div className='mb-0.5 text-app font-caption tracking-normal text-secondary-token'>
             Current
           </div>
@@ -201,7 +201,7 @@ export function ProfileEditPreviewCard({
             {formatValue(preview.currentValue)}
           </div>
         </div>
-        <div className='rounded-[10px] border border-accent/20 bg-accent/5 px-2.5 py-2'>
+        <div className='rounded-lg border border-accent/20 bg-accent/5 px-2.5 py-2'>
           <div className='mb-0.5 text-app font-caption tracking-normal text-(--linear-accent)'>
             New
           </div>

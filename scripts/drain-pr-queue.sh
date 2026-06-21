@@ -1,146 +1,92 @@
 #!/usr/bin/env bash
-# Drain the main-target PR backlog per btw Phase 0 + ci-branching policy.
-# Closes conflicted agent PRs, retargets remainder to integration/loop-*,
-# refreshes dependabot, and queues safe auto-merges.
+# Graphite-native PR queue drain.
+# Classifies every open PR and ENROLLS the clean ones into the Graphite merge
+# queue by applying the `merge-queue` label. That label is the only mutation.
+#
+# It deliberately does NOT:
+#   - run `gh pr merge` (branch protection lets only the Graphite app push to
+#     main; Graphite rebase-merges enrolled PRs server-side)
+#   - retarget to integration/loop-* (agents ship straight to main now)
+#   - close PRs (surfaced for a human instead — see the SURFACE bucket)
+#
+# Buckets that need code work (CONFLICT / BLOCKED) are printed for the
+# /drain command to fan out per-PR worktree agents (cheap model for mechanical
+# rebases, capable model for semantic conflicts).
+#
+# Env:
+#   DRY_RUN=1   classify and print only; apply no labels
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO_ROOT"
+# shellcheck source=lib/gh-retry.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
-RETARGET_COMMENT='Main-target queue drain (btw Phase 0). Reopened against the recommended integration branch — full CI runs on the domain train PR only. Policy: `.claude/rules/ci-branching.md`, state: `.context/loop-state.json`.'
+REPO="${REPO:-JovieInc/Jovie}"
+DRY_RUN="${DRY_RUN:-0}"
+# Branches that are agent-owned (safe to rebase/force-push in a fix agent).
+AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/)'
 
-close_pr() {
-  local num="$1"
-  local reason="${2:-queue drain}"
-  echo "Closing #$num ($reason)"
-  gh pr close "$num" --comment "$CLOSE_COMMENT ($reason)" 2>/dev/null || true
+label() {  # label <num> <label>
+  [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would +$2 on #$1"; return 0; }
+  gh_retry pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
+    && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
-close_pr_silent() {
-  local num="$1"
-  gh pr close "$num" 2>/dev/null || true
-}
+SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
+  --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
+  [ .[] | {
+    n: .number,
+    t: (.title[0:48]),
+    draft: .isDraft,
+    m: .mergeable,
+    head: .headRefName,
+    L: [.labels[].name],
+    fail: [ .statusCheckRollup[]?
+            | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
+            | (.name // .context)
+            | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]
+  } ]')"
 
-remove_testing_label() {
-  local num="$1"
-  echo "Removing testing label from #$num"
-  gh pr edit "$num" --remove-label testing 2>/dev/null || true
-}
-
-enable_automerge() {
-  local num="$1"
-  echo "Enabling auto-merge on #$num"
-  gh pr merge "$num" --auto --squash 2>/dev/null || true
-}
-
-update_branch() {
-  local num="$1"
-  echo "Updating branch for #$num"
-  gh api -X PUT "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/pulls/${num}/update-branch" 2>/dev/null || true
-}
-
-suggest_integration() {
-  local head="$1"
-  local title="${2:-}"
-  local combined="${head} ${title}"
-  node --input-type=module -e "
-    import { suggestIntegrationBranch } from './scripts/lib/ci-branching-guard.mjs';
-    console.log(suggestIntegrationBranch('${combined//\'/\\\'}'));
-  " 2>/dev/null || echo "integration/loop-ui"
-}
-
-retarget_to_integration() {
-  local num="$1"
-  local head="$2"
-  local title="$3"
-  local integration
-  integration="$(suggest_integration "$head" "$title")"
-
-  echo "Retargeting #$num ($head) -> $integration"
-  close_pr_silent "$num"
-  if gh pr list --head "$head" --state open --json number --jq '.[0].number' 2>/dev/null | grep -q .; then
-    echo "  Skip: open PR already exists for $head"
-    return 0
-  fi
-  gh pr create \
-    --base "$integration" \
-    --head "$head" \
-    --title "$title" \
-    --body "${RETARGET_COMMENT}
-
-Integration fast lane only. Merge via \`scripts/loop-integration-ship.sh ${integration} ${head}\` after local verify.
-
-<!-- linear-issue-id:$(echo "$head" | sed -n 's/.*[Jj][Oo][Vv]-\?\([0-9]*\).*/JOV-\1/p' | tr '[:lower:]' '[:upper:]') -->" \
-    2>/dev/null && echo "  Created integration PR for $head" || echo "  Failed to create integration PR for $head"
-}
-
-CLOSE_COMMENT='Closed to reduce main CI/merge-queue saturation. Reopen targeting `integration/loop-{domain}` for agent batch work, or rebase onto `main` and open a fresh PR. See `scripts/drain-pr-queue.sh` and `.context/loop-state.json`.'
-
-echo "=== Strip testing label from non-risk PRs ==="
-gh pr list --base main --state open --limit 100 --json number,headRefName,labels,title \
-  --jq '.[] | select([.labels[].name] | index("testing")) | select(.title | test("\\(auth\\)|\\(billing\\)|\\(migration\\)|clerk|proxy"; "i") | not) | "\(.number)|\(.headRefName)"' \
-  | while IFS='|' read -r num _; do
-    [[ -n "$num" ]] && remove_testing_label "$num"
+# --- ENROLL: non-draft, mergeable, green, not opted-out, not already queued ---
+echo "=== ENROLL (clean → +merge-queue) ==="
+echo "$SNAP" | jq -c '.[]
+  | select(.draft|not)
+  | select(.m=="MERGEABLE")
+  | select(.fail|length==0)
+  | select((.head|startswith("gtmq_"))|not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="merge-queue" or .=="fast") | not)' \
+| while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    echo "  #$n  $t"
+    label "$n" merge-queue
   done
 
-echo "=== Close DIRTY agent/codex PRs (merge conflicts) ==="
-gh pr list --base main --state open --limit 100 --json number,headRefName,mergeStateStatus,title \
-  --jq '.[] | select(.mergeStateStatus=="DIRTY") | select(.headRefName | test("^(tim/|codex/|agent/|claude/|linear/|feat/)")) | "\(.number)|\(.headRefName)|\(.title)"' \
-  | while IFS='|' read -r num head title; do
-    [[ -n "$num" ]] && close_pr "$num" "DIRTY — merge conflicts"
-    [[ -n "$head" ]] && retarget_to_integration "$num" "$head" "$title"
-  done
+# --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---
+echo "=== CONFLICT (needs rebase → fix agent) ==="
+echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
+  | select(.m=="CONFLICTING")
+  | select(.head|test($re))
+  | select([.L[]]|index("needs-human")|not)
+  | "  #\(.n)  \(.t)  [\(.head)]"'
+echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
+  | select(.m=="CONFLICTING") | select(.head|test($re))
+  | select([.L[]]|index("needs-human")|not) | .n' \
+| while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
 
-echo "=== Retarget remaining agent PRs off main (max 5 per integration branch) ==="
-COUNT_FILE="$(mktemp)"
-trap 'rm -f "$COUNT_FILE"' EXIT
-: >"$COUNT_FILE"
+# --- BLOCKED: mergeable but red checks → hand to fix agent ---
+echo "=== BLOCKED (red checks → fix agent) ==="
+echo "$SNAP" | jq -r '.[]
+  | select(.draft|not) | select(.m=="MERGEABLE") | select(.fail|length>0)
+  | select([.L[]]|index("needs-human")|not)
+  | "  #\(.n)  \(.t)  ✗ \(.fail|join(", "))"'
 
-integration_count() {
-  local branch="$1"
-  local count
-  count="$(grep -c "^${branch}$" "$COUNT_FILE" 2>/dev/null || true)"
-  count="${count:-0}"
-  echo "$count"
-}
+# --- SURFACE: human-gated / superseded → report only, never auto-close ---
+echo "=== SURFACE (human decision; not touched) ==="
+echo "$SNAP" | jq -r '.[]
+  | select([.L[]]|index("needs-human"))
+  | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
 
-record_integration() {
-  echo "$1" >>"$COUNT_FILE"
-}
+# --- Graphite MQ working drafts (the queue itself; leave alone) ---
+echo "=== GRAPHITE MQ in-flight (leave) ==="
+echo "$SNAP" | jq -r '.[] | select(.head|startswith("gtmq_")) | "  #\(.n)  \(.t)"'
 
-while IFS='|' read -r num head title; do
-  [[ -z "$num" ]] && continue
-  integration="$(suggest_integration "$head" "$title")"
-  count="$(integration_count "$integration")"
-  if [[ "$count" -ge 5 ]]; then
-    echo "Skipping #$num — $integration already has 5 queued"
-    close_pr "$num" "integration batch full for $integration"
-    continue
-  fi
-  retarget_to_integration "$num" "$head" "$title"
-  record_integration "$integration"
-done < <(
-  gh pr list --base main --state open --limit 100 --json number,headRefName,title,labels \
-    --jq '.[] | select(.headRefName | test("^(tim/|codex/|agent/|claude/|linear/|feat/)")) | select([.labels[].name] | index("needs-human") | not) | "\(.number)|\(.headRefName)|\(.title)"'
-)
-
-echo "=== Refresh BEHIND dependabot branches ==="
-gh pr list --base main --state open --author "app/dependabot" --json number,mergeStateStatus \
-  --jq '.[] | select(.mergeStateStatus=="BEHIND" or .mergeStateStatus=="UNKNOWN") | .number' \
-  | while read -r num; do
-    [[ -n "$num" ]] && update_branch "$num"
-  done
-
-echo "=== Enable auto-merge on CLEAN dependabot patch/minor ==="
-gh pr list --base main --state open --author "app/dependabot" --json number,mergeStateStatus \
-  --jq '.[] | select(.mergeStateStatus=="CLEAN") | .number' \
-  | while read -r num; do
-    [[ -n "$num" ]] && enable_automerge "$num"
-  done
-
-echo "=== Summary ==="
-echo "Open PRs targeting main:"
-gh pr list --base main --state open --limit 100 | wc -l | xargs echo "  count:"
-echo "Open PRs targeting integration:"
-gh pr list --state open --limit 100 --json baseRefName --jq '[.[] | select(.baseRefName | startswith("integration/"))] | length' 2>/dev/null || echo "  (query failed)"
-echo "Done."
+echo "=== done (DRY_RUN=$DRY_RUN) ==="

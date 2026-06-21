@@ -27,7 +27,7 @@ function ChannelChip({ channel }: { readonly channel: AudienceAlertChannel }) {
   return (
     <Tooltip label={label} side='top'>
       <span
-        className='inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-emerald-500/20 text-[8px] font-bold tabular-nums uppercase tracking-tight text-emerald-200 ring-1 ring-inset ring-emerald-500/40'
+        className='inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-emerald-500/20 text-3xs font-bold tabular-nums uppercase tracking-tight text-emerald-200 ring-1 ring-inset ring-emerald-500/40'
         aria-label={label}
         role='img'
       >

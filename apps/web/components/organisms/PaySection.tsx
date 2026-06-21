@@ -120,7 +120,7 @@ export function PaySection({
         handle,
         venmoLink,
       });
-      toast.error('Unable to open Venmo. The payment link is not valid.');
+      toast.error('Payment link is not valid.');
       return;
     }
 
@@ -175,8 +175,8 @@ export function PaySection({
     return (
       <div className={cn('w-full max-w-sm', className)}>
         <div className={CARD_CLASSES}>
-          <h3 className='text-[15px] font-semibold tracking-tight text-center text-primary-token mb-1'>
-            Choose payment method
+          <h3 className='text-mid font-semibold tracking-tight text-center text-primary-token mb-1'>
+            Choose Payment Method
           </h3>
           <p className='text-center text-xs text-secondary-token mb-5'>
             Select how you&apos;d like to send your payment
@@ -186,7 +186,7 @@ export function PaySection({
               type='button'
               onClick={() => setPaymentMethod('stripe')}
               className={cn(PAY_METHOD_BUTTON_CLASSES, 'gap-1')}
-              aria-label='Pay with Apple Pay or Card'
+              aria-label='Pay With Apple Pay Or Card'
             >
               <ApplePayLogo className='h-6 w-auto' />
             </button>
@@ -194,9 +194,9 @@ export function PaySection({
               type='button'
               onClick={() => setPaymentMethod('venmo')}
               className={cn(PAY_METHOD_BUTTON_CLASSES, 'gap-2')}
-              aria-label='Pay with Venmo'
+              aria-label='Pay With Venmo'
             >
-              <VenmoLogo className='h-5 w-auto text-[#008CFF]' />
+              <VenmoLogo className='h-5 w-auto text-brand-venmo' />
             </button>
           </div>
         </div>

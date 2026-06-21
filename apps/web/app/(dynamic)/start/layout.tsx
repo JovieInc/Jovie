@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
+import { env, isSecureEnv } from '@/lib/env-server';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { resolveStartRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
@@ -15,12 +16,16 @@ export default async function StartLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const forceBypassClerk = env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureEnv();
   const initialFlags = await getAppFlagsSnapshot({
     flagNames: resolveStartRouteFlagNames(),
   });
 
   return (
-    <ResolvedClientProviders skipCoreProviders>
+    <ResolvedClientProviders
+      forceBypassClerk={forceBypassClerk}
+      skipCoreProviders
+    >
       <AppFlagProvider initialFlags={initialFlags}>{children}</AppFlagProvider>
     </ResolvedClientProviders>
   );

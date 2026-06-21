@@ -57,7 +57,7 @@ const DARK_PRIMARY_CONTROL_CLASSES =
   'border border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button) hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)';
 
 const CREAM_PRIMARY_CONTROL_CLASSES =
-  'border border-[#0a0a0a] bg-[#0a0a0a] text-[#F5F3EE] hover:bg-[#161616]';
+  'border border-(--color-bg-surface-0) bg-(--color-bg-surface-0) text-(--color-cell-hover) hover:bg-(--color-cell-hover)';
 
 function primaryControlTone(onCream: boolean) {
   return onCream ? CREAM_PRIMARY_CONTROL_CLASSES : DARK_PRIMARY_CONTROL_CLASSES;
@@ -133,8 +133,8 @@ export default function HomeV1Page() {
       className={cn(
         'home-v1 min-h-dvh w-full',
         variant === 'c'
-          ? 'bg-[#F5F3EE] text-[#0a0a0a]'
-          : 'bg-[#06070a] text-white'
+          ? 'bg-(--color-cell-hover) text-(--color-bg-surface-0)'
+          : 'bg-(--color-bg-base) text-white'
       )}
       style={{
         fontFamily:
@@ -209,7 +209,7 @@ function VariantToggle({
           )}
           title={`Variant ${v.tone}: ${v.label}`}
         >
-          <span className='font-mono text-[10px] opacity-60'>{v.tone}</span>
+          <span className='font-mono text-3xs opacity-60'>{v.tone}</span>
           <span className='hidden sm:inline'>{v.label}</span>
         </button>
       ))}
@@ -225,15 +225,18 @@ function Nav({ variant }: { variant: Variant }) {
   return (
     <nav
       className={cn(
-        'absolute top-0 left-0 right-0 z-30 max-w-[1200px] mx-auto flex items-center justify-between h-16 px-6 lg:px-10',
-        onCream ? 'text-[#0a0a0a]' : 'text-white'
+        'absolute top-0 left-0 right-0 z-30 max-w-300 mx-auto flex items-center justify-between h-16 px-6 lg:px-10',
+        onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
       )}
     >
       <div className='flex items-center gap-2.5'>
         <JovieMark
-          className={cn('h-5 w-5', onCream ? 'text-[#0a0a0a]' : 'text-white')}
+          className={cn(
+            'h-5 w-5',
+            onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
+          )}
         />
-        <span className='text-[15px] font-semibold tracking-[-0.018em]'>
+        <span className='text-mid font-semibold tracking-[-0.018em]'>
           Jovie
         </span>
       </div>
@@ -241,9 +244,9 @@ function Nav({ variant }: { variant: Variant }) {
         <Link
           href='/exp/auth-v1'
           className={cn(
-            'inline-flex items-center h-8 px-3.5 rounded-full text-[12.5px] transition-colors duration-subtle ease-out',
+            'inline-flex items-center h-8 px-3.5 rounded-full text-xs transition-colors duration-subtle ease-out',
             onCream
-              ? 'text-[#0a0a0a]/55 hover:text-[#0a0a0a]'
+              ? 'text-(--color-bg-surface-0)/55 hover:text-(--color-bg-surface-0)'
               : 'text-white/55 hover:text-white'
           )}
         >
@@ -282,7 +285,7 @@ function HeroProductShell({
           without rendering the full sidebar. Linear-style chrome. */}
       <div
         aria-hidden='true'
-        className='hidden lg:block absolute top-0 bottom-0 left-0 w-[212px] border-r border-white/[0.04]'
+        className='hidden lg:block absolute top-0 bottom-0 left-0 w-53 border-r border-white/[0.04]'
         style={{
           background:
             'linear-gradient(90deg, rgba(255,255,255,0.012) 0%, rgba(255,255,255,0) 100%)',
@@ -310,8 +313,8 @@ function HeroProductShell({
         </div>
       </div>
 
-      <div className='relative z-[2] w-full max-w-[680px] flex flex-col items-center text-center'>
-        <span className='inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-[10.5px] uppercase tracking-[0.14em] font-medium text-cyan-300/85 bg-cyan-500/[0.08] border border-cyan-500/15 mb-7'>
+      <div className='relative z-[2] w-full max-w-170 flex flex-col items-center text-center'>
+        <span className='inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-3xs uppercase tracking-[0.14em] font-medium text-cyan-300/85 bg-cyan-500/[0.08] border border-cyan-500/15 mb-7'>
           <Sparkles className='h-3 w-3' strokeWidth={2.25} />
           Ask Jovie anything
         </span>
@@ -324,14 +327,14 @@ function HeroProductShell({
               key={label}
               type='button'
               onClick={() => onDraft(label)}
-              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-white/55 bg-white/[0.03] border border-white/[0.06] hover:text-white hover:bg-white/[0.07] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-full text-2xs text-white/55 bg-white/[0.03] border border-white/[0.06] hover:text-white hover:bg-white/[0.07] transition-colors duration-subtle ease-out'
             >
               {label}
             </button>
           ))}
         </div>
 
-        <p className='mt-10 text-[11.5px] text-white/30'>
+        <p className='mt-10 text-2xs text-white/30'>
           Free during beta · No credit card · Cancel anytime
         </p>
       </div>
@@ -366,12 +369,12 @@ function ProductComposer({
           value={draft}
           onChange={e => onDraft(e.target.value)}
           placeholder='Plan a release. Generate album art. Pitch playlists. Anything.'
-          aria-label='Tell Jovie what you need'
-          className='flex-1 bg-transparent text-[15px] text-white placeholder:text-white/35 outline-none'
+          aria-label='Tell Jovie What You Need'
+          className='flex-1 bg-transparent text-mid text-white placeholder:text-white/35 outline-none'
         />
         <button
           type='button'
-          aria-label='Push-to-talk'
+          aria-label='Push-to-talk' // ui-casing-allow: hyphenated aria label
           className='shrink-0 h-9 w-9 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/[0.07] transition-colors duration-subtle ease-out'
         >
           <Mic className='h-4 w-4' strokeWidth={2.25} />
@@ -407,12 +410,12 @@ function HeroConversation({
   return (
     <section className='relative h-dvh flex flex-col px-6 lg:px-8'>
       {/* Eyebrow + headline up top */}
-      <div className='mx-auto w-full max-w-[640px] pt-[88px] lg:pt-[110px] flex flex-col items-center text-center'>
-        <span className='text-[10.5px] uppercase tracking-[0.14em] font-bold text-white/22 mb-4'>
+      <div className='mx-auto w-full max-w-160 pt-22 lg:pt-28 flex flex-col items-center text-center'>
+        <span className='text-3xs uppercase tracking-[0.14em] font-bold text-white/22 mb-4'>
           {EYEBROW}
         </span>
         <h1
-          className='text-[34px] lg:text-[42px] font-semibold leading-[1.06] text-white max-w-[18ch]'
+          className='text-4xl lg:text-[42px] font-semibold leading-[1.06] text-white max-w-[18ch]'
           style={{ letterSpacing: '-0.024em' }}
         >
           {HEADLINE}
@@ -421,7 +424,7 @@ function HeroConversation({
 
       {/* Conversation occupies the middle */}
       <div className='flex-1 min-h-0 flex flex-col justify-end'>
-        <div className='mx-auto w-full max-w-[600px] space-y-3 pb-6'>
+        <div className='mx-auto w-full max-w-150 space-y-3 pb-6'>
           <ChatBubble delay={120}>
             Hey. I&apos;m Jovie — I&apos;ll help you set up your home and figure
             out the best way to grow this quarter.
@@ -435,7 +438,7 @@ function HeroConversation({
       </div>
 
       {/* Composer + chips */}
-      <div className='mx-auto w-full max-w-[600px] pb-[120px]'>
+      <div className='mx-auto w-full max-w-150 pb-30'>
         <Composer draft={draft} onDraft={onDraft} onSubmit={onSubmit} />
         <div className='mt-3 flex flex-wrap justify-center gap-1.5'>
           {SUGGESTIONS.map(label => (
@@ -443,7 +446,7 @@ function HeroConversation({
               key={label}
               type='button'
               onClick={() => onDraft(label)}
-              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-white/52 bg-white/[0.04] border border-white/8 hover:text-white hover:bg-white/8 transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-full text-2xs text-white/52 bg-white/[0.04] border border-white/8 hover:text-white hover:bg-white/8 transition-colors duration-subtle ease-out'
             >
               {label}
             </button>
@@ -462,16 +465,16 @@ function HeroConversation({
 // ---------------------------------------------------------------------------
 function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
   return (
-    <section className='relative h-dvh flex flex-col px-6 lg:px-10 pt-[88px] lg:pt-[110px] pb-10'>
-      <div className='flex-1 min-h-0 grid grid-cols-12 gap-6 lg:gap-10 max-w-[1200px] w-full mx-auto'>
+    <section className='relative h-dvh flex flex-col px-6 lg:px-10 pt-22 lg:pt-28 pb-10'>
+      <div className='flex-1 min-h-0 grid grid-cols-12 gap-6 lg:gap-10 max-w-300 w-full mx-auto'>
         {/* Left rail: eyebrow + tiny meta */}
         <div className='col-span-12 lg:col-span-3 flex flex-col gap-3'>
-          <div className='border-2 border-[#0a0a0a] px-3 py-2 inline-block w-fit'>
-            <span className='text-[10px] uppercase tracking-[0.18em] font-extrabold'>
+          <div className='border-2 border-(--color-bg-surface-0) px-3 py-2 inline-block w-fit'>
+            <span className='text-3xs uppercase tracking-[0.18em] font-extrabold'>
               {EYEBROW}
             </span>
           </div>
-          <p className='text-[12px] uppercase tracking-[0.06em] text-[#0a0a0a]/55 leading-[1.5] max-w-[26ch]'>
+          <p className='text-xs uppercase tracking-[0.06em] text-(--color-bg-surface-0)/55 leading-[1.5] max-w-[26ch]'>
             ED. 01 / 2026 — A studio for artists who&apos;d rather make than
             manage.
           </p>
@@ -488,11 +491,11 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
           >
             Release
             <br />
-            more music
+            More Music
             <br />
-            with less work.
+            With Less Work.
           </h1>
-          <p className='mt-6 text-[14px] lg:text-[15.5px] leading-[1.55] text-[#0a0a0a]/72 max-w-[50ch]'>
+          <p className='mt-6 text-sm lg:text-mid leading-[1.55] text-(--color-bg-surface-0)/72 max-w-[50ch]'>
             {SUBHEAD}
           </p>
 
@@ -502,24 +505,24 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
               e.preventDefault();
               onSubmit();
             }}
-            className='mt-8 flex items-center gap-0 max-w-[640px] border-2 border-[#0a0a0a]'
+            className='mt-8 flex items-center gap-0 max-w-160 border-2 border-(--color-bg-surface-0)'
           >
             <input
               type='text'
               value={draft}
               onChange={e => onDraft(e.target.value)}
-              placeholder='ASK JOVIE…'
-              className='flex-1 h-12 px-4 bg-transparent text-[13.5px] uppercase tracking-[0.04em] placeholder:text-[#0a0a0a]/35 outline-none'
+              placeholder='ASK JOVIE…' // ui-casing-allow: uppercase placeholder
+              className='flex-1 h-12 px-4 bg-transparent text-app uppercase tracking-[0.04em] placeholder:text-(--color-bg-surface-0)/35 outline-none'
             />
             <button
               type='submit'
               disabled={!draft.trim()}
               className={cn(
-                'h-12 px-5 text-[12px] uppercase tracking-[0.14em] font-bold border-l-2 border-[#0a0a0a]',
+                'h-12 px-5 text-xs uppercase tracking-[0.14em] font-bold border-l-2 border-(--color-bg-surface-0)',
                 CONTROL_FEEDBACK_CLASSES,
                 draft.trim()
-                  ? 'bg-[#0a0a0a] text-[#F5F3EE] hover:bg-[#161616]'
-                  : 'bg-transparent text-[#0a0a0a]/50 cursor-not-allowed'
+                  ? 'bg-(--color-bg-surface-0) text-(--color-cell-hover) hover:bg-(--color-cell-hover)'
+                  : 'bg-transparent text-(--color-bg-surface-0)/50 cursor-not-allowed'
               )}
             >
               Send
@@ -527,14 +530,14 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
           </form>
 
           {/* Chips — square, bordered, uppercase */}
-          <div className='mt-5 flex flex-wrap gap-0 max-w-[640px]'>
+          <div className='mt-5 flex flex-wrap gap-0 max-w-160'>
             {SUGGESTIONS.map((label, i) => (
               <button
                 key={label}
                 type='button'
                 onClick={() => onDraft(label)}
                 className={cn(
-                  'inline-flex items-center h-9 px-3 text-[10.5px] uppercase tracking-[0.12em] font-semibold border-2 border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#F5F3EE] transition-colors duration-subtle ease-out',
+                  'inline-flex items-center h-9 px-3 text-3xs uppercase tracking-[0.12em] font-semibold border-2 border-(--color-bg-surface-0) hover:bg-(--color-bg-surface-0) hover:text-(--color-cell-hover) transition-colors duration-subtle ease-out',
                   i > 0 && 'border-l-0'
                 )}
               >
@@ -576,8 +579,8 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
         }}
       />
 
-      <div className='relative z-10 max-w-[920px] flex flex-col items-center text-center'>
-        <span className='text-[11px] uppercase tracking-[0.22em] font-medium text-white/45 mb-7'>
+      <div className='relative z-10 max-w-230 flex flex-col items-center text-center'>
+        <span className='text-2xs uppercase tracking-[0.22em] font-medium text-white/45 mb-7'>
           {EYEBROW}
         </span>
         <h1
@@ -589,7 +592,7 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
         >
           {HEADLINE}
         </h1>
-        <p className='mt-7 text-[16px] lg:text-[18px] leading-[1.5] text-white/60 max-w-[52ch]'>
+        <p className='mt-7 text-base lg:text-lg leading-[1.5] text-white/60 max-w-[52ch]'>
           {SUBHEAD}
         </p>
         <Link
@@ -603,11 +606,11 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
           Start free
           <ArrowRight className='h-4 w-4' strokeWidth={2.4} />
         </Link>
-        <div className='mt-8 flex flex-wrap justify-center gap-1.5 max-w-[560px]'>
+        <div className='mt-8 flex flex-wrap justify-center gap-1.5 max-w-140'>
           {SUGGESTIONS.map(label => (
             <span
               key={label}
-              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-white/40 bg-white/[0.03] border border-white/[0.06]'
+              className='inline-flex items-center h-7 px-3 rounded-full text-2xs text-white/40 bg-white/[0.03] border border-white/[0.06]'
             >
               {label}
             </span>
@@ -645,13 +648,13 @@ function Composer({
           type='text'
           value={draft}
           onChange={e => onDraft(e.target.value)}
-          placeholder='Ask Jovie…'
-          aria-label='Tell Jovie what you need'
-          className='flex-1 bg-transparent text-[14px] text-white placeholder:text-white/35 outline-none'
+          placeholder='Ask Jovie…' // ui-casing-allow: brand placeholder
+          aria-label='Tell Jovie What You Need'
+          className='flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none'
         />
         <button
           type='button'
-          aria-label='Push-to-talk'
+          aria-label='Push-to-talk' // ui-casing-allow: hyphenated aria label
           className='shrink-0 h-8 w-8 grid place-items-center rounded-full text-white/45 hover:text-white hover:bg-white/8 transition-colors duration-subtle ease-out'
         >
           <Mic className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -691,7 +694,7 @@ function ChatBubble({
       <span className='shrink-0 h-6 w-6 rounded-full bg-cyan-500/15 border border-cyan-500/30 grid place-items-center mt-1'>
         <JovieMark className='h-3 w-3 text-cyan-400' />
       </span>
-      <div className='text-[14px] leading-[1.55] text-white/80 max-w-[440px]'>
+      <div className='text-sm leading-[1.55] text-white/80 max-w-110'>
         {children}
       </div>
     </div>
@@ -735,11 +738,11 @@ function ScrollCue({
     <button
       type='button'
       onClick={onClick}
-      aria-label='Scroll to next section'
+      aria-label='Scroll To Next Section'
       className={cn(
-        'absolute bottom-7 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 h-8 px-3 rounded-full text-[11px] uppercase tracking-[0.14em] font-medium transition-colors duration-subtle ease-out',
+        'absolute bottom-7 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 h-8 px-3 rounded-full text-2xs uppercase tracking-[0.14em] font-medium transition-colors duration-subtle ease-out',
         tone === 'dark'
-          ? 'text-[#0a0a0a]/45 hover:text-[#0a0a0a] hover:bg-[#0a0a0a]/5'
+          ? 'text-(--color-bg-surface-0)/45 hover:text-(--color-bg-surface-0) hover:bg-(--color-bg-surface-0)/5'
           : 'text-white/35 hover:text-white hover:bg-white/8'
       )}
     >
@@ -759,15 +762,15 @@ function Trust({ variant }: { variant: Variant }) {
       className={cn(
         'px-6 lg:px-8 pt-16 pb-16',
         onCream
-          ? 'border-t border-[#0a0a0a]/12'
+          ? 'border-t border-(--color-bg-surface-0)/12'
           : 'border-t border-white/[0.06]'
       )}
     >
-      <div className='max-w-[1200px] mx-auto'>
+      <div className='max-w-300 mx-auto'>
         <p
           className={cn(
-            'text-center text-[10.5px] uppercase tracking-[0.14em] font-bold mb-7',
-            onCream ? 'text-[#0a0a0a]/35' : 'text-white/22'
+            'text-center text-3xs uppercase tracking-[0.14em] font-bold mb-7',
+            onCream ? 'text-(--color-bg-surface-0)/35' : 'text-white/22'
           )}
         >
           Trusted by artists on
@@ -775,13 +778,13 @@ function Trust({ variant }: { variant: Variant }) {
         <div
           className={cn(
             'flex items-center justify-center gap-x-12 lg:gap-x-16',
-            onCream ? 'text-[#0a0a0a]/72' : 'text-white/55'
+            onCream ? 'text-(--color-bg-surface-0)/72' : 'text-white/55'
           )}
         >
-          <AwalLogo className='h-[22px] w-auto select-none' />
-          <TheOrchardLogo className='h-[30px] w-auto select-none' />
-          <ArmadaMusicLogo className='h-[24px] w-auto select-none' />
-          <BlackHoleRecordingsLogo className='h-[18px] w-auto select-none' />
+          <AwalLogo className='h-6 w-auto select-none' />
+          <TheOrchardLogo className='h-8 w-auto select-none' />
+          <ArmadaMusicLogo className='h-6 w-auto select-none' />
+          <BlackHoleRecordingsLogo className='h-5 w-auto select-none' />
         </div>
       </div>
     </section>
@@ -824,11 +827,11 @@ function ArtistsBuilt({ variant }: { variant: Variant }) {
 
   return (
     <section className={cn('px-0 pt-2 pb-20')} ref={containerRef}>
-      <div className='max-w-[1200px] mx-auto px-6 lg:px-8 mb-8'>
+      <div className='max-w-300 mx-auto px-6 lg:px-8 mb-8'>
         <p
           className={cn(
-            'text-center text-[10.5px] uppercase tracking-[0.14em] font-bold',
-            onCream ? 'text-[#0a0a0a]/35' : 'text-white/22'
+            'text-center text-3xs uppercase tracking-[0.14em] font-bold',
+            onCream ? 'text-(--color-bg-surface-0)/35' : 'text-white/22'
           )}
         >
           Built for artists
@@ -852,7 +855,7 @@ function ArtistsBuilt({ variant }: { variant: Variant }) {
                   className={cn(
                     'relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-2 transition-colors duration-subtle ease-out',
                     onCream
-                      ? 'border-[#0a0a0a]/12 group-hover:border-[#0a0a0a]/40'
+                      ? 'border-(--color-bg-surface-0)/12 group-hover:border-(--color-bg-surface-0)/40'
                       : 'border-white/[0.08] group-hover:border-white/35'
                   )}
                 >
@@ -875,8 +878,8 @@ function ArtistsBuilt({ variant }: { variant: Variant }) {
           className={cn(
             'pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-14',
             onCream
-              ? 'bg-gradient-to-r from-[#F5F3EE] to-transparent'
-              : 'bg-gradient-to-r from-[#06070a] to-transparent'
+              ? 'bg-gradient-to-r from-(--color-cell-hover) to-transparent'
+              : 'bg-gradient-to-r from-(--color-bg-base) to-transparent'
           )}
         />
         <div
@@ -884,8 +887,8 @@ function ArtistsBuilt({ variant }: { variant: Variant }) {
           className={cn(
             'pointer-events-none absolute inset-y-0 right-0 w-10 sm:w-14',
             onCream
-              ? 'bg-gradient-to-l from-[#F5F3EE] to-transparent'
-              : 'bg-gradient-to-l from-[#06070a] to-transparent'
+              ? 'bg-gradient-to-l from-(--color-cell-hover) to-transparent'
+              : 'bg-gradient-to-l from-(--color-bg-base) to-transparent'
           )}
         />
       </div>
@@ -917,15 +920,15 @@ function Outcomes({ variant }: { variant: Variant }) {
   ];
   return (
     <section className='px-6 lg:px-8 pb-24'>
-      <div className='max-w-[1200px] mx-auto grid gap-6 lg:grid-cols-3'>
+      <div className='max-w-300 mx-auto grid gap-6 lg:grid-cols-3'>
         {items.map(it => (
           <div
             key={it.title}
             className={cn(
               'px-7 py-7',
               onCream
-                ? 'border-2 border-[#0a0a0a] bg-transparent'
-                : 'rounded-[18px] border border-white/[0.06] bg-white/[0.02]'
+                ? 'border-2 border-(--color-bg-surface-0) bg-transparent'
+                : 'rounded-2xl border border-white/[0.06] bg-white/[0.02]'
             )}
             style={
               onCream
@@ -938,16 +941,16 @@ function Outcomes({ variant }: { variant: Variant }) {
           >
             <span
               className={cn(
-                'text-[10px] uppercase tracking-[0.14em] font-bold',
-                onCream ? 'text-[#0a0a0a]/45' : 'text-white/22'
+                'text-3xs uppercase tracking-[0.14em] font-bold',
+                onCream ? 'text-(--color-bg-surface-0)/45' : 'text-white/22'
               )}
             >
               {it.eyebrow}
             </span>
             <h3
               className={cn(
-                'mt-2 text-[18px] font-semibold leading-tight',
-                onCream ? 'text-[#0a0a0a]' : 'text-white'
+                'mt-2 text-lg font-semibold leading-tight',
+                onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
               )}
               style={{ letterSpacing: '-0.022em' }}
             >
@@ -955,8 +958,8 @@ function Outcomes({ variant }: { variant: Variant }) {
             </h3>
             <p
               className={cn(
-                'mt-2 text-[12.5px] leading-[1.6]',
-                onCream ? 'text-[#0a0a0a]/68' : 'text-white/55'
+                'mt-2 text-xs leading-[1.6]',
+                onCream ? 'text-(--color-bg-surface-0)/68' : 'text-white/55'
               )}
             >
               {it.body}
@@ -972,23 +975,23 @@ function FinalCta({ variant }: { variant: Variant }) {
   const onCream = variant === 'c';
   return (
     <section className='px-6 lg:px-8 pb-24'>
-      <div className='max-w-[1200px] mx-auto text-center'>
+      <div className='max-w-300 mx-auto text-center'>
         <span
           className={cn(
-            'text-[10.5px] uppercase tracking-[0.14em] font-bold',
-            onCream ? 'text-[#0a0a0a]/45' : 'text-white/22'
+            'text-3xs uppercase tracking-[0.14em] font-bold',
+            onCream ? 'text-(--color-bg-surface-0)/45' : 'text-white/22'
           )}
         >
           Free during beta
         </span>
         <h2
           className={cn(
-            'mt-3 text-[28px] lg:text-[34px] font-semibold leading-tight max-w-[20ch] mx-auto',
-            onCream ? 'text-[#0a0a0a]' : 'text-white'
+            'mt-3 text-3xl lg:text-4xl font-semibold leading-tight max-w-[20ch] mx-auto',
+            onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
           )}
           style={{ letterSpacing: '-0.022em' }}
         >
-          Spend less time managing. More time creating.
+          Spend Less Time Managing. More Time Creating.
         </h2>
         <div className='mt-8 inline-flex items-center gap-2'>
           <Link
@@ -1005,9 +1008,9 @@ function FinalCta({ variant }: { variant: Variant }) {
           <Link
             href='/exp/auth-v1'
             className={cn(
-              'inline-flex items-center h-10 px-5 rounded-full text-[13px] transition-colors duration-subtle ease-out',
+              'inline-flex items-center h-10 px-5 rounded-full text-app transition-colors duration-subtle ease-out',
               onCream
-                ? 'border-2 border-[#0a0a0a] text-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-[#F5F3EE]'
+                ? 'border-2 border-(--color-bg-surface-0) text-(--color-bg-surface-0) hover:bg-(--color-bg-surface-0) hover:text-(--color-cell-hover)'
                 : 'text-white/72 border border-white/10 hover:text-white hover:bg-white/[0.04]'
             )}
           >
@@ -1025,13 +1028,13 @@ function Footer({ variant }: { variant: Variant }) {
     <footer
       className={cn(
         'border-t px-6 lg:px-8',
-        onCream ? 'border-[#0a0a0a]/12' : 'border-white/[0.06]'
+        onCream ? 'border-(--color-bg-surface-0)/12' : 'border-white/[0.06]'
       )}
     >
       <div
         className={cn(
-          'max-w-[1200px] mx-auto flex items-center justify-between h-14 text-[11.5px]',
-          onCream ? 'text-[#0a0a0a]/45' : 'text-white/35'
+          'max-w-300 mx-auto flex items-center justify-between h-14 text-2xs',
+          onCream ? 'text-(--color-bg-surface-0)/45' : 'text-white/35'
         )}
       >
         <div className='flex items-center gap-2'>
@@ -1043,7 +1046,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/terms'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-[#0a0a0a]' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Terms
@@ -1052,7 +1057,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/privacy'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-[#0a0a0a]' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Privacy
@@ -1061,7 +1068,9 @@ function Footer({ variant }: { variant: Variant }) {
             href='/'
             className={cn(
               'transition-colors duration-subtle ease-out',
-              onCream ? 'hover:text-[#0a0a0a]' : 'hover:text-white/72'
+              onCream
+                ? 'hover:text-(--color-bg-surface-0)'
+                : 'hover:text-white/72'
             )}
           >
             Home (live)

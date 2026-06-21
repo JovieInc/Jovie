@@ -90,12 +90,12 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     expect(screen.getByText('Lost in the Light').className).toContain(
-      'text-[13px]'
-    );
-    expect(screen.getByText('Lost in the Light').className).toContain(
       'font-caption'
     );
-    expect(screen.getByText('Bahamas').className).toContain('text-[11px]');
+    expect(screen.getByText('Lost in the Light').className).toContain(
+      'leading-[1.2]'
+    );
+    expect(screen.getByText('Bahamas').className).toContain('text-2xs');
   });
 
   it('omits the play overlay when the release has no preview URL', () => {

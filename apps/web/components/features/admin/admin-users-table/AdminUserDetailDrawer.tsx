@@ -234,7 +234,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>User ID</dt>
             <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>
-              <span className='truncate max-w-[140px]'>{user.id}</span>
+              <span className='truncate max-w-35'>{user.id}</span>
               <CopyButton value={user.id} label='User ID' />
             </dd>
           </div>
@@ -242,7 +242,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>Clerk ID</dt>
             <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>
-              <span className='truncate max-w-[140px]'>{user.clerkId}</span>
+              <span className='truncate max-w-35'>{user.clerkId}</span>
               <CopyButton value={user.clerkId} label='Clerk ID' />
             </dd>
           </div>
@@ -267,7 +267,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
             <dt className='text-secondary-token'>Stripe customer</dt>
             <dd className='text-primary-token'>
               {user.stripeCustomerId ? (
-                <span className='font-mono text-xs truncate max-w-[140px] inline-block'>
+                <span className='font-mono text-xs truncate max-w-35 inline-block'>
                   {user.stripeCustomerId}
                 </span>
               ) : (

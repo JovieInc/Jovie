@@ -22,13 +22,13 @@ export const TAB_BAR_RAIL_CLASSNAME =
   'flex min-w-0 items-center gap-1 rounded-full border-0 bg-transparent p-0';
 
 export const TAB_BAR_DRAWER_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-subtle bg-transparent px-2.5 py-1 text-[11.5px] font-caption tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
+  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-subtle bg-transparent px-2.5 py-1 text-2xs font-caption tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
 
 export const TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME =
   'border-subtle bg-surface-0 text-primary-token';
 
 export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
-  'inline-flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-transparent bg-transparent px-2.5 text-[12px] font-caption tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-fast hover:border-subtle hover:bg-surface-0 hover:text-secondary-token';
+  'inline-flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-transparent bg-transparent px-2.5 text-xs font-caption tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-fast hover:border-subtle hover:bg-surface-0 hover:text-secondary-token';
 
 export const TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME =
   'border-subtle bg-surface-0 text-primary-token';
@@ -167,7 +167,7 @@ export function TabBar<T extends string>({
                 onClick={() => onValueChange(option.value)}
                 className={cn(
                   triggerClass,
-                  usesFillDistribution && 'min-w-[72px] flex-1',
+                  usesFillDistribution && 'min-w-18 flex-1',
                   value === option.value && activeClass,
                   option.disabled && 'opacity-45 pointer-events-none',
                   triggerClassName
@@ -211,7 +211,7 @@ export function TabBar<T extends string>({
                   {overflowLabelText}
                 </TooltipContent>
               </Tooltip>
-              <DropdownMenuContent align='start' className='min-w-[120px]'>
+              <DropdownMenuContent align='start' className='min-w-30'>
                 <DropdownMenuRadioGroup
                   value={value}
                   onValueChange={v => {
@@ -319,7 +319,7 @@ function LegacyTabBar<T extends string>({
           onClick={() => onValueChange(option.value)}
           className={cn(
             triggerClass,
-            usesFillDistribution && 'min-w-[72px] flex-1',
+            usesFillDistribution && 'min-w-18 flex-1',
             value === option.value && activeClass,
             option.disabled && 'opacity-45 pointer-events-none',
             triggerClassName

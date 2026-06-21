@@ -32,7 +32,7 @@ export function SortableHeaderButton({
       {label}
       <span
         className={cn(
-          'text-[9px] transition-opacity',
+          'text-3xs transition-opacity',
           direction
             ? 'opacity-100 text-primary-token'
             : 'opacity-50 text-secondary-token'

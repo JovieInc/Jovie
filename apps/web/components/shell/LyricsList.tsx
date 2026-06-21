@@ -53,9 +53,9 @@ const LyricListRow = memo(function LyricListRow({
       type='button'
       onClick={() => onSeek?.(line.at)}
       disabled={disabled}
-      className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle text-left'
+      className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle text-left'
     >
-      <span className='shrink-0 w-9 pt-0.5 text-[10.5px] tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-subtle ease-subtle'>
+      <span className='shrink-0 w-9 pt-0.5 text-3xs tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-subtle ease-subtle'>
         {formatLyricsTime(line.at)}
       </span>
       <span className='flex-1 leading-snug'>{line.text}</span>
@@ -93,14 +93,14 @@ export function LyricsList({
   return (
     <div className={cn('px-4 py-4', className)}>
       <div className='flex items-center justify-between pb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {title}
         </p>
         {onEdit && (
           <button
             type='button'
             onClick={onEdit}
-            className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) rounded transition-colors duration-subtle ease-subtle'
+            className='text-3xs uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) rounded transition-colors duration-subtle ease-subtle'
           >
             {editLabel}
           </button>

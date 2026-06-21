@@ -129,7 +129,7 @@ function buildDropdownItems({
                   <Badge
                     variant='secondary'
                     size='sm'
-                    className='shrink-0 rounded-full px-1.5 py-0 text-[10px] font-medium'
+                    className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
                   >
                     Pro
                   </Badge>
@@ -197,7 +197,7 @@ function buildDropdownItems({
     learnMoreItems.push({
       type: 'action',
       id: 'keyboard-shortcuts',
-      label: 'Keyboard shortcuts',
+      label: 'Keyboard Shortcuts',
       icon: Keyboard,
       onClick: handleOpenShortcuts,
       shortcut: `${GLYPH_CMD} /`,
@@ -217,7 +217,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'terms-of-service',
-      label: 'Terms of Service',
+      label: 'Terms Of Service',
       icon: FileText,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
@@ -253,7 +253,7 @@ function buildDropdownItems({
   const learnMoreSubmenu: CommonDropdownSubmenu = {
     type: 'submenu',
     id: 'learn-more',
-    label: 'Learn more',
+    label: 'Learn More',
     icon: HelpCircle,
     items: learnMoreItems,
   };
@@ -302,7 +302,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'feedback',
-      label: 'Send feedback',
+      label: 'Send Feedback',
       icon: MessageSquare,
       onClick: () => setIsFeedbackOpen(true),
     },
@@ -311,7 +311,7 @@ function buildDropdownItems({
       type: 'custom',
       id: 'version',
       render: () => (
-        <div className='px-2.5 py-1.5 text-[11px] leading-4 text-tertiary-token select-none'>
+        <div className='px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'>
           Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
@@ -454,7 +454,7 @@ export function UserButton({
             open={isMenuOpen}
             onOpenChange={setIsMenuOpen}
             disabled
-            contentClassName='w-[240px]'
+            contentClassName='w-60'
           />
         </div>
       );
@@ -550,7 +550,7 @@ export function UserButton({
         align={trigger ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName='w-[240px]'
+        contentClassName='w-60'
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

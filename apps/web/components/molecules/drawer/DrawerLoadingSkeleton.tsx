@@ -1,9 +1,9 @@
 'use client';
 
-import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
+import { RightDrawer } from './RightDrawer';
 
 export interface DrawerLoadingSkeletonProps {
   readonly ariaLabel?: string;
@@ -38,13 +38,13 @@ export function DrawerLoadingSkeleton({
       >
         <div
           className={cn(
-            'sticky top-0 z-10 flex min-h-[32px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) bg-surface-1 px-2 py-1 backdrop-blur-[10px]'
+            'sticky top-0 z-10 flex min-h-8 shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) bg-surface-1 px-2 py-1 backdrop-blur-[10px]'
           )}
         >
           <div className='h-2.5 w-28 rounded skeleton' />
           <div className='flex items-center gap-px'>
-            <div className='h-[24px] w-[24px] rounded-full skeleton' />
-            <div className='h-[24px] w-[24px] rounded-full skeleton' />
+            <div className='h-6 w-6 rounded-full skeleton' />
+            <div className='h-6 w-6 rounded-full skeleton' />
           </div>
         </div>
 
@@ -56,7 +56,7 @@ export function DrawerLoadingSkeleton({
             >
               <div className='mb-2 h-2.5 w-14 rounded skeleton' />
               <div className='flex items-start gap-3'>
-                <div className='h-[72px] w-[72px] shrink-0 rounded-lg skeleton' />
+                <div className='h-18 w-18 shrink-0 rounded-lg skeleton' />
                 <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
                   <div className='h-4 w-2/3 rounded skeleton' />
                   <div className='h-3 w-1/2 rounded skeleton' />
@@ -65,7 +65,7 @@ export function DrawerLoadingSkeleton({
                 </div>
               </div>
               <div className='mt-3 border-t border-(--linear-app-frame-seam) pt-2.5'>
-                <div className='h-[24px] w-full rounded-md skeleton' />
+                <div className='h-6 w-full rounded-md skeleton' />
               </div>
             </div>
 
@@ -78,14 +78,14 @@ export function DrawerLoadingSkeleton({
               </div>
               <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam) p-3'>
                 <div className='space-y-1'>
-                  <div className='h-[10px] w-14 rounded skeleton' />
+                  <div className='h-2.5 w-14 rounded skeleton' />
                   <div className='h-4.5 w-10 rounded skeleton' />
-                  <div className='h-[11px] w-10 rounded skeleton' />
+                  <div className='h-3 w-10 rounded skeleton' />
                 </div>
                 <div className='space-y-1 pl-3'>
-                  <div className='h-[10px] w-14 rounded skeleton' />
+                  <div className='h-2.5 w-14 rounded skeleton' />
                   <div className='h-4.5 w-10 rounded skeleton' />
-                  <div className='h-[11px] w-10 rounded skeleton' />
+                  <div className='h-3 w-10 rounded skeleton' />
                 </div>
               </div>
             </div>
@@ -100,10 +100,7 @@ export function DrawerLoadingSkeleton({
             >
               <div className='flex w-full gap-1'>
                 {['tab-1', 'tab-2', 'tab-3', 'tab-4'].map(tabId => (
-                  <div
-                    key={tabId}
-                    className='h-[26px] flex-1 rounded-lg skeleton'
-                  />
+                  <div key={tabId} className='h-7 flex-1 rounded-lg skeleton' />
                 ))}
               </div>
             </div>

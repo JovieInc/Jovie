@@ -35,6 +35,9 @@ const isCI = !!process.env.CI;
 const usesManagedLocalWebServer = !process.env.BASE_URL;
 const shouldThrottleManagedTestAuthRun =
   isCI && usesManagedLocalWebServer && useTestAuthBypass;
+// GitHub-hosted runners expose ~7 GiB RAM; an 8 GiB V8 heap starves the OS and
+// Playwright, causing next dev to OOM mid-smoke (ECONNREFUSED cascades).
+const smokeDevHeapMb = isCI ? 4096 : 8192;
 
 function getWorkers(defaultWorkers: number): number {
   const explicitWorkers = process.env.PLAYWRIGHT_WORKERS;
@@ -108,7 +111,7 @@ export default defineConfig({
                 }
               : {}),
             NODE_OPTIONS:
-              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
+              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=${smokeDevHeapMb}`.trim(),
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: true,

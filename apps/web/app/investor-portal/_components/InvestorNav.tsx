@@ -66,16 +66,16 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
     <>
       {/* Desktop sidebar */}
       <nav
-        className='max-lg:hidden w-[200px] flex-shrink-0 flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-0)] px-3 py-6 lg:flex'
-        aria-label='Investor portal navigation'
+        className='max-lg:hidden w-50 flex-shrink-0 flex-col border-r border-subtle bg-surface-0 px-3 py-6 lg:flex'
+        aria-label='Investor Portal Navigation'
       >
         {/* Branding */}
         <div className='mb-8 px-2'>
-          <span className='text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
+          <span className='text-[length:var(--text-lg)] font-bold tracking-tight text-primary-token'>
             Jovie
           </span>
           {investorName && (
-            <p className='mt-1 text-[length:var(--text-xs)] text-[var(--color-text-tertiary-token)]'>
+            <p className='mt-1 text-[length:var(--text-xs)] text-tertiary-token'>
               For {investorName}
             </p>
           )}
@@ -85,13 +85,13 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
       </nav>
 
       {/* Mobile header bar */}
-      <header className='fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-4 py-3 lg:hidden'>
-        <span className='text-[length:var(--text-base)] font-bold text-[var(--color-text-primary-token)]'>
+      <header className='fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-subtle bg-base px-4 py-3 lg:hidden'>
+        <span className='text-[length:var(--text-base)] font-bold text-primary-token'>
           Jovie
         </span>
         <div className='flex items-center gap-3'>
           {investorName && (
-            <span className='text-[length:var(--text-xs)] text-[var(--color-text-tertiary-token)]'>
+            <span className='text-[length:var(--text-xs)] text-tertiary-token'>
               For {investorName}
             </span>
           )}
@@ -100,10 +100,10 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
             onClick={toggleSheet}
             aria-expanded={isOpen}
             aria-controls='mobile-nav'
-            aria-label={isOpen ? 'Close navigation' : 'Open navigation'}
+            aria-label={isOpen ? 'Close Navigation' : 'Open Navigation'}
             className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-[var(--radius-default)]',
-              'text-[var(--color-text-secondary-token)] hover:bg-[var(--color-interactive-hover)]',
+              'flex h-8 w-8 items-center justify-center rounded',
+              'text-secondary-token hover:bg-interactive-hover',
               'focus-ring-themed transition-colors'
             )}
           >
@@ -124,7 +124,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
             type='button'
             className='absolute inset-0 bg-black/50 transition-opacity'
             onClick={() => setIsOpen(false)}
-            aria-label='Close navigation'
+            aria-label='Close Navigation'
             tabIndex={-1}
           />
 
@@ -133,16 +133,16 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
             id='mobile-nav'
             open
             aria-label='Navigation'
-            className='absolute bottom-0 left-0 top-0 m-0 w-64 border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-0)] px-3 py-6'
+            className='absolute bottom-0 left-0 top-0 m-0 w-64 border-r border-subtle bg-surface-0 px-3 py-6'
           >
             {/* Branding */}
             <div className='mb-8 flex items-center justify-between px-2'>
               <div>
-                <span className='text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
+                <span className='text-[length:var(--text-lg)] font-bold tracking-tight text-primary-token'>
                   Jovie
                 </span>
                 {investorName && (
-                  <p className='mt-1 text-[length:var(--text-xs)] text-[var(--color-text-tertiary-token)]'>
+                  <p className='mt-1 text-[length:var(--text-xs)] text-tertiary-token'>
                     For {investorName}
                   </p>
                 )}
@@ -150,10 +150,10 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
               <button
                 type='button'
                 onClick={() => setIsOpen(false)}
-                aria-label='Close navigation'
+                aria-label='Close Navigation'
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-[var(--radius-default)]',
-                  'text-[var(--color-text-secondary-token)] hover:bg-[var(--color-interactive-hover)]',
+                  'flex h-8 w-8 items-center justify-center rounded',
+                  'text-secondary-token hover:bg-interactive-hover',
                   'focus-ring-themed transition-colors'
                 )}
               >
@@ -185,8 +185,8 @@ function NavItem({
         aria-current={isActive ? 'page' : undefined}
         className={`block rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-app)] font-medium transition-colors ${
           isActive
-            ? 'bg-[var(--color-interactive-hover)] text-[var(--color-text-primary-token)]'
-            : 'text-[var(--color-text-tertiary-token)] hover:bg-[var(--color-interactive-hover)] hover:text-[var(--color-text-secondary-token)]'
+            ? 'bg-interactive-hover text-primary-token'
+            : 'text-tertiary-token hover:bg-interactive-hover hover:text-secondary-token'
         }`}
       >
         {label}

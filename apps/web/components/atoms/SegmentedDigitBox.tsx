@@ -25,7 +25,7 @@ interface SegmentedDigitBoxProps {
   readonly ariaLabel: string;
   readonly ariaDescribedBy?: string;
   readonly ariaInvalid?: boolean;
-  /** Outer box sizing class (e.g., 'min-h-[48px] w-11 sm:h-[52px] sm:w-12') */
+  /** Outer box sizing class (e.g., 'min-h-12 w-11 sm:h-13 sm:w-12') */
   readonly boxSizeClassName: string;
   /** Inner text sizing class (e.g., 'text-[1.3rem] sm:text-[1.45rem]') */
   readonly textSizeClassName: string;
@@ -56,7 +56,7 @@ export function SegmentedDigitBox({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-[18px] border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-150',
+        'relative flex items-center justify-center rounded-2xl border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-150',
         boxSizeClassName,
         'border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl',
         isFocused

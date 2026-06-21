@@ -95,7 +95,7 @@ jobs:
                 head_ref: .head.ref,
                 head_sha: .head.sha,
                 labels: [.labels[].name],
-                auto_merge: (.auto_merge != null)
+                queued: ([.labels[].name] | any(. == "merge-queue"))
               }]')
 
           TOTAL=$(echo "$ALL_PRS" | jq 'length')
@@ -120,9 +120,9 @@ jobs:
           # ------------------------------------------------------------------
           # 3. Queue pressure check (same threshold as agent-pipeline.yml)
           # ------------------------------------------------------------------
-          READY_COUNT=$(echo "$ALL_PRS" | jq '[.[] | select(.auto_merge == true)] | length')
+          READY_COUNT=$(echo "$ALL_PRS" | jq '[.[] | select(.queued == true)] | length')
 
-          echo "Auto-merge PRs in queue: $READY_COUNT / $READY_THRESHOLD"
+          echo "PRs already in merge queue: $READY_COUNT / $READY_THRESHOLD"
 
           if [[ "$READY_COUNT" -ge "$READY_THRESHOLD" ]]; then
             echo "Queue pressure is high ($READY_COUNT / $READY_THRESHOLD). Skipping sweep to avoid saturation."
@@ -140,7 +140,7 @@ jobs:
             PR_TITLE=$(echo "$PR" | jq -r '.title')
             PR_SHA=$(echo "$PR" | jq -r '.head_sha')
             PR_BRANCH=$(echo "$PR" | jq -r '.head_ref')
-            PR_AUTO_MERGE=$(echo "$PR" | jq -r '.auto_merge')
+            PR_QUEUED=$(echo "$PR" | jq -r '.queued')
             LABELS=$(echo "$PR" | jq -r '[.labels[]] | join(",")')
 
             echo ""
@@ -148,11 +148,11 @@ jobs:
             echo "Branch: $PR_BRANCH"
             echo "SHA: $PR_SHA"
             echo "Labels: ${LABELS:-none}"
-            echo "Auto-merge already enabled: $PR_AUTO_MERGE"
+            echo "Already in merge queue: $PR_QUEUED"
 
-            # Skip if already queued for auto-merge (idempotency guard)
-            if [[ "$PR_AUTO_MERGE" == "true" ]]; then
-              echo "Auto-merge already enabled. Skipping."
+            # Skip if already enqueued in Graphite (idempotency guard)
+            if [[ "$PR_QUEUED" == "true" ]]; then
+              echo "Already in Graphite merge queue. Skipping."
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
@@ -242,16 +242,17 @@ jobs:
             echo "All gates passed for PR #$PR_NUMBER."
 
             if [[ "${DRY_RUN,,}" == "true" ]]; then
-              echo "[DRY RUN] Would enable auto-merge on PR #$PR_NUMBER."
+              echo "[DRY RUN] Would add PR #$PR_NUMBER to merge queue."
               LANDED=$((LANDED + 1))
               continue
             fi
 
-            if gh pr merge "$PR_NUMBER" --auto --squash 2>/dev/null; then
-              echo "Auto-merge enabled for PR #$PR_NUMBER."
+            # Graphite enqueues by label; native auto-merge retired
+            if gh pr edit "$PR_NUMBER" --add-label "merge-queue"; then
+              echo "Added PR #$PR_NUMBER to the Graphite merge queue."
               LANDED=$((LANDED + 1))
             else
-              echo "::warning::Failed to enable auto-merge on PR #$PR_NUMBER (may already be queued or ineligible)."
+              echo "::warning::Failed to add merge-queue label to PR #$PR_NUMBER — not enqueued."
               SKIPPED=$((SKIPPED + 1))
             fi
           done < <(echo "$AGENT_PRS" | jq -c '.[]')

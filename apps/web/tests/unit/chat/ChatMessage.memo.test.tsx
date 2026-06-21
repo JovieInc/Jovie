@@ -8,9 +8,17 @@ const markdownRenderCount = vi.hoisted(() => ({ current: 0 }));
 
 vi.mock('motion/react', () => ({
   motion: {
-    div: ({ children, ...props }: ComponentProps<'div'>) => (
-      <div {...props}>{children}</div>
-    ),
+    div: ({
+      children,
+      initial: _initial,
+      animate: _animate,
+      transition: _transition,
+      ...props
+    }: ComponentProps<'div'> & {
+      initial?: unknown;
+      animate?: unknown;
+      transition?: unknown;
+    }) => <div {...props}>{children}</div>,
   },
   useReducedMotion: () => true,
 }));
@@ -26,12 +34,11 @@ vi.mock('@/hooks/useClipboard', () => ({
   useClipboard: () => ({ copy: vi.fn(), isSuccess: false }),
 }));
 
-vi.mock('next/dynamic', () => ({
-  default: () =>
-    function MockChatMarkdown({ content }: { content: string }) {
-      markdownRenderCount.current += 1;
-      return <div data-testid='chat-markdown'>{content}</div>;
-    },
+vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
+  ChatMarkdown: ({ content }: { content: string }) => {
+    markdownRenderCount.current += 1;
+    return <div data-testid='chat-markdown'>{content}</div>;
+  },
 }));
 
 vi.mock('../tool-ui', () => ({

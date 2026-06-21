@@ -228,13 +228,13 @@ export function AlertGrowthLanding({
 
   return (
     <main className='min-h-dvh bg-(--linear-app-content-surface) text-primary-token'>
-      <div className='mx-auto flex min-h-dvh max-w-[430px] flex-col px-5 py-10 sm:py-12'>
+      <div className='mx-auto flex min-h-dvh max-w-108 flex-col px-5 py-10 sm:py-12'>
         <header className='mb-6'>
-          <p className='text-secondary-token text-[13px]'>{APP_LABEL}</p>
-          <h1 className='mt-2 text-[24px] font-semibold leading-[1.08] tracking-normal'>
-            Get alerts first.
+          <p className='text-secondary-token text-app'>{APP_LABEL}</p>
+          <h1 className='mt-2 text-2xl font-semibold leading-[1.08] tracking-normal'>
+            Get Alerts First.
           </h1>
-          <p className='text-secondary-token mt-3 max-w-[28rem] text-[14px] leading-5'>
+          <p className='text-secondary-token mt-3 max-w-[28rem] text-sm leading-5'>
             Text or email alerts for new music, shows, and major updates from{' '}
             <span className='text-primary-token'>{artistName}</span>.
           </p>
@@ -257,13 +257,13 @@ export function AlertGrowthLanding({
               <ChannelToggle
                 pressed={channel === 'sms'}
                 disabled={isPending}
-                label='Text me'
+                label='Text Me'
                 onSelect={() => handleChannelChange('sms')}
               />
               <ChannelToggle
                 pressed={channel === 'email'}
                 disabled={isPending}
-                label='Email me'
+                label='Email Me'
                 onSelect={() => handleChannelChange('email')}
               />
             </fieldset>
@@ -285,7 +285,7 @@ export function AlertGrowthLanding({
                     value={phoneInput}
                     onChange={e => setPhoneInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-[var(--profile-action-radius)] border px-3.5 text-[16px] focus:outline-none focus-visible:ring-2'
+                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-[var(--profile-action-radius)] border px-3.5 text-base focus:outline-none focus-visible:ring-2'
                   />
                 </>
               ) : (
@@ -299,12 +299,13 @@ export function AlertGrowthLanding({
                     type='email'
                     inputMode='email'
                     autoComplete='email'
+                    // eslint-disable-next-line @jovie/canonical-ui-label-casing
                     placeholder='you@example.com'
                     aria-describedby={consentId}
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-[var(--profile-action-radius)] border px-3.5 text-[16px] focus:outline-none focus-visible:ring-2'
+                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-[var(--profile-action-radius)] border px-3.5 text-base focus:outline-none focus-visible:ring-2'
                   />
                 </>
               )}
@@ -313,7 +314,7 @@ export function AlertGrowthLanding({
             <button
               type='submit'
               disabled={isPending}
-              className='h-12 w-full rounded-[var(--profile-action-radius)] border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-[14px] font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
+              className='h-12 w-full rounded-[var(--profile-action-radius)] border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-sm font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
             >
               {isPending ? 'Sending…' : 'Get alerts'}
             </button>
@@ -351,7 +352,7 @@ export function AlertGrowthLanding({
           {PROOF_POINTS.map(point => (
             <li
               key={point}
-              className='border-subtle text-secondary-token rounded-[var(--profile-action-radius)] border bg-surface-1 px-3.5 py-3 text-[13px]'
+              className='border-subtle text-secondary-token rounded-[var(--profile-action-radius)] border bg-surface-1 px-3.5 py-3 text-app'
             >
               {point}
             </li>
@@ -389,8 +390,8 @@ function ChannelToggle({
       onClick={onSelect}
       className={
         pressed
-          ? 'border-default bg-surface-1 text-primary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-[13px] font-semibold disabled:opacity-60'
-          : 'border-subtle bg-surface-0 text-secondary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-[13px] font-semibold disabled:opacity-60'
+          ? 'border-default bg-surface-1 text-primary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-app font-semibold disabled:opacity-60'
+          : 'border-subtle bg-surface-0 text-secondary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-app font-semibold disabled:opacity-60'
       }
     >
       {label}
@@ -412,8 +413,8 @@ function SubscribedState({
         className='bg-surface-1 border-subtle rounded-[var(--profile-card-radius)] border p-5'
         data-testid='alerts-landing-pending'
       >
-        <h2 className='text-primary-token text-[17px] font-semibold tracking-normal'>
-          Check your {channel === 'sms' ? 'phone' : 'inbox'}.
+        <h2 className='text-primary-token text-base font-semibold tracking-normal'>
+          Check Your {channel === 'sms' ? 'Phone' : 'Inbox'}.
         </h2>
         <p className='text-secondary-token mt-2 text-sm'>
           {channel === 'sms'
@@ -430,8 +431,8 @@ function SubscribedState({
       className='bg-surface-1 border-subtle rounded-[var(--profile-card-radius)] border p-5'
       data-testid='alerts-landing-success'
     >
-      <h2 className='text-primary-token text-[17px] font-semibold tracking-normal'>
-        You&apos;re on the list.
+      <h2 className='text-primary-token text-base font-semibold tracking-normal'>
+        You&apos;re On The List.
       </h2>
       <p className='text-secondary-token mt-2 text-sm'>
         {channel === 'sms'

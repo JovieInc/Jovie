@@ -3,7 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   getNotFoundCopy,
   type NotFoundVariant,
-} from '@/lib/routing/not-found-context';
+} from '@/lib/routing/not-found-copy';
 
 type NotFoundSurface = 'root' | 'profile';
 

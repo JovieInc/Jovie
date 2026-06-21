@@ -189,10 +189,10 @@ function ReleasesListContent({
     return (
       <div className='py-12 grid place-items-center text-center'>
         <div className='max-w-sm'>
-          <div className='text-[13px] font-caption text-primary-token'>
+          <div className='text-app font-caption text-primary-token'>
             Connect Spotify to get started
           </div>
-          <p className='mt-1 text-[12px] text-tertiary-token leading-[1.5]'>
+          <p className='mt-1 text-xs text-tertiary-token leading-[1.5]'>
             Sync your catalog from Spotify or add a release manually to start
             generating smart links.
           </p>
@@ -275,14 +275,14 @@ function ReleasesListContent({
     return (
       <div className='py-12 grid place-items-center text-center'>
         <div>
-          <div className='text-[13px] font-caption text-secondary-token'>
+          <div className='text-app font-caption text-secondary-token'>
             No releases match your filters
           </div>
           {pills.length > 0 ? (
             <button
               type='button'
               onClick={onClearFilters}
-              className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-subtle'
+              className='mt-2 text-2xs text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-subtle'
             >
               Clear filters
             </button>

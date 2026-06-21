@@ -15,6 +15,7 @@ import {
   Lock,
   type LucideIcon,
   MailCheck,
+  Map,
   Music,
   PieChart,
   Settings,
@@ -231,6 +232,7 @@ const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   screenshots: ImageIcon,
   costs: Banknote,
   share_studio: Share2,
+  system_map: Map,
 };
 
 function buildAdminNavigationItems(

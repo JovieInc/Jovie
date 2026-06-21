@@ -58,14 +58,14 @@ export function OtpInput({
   });
   const sizeStyles = {
     hero: {
-      fieldset: 'flex justify-center gap-[3px] border-0 p-0 m-0 relative z-10',
+      fieldset: 'flex justify-center gap-1 border-0 p-0 m-0 relative z-10',
       boxSize:
-        'h-8 w-[26px] rounded-lg border-white/14 bg-white/[0.06] text-app text-white shadow-none',
+        'h-8 w-7 rounded-lg border-white/14 bg-white/[0.06] text-app text-white shadow-none',
       textSize: 'text-app',
     },
     compact: {
       fieldset: 'flex justify-center gap-1.5 border-0 p-0 m-0 relative z-10',
-      boxSize: 'h-10 w-[34px] text-[1rem] sm:h-10 sm:w-[34px] sm:text-[1rem]',
+      boxSize: 'h-10 w-9 text-[1rem] sm:h-10 sm:w-9 sm:text-[1rem]',
       textSize: 'text-[1rem] sm:text-[1rem]',
     },
     default: {
@@ -121,7 +121,7 @@ export function OtpInput({
         onFocus={handleAutofillFocus}
         disabled={disabled}
         className={cn(
-          'absolute inset-0 w-full h-full opacity-0 cursor-text text-[16px]',
+          'absolute inset-0 w-full h-full opacity-0 cursor-text text-base',
           'z-0',
           'bg-transparent border-none outline-none'
         )}

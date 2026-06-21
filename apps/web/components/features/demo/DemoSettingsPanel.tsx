@@ -73,7 +73,7 @@ export function DemoSettingsPanel() {
                     }}
                   />
                   <span
-                    className='truncate text-[13px] font-caption'
+                    className='truncate text-app font-caption'
                     style={{ color: platform.color }}
                   >
                     {platform.name}
@@ -101,17 +101,17 @@ export function DemoSettingsPanel() {
         <SettingsSection title='Preferences' bordered>
           <div className='px-4 py-3'>
             <ToggleRow
-              label='Auto-sync new releases'
+              label='Automatic New Releases'
               description='Automatically create smart links when new releases are detected'
               defaultChecked
             />
             <ToggleRow
-              label='Email notifications'
+              label='Email Notifications'
               description='Get notified when platforms sync or require attention'
               defaultChecked
             />
             <ToggleRow
-              label='Public profile'
+              label='Public Profile'
               description='Allow your artist page to be discoverable'
               defaultChecked={false}
             />
@@ -124,26 +124,26 @@ export function DemoSettingsPanel() {
 
 function AudienceQualityCaptureCard() {
   return (
-    <div className='mx-auto max-w-[880px] px-4 py-4 sm:px-5 sm:py-5'>
+    <div className='mx-auto max-w-220 px-4 py-4 sm:px-5 sm:py-5'>
       <div
-        className='overflow-hidden rounded-[24px] border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
+        className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
         data-testid='demo-settings-audience-quality-capture'
       >
         <div className='border-b border-subtle px-5 py-4'>
-          <p className='text-[11px] font-semibold tracking-[0.12em] text-tertiary-token uppercase'>
+          <p className='text-2xs font-semibold tracking-[0.12em] text-tertiary-token uppercase'>
             Settings
           </p>
           <div className='mt-2 flex items-end justify-between gap-4'>
             <div>
-              <h2 className='text-[22px] font-semibold tracking-[-0.03em] text-primary-token'>
+              <h2 className='text-xl font-semibold tracking-[-0.03em] text-primary-token'>
                 Audience Quality Filtering
               </h2>
-              <p className='mt-1 max-w-[34rem] text-[13px] leading-[1.55] text-secondary-token'>
+              <p className='mt-1 max-w-[34rem] text-app leading-[1.55] text-secondary-token'>
                 Keep the audience view focused on real intent by filtering junk
                 traffic, repeat self-visits, and low-signal activity.
               </p>
             </div>
-            <span className='rounded-full border border-[color:color-mix(in_srgb,var(--color-success)_38%,transparent)] bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] px-3 py-1 text-[12px] font-semibold text-primary-token'>
+            <span className='rounded-full border border-[color:color-mix(in_srgb,var(--color-success)_38%,transparent)] bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] px-3 py-1 text-xs font-semibold text-primary-token'>
               Active
             </span>
           </div>
@@ -153,19 +153,19 @@ function AudienceQualityCaptureCard() {
           <div className='border-b border-subtle p-5 md:border-b-0 md:border-r'>
             <div className='space-y-3'>
               <QualitySignalRow
-                label='Filter self visits'
+                label='Filter Self Visits'
                 detail='Hide your own scans, test taps, and internal traffic.'
                 value='On'
                 tone='success'
               />
               <QualitySignalRow
-                label='Filter low signal'
+                label='Filter Low Signal'
                 detail='Suppress anonymous taps with weak downstream intent.'
                 value='On'
                 tone='success'
               />
               <QualitySignalRow
-                label='Filter junk traffic'
+                label='Filter Junk Traffic'
                 detail='Catch suspicious spikes, repeat loops, and broken crawlers.'
                 value='Auto'
                 tone='neutral'
@@ -174,13 +174,13 @@ function AudienceQualityCaptureCard() {
           </div>
 
           <div className='p-5'>
-            <div className='rounded-[18px] border border-subtle bg-surface-1 p-4'>
+            <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
               <div className='flex items-start justify-between gap-4'>
                 <div>
-                  <p className='text-[13px] font-semibold text-primary-token'>
+                  <p className='text-app font-semibold text-primary-token'>
                     Advanced Quality Filtering
                   </p>
-                  <p className='mt-1 text-[12px] leading-[1.5] text-secondary-token'>
+                  <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
                     Apply the same quality logic across audience views, exports,
                     and downstream automations.
                   </p>
@@ -189,12 +189,12 @@ function AudienceQualityCaptureCard() {
               </div>
 
               <div className='mt-4 space-y-2'>
-                <FilterRule label='Merch table scans' value='Trusted source' />
+                <FilterRule label='Merch Table Scans' value='Trusted source' />
                 <FilterRule
-                  label='Profile revisit within 20m'
+                  label='Profile Revisit Within Twenty Minutes'
                   value='Collapsed'
                 />
-                <FilterRule label='Anonymous bounce' value='Excluded' />
+                <FilterRule label='Anonymous Bounce' value='Excluded' />
               </div>
             </div>
           </div>
@@ -206,32 +206,32 @@ function AudienceQualityCaptureCard() {
 
 function SyncSettingsCaptureCard() {
   return (
-    <div className='mx-auto max-w-[760px] px-4 py-4 sm:px-5 sm:py-5'>
+    <div className='mx-auto max-w-190 px-4 py-4 sm:px-5 sm:py-5'>
       <div
-        className='overflow-hidden rounded-[24px] border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
+        className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
         data-testid='demo-settings-sync-capture'
       >
         <div className='border-b border-subtle px-5 py-4'>
-          <p className='text-[11px] font-semibold tracking-[0.12em] text-tertiary-token uppercase'>
+          <p className='text-2xs font-semibold tracking-[0.12em] text-tertiary-token uppercase'>
             Settings
           </p>
-          <h2 className='mt-2 text-[22px] font-semibold tracking-[-0.03em] text-primary-token'>
-            Always in sync
+          <h2 className='mt-2 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
+            Always In Sync
           </h2>
-          <p className='mt-1 max-w-[34rem] text-[13px] leading-[1.55] text-secondary-token'>
+          <p className='mt-1 max-w-[34rem] text-app leading-[1.55] text-secondary-token'>
             Keep new music and profile surfaces current automatically, without
             republishing your page every time something changes.
           </p>
         </div>
 
         <div className='space-y-3 p-5'>
-          <div className='rounded-[18px] border border-subtle bg-surface-1 p-4'>
+          <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
             <div className='flex items-start justify-between gap-4'>
               <div>
-                <p className='text-[13px] font-semibold text-primary-token'>
+                <p className='text-app font-semibold text-primary-token'>
                   Always in sync
                 </p>
-                <p className='mt-1 text-[12px] leading-[1.5] text-secondary-token'>
+                <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
                   New releases, top tracks, and linked surfaces stay aligned.
                 </p>
               </div>
@@ -240,13 +240,13 @@ function SyncSettingsCaptureCard() {
           </div>
 
           <div className='grid gap-2 sm:grid-cols-3'>
-            <SyncSurfacePill label='Latest release' value='Live' />
-            <SyncSurfacePill label='Top tracks' value='Auto' />
-            <SyncSurfacePill label='Profile pages' value='Updated' />
+            <SyncSurfacePill label='Latest Release' value='Live' />
+            <SyncSurfacePill label='Top Tracks' value='Auto' />
+            <SyncSurfacePill label='Profile Pages' value='Updated' />
           </div>
 
-          <div className='rounded-[18px] border border-subtle bg-surface-1 p-4'>
-            <p className='text-[12px] font-semibold text-secondary-token'>
+          <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
+            <p className='text-xs font-semibold text-secondary-token'>
               Connected surfaces
             </p>
             <div className='mt-3 space-y-2'>
@@ -258,7 +258,7 @@ function SyncSettingsCaptureCard() {
               ].map(label => (
                 <div
                   key={label}
-                  className='flex items-center justify-between rounded-[14px] bg-surface-0 px-3 py-2 text-[12px]'
+                  className='flex items-center justify-between rounded-xl bg-surface-0 px-3 py-2 text-xs'
                 >
                   <span className='font-caption text-primary-token'>
                     {label}
@@ -279,11 +279,11 @@ function SyncSettingsCaptureCard() {
 function AlwaysInSyncToggle() {
   return (
     <div className='inline-flex items-center gap-3'>
-      <span className='text-[12px] font-semibold text-primary-token'>
-        Always in sync
+      <span className='text-xs font-semibold text-primary-token'>
+        Always In Sync
       </span>
       <span className='flex h-7 w-12 items-center rounded-full bg-[color:var(--color-accent)] px-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'>
-        <span className='ml-auto h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)]' />
+        <span className='ml-auto h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] dark:bg-white' />
       </span>
     </div>
   );
@@ -301,19 +301,17 @@ function QualitySignalRow({
   tone: 'success' | 'neutral';
 }>) {
   return (
-    <div className='rounded-[18px] border border-subtle bg-surface-1 p-4'>
+    <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-[13px] font-semibold text-primary-token'>
-            {label}
-          </p>
-          <p className='mt-1 text-[12px] leading-[1.5] text-secondary-token'>
+          <p className='text-app font-semibold text-primary-token'>{label}</p>
+          <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
             {detail}
           </p>
         </div>
         <span
           className={cn(
-            'rounded-full px-2.5 py-1 text-[11px] font-semibold',
+            'rounded-full px-2.5 py-1 text-2xs font-semibold',
             tone === 'success'
               ? 'bg-[color:color-mix(in_srgb,var(--color-success)_18%,transparent)] text-primary-token'
               : 'bg-surface-0 text-secondary-token'
@@ -334,7 +332,7 @@ function FilterRule({
   value: string;
 }>) {
   return (
-    <div className='flex items-center justify-between rounded-[14px] bg-surface-0 px-3 py-2 text-[12px]'>
+    <div className='flex items-center justify-between rounded-xl bg-surface-0 px-3 py-2 text-xs'>
       <span className='font-caption text-primary-token'>{label}</span>
       <span className='text-secondary-token'>{value}</span>
     </div>
@@ -349,13 +347,11 @@ function SyncSurfacePill({
   value: string;
 }>) {
   return (
-    <div className='rounded-[16px] border border-subtle bg-surface-1 px-3 py-3'>
-      <p className='text-[11px] font-semibold tracking-[-0.01em] text-secondary-token'>
+    <div className='rounded-2xl border border-subtle bg-surface-1 px-3 py-3'>
+      <p className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
         {label}
       </p>
-      <p className='mt-1 text-[14px] font-semibold text-primary-token'>
-        {value}
-      </p>
+      <p className='mt-1 text-sm font-semibold text-primary-token'>{value}</p>
     </div>
   );
 }
@@ -395,7 +391,7 @@ function SettingsRow({
   value: string;
 }>) {
   return (
-    <div className='flex items-start justify-between gap-4 text-[13px]'>
+    <div className='flex items-start justify-between gap-4 text-app'>
       <span className='shrink-0 text-tertiary-token'>{label}</span>
       <span className='text-right text-primary-token'>{value}</span>
     </div>
@@ -417,8 +413,8 @@ function ToggleRow({
       className='flex cursor-pointer items-start justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] py-2.5 last:border-b-0'
     >
       <div>
-        <p className='text-[13px] font-caption text-primary-token'>{label}</p>
-        <p className='text-[12px] text-tertiary-token'>{description}</p>
+        <p className='text-app font-caption text-primary-token'>{label}</p>
+        <p className='text-xs text-tertiary-token'>{description}</p>
       </div>
       <input
         type='checkbox'

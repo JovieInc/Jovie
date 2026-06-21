@@ -572,11 +572,10 @@ async function collectMockHomeReleaseCardLayout(
 ): Promise<ReleaseCardLayout> {
   return page.evaluate(() => {
     const card = document.querySelector<HTMLElement>(
-      '[data-testid="profile-home-primary-action-card"]'
+      '[data-testid="profile-home-carousel"] a'
     );
     const artwork = card?.querySelector<HTMLImageElement>('img') ?? null;
-    const title =
-      card?.querySelector<HTMLElement>('p.line-clamp-2, p.truncate') ?? null;
+    const title = card?.querySelector<HTMLElement>('h3') ?? null;
     const hero = document.querySelector<HTMLElement>(
       '[data-testid="profile-hero-identity-block"]'
     );
@@ -632,7 +631,7 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       );
       await waitForHydration(page);
       await waitForAnyVisible(page, [
-        '[data-testid="profile-home-primary-action-card"]',
+        '[data-testid="profile-home-carousel"] a',
       ]);
       await settleLayout(page);
       await expectNoDocumentOverflow(
@@ -682,6 +681,46 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       }
     });
   }
+});
+
+test.describe('Public Profile Home Carousel @smoke @critical', () => {
+  test('mock-home includes horizontally scrollable back-catalog cards', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installProfileMocks(page);
+
+    await smokeNavigate(
+      page,
+      '/demo/showcase/tim-white-profile?state=mock-home',
+      { timeout: 120_000 }
+    );
+    await waitForHydration(page);
+    await waitForAnyVisible(page, ['[data-testid="profile-home-carousel"] a']);
+
+    const carousel = page.getByTestId('profile-home-carousel');
+    await expect(carousel).toBeVisible();
+    const metrics = await carousel.evaluate(el => ({
+      linkCount: el.querySelectorAll('a').length,
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(metrics.linkCount).toBeGreaterThanOrEqual(2);
+    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+
+    await expect(
+      carousel.locator('a').filter({ hasText: /Holding On/i })
+    ).toHaveCount(1);
+    await expect(
+      carousel.locator('a').filter({ hasText: /Clear Skies/i })
+    ).toHaveCount(1);
+
+    const scrolledLeft = await carousel.evaluate(el => {
+      el.scrollLeft = el.scrollWidth;
+      return el.scrollLeft;
+    });
+    expect(scrolledLeft).toBeGreaterThan(0);
+  });
 });
 
 test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () => {

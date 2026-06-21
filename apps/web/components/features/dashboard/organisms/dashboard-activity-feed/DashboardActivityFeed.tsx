@@ -42,7 +42,7 @@ function ActivityEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <div className='flex min-h-[140px] items-center rounded-md bg-surface-1 px-2'>
+      <div className='flex min-h-35 items-center rounded-md bg-surface-1 px-2'>
         <p className='text-xs leading-[17px] text-secondary-token'>
           No recent activity. Share your profile to see engagement here.
         </p>
@@ -160,7 +160,7 @@ export function DashboardActivityFeed({
         </span>
       </div>
 
-      <div className='min-h-[180px]'>
+      <div className='min-h-45'>
         {(() => {
           if (error) {
             return (

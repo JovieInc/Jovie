@@ -200,9 +200,32 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
  * dynamic rendering, emitting per-request nonce headers that violate the
  * static-marketing rule (.claude/rules/ui.md).
  */
+function resolveStaticPublishableKeyPair(): string | undefined {
+  const publishableKey = runtimePublicEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
+  if (publishableKey && process.env.CLERK_SECRET_KEY) {
+    return publishableKey;
+  }
+  return undefined;
+}
+
 export async function resolvePublishableKeyStaticFirst(): Promise<
   string | undefined
 > {
+  // Clerk mock / CI smoke: use runtime keys without headers(). The @auth
+  // parallel slot mounts on ISR profile routes; calling headers() there opts
+  // statically generated pages into dynamic rendering and 500s on standalone
+  // production servers (PR smoke lane).
+  //
+  // Use bracket-notation runtimePublicEnv — dot-notation NEXT_PUBLIC_* reads
+  // are inlined at build time and ignore CI's runtime overrides on standalone
+  // artifacts.
+  if (
+    runtimePublicEnv('NEXT_PUBLIC_CLERK_MOCK') === '1' ||
+    runtimePublicEnv('E2E_USE_TEST_AUTH_BYPASS') === '1'
+  ) {
+    return resolveStaticPublishableKeyPair();
+  }
+
   if (process.env.VERCEL_ENV === 'production') {
     // A promoted staging deployment can also report VERCEL_ENV=production.
     // When staging-specific keys are present, inspect the request host so

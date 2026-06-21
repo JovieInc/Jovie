@@ -399,8 +399,14 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'h-[var(--cover-height)] max-h-[430px] [@media(max-height:880px)]:max-h-[218px] [@media(max-height:760px)]:h-[178px] [@media(max-height:760px)]:max-h-[178px]'
+    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:h-45 [@media(max-height:760px)]:max-h-45'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
+  const homeContentColumnClassName = isHomeMode
+    ? 'shrink-0 [@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
+    : 'min-h-0 flex-1';
+  const homeContentScrollClassName = isHomeMode
+    ? '[@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
+    : 'min-h-0 flex-1';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
@@ -511,14 +517,15 @@ export function ProfileCompactSurface({
 
         <header
           className={cn(
-            'relative shrink-0 overflow-hidden',
+            'relative overflow-hidden',
+            isHomeMode ? 'min-h-0' : 'shrink-0',
             heroHeightClassName
           )}
           data-testid='profile-cover'
         >
           {isHomeMode ? (
             <>
-              <div className='absolute inset-0'>
+              <div className='profile-cover-home-media absolute inset-0'>
                 {resolvedHeroImageUrl ? (
                   <ImageWithFallback
                     src={resolvedHeroImageUrl}
@@ -538,8 +545,9 @@ export function ProfileCompactSurface({
                 )}
               </div>
 
-              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
+              <div className='profile-cover-home-gradient pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
+              <div className='profile-cover-home-fade pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
+              <div className='profile-cover-mode-backdrop absolute inset-0 hidden bg-black/94 backdrop-blur-2xl' />
             </>
           ) : (
             <div className='absolute inset-0 bg-black/94 backdrop-blur-2xl' />
@@ -547,9 +555,9 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'relative z-10 flex h-full items-start justify-between px-4',
+              'profile-cover-chrome relative z-10 flex h-full items-start justify-between px-4',
               isPreviewEmbedded
-                ? 'pt-[74px]'
+                ? 'pt-19'
                 : isHomeMode
                   ? 'pt-[max(env(safe-area-inset-top),16px)]'
                   : 'pt-[max(env(safe-area-inset-top),10px)]'
@@ -569,20 +577,23 @@ export function ProfileCompactSurface({
                   className={topChromeButtonClassName}
                   ariaLabel='Back'
                 >
-                  <ChevronLeft className='h-[18px] w-[18px]' />
+                  <ChevronLeft className='h-5 w-5' />
                 </CircleIconButton>
               )}
 
-              {!isHomeMode ? (
-                <p
-                  className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-[14px] font-semibold tracking-[-0.012em] text-white'
-                  data-testid={
-                    renderMode === 'preview' ? undefined : 'profile-header'
-                  }
-                >
-                  {artist.name}
-                </p>
-              ) : null}
+              <p
+                className={cn(
+                  'profile-cover-mode-title absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-normal text-[color:var(--profile-status-pill-fg)]',
+                  isHomeMode && 'hidden'
+                )}
+                data-testid={
+                  !isHomeMode && renderMode !== 'preview'
+                    ? 'profile-header'
+                    : undefined
+                }
+              >
+                {artist.name}
+              </p>
 
               {hideMoreMenu ? (
                 <div className='h-11 w-11 shrink-0' aria-hidden='true' />
@@ -595,9 +606,9 @@ export function ProfileCompactSurface({
                   ariaLabel='Menu'
                 >
                   {hideJovieBranding ? (
-                    <MoreHorizontal className='h-[18px] w-[18px]' />
+                    <MoreHorizontal className='h-5 w-5' />
                   ) : (
-                    <Mark size={18} className='h-[18px] w-[18px]' />
+                    <Mark size={18} className='h-5 w-5' />
                   )}
                 </CircleIconButton>
               )}
@@ -607,7 +618,7 @@ export function ProfileCompactSurface({
           {isHomeMode ? (
             <div className='absolute inset-x-0 bottom-0 z-10 px-[var(--page-pad)] pb-5 [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'>
               <div
-                className='min-w-0 rounded-[18px] bg-black/18 px-3 py-2.5 shadow-[0_16px_38px_-24px_rgba(0,0,0,0.72)] backdrop-blur-[2px] [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
+                className='min-w-0 rounded-2xl bg-black/18 px-3 py-2.5 shadow-[0_16px_38px_-24px_rgba(0,0,0,0.72)] backdrop-blur-[2px] [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
                 data-testid='profile-hero-identity-block'
               >
                 <IdentityHeading
@@ -619,8 +630,9 @@ export function ProfileCompactSurface({
                   <Link
                     data-testid='profile-identity-link'
                     href={profileHref}
+                    prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-[28px] font-semibold leading-none tracking-normal text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[26px] [@media(max-height:760px)]:text-[24px]'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-[color:var(--profile-status-pill-fg)] drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
@@ -638,7 +650,7 @@ export function ProfileCompactSurface({
                 </IdentityHeading>
 
                 <div className='mt-1 flex min-w-0 items-center justify-between gap-2 [@media(max-height:820px)]:mt-0.5'>
-                  <p className='flex min-w-0 items-center gap-1.5 text-[12px] font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-[11.5px]'>
+                  <p className='flex min-w-0 items-center gap-1.5 text-xs font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-2xs'>
                     <span className='min-w-0 truncate'>{heroSubtitle}</span>
                     {locationLabel ? (
                       <>
@@ -669,7 +681,7 @@ export function ProfileCompactSurface({
                           >
                             <SocialIcon
                               platform={link.platform}
-                              className='h-[18px] w-[18px]'
+                              className='h-5 w-5'
                             />
                           </a>
                         ) : null
@@ -684,7 +696,8 @@ export function ProfileCompactSurface({
 
         <div
           className={cn(
-            'relative z-10 flex min-h-0 flex-1 flex-col px-[var(--page-pad)]',
+            'relative z-10 flex flex-col px-[var(--page-pad)]',
+            homeContentColumnClassName,
             isHomeMode ? 'pt-0' : 'pt-2'
           )}
         >
@@ -715,7 +728,8 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'min-h-0 flex-1 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [touch-action:pan-y] [will-change:scroll-position]',
+              'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [touch-action:pan-y] [will-change:scroll-position]',
+              homeContentScrollClassName,
               showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
               !isHomeMode &&
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
@@ -738,6 +752,7 @@ export function ProfileCompactSurface({
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
                 merchCards={merchCards}
+                releases={releases}
               />
             ) : (
               <ProfilePrimaryTabPanel

@@ -609,12 +609,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
-      'Alerts'
-    );
     expect(
-      screen.getByTestId('profile-home-primary-action-card')
-    ).toHaveTextContent('Tickets');
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toHaveTextContent('Alerts');
+    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
+      'Tickets'
+    );
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
@@ -637,18 +637,18 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
-      'Alerts'
-    );
     expect(
-      screen.getByTestId('profile-home-primary-action-card')
-    ).toHaveTextContent('Listen');
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toHaveTextContent('Alerts');
+    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
+      'Listen'
+    );
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
   });
 
-  it('shows the newest catalog release on Home when latestRelease is not provided', async () => {
+  it('shows catalog releases in the home carousel when latestRelease is not provided', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -659,10 +659,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const homeCard = screen.getByTestId('profile-home-primary-action-card');
-    expect(homeCard).toHaveAttribute('data-state', 'release_live');
+    const homeCard = screen.getByTestId('profile-home-carousel');
     expect(homeCard).toHaveTextContent("Don't Look Down");
-    expect(homeCard).not.toHaveTextContent('Holding On');
+    expect(homeCard).toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {
@@ -989,7 +988,7 @@ describe('ProfileCompactTemplate', () => {
       'href',
       'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
     );
-    expect(screen.getByText('Open playlist')).toBeInTheDocument();
+    expect(screen.getByText('Open Playlist')).toBeInTheDocument();
   });
 
   it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
@@ -1053,9 +1052,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.getByTestId('profile-home-primary-action-card')
-    ).toHaveAttribute('data-state', 'tour_next');
+    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
+      'The Ballroom'
+    );
     expect(
       screen.queryByRole('link', {
         name: `Open This Is playlist for ${mockArtist.name}`,

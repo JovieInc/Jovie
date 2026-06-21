@@ -37,9 +37,9 @@ const VARIANT_STYLES: Record<
   },
   drawer: {
     container: 'space-y-1.5',
-    number: 'text-[10.5px]',
+    number: 'text-3xs',
     title: 'text-sm tracking-[-0.01em]',
-    meta: 'text-[10.5px]',
+    meta: 'text-3xs',
   },
 };
 
@@ -84,7 +84,7 @@ export function TrackMetaSummary({
           {isExplicit ? (
             <Badge
               variant='secondary'
-              className='shrink-0 rounded-full bg-surface-1 px-1.5 py-0 text-[9px] font-caption text-tertiary-token'
+              className='shrink-0 rounded-full bg-surface-1 px-1.5 py-0 text-3xs font-caption text-tertiary-token'
             >
               E
             </Badge>
@@ -102,7 +102,7 @@ export function TrackMetaSummary({
               <span className='tabular-nums'>{formatDuration(durationMs)}</span>
             )}
             {isrc && showIsrc ? (
-              <span className='font-mono text-[9.5px] tracking-[0.02em] text-tertiary-token'>
+              <span className='font-mono text-3xs tracking-[0.02em] text-tertiary-token'>
                 {isrc}
               </span>
             ) : null}
