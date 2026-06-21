@@ -112,7 +112,7 @@ export function MarketingFooter({
     >
       <div
         className={cn(
-          'mx-auto w-full max-w-[var(--linear-content-max)] px-[clamp(1.25rem,2.2vw,2rem)]',
+          'mx-auto w-full max-w-linear-content px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
             ? 'pt-[clamp(3rem,5vw,4.5rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
             : shouldShowCta
@@ -130,7 +130,7 @@ export function MarketingFooter({
           <Link
             href={APP_ROUTES.HOME}
             prefetch={false}
-            aria-label='Jovie home'
+            aria-label='Jovie Home'
             className={markLinkClassName}
           >
             <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
@@ -141,7 +141,7 @@ export function MarketingFooter({
               <Link
                 href={APP_ROUTES.HOME}
                 prefetch={false}
-                aria-label='Jovie home'
+                aria-label='Jovie Home'
                 className={markLinkClassName}
               >
                 <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
