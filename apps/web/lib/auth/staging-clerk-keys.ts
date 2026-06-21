@@ -221,7 +221,7 @@ export async function resolvePublishableKeyStaticFirst(): Promise<
   // artifacts.
   if (
     runtimePublicEnv('NEXT_PUBLIC_CLERK_MOCK') === '1' ||
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+    runtimePublicEnv('E2E_USE_TEST_AUTH_BYPASS') === '1'
   ) {
     return resolveStaticPublishableKeyPair();
   }

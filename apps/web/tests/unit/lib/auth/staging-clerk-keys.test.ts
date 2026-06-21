@@ -337,6 +337,19 @@ describe('resolvePublishableKeyStaticFirst', () => {
     expect(headersMock).not.toHaveBeenCalled();
   });
 
+  it('reads E2E_USE_TEST_AUTH_BYPASS via runtime env lookup for standalone smoke servers', async () => {
+    process.env.VERCEL_ENV = 'development';
+    delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+    (process.env as Record<string, string | undefined>)[
+      'E2E_USE_TEST_AUTH_BYPASS'
+    ] = '1';
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
   it('falls back to headers() on staging (VERCEL_ENV=preview)', async () => {
     process.env.VERCEL_ENV = 'preview';
     headersMock.mockResolvedValue(

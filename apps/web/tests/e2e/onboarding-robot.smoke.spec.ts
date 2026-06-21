@@ -6,11 +6,12 @@ import {
   readOnboardingRobotState,
   waitForOnboardingRobotEvents,
 } from './helpers/onboarding-robot';
-import { waitForHydration } from './utils/smoke-test-utils';
+import {
+  chatComposerInputLocator,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-const COMPOSER_TEXTBOX_NAME = /chat message input/i;
 
 test.describe('Onboarding Robot PR Smoke', () => {
   test('verifies /start chat health and event emission', async ({ page }) => {
@@ -27,9 +28,7 @@ test.describe('Onboarding Robot PR Smoke', () => {
       ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED,
     ]);
 
-    await page
-      .getByRole('textbox', { name: COMPOSER_TEXTBOX_NAME })
-      .fill('I am launching a test artist');
+    await chatComposerInputLocator(page).fill('I am launching a test artist');
     await page.getByRole('button', { name: 'Send message' }).click();
 
     await expect(

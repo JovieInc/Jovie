@@ -16,7 +16,10 @@ import {
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
-import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
+import {
+  chatComposerInputLocator,
+  gotoAuthenticatedChatRoute,
+} from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -211,10 +214,7 @@ function shellChatFrameLocators(page: Page): ShellChatLocators {
   const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
   const chatContent = shellScroll.locator('[data-testid="chat-content"]');
   const composer = shellFrame.locator('[data-testid="chat-composer-surface"]');
-  const input = composer
-    .getByRole('combobox', { name: /chat message input/i })
-    .or(composer.getByRole('textbox', { name: /chat message input/i }))
-    .first();
+  const input = chatComposerInputLocator(composer);
 
   return { chatContent, composer, input, shellFrame, shellScroll };
 }

@@ -37,7 +37,7 @@ vi.mock('react', async importOriginal => {
 });
 
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: mockCachedAuth,
+  getOptionalAuth: mockCachedAuth,
   getCachedCurrentUser: mockCachedCurrentUser,
 }));
 
