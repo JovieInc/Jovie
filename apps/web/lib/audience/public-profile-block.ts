@@ -36,12 +36,6 @@ const REDIS_CACHE_TTL_SECONDS = 60; // ≤60s per audit acceptance criteria
 const REDIS_CACHE_TIMEOUT_MS = 500;
 const MEMORY_CACHE_MAX_ENTRIES = 1_000;
 
-const runtimeImport = new Function('specifier', 'return import(specifier)') as <
-  T,
->(
-  specifier: string
-) => Promise<T>;
-
 type SentryModule = typeof import('@sentry/nextjs');
 
 let sentryModulePromise: Promise<SentryModule> | null = null;
@@ -108,16 +102,27 @@ function isE2ERuntime(): boolean {
   );
 }
 
+function isSecureVercelDeployment(): boolean {
+  return (
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.VERCEL_ENV === 'production'
+  );
+}
+
 function shouldSkipAudienceBlockTelemetry(): boolean {
   // This module is shared by ISR-sensitive public routes and proxy checks.
   // Keep env reads inline so typed server env imports cannot pull request-aware
   // modules into static profile renders.
+  if (isSecureVercelDeployment()) {
+    return false;
+  }
+
   return process.env.CI === 'true' || isTestRuntime() || isE2ERuntime();
 }
 
 function loadSentry(): Promise<SentryModule> {
   if (!sentryModulePromise) {
-    sentryModulePromise = runtimeImport<SentryModule>('@sentry/nextjs');
+    sentryModulePromise = import('@sentry/nextjs');
   }
   return sentryModulePromise;
 }
