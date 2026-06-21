@@ -13,12 +13,14 @@ interface ReleaseCatalogCarouselProps {
   readonly dataTestId?: string;
 }
 
-function isCatalogMusicCard(model: EntityCardModel): boolean {
-  return model.kind === 'music' || model.kind === 'video';
-}
-
-function resolveReleaseId(model: EntityCardModel): string {
-  return model.releaseId ?? model.id;
+function isCatalogReleaseCard(
+  model: EntityCardModel
+): model is EntityCardModel & { readonly releaseId: string } {
+  return (
+    (model.kind === 'music' || model.kind === 'video') &&
+    typeof model.releaseId === 'string' &&
+    model.releaseId.length > 0
+  );
 }
 
 export function ReleaseCatalogCarousel({
@@ -30,12 +32,12 @@ export function ReleaseCatalogCarousel({
 }: Readonly<ReleaseCatalogCarouselProps>) {
   const handleCardImpression = useCallback(
     (index: number, model: EntityCardModel) => {
-      if (!analyticsEnabled || !isCatalogMusicCard(model)) {
+      if (!analyticsEnabled || !isCatalogReleaseCard(model)) {
         return;
       }
 
       track('catalog_carousel_card_impression', {
-        release_id: resolveReleaseId(model),
+        release_id: model.releaseId,
         index,
         artist_handle: artistHandle,
         artist_id: artistId,
@@ -51,12 +53,12 @@ export function ReleaseCatalogCarousel({
 
   const handleCardClick = useCallback(
     (index: number, model: EntityCardModel) => {
-      if (!analyticsEnabled || !isCatalogMusicCard(model)) {
+      if (!analyticsEnabled || !isCatalogReleaseCard(model)) {
         return;
       }
 
       track('catalog_carousel_listen_click', {
-        release_id: resolveReleaseId(model),
+        release_id: model.releaseId,
         index,
         artist_handle: artistHandle,
         artist_id: artistId,

@@ -39,17 +39,22 @@ vi.mock('next/link', () => ({
     children,
     href,
     onClick,
+    prefetch,
     ...props
   }: {
     readonly children: React.ReactNode;
     readonly href: string;
     readonly onClick?: () => void;
+    readonly prefetch?: boolean;
     readonly [key: string]: unknown;
-  }) => (
-    <a href={href} onClick={onClick} {...props}>
-      {children}
-    </a>
-  ),
+  }) => {
+    void prefetch;
+    return (
+      <a href={href} onClick={onClick} {...props}>
+        {children}
+      </a>
+    );
+  },
 }));
 
 vi.mock('@/components/atoms/ImageWithFallback', () => ({
@@ -82,6 +87,20 @@ const catalogRelease: EntityCardModel = {
   imageAlt: 'Under Lights artwork',
   title: 'Under Lights',
   cta: { label: 'Listen', href: '/tim/under-lights' },
+};
+
+const playlistFallback: EntityCardModel = {
+  id: 'playlist-this-is-tim',
+  kind: 'music',
+  href: 'https://open.spotify.com/playlist/this-is-tim',
+  imageUrl: '/img/playlists/this-is-tim.jpg',
+  imageAlt: 'This Is Tim playlist cover',
+  title: 'This Is Tim',
+  cta: {
+    label: 'Open Playlist',
+    href: 'https://open.spotify.com/playlist/this-is-tim',
+    external: true,
+  },
 };
 
 describe('ReleaseCatalogCarousel', () => {
@@ -162,6 +181,24 @@ describe('ReleaseCatalogCarousel', () => {
     trackMock.mockClear();
 
     const link = screen.getByRole('link', { name: /The Deep End/i });
+    link.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(link);
+
+    expect(trackMock).not.toHaveBeenCalled();
+  });
+
+  it('does not track music-like cards without a release id', () => {
+    render(
+      <ReleaseCatalogCarousel
+        items={[playlistFallback]}
+        artistHandle='tim'
+        artistId='artist-1'
+      />
+    );
+
+    expect(trackMock).not.toHaveBeenCalled();
+
+    const link = screen.getByRole('link', { name: /This Is Tim/i });
     link.addEventListener('click', event => event.preventDefault());
     fireEvent.click(link);
 
