@@ -167,7 +167,7 @@ export function EntityCard({
             <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
               {model.datePill.month}
             </span>
-            <span className='text-[34px] font-[680] leading-none tracking-[-0.02em] tabular-nums'>
+            <span className='text-[34px] font-bold leading-none tracking-[-0.02em] tabular-nums'>
               {model.datePill.day}
             </span>
           </div>
@@ -222,7 +222,7 @@ export function EntityCard({
         >
           {model.price ? (
             <div className='min-w-0'>
-              <span className='text-sm font-[680] text-primary-token'>
+              <span className='text-sm font-bold text-primary-token'>
                 {model.price.original ? (
                   <>
                     {model.price.display}
