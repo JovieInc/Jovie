@@ -43,6 +43,8 @@ describe('CookieBannerSection', () => {
 
   it.each([
     '/desktop-auth',
+    '/start',
+    '/start/access',
     '/auth/native-complete',
     '/signin',
     '/signin/sso-callback',
