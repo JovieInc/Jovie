@@ -210,7 +210,7 @@ function SmartLinkClaimBanner({
           type='button'
           onClick={handleDismiss}
           className='text-muted-foreground hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors'
-          aria-label='Dismiss claim profile banner'
+          aria-label='Dismiss Claim Profile Banner'
         >
           <Icon name='X' className='h-3.5 w-3.5' aria-hidden='true' />
         </button>
@@ -291,7 +291,7 @@ export function ReleaseLandingPage({
   allowDownloads = false,
   soundsUrl,
   tracking,
-  utmParams = {},
+  utmParams = { utm_source: 'jovie' },
   parentRelease = null,
   claimBanner = null,
   downloadUrl = null,

@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main, 'integration/**']
-  merge_group:
+  # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
+  # creates a merge_group, so this trigger would never fire. See .github/MERGE_QUEUE.md.
   push:
     branches: [main]
     paths-ignore:
@@ -22,8 +23,7 @@ concurrency:
   # expressions as strings and treats "false" as truthy, which was cancelling
   # every main CI run when the next merge landed and starving production
   # promotion. Using github.sha in the group on main sidesteps the issue
-  # entirely. PRs and merge_group runs still share a group per ref so stale
-  # runs are superseded as usual.
+  # entirely. PRs share a group per ref so stale runs are superseded as usual.
   group: >-
     ci-${{ github.workflow }}-${{
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -77,9 +77,6 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
             CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            git fetch origin main --depth=1
-            CHANGED_FILES=$(git diff --name-only origin/main HEAD)
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
@@ -268,10 +265,6 @@ jobs:
             git fetch origin "$BASE_REF" --depth=1
             DIFF_BASE="origin/$BASE_REF"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
-          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
-            git fetch origin main --depth=1
-            DIFF_BASE="origin/main"
-            git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" || true
           elif [[ "$EVENT_NAME" == "push" ]]; then
             DIFF_BASE="HEAD~1"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
@@ -374,9 +367,6 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
             ./scripts/security/scan-secrets.sh ci-pr "origin/${{ github.base_ref }}"
-          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            git fetch origin main --depth=1
-            ./scripts/security/scan-secrets.sh ci-pr "origin/main"
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
               git fetch origin main --depth=1
@@ -409,7 +399,7 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'main' }}
         run: node scripts/desktop-release-guard.mjs --base "origin/${BASE_REF}"
       - name: Script unit tests
-        run: node --test scripts/desktop-release-guard.test.mjs scripts/dev-web-fast.test.mjs
+        run: node --test scripts/desktop-release-guard.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs
       - name: Version consistency guard
         run: node scripts/version-check.mjs
       - name: Next.js proxy guard
@@ -421,7 +411,7 @@ jobs:
 
   ci-structural-contract:
     name: Structural Contract
-    needs: [ci-risk-classifier]
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -443,6 +433,8 @@ jobs:
           pnpm tailwind:check
           pnpm --filter=@jovie/web run lint:no-native-dialogs
           pnpm --filter=@jovie/web run lint:seo
+          pnpm --filter=@jovie/web run lint:perf-ratchet
+          pnpm --filter=@jovie/web run lint:contrast-ratchet
       - name: Validate flaky quarantine ledger
         run: node .github/scripts/quarantine-ledger.mjs validate
       - name: Write remediation summary
@@ -451,12 +443,12 @@ jobs:
           {
             echo "### Structural Contract"
             echo
-            echo "This lane enforces the CI harness manifest, generated docs, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, and SEO/AEO ratchet."
+            echo "This lane enforces the CI harness manifest, generated docs, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, SEO/AEO ratchet, perf ratchet, and contrast ratchet."
             echo
             echo "Next local command:"
             echo
             echo '```bash'
-            echo "pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo"
+            echo "pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:perf-ratchet && pnpm --filter=@jovie/web run lint:contrast-ratchet"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -616,13 +608,12 @@ jobs:
           path: |
             .cache/tsbuildinfo
             apps/web/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
+          key: ${{ runner.os }}-tsc-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
           restore-keys: |
-            ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
         env:
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm turbo typecheck --affected
 
   neon-db:
@@ -755,7 +746,7 @@ jobs:
     name: Migration Guard
     needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -867,9 +858,8 @@ jobs:
   ci-pr-ready:
     name: PR Ready
     # PR gate: fast checks + unit tests + build + Lighthouse (+ risk-triggered smoke/preview).
-    # Merge queue gate: ci-fast + risk classifier only (build/tests already passed on the PR).
     needs: [ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
-    if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || github.event_name == 'merge_group') }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -922,16 +912,6 @@ jobs:
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
             echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
             exit 1
-          fi
-
-          # Merge queue: lightweight re-validation only (see branch-protection merge_queue contract).
-          if [[ "$EVENT_NAME" == "merge_group" ]]; then
-            if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
-              echo "❌ merge_group requires ci-fast (result: $FAST_RESULT)"
-              exit 1
-            fi
-            echo "Merge queue fast lane passed: ci-fast + risk classifier"
-            exit 0
           fi
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
@@ -1086,6 +1066,11 @@ jobs:
 
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        # ponytail: artifact only feeds informational downstream jobs (layout-guard,
+        # a11y), so a transient FinalizeArtifact timeout must not fail this merge gate.
+        # Build correctness is already asserted by the build + "Verify build output"
+        # steps above. Re-enable hard failure if a downstream gate ever depends on it.
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
@@ -2498,7 +2483,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: |
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
           export NODE_OPTIONS="--max-old-space-size=2048"
@@ -2515,9 +2500,9 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "main: Running web unit suite through Turbo without coverage; nightly coverage audit uploads Codecov coverage"
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
-          elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
-            echo "🔍 PR/merge queue: Running full test suite"
-            # Run all tests on PRs and merge queue to catch regressions before merge
+          elif [ -n "${{ github.base_ref }}" ]; then
+            echo "🔍 PR: Running full test suite"
+            # Run all tests on PRs to catch regressions before merge
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
@@ -2532,7 +2517,7 @@ jobs:
         continue-on-error: true
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests

@@ -342,6 +342,9 @@ struct JovieApp: App {
       dsn: configuration.sentryDSN,
       isEnabled: launchMode == .live
     )
+    if launchMode == .live {
+      MetricKitWatch.start()
+    }
     Observability.setTag(key: "platform", value: "ios")
     Observability.setTag(
       key: "launch_mode",

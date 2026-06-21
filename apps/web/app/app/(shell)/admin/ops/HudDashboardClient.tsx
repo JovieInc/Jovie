@@ -198,7 +198,7 @@ function HudDeploymentsSurfaceCard({
     <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
       <div className='flex items-center justify-between gap-3'>
         <SectionLabel>Deployments</SectionLabel>
-        <p className='text-[12px] text-secondary-token'>{deploymentDetail}</p>
+        <p className='text-xs text-secondary-token'>{deploymentDetail}</p>
       </div>
       {metrics.deployments.recent.length > 0 ? (
         <div className='grid gap-2'>
@@ -207,7 +207,7 @@ function HudDeploymentsSurfaceCard({
           ))}
         </div>
       ) : (
-        <p className='text-[13px] text-secondary-token'>No recent runs.</p>
+        <p className='text-app text-secondary-token'>No recent runs.</p>
       )}
       <HudMetricSourceTrust source={githubSource} onRetry={handleSourceRetry} />
     </ContentSurfaceCard>
@@ -353,12 +353,12 @@ function CompactDeploymentRow({
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${DEPLOYMENT_STATE_DOT_CLASSNAMES[run.status]}`}
             aria-hidden='true'
           />
-          <p className='truncate text-[13px] font-[590] text-primary-token'>
+          <p className='truncate text-app font-[590] text-primary-token'>
             {DEPLOYMENT_STATE_LABELS[run.status]}
           </p>
         </div>
         <div className='flex shrink-0 items-center gap-1.5'>
-          <p className='text-[12px] font-[560] tabular-nums text-primary-token'>
+          <p className='text-xs font-[560] tabular-nums text-primary-token'>
             #{run.runNumber}
           </p>
           <DeploymentActionsMenu run={run} />
@@ -370,7 +370,7 @@ function CompactDeploymentRow({
       >
         {run.branch ?? '\u2014'}
       </p>
-      <p className='text-[11px] text-tertiary-token'>
+      <p className='text-2xs text-tertiary-token'>
         {formatDeploymentTime(run.createdAtIso)}
       </p>
     </ShellListRowFrame>
@@ -385,7 +385,7 @@ function DeploymentRow({
   return (
     <ShellListRowFrame className='flex items-center justify-between gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
-        <p className='truncate text-[13px] font-semibold text-primary-token'>
+        <p className='truncate text-app font-semibold text-primary-token'>
           #{run.runNumber}
           <span className='ml-2 font-normal text-secondary-token'>
             {run.branch ?? '\u2014'}
@@ -394,10 +394,10 @@ function DeploymentRow({
       </div>
       <div className='flex shrink-0 items-center gap-2'>
         <div className='text-right'>
-          <p className='text-[11px] text-tertiary-token'>
+          <p className='text-2xs text-tertiary-token'>
             {formatDeploymentTime(run.createdAtIso)}
           </p>
-          <p className='mt-0.5 text-[11px] font-medium text-secondary-token'>
+          <p className='mt-0.5 text-2xs font-medium text-secondary-token'>
             {DEPLOYMENT_STATE_LABELS[run.status]}
           </p>
         </div>
@@ -423,7 +423,7 @@ function DeploymentsPanel({
         <p className='text-[12.5px] font-[560] text-primary-token'>
           Deployments
         </p>
-        <p className='truncate text-[11px] text-tertiary-token' title={detail}>
+        <p className='truncate text-2xs text-tertiary-token' title={detail}>
           {detail}
         </p>
       </div>
@@ -434,7 +434,7 @@ function DeploymentsPanel({
           ))}
         </div>
       ) : (
-        <p className='text-[13px] text-secondary-token'>No recent runs.</p>
+        <p className='text-app text-secondary-token'>No recent runs.</p>
       )}
     </div>
   );
@@ -473,21 +473,21 @@ function AiOpsItemRow({
   return (
     <ShellListRowFrame className='flex items-start justify-between gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
-        <p className='truncate text-[13px] font-semibold text-primary-token'>
+        <p className='truncate text-app font-semibold text-primary-token'>
           {item.summary}
         </p>
-        <p className='mt-1 text-[11px] text-tertiary-token'>
+        <p className='mt-1 text-2xs text-tertiary-token'>
           {formatMetaLabel(item.source)} / {formatMetaLabel(item.status)}
         </p>
       </div>
-      <div className='flex shrink-0 items-center gap-1.5 text-right text-[11px] text-tertiary-token'>
+      <div className='flex shrink-0 items-center gap-1.5 text-right text-2xs text-tertiary-token'>
         <p>{formatDeploymentTime(item.updatedAt)}</p>
         {isDismissed && onUndismiss ? (
           <button
             type='button'
             onClick={onUndismiss}
             aria-label='Restore Item'
-            className='rounded px-1 py-0.5 text-[11px] text-tertiary-token hover:text-primary-token'
+            className='rounded px-1 py-0.5 text-2xs text-tertiary-token hover:text-primary-token'
           >
             Undo
           </button>
@@ -587,12 +587,12 @@ function HermesDispatchControls({
           value={sourceUrl}
           onChange={event => setSourceUrl(event.target.value)}
           placeholder={DISPATCH_SOURCE_PLACEHOLDER}
-          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-app text-primary-token outline-none'
         />
         <select
           value={runtime}
           onChange={event => setRuntime(event.target.value as HermesCliRuntime)}
-          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-app text-primary-token outline-none'
         >
           {aiOps.dispatch.runtimes.map(option => (
             <option key={option} value={option}>
@@ -603,7 +603,7 @@ function HermesDispatchControls({
         <select
           value={kind}
           onChange={event => setKind(event.target.value as HermesDispatchKind)}
-          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-app text-primary-token outline-none'
         >
           <option value='investigation'>investigation</option>
           <option value='bug_patch'>bug_patch</option>
@@ -618,7 +618,7 @@ function HermesDispatchControls({
           type='button'
           onClick={() => void dispatchWorker(false)}
           disabled={isDispatching}
-          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-[13px] font-semibold text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-app font-semibold text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isDispatching ? (
             <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
@@ -631,7 +631,7 @@ function HermesDispatchControls({
           type='button'
           onClick={() => void dispatchWorker(true)}
           disabled={isDispatching}
-          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] font-semibold text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-app font-semibold text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
         >
           Dry run
         </button>
@@ -899,16 +899,16 @@ export function HudDashboardClient({
             </div>
             <div className='min-w-0'>
               <SectionLabel>HUD</SectionLabel>
-              <h1 className='mt-1 truncate text-[22px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[24px]'>
+              <h1 className='mt-1 truncate text-[22px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-2xl'>
                 {metrics.branding.startupName}
               </h1>
             </div>
           </div>
           <div className='flex flex-col items-start gap-1 sm:items-end'>
-            <div className='text-[18px] font-[620] tracking-[-0.03em] text-primary-token sm:text-[20px]'>
+            <div className='text-lg font-[620] tracking-[-0.03em] text-primary-token sm:text-xl'>
               <HudClockClient />
             </div>
-            <p className='text-[12px] text-secondary-token'>
+            <p className='text-xs text-secondary-token'>
               Updated {formatUpdatedTime(metrics.generatedAtIso)}
             </p>
           </div>
@@ -940,7 +940,7 @@ export function HudDashboardClient({
                 : '\u2014'
             }
             subtitle={metricSubtitleWithTrust(
-              <span className='text-[14px] text-secondary-token'>
+              <span className='text-sm text-secondary-token'>
                 {isHudMetricValueAvailable(stripeSource)
                   ? `${metrics.overview.activeSubscribers.toLocaleString('en-US')} subscribers`
                   : 'Stripe data unavailable'}
@@ -1009,7 +1009,7 @@ export function HudDashboardClient({
             <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
               <div className='space-y-1'>
                 <SectionLabel>Open on phone</SectionLabel>
-                <p className='text-[20px] font-[620] tracking-[-0.03em] text-primary-token'>
+                <p className='text-xl font-[620] tracking-[-0.03em] text-primary-token'>
                   Scan to view
                 </p>
                 <p className='max-w-[28ch] text-app leading-5 text-secondary-token'>
@@ -1083,7 +1083,7 @@ export function HudDashboardClient({
           <div className='space-y-3'>
             <div className='flex items-center justify-between gap-3'>
               <SectionLabel>Blockers</SectionLabel>
-              <p className='text-[12px] text-secondary-token'>
+              <p className='text-xs text-secondary-token'>
                 {metrics.aiOps.availability}
               </p>
             </div>
@@ -1108,13 +1108,13 @@ export function HudDashboardClient({
                       ))}
                     </div>
                   ) : (
-                    <p className='text-[13px] text-secondary-token'>
+                    <p className='text-app text-secondary-token'>
                       No blocked worker runs or agent PRs.
                     </p>
                   )}
                   {dismissed.length > 0 ? (
                     <details className='group'>
-                      <summary className='cursor-pointer list-none text-[11px] font-medium text-tertiary-token hover:text-secondary-token'>
+                      <summary className='cursor-pointer list-none text-2xs font-medium text-tertiary-token hover:text-secondary-token'>
                         Dismissed ({dismissed.length})
                       </summary>
                       <div className='mt-2 grid gap-2'>
@@ -1178,13 +1178,13 @@ export function HudDashboardClient({
                   ))}
                 </div>
               ) : (
-                <p className='mt-2 text-[13px] text-secondary-token'>
+                <p className='mt-2 text-app text-secondary-token'>
                   All next actions dismissed.
                 </p>
               )}
               {dismissedRecs.length > 0 ? (
                 <details className='mt-2'>
-                  <summary className='cursor-pointer list-none text-[11px] font-medium text-tertiary-token hover:text-secondary-token'>
+                  <summary className='cursor-pointer list-none text-2xs font-medium text-tertiary-token hover:text-secondary-token'>
                     Dismissed ({dismissedRecs.length})
                   </summary>
                   <div className='mt-2 grid gap-2'>

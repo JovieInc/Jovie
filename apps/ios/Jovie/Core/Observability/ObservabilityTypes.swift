@@ -28,6 +28,7 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case deepLinkRouteUnmatched = "deep_link_route_unmatched"
   case chatFirstTokenTimeout = "chat_first_token_timeout"
   case profileImportFailed = "profile_import_failed"
+  case metrickitPayloadReceived = "metrickit_payload_received"
 }
 
 struct ObservabilityConfiguration: Equatable {

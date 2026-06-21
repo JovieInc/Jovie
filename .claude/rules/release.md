@@ -138,9 +138,9 @@ When in doubt, skip auto-merge and request review.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
 4. `/ship` handles: tests, review, version bump, CHANGELOG, commit, push, PR creation/update.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. **Enable automerge** with squash after the PR is marked ready:
+6. **Add to the Graphite merge queue** after the PR is marked ready. Apply the `merge-queue` label and Graphite enqueues and merges the PR when CI is green:
    ```bash
-   gh pr merge --auto --squash
+   gh pr edit --add-label merge-queue
    ```
 
 ## Conventional Commits Required
@@ -288,7 +288,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Job | Tier | Local remediation command |
 | --- | --- | --- |
 | `ci-fast` | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
-| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo` |
+| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet` |
 | `CI Risk Classifier` | structural-contract | `pnpm ci:harness:check` |
 | `Unit Tests` | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build (public routes)` | preview-evidence | `pnpm run build:web` |

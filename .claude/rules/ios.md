@@ -2,22 +2,22 @@
 
 Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-auth, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`.
 
-The north star: **rock solid and blazing fast — 0 jank.** Every change should make the existing surface faster or more robust, never add main-thread work, flicker, or layout shift.
+The north star: **rock solid and blazing fast — 0 jank.** Every change should make the existing surface faster or more reliable, never add main-thread work, flicker, or layout shift.
 
 ## Hard Invariants (Enforced by `scripts/ios-best-practices-lint.sh`)
 
 The guardrail lint runs in `ios-ci.yml` and via `pnpm run ios:lint`. It scans production Swift (`apps/ios/Jovie/**`, tests excluded) and **fails the build** on any of these:
 
 | Rule | Blocks | Why | Fix |
-|------|--------|-----|-----|
+| - | - | - | - |
 | `no-raw-asyncimage` | `AsyncImage(` | Re-fetches and flashes its placeholder on every appearance; no cross-instance cache → avatar flicker | Use a cached, off-main loader (`AvatarImageCache` + `AvatarImageLoader` in `DashboardView.swift`) |
 | `no-coreimage-in-views` | `CIContext(` / `createCGImage(` outside `*Renderer.swift` | CoreImage/CGImage generation is CPU-bound; in a `body` it hitches the first paint | Put it in a dedicated cache-backed `*Renderer.swift` and render via `Task.detached` (see `QRCodeRenderer.imageAsync`) |
 | `no-main-thread-blocking` | `DispatchQueue.main.sync`, `Thread.sleep`, `usleep`, `DispatchSemaphore`, `Data(contentsOf:)` | Blocks the render loop → dropped frames | `async`/`await`: `Task`, `URLSession.data`, `Task.sleep` |
-| `no-userdefaults-synchronize` | `.synchronize()` | Deprecated; forces a blocking disk flush | Delete it — `UserDefaults` persists automatically |
+| `no-userdefaults-synchronize` | `.synchronize()` | Deprecated; forces a blocking disk flush | Delete it; `UserDefaults` persists automatically |
 | `no-print` | `print(` | Invisible in production, ships noise | Use the `Observability` layer |
 | `no-force-try` | `try!` | Crashes the whole app on any thrown error | `try?` or `do`/`catch` |
 
-Do **not** add an inline-ignore escape hatch to this lint (same spirit as the web `no biome-ignore` rule). If a rule is genuinely wrong for a case, fix the rule with review — don't suppress it.
+Do **not** add an inline-ignore escape hatch to this lint (same spirit as the web `no biome-ignore` rule). If a rule is genuinely wrong for a case, fix the rule with review and don't suppress it.
 
 ## Performance Canon
 
@@ -44,25 +44,27 @@ Network-bound screens must paint cached data **instantly**, then revalidate in t
 
 Same contract as the web app (`.claude/rules/ui.md` → "Layout Shift Prevention"), applied to SwiftUI. Before editing any view, enumerate every visual state it can render (loading, empty, error, partial, success, offline, signed-out, etc.) and verify **no state transition shifts layout**:
 
-- Reserve space for conditional content up front. For async media, use a fixed `aspectRatio` + `frame(maxWidth:)` container that exists in every state (see `QRCodeCardView` — square footprint reserved while the QR renders).
+- Reserve space for conditional content up front. For async media, use a fixed `aspectRatio` + `frame(maxWidth:)` container that exists in every state (see `QRCodeCardView`; square footprint reserved while the QR renders).
 - Skeletons must mirror the loaded layout's dimensions and alignment so skeleton → loaded does not jump (see `DashboardView.skeleton`).
 - Prefer `opacity`/`transition(.opacity)` for content swaps; never animate `height`/`margin` in a way that reflows siblings.
-- No decorative spatial motion (translate/scale/lift) for hover/press polish — match the web taste rule.
+- No decorative spatial motion (translate/scale/lift) for hover/press polish, to match the web taste rule.
 
 ## Verification (Before Claiming Done)
 
-- `pnpm run ios:lint` — guardrail lint (fast, no simulator).
-- `pnpm run ios:test` — builds + runs unit/UI tests on a simulator (`apps/ios/scripts/run-xcodebuild.sh`).
-- New behavior gets a unit test; new view state gets a layout-shift check. Tests live in existing files under `apps/ios/JovieTests/` unless a new file is added to `project.pbxproj` (the project does **not** use synchronized file groups — new files require explicit pbxproj entries, so prefer extending existing files).
+- `pnpm run ios:lint`, the guardrail lint (fast, no simulator).
+- `pnpm run ios:test`, which builds and runs unit/UI tests on a simulator (`apps/ios/scripts/run-xcodebuild.sh`).
+- New behavior gets a unit test; new view state gets a layout-shift check. Tests live in existing files under `apps/ios/JovieTests/` unless a new file is added to `project.pbxproj` (the project does **not** use synchronized file groups; new files require explicit pbxproj entries, so prefer extending existing files).
 - The local `Configuration.local.plist` is generated and gitignored (`apps/ios/scripts/ensure-configuration.sh`); never commit it.
 
 ## Company-Wide Portability (Apply These Guardrails to Every iOS-Touching Repo)
 
-`scripts/ios-best-practices-lint.sh` is intentionally self-contained and portable — it takes a target directory and has no repo-specific dependencies. Any company repo that ships iOS/SwiftUI code must run it:
+`scripts/ios-best-practices-lint.sh` is intentionally self-contained and portable; it takes a target directory and has no repo-specific dependencies. Any company repo that ships iOS/SwiftUI code must run it:
 
 1. Vendor `scripts/ios-best-practices-lint.sh` into the repo (copy as-is).
 2. Add a CI step before the Swift build: `bash scripts/ios-best-practices-lint.sh <swift-source-dir>` (mirror the `iOS best-practices lint` step in `.github/workflows/ios-ci.yml`).
 3. Add a `pnpm run ios:lint` (or equivalent) pointing at the repo's Swift source dir.
 4. Adopt the performance canon and layout-shift rules above in that repo's agent rules.
 
-Rollout to other repos is tracked in Linear (this repo cannot edit other repos). When standing up iOS code in a new repo, copy the lint and wire the CI step in the same PR — do not ship SwiftUI without the guardrail.
+Verify a local checkout with `pnpm run ios:guardrail:audit -- <repo-path>`. The audit fails if an iOS-touching repo is missing the vendored lint script, an explicit Swift-source lint entrypoint, a pre-build CI step, or the canon in its agent rules.
+
+Rollout to other repos is tracked in Linear (this repo cannot edit other repos). When standing up iOS code in a new repo, copy the lint and wire the CI step in the same PR; do not ship SwiftUI without the guardrail.

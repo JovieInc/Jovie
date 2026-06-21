@@ -24,6 +24,15 @@
 		70003B11B0FA1692B2017553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
 		71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */; };
 		74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E33DCDBD6A55190F563B419C /* DashboardView.swift */; };
+		A0PERF000000000000000002 /* DashboardAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF000000000000000001 /* DashboardAvatarView.swift */; };
+		A0PERF000000000000000004 /* QRCodeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF000000000000000003 /* QRCodeCardView.swift */; };
+		A0PERF000000000000000006 /* DashboardAppleWallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF000000000000000005 /* DashboardAppleWallet.swift */; };
+		A0PERF000000000000000010 /* DashboardSkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF00000000000000000F /* DashboardSkeletonView.swift */; };
+		A0PERF000000000000000012 /* DashboardLoadedContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF000000000000000011 /* DashboardLoadedContentView.swift */; };
+		A0PERF000000000000000008 /* PerformanceBudgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF000000000000000007 /* PerformanceBudgets.swift */; };
+		A0PERF00000000000000000A /* MetricKitWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF000000000000000009 /* MetricKitWatch.swift */; };
+		A0PERF00000000000000000C /* DashboardViewGodViewGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF00000000000000000B /* DashboardViewGodViewGuardTests.swift */; };
+		A0PERF00000000000000000E /* PerformanceBudgetGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PERF00000000000000000D /* PerformanceBudgetGuardTests.swift */; };
 		7F479BE5BDDDDCF9BFFF256B /* JovieAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */; };
 		8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */; };
 		89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */; };
@@ -37,6 +46,7 @@
 		A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */; };
 		A0B10F000000000000000012 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = A0B10F000000000000000011 /* Sentry */; };
 		A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */; };
+		E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */; };
 		A0J0V25490000000000000002 /* ChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000001 /* ChatCache.swift */; };
 		A0J0V25490000000000000004 /* ChatRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000003 /* ChatRepository.swift */; };
 		A0J0V25490000000000000006 /* MobileChatClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000005 /* MobileChatClient.swift */; };
@@ -130,6 +140,7 @@
 		A0B10F00000000000000000C /* ObservabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTests.swift; sourceTree = "<group>"; };
 		A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactionTests.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreenStyleGuardTests.swift; sourceTree = "<group>"; };
+		F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsEscapeTrapGuardTests.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000001 /* ChatCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatCache.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000003 /* ChatRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRepository.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000005 /* MobileChatClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatClient.swift; sourceTree = "<group>"; };
@@ -147,6 +158,15 @@
 		D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieTheme.swift; sourceTree = "<group>"; };
 		D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Configuration.local.plist; sourceTree = "<group>"; };
 		DD30F57584F71E958D8C0514 /* LaunchMode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchMode.swift; sourceTree = "<group>"; };
+		A0PERF000000000000000001 /* DashboardAvatarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardAvatarView.swift; sourceTree = "<group>"; };
+		A0PERF000000000000000003 /* QRCodeCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeCardView.swift; sourceTree = "<group>"; };
+		A0PERF000000000000000005 /* DashboardAppleWallet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardAppleWallet.swift; sourceTree = "<group>"; };
+		A0PERF00000000000000000F /* DashboardSkeletonView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardSkeletonView.swift; sourceTree = "<group>"; };
+		A0PERF000000000000000011 /* DashboardLoadedContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardLoadedContentView.swift; sourceTree = "<group>"; };
+		A0PERF000000000000000007 /* PerformanceBudgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PerformanceBudgets.swift; sourceTree = "<group>"; };
+		A0PERF000000000000000009 /* MetricKitWatch.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MetricKitWatch.swift; sourceTree = "<group>"; };
+		A0PERF00000000000000000B /* DashboardViewGodViewGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardViewGodViewGuardTests.swift; sourceTree = "<group>"; };
+		A0PERF00000000000000000D /* PerformanceBudgetGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PerformanceBudgetGuardTests.swift; sourceTree = "<group>"; };
 		E33DCDBD6A55190F563B419C /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		E4EAFC467F76300BCFC2659F /* Configuration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreen.swift; sourceTree = "<group>"; };
@@ -237,6 +257,9 @@
 				4C8753F36E077F69D925EE26 /* APIClientTests.swift */,
 				A93DB506915B418D06E897A4 /* AppStateTests.swift */,
 				A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */,
+				A0PERF00000000000000000B /* DashboardViewGodViewGuardTests.swift */,
+				A0PERF00000000000000000D /* PerformanceBudgetGuardTests.swift */,
+				F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */,
 				A0J0V2549000000000000000B /* ChatRepositoryTests.swift */,
 				A0J0V2549000000000000000D /* MobileChatClientTests.swift */,
 				191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */,
@@ -332,6 +355,8 @@
 				A0B10F00000000000000000B /* Observability */,
 				44B3D151E21A49C2876932A8 /* NativeSessionTokenStore.swift */,
 				A0J0V26350000000000000001 /* MobileAuthFinalization.swift */,
+				A0PERF000000000000000009 /* MetricKitWatch.swift */,
+				A0PERF000000000000000007 /* PerformanceBudgets.swift */,
 				000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */,
 				3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */,
 			);
@@ -390,7 +415,12 @@
 		A5A8CD9F74C3AE8AD7332D93 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
+				A0PERF000000000000000005 /* DashboardAppleWallet.swift */,
+				A0PERF000000000000000001 /* DashboardAvatarView.swift */,
+				A0PERF000000000000000011 /* DashboardLoadedContentView.swift */,
+				A0PERF00000000000000000F /* DashboardSkeletonView.swift */,
 				E33DCDBD6A55190F563B419C /* DashboardView.swift */,
+				A0PERF000000000000000003 /* QRCodeCardView.swift */,
 				7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */,
 			);
 			name = Dashboard;
@@ -582,6 +612,9 @@
 				DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */,
 				A0J0V26350000000000000004 /* MobileAuthFinalizationTests.swift in Sources */,
 				A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */,
+				A0PERF00000000000000000C /* DashboardViewGodViewGuardTests.swift in Sources */,
+				A0PERF00000000000000000E /* PerformanceBudgetGuardTests.swift in Sources */,
+				E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */,
 				71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */,
 				F232904F618A4671B805D0BC /* JovieAppIntentsTests.swift in Sources */,
 			);
@@ -614,12 +647,19 @@
 				52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */,
 				DA0F3A9E1C4B4B149B7D4C21 /* NativeSessionTokenStore.swift in Sources */,
 				A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */,
+				A0PERF00000000000000000A /* MetricKitWatch.swift in Sources */,
+				A0PERF000000000000000008 /* PerformanceBudgets.swift in Sources */,
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
 				A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */,
 				6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */,
 				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
+				A0PERF000000000000000006 /* DashboardAppleWallet.swift in Sources */,
+				A0PERF000000000000000002 /* DashboardAvatarView.swift in Sources */,
+				A0PERF000000000000000012 /* DashboardLoadedContentView.swift in Sources */,
+				A0PERF000000000000000010 /* DashboardSkeletonView.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
+				A0PERF000000000000000004 /* QRCodeCardView.swift in Sources */,
 				BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */,
 				F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */,
 				F178AB3E908746C78645E4EE /* SettingsView.swift in Sources */,
