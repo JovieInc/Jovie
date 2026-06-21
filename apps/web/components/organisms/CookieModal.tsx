@@ -205,7 +205,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
               disabled={isSaving}
               className='flex-1'
             >
-              Save preferences
+              Save Preferences
             </Button>
           </SheetFooter>
           {saveError ? (
@@ -229,7 +229,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
       className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] sm:mx-auto sm:w-full'
     >
       <DialogTitle className='text-app font-semibold text-primary-token'>
-        Cookie preferences
+        Cookie Preferences
       </DialogTitle>
       <DialogDescription className='sr-only'>
         Manage your cookie preferences
@@ -267,7 +267,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           onClick={save}
           disabled={isSaving}
         >
-          Save preferences
+          Save Preferences
         </Button>
       </DialogActions>
     </Dialog>

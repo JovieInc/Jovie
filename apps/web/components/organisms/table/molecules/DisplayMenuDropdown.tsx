@@ -45,7 +45,7 @@ function ToggleSwitch({
         <span
           className={cn(
             'h-3 w-3 rounded-full transition-[background-color,transform]',
-            checked ? 'bg-btn-primary-foreground' : 'bg-white',
+            checked ? 'bg-btn-primary-foreground' : 'bg-white dark:bg-white',
             checked && 'translate-x-3'
           )}
         />

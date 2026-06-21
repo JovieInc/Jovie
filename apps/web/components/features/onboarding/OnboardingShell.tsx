@@ -146,6 +146,10 @@ export function OnboardingShell({
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
+  const sideProfileRail = profileBuilderState.artist ? (
+    <OnboardingProfileRail state={profileBuilderState} />
+  ) : null;
+
   return (
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
@@ -183,7 +187,7 @@ export function OnboardingShell({
             />
           </div>
         }
-        rightPanel={<OnboardingProfileRail state={profileBuilderState} />}
+        rightPanel={sideProfileRail}
       />
     </SidebarProvider>
   );

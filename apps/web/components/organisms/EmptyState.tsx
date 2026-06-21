@@ -61,28 +61,28 @@ const variantStyles: Record<
   {
     iconWrapper: string;
     heading: string;
-    description: string;
+    descriptionClassName: string;
   }
 > = {
   default: {
     iconWrapper: 'text-tertiary-token',
     heading: 'text-secondary-token',
-    description: 'text-secondary-token',
+    descriptionClassName: 'text-secondary-token',
   },
   search: {
     iconWrapper: 'text-sky-600 dark:text-sky-300',
     heading: 'text-sky-800 dark:text-sky-200',
-    description: 'text-sky-700/70 dark:text-sky-300/70',
+    descriptionClassName: 'text-sky-700/70 dark:text-sky-300/70',
   },
   error: {
     iconWrapper: 'text-rose-600 dark:text-rose-300',
     heading: 'text-rose-700 dark:text-rose-200',
-    description: 'text-rose-600/70 dark:text-rose-300/70',
+    descriptionClassName: 'text-rose-600/70 dark:text-rose-300/70',
   },
   permission: {
     iconWrapper: 'text-amber-600 dark:text-amber-300',
     heading: 'text-amber-800 dark:text-amber-200',
-    description: 'text-amber-700/70 dark:text-amber-300/70',
+    descriptionClassName: 'text-amber-700/70 dark:text-amber-300/70',
   },
 };
 
@@ -228,7 +228,7 @@ export function EmptyState({
           id={descriptionId}
           className={cn(
             'mb-5 max-w-sm text-app leading-[1.45]',
-            styles.description
+            styles.descriptionClassName
           )}
         >
           {description}

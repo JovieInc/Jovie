@@ -25,6 +25,12 @@ const OVERLAY_SELECTOR = [
 const SAFE_TRIGGER_DENYLIST =
   /start free|get started|claim profile|continue|pay|buy|checkout|open in|venmo|spotify|apple music|youtube music|sign in|sign up|more options|view on mobile|back|close/i;
 
+const NON_VISIBLE_READY_SELECTORS = new Set([
+  'h1',
+  '[data-testid="profile-header"]',
+  '[data-testid="profile-intent-page-body"]',
+]);
+
 export function createPublicMonitoring(page: Page) {
   return setupPageMonitoring(page);
 }
@@ -47,6 +53,23 @@ export async function installPublicRouteMocks(page: Page) {
   );
 }
 
+async function selectorSignalsReady(page: Page, selector: string) {
+  const locator = page.locator(selector).first();
+  const visible = await locator.isVisible().catch(() => false);
+  if (visible) {
+    return true;
+  }
+
+  if (!NON_VISIBLE_READY_SELECTORS.has(selector)) {
+    return false;
+  }
+
+  const text = normalizeText(
+    await locator.textContent({ timeout: 250 }).catch(() => null)
+  );
+  return text.length > 0;
+}
+
 async function waitForAnyVisible(
   page: Page,
   selectors: readonly string[],
@@ -56,12 +79,8 @@ async function waitForAnyVisible(
 
   while (Date.now() < deadline) {
     for (const selector of selectors) {
-      const visible = await page
-        .locator(selector)
-        .first()
-        .isVisible()
-        .catch(() => false);
-      if (visible) {
+      const ready = await selectorSignalsReady(page, selector);
+      if (ready) {
         return selector;
       }
     }
@@ -69,7 +88,7 @@ async function waitForAnyVisible(
   }
 
   throw new Error(
-    `None of the expected selectors became visible: ${selectors.join(', ')}`
+    `None of the expected selectors became ready: ${selectors.join(', ')}`
   );
 }
 

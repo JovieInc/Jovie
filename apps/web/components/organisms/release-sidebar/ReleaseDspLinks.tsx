@@ -254,7 +254,7 @@ export function ReleaseDspLinks({
                   key={`missing-${key}`}
                   className={cn(
                     'group flex min-h-8 items-center justify-between rounded-lg border border-dashed border-subtle bg-transparent px-2 py-1.5 opacity-75',
-                    'transition-[background-color,opacity] duration-150 lg:hover:opacity-100'
+                    'transition-[background-color,opacity] duration-subtle lg:hover:opacity-100'
                   )}
                   data-dsp-status='missing'
                   data-provider={key}
@@ -280,7 +280,7 @@ export function ReleaseDspLinks({
                   >
                     <span
                       className='flex h-4 w-4 items-center justify-center text-warning'
-                      aria-label='Missing provider'
+                      aria-label='Missing Provider'
                       role='img'
                     >
                       <AlertTriangle className='h-3 w-3' aria-hidden='true' />

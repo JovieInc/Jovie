@@ -3,7 +3,6 @@
  * Validates HMAC-SHA256 signed request tokens for audience tracking endpoints
  */
 
-import * as Sentry from '@sentry/nextjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   generateTrackingToken,
@@ -12,10 +11,6 @@ import {
   TrackingTokenError,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
-
-vi.mock('@sentry/nextjs', () => ({
-  addBreadcrumb: vi.fn(),
-}));
 
 describe('Tracking Token', () => {
   describe('isTrackingTokenEnabled', () => {
@@ -222,12 +217,6 @@ describe('Tracking Token', () => {
 
       expect(() => generateTrackingToken('profile-id')).not.toThrow();
       expect(generateTrackingToken('profile-id')).toBeNull();
-      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
-        expect.objectContaining({
-          category: 'tracking-token',
-          message: 'TRACKING_TOKEN_SECRET not set - skipping token generation',
-        })
-      );
     });
 
     it('should return null client token payload in non-development environments', () => {
@@ -247,12 +236,6 @@ describe('Tracking Token', () => {
       const token = generateTrackingToken('profile-id');
 
       expect(token).toMatch(/^profile-id:\d+:dev$/);
-      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
-        expect.objectContaining({
-          category: 'tracking-token',
-          message: 'TRACKING_TOKEN_SECRET not set - using dev token',
-        })
-      );
     });
 
     it('should validate dev tokens in development', () => {

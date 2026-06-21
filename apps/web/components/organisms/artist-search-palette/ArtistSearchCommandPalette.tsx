@@ -87,7 +87,7 @@ function ArtistResultImage({
         fill
         sizes='40px'
         className={cn(
-          'object-cover transition-opacity duration-200',
+          'object-cover transition-opacity duration-subtle',
           isLoaded ? 'opacity-100' : 'opacity-0'
         )}
         onLoad={() => setIsLoaded(true)}
@@ -280,7 +280,7 @@ export function ArtistSearchCommandPalette({
             {search.state === 'loading' && search.results.length === 0 && (
               <output
                 className='block p-3 space-y-2'
-                aria-label='Loading search results'
+                aria-label='Loading Search Results'
               >
                 {SKELETON_KEYS.map((key, index) => (
                   <div
@@ -397,7 +397,7 @@ export function ArtistSearchCommandPalette({
                 onClick={handleManualSubmit}
                 disabled={!manualUrl.trim()}
                 data-testid='artist-search-manual-submit'
-                className='rounded-full px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50'
+                className='rounded-full px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50 dark:text-white'
                 style={{ backgroundColor: config.accent }}
               >
                 Connect

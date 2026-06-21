@@ -63,7 +63,7 @@ export function buildRegistrySections(
   if (matchedNavs.length > 0) {
     sections.push({
       id: 'nav',
-      label: 'Go to',
+      label: 'Go To',
       items: matchedNavs.map(nav => ({ kind: 'nav' as const, nav })),
     });
   }
@@ -366,7 +366,7 @@ export function InlinePalette({
       <div
         id={listId}
         role='listbox'
-        aria-label='Slash command suggestions'
+        aria-label='Slash Command Suggestions'
         className={cn(
           'min-h-0 flex-1 overflow-y-auto p-1',
           variant === 'inline' && 'max-h-65'

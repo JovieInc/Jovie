@@ -218,7 +218,7 @@ export function PaySelector({
             type='button'
             onClick={handleContinue}
             disabled={isLoading || !canContinue}
-            className='flex h-13 w-full items-center justify-center gap-2.5 rounded-full bg-white px-5 text-base font-semibold tracking-[-0.025em] text-(--color-bg-tooltip) transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
+            className='flex h-13 w-full items-center justify-center gap-2.5 rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 text-base font-semibold tracking-[-0.025em] text-[var(--profile-pearl-primary-fg)] transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
             aria-label={`${primaryLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
           >
             {paymentLabel === 'Venmo' ? (

@@ -50,6 +50,7 @@ let mockConversationData:
       }>;
     }
   | undefined;
+let mockConversationQueryError: Error | null = null;
 
 vi.mock('@ai-sdk/react', () => ({
   useChat: ({
@@ -123,6 +124,8 @@ vi.mock('@tanstack/react-pacer', () => ({
 vi.mock('@/lib/queries/useChatConversationQuery', () => ({
   useChatConversationQuery: () => ({
     data: mockConversationData,
+    error: mockConversationQueryError,
+    isError: Boolean(mockConversationQueryError),
     isLoading: false,
   }),
 }));
@@ -156,6 +159,7 @@ describe('useJovieChat', () => {
     currentTransportConversationId = null;
     mockMessages = [];
     mockConversationData = undefined;
+    mockConversationQueryError = null;
   });
 
   afterEach(() => {
@@ -298,6 +302,21 @@ describe('useJovieChat', () => {
         status: 'complete',
       },
     ]);
+  });
+
+  it('exits existing-conversation loading state when the conversation query fails', async () => {
+    mockConversationQueryError = new Error('Request timeout');
+
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1', conversationId: 'conv_timeout' })
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.isLoadingConversation).toBe(false);
+    expect(result.current.messages).toHaveLength(0);
   });
 
   it('sends the first message immediately through the chat turn boundary', async () => {

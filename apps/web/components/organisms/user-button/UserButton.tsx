@@ -197,7 +197,7 @@ function buildDropdownItems({
     learnMoreItems.push({
       type: 'action',
       id: 'keyboard-shortcuts',
-      label: 'Keyboard shortcuts',
+      label: 'Keyboard Shortcuts',
       icon: Keyboard,
       onClick: handleOpenShortcuts,
       shortcut: `${GLYPH_CMD} /`,
@@ -217,7 +217,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'terms-of-service',
-      label: 'Terms of Service',
+      label: 'Terms Of Service',
       icon: FileText,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
@@ -253,7 +253,7 @@ function buildDropdownItems({
   const learnMoreSubmenu: CommonDropdownSubmenu = {
     type: 'submenu',
     id: 'learn-more',
-    label: 'Learn more',
+    label: 'Learn More',
     icon: HelpCircle,
     items: learnMoreItems,
   };
@@ -302,7 +302,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'feedback',
-      label: 'Send feedback',
+      label: 'Send Feedback',
       icon: MessageSquare,
       onClick: () => setIsFeedbackOpen(true),
     },

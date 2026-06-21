@@ -270,13 +270,13 @@ export function ReleaseSmartLinkAnalytics({
     ? [
         {
           id: 'total-clicks',
-          label: 'Total clicks',
+          label: 'Total Clicks',
           value: numberFormatter.format(totalClicks),
           hint: topProviderLabel ? `Top: ${topProviderLabel}` : 'All time',
         },
         {
           id: 'last-click',
-          label: 'Last click',
+          label: 'Last Click',
           value: lastClickAt ? formatTimeAgo(lastClickAt) : '—',
           hint: `${numberFormatter.format(last7DaysClicks)} in last 7 days`,
         },

@@ -33,6 +33,7 @@ describe('public profile not-found System B source tokens', () => {
     expect(source).toContain("headerVariant='minimal'");
     expect(source).toContain('system-b-public-profile-not-found-main');
     expect(source).toContain('NotFoundPageContent');
+    expect(source).not.toContain('next/headers');
     expect(source).toContain("variant = 'profile-miss'");
     expect(source).not.toContain('resolveNotFoundPathname');
   });

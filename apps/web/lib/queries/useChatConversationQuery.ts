@@ -19,13 +19,15 @@ interface ConversationOptions {
   refetchInterval?: number | false;
 }
 
+export const CHAT_CONVERSATION_FETCH_TIMEOUT_MS = 60_000;
+
 async function fetchConversation(
   conversationId: string,
   signal?: AbortSignal
 ): Promise<ConversationWithMessages> {
   return fetchWithTimeout<ConversationWithMessages>(
     `/api/chat/conversations/${conversationId}`,
-    { signal }
+    { signal, timeout: CHAT_CONVERSATION_FETCH_TIMEOUT_MS }
   );
 }
 

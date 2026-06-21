@@ -180,7 +180,7 @@ export function CookieBannerSection() {
     <>
       {visible && !isSuppressedPath ? (
         <aside
-          aria-label='Cookie consent'
+          aria-label='Cookie Consent'
           data-testid='cookie-banner'
           className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95'
         >

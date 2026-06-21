@@ -518,7 +518,7 @@ export function ProfileCompactSurface({
         >
           {isHomeMode ? (
             <>
-              <div className='absolute inset-0'>
+              <div className='profile-cover-home-media absolute inset-0'>
                 {resolvedHeroImageUrl ? (
                   <ImageWithFallback
                     src={resolvedHeroImageUrl}
@@ -538,8 +538,9 @@ export function ProfileCompactSurface({
                 )}
               </div>
 
-              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
+              <div className='profile-cover-home-gradient pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
+              <div className='profile-cover-home-fade pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
+              <div className='profile-cover-mode-backdrop absolute inset-0 hidden bg-black/94 backdrop-blur-2xl' />
             </>
           ) : (
             <div className='absolute inset-0 bg-black/94 backdrop-blur-2xl' />
@@ -547,7 +548,7 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'relative z-10 flex h-full items-start justify-between px-4',
+              'profile-cover-chrome relative z-10 flex h-full items-start justify-between px-4',
               isPreviewEmbedded
                 ? 'pt-19'
                 : isHomeMode
@@ -573,16 +574,19 @@ export function ProfileCompactSurface({
                 </CircleIconButton>
               )}
 
-              {!isHomeMode ? (
-                <p
-                  className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-[-0.012em] text-white dark:text-white'
-                  data-testid={
-                    renderMode === 'preview' ? undefined : 'profile-header'
-                  }
-                >
-                  {artist.name}
-                </p>
-              ) : null}
+              <p
+                className={cn(
+                  'profile-cover-mode-title absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-normal text-[color:var(--profile-status-pill-fg)]',
+                  isHomeMode && 'hidden'
+                )}
+                data-testid={
+                  !isHomeMode && renderMode !== 'preview'
+                    ? 'profile-header'
+                    : undefined
+                }
+              >
+                {artist.name}
+              </p>
 
               {hideMoreMenu ? (
                 <div className='h-11 w-11 shrink-0' aria-hidden='true' />
@@ -619,8 +623,9 @@ export function ProfileCompactSurface({
                   <Link
                     data-testid='profile-identity-link'
                     href={profileHref}
+                    prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-white dark:text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-[color:var(--profile-status-pill-fg)] drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}

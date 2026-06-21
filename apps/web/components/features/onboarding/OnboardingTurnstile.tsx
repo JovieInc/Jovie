@@ -7,6 +7,7 @@ import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
 import { cn } from '@/lib/utils';
+import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
 /**
  * Cloudflare Turnstile widget for the onboarding chat (JOV-2132 PR 3).
@@ -186,16 +187,27 @@ export function OnboardingTurnstile({
   const headingId = useId();
   const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
+  const [localAutomationBypass, setLocalAutomationBypass] = useState<
+    boolean | null
+  >(null);
   // True only while the brief "Verified" confirmation is held open after a
   // *visible* challenge. Silent (invisible-first) verifications never set it,
   // so the panel stays collapsed when the user never saw a challenge.
   const [verifiedMoment, setVerifiedMoment] = useState(false);
   const panelVisibleRef = useRef(false);
   const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const shouldBypassTurnstile =
+  const hasStaticBypass =
     process.env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
     publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1';
+  const shouldBypassTurnstile =
+    hasStaticBypass || localAutomationBypass === true;
+  const isRuntimeBypassPending =
+    !hasStaticBypass && localAutomationBypass === null;
+
+  useEffect(() => {
+    setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
+  }, []);
 
   const commitState = useCallback(
     (nextState: OnboardingTurnstileState) => {
@@ -222,7 +234,7 @@ export function OnboardingTurnstile({
   }, []);
 
   const render = useCallback(() => {
-    if (shouldBypassTurnstile || !siteKey) return; // local fallback handled server-side
+    if (isRuntimeBypassPending || shouldBypassTurnstile || !siteKey) return;
     const turnstile = getTurnstile();
     if (!containerRef.current || !turnstile) return;
     if (widgetIdRef.current) return; // already rendered
@@ -282,7 +294,14 @@ export function OnboardingTurnstile({
       });
       console.error('[onboarding] turnstile render error', err);
     }
-  }, [commitState, onToken, reducedMotion, shouldBypassTurnstile, siteKey]);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    onToken,
+    reducedMotion,
+    shouldBypassTurnstile,
+    siteKey,
+  ]);
 
   useEffect(() => {
     if (!verifiedMoment) return;
@@ -304,6 +323,7 @@ export function OnboardingTurnstile({
   );
 
   useEffect(() => {
+    if (isRuntimeBypassPending) return;
     if (shouldBypassTurnstile) {
       onToken(LOCAL_DEV_BYPASS_TOKEN);
       commitState({ status: 'bypassed' });
@@ -330,7 +350,14 @@ export function OnboardingTurnstile({
         }
       }
     };
-  }, [commitState, onToken, render, shouldBypassTurnstile, siteKey]);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    onToken,
+    render,
+    shouldBypassTurnstile,
+    siteKey,
+  ]);
 
   useEffect(() => {
     if (lastResetSignalRef.current === resetSignal) return;
@@ -355,7 +382,7 @@ export function OnboardingTurnstile({
     panelVisibleRef.current = shouldShowPanel;
   }, [shouldShowPanel]);
 
-  if (shouldBypassTurnstile) {
+  if (isRuntimeBypassPending || shouldBypassTurnstile) {
     // No Turnstile UI in dev. The server-side dev-mode skip still owns trust.
     return null;
   }

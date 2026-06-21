@@ -118,18 +118,28 @@ describe('OnboardingTurnstile', () => {
 
   it('bypasses verification in runtime E2E mode', async () => {
     vi.stubEnv('NODE_ENV', 'test');
-    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', '');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
     document.documentElement.dataset.e2eMode = '1';
     const onToken = vi.fn();
     const onStateChange = vi.fn();
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
 
     render(
       <OnboardingTurnstile onToken={onToken} onStateChange={onStateChange} />
     );
 
+    expect(screen.queryByTestId('next-script')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(onToken).toHaveBeenCalledWith('local-dev-turnstile-bypass');
     });
+    expect(renderMock).not.toHaveBeenCalled();
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'bypassed' })
     );

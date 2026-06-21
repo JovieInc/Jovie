@@ -29,16 +29,16 @@ const CANVAS_STATUS_CONFIG: Record<
   { label: string; className: string; displayLabel?: string }
 > = {
   uploaded: {
-    label: 'Has video',
+    label: 'Has Video',
     className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   },
   generated: {
-    label: 'Ready to upload',
+    label: 'Ready To Upload',
     className: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
   },
   not_set: {
-    label: 'No video',
-    displayLabel: 'Has video',
+    label: 'No Video',
+    displayLabel: 'Has Video',
     className: 'border-subtle bg-surface-1 text-secondary-token',
   },
 };
@@ -280,7 +280,7 @@ export function ReleaseMetadata({
                 label='Label'
                 value={release.label}
                 editable={canEditMetadata}
-                placeholder='Add Label'
+                placeholder='Add label'
                 emptyLabel='Unknown'
                 density='inline'
                 normalizeValue={nextValue => {

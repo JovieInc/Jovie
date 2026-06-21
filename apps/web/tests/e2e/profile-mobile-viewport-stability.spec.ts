@@ -708,12 +708,18 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     expect(metrics.linkCount).toBeGreaterThanOrEqual(2);
     expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
 
-    await carousel.evaluate(el => {
+    await expect(
+      carousel.locator('a').filter({ hasText: /Holding On/i })
+    ).toHaveCount(1);
+    await expect(
+      carousel.locator('a').filter({ hasText: /Clear Skies/i })
+    ).toHaveCount(1);
+
+    const scrolledLeft = await carousel.evaluate(el => {
       el.scrollLeft = el.scrollWidth;
+      return el.scrollLeft;
     });
-    await expect(page.getByRole('link', { name: /Holding On/i })).toBeVisible({
-      timeout: 5_000,
-    });
+    expect(scrolledLeft).toBeGreaterThan(0);
   });
 });
 

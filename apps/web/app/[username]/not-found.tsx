@@ -6,7 +6,6 @@ export default function NotFound() {
   // lookup failure — avoid headers() so ISR profile routes stay static on the
   // standalone production server used by PR smoke.
   const variant = 'profile-miss' as const;
-
   return (
     <PublicPageShell
       headerVariant='minimal'

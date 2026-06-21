@@ -29,8 +29,8 @@ const FOOTER_COLUMNS = [
     id: 'account',
     heading: 'Account',
     links: [
-      { href: APP_ROUTES.SIGNIN, label: 'Log in' },
-      { href: APP_ROUTES.SIGNUP, label: 'Get started' },
+      { href: APP_ROUTES.SIGNIN, label: 'Log In' },
+      { href: APP_ROUTES.SIGNUP, label: 'Get Started' },
     ],
   },
   {
@@ -114,7 +114,7 @@ export function Footer({
       <footer
         className={className}
         style={{ backgroundColor: 'var(--linear-bg-footer)' }}
-        aria-label='Site footer'
+        aria-label='Site Footer'
       >
         <div
           aria-hidden='true'

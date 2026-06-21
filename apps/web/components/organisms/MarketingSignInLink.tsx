@@ -35,8 +35,8 @@ export function MarketingSignInLink({
       href={APP_ROUTES.SIGNIN}
       prefetch
       className={cn(
-        'focus-ring-themed transition-colors duration-subtle',
-        'text-app text-white/60 hover:text-white/90'
+        'focus-ring-themed',
+        'text-[13px] text-neutral-700 hover:text-neutral-950 dark:text-white/60 dark:hover:text-white/90'
       )}
     >
       Sign in

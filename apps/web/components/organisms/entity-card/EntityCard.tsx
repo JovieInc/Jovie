@@ -135,7 +135,8 @@ export function EntityCard({
       testId={dataTestId ?? `entity-card-${model.kind}`}
       onClick={onClick}
       className={cn(
-        'group flex min-w-0 flex-col gap-3 p-3 text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
+        'group flex min-w-0 flex-col text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
+        treatment === 'big' ? 'gap-0 overflow-hidden p-0' : 'gap-3 p-3',
         isPearl
           ? 'rounded-[var(--profile-inner-radius)] border border-[color:var(--profile-pearl-border)] bg-[color:var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-2xl hover:bg-[color:var(--profile-pearl-bg-hover)]'
           : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',
@@ -145,7 +146,8 @@ export function EntityCard({
       <div
         className={cn(
           'relative flex w-full shrink-0 items-center justify-center overflow-hidden border border-subtle',
-          size.artClass
+          size.artClass,
+          treatment === 'big' && 'rounded-none border-0'
         )}
         style={artStyle}
       >
@@ -174,7 +176,12 @@ export function EntityCard({
         )}
       </div>
 
-      <div className='flex min-w-0 flex-1 flex-col gap-1.5'>
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-col gap-1.5',
+          treatment === 'big' && 'p-3'
+        )}
+      >
         <div className='flex min-w-0 items-center justify-between gap-2'>
           <span className='inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token'>
             <Icon className='h-3 w-3 shrink-0' aria-hidden='true' />

@@ -3,20 +3,15 @@
 import { SimpleTooltip, Skeleton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import dynamic from 'next/dynamic';
 import { memo } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
+import { ChatMarkdown } from './ChatMarkdown';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
-
-const ChatMarkdown = dynamic(
-  () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
-  { ssr: false }
-);
 
 interface ChatMessageProps {
   readonly id: string;

@@ -279,7 +279,7 @@ export function ReleaseLyricsSection({
                   size='icon'
                   disabled={isActionsDisabled || isFormatting}
                   className='h-7 w-7 rounded-l-none px-1.5'
-                  aria-label='Choose format'
+                  aria-label='Choose Format'
                 >
                   <ChevronDown className='h-3.5 w-3.5' />
                 </DrawerButton>

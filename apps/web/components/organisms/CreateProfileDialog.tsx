@@ -108,7 +108,7 @@ export function CreateProfileDialog({
                 );
                 setError(null);
               }}
-              placeholder='username'
+              placeholder='Username'
               disabled={isPending}
             />
           </div>
