@@ -243,6 +243,24 @@
   text-decoration-color: var(--profile-aeo-text);
 }
 
+/* Mobile public profiles are a fixed one-screen shell. Keep the AEO copy in the
+   static DOM, but out of mobile layout so it cannot add page scroll below the
+   compact profile. Desktop keeps the readable AEO section. */
+@media (max-width: 767px) {
+  .profile-viewport ~ .profile-aeo-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* Short-viewport home hero: reserve room for the showcase release card below. */
 [data-testid="profile-compact-surface"][data-mode="profile"] {
   @media (max-height: 880px) and (min-height: 761px) {
