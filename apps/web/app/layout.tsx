@@ -160,6 +160,11 @@ export default async function RootLayout({
 }>) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
   const isTestAuthBypassRuntime = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const isSecureVercelDeployment =
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'preview';
+  const isPublicNoAuthSmokeRuntime =
+    process.env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureVercelDeployment;
   const clerkMockEnabled = process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
   const clerkProxyDisabled =
     process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
@@ -216,7 +221,11 @@ export default async function RootLayout({
       data-clerk-mock={clerkMockEnabled ? '1' : undefined}
       data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
       data-e2e-mode={
-        isE2EClientRuntime || isTestAuthBypassRuntime ? '1' : undefined
+        isE2EClientRuntime ||
+        isTestAuthBypassRuntime ||
+        isPublicNoAuthSmokeRuntime
+          ? '1'
+          : undefined
       }
       data-demo-recording={isDemoRecording ? '1' : undefined}
       data-dev-chrome-disabled={shouldRenderDevChrome ? undefined : '1'}

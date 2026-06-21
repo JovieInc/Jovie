@@ -251,6 +251,52 @@
   }
 }
 
+/* Query-mode profile URLs are served from the ISR home shell, then hydrate into
+   the requested mode from window.location. Match the mode header on first paint
+   so hydration does not move the compact profile frame. */
+html[data-profile-initial-mode]
+[data-testid="profile-compact-surface"][data-mode="profile"] {
+  --cover-height: calc(3.5rem + max(env(safe-area-inset-top), 0px));
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  [data-testid="profile-cover"] {
+  height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
+  max-height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
+  border-bottom: 1px solid rgb(255 255 255 / 0.075);
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-chrome {
+  padding-top: max(env(safe-area-inset-top), 10px) !important;
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-media,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-gradient,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-fade,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  [data-testid="profile-hero-identity-block"] {
+  display: none !important;
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-mode-backdrop,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-mode-title {
+  display: block !important;
+}
+
 @media (min-width: 768px) {
   .public-profile-compact-shell {
     --cover-height: 340px;
@@ -1559,6 +1605,104 @@
   /* Map Linear page bg and focus ring */
   --color-bg-page: var(--linear-bg-page);
   --color-border-focus: var(--linear-border-focus);
+}
+
+.linear-marketing.dark,
+.home-viewport.dark,
+.system-b-root-not-found-page.dark {
+  --linear-text-primary: #f7f8f8;
+  --linear-text-secondary: #d0d6e0;
+  --linear-text-tertiary: #8a8f98;
+  --linear-text-quaternary: #62666d;
+  --linear-bg-page: #06070a;
+  --linear-bg-surface-0: #0a0b0e;
+  --linear-bg-surface-1: #101216;
+  --linear-bg-surface-2: #161a20;
+  --linear-bg-button: #2a2c32;
+  --linear-bg-footer: #06070a;
+  --linear-border-subtle: rgba(255, 255, 255, 0.07);
+  --linear-border-default: rgba(255, 255, 255, 0.11);
+  --linear-border-strong: rgba(255, 255, 255, 0.18);
+
+  --color-text-primary-token: var(--linear-text-primary);
+  --color-text-secondary-token: var(--linear-text-secondary);
+  --color-text-tertiary-token: var(--linear-text-tertiary);
+  --color-text-quaternary-token: var(--linear-text-quaternary);
+  --color-bg-base: var(--linear-bg-page);
+  --color-bg-surface-0: var(--linear-bg-surface-0);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-2: var(--linear-bg-surface-2);
+  --color-bg-page: var(--linear-bg-page);
+  --color-bg-elevated: var(--linear-bg-surface-0);
+  --color-bg-input: var(--linear-bg-surface-1);
+  --color-bg-button: var(--linear-bg-button);
+  --color-bg-hover: rgba(255, 255, 255, 0.04);
+  --color-bg-active: var(--linear-bg-surface-2);
+  --color-bg-tooltip: var(--linear-bg-button);
+  --color-border-subtle: var(--linear-border-subtle);
+  --color-border-default: var(--linear-border-default);
+  --color-border-strong: var(--linear-border-strong);
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-button);
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-surface-button: var(--color-bg-button);
+  --color-surface-tooltip: var(--color-bg-tooltip);
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-muted-token: var(--color-text-secondary-token);
+  --color-foreground: var(--color-text-primary-token);
+  --color-muted-foreground: var(--color-text-secondary-token);
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --public-shell-bg: var(--color-bg-base);
+  --public-shell-text: var(--color-text-primary-token);
+
+  color-scheme: dark;
+}
+
+.profile-intent-page {
+  --color-text-primary-token: #f7f8f8;
+  --color-text-secondary-token: #d0d6e0;
+  --color-text-tertiary-token: #8a8f98;
+  --color-text-quaternary-token: #62666d;
+  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-panel-border: rgba(255, 255, 255, 0.09);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 36%,
+    transparent 100%
+  );
+
+  color-scheme: dark;
+}
+
+html:not(.dark) .profile-intent-page :where(a, button, span),
+html:not(.dark) [data-testid^="profile-mode-drawer"] :where(a, button, span) {
+  transition: none !important;
+}
+
+html:not(.dark) .linear-marketing :where(a, button, span),
+html:not(.dark) [data-testid="header-nav"] a[href="/signin"],
+html:not(.dark) [data-testid="not-found"] :where(a, button, span),
+html:not(.dark) .smart-link-powered-by {
+  transition: none !important;
+}
+
+html:not(.dark) .smart-link-powered-by {
+  color: rgb(64 64 64) !important;
 }
 
 /* Marketing typography: headings and buttons use Satoshi (display font) */
@@ -2956,6 +3100,11 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   );
   color: var(--color-text-quaternary-token);
   opacity: 0.42;
+}
+
+html:not(.dark) .system-b-claim-handle-row,
+html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
+  transition: none !important;
 }
 
 .system-b-claim-handle-helper {
@@ -9132,7 +9281,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-kicker) {
   margin: 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
@@ -9164,7 +9313,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-hero-note) {
   margin: var(--space-5) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
 }
 
@@ -9468,7 +9617,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-release-callout p) {
   margin: var(--space-1) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-xs);
 }
 
@@ -9797,7 +9946,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
     color-mix(in oklab, var(--system-b-text-primary) 10%, transparent);
   border-radius: var(--radius-md);
   padding: var(--space-1) var(--space-2);
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-xs);
 }
 
@@ -9949,8 +10098,8 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-launch-final a:first-child) {
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
+  background: var(--system-b-text-primary);
+  color: var(--system-b-cinematic-black);
 }
 
 :where(.system-b-launch-final a:not(:first-child)) {
@@ -10093,7 +10242,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-note) {
   max-width: 31rem;
   margin: var(--space-5) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
@@ -10133,8 +10282,8 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-primary-link) {
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
+  background: var(--system-b-text-primary);
+  color: var(--system-b-cinematic-black);
 }
 
 :where(.system-b-pricing-secondary-link),
@@ -10193,7 +10342,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-story-label),
 :where(.system-b-pricing-category-cell) {
   margin: 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 50%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 54%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
@@ -10296,7 +10445,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-page .marketing-pricing-plan-card__price span) {
-  color: color-mix(in oklab, var(--system-b-text-primary) 48%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 54%, transparent);
   font-size: var(--text-base);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
@@ -10397,7 +10546,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   min-height: var(--space-6);
   align-items: center;
   gap: var(--space-2);
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
@@ -10588,7 +10737,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-pricing-plan-price span),
 :where(.system-b-pricing-plan-annual) {
-  color: color-mix(in oklab, var(--system-b-text-primary) 46%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-normal);
 }
@@ -10641,7 +10790,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-pricing-footnote) {
   margin: var(--space-4) 0 0;
-  color: color-mix(in oklab, var(--system-b-text-primary) 50%, transparent);
+  color: color-mix(in oklab, var(--system-b-text-primary) 54%, transparent);
   font-size: var(--text-xs);
   text-align: center;
 }
@@ -10862,8 +11011,8 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-brand-primary-link) {
   border: 1px solid transparent;
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
+  background: var(--system-b-text-primary);
+  color: var(--system-b-cinematic-black);
   padding-inline: var(--space-5);
 }
 

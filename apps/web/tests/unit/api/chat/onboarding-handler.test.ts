@@ -70,12 +70,17 @@ vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: hoisted.addBreadcrumbMock,
 }));
 
-function makeRequest(body: unknown, cookieHeader = ''): Request {
+function makeRequest(
+  body: unknown,
+  cookieHeader = '',
+  headers: Record<string, string> = {}
+): Request {
   return new Request('http://localhost/api/chat', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       cookie: cookieHeader,
+      ...headers,
     },
     body: JSON.stringify(body),
   });
@@ -299,22 +304,67 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
   });
 
+  it('skips Turnstile for explicit public smoke runs on loopback', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ nodeEnv: 'production' });
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    hoisted.checkGateForUserMock.mockResolvedValue(true);
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: {
+        toUIMessageStreamResponse: ({
+          headers,
+        }: {
+          headers: Record<string, string>;
+        }) => new Response('ok', { status: 200, headers }),
+      },
+      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      {
+        mode: 'onboarding',
+        turnstileToken: 'local-dev-turnstile-bypass',
+        messages: [userMessage('hi')],
+      },
+      '',
+      { host: '127.0.0.1:3102' }
+    );
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-smoke');
+
+    expect(result?.status).toBe(200);
+    expect(hoisted.checkGateForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.isTurnstileConfiguredMock).not.toHaveBeenCalled();
+    expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+  });
+
   it('keeps Turnstile fail-closed in secure env even when mock flags are set', async () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'preview' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(false);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
 
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'
     );
-    const req = makeRequest({
-      mode: 'onboarding',
-      turnstileToken: 'local-dev-turnstile-bypass',
-      messages: [userMessage('hi')],
-    });
+    const req = makeRequest(
+      {
+        mode: 'onboarding',
+        turnstileToken: 'local-dev-turnstile-bypass',
+        messages: [userMessage('hi')],
+      },
+      '',
+      { host: '127.0.0.1:3102' }
+    );
     const result = await tryHandleAnonymousOnboardingChat(req, 'req-secure');
 
     expect(result?.status).toBe(503);

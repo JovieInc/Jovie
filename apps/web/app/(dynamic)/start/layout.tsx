@@ -15,12 +15,20 @@ export default async function StartLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isSecureVercelDeployment =
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'preview';
+  const forceBypassClerk =
+    process.env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureVercelDeployment;
   const initialFlags = await getAppFlagsSnapshot({
     flagNames: resolveStartRouteFlagNames(),
   });
 
   return (
-    <ResolvedClientProviders skipCoreProviders>
+    <ResolvedClientProviders
+      forceBypassClerk={forceBypassClerk}
+      skipCoreProviders
+    >
       <AppFlagProvider initialFlags={initialFlags}>{children}</AppFlagProvider>
     </ResolvedClientProviders>
   );

@@ -7,6 +7,7 @@ import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
 import { cn } from '@/lib/utils';
+import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
 /**
  * Cloudflare Turnstile widget for the onboarding chat (JOV-2132 PR 3).
@@ -186,6 +187,7 @@ export function OnboardingTurnstile({
   const headingId = useId();
   const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
+  const [localAutomationBypass, setLocalAutomationBypass] = useState(false);
   // True only while the brief "Verified" confirmation is held open after a
   // *visible* challenge. Silent (invisible-first) verifications never set it,
   // so the panel stays collapsed when the user never saw a challenge.
@@ -195,7 +197,12 @@ export function OnboardingTurnstile({
   const shouldBypassTurnstile =
     process.env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1';
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    localAutomationBypass;
+
+  useEffect(() => {
+    setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
+  }, []);
 
   const commitState = useCallback(
     (nextState: OnboardingTurnstileState) => {

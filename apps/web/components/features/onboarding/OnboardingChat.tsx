@@ -57,6 +57,7 @@ import {
   useArtistSelectionMessage,
 } from './OnboardingToolArtifacts';
 import type { OnboardingTurnstileStatus } from './OnboardingTurnstile';
+import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -795,7 +796,12 @@ export function OnboardingChat({
   const hasRequestedStarterVerificationRef = useRef(false);
   const pendingStarterPromptRef = useRef<string | null>(null);
   const wasAwaitingTurnstileRetryRef = useRef(false);
+  const [localAutomationBypass, setLocalAutomationBypass] = useState(false);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
+
+  useEffect(() => {
+    setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
+  }, []);
 
   const transport = useMemo(
     () =>
@@ -847,7 +853,8 @@ export function OnboardingChat({
   const isSubmitted = status === 'submitted';
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
-  const requiresTurnstile = process.env.NODE_ENV !== 'development';
+  const requiresTurnstile =
+    process.env.NODE_ENV !== 'development' && !localAutomationBypass;
   const isAwaitingFirstToken =
     requiresTurnstile &&
     !hasSentFirst &&

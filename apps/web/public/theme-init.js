@@ -50,6 +50,25 @@
       }
     }
 
+    var initialProfileMode = new URLSearchParams(
+      globalThis.location?.search ?? ''
+    ).get('mode');
+    if (
+      initialProfileMode === 'listen' ||
+      initialProfileMode === 'pay' ||
+      initialProfileMode === 'subscribe' ||
+      initialProfileMode === 'about' ||
+      initialProfileMode === 'contact' ||
+      initialProfileMode === 'tour' ||
+      initialProfileMode === 'releases' ||
+      initialProfileMode === 'tip'
+    ) {
+      root.dataset.profileInitialMode =
+        initialProfileMode === 'tip' ? 'pay' : initialProfileMode;
+    } else {
+      delete root.dataset.profileInitialMode;
+    }
+
     // High contrast mode (independent of light/dark)
     if (typeof localStorage !== 'undefined' && localStorage) {
       var hc = localStorage.getItem('jovie-high-contrast');
