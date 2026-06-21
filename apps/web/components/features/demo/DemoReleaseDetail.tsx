@@ -34,13 +34,13 @@ export function DemoReleaseDetail({
     <div className='flex h-full flex-col'>
       {/* Header */}
       <div className='flex min-h-10 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 py-2'>
-        <div className='min-w-0 flex-1 text-app font-[510] tracking-[-0.01em] text-secondary-token'>
+        <div className='min-w-0 flex-1 text-app font-medium tracking-[-0.01em] text-secondary-token'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
         <DrawerInlineIconButton
           onClick={onClose}
           className='size-7 rounded-full'
-          aria-label='Close detail panel'
+          aria-label='Close Detail Panel'
         >
           <X className='size-4' />
         </DrawerInlineIconButton>
@@ -86,7 +86,7 @@ export function DemoReleaseDetail({
               <span>{release.trackCount}</span>
             </div>
           </DemoPropertyRow>
-          <DemoPropertyRow label='Release date'>
+          <DemoPropertyRow label='Release Date'>
             <div className='-ml-2 rounded px-2 py-1'>
               <span>{release.releaseDate}</span>
             </div>
@@ -129,7 +129,7 @@ export function DemoReleaseDetail({
               {release.labels.map(label => (
                 <span
                   key={label.id}
-                  className='flex items-center gap-1.5 rounded bg-surface-1 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token'
+                  className='flex items-center gap-1.5 rounded bg-surface-1 px-1.5 py-0.5 text-3xs font-medium text-secondary-token'
                 >
                   <span
                     className='size-1.5 rounded-full'
@@ -203,7 +203,7 @@ export function DemoReleaseDetail({
                 <div className='flex items-center gap-1.5'>
                   <DrawerInlineIconButton
                     className='size-7 rounded-full text-tertiary-token'
-                    aria-label='Attach file'
+                    aria-label='Attach File'
                   >
                     <Paperclip className='size-3.5' />
                   </DrawerInlineIconButton>
@@ -211,7 +211,7 @@ export function DemoReleaseDetail({
                     size='icon'
                     tone='secondary'
                     className='h-7 w-7 rounded-full'
-                    aria-label='Send comment'
+                    aria-label='Send Comment'
                     onClick={() =>
                       runDemoAction({
                         loadingMessage: 'Posting comment',
