@@ -3917,8 +3917,11 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-chat-entity-panel-eyebrow) {
   color: var(--color-text-tertiary-token);
-  font-size: var(--text-2xs);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
   line-height: 1rem;
+  text-transform: uppercase;
 }
 
 :where(.system-b-chat-entity-panel-title) {
@@ -3964,15 +3967,18 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   min-width: 0;
   align-items: center;
   gap: var(--space-3);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--color-bg-surface-1);
   padding: var(--space-2-5) var(--space-3);
+  box-shadow: var(--shadow-card);
   text-align: left;
-  transition-property: background-color, color;
+  transition-property: background-color, border-color;
   transition-duration: 150ms;
 }
 
 :where(.system-b-chat-entity-context-card:hover) {
-  background: var(--system-b-bg-surface-1);
+  border-color: var(--color-border-default);
 }
 
 :where(.system-b-chat-entity-context-copy) {
@@ -4018,10 +4024,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   height: calc(var(--space-8) + var(--space-1));
   flex-shrink: 0;
   overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 54%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-2);
   color: var(--color-text-secondary-token);
   font-size: var(--text-nav);
   font-weight: var(--font-weight-semibold);
@@ -4034,10 +4039,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 64%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-2);
   color: var(--color-text-tertiary-token);
 }
 
@@ -4053,10 +4057,8 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   height: var(--space-16);
   flex-shrink: 0;
   overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
 }
 
 :where(.system-b-chat-release-copy) {
@@ -4084,14 +4086,16 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-chat-entity-meta-pill) {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 48%, transparent);
-  border-radius: var(--radius-md);
-  background: var(--system-b-bg-surface-1);
-  padding: var(--space-1) var(--space-1-5);
+  gap: var(--space-1-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface-0);
+  padding: var(--space-0-5) var(--space-2);
   color: var(--color-text-secondary-token);
-  font-size: var(--text-2xs);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 :where(.system-b-chat-entity-action-link) {
@@ -4117,8 +4121,10 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-chat-entity-audio-card),
 :where(.system-b-chat-entity-note-card) {
-  border-radius: var(--radius-lg);
-  background: var(--system-b-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-1);
+  box-shadow: var(--shadow-card);
   padding: var(--space-2-5) var(--space-3);
   color: var(--color-text-secondary-token);
   font-size: var(--text-nav);
@@ -4182,14 +4188,9 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   position: relative;
   min-height: 18.75rem;
   overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 70%, transparent);
-  border-radius: var(--radius-lg);
-  background: color-mix(
-    in oklab,
-    var(--system-b-bg-surface-1) 86%,
-    var(--system-b-app-content-surface) 14%
-  );
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--color-bg-surface-1);
   padding: var(--space-5) var(--space-4);
   box-shadow: var(--shadow-card);
 }

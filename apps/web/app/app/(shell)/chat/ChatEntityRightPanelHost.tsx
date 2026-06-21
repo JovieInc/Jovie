@@ -23,6 +23,14 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks/ReleaseTaskChecklist';
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
+import type { EntityCardModel } from '@/components/organisms/entity-card';
+import {
+  chatReleaseContextToEntityCard,
+  chatTourDateContextToEntityCard,
+  EntityCard,
+  entityCardArtStyle,
+  KIND_PRESETS,
+} from '@/components/organisms/entity-card';
 import {
   type ContextMenuItemType,
   TableContextMenu,
@@ -177,7 +185,7 @@ function ChatProfileContextCard({
         type='button'
         variant='ghost'
         size='icon'
-        aria-label='Dismiss profile context'
+        aria-label='Dismiss Profile Context'
         onClick={() => onDismiss(target.focusKey)}
         className='system-b-chat-entity-context-dismiss'
       >
@@ -185,6 +193,53 @@ function ChatProfileContextCard({
       </Button>
     </div>
   );
+}
+
+function ChatRailEntityCard({
+  model,
+  contextKind,
+  focusKey,
+  onDismiss,
+  contextMenuItems,
+  dismissLabel,
+}: Readonly<{
+  model: EntityCardModel;
+  contextKind: ChatRailContextKind;
+  focusKey: string;
+  onDismiss: (focusKey: string) => void;
+  contextMenuItems?: ContextMenuItemType[];
+  dismissLabel: string;
+}>) {
+  const card = (
+    <div
+      className='group relative'
+      data-testid='chat-rail-context-card'
+      data-context-kind={contextKind}
+    >
+      <EntityCard
+        model={model}
+        treatment='compact'
+        className='w-full'
+        dataTestId={`chat-rail-entity-card-${contextKind}`}
+      />
+      <Button
+        type='button'
+        variant='ghost'
+        size='icon'
+        aria-label={dismissLabel}
+        onClick={() => onDismiss(focusKey)}
+        className='system-b-chat-entity-context-dismiss absolute right-2 top-2 z-10'
+      >
+        <X className='h-3.5 w-3.5' />
+      </Button>
+    </div>
+  );
+
+  if (contextMenuItems && contextMenuItems.length > 0) {
+    return <TableContextMenu items={contextMenuItems}>{card}</TableContextMenu>;
+  }
+
+  return card;
 }
 
 function ChatEntityContextCard({
@@ -214,7 +269,7 @@ function ChatEntityContextCard({
         type='button'
         variant='ghost'
         size='icon'
-        aria-label={`Dismiss ${contextKindLabel(target.kind)} context`}
+        aria-label={`Dismiss ${contextKindLabel(target.kind)} Context`}
         onClick={() => onDismiss(target.focusKey)}
         className='system-b-chat-entity-context-dismiss'
       >
@@ -295,56 +350,68 @@ function ChatReleaseContextCard({
     target.id
   );
   const title = release?.title ?? target.label?.trim() ?? 'Release';
-  const meta = release
-    ? `${releaseTypeLabel(release.releaseType)} Context`
-    : isLoading
-      ? 'Loading Release'
-      : 'Release Context';
+  const model = chatReleaseContextToEntityCard(
+    release
+      ? {
+          id: release.id,
+          title: release.title,
+          artworkUrl: release.artworkUrl,
+          releaseType: release.releaseType,
+        }
+      : null,
+    { fallbackTitle: title, loading: isLoading }
+  );
 
   return (
-    <TableContextMenu
-      items={buildChatContextMenuItems({
+    <ChatRailEntityCard
+      model={model}
+      contextKind='release'
+      focusKey={target.focusKey}
+      onDismiss={onDismiss}
+      dismissLabel='Dismiss Release Context'
+      contextMenuItems={buildChatContextMenuItems({
         title,
         href: release?.smartLinkPath,
         onDismiss: () => onDismiss(target.focusKey),
       })}
-    >
-      <div
-        data-testid='chat-rail-context-card'
-        data-context-kind='release'
-        className='system-b-chat-entity-context-card group'
-      >
-        <div className='system-b-chat-entity-context-avatar'>
-          {release?.artworkUrl ? (
-            <Image
-              src={release.artworkUrl}
-              alt=''
-              fill
-              sizes='36px'
-              className='object-cover'
-            />
-          ) : (
-            <div className='flex h-full w-full items-center justify-center'>
-              <Disc3 className='h-3.5 w-3.5' />
-            </div>
-          )}
-        </div>
-        <div className='system-b-chat-entity-context-copy'>
-          <p className='system-b-chat-entity-context-title'>{title}</p>
-          <p className='system-b-chat-entity-context-meta'>{meta}</p>
-        </div>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon'
-          aria-label='Dismiss release context'
-          onClick={() => onDismiss(target.focusKey)}
-          className='system-b-chat-entity-context-dismiss'
-        >
-          <X className='h-3.5 w-3.5' />
-        </Button>
-      </div>
-    </TableContextMenu>
+    />
+  );
+}
+
+function ChatTourDateContextCard({
+  target,
+  profileId,
+  onDismiss,
+}: Readonly<{
+  target: ChatRailContextTarget;
+  profileId: string;
+  onDismiss: (focusKey: string) => void;
+}>) {
+  const { data, isLoading } = useEventsQuery(profileId);
+  const event: EventRecord | null =
+    (data ?? []).find(entry => entry.id === target.id) ?? null;
+  const title = event?.title ?? target.label?.trim() ?? 'Tour date';
+  const model = chatTourDateContextToEntityCard(
+    event
+      ? {
+          id: event.id,
+          title: event.title,
+          venueName: event.venue,
+          city: event.city,
+          startDate: event.eventDate,
+        }
+      : null,
+    { fallbackTitle: title, loading: isLoading }
+  );
+
+  return (
+    <ChatRailEntityCard
+      model={model}
+      contextKind='tour-date'
+      focusKey={target.focusKey}
+      onDismiss={onDismiss}
+      dismissLabel='Dismiss Tour Date Context'
+    />
   );
 }
 
@@ -376,6 +443,13 @@ function ChatRailContextCards({
             />
           ) : target.kind === 'release' && profileId ? (
             <ChatReleaseContextCard
+              key={target.focusKey}
+              target={target}
+              profileId={profileId}
+              onDismiss={onDismiss}
+            />
+          ) : target.kind === 'tour-date' && profileId ? (
+            <ChatTourDateContextCard
               key={target.focusKey}
               target={target}
               profileId={profileId}
@@ -432,6 +506,7 @@ function ChatReleaseEntityPanel({
     usePlanGate();
   const [showTasksUpgrade, setShowTasksUpgrade] = useState(true);
   const releaseDate = formatReleaseDate(release?.releaseDate);
+  const releaseArtStyle = entityCardArtStyle(KIND_PRESETS.music.accent);
   const visibleProviders = release?.providers.filter(provider => provider.url);
   const hasMedia =
     Boolean(release?.artworkUrl) ||
@@ -472,7 +547,7 @@ function ChatReleaseEntityPanel({
             type='button'
             variant='ghost'
             size='icon'
-            aria-label='Close entity panel'
+            aria-label='Close Entity Panel'
             onClick={onClose}
             className='system-b-chat-entity-panel-close'
           >
@@ -496,7 +571,10 @@ function ChatReleaseEntityPanel({
           <div className='min-h-0 flex-1 overflow-y-auto'>
             <div className='px-4 py-4'>
               <div className='system-b-chat-release-summary'>
-                <div className='system-b-chat-release-artwork'>
+                <div
+                  className='system-b-chat-release-artwork'
+                  style={releaseArtStyle}
+                >
                   {release.artworkUrl ? (
                     <Image
                       src={release.artworkUrl}
@@ -728,7 +806,7 @@ function ChatSimpleEntityPanel({
           type='button'
           variant='ghost'
           size='icon'
-          aria-label='Close entity panel'
+          aria-label='Close Entity Panel'
           onClick={onClose}
           className='system-b-chat-entity-panel-close'
         >
@@ -903,7 +981,7 @@ function ChatProfileBentoPanel({
             type='button'
             variant='ghost'
             size='icon'
-            aria-label='Close profile panel'
+            aria-label='Close Profile Panel'
             onClick={onClose}
             className='system-b-chat-entity-panel-close'
           >
