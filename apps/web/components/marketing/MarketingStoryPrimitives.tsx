@@ -73,7 +73,7 @@ export function ArtistNotificationFloatingCardView({
           <span className='min-w-0 flex-1 truncate text-app text-secondary-token'>
             {card.detail}
           </span>
-          <span className='inline-flex h-7 shrink-0 items-center rounded-full bg-white px-3 text-xs font-medium text-black'>
+          <span className='inline-flex h-7 shrink-0 items-center rounded-full bg-white px-3 text-xs font-medium text-black dark:bg-white dark:text-black'>
             {card.title}
           </span>
         </div>
@@ -97,7 +97,7 @@ export function ArtistNotificationFloatingCardView({
             {card.title}
           </p>
           {card.detail ? (
-            <p className='mt-1.5 text-app leading-[1.5] text-secondary-token'>
+            <p className='mt-1.5 text-app leading-normal text-secondary-token'>
               {card.detail}
             </p>
           ) : null}
@@ -238,7 +238,7 @@ export function ArtistProfileReactivationVisual({
       <div className='rounded-[1.5rem] bg-white/[0.02] p-2.5 shadow-[0_24px_64px_rgba(0,0,0,0.22)]'>
         <div className='rounded-[1.25rem] bg-(--color-bg-base) px-4 py-4'>
           <div className='flex items-start gap-3'>
-            <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black'>
+            <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black dark:bg-white dark:text-black'>
               <BellRing className='h-4 w-4' strokeWidth={1.9} />
             </span>
             <div className='min-w-0'>
@@ -251,7 +251,7 @@ export function ArtistProfileReactivationVisual({
               <p className='mt-2 text-mid font-semibold tracking-[-0.03em] text-primary-token'>
                 {notification.title}
               </p>
-              <p className='mt-1.5 text-app leading-[1.5] text-white/56'>
+              <p className='mt-1.5 text-app leading-normal text-white/56'>
                 {notification.detail}
               </p>
             </div>
@@ -309,7 +309,7 @@ export function ArtistProfileReactivationVisual({
                     {output.title}
                   </p>
                   <div className='mt-4 space-y-1.5'>
-                    <p className='text-app leading-[1.5] text-secondary-token'>
+                    <p className='text-app leading-normal text-secondary-token'>
                       {output.detail}
                     </p>
                     <p className='text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
