@@ -12,10 +12,15 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
-import { captureError } from '@/lib/error-tracking';
+import {
+  captureError,
+  captureWarning,
+  sanitizeErrorResponse,
+} from '@/lib/error-tracking';
 import { getAppFlagValue } from '@/lib/flags/server';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { stripe } from '@/lib/stripe/client';
+import { classifyStripeConnectOnboardError } from '@/lib/stripe/connect-errors';
 
 export const runtime = 'nodejs';
 
@@ -106,12 +111,26 @@ export async function POST() {
       { headers: NO_STORE_HEADERS }
     );
   } catch (err) {
-    captureError('Stripe Connect onboarding failed', err, {
+    const classified = classifyStripeConnectOnboardError(err);
+    const capture =
+      classified.logLevel === 'warning' ? captureWarning : captureError;
+
+    await capture('Stripe Connect onboarding failed', err, {
       clerkUserId,
+      code: classified.code,
     });
+
     return NextResponse.json(
-      { error: 'Failed to start Stripe Connect onboarding' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      sanitizeErrorResponse(classified.userMessage, undefined, {
+        code: classified.code,
+      }),
+      {
+        status: classified.status,
+        headers:
+          classified.status === 503
+            ? { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE }
+            : NO_STORE_HEADERS,
+      }
     );
   }
 }
