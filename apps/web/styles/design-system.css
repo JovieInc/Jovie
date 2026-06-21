@@ -43,6 +43,9 @@
   --profile-drawer-radius-mobile: 22px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
+  --profile-notification-icon-size: 17px;
+  --app-dialog-radius: var(--profile-inner-radius);
+  --app-shell-sidebar-floating-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);

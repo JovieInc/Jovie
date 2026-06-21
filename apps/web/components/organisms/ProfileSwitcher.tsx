@@ -50,7 +50,7 @@ export function ProfileSwitcher() {
         <DropdownMenuTrigger asChild>
           <button
             type='button'
-            aria-label='Switch artist profile'
+            aria-label='Switch Artist Profile'
             className={cn(
               'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
               'group-data-[collapsible=icon]:justify-center'
@@ -60,7 +60,7 @@ export function ProfileSwitcher() {
               src={selectedProfile?.avatarUrl}
               alt={selectedProfile?.displayName ?? ''}
               size='xs'
-              className='size-5 shrink-0 rounded-full'
+              className='size-4.5 shrink-0 rounded-full'
             />
             <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
               {selectedProfile?.displayName || 'Select profile'}
