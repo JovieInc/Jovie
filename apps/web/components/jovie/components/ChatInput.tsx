@@ -1101,7 +1101,7 @@ function InputRow({
             className={cn(
               'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token',
               isHero
-                ? 'min-h-7 px-2 py-0.5 text-[15px] font-[450] leading-6 text-primary-token sm:text-[16px]'
+                ? 'min-h-7 px-2 py-0.5 text-[15px] font-book leading-6 text-primary-token sm:text-[16px]'
                 : 'min-h-6 px-1.5 py-[1px] text-[15px] leading-6 text-primary-token',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
