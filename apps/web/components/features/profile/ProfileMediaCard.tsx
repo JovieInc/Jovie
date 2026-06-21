@@ -204,7 +204,7 @@ function CountdownGrid({
           <div key={label} className='min-w-0'>
             <p
               className={cn(
-                'font-[680] leading-none tracking-[-0.018em] text-white tabular-nums',
+                'font-bold leading-none tracking-[-0.018em] text-(--color-text-tooltip) tabular-nums',
                 compact ? 'text-2xs' : 'text-3xl'
               )}
             >
@@ -230,7 +230,7 @@ function DatePill({
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-col items-center justify-center border border-white/14 bg-white/10 text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl',
+        'flex shrink-0 flex-col items-center justify-center border border-white/14 bg-white/10 text-(--color-text-tooltip) shadow-[0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl',
         compact
           ? 'min-w-8 rounded-lg px-1.5 py-1'
           : 'min-w-16 rounded-2xl px-3 py-2.5'
@@ -241,7 +241,7 @@ function DatePill({
       </span>
       <span
         className={cn(
-          'font-[680] leading-none tracking-[-0.02em] tabular-nums',
+          'font-bold leading-none tracking-[-0.02em] tabular-nums',
           compact ? 'mt-0.5 text-xs' : 'mt-1 text-xl'
         )}
       >
@@ -294,8 +294,8 @@ function CardAction({
     'inline-flex w-full min-w-0 items-center rounded-xl bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-opacity duration-subtle hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
     action.showChevron ? 'justify-between' : 'justify-center',
     compact
-      ? 'min-h-11 gap-1 px-2.5 py-2 text-2xs font-[680]'
-      : 'min-h-11 gap-2 px-4 py-2 text-app font-[680]',
+      ? 'min-h-11 gap-1 px-2.5 py-2 text-2xs font-bold'
+      : 'min-h-11 gap-2 px-4 py-2 text-app font-bold',
     action.disabled &&
       'cursor-not-allowed bg-white/14 text-white/42 hover:opacity-100'
   );
@@ -443,7 +443,7 @@ export function ProfileMediaCard({
           <div className={cn('space-y-1.5', compact && 'space-y-1')}>
             <p
               className={cn(
-                'font-[680] uppercase text-white/72',
+                'font-bold uppercase text-white/72',
                 accentClassName,
                 compact
                   ? 'text-3xs leading-none tracking-[0.14em]'
@@ -454,7 +454,7 @@ export function ProfileMediaCard({
             </p>
             <h3
               className={cn(
-                'min-w-0 font-[680] leading-[1.03] tracking-[-0.026em] text-white [overflow-wrap:anywhere]',
+                'min-w-0 font-bold leading-[1.03] tracking-[-0.026em] text-(--color-text-tooltip) [overflow-wrap:anywhere]',
                 compact
                   ? 'line-clamp-2 text-xs'
                   : landscape
@@ -504,7 +504,7 @@ export function ProfileMediaCard({
             {status ? (
               <p
                 className={cn(
-                  'inline-flex min-w-0 items-center gap-2 font-semibold tracking-[-0.005em] text-white [overflow-wrap:anywhere]',
+                  'inline-flex min-w-0 items-center gap-2 font-semibold tracking-[-0.005em] text-(--color-text-tooltip) [overflow-wrap:anywhere]',
                   compact ? 'text-3xs' : 'text-app'
                 )}
               >
@@ -550,7 +550,12 @@ export function ProfileMediaCard({
       </div>
 
       {!overlayActions && (action || secondaryAction) ? (
-        <div className={cn('bg-black', compact ? 'p-1.5' : 'px-3 py-3')}>
+        <div
+          className={cn(
+            'bg-black dark:bg-black',
+            compact ? 'p-1.5' : 'px-3 py-3'
+          )}
+        >
           <div
             className={cn(
               'grid gap-2',
