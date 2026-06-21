@@ -52,25 +52,25 @@ export function NotificationsPageClient({ artist }: Props) {
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative flex h-dvh items-center justify-center overflow-hidden bg-[color:var(--profile-stage-bg)] p-4 sm:p-6'
+        className='relative flex h-dvh items-center justify-center overflow-hidden bg-(--profile-stage-bg) p-4 sm:p-6'
         data-testid='notifications-page'
         style={accentStyle}
       >
         <div
-          className='pointer-events-none absolute inset-0 bg-[var(--profile-stage-overlay)]'
+          className='pointer-events-none absolute inset-0 bg-(--profile-stage-overlay)'
           aria-hidden='true'
         />
         <div
-          className='pointer-events-none absolute left-[12%] top-[10%] h-56 w-56 rounded-full bg-[color:var(--profile-stage-glow-a)] blur-3xl sm:h-72 sm:w-72'
+          className='pointer-events-none absolute left-[12%] top-[10%] h-56 w-56 rounded-full bg-(--profile-stage-glow-a) blur-3xl sm:h-72 sm:w-72'
           aria-hidden='true'
         />
         <div
-          className='pointer-events-none absolute bottom-[12%] right-[10%] h-52 w-52 rounded-full bg-[color:var(--profile-stage-glow-b)] blur-3xl sm:h-64 sm:w-64'
+          className='pointer-events-none absolute bottom-[12%] right-[10%] h-52 w-52 rounded-full bg-(--profile-stage-glow-b) blur-3xl sm:h-64 sm:w-64'
           aria-hidden='true'
         />
         <div
           ref={setNotificationsPortalContainer}
-          className='relative z-10 flex h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:h-[min(844px,calc(100dvh-48px))] sm:p-6 min-[1180px]:h-[min(940px,calc(100dvh-48px))] min-[1180px]:max-w-profile-notifications-wide min-[1180px]:p-8'
+          className='relative z-10 flex h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-(--profile-card-radius) border border-(--profile-panel-border) bg-(--profile-content-bg) p-5 shadow-(--profile-panel-shadow) backdrop-blur-2xl sm:h-[min(844px,calc(100dvh-48px))] sm:p-6 min-[1180px]:h-[min(940px,calc(100dvh-48px))] min-[1180px]:max-w-profile-notifications-wide min-[1180px]:p-8'
         >
           <div className='mb-5 flex items-center justify-between'>
             <Link
