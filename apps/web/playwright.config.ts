@@ -22,6 +22,8 @@ const includeMobileMatrix =
   process.env.E2E_MOBILE_MATRIX === '1' || isFullMatrix;
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+const webServerWarmupProfile =
+  process.env.E2E_WEB_SERVER_WARMUP || (isCI ? 'full' : 'public');
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
 const managedWebServerUrl = new URL(baseURL);
 if (!managedWebServerUrl.port) {
@@ -36,7 +38,7 @@ const videoMode: 'off' | 'retain-on-failure' =
   isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
 
 const stableLocalServerCommand =
-  process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:local:playwright';
+  process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:fast';
 // Pin Doppler scope explicitly so worktrees never inherit whichever scope
 // happens to be active in the parent shell. See .claude/rules/environment.md.
 const webServerCommand = process.env.DATABASE_URL
@@ -179,6 +181,7 @@ export default defineConfig({
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_FAST_ONBOARDING: '1',
             E2E_ALLOW_DEV_CSP: '1',
+            E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
             ...(useTestAuthBypass
               ? {
                   NEXT_PUBLIC_CLERK_MOCK: '1',
