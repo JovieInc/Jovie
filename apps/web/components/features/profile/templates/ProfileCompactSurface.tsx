@@ -399,13 +399,13 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:h-45 [@media(max-height:760px)]:max-h-45'
+    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:820px)]:flex-none [@media(max-height:820px)]:h-45 [@media(max-height:820px)]:max-h-45'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
   const homeContentColumnClassName = isHomeMode
-    ? 'shrink-0 [@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
+    ? 'shrink-0 [@media(max-height:820px)]:min-h-0 [@media(max-height:820px)]:flex-1'
     : 'min-h-0 flex-1';
   const homeContentScrollClassName = isHomeMode
-    ? '[@media(max-height:760px)]:min-h-0 [@media(max-height:760px)]:flex-1'
+    ? '[@media(max-height:820px)]:min-h-0 [@media(max-height:820px)]:flex-1'
     : 'min-h-0 flex-1';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
