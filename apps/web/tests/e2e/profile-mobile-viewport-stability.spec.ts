@@ -673,10 +673,10 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         ).toBeLessThanOrEqual(layout.card.bottom - 6);
       }
 
-      if (viewport.height <= 760 && layout.cover) {
+      if (viewport.height <= 820 && layout.cover) {
         expect(
           layout.cover.height,
-          `${viewport.label} home hero should compress on short viewports`
+          `${viewport.label} home hero should compress on compact viewports`
         ).toBeLessThanOrEqual(190);
       }
     });
