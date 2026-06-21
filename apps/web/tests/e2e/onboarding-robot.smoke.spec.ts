@@ -10,7 +10,7 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const COMPOSER_TEXTBOX_NAME = /chat message input/i;
 
 test.describe('Onboarding Robot PR Smoke', () => {
   test('verifies /start chat health and event emission', async ({ page }) => {
@@ -27,7 +27,9 @@ test.describe('Onboarding Robot PR Smoke', () => {
       ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED,
     ]);
 
-    await page.locator(COMPOSER_TEXTAREA).fill('I am launching a test artist');
+    await page
+      .getByRole('textbox', { name: COMPOSER_TEXTBOX_NAME })
+      .fill('I am launching a test artist');
     await page.getByRole('button', { name: 'Send message' }).click();
 
     await expect(

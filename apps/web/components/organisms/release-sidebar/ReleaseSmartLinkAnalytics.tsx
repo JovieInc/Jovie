@@ -200,7 +200,7 @@ function ReleaseSmartLinkControl({
         />
       </div>
       {helperText ? (
-        <p className='px-2.5 text-[10px] leading-[14px] text-tertiary-token'>
+        <p className='px-2.5 text-3xs leading-[14px] text-tertiary-token'>
           {helperText}
         </p>
       ) : null}

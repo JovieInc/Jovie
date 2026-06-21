@@ -251,7 +251,7 @@ export function CmdKPalette({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-[560px]'
+        className='overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-140'
         hideClose
       >
         <DialogPrimitive.Title className='sr-only'>
@@ -282,12 +282,12 @@ export function CmdKPalette({
               className='flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
               aria-label='Command Palette Search'
             />
-            <span className='hidden shrink-0 px-1 text-[11px] font-medium text-quaternary-token sm:inline'>
+            <span className='hidden shrink-0 px-1 text-2xs font-medium text-quaternary-token sm:inline'>
               Esc
             </span>
           </div>
           <div
-            className='max-h-[420px] overflow-y-auto px-2 pb-2 pt-1.5'
+            className='max-h-105 overflow-y-auto px-2 pb-2 pt-1.5'
             role='listbox'
             aria-label='Command Palette Results'
           >
