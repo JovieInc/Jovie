@@ -223,7 +223,7 @@ private struct AppContentView: View {
           initialTab: appState.launchMode.opensChatOnLaunch ? .chat : .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
-          chatEnabled: appState.loadedDashboardResponse?.chatEnabled ?? false,
+          chatEnabled: appState.loadedDashboardResponse != nil,
           recentConversations: chatRepository?.conversations ?? [],
           onSelectConversation: { conversationID in
             Task { await chatRepository?.openConversation(conversationID) }
@@ -304,7 +304,7 @@ private struct MobileChatPlaceholderView: View {
               .foregroundStyle(JovieColor.textPrimary)
               .multilineTextAlignment(.center)
 
-            Text(isOffline ? "Offline. Drafts stay on this device." : "Native chat is in alpha for internal testers.")
+            Text(isOffline ? "Offline. Drafts stay on this device." : "Ask Jovie about your profile, releases, and next moves.")
               .font(JovieFont.body(size: 15))
               .foregroundStyle(JovieColor.textTertiary)
               .multilineTextAlignment(.center)

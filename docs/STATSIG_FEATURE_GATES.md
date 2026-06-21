@@ -23,10 +23,9 @@ experiments used by the web app.
 | `stripe-connect-enabled` | `LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED` | `false` | Stripe Connect payouts (settings + payment routes) | Active |
 | `chat_jank_monitor` | `LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR` | `false` | Chat jank instrumentation (message continuity + streaming) | Active |
 | `ai_connectors_beta` | `LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA` | `false` | AI Connector v1 closed beta — Gmail booking email → Google Calendar event flow | Active |
-| `ios_app_alpha_access` | `LEGACY_STATSIG_GATE_KEYS.IOS_APP_ALPHA_ACCESS` | `false` | Internal iOS TestFlight install access | Active |
 | `merch_mvp` | `LEGACY_STATSIG_GATE_KEYS.MERCH_MVP` | `false` | Jovie-owned merch generation, public merch cards, checkout, and Printful fulfillment | Active |
 | `bulk_press_photo_import` | `LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT` | `false` | DSP bulk press-photo import after platform activation evidence passes | Active |
-| `apple_wallet_profile_pass` | `LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS` | `false` | First-party Apple Wallet generic profile pass generation, update service, and iOS/mobile web add flows | Active |
+| `apple_wallet_profile_pass` | `LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS` | `false` | Web dashboard Wallet affordances only; iOS/mobile pass API availability is config and profile based | Active |
 | `ai_chat_disabled` | `CHAT_KILL_SWITCH_GATES.DISABLED` | `false` | Emergency kill switch for `/api/chat` | Active |
 | `ai_chat_force_light` | `CHAT_KILL_SWITCH_GATES.FORCE_LIGHT` | `false` | Runtime switch to route `/api/chat` to the lighter model | Active |
 

@@ -461,7 +461,7 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertNoRoutePersistence
 
-  - description: Mobile chat route fails closed while native runtime is disabled
+  - description: Mobile chat route reaches handler boundary for authenticated valid turns
     metadata:
       cost: deterministic
     vars:
@@ -470,13 +470,13 @@ tests:
       authenticated: true
       body:
         conversationId: mobile-conversation-1
-        clientTurnId: mobile-turn-disabled
-        clientMessageId: mobile-message-disabled
+        clientTurnId: mobile-turn-handler-boundary
+        clientMessageId: mobile-message-handler-boundary
         text: "Help me launch my next release."
         source: typed
     assert:
       - type: javascript
-        value: file://assertions.cjs:assertMobileRouteRuntimeDisabled
+        value: file://assertions.cjs:assertMobileRouteHandlerBoundary
       - type: javascript
         value: file://assertions.cjs:assertNoRoutePersistence
 

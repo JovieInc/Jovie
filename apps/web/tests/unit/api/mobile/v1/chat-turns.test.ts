@@ -15,10 +15,6 @@ vi.mock('@/lib/mobile/chat/turn-handler', () => ({
 
 const routeModulePromise = import('@/app/api/mobile/v1/chat/turns/route');
 
-async function text(response: Response) {
-  return response.text();
-}
-
 describe('POST /api/mobile/v1/chat/turns', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,7 +48,7 @@ describe('POST /api/mobile/v1/chat/turns', () => {
     });
   });
 
-  it('validates required mobile turn ids before the runtime starts', async () => {
+  it('validates required mobile turn ids before the chat handler runs', async () => {
     const { POST } = await routeModulePromise;
     const response = await POST(
       new Request('https://jov.ie/api/mobile/v1/chat/turns', {
@@ -68,10 +64,17 @@ describe('POST /api/mobile/v1/chat/turns', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Invalid request body',
     });
+    expect(hoisted.handleMobileChatTurnMock).not.toHaveBeenCalled();
   });
 
-  it('fails closed with an NDJSON error event when the runtime flag is off', async () => {
+  it('delegates to the chat runtime without the old rollout env', async () => {
     vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', '');
+    vi.stubEnv('MOBILE_CHAT_ALPHA_GATE_ENABLED', 'true');
+    const runtimeResponse = new Response('{"type":"turn.reserved"}\n', {
+      status: 200,
+      headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' },
+    });
+    hoisted.handleMobileChatTurnMock.mockResolvedValue(runtimeResponse);
 
     const { POST } = await routeModulePromise;
     const response = await POST(
@@ -86,17 +89,11 @@ describe('POST /api/mobile/v1/chat/turns', () => {
       })
     );
 
-    expect(response.status).toBe(501);
-    expect(response.headers.get('Content-Type')).toBe(
-      'application/x-ndjson; charset=utf-8'
-    );
-    await expect(text(response)).resolves.toBe(
-      '{"type":"error","errorCode":"MOBILE_CHAT_RUNTIME_DISABLED","message":"Native chat is not enabled for this build."}\n'
-    );
-    expect(hoisted.handleMobileChatTurnMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(hoisted.handleMobileChatTurnMock).toHaveBeenCalledTimes(1);
   });
 
-  it('delegates to the chat runtime when the flag is enabled', async () => {
+  it('delegates to the chat runtime when legacy env is still enabled', async () => {
     vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', 'true');
     const runtimeResponse = new Response('{"type":"turn.reserved"}\n', {
       status: 200,
