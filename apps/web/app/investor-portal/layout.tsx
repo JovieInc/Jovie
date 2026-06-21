@@ -51,7 +51,7 @@ export default async function InvestorLayout({
     .map(p => ({ slug: p.slug, title: p.title }));
 
   return (
-    <div className='dark min-h-screen bg-[var(--color-bg-base)] text-[var(--color-text-primary-token)]'>
+    <div className='dark min-h-screen bg-base text-primary-token'>
       <div className='flex min-h-screen'>
         {/* Left sidebar nav — 200px fixed on desktop */}
         <InvestorNav investorName={investorName} pages={navPages} />
