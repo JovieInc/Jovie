@@ -94,21 +94,21 @@ function BreadcrumbTrail({
   return (
     <>
       {usesSectionTitleLayout ? (
-        <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
+        <span className='truncate text-xs font-semibold tracking-tight text-primary-token'>
           {currentLabel}
         </span>
       ) : (
         <>
-          <span className='shrink-0 text-2xs font-caption tracking-[-0.01em] text-tertiary-token'>
+          <span className='shrink-0 text-2xs font-caption tracking-tight text-tertiary-token'>
             {rootLabel}
           </span>
           <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
           {breadcrumbSuffix ? (
-            <div className='min-w-0 truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
+            <div className='min-w-0 truncate text-xs font-semibold tracking-tight text-primary-token'>
               {breadcrumbSuffix}
             </div>
           ) : (
-            <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
+            <span className='truncate text-xs font-semibold tracking-tight text-primary-token'>
               {currentLabel}
             </span>
           )}

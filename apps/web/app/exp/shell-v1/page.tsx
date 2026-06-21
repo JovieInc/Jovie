@@ -3179,7 +3179,7 @@ function Sidebar({
                   className='shrink-0 text-primary-token'
                   aria-hidden
                 />
-                <span className='text-app font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
+                <span className='text-app font-semibold tracking-tighter text-primary-token flex-1 truncate'>
                   Jovie
                 </span>
                 <ChevronDown
@@ -5085,7 +5085,7 @@ function ReleaseRow({
       {/* Title (with type badge) / artist */}
       <div className='min-w-0'>
         <div className='flex items-center gap-1.5 min-w-0'>
-          <span className='truncate text-app font-caption leading-tight tracking-[-0.01em] text-primary-token'>
+          <span className='truncate text-app font-caption leading-tight tracking-tight text-primary-token'>
             {release.title}
           </span>
           <TypeBadge label={release.type} />
@@ -6281,7 +6281,7 @@ function TrackRow({
       </div>
 
       {/* BPM — heavier weight, monochrome, right-aligned */}
-      <span className='w-11 shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
+      <span className='w-11 shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-tight'>
         {track.bpm}
       </span>
 
@@ -6727,7 +6727,7 @@ function TaskDetail({
     : null;
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12'>
-      <h1 className='text-2xl font-display tracking-[-0.02em] text-primary-token leading-tight'>
+      <h1 className='text-2xl font-display tracking-tighter text-primary-token leading-tight'>
         {onOpenRelease
           ? renderWithEntities(task.title, RELEASES, onOpenRelease)
           : task.title}
