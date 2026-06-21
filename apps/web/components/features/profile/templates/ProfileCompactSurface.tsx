@@ -575,7 +575,7 @@ export function ProfileCompactSurface({
 
               {!isHomeMode ? (
                 <p
-                  className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-[-0.012em] text-white'
+                  className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-[-0.012em] text-white dark:text-white'
                   data-testid={
                     renderMode === 'preview' ? undefined : 'profile-header'
                   }
@@ -620,7 +620,7 @@ export function ProfileCompactSurface({
                     data-testid='profile-identity-link'
                     href={profileHref}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-white dark:text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
@@ -738,6 +738,7 @@ export function ProfileCompactSurface({
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
                 merchCards={merchCards}
+                releases={releases}
               />
             ) : (
               <ProfilePrimaryTabPanel

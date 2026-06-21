@@ -79,6 +79,7 @@ export function merchToEntityCard(
 }
 
 export interface ReleaseEntityInput {
+  readonly id?: string;
   readonly title: string;
   readonly slug: string;
   readonly artworkUrl?: string | null;
@@ -116,6 +117,7 @@ export function releaseToEntityCard(
 
   return {
     id: release.slug,
+    releaseId: release.id,
     kind,
     href,
     imageUrl: release.artworkUrl ?? null,
