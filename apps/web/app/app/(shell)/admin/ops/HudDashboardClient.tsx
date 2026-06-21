@@ -353,7 +353,7 @@ function CompactDeploymentRow({
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${DEPLOYMENT_STATE_DOT_CLASSNAMES[run.status]}`}
             aria-hidden='true'
           />
-          <p className='truncate text-app font-[590] text-primary-token'>
+          <p className='truncate text-app font-semibold text-primary-token'>
             {DEPLOYMENT_STATE_LABELS[run.status]}
           </p>
         </div>

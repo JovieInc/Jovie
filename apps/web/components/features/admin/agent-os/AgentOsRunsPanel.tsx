@@ -130,7 +130,7 @@ function AgentRunDetailPopover({
       >
         <div className='space-y-3'>
           <div className='min-w-0'>
-            <p className='text-xs font-[590] text-primary-token'>
+            <p className='text-xs font-semibold text-primary-token'>
               {artifact.title}
             </p>
             <p className='mt-1 text-xs leading-5 text-secondary-token'>
