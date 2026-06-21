@@ -82,7 +82,7 @@ export function HomeTrustSection({
         className={cn(
           isInlineStrip
             ? 'homepage-trust-strip-inner'
-            : 'mx-auto max-w-[var(--linear-content-max)]',
+            : 'mx-auto max-w-linear-content',
           innerBoxClass
         )}
       >
