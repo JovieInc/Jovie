@@ -1,23 +1,6 @@
 /**
- * Contrast Inventory Sweep — JOV-#11028
- *
- * One-time (but re-runnable) crawl of all public routes × light/dark themes
- * with axe color-contrast rule only. Emits a structured JSON inventory used
- * to seed the JOV-#11025 gate baseline.
- *
- * This spec NEVER fails — it is an inventory, not a gate. Violations are
- * collected and written to contrast-baseline.json for downstream use.
- *
- * Run:
- *   E2E_USE_TEST_AUTH_BYPASS=1 pnpm run contrast:inventory
- *
- * Output:
- *   apps/web/tests/e2e/contrast-baseline.json
- *   apps/web/tests/e2e/contrast-baseline.md
- *   apps/web/tests/e2e/contrast-screenshots/*.png
- *
- * @see JovieInc/Jovie#11028 (this task)
- * @see JovieInc/Jovie#11025 (gate that consumes the baseline)
+ * Contrast inventory sweep (JOV-#11028). Never fails — writes contrast-baseline.json.
+ * Run: E2E_USE_TEST_AUTH_BYPASS=1 pnpm --filter web exec playwright test tests/e2e/contrast-inventory.spec.ts --workers=1
  */
 
 import { join } from 'node:path';
@@ -42,10 +25,6 @@ import { resolvePublicSurfaceManifestSync } from './utils/public-surface-manifes
 
 const OUTPUT_DIR = join(process.cwd(), 'tests/e2e');
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate(t => {
     if (t === 'dark') {
@@ -69,20 +48,17 @@ async function collectContrastViolations(
     .disableRules(['frame-tested'])
     .analyze();
 
-  if (results.violations.length === 0) {
-    return null;
-  }
+  if (results.violations.length === 0) return null;
 
   const screenshotPath = getScreenshotAbsolutePath(OUTPUT_DIR, route, theme);
   await page.screenshot({ path: screenshotPath, fullPage: true });
-  const screenshot = getScreenshotRelativePath(route, theme);
 
   return {
     route,
     theme,
     ruleId: 'color-contrast',
     impact: results.violations[0]?.impact ?? null,
-    screenshot,
+    screenshot: getScreenshotRelativePath(route, theme),
     nodes: results.violations.flatMap(violation =>
       violation.nodes.map(node => ({
         selector: node.target.join(', '),
@@ -93,58 +69,22 @@ async function collectContrastViolations(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Route definitions
-// ---------------------------------------------------------------------------
-
 const publicSurfaces = resolvePublicSurfaceManifestSync().filter(
   surface => surface.expectedState === 'ok'
 );
 
-const AUTH_ROUTES: ReadonlyArray<{
-  readonly id: string;
-  readonly path: string;
-  readonly label: string;
-}> = [
-  {
-    id: 'app-dashboard',
-    path: APP_ROUTES.LEGACY_DASHBOARD,
-    label: 'App Dashboard',
-  },
-  { id: 'app-chat', path: APP_ROUTES.CHAT, label: 'Chat' },
-  { id: 'app-releases', path: APP_ROUTES.RELEASES, label: 'Releases' },
-  {
-    id: 'settings-artist-profile',
-    path: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
-    label: 'Settings — Artist Profile',
-  },
-  {
-    id: 'settings-billing',
-    path: APP_ROUTES.SETTINGS_BILLING,
-    label: 'Settings — Billing',
-  },
-  {
-    id: 'settings-account',
-    path: APP_ROUTES.SETTINGS_ACCOUNT,
-    label: 'Settings — Account',
-  },
-  {
-    id: 'onboarding-start',
-    path: APP_ROUTES.ONBOARDING,
-    label: 'Onboarding',
-  },
-  {
-    id: 'paywall',
-    path: APP_ROUTES.BILLING,
-    label: 'Paywall / Upgrade',
-  },
+const AUTH_ROUTES = [
+  [APP_ROUTES.LEGACY_DASHBOARD, 'app-dashboard'],
+  [APP_ROUTES.CHAT, 'app-chat'],
+  [APP_ROUTES.RELEASES, 'app-releases'],
+  [APP_ROUTES.SETTINGS_ARTIST_PROFILE, 'settings-artist-profile'],
+  [APP_ROUTES.SETTINGS_BILLING, 'settings-billing'],
+  [APP_ROUTES.SETTINGS_ACCOUNT, 'settings-account'],
+  [APP_ROUTES.ONBOARDING, 'onboarding-start'],
+  [APP_ROUTES.BILLING, 'paywall'],
 ] as const;
 
 const allViolations: ContrastViolationRecord[] = [];
-
-// ---------------------------------------------------------------------------
-// Suite
-// ---------------------------------------------------------------------------
 
 test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
   test.describe.configure({ mode: 'serial' });
@@ -159,28 +99,24 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
 
     for (const surface of publicSurfaces) {
       for (const theme of ['light', 'dark'] as const) {
-        const testId = `${surface.id}/${theme}`;
-
-        test(`contrast:inventory — ${testId}`, async ({ page }) => {
+        test(`contrast:inventory — ${surface.id}/${theme}`, async ({
+          page,
+        }) => {
           await installPublicRouteMocks(page);
-
           try {
             await page.goto(surface.resolvedPath, {
               waitUntil: 'domcontentloaded',
               timeout: 60_000,
             });
             await setTheme(page, theme);
-
             const record = await collectContrastViolations(
               page,
               surface.resolvedPath,
               theme
             );
-            if (record) {
-              allViolations.push(record);
-            }
+            if (record) allViolations.push(record);
           } catch (err) {
-            console.warn(`[contrast-inventory] ${testId} error:`, err);
+            console.warn(`[contrast-inventory] ${surface.id}/${theme}:`, err);
           }
         });
       }
@@ -189,7 +125,6 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
 
   test.describe('Authenticated routes', () => {
     const hasBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
-
     test.skip(
       !hasBypass,
       'Auth routes skipped: set E2E_USE_TEST_AUTH_BYPASS=1'
@@ -197,7 +132,6 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
 
     test.beforeEach(async ({ page }) => {
       if (!hasBypass) return;
-
       const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
       await page.goto(
         `${baseUrl}/api/dev/test-auth/enter?persona=creator-ready&redirect=${APP_ROUTES.CHAT}`,
@@ -205,31 +139,21 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
       );
     });
 
-    for (const route of AUTH_ROUTES) {
+    for (const [path, id] of AUTH_ROUTES) {
       for (const theme of ['light', 'dark'] as const) {
-        const testId = `${route.id}/${theme}`;
-
-        test(`contrast:inventory — ${testId}`, async ({ page }) => {
+        test(`contrast:inventory — ${id}/${theme}`, async ({ page }) => {
           const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
-
           try {
-            await page.goto(`${baseUrl}${route.path}`, {
+            await page.goto(`${baseUrl}${path}`, {
               waitUntil: 'domcontentloaded',
               timeout: 60_000,
             });
             await setTheme(page, theme);
             await page.waitForTimeout(1_000);
-
-            const record = await collectContrastViolations(
-              page,
-              route.path,
-              theme
-            );
-            if (record) {
-              allViolations.push(record);
-            }
+            const record = await collectContrastViolations(page, path, theme);
+            if (record) allViolations.push(record);
           } catch (err) {
-            console.warn(`[contrast-inventory] ${testId} error:`, err);
+            console.warn(`[contrast-inventory] ${id}/${theme}:`, err);
           }
         });
       }
@@ -240,7 +164,6 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
     const bySelector = buildSelectorIndex(allViolations);
     const byComponent = buildComponentIndex(allViolations);
     const fixClusters = buildFixClusters(byComponent);
-
     const totalViolationNodes = allViolations.reduce(
       (sum, violation) => sum + violation.nodes.length,
       0
@@ -262,28 +185,9 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
       OUTPUT_DIR
     );
 
-    const topClusters = fixClusters.slice(0, 20);
     console.log(
-      `\n[contrast-inventory] ✓ Wrote ${jsonPath}\n` +
-        `[contrast-inventory] ✓ Wrote ${markdownPath}\n` +
-        `  Total violation nodes: ${totalViolationNodes}\n` +
-        `  Unique selectors: ${Object.keys(bySelector).length}\n` +
-        `  Shared component keys: ${Object.keys(byComponent).length}\n` +
-        `  Routes scanned: ${
-          [...new Set(allViolations.map(v => v.route))].length
-        }\n\n` +
-        `  Top 20 fix clusters:\n` +
-        topClusters
-          .map(
-            cluster =>
-              `    [${cluster.priority} ×${cluster.count}] ` +
-              `ratio:${cluster.worstRatio ?? 'n/a'} — ${cluster.componentKey}`
-          )
-          .join('\n')
-    );
-
-    console.log(
-      '[contrast-inventory] Inventory complete — gate-baseline seeded'
+      `[contrast-inventory] wrote ${jsonPath} and ${markdownPath} ` +
+        `(${totalViolationNodes} nodes, ${Object.keys(bySelector).length} selectors)`
     );
   });
 });
