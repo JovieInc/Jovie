@@ -48,7 +48,7 @@ export function SignInTimeoutEscape() {
   if (!timedOut) return null;
 
   return (
-    <div className='mt-6 text-center text-sm text-[var(--color-text-tertiary-token)]'>
+    <div className='mt-6 text-center text-sm text-tertiary-token'>
       Having trouble?{' '}
       {/* API route, not a page — intentional full-document navigation so the
           server can clear cookies and 303 to /signin?reset=1. */}
