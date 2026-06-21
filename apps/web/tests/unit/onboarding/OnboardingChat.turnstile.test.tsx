@@ -275,6 +275,27 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByTestId('onboarding-composer-dock')).toBeVisible();
   });
 
+  it('renders a starter prompt and reserves verification space before effects run', () => {
+    render(
+      <OnboardingChat
+        starterPrompt='  Hey, I want to get access to Jovie.  '
+        turnstilePanel={<div data-testid='test-turnstile-panel' />}
+        turnstilePanelVisible={false}
+        turnstileStatus='interactive'
+        turnstileToken={null}
+      />
+    );
+
+    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+      'Hey, I want to get access to Jovie.'
+    );
+    expect(screen.getByTestId('onboarding-turnstile-slot')).toHaveClass(
+      'min-h-[10rem]'
+    );
+    expect(screen.getByTestId('test-turnstile-panel')).toBeInTheDocument();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('keeps the first message local and shows verification guidance until a token exists', () => {
     const onTurnstileRequired = vi.fn();
     render(<TurnstileHarness onTurnstileRequired={onTurnstileRequired} />);
