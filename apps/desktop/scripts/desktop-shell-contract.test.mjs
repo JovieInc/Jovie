@@ -530,12 +530,13 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     'utf8'
   );
 
-  assert.match(rootLayout, /import Script from 'next\/script';/);
   assert.match(
     rootLayout,
-    /src='\/electron-runtime-init\.js'\s+strategy='beforeInteractive'/
+    /<script src='\/electron-runtime-init\.js' \/>/
   );
-  assert.doesNotMatch(rootLayout, /<script src='\/electron-runtime-init\.js'/);
+  assert.match(rootLayout, /<script src='\/theme-init\.js' \/>/);
+  assert.doesNotMatch(rootLayout, /import Script from 'next\/script';/);
+  assert.doesNotMatch(rootLayout, /beforeInteractive/);
   assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
