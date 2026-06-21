@@ -87,6 +87,29 @@ describe('computeAlbumArtWinner', () => {
     expect(result).toBeNull();
   });
 
+  it('does not promote a challenger to control when true control is unqualified', () => {
+    // Regression: pre-fix code used qualified[0] as control. With two qualified
+    // challengers it would return a winner with controlId='c1' instead of null.
+    const result = computeAlbumArtWinner([
+      { variantId: 'control', impressions: minI - 1, clicks: 5 },
+      { variantId: 'c1', impressions: minI, clicks: 10 },
+      { variantId: 'c2', impressions: minI, clicks: 20 },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('does not promote a challenger to control when true control misses a custom threshold', () => {
+    const result = computeAlbumArtWinner(
+      [
+        { variantId: 'control', impressions: 49, clicks: 4 },
+        { variantId: 'c1', impressions: 50, clicks: 5 },
+        { variantId: 'c2', impressions: 50, clicks: 10 },
+      ],
+      { minImpressions: 50 }
+    );
+    expect(result).toBeNull();
+  });
+
   it('throws when impressions are negative', () => {
     expect(() =>
       computeAlbumArtWinner([

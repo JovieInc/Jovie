@@ -65,6 +65,19 @@ module.exports = {
         'app-header': 'var(--linear-app-header-padding-x)',
       },
 
+      // App-specific fixed layout tokens
+      width: {
+        'investor-label': '12.5rem',
+        'investor-name': '9.5rem',
+        'investor-stage': '6.25rem',
+        'investor-date': '7rem',
+        'investor-status': '4.5rem',
+      },
+
+      minWidth: {
+        'investor-table': '47.5rem',
+      },
+
       // Border radius - Linear-extracted values
       borderRadius: {
         xs: 'var(--radius-xs)', // 2px — tags, tiny elements
@@ -84,6 +97,7 @@ module.exports = {
         'linear-content': 'var(--linear-content-max)',
         'linear-hero': 'var(--linear-hero-section-max)',
         'linear-pricing': 'var(--linear-pricing-grid-max)',
+        'profile-notifications-wide': '96.25rem',
         // DS_FOUNDATION_V1 canonical max widths
         'public-content': 'var(--ds-public-content-max)',
         'prose-canonical': 'var(--ds-prose-max)',
@@ -126,6 +140,7 @@ module.exports = {
 
         // Base colors
         base: 'var(--color-bg-base)',
+        paper: 'var(--color-bg-paper)',
 
         // Button colors
         'btn-primary': 'var(--color-btn-primary-bg)',

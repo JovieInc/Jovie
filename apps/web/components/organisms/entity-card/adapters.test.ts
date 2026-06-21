@@ -98,6 +98,21 @@ describe('releaseToEntityCard', () => {
     expect(model.kind).toBe('video');
     expect(model.cta?.label).toBe('Watch');
   });
+
+  it('preserves the database release id for carousel analytics', () => {
+    const model = releaseToEntityCard(
+      {
+        id: 'release-42',
+        title: 'Catalog Cut',
+        slug: 'catalog-cut',
+        releaseType: 'single',
+      },
+      { handle: 'tim', now }
+    );
+
+    expect(model.releaseId).toBe('release-42');
+    expect(model.id).toBe('catalog-cut');
+  });
 });
 
 describe('showToEntityCard', () => {

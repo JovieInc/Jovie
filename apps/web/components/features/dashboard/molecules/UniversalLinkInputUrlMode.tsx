@@ -133,7 +133,7 @@ export function UniversalLinkInputUrlMode({
         className={cn(
           'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-[border-color,box-shadow]',
           isDropdownOpen
-            ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
+            ? 'rounded-t-xl border-2 border-b-0 border-accent'
             : 'rounded-xl border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
           disabled && 'opacity-50'
         )}
@@ -246,12 +246,12 @@ export function UniversalLinkInputUrlMode({
               <button
                 type='button'
                 onClick={onCancelVoiceRecording}
-                className='flex h-9 w-9 items-center justify-center rounded-[10px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+                className='flex h-9 w-9 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                 aria-label='Cancel voice recording'
               >
                 <X className='h-4 w-4' />
               </button>
-              <div className='flex min-w-0 flex-1 items-center justify-between gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
+              <div className='flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
                 <div className='flex min-w-0 items-center gap-3'>
                   <VoiceRecordingWaveform levels={waveformLevels} />
                   <span className='truncate text-sm text-secondary-token'>
@@ -265,7 +265,7 @@ export function UniversalLinkInputUrlMode({
               <button
                 type='button'
                 onClick={onSendVoiceRecording}
-                className='flex h-9 w-9 items-center justify-center rounded-[10px] bg-secondary-token text-primary-inverse transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+                className='flex h-9 w-9 items-center justify-center rounded-lg bg-secondary-token text-primary-inverse transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                 aria-label='Send voice recording'
               >
                 <Check className='h-4 w-4' />

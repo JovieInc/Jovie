@@ -83,22 +83,22 @@ export function WaitlistOutcomeView({
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
 
   return (
-    <section className='w-full rounded-2xl border border-white/[0.08] bg-[#0a0c0f] px-5 py-6 text-white shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
+    <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-white shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
       <div className='mb-5 flex items-center gap-3'>
         <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/74'>
           <Icon className='h-4 w-4' aria-hidden />
         </span>
-        <h1 className='text-[20px] font-semibold leading-6 text-white'>
+        <h1 className='text-xl font-semibold leading-6 text-white'>
           {copy.title}
         </h1>
       </div>
-      <p className='text-[14px] leading-6 text-white/62'>{copy.body}</p>
+      <p className='text-sm leading-6 text-white/62'>{copy.body}</p>
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
         {copy.actionHref && copy.actionLabel ? (
           <Link
             href={copy.actionHref}
-            className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed'
+            className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed'
           >
             {copy.actionLabel}
             <ArrowRight className='h-3.5 w-3.5' aria-hidden />
@@ -108,7 +108,7 @@ export function WaitlistOutcomeView({
           <button
             type='button'
             onClick={onRetry}
-            className='inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/[0.12] px-4 text-[13px] font-semibold text-white/86 transition-colors hover:bg-white/[0.04] focus-ring-themed'
+            className='inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/86 transition-colors hover:bg-white/[0.04] focus-ring-themed'
           >
             Try Again
           </button>
@@ -118,7 +118,7 @@ export function WaitlistOutcomeView({
             <button
               type='button'
               className={cn(
-                'inline-flex h-10 items-center justify-center rounded-full border border-white/[0.12] px-4 text-[13px] font-semibold text-white/74 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed',
+                'inline-flex h-10 items-center justify-center rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/74 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed',
                 canRetry && 'sm:ml-auto'
               )}
             >

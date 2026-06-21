@@ -68,7 +68,7 @@ export function DashboardAudienceDemo() {
             key={card.label}
             className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
           >
-            <p className='text-[11px] text-tertiary-token'>{card.label}</p>
+            <p className='text-2xs text-tertiary-token'>{card.label}</p>
             <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
               {card.value}
             </p>
@@ -132,7 +132,7 @@ export function DashboardAudienceDemo() {
                 </td>
                 {/* Source — pill badge */}
                 <td className='px-3 py-2'>
-                  <span className='inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium text-secondary-token bg-surface-2'>
+                  <span className='inline-flex rounded-full px-2 py-0.5 text-3xs font-medium text-secondary-token bg-surface-2'>
                     {m.source}
                   </span>
                 </td>

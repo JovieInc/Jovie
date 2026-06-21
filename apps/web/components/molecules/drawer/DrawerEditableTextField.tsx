@@ -222,7 +222,7 @@ export const DrawerEditableTextField = React.memo(
                     // removing horizontal inset. The hover chip sits over the
                     // text area so editable and static rows share the same
                     // visual grid.
-                    'h-auto px-0 py-0 rounded-[6px] hover:bg-surface-0'
+                    'h-auto px-0 py-0 rounded-md hover:bg-surface-0'
                   : 'h-8 rounded-lg px-2.5 hover:bg-surface-0',
                 density === 'inline' ? undefined : inputClassName,
                 'border border-transparent bg-transparent shadow-none',
@@ -270,7 +270,7 @@ export const DrawerEditableTextField = React.memo(
               ? actionSlotIds.map(slotId => (
                   <span
                     key={`action-slot-placeholder-${slotId}`}
-                    className='h-6 w-6 shrink-0 rounded-[6px] opacity-0'
+                    className='h-6 w-6 shrink-0 rounded-md opacity-0'
                   />
                 ))
               : null}
@@ -302,7 +302,7 @@ export const DrawerEditableTextField = React.memo(
                       target='_blank'
                       rel='noreferrer'
                       aria-label={action.ariaLabel}
-                      className='inline-flex h-6 w-6 items-center justify-center rounded-[6px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+                      className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
                       onClick={event => {
                         event.stopPropagation();
                         action.onClick?.();

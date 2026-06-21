@@ -150,7 +150,7 @@ export function AppleMusicSyncBanner({
         )}
       >
         <DspProviderIcon provider='apple_music' size='sm' />
-        <span className='max-w-[160px] truncate text-secondary-token'>
+        <span className='max-w-40 truncate text-secondary-token'>
           Match: {match.externalArtistName}
         </span>
         <DrawerButton

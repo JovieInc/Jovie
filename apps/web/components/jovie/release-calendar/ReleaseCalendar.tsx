@@ -138,7 +138,7 @@ export function ReleaseCalendar({
                 <span className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
                   {formatShort(week.friday)}
                 </span>
-                <span className='text-[10px] text-(--linear-text-tertiary)'>
+                <span className='text-3xs text-(--linear-text-tertiary)'>
                   Fri
                 </span>
               </div>
@@ -147,10 +147,10 @@ export function ReleaseCalendar({
                   <div
                     key={tour.id}
                     data-testid={`release-tour-date-${tour.id}`}
-                    className='rounded border border-dashed border-rose-400/60 bg-rose-500/5 px-2 py-1 text-[11px] text-rose-200'
+                    className='rounded border border-dashed border-rose-400/60 bg-rose-500/5 px-2 py-1 text-2xs text-rose-200'
                   >
                     <span className='font-semibold'>Tour</span> · {tour.city}
-                    <div className='text-[10px] text-rose-300/80'>
+                    <div className='text-3xs text-rose-300/80'>
                       {formatShort(tour.date)}
                     </div>
                   </div>
@@ -170,7 +170,7 @@ export function ReleaseCalendar({
                         layout: { duration: 0.5, ease: 'easeInOut' },
                       }}
                     >
-                      <span className='text-[10px] font-semibold uppercase tracking-wide opacity-80'>
+                      <span className='text-3xs font-semibold uppercase tracking-wide opacity-80'>
                         {MOMENT_LABEL[moment.momentType]}
                       </span>
                       <span className='font-medium leading-snug'>
@@ -182,7 +182,7 @@ export function ReleaseCalendar({
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0 }}
                           data-testid={`release-calendar-moved-badge-${moment.slug}`}
-                          className='absolute -right-1 -top-2 rounded-full bg-fuchsia-500 px-2 py-0.5 text-[9px] font-bold text-white shadow'
+                          className='absolute -right-1 -top-2 rounded-full bg-fuchsia-500 px-2 py-0.5 text-3xs font-bold text-white shadow'
                         >
                           Moved
                         </motion.span>

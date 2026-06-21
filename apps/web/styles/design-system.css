@@ -290,6 +290,8 @@
   --color-bg-button: #e3e5e8;
   --color-bg-tooltip: #101012;
   /* Linear dark background for light mode tooltips */
+  --color-bg-paper: #f7f8f8;
+  /* Paper surface for explicit light reading modes embedded in app shells */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: lch(9.894% 0 282);
@@ -510,6 +512,8 @@
   /* Same as surface-3 */
   --color-bg-tooltip: #2a2c32;
   /* Matches surface-3 in dark mode */
+  --color-bg-paper: #f7f8f8;
+  /* Paper surface remains light for explicit light reading modes */
 
   /* Text hierarchy - inverted for dark mode
      Extracted from Linear.app live (2026-02-15):

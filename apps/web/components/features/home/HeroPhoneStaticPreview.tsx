@@ -14,7 +14,7 @@ export function HeroPhoneStaticPreview() {
     <div className='flex flex-col items-center'>
       <PhoneFrame>
         <div className='flex flex-col items-center px-5 pt-14 pb-3'>
-          <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
+          <div className='rounded-full p-1 ring-1 ring-white/6 shadow-sm'>
             <div className='size-32 overflow-hidden rounded-full bg-surface-1'>
               <Image
                 src={ARTIST.avatarSrc}
@@ -49,14 +49,14 @@ export function HeroPhoneStaticPreview() {
                 }}
               />
               <div className='min-w-0 flex-1'>
-                <p className='text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary-token'>
+                <p className='text-3xs font-medium uppercase tracking-[0.12em] text-tertiary-token'>
                   Out now
                 </p>
-                <p className='truncate text-[13px] font-semibold text-primary-token'>
+                <p className='truncate text-app font-semibold text-primary-token'>
                   New Single
                 </p>
               </div>
-              <span className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'>
+              <span className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-xs font-semibold text-btn-primary-foreground shadow-sm'>
                 Listen
               </span>
             </div>
@@ -64,7 +64,7 @@ export function HeroPhoneStaticPreview() {
         </div>
 
         <div className='pb-3 pt-1 text-center'>
-          <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
+          <p className='text-3xs uppercase tracking-[0.15em] text-secondary-token'>
             Powered by Jovie
           </p>
         </div>

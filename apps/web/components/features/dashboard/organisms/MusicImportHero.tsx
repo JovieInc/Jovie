@@ -76,7 +76,7 @@ export const MusicImportHero = memo(function MusicImportHero({
   // Failed state
   if (isFailed && !hasReleases) {
     return (
-      <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
+      <div className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <AlertCircle className='h-4 w-4 shrink-0' />
           <p className='text-sm'>
@@ -133,7 +133,7 @@ export const MusicImportHero = memo(function MusicImportHero({
           variant='secondary'
           size='sm'
           asChild
-          className='rounded-[10px] text-2xs font-caption tracking-[-0.01em]'
+          className='rounded-lg text-2xs font-caption tracking-[-0.01em]'
         >
           <Link href={APP_ROUTES.RELEASES}>
             {isImporting ? 'View All Releases' : 'Explore Your Releases'}

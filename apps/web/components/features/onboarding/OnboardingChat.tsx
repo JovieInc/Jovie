@@ -403,7 +403,7 @@ const renderProposeNextStep: OnboardingToolRenderer = ({ part, key }) => {
   }
 
   return (
-    <div key={key} className='w-full max-w-[440px]'>
+    <div key={key} className='w-full max-w-110'>
       <ChatProposeNextStepCard payload={part.output} />
     </div>
   );
@@ -415,7 +415,7 @@ const renderProposeCheckout: OnboardingToolRenderer = ({ part, key }) => {
   }
 
   return (
-    <div key={key} className='w-full max-w-[440px]'>
+    <div key={key} className='w-full max-w-110'>
       <ChatProposeCheckoutCard payload={part.output} />
     </div>
   );
@@ -625,7 +625,7 @@ function ChatErrorStatusBanner({
   const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
 
   return (
-    <div className='px-3 py-2.5 text-[12.5px] leading-5'>
+    <div className='px-3 py-2.5 text-xs leading-5'>
       <div role='alert' aria-live='assertive' aria-atomic='true'>
         <p className='font-medium text-primary-token'>Message paused</p>
         <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
@@ -634,7 +634,7 @@ function ChatErrorStatusBanner({
             type='button'
             onClick={handleRetry}
             disabled={isBusy || isSubmitted}
-            className='mt-2 inline-flex h-7 items-center rounded-[8px] border border-subtle px-2.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+            className='mt-2 inline-flex h-7 items-center rounded-lg border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
           >
             Retry message
           </button>

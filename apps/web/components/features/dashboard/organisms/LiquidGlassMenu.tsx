@@ -115,7 +115,7 @@ function GlassHighlight({
     <div
       className={cn(
         'absolute inset-0 pointer-events-none',
-        rounded && 'rounded-[10px]'
+        rounded && 'rounded-lg'
       )}
       style={
         subtle
@@ -136,7 +136,7 @@ function GlassBlur({
 }) {
   return (
     <div
-      className={cn('absolute inset-0', rounded && 'rounded-[10px]')}
+      className={cn('absolute inset-0', rounded && 'rounded-lg')}
       style={intense ? GLASS_LAYER_STYLES.blur : GLASS_LAYER_STYLES.blurLight}
       aria-hidden='true'
     />
@@ -153,14 +153,12 @@ function Badge({
   if (count <= 0) return null;
 
   const sizeClasses =
-    size === 'sm'
-      ? 'min-w-[16px] h-[16px] px-1 text-[9px]'
-      : 'min-w-[24px] h-[20px] px-2 text-xs';
+    size === 'sm' ? 'min-w-4 h-4 px-1 text-3xs' : 'min-w-6 h-5 px-2 text-xs';
 
   return (
     <span
       className={cn(
-        'flex items-center justify-center font-caption rounded-full bg-accent text-white',
+        'flex items-center justify-center font-caption rounded-full bg-accent text-on-accent',
         sizeClasses
       )}
     >
@@ -274,7 +272,7 @@ export function LiquidGlassMenu({
 
           <nav
             className='relative z-10 py-2 max-h-[70svh] overflow-y-auto overscroll-contain'
-            aria-label='Expanded navigation menu'
+            aria-label='Expanded Navigation Menu'
           >
             {/* Menu items */}
             <div className='px-2'>
@@ -327,7 +325,7 @@ export function LiquidGlassMenu({
 
       {/* Bottom tab bar */}
       <nav
-        aria-label='Dashboard tabs'
+        aria-label='Dashboard Tabs'
         className='relative z-50'
         style={{
           background: 'var(--liquid-glass-bg-solid)',
@@ -350,7 +348,7 @@ export function LiquidGlassMenu({
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+                  'relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
                   active
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -387,7 +385,7 @@ export function LiquidGlassMenu({
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
             className={cn(
-              'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+              'relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
               isExpanded
                 ? 'text-primary-token'
                 : 'text-tertiary-token hover:text-secondary-token'
@@ -410,7 +408,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
+              className='relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='sr-only'>Search</span>

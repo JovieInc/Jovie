@@ -55,6 +55,6 @@ describe('HudMetricSourceTrust', () => {
 
     expect(
       container.querySelector('[data-testid="hud-source-trust-stripe"]')
-    ).toHaveClass('min-h-[36px]');
+    ).toHaveClass('min-h-9');
   });
 });

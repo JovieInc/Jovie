@@ -93,10 +93,10 @@ const SettingsSidebar = memo(
     useRouteLinks = false,
   }: SettingsSidebarProps) => (
     <aside className='h-fit'>
-      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
+      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
@@ -162,7 +162,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
+      className='flex w-full items-center justify-between rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
         <p className='text-sm font-caption text-primary-token'>
@@ -414,7 +414,7 @@ export function SettingsPolished({
 
     return (
       <div
-        className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+        className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
         data-testid='settings-polished'
       >
         <div className='lg:sticky lg:top-4 lg:self-start'>
@@ -444,7 +444,7 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+      className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
       data-testid='settings-polished'
     >
       <div className='lg:sticky lg:top-4 lg:self-start'>

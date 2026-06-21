@@ -4,7 +4,6 @@ import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
 import {
   type EntityCardModel,
-  EntityCarousel,
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
@@ -26,6 +25,7 @@ import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
+import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
 import type { PublicRelease } from './releases/types';
 
 interface ProfileHomeRailProps {
@@ -130,7 +130,7 @@ function HomeAlertsCard({
         aria-hidden='true'
         data-testid='profile-home-alerts-switch'
       >
-        <span className='block h-5 w-5 rounded-full bg-white shadow-sm' />
+        <span className='block h-6 w-6 rounded-full bg-white dark:bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
       </span>
     </>
   );
@@ -207,11 +207,17 @@ export function ProfileHomeRail({
     );
     const featuredReleaseSlug =
       hasFeaturedRelease && latestRelease ? latestRelease.slug : null;
+    const featuredReleaseId =
+      featuredReleaseSlug === null
+        ? null
+        : (releases.find(release => release.slug === featuredReleaseSlug)?.id ??
+          null);
 
     if (hasFeaturedRelease && latestRelease) {
       items.push(
         releaseToEntityCard(
           {
+            id: featuredReleaseId ?? undefined,
             title: latestRelease.title,
             slug: latestRelease.slug,
             artworkUrl: latestRelease.artworkUrl,
@@ -307,10 +313,11 @@ export function ProfileHomeRail({
       data-testid='profile-home-rail'
     >
       {alertsCard}
-      <EntityCarousel
+      <ReleaseCatalogCarousel
         items={carouselItems}
-        surface='pearl'
-        dataTestId='profile-home-carousel'
+        artistHandle={artist.handle}
+        artistId={artist.id}
+        analyticsEnabled={renderMode !== 'preview'}
       />
     </div>
   );
