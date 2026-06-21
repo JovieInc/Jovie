@@ -11,12 +11,6 @@ type SentryModule = {
 
 let sentryModulePromise: Promise<SentryModule> | null = null;
 
-const runtimeImport = new Function('specifier', 'return import(specifier)') as <
-  T,
->(
-  specifier: string
-) => Promise<T>;
-
 function isSecureVercelDeployment(): boolean {
   return (
     process.env.VERCEL_ENV === 'preview' ||
@@ -46,9 +40,7 @@ export function shouldSkipServerObservability(): boolean {
 
 function loadSentry(): Promise<SentryModule> {
   if (!sentryModulePromise) {
-    sentryModulePromise = runtimeImport<typeof import('@sentry/nextjs')>(
-      '@sentry/nextjs'
-    ).then(module => ({
+    sentryModulePromise = import('@sentry/nextjs').then(module => ({
       captureException: module.captureException,
       captureMessage: module.captureMessage,
       captureRequestError: (...args: unknown[]) =>
@@ -314,10 +306,6 @@ export async function register() {
 }
 
 export async function onRequestError(...args: unknown[]) {
-  if (process.env.NEXT_RUNTIME !== 'nodejs') {
-    return;
-  }
-
   if (shouldSkipServerObservability()) {
     return;
   }

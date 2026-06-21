@@ -5,6 +5,7 @@ describe('server instrumentation guard', () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    vi.clearAllMocks();
     vi.resetModules();
   });
 
@@ -40,5 +41,21 @@ describe('server instrumentation guard', () => {
     const { shouldSkipServerObservability } = await import('@/instrumentation');
 
     expect(shouldSkipServerObservability()).toBe(false);
+  });
+
+  it('captures request errors in edge runtime', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_RUNTIME = 'edge';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+
+    const Sentry = await import('@sentry/nextjs');
+    const { onRequestError } = await import('@/instrumentation');
+    const error = new Error('edge request failed');
+
+    await onRequestError(error);
+
+    expect(Sentry.captureRequestError).toHaveBeenCalledWith(error);
   });
 });
