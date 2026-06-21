@@ -146,6 +146,88 @@ export interface ShowEntityInput {
   readonly status?: EntityStatusTone | null;
 }
 
+export interface ChatReleaseContextInput {
+  readonly id: string;
+  readonly title: string;
+  readonly artworkUrl?: string | null;
+  readonly releaseType?: string | null;
+}
+
+/** Chat rail release context chip → compact EntityCard (no navigation). */
+export function chatReleaseContextToEntityCard(
+  release: ChatReleaseContextInput | null,
+  options: Readonly<{
+    fallbackTitle: string;
+    fallbackType?: string | null;
+    loading?: boolean;
+  }>
+): EntityCardModel {
+  const preset = KIND_PRESETS.music;
+  const title = release?.title?.trim() || options.fallbackTitle;
+  const typeLabel = formatReleaseType(
+    release?.releaseType ?? options.fallbackType
+  );
+  const meta = options.loading
+    ? 'Loading Release'
+    : typeLabel
+      ? `${typeLabel} Context`
+      : 'Release Context';
+
+  return {
+    id: release?.id ?? 'release-context',
+    kind: 'music',
+    imageUrl: release?.artworkUrl ?? null,
+    imageAlt: title,
+    accent: preset.accent,
+    eyebrow: preset.eyebrow,
+    title,
+    meta,
+  };
+}
+
+export interface ChatTourDateContextInput {
+  readonly id: string;
+  readonly title?: string | null;
+  readonly venueName?: string | null;
+  readonly city?: string | null;
+  readonly startDate?: Date | string | null;
+}
+
+/** Chat rail tour-date context chip → compact EntityCard (no navigation). */
+export function chatTourDateContextToEntityCard(
+  event: ChatTourDateContextInput | null,
+  options: Readonly<{
+    fallbackTitle: string;
+    loading?: boolean;
+  }>
+): EntityCardModel {
+  if (options.loading) {
+    return {
+      id: event?.id ?? 'tour-date-context',
+      kind: 'show',
+      imageUrl: null,
+      imageAlt: options.fallbackTitle,
+      title: options.fallbackTitle,
+      meta: 'Loading Tour Date',
+    };
+  }
+
+  const model = showToEntityCard({
+    id: event?.id ?? 'tour-date-context',
+    title: event?.title,
+    venueName: event?.venueName,
+    city: event?.city,
+    startDate: event?.startDate,
+  });
+
+  return {
+    ...model,
+    href: null,
+    cta: null,
+    meta: 'Tour Date Context',
+  };
+}
+
 /** Tour date / event → unified model with a date pill. */
 export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
   const preset = KIND_PRESETS.show;
