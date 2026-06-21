@@ -405,7 +405,7 @@ export function OnboardingTurnstile({
               data-testid='onboarding-turnstile-icon'
               data-turnstile-icon={state.status}
               className={cn(
-                'mt-px flex size-7 shrink-0 items-center justify-center rounded-[8px] border transition-colors duration-subtle',
+                'mt-px flex size-7 shrink-0 items-center justify-center rounded-lg border transition-colors duration-subtle',
                 TONE_BADGE_CLASSES[tone]
               )}
             >
@@ -419,7 +419,7 @@ export function OnboardingTurnstile({
                 >
                   {getHeading(state.status)}
                 </p>
-                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
+                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-xs'>
                   {panelCopy}
                 </p>
               </div>
@@ -441,7 +441,7 @@ export function OnboardingTurnstile({
         <div
           className={cn(
             shouldShowWidgetFrame
-              ? 'relative mt-2 overflow-hidden rounded-[8px] border border-subtle bg-surface-0 p-1.5'
+              ? 'relative mt-2 overflow-hidden rounded-lg border border-subtle bg-surface-0 p-1.5'
               : 'sr-only h-0 overflow-hidden',
             !shouldShowPanel && 'sr-only h-0 overflow-hidden'
           )}
@@ -459,7 +459,7 @@ export function OnboardingTurnstile({
           <div
             ref={containerRef}
             id={`cf-turnstile-${widgetDomId}`}
-            className='relative min-h-[64px]'
+            className='relative min-h-16'
           />
         </div>
       ) : null}

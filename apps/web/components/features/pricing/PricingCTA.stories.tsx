@@ -19,7 +19,7 @@ export const Default: Story = {
   },
   decorators: [
     Story => (
-      <div className='w-[600px]'>
+      <div className='w-150'>
         <Story />
       </div>
     ),
@@ -33,7 +33,7 @@ export const Loading: Story = {
   },
   decorators: [
     Story => (
-      <div className='w-[600px]'>
+      <div className='w-150'>
         <Story />
       </div>
     ),

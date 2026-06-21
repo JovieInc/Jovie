@@ -228,9 +228,9 @@ export function AlertGrowthLanding({
 
   return (
     <main className='min-h-dvh bg-(--linear-app-content-surface) text-primary-token'>
-      <div className='mx-auto flex min-h-dvh max-w-[430px] flex-col px-5 py-10 sm:py-12'>
+      <div className='mx-auto flex min-h-dvh max-w-108 flex-col px-5 py-10 sm:py-12'>
         <header className='mb-6'>
-          <p className='text-secondary-token text-[13px]'>{APP_LABEL}</p>
+          <p className='text-secondary-token text-app'>{APP_LABEL}</p>
           <h1 className='mt-2 text-2xl font-semibold leading-[1.08] tracking-normal'>
             Get Alerts First.
           </h1>
@@ -352,7 +352,7 @@ export function AlertGrowthLanding({
           {PROOF_POINTS.map(point => (
             <li
               key={point}
-              className='border-subtle text-secondary-token rounded-[var(--profile-action-radius)] border bg-surface-1 px-3.5 py-3 text-[13px]'
+              className='border-subtle text-secondary-token rounded-[var(--profile-action-radius)] border bg-surface-1 px-3.5 py-3 text-app'
             >
               {point}
             </li>
@@ -390,8 +390,8 @@ function ChannelToggle({
       onClick={onSelect}
       className={
         pressed
-          ? 'border-default bg-surface-1 text-primary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-[13px] font-semibold disabled:opacity-60'
-          : 'border-subtle bg-surface-0 text-secondary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-[13px] font-semibold disabled:opacity-60'
+          ? 'border-default bg-surface-1 text-primary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-app font-semibold disabled:opacity-60'
+          : 'border-subtle bg-surface-0 text-secondary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-app font-semibold disabled:opacity-60'
       }
     >
       {label}
@@ -413,8 +413,8 @@ function SubscribedState({
         className='bg-surface-1 border-subtle rounded-[var(--profile-card-radius)] border p-5'
         data-testid='alerts-landing-pending'
       >
-        <h2 className='text-primary-token text-[17px] font-semibold tracking-normal'>
-          Check Your {channel === 'sms' ? 'phone' : 'inbox'}.
+        <h2 className='text-primary-token text-base font-semibold tracking-normal'>
+          Check Your {channel === 'sms' ? 'Phone' : 'Inbox'}.
         </h2>
         <p className='text-secondary-token mt-2 text-sm'>
           {channel === 'sms'
@@ -431,7 +431,7 @@ function SubscribedState({
       className='bg-surface-1 border-subtle rounded-[var(--profile-card-radius)] border p-5'
       data-testid='alerts-landing-success'
     >
-      <h2 className='text-primary-token text-[17px] font-semibold tracking-normal'>
+      <h2 className='text-primary-token text-base font-semibold tracking-normal'>
         You&apos;re On The List.
       </h2>
       <p className='text-secondary-token mt-2 text-sm'>
