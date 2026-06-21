@@ -16,7 +16,7 @@ describe('DisplayMenuDropdown System B style guard', () => {
     expect(source).not.toMatch(/\bbg-accent\b/);
     expect(source).toContain("checked ? 'bg-btn-primary' : 'bg-surface-2'");
     expect(source).toContain(
-      "checked ? 'bg-btn-primary-foreground' : 'bg-white'"
+      "checked ? 'bg-btn-primary-foreground' : 'bg-white dark:bg-white'"
     );
   });
 

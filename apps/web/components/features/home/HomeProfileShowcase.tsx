@@ -407,7 +407,7 @@ export function HomeProfileShowcase({
       data-overlay-mode={overlayMode}
       data-crop-anchor={cropAnchor}
       className={cn(
-        'homepage-showcase pointer-events-none select-none',
+        'homepage-showcase pointer-events-none w-full min-w-0 max-w-full select-none overflow-x-clip',
         reducedMotion ? 'motion-reduce' : 'motion-default',
         className
       )}

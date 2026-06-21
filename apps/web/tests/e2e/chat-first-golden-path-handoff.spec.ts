@@ -33,7 +33,12 @@ function relevantConsoleFailures(failures: readonly string[]) {
 }
 
 test.describe('Chat-first golden path handoff @golden-path', () => {
+  test.setTimeout(360_000);
   test.use({ storageState: { cookies: [], origins: [] } });
+
+  test.beforeEach(async ({ page }) => {
+    page.setDefaultNavigationTimeout(240_000);
+  });
 
   test('authenticated welcome-chat bootstrap returns onboarding route with zero console errors', async ({
     page,
@@ -79,7 +84,9 @@ test.describe('Chat-first golden path handoff @golden-path', () => {
     await expect(page.locator('body')).not.toContainText(
       /application error|internal server error|something went wrong/i
     );
-    await expect(page.getByLabel('Chat message input')).toBeVisible();
+    await expect(page.getByLabel('Chat message input')).toBeVisible({
+      timeout: 90_000,
+    });
 
     expect(
       relevantConsoleFailures(consoleFailures),

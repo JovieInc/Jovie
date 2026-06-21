@@ -1188,7 +1188,11 @@ body {
     padding: 0.375rem 0.75rem;
     text-align: left;
     font-size: 0.875rem;
-    color: var(--color-text-tertiary-token);
+    color: color-mix(
+      in oklab,
+      var(--color-text-primary-token) 64%,
+      transparent
+    );
     overflow-wrap: anywhere;
     transition:
       background-color 150ms var(--ease-interactive),
@@ -1210,6 +1214,48 @@ body {
     background: var(--color-bg-surface-1);
     color: var(--color-text-primary-token);
     font-weight: var(--linear-font-weight-medium);
+  }
+  .public-legal-shell [data-testid="header-nav"] a[href="/signin"] {
+    color: rgb(64 64 64) !important;
+  }
+  .public-legal-shell [data-testid="header-nav"] a[href="/signin"]:hover {
+    color: rgb(10 10 10) !important;
+  }
+  .public-legal-shell .public-doc-nav-item {
+    color: rgb(75 85 99) !important;
+  }
+  .public-legal-shell .public-doc-nav-item:hover,
+  .public-legal-shell .public-doc-nav-item-active {
+    background: rgb(244 244 245);
+    color: rgb(17 24 39) !important;
+  }
+  html:not(.dark)
+    .public-legal-shell
+    [data-testid="header-nav"]
+    a[href="/signin"],
+  html:not(.dark) .public-legal-shell .public-doc-nav-item {
+    transition: none !important;
+  }
+  html.dark .public-legal-shell [data-testid="header-nav"] a[href="/signin"] {
+    color: rgb(236 236 236 / 0.6) !important;
+  }
+  html.dark
+    .public-legal-shell
+    [data-testid="header-nav"]
+    a[href="/signin"]:hover {
+    color: rgb(236 236 236 / 0.9) !important;
+  }
+  html.dark .public-legal-shell .public-doc-nav-item {
+    color: color-mix(
+      in oklab,
+      var(--color-text-primary-token) 64%,
+      transparent
+    ) !important;
+  }
+  html.dark .public-legal-shell .public-doc-nav-item:hover,
+  html.dark .public-legal-shell .public-doc-nav-item-active {
+    background: var(--color-bg-surface-1);
+    color: var(--color-text-primary-token) !important;
   }
 
   /* Hero stagger entrance — children fade up in sequence */

@@ -95,6 +95,9 @@ function mockProfileHasBlocksRows(rows: unknown[]) {
 describe('public profile audience block helper', () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalSmoke = process.env.PUBLIC_NOAUTH_SMOKE;
+  const originalE2E = process.env.NEXT_PUBLIC_E2E_MODE;
+  const originalTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS;
+  const originalVercelEnv = process.env.VERCEL_ENV;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -113,6 +116,21 @@ describe('public profile audience block helper', () => {
       delete process.env.PUBLIC_NOAUTH_SMOKE;
     } else {
       process.env.PUBLIC_NOAUTH_SMOKE = originalSmoke;
+    }
+    if (originalE2E === undefined) {
+      delete process.env.NEXT_PUBLIC_E2E_MODE;
+    } else {
+      process.env.NEXT_PUBLIC_E2E_MODE = originalE2E;
+    }
+    if (originalTestAuthBypass === undefined) {
+      delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+    } else {
+      process.env.E2E_USE_TEST_AUTH_BYPASS = originalTestAuthBypass;
+    }
+    if (originalVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = originalVercelEnv;
     }
     await invalidateProfileAudienceBlockCache('tim');
     await invalidateProfileAudienceBlockCache('timwhite');
@@ -161,6 +179,32 @@ describe('public profile audience block helper', () => {
 
     expect(mocks.createFingerprintEdge).not.toHaveBeenCalled();
     expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('keeps audience-block telemetry enabled in Vercel preview even when E2E bypass is set', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.PUBLIC_NOAUTH_SMOKE;
+    process.env.VERCEL_ENV = 'preview';
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    const redis = {
+      get: vi.fn().mockResolvedValue(true),
+      set: vi.fn().mockResolvedValue(undefined),
+      del: vi.fn().mockResolvedValue(undefined),
+    };
+    mocks.getRedis.mockReturnValue(redis);
+
+    await expect(
+      checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+    ).resolves.toBe(false);
+
+    await vi.waitFor(() => {
+      expect(mocks.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'audience-block',
+          message: 'Cache hit',
+        })
+      );
+    });
   });
 
   it('returns true when the joined block query finds a row', async () => {

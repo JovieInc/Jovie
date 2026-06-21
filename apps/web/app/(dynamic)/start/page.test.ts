@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const { mockResolveUserState } = vi.hoisted(() => ({
+  mockResolveUserState: vi.fn().mockResolvedValue({
+    state: 'UNAUTHENTICATED',
+    redirectTo: '/signin',
+  }),
+}));
+
 // OnboardingShell is a UI component we don't need to render in this test.
 vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
   OnboardingShell: () => null,
+}));
+
+vi.mock('@/lib/auth/gate', () => ({
+  resolveUserState: mockResolveUserState,
 }));
 
 import StartPage from './page';

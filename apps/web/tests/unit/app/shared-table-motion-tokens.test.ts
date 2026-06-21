@@ -81,7 +81,7 @@ describe('shared table motion tokens', () => {
 
     expect(toolbarSource).toContain('data-state');
     expect(toolbarSource).toContain('TABLE_TOOLBAR_OVERLAY_CLASS');
-    expect(pageToolbarSource).toContain('min-h-[44px]');
+    expect(pageToolbarSource).toContain('min-h-11');
     expect(toolbarSource).not.toMatch(
       /selectedCount\s*===\s*0\)\s*return null/
     );

@@ -13,7 +13,7 @@ export function AccountDashboard() {
     <div className='space-y-6'>
       {/* Header */}
       <div>
-        <h1 className='text-[24px] font-[620] tracking-[-0.03em] text-primary-token'>
+        <h1 className='text-2xl font-[620] tracking-[-0.03em] text-primary-token'>
           Account Settings
         </h1>
         <p className='mt-2 text-app text-secondary-token'>

@@ -38,6 +38,12 @@ describe('chat entity right panel System B style guard', () => {
     expect(source).toContain('system-b-chat-entity-context-icon');
     expect(source).toContain('system-b-chat-profile-preview-card');
     expect(source).toContain('system-b-chat-entity-provider-dot');
+    expect(source).toContain("from '@/components/organisms/entity-card'");
+    expect(source).toContain('EntityCard');
+    expect(source).toContain('ChatRailEntityCard');
+    expect(source).toContain('chatReleaseContextToEntityCard');
+    expect(source).toContain('chatTourDateContextToEntityCard');
+    expect(source).toContain('entityCardArtStyle');
   });
 
   it('defines right-panel chrome from System B aliases', () => {
@@ -51,6 +57,9 @@ describe('chat entity right panel System B style guard', () => {
     expect(panelCss).toContain('var(--system-b-app-frame-seam)');
     expect(panelCss).toContain('var(--system-b-bg-surface-1)');
     expect(panelCss).toContain('var(--color-success)');
+    expect(panelCss).toContain('var(--color-border-subtle)');
+    expect(panelCss).toContain('var(--color-bg-surface-1)');
+    expect(panelCss).toContain('var(--shadow-card)');
     expect(panelCss).not.toMatch(/--linear-/);
     expect(panelCss).not.toMatch(/\b(?:bg|text|border)-cyan-/);
     expect(panelCss).not.toMatch(/#[0-9a-f]{3,8}\b/i);

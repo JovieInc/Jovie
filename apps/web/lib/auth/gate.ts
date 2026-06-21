@@ -20,7 +20,7 @@ import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
 } from '@/lib/waitlist/state-machine';
-import { getCachedAuth, getCachedCurrentUser } from './cached';
+import { getCachedCurrentUser, getOptionalAuth } from './cached';
 import {
   CanonicalUserState,
   getRedirectForState,
@@ -529,12 +529,19 @@ async function resolveClerkIdentity(knownClerkUserId?: string): Promise<{
     return { clerkUserId: knownClerkUserId, email: null };
   }
 
-  const [authResult, clerkUser] = await Promise.all([
-    getCachedAuth(),
-    getCachedCurrentUser(),
-  ]);
+  const authResult = await getOptionalAuth();
   const clerkUserId = authResult.userId;
-  const email = selectVerifiedClerkEmail(clerkUser?.emailAddresses);
+  if (!clerkUserId) {
+    return { clerkUserId: null, email: null };
+  }
+
+  let email: string | null = null;
+  try {
+    const clerkUser = await getCachedCurrentUser();
+    email = selectVerifiedClerkEmail(clerkUser?.emailAddresses);
+  } catch {
+    // Email is optional for redirect-only auth entry routes.
+  }
 
   return { clerkUserId, email };
 }

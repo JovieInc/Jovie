@@ -99,7 +99,7 @@ export function SmartLinkPoweredByFooter() {
     <footer className='shrink-0 pb-5 pt-3 text-center'>
       <Link
         href='/'
-        className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
+        className='smart-link-powered-by inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
       >
         <span>Powered by</span>
         <span className='font-semibold'>Jovie</span>
