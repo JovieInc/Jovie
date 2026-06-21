@@ -683,6 +683,40 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
   }
 });
 
+test.describe('Public Profile Home Carousel @smoke @critical', () => {
+  test('mock-home includes horizontally scrollable back-catalog cards', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installProfileMocks(page);
+
+    await smokeNavigate(
+      page,
+      '/demo/showcase/tim-white-profile?state=mock-home',
+      { timeout: 120_000 }
+    );
+    await waitForHydration(page);
+    await waitForAnyVisible(page, ['[data-testid="profile-home-carousel"] a']);
+
+    const carousel = page.getByTestId('profile-home-carousel');
+    await expect(carousel).toBeVisible();
+    const metrics = await carousel.evaluate(el => ({
+      linkCount: el.querySelectorAll('a').length,
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(metrics.linkCount).toBeGreaterThanOrEqual(2);
+    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+
+    await carousel.evaluate(el => {
+      el.scrollLeft = el.scrollWidth;
+    });
+    await expect(page.getByRole('link', { name: /Holding On/i })).toBeVisible({
+      timeout: 5_000,
+    });
+  });
+});
+
 test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () => {
   test.setTimeout(120_000);
 
