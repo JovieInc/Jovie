@@ -632,7 +632,7 @@ function SingleStatePhonePreview({
           presentation='full-phone'
           hideJovieBranding
           hideMoreMenu
-          phoneClassName='max-w-[24rem]'
+          phoneClassName='[--homepage-phone-frame-width:24rem]'
           referenceImageSrc={referenceImageSrc}
         />
       </div>
@@ -654,7 +654,7 @@ function MoreMenuPhonePreview() {
         subtitle='Use the state query param to pin one Tim White profile state for screenshots or focused review.'
       >
         <div className='flex items-center justify-center'>
-          <HomePhoneFrame className='homepage-showcase-phone-frame max-w-[24rem]'>
+          <HomePhoneFrame className='homepage-showcase-phone-frame [--homepage-phone-frame-width:24rem]'>
             <div
               className='homepage-showcase-surface relative h-full w-full bg-black/96'
               style={profileAccentStyle}
