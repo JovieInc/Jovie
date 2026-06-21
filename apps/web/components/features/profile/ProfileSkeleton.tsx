@@ -9,9 +9,9 @@ export function ProfileSkeleton() {
 
   return (
     <output
-      className='relative min-h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-white/90'
+      className='relative min-h-dvh overflow-hidden bg-[color:var(--profile-stage-bg)] text-white/90'
       aria-busy='true'
-      aria-label='Loading Jovie profile'
+      aria-label='Loading Jovie Profile'
     >
       {/* Ambient background blur placeholder */}
       <div className='absolute inset-0' aria-hidden='true'>
@@ -19,7 +19,7 @@ export function ProfileSkeleton() {
       </div>
 
       {/* Viewport shell */}
-      <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-170 items-stretch justify-center md:items-center md:px-6 md:py-8'>
+      <div className='relative mx-auto flex min-h-dvh w-full max-w-170 items-stretch justify-center md:items-center md:px-6 md:py-8'>
         <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-[var(--profile-shell-card-radius)] md:border md:border-white/[0.06]'>
           {/* Hero placeholder — matches ArtistHero height */}
           <div
