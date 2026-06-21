@@ -44,19 +44,19 @@ export default function SwitchesPage() {
       {/* Default states */}
       <Section title='Default States'>
         <Stack title='unchecked'>
-          <Switch aria-label='Toggle unchecked' />
+          <Switch aria-label='Toggle Unchecked' />
         </Stack>
         <Stack title='checked'>
-          <Switch defaultChecked aria-label='Toggle checked' />
+          <Switch defaultChecked aria-label='Toggle Checked' />
         </Stack>
         <Stack title='disabled unchecked'>
-          <Switch disabled aria-label='Toggle disabled unchecked' />
+          <Switch disabled aria-label='Toggle Disabled Unchecked' />
         </Stack>
         <Stack title='disabled checked'>
           <Switch
             disabled
             defaultChecked
-            aria-label='Toggle disabled checked'
+            aria-label='Toggle Disabled Checked'
           />
         </Stack>
       </Section>
@@ -65,10 +65,10 @@ export default function SwitchesPage() {
       <Section title='With Labels'>
         <Stack title='Enable notifications'>
           <div className='flex items-center gap-3'>
-            <Switch id='notifications' aria-label='Enable notifications' />
+            <Switch id='notifications' aria-label='Enable Notifications' />
             <label
               htmlFor='notifications'
-              className='text-[13px] font-[510] text-primary-token'
+              className='text-[13px] font-medium text-primary-token'
             >
               Enable notifications
             </label>
@@ -79,11 +79,11 @@ export default function SwitchesPage() {
             <Switch
               id='auto-assign'
               defaultChecked
-              aria-label='Auto-assign issues'
+              aria-label='Auto Assign Issues'
             />
             <label
               htmlFor='auto-assign'
-              className='text-[13px] font-[510] text-primary-token'
+              className='text-[13px] font-medium text-primary-token'
             >
               Auto-assign issues
             </label>
@@ -94,11 +94,11 @@ export default function SwitchesPage() {
             <Switch
               id='disabled-setting'
               disabled
-              aria-label='Disabled setting'
+              aria-label='Disabled Setting'
             />
             <label
               htmlFor='disabled-setting'
-              className='text-[13px] font-[510] text-primary-token opacity-50'
+              className='text-[13px] font-medium text-primary-token opacity-50'
             >
               Disabled setting
             </label>
@@ -111,9 +111,9 @@ export default function SwitchesPage() {
         <Stack title='settings row'>
           <div className='flex w-64 flex-col divide-y rounded-lg border border-subtle'>
             {[
-              { label: 'Slack notifications', checked: true },
-              { label: 'Email digest', checked: false },
-              { label: 'Desktop alerts', checked: true },
+              { label: 'Slack Notifications', checked: true },
+              { label: 'Email Digest', checked: false },
+              { label: 'Desktop Alerts', checked: true },
             ].map(item => (
               <div
                 key={item.label}
@@ -121,7 +121,7 @@ export default function SwitchesPage() {
               >
                 <label
                   htmlFor={`setting-${item.label}`}
-                  className='text-[13px] font-[450] text-primary-token'
+                  className='text-[13px] font-book text-primary-token'
                 >
                   {item.label}
                 </label>

@@ -90,7 +90,7 @@ export default function DialogsPage() {
               </DialogHeader>
               <DialogFooter>
                 <Button variant='ghost'>Cancel</Button>
-                <Button variant='primary'>Got it</Button>
+                <Button variant='primary'>Got It</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -159,7 +159,7 @@ export default function DialogsPage() {
                 <div className='flex flex-col gap-1.5'>
                   <label
                     htmlFor='issue-title'
-                    className='text-[13px] font-[450] text-primary-token'
+                    className='text-[13px] font-book text-primary-token'
                   >
                     Title
                   </label>
@@ -173,7 +173,7 @@ export default function DialogsPage() {
                 <div className='flex flex-col gap-1.5'>
                   <label
                     htmlFor='issue-description'
-                    className='text-[13px] font-[450] text-primary-token'
+                    className='text-[13px] font-book text-primary-token'
                   >
                     Description
                   </label>
@@ -208,7 +208,7 @@ export default function DialogsPage() {
                 <input
                   type='text'
                   defaultValue='My Project'
-                  aria-label='Project name'
+                  aria-label='Project Name'
                   className='h-8 w-full rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 text-[13px] text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
                 />
               </div>
