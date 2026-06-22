@@ -64,6 +64,25 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "profile", app: app)
   }
 
+  func testProfileLoadErrorRetryRestoresDashboard() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-profile-error",
+      expectedElementDescription: "\"Retry\""
+    ) {
+      $0.buttons["Retry"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Couldn't load your profile."].exists)
+    attachScreenshot(named: "profile-error", app: app)
+
+    app.buttons["Retry"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Retry did not restore the dashboard.\n\(app.debugDescription)"
+    )
+  }
+
   func testNeedsOnboardingLaunchShowsContinueOnWeb() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",

@@ -9,6 +9,7 @@ enum LaunchMode: Equatable {
   case uiTestingAuthCallback
   case uiTestingSignedOut
   case uiTestingReady
+  case uiTestingProfileError
   case uiTestingChat
   case uiTestingRecentConversations
   case uiTestingSettings
@@ -24,6 +25,7 @@ enum LaunchMode: Equatable {
          .uiTestingAuthCallback,
          .uiTestingSignedOut,
          .uiTestingReady,
+         .uiTestingProfileError,
          .uiTestingChat,
          .uiTestingRecentConversations,
          .uiTestingSettings,
@@ -50,6 +52,10 @@ enum LaunchMode: Equatable {
     self == .uiTestingVenueMode
   }
 
+  var recoversProfileErrorOnRetry: Bool {
+    self == .uiTestingProfileError
+  }
+
   var clearsStoredClerkSession: Bool {
     self == .uiTestingLiveAuth
   }
@@ -66,6 +72,7 @@ enum LaunchMode: Equatable {
          .uiTestingAuthCallback,
          .uiTestingSignedOut,
          .uiTestingReady,
+         .uiTestingProfileError,
          .uiTestingChat,
          .uiTestingRecentConversations,
          .uiTestingSettings,
@@ -101,6 +108,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-ready") {
       return .uiTestingReady
+    }
+
+    if arguments.contains("-ui-testing-profile-error") {
+      return .uiTestingProfileError
     }
 
     if arguments.contains("-ui-testing-chat") {

@@ -83,6 +83,10 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
+    case .uiTestingProfileError:
+      route = .ready
+      dashboardState = .error("Couldn't load your profile.")
+      isOffline = false
     case .uiTestingNeedsOnboarding:
       route = .needsOnboarding
       dashboardState = .idle
@@ -208,6 +212,13 @@ final class AppState {
   }
 
   func retry() async {
+    if launchMode.recoversProfileErrorOnRetry {
+      route = .ready
+      dashboardState = .loaded(.previewReady)
+      isOffline = false
+      return
+    }
+
     await handleSignedInUserChange(activeUserID)
   }
 
