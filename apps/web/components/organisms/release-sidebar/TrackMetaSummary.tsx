@@ -38,7 +38,7 @@ const VARIANT_STYLES: Record<
   drawer: {
     container: 'space-y-1.5',
     number: 'text-3xs',
-    title: 'text-sm tracking-[-0.01em]',
+    title: 'text-sm tracking-tight',
     meta: 'text-3xs',
   },
 };
@@ -102,7 +102,7 @@ export function TrackMetaSummary({
               <span className='tabular-nums'>{formatDuration(durationMs)}</span>
             )}
             {isrc && showIsrc ? (
-              <span className='font-mono text-3xs tracking-[0.02em] text-tertiary-token'>
+              <span className='font-mono text-3xs tracking-wider text-tertiary-token'>
                 {isrc}
               </span>
             ) : null}
