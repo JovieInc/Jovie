@@ -55,7 +55,7 @@ export function SignInTimeoutEscape() {
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <a
         href='/api/auth/reset'
-        className='underline font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+        className='underline font-medium text-(--color-text-secondary) hover:text-(--color-text-primary)'
       >
         Reset session and retry &rarr;
       </a>
