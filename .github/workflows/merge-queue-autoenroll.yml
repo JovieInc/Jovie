@@ -28,6 +28,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.12'
+      - name: Run merge-queue drain regression tests
+        run: pip install pytest --quiet && pytest scripts/tests/test_gh_retry.py -v
       - name: Enroll clean PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
