@@ -124,7 +124,7 @@ export function FeatureShowcase() {
           <div className='reveal-on-scroll mb-12 max-w-150 lg:mb-16'>
             <p className='homepage-section-eyebrow'>The platform</p>
             <h2 className='marketing-h2-linear mt-5 text-primary-token'>
-              Everything Your Music Needs.
+              Everything your music needs.
             </h2>
             <p className='marketing-lead-linear mt-4 text-secondary-token'>
               From smart links to fan intelligence, every release gets the full

@@ -141,7 +141,7 @@ export function BentoFeatureGrid() {
             id='bento-heading'
             className='marketing-h2-linear text-primary-token'
           >
-            A Command Center For Your Career.
+            A command center for your career.
           </h2>
 
           <div className='mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2'>

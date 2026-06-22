@@ -35,7 +35,7 @@ export function ReplacesSection() {
               Why switch
             </span>
             <h2 className='marketing-h2-linear text-primary-token'>
-              One Tool Instead Of Three.
+              One tool instead of three.
             </h2>
             <p className='max-w-lg marketing-lead-linear text-secondary-token'>
               Most artists juggle a link page, a smart link service, and an
