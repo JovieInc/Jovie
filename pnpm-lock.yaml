@@ -92,8 +92,8 @@ importers:
         specifier: 1.60.0
         version: 1.60.0
       commitizen:
-        specifier: ^4.3.1
-        version: 4.3.1(@types/node@25.5.0)(typescript@6.0.3)
+        specifier: ^4.3.2
+        version: 4.3.2(@types/node@25.5.0)(typescript@6.0.3)
       csv-parse:
         specifier: ^6.2.1
         version: 6.2.1
@@ -8504,8 +8504,8 @@ packages:
     resolution: {integrity: sha512-v+p6ongsrp0yTGbJXjgxPow2+DL93DASP4kXCDKb8/bwRtt9OEF3whggkkDkGNzgcWy2XaF4a8nZglC7uElscg==}
     engines: {node: '>=8'}
 
-  cachedir@2.3.0:
-    resolution: {integrity: sha512-A+Fezp4zxnit6FanDmv9EqXNAi3vt9DWp51/71UEhXukb7QUuvtv9344h91dyAxuTLoSYJFU299qzR3tzwPAhw==}
+  cachedir@2.4.0:
+    resolution: {integrity: sha512-9EtFOZR8g22CL7BWjJ9BUx1+A/djkofnyW3aOXZORNW2kxoUpx2h+uN2cOqwPmFhnpVmxg+KW2OjOSgChTEvsQ==}
     engines: {node: '>=6'}
 
   call-bind-apply-helpers@1.0.2:
@@ -8598,6 +8598,9 @@ packages:
 
   chardet@2.1.1:
     resolution: {integrity: sha512-PsezH1rqdV9VvyNhxxOW32/d75r01NY7TQCmOqomRo15ZSOKbpTFVsfjghxo6JloQUCGnH4k1LGu0R4yCLlWQQ==}
+
+  chardet@2.2.0:
+    resolution: {integrity: sha512-rddelWYNPRrXq6PtNEN2S3f6t9ILzvqaN5pVgi4kqt9jHQaXIial9PznB5iSPVlQSLNaaH22ItWz3EJtQ10+OA==}
 
   charenc@0.0.2:
     resolution: {integrity: sha512-yrLQ/yVUFXkzg7EDQsPieE/53+0RlaWTs+wBrvW36cyilJ2SaDWfl4Yj7MtLTXleV9uEKefbAGUPv2/iWSooRA==}
@@ -8877,9 +8880,9 @@ packages:
     resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
     engines: {node: '>= 12'}
 
-  commitizen@4.3.1:
-    resolution: {integrity: sha512-gwAPAVTy/j5YcOOebcCRIijn+mSjWJC+IYKivTu6aG8Ei/scoXgfsMRnuAk6b0GRste2J4NGxVdMN3ZpfNaVaw==}
-    engines: {node: '>= 12'}
+  commitizen@4.3.2:
+    resolution: {integrity: sha512-1Zs37z9JPvAcuTSSricZZwBhOPVNNxJouuY4yDEt+eD70EoxT2TU9kViG8CuB/PmVg2G4XsAGQiK4YCst97aDQ==}
+    engines: {node: '>= 18'}
     hasBin: true
 
   commondir@1.0.1:
@@ -11217,8 +11220,8 @@ packages:
     resolution: {integrity: sha512-cntlB5ghuB0iuO65Ovoi8ogLHiWGs/5yNrtUcKjFhSSiVeAIVpD7koaSU9RM8mpXw5YDi9RdYXGQMaOURB7ycQ==}
     engines: {node: '>=6.0.0'}
 
-  inquirer@8.2.5:
-    resolution: {integrity: sha512-QAgPDQMEgrDssk1XiwwHoOGYF9BAbUcc1+j+FhEvaOt8/cKRqyLn0U5qA6F74fGhTMGxf92pOvPBeh29jQJDTQ==}
+  inquirer@8.2.7:
+    resolution: {integrity: sha512-UjOaSel/iddGZJ5xP/Eixh6dY1XghiBw4XK13rCCIJcJfyhhoul/7KhLLUGtebEj6GDYM6Vnx/mVsjx2L/mFIA==}
     engines: {node: '>=12.0.0'}
 
   inquirer@9.3.8:
@@ -12632,9 +12635,6 @@ packages:
   minimatch@9.0.9:
     resolution: {integrity: sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg==}
     engines: {node: '>=16 || 14 >=14.17'}
-
-  minimist@1.2.7:
-    resolution: {integrity: sha512-bzfL1YUZsP41gmu/qjrEk0Q6i2ix/cVeAhbCbqH9u3zYutS1cLg00qhrD0M2MVdCcx4Sc0UpP2eBWo9rotpq6g==}
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
@@ -18824,10 +18824,17 @@ snapshots:
 
   '@inquirer/external-editor@1.0.3(@types/node@22.19.15)':
     dependencies:
-      chardet: 2.1.1
+      chardet: 2.2.0
       iconv-lite: 0.7.2
     optionalDependencies:
       '@types/node': 22.19.15
+
+  '@inquirer/external-editor@1.0.3(@types/node@25.5.0)':
+    dependencies:
+      chardet: 2.2.0
+      iconv-lite: 0.7.2
+    optionalDependencies:
+      '@types/node': 25.5.0
 
   '@inquirer/external-editor@3.0.0(@types/node@22.19.15)':
     dependencies:
@@ -25693,7 +25700,7 @@ snapshots:
       normalize-url: 6.1.0
       responselike: 2.0.1
 
-  cachedir@2.3.0: {}
+  cachedir@2.4.0: {}
 
   call-bind-apply-helpers@1.0.2:
     dependencies:
@@ -25784,6 +25791,8 @@ snapshots:
   chardet@0.7.0: {}
 
   chardet@2.1.1: {}
+
+  chardet@2.2.0: {}
 
   charenc@0.0.2: {}
 
@@ -26044,9 +26053,9 @@ snapshots:
 
   commander@8.3.0: {}
 
-  commitizen@4.3.1(@types/node@25.5.0)(typescript@6.0.3):
+  commitizen@4.3.2(@types/node@25.5.0)(typescript@6.0.3):
     dependencies:
-      cachedir: 2.3.0
+      cachedir: 2.4.0
       cz-conventional-changelog: 3.3.0(@types/node@25.5.0)(typescript@6.0.3)
       dedent: 0.7.0
       detect-indent: 6.1.0
@@ -26054,10 +26063,10 @@ snapshots:
       find-root: 1.1.0
       fs-extra: 9.1.0
       glob: 7.2.3
-      inquirer: 8.2.5
+      inquirer: 8.2.7(@types/node@25.5.0)
       is-utf8: 0.2.1
       lodash: 4.18.1
-      minimist: 1.2.7
+      minimist: 1.2.8
       strip-bom: 4.0.0
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
@@ -26290,7 +26299,7 @@ snapshots:
   cz-conventional-changelog@3.3.0(@types/node@25.5.0)(typescript@6.0.3):
     dependencies:
       chalk: 2.4.2
-      commitizen: 4.3.1(@types/node@25.5.0)(typescript@6.0.3)
+      commitizen: 4.3.2(@types/node@25.5.0)(typescript@6.0.3)
       conventional-commit-types: 3.0.0
       lodash.map: 4.6.0
       longest: 2.0.1
@@ -28912,13 +28921,13 @@ snapshots:
       strip-ansi: 5.2.0
       through: 2.3.8
 
-  inquirer@8.2.5:
+  inquirer@8.2.7(@types/node@25.5.0):
     dependencies:
+      '@inquirer/external-editor': 1.0.3(@types/node@25.5.0)
       ansi-escapes: 4.3.2
       chalk: 4.1.2
       cli-cursor: 3.1.0
       cli-width: 3.0.0
-      external-editor: 3.1.0
       figures: 3.2.0
       lodash: 4.18.1
       mute-stream: 0.0.8
@@ -28928,7 +28937,9 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
       through: 2.3.8
-      wrap-ansi: 7.0.0
+      wrap-ansi: 6.2.0
+    transitivePeerDependencies:
+      - '@types/node'
 
   inquirer@9.3.8(@types/node@22.19.15):
     dependencies:
@@ -30812,8 +30823,6 @@ snapshots:
   minimatch@9.0.9:
     dependencies:
       brace-expansion: 5.0.6
-
-  minimist@1.2.7: {}
 
   minimist@1.2.8: {}
 
