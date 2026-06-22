@@ -50,7 +50,14 @@ fix the same thing on N branches.
 ```bash
 # failing-check histogram across open PRs
 gh pr list --state open --limit 100 --json number,statusCheckRollup --jq '
-  [.[] | .statusCheckRollup[]? | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED")) | (.name//.context)]
+  [.[] | .statusCheckRollup[]?
+    | select(.completedAt != null and .completedAt != "0001-01-01T00:00:00Z")
+    | {name: (.name // .context), conclusion: (.conclusion // ""), completedAt: .completedAt}
+    | select(.name != null and .name != "")
+  ]
+  | group_by(.name) | map(sort_by(.completedAt) | last)
+  | map(select(.conclusion | test("FAILURE|TIMED_OUT|ACTION_REQUIRED")))
+  | map(.name)
   | group_by(.) | map({check: .[0], prs: length}) | sort_by(-.prs) | .[]'
 ```
 
