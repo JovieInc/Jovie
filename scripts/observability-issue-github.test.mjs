@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-
-import { buildObservabilityIssuePayload } from './observability-issue-sync.mjs';
 import { syncObservabilityIssue } from './observability-issue-github.mjs';
+import { buildObservabilityIssuePayload } from './observability-issue-sync.mjs';
 
 const sampleReport = {
   platform: 'ios',
@@ -29,7 +28,10 @@ test('syncObservabilityIssue creates one issue for a new fingerprint', async () 
         return new Response(JSON.stringify({ items: [] }), { status: 200 });
       }
 
-      if (url.endsWith('/repos/JovieInc/Jovie/issues') && init?.method === 'POST') {
+      if (
+        url.endsWith('/repos/JovieInc/Jovie/issues') &&
+        init?.method === 'POST'
+      ) {
         return new Response(JSON.stringify({ number: 10936 }), { status: 201 });
       }
 
@@ -44,7 +46,8 @@ test('syncObservabilityIssue creates one issue for a new fingerprint', async () 
 });
 
 test('syncObservabilityIssue bumps occurrence counter for duplicate fingerprint', async () => {
-  const fingerprintLabel = buildObservabilityIssuePayload(sampleReport).fingerprintLabel;
+  const fingerprintLabel =
+    buildObservabilityIssuePayload(sampleReport).fingerprintLabel;
   const existingBody = '<!-- observability-occurrences:12 -->\nExisting body';
   const calls = [];
 
@@ -72,7 +75,10 @@ test('syncObservabilityIssue bumps occurrence counter for duplicate fingerprint'
         );
       }
 
-      if (url.endsWith('/repos/JovieInc/Jovie/issues/10936') && init?.method === 'PATCH') {
+      if (
+        url.endsWith('/repos/JovieInc/Jovie/issues/10936') &&
+        init?.method === 'PATCH'
+      ) {
         const body = JSON.parse(init.body);
         assert.match(body.body, /observability-occurrences:500/);
         return new Response(JSON.stringify({ number: 10936 }), { status: 200 });

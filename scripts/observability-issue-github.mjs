@@ -78,7 +78,11 @@ async function findIssueByFingerprint({
   });
 
   const items = response.items ?? [];
-  return items.find((item) => item.labels?.some((label) => label.name === fingerprintLabel)) ?? null;
+  return (
+    items.find(item =>
+      item.labels?.some(label => label.name === fingerprintLabel)
+    ) ?? null
+  );
 }
 
 async function createIssue({
@@ -116,13 +120,7 @@ async function updateIssueBody({
   });
 }
 
-async function githubRequest({
-  token,
-  path,
-  method = 'GET',
-  body,
-  fetchImpl,
-}) {
+async function githubRequest({ token, path, method = 'GET', body, fetchImpl }) {
   const response = await fetchImpl(`${GITHUB_API}${path}`, {
     method,
     headers: {
@@ -136,7 +134,9 @@ async function githubRequest({
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`GitHub API ${method} ${path} failed: ${response.status} ${errorText}`);
+    throw new Error(
+      `GitHub API ${method} ${path} failed: ${response.status} ${errorText}`
+    );
   }
 
   return response.json();
@@ -170,7 +170,7 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  main().catch(error => {
     console.error(error);
     process.exit(1);
   });

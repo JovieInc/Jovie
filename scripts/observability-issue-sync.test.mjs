@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-
+import { parseOccurrenceCount } from './lib/observability-fingerprint.mjs';
 import {
   buildObservabilityIssuePayload,
   mergeObservabilityIssue,
   shouldDispatchObservabilityReport,
 } from './observability-issue-sync.mjs';
-import { parseOccurrenceCount } from './lib/observability-fingerprint.mjs';
 
 const sampleReport = {
   platform: 'ios',

@@ -7,7 +7,9 @@ import {
   shouldAcceptClientSample,
   verifySignature,
 } from './index.ts' with { type: 'javascript' };
-import { parseObservabilityReport } from './report.ts' with { type: 'javascript' };
+import { parseObservabilityReport } from './report.ts' with {
+  type: 'javascript',
+};
 
 class MemoryKV {
   constructor() {
@@ -101,7 +103,7 @@ test('verifySignature validates ingest HMAC without exposing GitHub token', asyn
     new TextEncoder().encode(`${secret}:${body}`)
   );
   const signature = `sha256=${[...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .map(byte => byte.toString(16).padStart(2, '0'))
     .join('')}`;
 
   assert.equal(await verifySignature(body, signature, secret), true);

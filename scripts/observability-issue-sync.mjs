@@ -10,7 +10,10 @@ const DEFAULT_LABELS = ['observability', 'automated', 'codex'];
 export function buildObservabilityIssuePayload(report, occurrenceDelta = 1) {
   const fingerprint = fingerprintObservabilityReport(report);
   const fingerprintLabel = observabilityFingerprintLabel(fingerprint);
-  const title = `[${report.platform}] ${report.kind}: ${report.title}`.slice(0, 240);
+  const title = `[${report.platform}] ${report.kind}: ${report.title}`.slice(
+    0,
+    240
+  );
 
   const body = withOccurrenceCount(
     [
@@ -46,7 +49,8 @@ export function buildObservabilityIssuePayload(report, occurrenceDelta = 1) {
 }
 
 export function mergeObservabilityIssue(existingIssue, occurrenceDelta) {
-  const nextCount = parseOccurrenceCount(existingIssue.body ?? '') + occurrenceDelta;
+  const nextCount =
+    parseOccurrenceCount(existingIssue.body ?? '') + occurrenceDelta;
 
   return {
     number: existingIssue.number,

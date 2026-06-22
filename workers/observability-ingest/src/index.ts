@@ -1,5 +1,8 @@
 import { fingerprintObservabilityReport } from './fingerprint.ts';
-import { parseObservabilityReport, type ObservabilityReport } from './report.ts';
+import {
+  type ObservabilityReport,
+  parseObservabilityReport,
+} from './report.ts';
 
 export interface Env {
   readonly GH_DISPATCH_TOKEN: string;
@@ -31,7 +34,10 @@ export default {
     const bodyText = await request.text();
     const signature = request.headers.get('x-observability-signature');
 
-    if (!signature || !(await verifySignature(bodyText, signature, env.INGEST_HMAC_SECRET))) {
+    if (
+      !signature ||
+      !(await verifySignature(bodyText, signature, env.INGEST_HMAC_SECRET))
+    ) {
       return json({ error: 'Invalid signature' }, 401);
     }
 
@@ -52,8 +58,14 @@ export default {
     }
 
     const fingerprint = await fingerprintObservabilityReport(report);
-    const cooldownMs = Number.parseInt(env.DISPATCH_COOLDOWN_MS ?? '', 10) || DEFAULT_COOLDOWN_MS;
-    const dispatchDecision = await recordOccurrence(env.OBSERVABILITY_KV, fingerprint, cooldownMs);
+    const cooldownMs =
+      Number.parseInt(env.DISPATCH_COOLDOWN_MS ?? '', 10) ||
+      DEFAULT_COOLDOWN_MS;
+    const dispatchDecision = await recordOccurrence(
+      env.OBSERVABILITY_KV,
+      fingerprint,
+      cooldownMs
+    );
 
     if (!dispatchDecision.shouldDispatch) {
       return json({
@@ -64,7 +76,12 @@ export default {
       });
     }
 
-    const dispatched = await dispatchObservabilityReport(env, report, fingerprint, dispatchDecision.occurrenceDelta);
+    const dispatched = await dispatchObservabilityReport(
+      env,
+      report,
+      fingerprint,
+      dispatchDecision.occurrenceDelta
+    );
     if (!dispatched) {
       return json({ error: 'Dispatch failed' }, 502);
     }
@@ -94,7 +111,7 @@ export async function verifySignature(
     new TextEncoder().encode(`${secret}:${body}`)
   );
   const expected = [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .map(byte => byte.toString(16).padStart(2, '0'))
     .join('');
 
   return timingSafeEqual(provided, expected);

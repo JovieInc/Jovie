@@ -14,8 +14,13 @@ export function fingerprintObservabilityReport(report) {
   const release = normalizePart(report.release);
   const stacktrace = normalizeStacktrace(report.stacktrace);
 
-  const canonical = [platform, kind, title, message, release, stacktrace].join('\n');
-  const digest = createHash('sha256').update(canonical).digest('hex').slice(0, 16);
+  const canonical = [platform, kind, title, message, release, stacktrace].join(
+    '\n'
+  );
+  const digest = createHash('sha256')
+    .update(canonical)
+    .digest('hex')
+    .slice(0, 16);
 
   return `${FINGERPRINT_PREFIX}-${digest}`;
 }
@@ -52,7 +57,7 @@ function normalizeStacktrace(stacktrace) {
 
   return stacktrace
     .split('\n')
-    .map((line) => line.trim())
+    .map(line => line.trim())
     .filter(Boolean)
     .slice(0, 8)
     .join('\n');

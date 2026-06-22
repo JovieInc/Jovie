@@ -15,7 +15,8 @@ test('fingerprint is stable for identical crash reports', () => {
     title: 'EXC_BREAKPOINT',
     message: 'Fatal error in AppState',
     release: 'ie.jov.Jovie@1.0+42',
-    stacktrace: 'AppState.swift:120 in completeLaunch\nRootView.swift:44 in body',
+    stacktrace:
+      'AppState.swift:120 in completeLaunch\nRootView.swift:44 in body',
   };
 
   const first = fingerprintObservabilityReport(report);

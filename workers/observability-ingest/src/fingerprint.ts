@@ -20,7 +20,7 @@ export async function fingerprintObservabilityReport(
   );
 
   const hex = [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .map(byte => byte.toString(16).padStart(2, '0'))
     .join('');
 
   return `${FINGERPRINT_PREFIX}-${hex.slice(0, 16)}`;
@@ -37,7 +37,7 @@ function normalizeStacktrace(stacktrace: string | undefined): string {
 
   return stacktrace
     .split('\n')
-    .map((line) => line.trim())
+    .map(line => line.trim())
     .filter(Boolean)
     .slice(0, 8)
     .join('\n');
