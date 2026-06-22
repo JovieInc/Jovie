@@ -77,7 +77,7 @@ test.describe('Billing Routes', () => {
     }
   });
 
-  test('/account redirects or loads without errors', async ({
+  test('legacy /account redirects or loads without errors', async ({
     page,
   }, testInfo) => {
     const { getContext, cleanup } = setupPageMonitoring(page);
@@ -99,11 +99,12 @@ test.describe('Billing Routes', () => {
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/account')
+          url.pathname.includes('/account') ||
+          url.pathname.includes('/app/settings/account')
       );
 
       const { isOnAuthPage } = await assertValidPageState(page, {
-        expectedPaths: ['/account'],
+        expectedPaths: ['/account', '/app/settings/account'],
         allowAuthRedirect: true,
       });
 

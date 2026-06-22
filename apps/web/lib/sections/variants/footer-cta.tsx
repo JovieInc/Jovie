@@ -50,7 +50,7 @@ export const FOOTER_CTA_VARIANTS: readonly SectionVariant[] = [
     category: 'footer-cta',
     label: 'CTASection (organism)',
     description:
-      'Generic CTA used only by PayPromo, which is itself dormant behind NEXT_PUBLIC_FEATURE_TIPS. Delete both together when the Tips feature is officially shelved.',
+      'Generic CTA used by PayPromo. Delete both together when the Tips feature is officially shelved.',
     componentPath: 'components/organisms/CTASection.tsx',
     usedIn: ['PayPromo (dormant, feature-flagged)'],
     status: 'consolidate',

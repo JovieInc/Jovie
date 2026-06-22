@@ -163,17 +163,19 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
-    def test_drain_script_uses_bulk_status_check_rollup_and_taste_approval(self) -> None:
+    def test_drain_script_avoids_bulk_status_rollup_and_uses_per_pr_checks(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
         assert 'gh_retry pr list' in content
         assert "--limit 200" in content
-        assert "statusCheckRollup" in content
-        assert 'tim-approved' in content
-        assert 'approved:taste' in content
-        assert "gh_retry pr checks" not in content
+        assert "statusCheckRollup" not in content
+        assert "gh pr checks" in content
+        assert "--required" in content
+        assert "--remove-label" in content
+        assert "tim-approved" not in content
+        assert "approved:taste" not in content
 
-    def test_red_status_check_rollup_blocks_enqueue(self, tmp_path: Path) -> None:
+    def test_red_required_checks_block_enqueue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -182,9 +184,13 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":123,"t":"Red CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-red","L":[],"fail":["Typecheck"]}]
-                JSON
+                [{"n":123,"t":"Red CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-red","L":[],"fail":[]}]
+JSON
                   exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '["Typecheck"]'
+                  exit 1
                 fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
@@ -204,7 +210,7 @@ class TestDrainPrQueueWiring:
         assert "#123" in result.stdout
         assert "Typecheck" in result.stdout
 
-    def test_taste_approved_needs_human_pr_can_enqueue(self, tmp_path: Path) -> None:
+    def test_hard_gated_prs_dequeue_and_do_not_enqueue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -213,8 +219,13 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]}]
-                JSON
+                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]},{"n":101,"t":"Clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  [[ "$3" == "101" ]]
+                  echo '[]'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -230,7 +241,87 @@ class TestDrainPrQueueWiring:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "[dry-run] would +merge-queue on #456" in result.stdout
+        assert "=== DEQUEUE (hard gates" in result.stdout
+        assert "[dry-run] would -merge-queue on #789" in result.stdout
+        assert "[dry-run] would +merge-queue on #101" in result.stdout
+        assert "[dry-run] would +merge-queue on #456" not in result.stdout
         assert "[dry-run] would +merge-queue on #789" not in result.stdout
         assert "=== SURFACE (human decision; not touched) ===" in result.stdout
+        assert "#456" in result.stdout
         assert "#789" in result.stdout
+
+    def test_nonzero_checks_with_valid_json_do_not_abort_drain(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":321,"t":"Clean nonzero checks","draft":false,"m":"MERGEABLE","head":"codex/jov-321-clean","L":[],"fail":[]}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[]'
+                  exit 8
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #321" in result.stdout
+
+    def test_required_check_lookup_retries_transient_failures(self, tmp_path: Path) -> None:
+        counter = tmp_path / "checks"
+        counter.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":654,"t":"Retry checks PR","draft":false,"m":"MERGEABLE","head":"codex/jov-654-retry","L":[],"fail":[]}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  count_file="${GH_RETRY_TEST_COUNTER:?}"
+                  count=$(<"$count_file")
+                  count=$((count + 1))
+                  echo "$count" >"$count_file"
+                  if [[ "$count" -lt 2 ]]; then
+                    echo "HTTP 504: We couldn't respond to your request in time." >&2
+                    exit 1
+                  fi
+                  echo '[]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" GH_RETRY_BASE_DELAY=0 GH_RETRY_TEST_COUNTER="{counter}" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #654" in result.stdout
+        assert "gh-retry" in result.stderr
+        assert counter.read_text(encoding="utf-8").strip() == "2"

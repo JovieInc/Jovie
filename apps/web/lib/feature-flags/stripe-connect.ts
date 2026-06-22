@@ -4,7 +4,7 @@ import { getAppFlagValue } from '@/lib/flags/server';
 /**
  * Check if Stripe Connect onboarding is enabled for a given user.
  *
- * Uses Statsig feature gate when configured, otherwise defaults to OFF.
+ * Uses the runtime app flag surface, which defaults on for internal v1.
  * The gate key is `stripe-connect-enabled`.
  *
  * @param userId - Clerk user ID (or null for anonymous)
