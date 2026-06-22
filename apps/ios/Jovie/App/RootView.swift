@@ -304,7 +304,11 @@ private struct MobileChatPlaceholderView: View {
               .foregroundStyle(JovieColor.textPrimary)
               .multilineTextAlignment(.center)
 
-            Text(isOffline ? "Offline. Drafts stay on this device." : "Ask Jovie about your profile, releases, and next moves.")
+            Text(
+              isOffline
+                ? "Offline. Drafts stay on this device and cached history remains available."
+                : "Ask Jovie about your profile, releases, and next moves."
+            )
               .font(JovieFont.body(size: 15))
               .foregroundStyle(JovieColor.textTertiary)
               .multilineTextAlignment(.center)
@@ -316,7 +320,7 @@ private struct MobileChatPlaceholderView: View {
 
         Spacer(minLength: 48)
 
-        ChatComposerPreview(draft: $draft)
+        ChatComposerPreview(draft: $draft, isOffline: isOffline)
           .padding(.horizontal, JovieSpacing.large)
           .padding(.bottom, JovieSpacing.medium)
       }
@@ -327,12 +331,13 @@ private struct MobileChatPlaceholderView: View {
 
 private struct ChatComposerPreview: View {
   @Binding var draft: String
+  let isOffline: Bool
 
   var body: some View {
     let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
 
     HStack(spacing: JovieSpacing.medium) {
-      TextField("Ask Jovie", text: $draft)
+      TextField(isOffline ? "Ask Jovie (offline)" : "Ask Jovie", text: $draft)
         .textInputAutocapitalization(.sentences)
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
