@@ -31,19 +31,25 @@ label() {  # label <num> <label>
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
+# statusCheckRollup on 100 PRs in one GraphQL call routinely 504s; fetch per-PR instead.
+pr_failed_checks() {  # pr_failed_checks <num> → JSON array of failing check names
+  gh_retry pr view "$1" -R "$REPO" --json statusCheckRollup --jq '
+    [ .statusCheckRollup[]?
+      | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
+      | (.name // .context)
+      | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]
+  ' 2>/dev/null || echo '[]'
+}
+
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
-  --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
+  --json number,title,isDraft,mergeable,labels,headRefName --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
     draft: .isDraft,
     m: .mergeable,
     head: .headRefName,
-    L: [.labels[].name],
-    fail: [ .statusCheckRollup[]?
-            | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
-            | (.name // .context)
-            | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]
+    L: [.labels[].name]
   } ]')"
 
 # --- ENROLL: non-draft, mergeable, green, not opted-out, not already queued ---
@@ -51,11 +57,12 @@ echo "=== ENROLL (clean → +merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
-  | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="merge-queue" or .=="fast") | not)' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    fail_count=$(pr_failed_checks "$n" | jq 'length')
+    [[ "$fail_count" -eq 0 ]] || continue
     echo "  #$n  $t"
     label "$n" merge-queue
   done
@@ -74,10 +81,17 @@ echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
 
 # --- BLOCKED: mergeable but red checks → hand to fix agent ---
 echo "=== BLOCKED (red checks → fix agent) ==="
-echo "$SNAP" | jq -r '.[]
-  | select(.draft|not) | select(.m=="MERGEABLE") | select(.fail|length>0)
-  | select([.L[]]|index("needs-human")|not)
-  | "  #\(.n)  \(.t)  ✗ \(.fail|join(", "))"'
+echo "$SNAP" | jq -c '.[]
+  | select(.draft|not) | select(.m=="MERGEABLE")
+  | select([.L[]]|index("needs-human")|not)' \
+| while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    fail=$(pr_failed_checks "$n")
+    fail_count=$(jq 'length' <<<"$fail")
+    [[ "$fail_count" -gt 0 ]] || continue
+    fail_str=$(jq -r 'join(", ")' <<<"$fail")
+    echo "  #$n  $t  ✗ $fail_str"
+  done
 
 # --- SURFACE: human-gated / superseded → report only, never auto-close ---
 echo "=== SURFACE (human decision; not touched) ==="

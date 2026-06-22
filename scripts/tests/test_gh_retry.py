@@ -116,3 +116,10 @@ class TestDrainPrQueueWiring:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
         assert 'gh_retry pr list' in content
+
+    def test_drain_script_avoids_bulk_status_check_rollup(self) -> None:
+        """Bulk statusCheckRollup on 100 PRs causes GitHub GraphQL 504 timeouts."""
+        content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
+        assert "statusCheckRollup" not in content.split("gh_retry pr list", 1)[1].split(")", 1)[0]
+        assert "pr_failed_checks" in content
+        assert "gh_retry pr view" in content
