@@ -14,6 +14,16 @@ describe('legacy dashboard redirect stubs', () => {
     redirectMock.mockClear();
   });
 
+  it('sends legacy dashboard root traffic to the canonical app dashboard', async () => {
+    const { default: LegacyDashboardPage } = await import(
+      '../../../app/app/(shell)/dashboard/page'
+    );
+
+    await LegacyDashboardPage();
+
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+  });
+
   it('sends legacy links traffic to the canonical profile panel', async () => {
     const { default: LinksPage } = await import(
       '../../../app/app/(shell)/dashboard/links/page'
