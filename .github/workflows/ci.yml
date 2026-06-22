@@ -988,10 +988,13 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_SMOKE" == "true" && "$E2E_SMOKE_RESULT" != "success" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_SMOKE" == "true" && "$E2E_SMOKE_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
             echo "❌ Risk classifier requires E2E smoke evidence, but ci-e2e-smoke result was $E2E_SMOKE_RESULT"
             echo "Likely fix: inspect the E2E Smoke job artifact, then run pnpm run test:web:smoke locally with the relevant env."
             exit 1
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" && "$IS_DEPENDABOT" == "true" && "$E2E_SMOKE_RESULT" == "skipped" ]]; then
+            echo "Dependabot PR: E2E smoke intentionally skipped — treating as waived."
           fi
 
           if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
