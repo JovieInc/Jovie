@@ -32,4 +32,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
         run: bash scripts/drain-pr-queue.sh

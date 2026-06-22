@@ -13,7 +13,8 @@ gh_retry() {
   trap "rm -f '$err_file'" RETURN
 
   while [[ "$attempt" -le "$attempts" ]]; do
-    if gh "$@" 2>"$err_file"; then
+    # gh colorizes JSON when stdout is a pipe; that breaks downstream jq.
+    if NO_COLOR=1 GH_FORCE_TTY=false gh "$@" 2>"$err_file"; then
       rm -f "$err_file"
       return 0
     fi
