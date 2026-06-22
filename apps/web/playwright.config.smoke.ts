@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { DESKTOP_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
+import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 /**
  * Smoke Test Playwright Configuration (Desktop)
@@ -32,8 +33,7 @@ if (!managedWebServerUrl.port) {
 const managedWebServerPort = managedWebServerUrl.port;
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const isCI = !!process.env.CI;
-const webServerWarmupProfile =
-  process.env.E2E_WEB_SERVER_WARMUP || (isCI ? 'full' : 'public');
+const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 const usesManagedLocalWebServer = !process.env.BASE_URL;
 const shouldThrottleManagedTestAuthRun =
   isCI && usesManagedLocalWebServer && useTestAuthBypass;

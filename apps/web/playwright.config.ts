@@ -3,6 +3,7 @@ import {
   devices,
   type ReporterDescription,
 } from '@playwright/test';
+import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 // Build extra HTTP headers for Vercel Deployment Protection bypass
 // Both headers are required for browser automation to work correctly
@@ -22,8 +23,7 @@ const includeMobileMatrix =
   process.env.E2E_MOBILE_MATRIX === '1' || isFullMatrix;
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
-const webServerWarmupProfile =
-  process.env.E2E_WEB_SERVER_WARMUP || (isCI ? 'full' : 'public');
+const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
 const managedWebServerUrl = new URL(baseURL);
 if (!managedWebServerUrl.port) {

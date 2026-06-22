@@ -64,6 +64,8 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
     ).toBeLessThan(500);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    // Retry exhaustion is a hard smoke failure; runner/server issues should be
+    // fixed at the source instead of hidden as skipped homepage coverage.
     throw new Error(`Homepage navigation failed: ${msg}`);
   }
 

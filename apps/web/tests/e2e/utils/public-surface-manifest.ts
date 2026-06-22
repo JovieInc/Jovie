@@ -644,7 +644,7 @@ const PROFILE_SURFACES = [
     minMainTextLength: 60,
     expectedRedirects: [
       /\/[^/]+$/,
-      /^\/\?utm_source=jovie&utm_medium=profile&utm_campaign=shop_click&utm_content=[^&]+$/,
+      /^\/\?utm_source=jovie&utm_medium=profile&utm_campaign=shop_click&utm_content=[a-z0-9][a-z0-9._-]*$/i,
     ],
     allowMissingMain: true,
     lighthouse: false,

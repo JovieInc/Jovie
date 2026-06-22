@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
 import { TEST_AUTH_BYPASS_MODE, TEST_MODE_HEADER } from '../lib/auth/test-mode';
+import { resolveWebServerWarmupProfile } from './e2e/utils/warmup-profile';
 import {
   ensureDevTestAuthPersona,
   resolveDevTestAuthPersona,
@@ -19,8 +20,7 @@ config({ path: path.join(repoRoot, '.env.test') }); // Fallback defaults
 
 const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
-const webServerWarmupProfile =
-  process.env.E2E_WEB_SERVER_WARMUP === 'public' ? 'public' : 'full';
+const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 
 const SENSITIVE_PATTERNS = [
   'dummy',

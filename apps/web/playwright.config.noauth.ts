@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 /**
  * Playwright configuration for tests that don't require authentication
@@ -6,8 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const stableLocalServerCommand =
   process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:fast';
-const webServerWarmupProfile =
-  process.env.E2E_WEB_SERVER_WARMUP || (process.env.CI ? 'full' : 'public');
+const webServerWarmupProfile = resolveWebServerWarmupProfile();
 // Pin Doppler scope explicitly so worktrees never inherit whichever scope
 // happens to be active in the parent shell. See .claude/rules/environment.md.
 const webServerCommand = process.env.DATABASE_URL
