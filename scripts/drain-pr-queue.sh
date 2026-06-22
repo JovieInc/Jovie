@@ -54,7 +54,7 @@ echo "$SNAP" | jq -c '.[]
   | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
   | select([.L[]] | any(.=="hold" or .=="gated" or .=="merge-queue" or .=="fast") | not)
-  | select( (([.L[]]|index("needs-human"))|not) or ([.L[]]|any(.=="tim-approved" or .=="approved:taste"))))' \
+  | select( (([.L[]]|index("needs-human"))|not) or ([.L[]]|any(.=="tim-approved" or .=="approved:taste")))' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     echo "  #$n  $t"
