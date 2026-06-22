@@ -18,6 +18,7 @@
  * ```
  */
 
+import { useUserSafe } from '@/hooks/useClerkSafe';
 import { ENTITLEMENT_REGISTRY, type PlanId } from '@/lib/entitlements/registry';
 import { useBillingStatusQuery } from './useBillingStatusQuery';
 
@@ -189,6 +190,12 @@ export function deriveNudgeState(input: NudgeStateInput): NudgeState {
   return 'never_trialed';
 }
 
+function isElectronRuntime(): boolean {
+  return (
+    globalThis.document?.documentElement.dataset.desktopRuntime === 'electron'
+  );
+}
+
 /**
  * Hook that derives plan-gated feature entitlements from billing status.
  *
@@ -199,8 +206,18 @@ export function deriveNudgeState(input: NudgeStateInput): NudgeState {
  * values but isError is exposed so callers can show a retry/error state
  * instead of silently hiding pro features.
  */
-export function usePlanGate(): PlanGateEntitlements {
-  const { data, isLoading, isError } = useBillingStatusQuery();
+export function usePlanGate(options?: {
+  enabled?: boolean;
+}): PlanGateEntitlements {
+  const { enabled = true } = options ?? {};
+  const { isLoaded: isUserLoaded, user } = useUserSafe();
+  const hasLoadedUser = isUserLoaded && Boolean(user?.id);
+  const shouldWaitForElectronUser = isElectronRuntime();
+  const shouldFetchBillingStatus =
+    enabled && (!shouldWaitForElectronUser || hasLoadedUser);
+  const { data, isLoading, isError } = useBillingStatusQuery({
+    enabled: shouldFetchBillingStatus,
+  });
   const isPro = data?.isPro ?? false;
   const plan = data?.plan ?? null;
 
@@ -235,7 +252,8 @@ export function usePlanGate(): PlanGateEntitlements {
   });
 
   return {
-    isLoading,
+    isLoading:
+      enabled && shouldWaitForElectronUser && !isUserLoaded ? true : isLoading,
     isError,
     isPro,
     plan,

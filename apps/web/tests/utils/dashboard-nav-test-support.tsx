@@ -16,6 +16,11 @@ export const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
 export const mockUseChatConversationsQuery = vi.fn(() => ({
   data: undefined,
 }));
+export const mockUseUserSafe = vi.fn(() => ({
+  isLoaded: true,
+  isSignedIn: true,
+  user: { id: 'user_123' },
+}));
 export const mockUsePlanGate = vi.fn(() => ({
   canAccessTasksWorkspace: true,
   isLoading: false,
@@ -53,6 +58,10 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useUserSafe: (...args: unknown[]) => mockUseUserSafe(...args),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
@@ -168,6 +177,12 @@ export function resetDashboardNavTestMocks() {
   mockUseTaskStatsQuery.mockReturnValue({ data: undefined });
   mockUseChatConversationsQuery.mockReset();
   mockUseChatConversationsQuery.mockReturnValue({ data: undefined });
+  mockUseUserSafe.mockReset();
+  mockUseUserSafe.mockReturnValue({
+    isLoaded: true,
+    isSignedIn: true,
+    user: { id: 'user_123' },
+  });
   mockUsePlanGate.mockReset();
   mockUsePlanGate.mockReturnValue({
     canAccessTasksWorkspace: true,

@@ -931,10 +931,19 @@ function formatElectronRendererIssue(issue) {
 
 function isLocalDevelopmentRendererWarning(issue) {
   if (!shouldUseLocalDevAccessSetup()) return false;
+  const message = String(issue.message ?? '');
+  if (
+    message.includes('Electron sandboxed_renderer.bundle.js script failed') ||
+    message.includes(
+      "Cannot destructure property 'preloadScripts' of 'binding.startupData'"
+    )
+  ) {
+    return true;
+  }
+
   const level = issue.level ?? issue.type ?? '';
   if (level !== 'warning') return false;
 
-  const message = String(issue.message ?? '');
   return (
     message.includes(
       'Electron Security Warning (Insecure Content-Security-Policy)'
@@ -1723,7 +1732,7 @@ async function signOutElectron() {
 
   try {
     await page.evaluate(`(async () => {
-      const redirectUrl = '/signin?redirect_url=${encodeURIComponent(ELECTRON_APP_ROUTE)}';
+      const redirectUrl = '${ELECTRON_APP_ROUTE}';
       await window.Clerk?.signOut?.({ redirectUrl })?.catch?.(() => undefined);
       return true;
     })()`);
@@ -1735,16 +1744,13 @@ async function signOutElectron() {
 }
 
 async function signOutOrClearElectronAuth() {
-  try {
-    return await signOutElectron();
-  } catch (error) {
-    if (!CLEAR_ELECTRON_AUTH_ON_START) {
-      throw error;
-    }
-
+  if (CLEAR_ELECTRON_AUTH_ON_START) {
+    await signOutElectron().catch(() => undefined);
     await clearElectronAuthStorage();
     return await waitForElectronSignedOut();
   }
+
+  return await signOutElectron();
 }
 
 async function clearElectronAuthStorage() {
@@ -1808,9 +1814,10 @@ async function main() {
 
   try {
     if (!SKIP_START_SIGN_OUT) {
-      await signOutElectron().catch(() => undefined);
       if (CLEAR_ELECTRON_AUTH_ON_START) {
         await clearElectronAuthStorage();
+      } else {
+        await signOutElectron().catch(() => undefined);
       }
     }
 
@@ -1835,9 +1842,6 @@ async function main() {
     await fresh.context.close();
 
     const signedOut = await signOutOrClearElectronAuth();
-    if (CLEAR_ELECTRON_AUTH_ON_START) {
-      await clearElectronAuthStorage();
-    }
 
     const existing = await newAuthContext(browser, fapiHost, testingToken);
     const existingSignin = await signInWithFreshTicket(
