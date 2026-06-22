@@ -31,20 +31,42 @@ label() {  # label <num> <label>
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
-SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
-  --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
-  [ .[] | {
-    n: .number,
-    t: (.title[0:48]),
-    draft: .isDraft,
-    m: .mergeable,
-    head: .headRefName,
-    L: [.labels[].name],
-    fail: [ .statusCheckRollup[]?
-            | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
-            | (.name // .context)
-            | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]
-  } ]')"
+# statusCheckRollup on 50+ open PRs in one GraphQL call reliably 504s; fetch
+# metadata in bulk, then rollup per mergeable non-draft PR only.
+failed_checks_for_pr() {  # failed_checks_for_pr <num> → JSON array of check names
+  gh_retry pr view "$1" -R "$REPO" --json statusCheckRollup --jq '
+    [ .statusCheckRollup[]?
+      | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
+      | (.name // .context)
+      | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]' \
+    2>/dev/null || echo '[]'
+}
+
+build_pr_snapshot() {
+  local meta pr n fail_json entry snap='[]'
+  meta="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
+    --json number,title,isDraft,mergeable,labels,headRefName,author)"
+  while IFS= read -r pr; do
+    n="$(jq -r '.number' <<<"$pr")"
+    fail_json='[]'
+    if [[ "$(jq -r '.isDraft' <<<"$pr")" == "false" && "$(jq -r '.mergeable' <<<"$pr")" == "MERGEABLE" ]]; then
+      fail_json="$(failed_checks_for_pr "$n")"
+    fi
+    entry="$(jq -n --argjson pr "$pr" --argjson fail "$fail_json" '{
+      n: $pr.number,
+      t: ($pr.title[0:48]),
+      draft: $pr.isDraft,
+      m: $pr.mergeable,
+      head: $pr.headRefName,
+      L: [$pr.labels[].name],
+      fail: $fail
+    }')"
+    snap="$(jq --argjson e "$entry" '. + [$e]' <<<"$snap")"
+  done < <(jq -c '.[]' <<<"$meta")
+  echo "$snap"
+}
+
+SNAP="$(build_pr_snapshot)"
 
 # --- ENROLL: non-draft, mergeable, green, not opted-out, not already queued ---
 echo "=== ENROLL (clean → +merge-queue) ==="
