@@ -6,7 +6,6 @@ import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 import {
   APP_FLAG_DEFAULTS,
-  APP_FLAG_TO_STATSIG_GATE,
   LEGACY_STATSIG_GATE_KEYS,
   type ProfileAlertOptInVariant,
   type StatsigBackedAppFlagName,
@@ -188,13 +187,9 @@ export async function checkGatesForUser(
 
 export async function getStatsigGateValue(
   flagName: StatsigBackedAppFlagName,
-  userId: string | null
+  _userId: string | null
 ): Promise<boolean> {
-  return checkGateForUser(
-    userId,
-    APP_FLAG_TO_STATSIG_GATE[flagName],
-    APP_FLAG_DEFAULTS[flagName]
-  );
+  return APP_FLAG_DEFAULTS[flagName];
 }
 
 export async function getExperiment(
