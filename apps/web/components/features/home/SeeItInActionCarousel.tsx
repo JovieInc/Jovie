@@ -156,7 +156,7 @@ function ReleasePopoverContent({
               label={DSP_LABELS[provider]}
               iconPath={config.iconPath}
               href={`${releaseHref}?dsp=${provider}`}
-              className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
+              className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
             />
           );
         })}
@@ -207,7 +207,7 @@ function ReleaseCard({
                 onHoverEnd(release.id);
               }
             }}
-            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-[var(--linear-duration-normal)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
+            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-[var(--linear-duration-normal)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-text-secondary)'
             style={{
               backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',

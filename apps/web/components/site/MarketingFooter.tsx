@@ -73,7 +73,7 @@ const markLinkClassName =
 const footerLinkClassName =
   'mf-link inline-flex w-fit rounded-md text-mid leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
-  'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-[-0.01em] text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-tight text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (

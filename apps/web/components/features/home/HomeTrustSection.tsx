@@ -90,7 +90,7 @@ export function HomeTrustSection({
           className={cn(
             isInlineStrip
               ? 'system-b-mounted-home-trust-strip-label'
-              : 'text-center font-medium tracking-[0.01em] text-xs text-white/56',
+              : 'text-center font-medium tracking-wide text-xs text-white/56',
             !isInlineStrip && labelMarginClass
           )}
         >

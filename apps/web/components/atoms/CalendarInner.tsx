@@ -29,7 +29,7 @@ export default function CalendarInner({
         months: 'flex flex-col gap-4',
         month: 'flex flex-col gap-3',
         month_caption:
-          'flex items-center justify-center h-8 text-app font-medium tracking-[-0.01em] text-primary-token',
+          'flex items-center justify-center h-8 text-app font-medium tracking-tight text-primary-token',
         caption_label: 'text-app font-medium',
         nav: 'flex items-center gap-1 absolute right-3 top-3',
         button_previous: cn(
