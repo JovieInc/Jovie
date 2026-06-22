@@ -44,7 +44,7 @@ export function ProfileNotificationsButton({
       variant='pearlQuiet'
       className={
         isActive
-          ? 'relative bg-[var(--profile-pearl-bg-active)] text-primary-token'
+          ? 'relative bg-(--profile-pearl-bg-active) text-primary-token'
           : 'relative text-primary-token/76'
       }
       aria-expanded={ariaExpanded}

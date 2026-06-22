@@ -191,7 +191,7 @@ function KanbanColumn<TData>({
               aria-hidden='true'
             />
           )}
-          <h3 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-app font-semibold tracking-tight text-primary-token'>
             {column.title}
           </h3>
         </div>
