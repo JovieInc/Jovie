@@ -151,6 +151,25 @@ function isPackageManifestPath(file) {
   return file === 'package.json' || file.endsWith('/package.json');
 }
 
+const DEPENDENCY_MANIFEST_FIELDS = [
+  'dependencies',
+  'devDependencies',
+  'optionalDependencies',
+  'peerDependencies',
+];
+
+function stripDependencyFields(manifest) {
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    return manifest;
+  }
+
+  const stripped = { ...manifest };
+  for (const field of DEPENDENCY_MANIFEST_FIELDS) {
+    delete stripped[field];
+  }
+  return stripped;
+}
+
 function isVersionOnlyPackageManifestChange(file, diffBase) {
   if (!diffBase || !isPackageManifestPath(file)) return false;
 
@@ -165,6 +184,69 @@ function isVersionOnlyPackageManifestChange(file, diffBase) {
   } catch {
     return false;
   }
+}
+
+function isDependencyOnlyPackageManifestChange(file, diffBase) {
+  if (!diffBase || !isPackageManifestPath(file)) return false;
+
+  try {
+    const before = readJsonAtRef(diffBase, file);
+    const after = JSON.parse(readFileSync(resolve(REPO_ROOT, file), 'utf8'));
+
+    if (
+      JSON.stringify(stripDependencyFields(before)) !==
+      JSON.stringify(stripDependencyFields(after))
+    ) {
+      return false;
+    }
+
+    let hasVersionChange = false;
+    for (const field of DEPENDENCY_MANIFEST_FIELDS) {
+      const beforeDeps = before[field] ?? {};
+      const afterDeps = after[field] ?? {};
+      const beforeKeys = Object.keys(beforeDeps).sort();
+      const afterKeys = Object.keys(afterDeps).sort();
+
+      if (JSON.stringify(beforeKeys) !== JSON.stringify(afterKeys)) {
+        return false;
+      }
+
+      for (const key of beforeKeys) {
+        if (beforeDeps[key] !== afterDeps[key]) {
+          hasVersionChange = true;
+        }
+      }
+    }
+
+    return hasVersionChange;
+  } catch {
+    return false;
+  }
+}
+
+function isSemverBumpCompanionLockfileChange(file, changedFiles, options) {
+  if (file !== 'pnpm-lock.yaml') return false;
+
+  const nonLockfileFiles = changedFiles.filter(
+    candidate => candidate !== 'pnpm-lock.yaml'
+  );
+  if (nonLockfileFiles.length === 0) return false;
+
+  const versionOnlyPredicate =
+    options?.isVersionOnlyPackageManifestChange ??
+    (candidate =>
+      isVersionOnlyPackageManifestChange(candidate, options?.diffBase));
+  const dependencyOnlyPredicate =
+    options?.isDependencyOnlyPackageManifestChange ??
+    (candidate =>
+      isDependencyOnlyPackageManifestChange(candidate, options?.diffBase));
+
+  return nonLockfileFiles.every(candidate => {
+    if (!isPackageManifestPath(candidate)) return false;
+    return (
+      versionOnlyPredicate(candidate) || dependencyOnlyPredicate(candidate)
+    );
+  });
 }
 
 function isDocumentationOnlyPolicyFile(file) {
@@ -184,18 +266,31 @@ function shouldIgnoreRuleFile(file, rule, options) {
   }
 
   if (rule.id !== 'env-config') return false;
+
   const versionOnlyPredicate =
     options?.isVersionOnlyPackageManifestChange ??
     (candidate =>
       isVersionOnlyPackageManifestChange(candidate, options?.diffBase));
+  if (versionOnlyPredicate(file)) return true;
 
-  return versionOnlyPredicate(file);
+  const dependencyOnlyPredicate =
+    options?.isDependencyOnlyPackageManifestChange ??
+    (candidate =>
+      isDependencyOnlyPackageManifestChange(candidate, options?.diffBase));
+  if (dependencyOnlyPredicate(file)) return true;
+
+  return isSemverBumpCompanionLockfileChange(
+    file,
+    options?.changedFiles ?? [],
+    options
+  );
 }
 
 export function classifyCiRisk(files, manifest, options = {}) {
   const changedFiles = normalizeChangedFiles(files);
   const errors = [];
   const matches = [];
+  const classifierOptions = { ...options, changedFiles };
 
   for (const rule of manifest.riskRules ?? []) {
     const regexes = (rule.patterns ?? [])
@@ -205,7 +300,7 @@ export function classifyCiRisk(files, manifest, options = {}) {
       regexes.some(regex => regex.test(file))
     );
     const effectiveMatchedFiles = matchedFiles.filter(
-      file => !shouldIgnoreRuleFile(file, rule, options)
+      file => !shouldIgnoreRuleFile(file, rule, classifierOptions)
     );
     if (effectiveMatchedFiles.length > 0) {
       matches.push({
