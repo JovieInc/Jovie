@@ -34,13 +34,19 @@ label() {  # label <num> <label>
 failed_checks_for_pr() {
   local number="$1"
   local fail_json
-  if ! fail_json="$(gh_retry pr checks "$number" -R "$REPO" \
+  local check_exit=0
+  fail_json="$(gh_retry pr checks "$number" -R "$REPO" \
     --json name,bucket,state --jq '
       [ .[]
-        | select((.bucket // "") == "fail" or ((.state // "") | test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED")))
+        | select(
+            (.bucket // "") == "fail"
+            or (.bucket // "") == "pending"
+            or ((.state // "") | test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED|PENDING|QUEUED|IN_PROGRESS"))
+          )
         | (.name // "")
         | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not)
-      ]')"; then
+      ]')" || check_exit=$?
+  if [[ "$check_exit" -ne 0 ]] && ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$fail_json"; then
     echo "    !! failed to fetch checks for #$number; leaving it out of enroll" >&2
     printf '%s\n' '["check status unavailable"]'
     return 0
@@ -112,8 +118,8 @@ echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select([.L[]]|index("needs-human")|not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
 
-# --- BLOCKED: mergeable but red checks → hand to fix agent ---
-echo "=== BLOCKED (red checks → fix agent) ==="
+# --- BLOCKED: mergeable but non-green checks → hand to fix agent ---
+echo "=== BLOCKED (non-green checks → fix agent) ==="
 echo "$SNAP" | jq -r '.[]
   | select(.draft|not) | select(.m=="MERGEABLE") | select(.fail|length>0)
   | select([.L[]]|index("needs-human")|not)

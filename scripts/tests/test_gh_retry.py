@@ -169,3 +169,43 @@ class TestDrainPrQueueWiring:
         assert 'gh_retry pr list' in content
         assert 'gh_retry pr checks' in content
         assert 'statusCheckRollup' not in content
+
+    def test_pending_check_json_blocks_enqueue_even_with_nonzero_exit(
+        self, tmp_path: Path
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":123,"t":"Pending CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-pending","L":[],"fail":[]}]
+                JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  cat <<'JSON'
+                ["Typecheck"]
+                JSON
+                  echo "checks are pending" >&2
+                  exit 8
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #123" not in result.stdout
+        assert "=== BLOCKED (non-green checks" in result.stdout
+        assert "#123" in result.stdout
+        assert "Typecheck" in result.stdout
