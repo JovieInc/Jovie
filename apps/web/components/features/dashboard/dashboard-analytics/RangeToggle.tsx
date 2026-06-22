@@ -67,7 +67,7 @@ export function RangeToggle({
   return (
     <div
       role='tablist'
-      aria-label='Select analytics range'
+      aria-label='Select Analytics Range'
       className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5'
     >
       {RANGE_OPTIONS.map((opt, index) => {
@@ -104,7 +104,7 @@ export function RangeToggle({
             title={
               disabled ? 'Upgrade to Pro for extended analytics' : undefined
             }
-            className={`relative h-7 rounded-full border border-transparent px-2.5 text-xs font-caption tracking-[-0.01em] shadow-none transition-[background-color,color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
+            className={`relative h-7 rounded-full border border-transparent px-2.5 text-xs font-caption tracking-tight shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
           >
             {opt.label}
           </button>
