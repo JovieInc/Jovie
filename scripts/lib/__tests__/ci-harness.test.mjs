@@ -102,6 +102,18 @@ describe('ci-harness risk classifier', () => {
     expect(risk.matchedRules).toEqual([]);
   });
 
+  it('does not escalate root devDependency bumps with lockfile to smoke', () => {
+    const risk = classifyCiRisk(['package.json', 'pnpm-lock.yaml'], manifest, {
+      diffBase: 'HEAD~1',
+    });
+
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.requiresPreview).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
   it('keeps package manifest changes that alter scripts in the env-config smoke lane', () => {
     const risk = classifyCiRisk(['package.json'], manifest, {
       isVersionOnlyPackageManifestChange: () => false,
