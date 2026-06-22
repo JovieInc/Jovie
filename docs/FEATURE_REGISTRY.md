@@ -99,8 +99,8 @@ The marketing homepage uses static-safe section flags to support iteration witho
 When shipping or updating any feature:
 
 1. Update product behavior in code.
-2. Update flag defaults only when the feature should stop being internal-v1 default-on.
-3. Update this registry and `docs/STATSIG_FEATURE_GATES.md` in the same PR.
-4. Update `docs/PRODUCT_CAPABILITIES.md` with rich feature description.
-5. Update the relevant `apps/docs/` page (user-facing docs at docs.jov.ie).
+2. Change flag defaults only when the feature should stop being internal-v1 default-on.
+3. Sync this registry and `docs/STATSIG_FEATURE_GATES.md` in the same PR.
+4. Add rich feature description to `docs/PRODUCT_CAPABILITIES.md`.
+5. Refresh the relevant `apps/docs/` page (user-facing docs at docs.jov.ie).
 6. Include tests for default-on behavior and any explicit kill switch behavior where applicable.

@@ -12,9 +12,11 @@ function readRedirectsBlock(): string {
 
   const source = readFileSync(nextConfigPath as string, 'utf8');
   const redirectsStart = source.indexOf('async redirects()');
-  const redirectsEnd = source.indexOf('async rewrites()', redirectsStart);
 
   expect(redirectsStart).toBeGreaterThanOrEqual(0);
+  const rewritesStart = source.indexOf('async rewrites()', redirectsStart);
+  const redirectsEnd =
+    rewritesStart > redirectsStart ? rewritesStart : source.length;
   expect(redirectsEnd).toBeGreaterThan(redirectsStart);
 
   return source.slice(redirectsStart, redirectsEnd);
