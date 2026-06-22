@@ -323,6 +323,31 @@ struct AppStateTests {
     #expect(await repository.loadCount() == 2)
   }
 
+  @Test func profileErrorLaunchModeRetryRestoresDashboard() async throws {
+    let repository = MockRepository(
+      nextResult: .failure(APIClientError.requestFailed(statusCode: 500))
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingProfileError,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.activeUserID == nil)
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .error("Couldn't load your profile."))
+
+    await appState.retry()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(await repository.loadCount() == 0)
+  }
+
   @Test func coldOfflineProfileLoadShowsOfflineStateAndRetryClearsIt() async throws {
     let repository = MockRepository(
       nextResult: .failure(APIClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue))
