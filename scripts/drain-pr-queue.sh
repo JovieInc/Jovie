@@ -2,7 +2,7 @@
 # Graphite-native PR queue drain.
 # Classifies every open PR and ENROLLS the clean ones into the Graphite merge
 # queue by applying the `merge-queue` label. It also removes that label from
-# hard-gated PRs so they stop occupying queue slots.
+# PRs that cannot currently merge so they stop occupying queue slots.
 #
 # It deliberately does NOT:
 #   - run `gh pr merge` (branch protection lets only the Graphite app push to
@@ -94,12 +94,13 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
 }
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,labels,headRefName --jq '
+  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
     draft: .isDraft,
     m: .mergeable,
+    ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
     L: [.labels[].name],
     fail: []
@@ -113,7 +114,7 @@ while IFS= read -r pr; do
     (.draft | not)
     and (.m == "MERGEABLE")
     and ((.head | startswith("gtmq_")) | not)
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "merge-queue" or . == "fast")) | not)
+    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -121,14 +122,56 @@ while IFS= read -r pr; do
 done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
+# --- SUMMARY: make queue shape obvious in scheduled logs ---
+echo "=== QUEUE SUMMARY ==="
+echo "$SNAP" | jq -r '
+  def labels: (.L // []);
+  def queued: labels | index("merge-queue");
+  def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated");
+  [
+    "  CLEAN: " + ([.[] | select(queued and (.ms // "") == "CLEAN")] | length | tostring),
+    "  UNSTABLE: " + ([.[] | select(queued and (.ms // "") == "UNSTABLE")] | length | tostring),
+    "  BLOCKED: " + ([.[] | select(queued and (.ms // "") == "BLOCKED")] | length | tostring),
+    "  DIRTY: " + ([.[] | select(queued and (.ms // "") == "DIRTY")] | length | tostring),
+    "  hard-gated: " + ([.[] | select(hard_gated)] | length | tostring),
+    "  gtmq: " + ([.[] | select((.head // "") | startswith("gtmq_"))] | length | tostring)
+  ] | .[]'
+
 # --- DEQUEUE: hard-gated PRs must not occupy Graphite queue slots ---
 echo "=== DEQUEUE (hard gates → -merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
   | select([.L[]] | index("merge-queue"))
+  | select((.head|startswith("gtmq_"))|not)
   | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated"))' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     echo "  #$n  $t"
+    unlabel "$n" merge-queue
+  done
+
+# --- DEQUEUE: conflicted, red, unknown, or explicitly queued-for-fix PRs ---
+echo "=== DEQUEUE (non-clean → -merge-queue) ==="
+echo "$SNAP" | jq -c '.[]
+  | select([.L[]] | index("merge-queue"))
+  | select((.head|startswith("gtmq_"))|not)
+  | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated")) | not)
+  | select(
+      ([.L[]] | any(.=="needs-conflict-resolution"))
+      or ((.ms // "CLEAN") != "CLEAN")
+      or (.m != "MERGEABLE")
+      or (.fail|length>0)
+    )' \
+| while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    reason=$(jq -r '
+      [
+        (if ([.L[]] | any(.=="needs-conflict-resolution")) then "needs-conflict-resolution" else empty end),
+        (if (.ms // "CLEAN") != "CLEAN" then "mergeStateStatus=" + (.ms // "UNKNOWN") else empty end),
+        (if .m != "MERGEABLE" then "mergeable=" + (.m // "UNKNOWN") else empty end),
+        (if (.fail|length)>0 then "checks=" + (.fail|join(",")) else empty end)
+      ] | join("; ")
+    ' <<<"$pr")
+    echo "  #$n  $t  ✗ $reason"
     unlabel "$n" merge-queue
   done
 
@@ -137,9 +180,10 @@ echo "=== ENROLL (clean → +merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
+  | select((.ms // "CLEAN")=="CLEAN")
   | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="merge-queue" or .=="fast") | not)' \
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     echo "  #$n  $t"
@@ -150,11 +194,14 @@ echo "$SNAP" | jq -c '.[]
 echo "=== CONFLICT (needs rebase → fix agent) ==="
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
+  | select((.head|startswith("gtmq_"))|not)
   | select(.head|test($re))
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated") | not)
   | "  #\(.n)  \(.t)  [\(.head)]"'
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
-  | select(.m=="CONFLICTING") | select(.head|test($re))
+  | select(.m=="CONFLICTING")
+  | select((.head|startswith("gtmq_"))|not)
+  | select(.head|test($re))
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated") | not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
 
