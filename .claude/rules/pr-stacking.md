@@ -13,6 +13,24 @@ size and stack instead.
   approved **mechanical codemod** (token sweep, rename, generated output) — add
   the **`big-pr`** label to bypass.
 
+## Mechanical codemod sweeps = ONE `big-pr` PR (not N stacked micro-PRs)
+
+A repo-wide mechanical sweep (token-drift / arbitrary-value reduction, a rename,
+a generated-output refresh) ships as **one `big-pr`-labelled PR**, or at most a
+few **sibling** PRs off `main` split by top-level domain. **Never** as a deep
+base-on-base stack of one-PR-per-file/component.
+
+Why: `ci.yml` only triggers on PRs to `main`/`integration/**`, so a stack of N
+agent PRs based on each other runs *no* heavy CI on the PR itself — then Graphite
+lands the stack bottom-up, rebasing each member onto main and running the **full**
+pipeline (build + 4× Lighthouse + tests) **per member**. A 63-deep token-drift
+stack = 63 sequential full-CI runs for one mechanical diff, and any one
+slow/failing/conflicted member stalls the whole chain. (This happened — June 2026,
+collapsed in #11689.) One `big-pr` PR = one CI run.
+
+Agents generating drift/token sweeps: emit a single PR per sweep. Do not call
+`gt create` once per component.
+
 ## Stack, don't pile
 
 - **Dependent work** (B needs A) → a **Graphite stack**: `gt create` per logical
