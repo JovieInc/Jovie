@@ -57,7 +57,7 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
   const errorActions = useMemo(
     () => [
       { label: 'Retry', onClick: handleRefresh },
-      { label: 'Contact support', href: '/support' },
+      { label: 'Contact Support', href: '/support' },
     ],
     [handleRefresh]
   );
@@ -121,7 +121,7 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
           surface='nested'
         >
           <AlertCircle
-            className='mt-0.5 h-4 w-4 shrink-0 text-[color:var(--linear-warning)]'
+            className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-warning)'
             aria-hidden='true'
           />
           <p>
