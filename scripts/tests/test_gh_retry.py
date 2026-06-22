@@ -116,3 +116,6 @@ class TestDrainPrQueueWiring:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
         assert 'gh_retry pr list' in content
+        assert 'statusCheckRollup' not in content.split('gh_retry pr list', 1)[1].split('--json', 1)[1].split(')', 1)[0]
+        assert 'failed_checks_for_pr' in content
+        assert 'build_pr_snapshot' in content

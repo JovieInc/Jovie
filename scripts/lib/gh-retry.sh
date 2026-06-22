@@ -3,6 +3,9 @@
 # Usage: source scripts/lib/gh-retry.sh, then gh_retry pr list ...
 
 gh_retry() {
+  # gh may ANSI-color JSON when it thinks stdout is a TTY; callers parse with jq.
+  export NO_COLOR=1
+  export GH_FORCE_TTY=0
   local attempts="${GH_RETRY_ATTEMPTS:-5}"
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
   local max_delay="${GH_RETRY_MAX_DELAY:-30}"
