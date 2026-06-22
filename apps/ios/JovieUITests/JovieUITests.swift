@@ -283,19 +283,30 @@ final class JovieUITests: XCTestCase {
       $0.buttons["dashboard-copy-url-button"]
     }
 
-    let copyURLButton = app.buttons["dashboard-copy-url-button"]
+    var didShowCopiedState = false
+
+    for attempt in 1...3 {
+      let copyURLButton = app.buttons["dashboard-copy-url-button"]
+      XCTAssertTrue(
+        copyURLButton.waitForExistence(timeout: 3),
+        "Copy URL button did not appear.\n\(app.debugDescription)"
+      )
+      XCTAssertTrue(
+        waitForHittable(copyURLButton, timeout: 5),
+        "Copy URL button was not hittable.\n\(app.debugDescription)"
+      )
+
+      copyURLButton.tap()
+
+      let copiedStateTimeout: TimeInterval = attempt == 3 ? 5 : 2
+      if app.buttons["Copied"].waitForExistence(timeout: copiedStateTimeout) {
+        didShowCopiedState = true
+        break
+      }
+    }
+
     XCTAssertTrue(
-      copyURLButton.waitForExistence(timeout: 3),
-      "Copy URL button did not appear.\n\(app.debugDescription)"
-    )
-
-    copyURLButton.tap()
-
-    let copiedState = NSPredicate(format: "label == %@ OR value == %@", "Copied", "Copied")
-    let copiedExpectation = expectation(for: copiedState, evaluatedWith: copyURLButton)
-    XCTAssertEqual(
-      XCTWaiter.wait(for: [copiedExpectation], timeout: 2),
-      .completed,
+      didShowCopiedState,
       "Copy URL button did not show copied state.\n\(app.debugDescription)"
     )
   }

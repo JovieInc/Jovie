@@ -353,11 +353,15 @@ struct DashboardView: View {
   private func copyURL(_ value: String?) {
     guard let value else { return }
     UIPasteboard.general.string = value
-    didCopyURL = true
+    withAnimation(.none) {
+      didCopyURL = true
+    }
 
-    Task {
+    Task { @MainActor in
       try? await Task.sleep(for: .seconds(2))
-      didCopyURL = false
+      withAnimation(.none) {
+        didCopyURL = false
+      }
     }
   }
 }
