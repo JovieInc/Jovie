@@ -248,6 +248,10 @@ final class JovieUITests: XCTestCase {
       app.staticTexts["Jovie"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal the menu.\n\(app.debugDescription)"
     )
+    XCTAssertTrue(
+      app.staticTexts["Start a conversation to see recent conversations here."].exists,
+      "Shell menu did not show the empty recent conversations state.\n\(app.debugDescription)"
+    )
 
     app.buttons["Close Menu"].tap()
     app.buttons["Open Settings"].tap()
