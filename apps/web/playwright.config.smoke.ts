@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { DESKTOP_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
+import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 /**
  * Smoke Test Playwright Configuration (Desktop)
@@ -32,6 +33,7 @@ if (!managedWebServerUrl.port) {
 const managedWebServerPort = managedWebServerUrl.port;
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const isCI = !!process.env.CI;
+const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 const usesManagedLocalWebServer = !process.env.BASE_URL;
 const shouldThrottleManagedTestAuthRun =
   isCI && usesManagedLocalWebServer && useTestAuthBypass;
@@ -96,14 +98,15 @@ export default defineConfig({
           // scope happens to be active in the parent shell.
           // See .claude/rules/environment.md.
           command: process.env.DATABASE_URL
-            ? 'pnpm run dev:local:playwright'
-            : 'doppler run --project jovie-web --config dev -- pnpm run dev:local:playwright',
+            ? 'pnpm run dev:fast'
+            : 'doppler run --project jovie-web --config dev -- pnpm run dev:fast',
           env: {
             ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
+            E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
             ...(useTestAuthBypass
               ? {
                   NEXT_PUBLIC_CLERK_MOCK: '1',
