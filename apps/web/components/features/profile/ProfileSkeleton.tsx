@@ -5,11 +5,11 @@
 export function ProfileSkeleton() {
   const pulse = 'animate-pulse motion-reduce:animate-none';
   const panelClass =
-    'rounded-[var(--profile-card-radius)] bg-white/[0.04] backdrop-blur-sm';
+    'rounded-(--profile-card-radius) bg-white/[0.04] backdrop-blur-sm';
 
   return (
     <output
-      className='relative min-h-dvh overflow-hidden bg-[color:var(--profile-stage-bg)] text-white/90'
+      className='relative min-h-dvh overflow-hidden bg-(--profile-stage-bg) text-white/90'
       aria-busy='true'
       aria-label='Loading Jovie Profile'
     >
@@ -20,7 +20,7 @@ export function ProfileSkeleton() {
 
       {/* Viewport shell */}
       <div className='relative mx-auto flex min-h-dvh w-full max-w-170 items-stretch justify-center md:items-center md:px-6 md:py-8'>
-        <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-[var(--profile-shell-card-radius)] md:border md:border-white/[0.06]'>
+        <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-(--profile-shell-card-radius) md:border md:border-white/[0.06]'>
           {/* Hero placeholder — matches ArtistHero height */}
           <div
             className={`relative h-[48dvh] max-h-155 min-h-105 w-full overflow-hidden md:h-[56dvh] md:min-h-130 md:rounded-t-[var(--profile-shell-card-radius)] xl:max-h-160 2xl:max-h-170 ${pulse}`}
