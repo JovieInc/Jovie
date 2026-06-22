@@ -188,7 +188,7 @@
     "tsx": "^4.21.0",
     "turbo": "^2.9.14",
     "typescript": "^6.0.3",
-    "vercel": "54.7.1",
+    "vercel": "54.14.5",
     "vitest": "4.1.8"
   },
   "lint-staged": {
