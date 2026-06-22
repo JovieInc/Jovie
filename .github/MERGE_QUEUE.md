@@ -10,6 +10,8 @@
 2. Apply the **`merge-queue`** label (this is Graphite's enqueue trigger). Automation does this for you:
    - Agent pipeline, Dependabot, Sentry/main autofix, screenshots, and landing sweep apply `merge-queue` after their gates pass (see `.github/workflows/`).
    - Humans/agents can do it directly: `gh pr edit <pr> --add-label merge-queue` (or `gt merge`, or the Graphite app).
+   - If a PR is later hard-gated with `needs-human`, `hold`, or `gated`, remove
+     `merge-queue` so it stops occupying Graphite queue slots.
 3. Graphite enqueues the PR, rebases it on `main`, waits for the required checks, and squash-merges.
 4. `linear-sync-on-merge.yml` transitions the Linear issue to `Done` on merge as before.
 
@@ -55,5 +57,5 @@ Agent commit signing (each identity that authors merges):
 ## Monitoring & troubleshooting
 
 - Queue status: Graphite dashboard (not the GitHub "merge queue" UI, which is now unused).
-- **PR not merging after labeling:** confirm the `merge-queue` label is applied, required checks are green, and `graphite-app` is a ruleset bypass actor. If Graphite can't push, the bypass actor is missing.
+- **PR not merging after labeling:** confirm the `merge-queue` label is applied, required checks are green, no hard-gate label (`needs-human`, `hold`, `gated`) is present, and `graphite-app` is a ruleset bypass actor. If Graphite can't push, the bypass actor is missing.
 - **Want to bypass for an emergency:** use Graphite's "merge now" in the dashboard; there is no GitHub-side bypass actor for humans.
