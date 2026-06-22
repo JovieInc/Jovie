@@ -14,7 +14,7 @@ describe('RangeToggle', () => {
     );
 
     const tablist = screen.getByRole('tablist', {
-      name: 'Select analytics range',
+      name: 'Select Analytics Range',
     });
     const activeTab = screen.getByRole('tab', { name: '7d' });
 

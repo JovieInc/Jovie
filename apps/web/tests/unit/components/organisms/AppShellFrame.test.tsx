@@ -21,14 +21,10 @@ describe('AppShellFrame', () => {
       'data-shell-design',
       'shellChatV1'
     );
-    expect(mainContent).toHaveClass(
-      'lg:shadow-[var(--linear-app-shell-shadow)]'
-    );
+    expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
-    expect(mainContent).toHaveClass(
-      'lg:rounded-[var(--linear-app-shell-radius)]'
-    );
+    expect(mainContent).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
     expect(mainContent.querySelector('div.flex.flex-1')).toHaveClass(
       'lg:gap-[var(--linear-app-shell-gap)]'
     );

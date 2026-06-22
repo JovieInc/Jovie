@@ -385,7 +385,7 @@ describe('ShellReleasesView', () => {
 
   it('shows the connected empty state when connected with no releases', () => {
     renderShell([], { spotifyConnected: true });
-    expect(screen.getByText(/No releases yet/)).toBeInTheDocument();
+    expect(screen.getByText(/No Releases Yet/)).toBeInTheDocument();
     expect(
       screen.getByTestId('shell-releases-empty-state-connected')
     ).not.toHaveAttribute('data-surface-variant');
