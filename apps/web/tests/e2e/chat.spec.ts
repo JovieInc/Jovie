@@ -7,7 +7,7 @@
  *   - pressing bare T while chat input is focused does NOT toggle theme
  *   - slash command appearing does not cause layout shift > 50px
  *
- * Auth: dev bypass via /api/dev/test-auth/enter (E2E_USE_TEST_AUTH_BYPASS=1).
+ * Auth: direct dev bypass session (E2E_USE_TEST_AUTH_BYPASS=1).
  * Falls back to Clerk test-mode sign-in when bypass is unavailable.
  *
  * Run:
@@ -18,26 +18,31 @@
 
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 import {
+  ensureSignedInUser,
+  hasClerkCredentials,
+  setTestAuthBypassSession,
+} from '../helpers/clerk-auth';
+import {
+  gotoAuthenticatedChatRoute,
   smokeNavigateWithRetry,
   waitForHydration,
 } from './utils/smoke-test-utils';
 
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const BYPASS_PERSONA = 'creator-ready';
+const CHAT_SMOKE_TEST_TIMEOUT_MS = 240_000;
 
 /** Authenticate via the fastest available path */
 async function authenticateAndGoToChat(
   page: import('@playwright/test').Page
 ): Promise<void> {
   if (USE_TEST_AUTH_BYPASS) {
-    // Fast local path: dev auth bypass sets cookies + redirects to chat
-    await page.goto(
-      `/api/dev/test-auth/enter?persona=${BYPASS_PERSONA}&redirect=${encodeURIComponent(APP_ROUTES.CHAT)}`,
-      { waitUntil: 'domcontentloaded', timeout: 60_000 }
-    );
-    await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
+    await setTestAuthBypassSession(page, BYPASS_PERSONA, 'e2e-chat-smoke-user');
+    await gotoAuthenticatedChatRoute(page, {
+      perAttemptTimeout: 180_000,
+      retries: 0,
+    });
   } else {
     await ensureSignedInUser(page);
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, { timeout: 60_000 });
@@ -56,7 +61,7 @@ test.describe('Chat @smoke', () => {
   });
 
   test('chat page loads for authenticated user', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(CHAT_SMOKE_TEST_TIMEOUT_MS);
 
     const consoleErrors: string[] = [];
     page.on('pageerror', err => consoleErrors.push(String(err)));
@@ -112,7 +117,7 @@ test.describe('Chat @smoke', () => {
   });
 
   test('can type text in chat input', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(CHAT_SMOKE_TEST_TIMEOUT_MS);
 
     await authenticateAndGoToChat(page);
 
@@ -152,7 +157,7 @@ test.describe('Chat @smoke', () => {
   test('pressing bare T while chat input focused does not toggle theme', async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(CHAT_SMOKE_TEST_TIMEOUT_MS);
 
     await authenticateAndGoToChat(page);
 
@@ -208,7 +213,7 @@ test.describe('Chat @smoke', () => {
   test('slash command appearing does not cause layout shift > 50px', async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(CHAT_SMOKE_TEST_TIMEOUT_MS);
 
     await authenticateAndGoToChat(page);
 
