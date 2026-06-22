@@ -14,8 +14,11 @@ queue, not this command, is what keeps `main` green.
 
 - **Never `gh pr merge` / `--auto` / `--admin`.** Branch protection lets only the
   Graphite app push to `main`; those calls fail and bypass the queue.
-- **Enroll = add the `merge-queue` label.** Fast-track an unblocker = add `fast`.
-  That is the only way a PR enters the queue.
+- **Enroll = add the `merge-queue` label.** That is the only way a PR enters the queue.
+- **`fast` is emergency/hotfix-only.** Ordinary generated PRs on `codex/*`,
+  `claude/*`, `agent/*`, or similar branches must not use `fast` unless the PR
+  is explicitly classified as emergency/hotfix/incident; otherwise the guard
+  removes `fast` and gates the PR for human review.
 - **Dequeue hard gates = remove only the `merge-queue` label.** A PR with
   `needs-human`, `hold`, or `gated` must not keep occupying Graphite MQ slots.
 - **Never retarget to `integration/loop-*`.** That model is dormant; agents go to `main`.
@@ -38,8 +41,11 @@ prints five work buckets: **DEQUEUE**, **CONFLICT**, **BLOCKED**, **SURFACE**,
 ## Phase 1 — Kill systemic blockers first
 
 If the same required check fails on **3+ PRs**, it's broken on `main`, not in the
-branches. Fix it once on `main` via a single PR and add `fast` so it jumps the
-queue and unblocks everyone. Don't fix the same thing on N branches.
+branches. Fix it once on `main` via a single PR, then add `merge-queue` so
+Graphite retests and lands it ahead of downstream work. Add `fast` only when
+the PR is explicitly emergency/hotfix/incident-classified; otherwise use the
+Graphite dashboard's merge-now path for human-approved emergency bypass. Don't
+fix the same thing on N branches.
 
 ```bash
 # failing-check histogram across open PRs
@@ -103,3 +109,8 @@ gh pr list --state open --json number,title --limit 100 \
 Flow-health targets: nothing non-draft sits unenrolled; no agent PR open >24h
 without a push; if a labeled PR isn't entering the queue, the `merge-queue` →
 Graphite enrollment wiring is broken — flag it.
+
+If a Graphite draft gets stale after a downstack MQ draft closes, first resubmit
+the source PR with `gt submit --always --update-only --no-edit --no-interactive
+--no-verify`. If the stale `gtmq_*` draft remains, use the Graphite dashboard
+to cancel/retry the queue entry. Do not close `gtmq_*` PRs from GitHub.
