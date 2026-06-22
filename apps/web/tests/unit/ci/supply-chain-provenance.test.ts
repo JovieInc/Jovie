@@ -100,7 +100,7 @@ describe('supply chain provenance guardrails', () => {
     expect(packageStep).toContain('tar -czf /tmp/vercel-build-output.tar.gz');
     expect(packageStep).toContain('.vercel/output');
     expect(attestStep).toContain(
-      'uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be'
+      'uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32'
     );
     expect(attestStep).toContain(
       'subject-path: /tmp/vercel-build-output.tar.gz'
