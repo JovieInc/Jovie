@@ -163,18 +163,17 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
-    def test_drain_script_uses_lightweight_pr_list_and_per_pr_check_retry(self) -> None:
+    def test_drain_script_uses_bulk_status_check_rollup_and_taste_approval(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
         assert 'gh_retry pr list' in content
-        assert 'gh_retry pr checks' in content
-        assert '--remove-label "$2"' in content
-        assert '=== DEQUEUE (hard-gated' in content
-        assert 'statusCheckRollup' not in content
+        assert "--limit 200" in content
+        assert "statusCheckRollup" in content
+        assert 'tim-approved' in content
+        assert 'approved:taste' in content
+        assert "gh_retry pr checks" not in content
 
-    def test_pending_check_json_blocks_enqueue_even_with_nonzero_exit(
-        self, tmp_path: Path
-    ) -> None:
+    def test_red_status_check_rollup_blocks_enqueue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -183,16 +182,9 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":123,"t":"Pending CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-pending","L":[],"fail":[]}]
+                [{"n":123,"t":"Red CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-red","L":[],"fail":["Typecheck"]}]
                 JSON
                   exit 0
-                fi
-                if [[ "$1 $2" == "pr checks" ]]; then
-                  cat <<'JSON'
-                ["Typecheck"]
-                JSON
-                  echo "checks are pending" >&2
-                  exit 8
                 fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
@@ -208,13 +200,11 @@ class TestDrainPrQueueWiring:
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "[dry-run] would +merge-queue on #123" not in result.stdout
-        assert "=== BLOCKED (non-green checks" in result.stdout
+        assert "=== BLOCKED (red checks" in result.stdout
         assert "#123" in result.stdout
         assert "Typecheck" in result.stdout
 
-    def test_hard_gated_queued_pr_is_dequeued_without_fetching_checks(
-        self, tmp_path: Path
-    ) -> None:
+    def test_taste_approved_needs_human_pr_can_enqueue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -223,13 +213,9 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":456,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-human","L":["needs-human","merge-queue"],"fail":[]}]
+                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]}]
                 JSON
                   exit 0
-                fi
-                if [[ "$1 $2" == "pr checks" ]]; then
-                  echo "hard-gated PR should not fetch checks" >&2
-                  exit 9
                 fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
@@ -244,9 +230,7 @@ class TestDrainPrQueueWiring:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "=== DEQUEUE (hard-gated" in result.stdout
-        assert "[dry-run] would -merge-queue on #456" in result.stdout
-        assert "[dry-run] would +merge-queue on #456" not in result.stdout
-        assert "hard-gated PR should not fetch checks" not in result.stderr
+        assert "[dry-run] would +merge-queue on #456" in result.stdout
+        assert "[dry-run] would +merge-queue on #789" not in result.stdout
         assert "=== SURFACE (human decision; not touched) ===" in result.stdout
-        assert "#456" in result.stdout
+        assert "#789" in result.stdout
