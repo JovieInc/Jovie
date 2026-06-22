@@ -128,6 +128,7 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           profile_views: 0,
+          unique_views: 0,
           unique_users: 0,
           tip_link_visits: 0,
           top_cities: [],

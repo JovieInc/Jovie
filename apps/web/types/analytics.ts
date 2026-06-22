@@ -35,6 +35,8 @@ export interface TourDateAnalyticsData {
 
 export type DashboardAnalyticsResponse = {
   profile_views: number;
+  /** Distinct non-bot audience members/fingerprints active in the selected range. */
+  unique_views?: number;
   unique_users?: number;
   listen_clicks?: number;
   subscribers?: number;

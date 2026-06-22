@@ -84,6 +84,11 @@ export async function getUserDashboardAnalytics(
     const hasDailyProfileViews = await doesTableExist(
       TABLE_NAMES.dailyProfileViews
     );
+    // Canonical total views: daily_profile_views (written atomically with member
+    // visits on /api/audience/visit). SUM(audience_members.visits) diverges because
+    // (1) member visits predate the daily aggregate table, (2) seed scripts write
+    // independent random values, and (3) other write paths (e.g. short-link scans)
+    // increment member visits without daily_profile_views.
     const totalViewsSelect = hasDailyProfileViews
       ? drizzleSql`(
           select coalesce(sum(${dailyProfileViews.viewCount}), 0)
@@ -112,6 +117,7 @@ export async function getUserDashboardAnalytics(
               count: number;
             }>;
             total_views: AggregateValue;
+            unique_views: AggregateValue;
             unique_users: AggregateValue;
             total_clicks: AggregateValue;
             spotify_clicks: AggregateValue;
@@ -203,6 +209,15 @@ export async function getUserDashboardAnalytics(
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
             ),
+            audience_unique_views as (
+              select 1
+              from ${audienceMembers}
+              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
+                and not (
+                  coalesce(${audienceMembers.tags}, '[]'::jsonb) @> '["bot"]'::jsonb
+                )
+            ),
             audience_identified as (
               select 1
               from ${audienceMembers}
@@ -212,6 +227,7 @@ export async function getUserDashboardAnalytics(
             )
             select
               ${totalViewsSelect} as total_views,
+              (select count(*) from audience_unique_views) as unique_views,
               (select count(*) from audience_recent) as unique_users,
               (select count(*) from ranged_events) as total_clicks,
               (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,
@@ -234,11 +250,13 @@ export async function getUserDashboardAnalytics(
     );
 
     const totalViews = Number(aggregates?.total_views ?? 0);
+    const uniqueViews = Number(aggregates?.unique_views ?? 0);
     const subscribers = Number(aggregates?.subscribers ?? 0);
 
     const base: DashboardAnalyticsResponse = {
       view,
       profile_views: totalViews,
+      unique_views: uniqueViews,
       unique_users: Number(aggregates?.unique_users ?? 0),
       subscribers,
       top_cities: parseJsonArray<{ city: string | null; count: number }>(
