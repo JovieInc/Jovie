@@ -44,9 +44,9 @@ export function AutomaticReleaseSmartlinksSection() {
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-primary-token'>
-              New release?
+              New Release?
               <br />
-              Already live.
+              Already Live.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-secondary-token'>

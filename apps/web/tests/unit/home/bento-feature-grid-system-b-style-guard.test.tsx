@@ -89,7 +89,7 @@ describe('BentoFeatureGrid System B source contract', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'A command center for your career.',
+        name: 'A Command Center For Your Career.',
       })
     ).toBeInTheDocument();
 
