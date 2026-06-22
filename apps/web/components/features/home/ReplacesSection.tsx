@@ -31,7 +31,7 @@ export function ReplacesSection() {
         <div className='relative mx-auto max-w-linear-content'>
           {/* Header */}
           <div className='reveal-on-scroll flex flex-col items-center text-center gap-5 mb-16'>
-            <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+            <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
               Why switch
             </span>
             <h2 className='marketing-h2-linear text-primary-token'>

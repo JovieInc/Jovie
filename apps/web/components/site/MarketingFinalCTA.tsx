@@ -53,7 +53,7 @@ export function MarketingFinalCTA({
           <Link
             href={ctaHref}
             prefetch={false}
-            className='inline-flex h-10 items-center rounded-full bg-(--color-text-tooltip) px-6 text-sm font-semibold tracking-[0.01em] text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black dark:text-black'
+            className='inline-flex h-10 items-center rounded-full bg-(--color-text-tooltip) px-6 text-sm font-semibold tracking-wide text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black dark:text-black'
           >
             {ctaLabel}
           </Link>
@@ -61,7 +61,7 @@ export function MarketingFinalCTA({
             <Link
               href={secondaryHref}
               prefetch={false}
-              className='inline-flex h-10 items-center gap-1 rounded-full px-6 text-sm font-semibold tracking-[0.01em] text-white/92 transition-colors duration-subtle ease-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='inline-flex h-10 items-center gap-1 rounded-full px-6 text-sm font-semibold tracking-wide text-white/92 transition-colors duration-subtle ease-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               {secondaryLabel}
               <span aria-hidden='true'>→</span>
