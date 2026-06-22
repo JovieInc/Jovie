@@ -168,6 +168,8 @@ class TestDrainPrQueueWiring:
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
         assert 'gh_retry pr list' in content
         assert 'gh_retry pr checks' in content
+        assert '--remove-label "$2"' in content
+        assert '=== DEQUEUE (hard-gated' in content
         assert 'statusCheckRollup' not in content
 
     def test_pending_check_json_blocks_enqueue_even_with_nonzero_exit(
@@ -209,3 +211,42 @@ class TestDrainPrQueueWiring:
         assert "=== BLOCKED (non-green checks" in result.stdout
         assert "#123" in result.stdout
         assert "Typecheck" in result.stdout
+
+    def test_hard_gated_queued_pr_is_dequeued_without_fetching_checks(
+        self, tmp_path: Path
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":456,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-human","L":["needs-human","merge-queue"],"fail":[]}]
+                JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo "hard-gated PR should not fetch checks" >&2
+                  exit 9
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "=== DEQUEUE (hard-gated" in result.stdout
+        assert "[dry-run] would -merge-queue on #456" in result.stdout
+        assert "[dry-run] would +merge-queue on #456" not in result.stdout
+        assert "hard-gated PR should not fetch checks" not in result.stderr
+        assert "=== SURFACE (human decision; not touched) ===" in result.stdout
+        assert "#456" in result.stdout
