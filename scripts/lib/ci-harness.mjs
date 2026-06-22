@@ -175,11 +175,19 @@ function isDocumentationOnlyPolicyFile(file) {
   );
 }
 
+function isIosOnlyWorkflowFile(file) {
+  return /^\.github\/workflows\/ios-/.test(file);
+}
+
 function shouldIgnoreRuleFile(file, rule, options) {
   if (
     rule.id === 'agent-control-plane' &&
     isDocumentationOnlyPolicyFile(file)
   ) {
+    return true;
+  }
+
+  if (rule.id === 'ci-workflows' && isIosOnlyWorkflowFile(file)) {
     return true;
   }
 
