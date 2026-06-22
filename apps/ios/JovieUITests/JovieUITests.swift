@@ -100,6 +100,19 @@ final class JovieUITests: XCTestCase {
     }
 
     attachScreenshot(named: "settings", app: app)
+    for linkTitle in ["Support", "Billing", "Privacy", "Terms"] {
+      XCTAssertTrue(
+        app.buttons[linkTitle].waitForExistence(timeout: 2),
+        "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+    for valueTitle in ["Version", "Build"] {
+      XCTAssertTrue(
+        app.staticTexts[valueTitle].waitForExistence(timeout: 2),
+        "Settings value row \(valueTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+
     app.buttons["Log Out"].tap()
 
     XCTAssertTrue(
