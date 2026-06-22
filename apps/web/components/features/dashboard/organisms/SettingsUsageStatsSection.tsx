@@ -271,7 +271,7 @@ export function SettingsUsageStatsSection() {
             </p>
             <span
               className={cn(
-                'inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-medium tracking-[0.01em]',
+                'inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-medium tracking-wide',
                 getStatusToneClasses(copy.state)
               )}
             >

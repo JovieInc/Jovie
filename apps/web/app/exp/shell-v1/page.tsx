@@ -2503,7 +2503,7 @@ function ShellV1ExperimentContent() {
                 : `padding-bottom var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
-          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
+          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'>
             {/* Static grain overlay — adds a subtle paper roughness so the
               dark surface doesn't read as flat slab. Pointer-events off,
               no animation; GPU-composited at zero per-frame cost. */}
@@ -2998,7 +2998,7 @@ function FloatingSidebarLayer({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: same as above */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: same */}
       <div
-        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)] overflow-hidden'
+        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-(--linear-app-shell-radius) border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-(--linear-app-shell-shadow) overflow-hidden'
         style={{
           transform: visible
             ? 'translateX(0)'
@@ -3179,7 +3179,7 @@ function Sidebar({
                   className='shrink-0 text-primary-token'
                   aria-hidden
                 />
-                <span className='text-app font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
+                <span className='text-app font-semibold tracking-tighter text-primary-token flex-1 truncate'>
                   Jovie
                 </span>
                 <ChevronDown
@@ -5085,7 +5085,7 @@ function ReleaseRow({
       {/* Title (with type badge) / artist */}
       <div className='min-w-0'>
         <div className='flex items-center gap-1.5 min-w-0'>
-          <span className='truncate text-app font-caption leading-tight tracking-[-0.01em] text-primary-token'>
+          <span className='truncate text-app font-caption leading-tight tracking-tight text-primary-token'>
             {release.title}
           </span>
           <TypeBadge label={release.type} />
@@ -6281,7 +6281,7 @@ function TrackRow({
       </div>
 
       {/* BPM — heavier weight, monochrome, right-aligned */}
-      <span className='w-11 shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
+      <span className='w-11 shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-tight'>
         {track.bpm}
       </span>
 
@@ -6727,7 +6727,7 @@ function TaskDetail({
     : null;
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12'>
-      <h1 className='text-2xl font-display tracking-[-0.02em] text-primary-token leading-tight'>
+      <h1 className='text-2xl font-display tracking-tighter text-primary-token leading-tight'>
         {onOpenRelease
           ? renderWithEntities(task.title, RELEASES, onOpenRelease)
           : task.title}

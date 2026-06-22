@@ -45,7 +45,7 @@ export function MarketingFooterCta({
     <section
       data-testid='marketing-footer-cta'
       className={cn(
-        'homepage-story-final-cta relative isolate overflow-hidden bg-black',
+        'homepage-story-final-cta relative isolate overflow-hidden bg-black dark:bg-black',
         className
       )}
     >
@@ -101,7 +101,7 @@ export function MarketingFooterCta({
       </svg>
       <MarketingContainer width='page' className='relative z-10'>
         <div className='homepage-final-cta-copy mx-auto'>
-          <h2 className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'>
+          <h2 className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
             {title}
           </h2>
           {body ? (

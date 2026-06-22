@@ -29,7 +29,7 @@ export const LINEAR_SURFACE = {
 
   // Tier 3 — floating UI (popovers, dropdowns)
   popover:
-    'rounded-xl border border-subtle bg-surface-1 p-0 shadow-[var(--shadow-popover)]',
+    'rounded-xl border border-subtle bg-surface-1 p-0 shadow-(--shadow-popover)',
 } as const;
 
 export const LINEAR_SURFACE_TIER = {

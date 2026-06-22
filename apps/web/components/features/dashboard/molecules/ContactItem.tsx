@@ -67,7 +67,7 @@ export const ContactItem = memo(function ContactItem({
             size='sm'
             variant='ghost'
             onClick={() => onUpdate({ isExpanded: !contact.isExpanded })}
-            className='rounded-lg px-3 text-2xs font-caption tracking-[-0.01em]'
+            className='rounded-lg px-3 text-2xs font-caption tracking-tight'
           >
             {contact.isExpanded ? 'Collapse' : 'Edit'}
           </Button>

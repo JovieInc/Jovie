@@ -40,20 +40,20 @@ export function AutomaticReleaseSmartlinksSection() {
       />
 
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-linear-content'>
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-primary-token'>
-              New release?
+              New Release?
               <br />
-              Already live.
+              Already Live.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-secondary-token'>
                 Connect Spotify once. Every new release gets a smart link across
                 every platform — automatically.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
                 Zero manual work
               </span>
             </div>
@@ -203,7 +203,7 @@ export function AutomaticReleaseSmartlinksSection() {
                             DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG]
                               ?.iconPath
                           }
-                          className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
+                          className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
                         />
                       );
                     })}

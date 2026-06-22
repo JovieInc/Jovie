@@ -9,9 +9,9 @@ export async function RedesignedHero() {
         style={{ background: 'var(--linear-hero-backdrop)' }}
       />
 
-      <div className='hero-stagger relative z-10 mx-auto flex w-full max-w-[var(--linear-content-max)] flex-col items-center text-center'>
+      <div className='hero-stagger relative z-10 mx-auto flex w-full max-w-linear-content flex-col items-center text-center'>
         <h1 className='marketing-h1-linear text-balance text-primary-token'>
-          One link to launch your music career.
+          One Link To Launch Your Music Career.
         </h1>
 
         <p className='marketing-lead-linear mt-8 max-w-[40rem] text-balance text-tertiary-token'>
@@ -22,10 +22,10 @@ export async function RedesignedHero() {
           <ClaimHandleForm size='hero' />
         </div>
 
-        <p className='mt-5 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] tracking-[0.01em] text-tertiary-token'>
+        <p className='mt-5 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] tracking-wide text-tertiary-token'>
           <span
             aria-hidden='true'
-            className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
+            className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-(--linear-success)'
           />{' '}
           Private launch access. No credit card required.
         </p>

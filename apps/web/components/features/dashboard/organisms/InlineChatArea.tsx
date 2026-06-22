@@ -300,10 +300,10 @@ export const InlineChatArea = forwardRef<
                       size='sm'
                       onClick={handleRetry}
                       disabled={isLoading || isSubmitting}
-                      className='mt-2 h-7 gap-1.5 rounded-lg text-2xs font-caption tracking-[-0.01em]'
+                      className='mt-2 h-7 gap-1.5 rounded-lg text-2xs font-caption tracking-tight'
                     >
                       <RefreshCw className='h-3 w-3' />
-                      Try again
+                      Try Again
                     </Button>
                   )}
                 </div>

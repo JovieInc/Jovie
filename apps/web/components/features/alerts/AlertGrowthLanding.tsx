@@ -285,7 +285,7 @@ export function AlertGrowthLanding({
                     value={phoneInput}
                     onChange={e => setPhoneInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-[var(--profile-action-radius)] border px-3.5 text-base focus:outline-none focus-visible:ring-2'
+                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-base focus:outline-none focus-visible:ring-2'
                   />
                 </>
               ) : (
@@ -305,7 +305,7 @@ export function AlertGrowthLanding({
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-[var(--profile-action-radius)] border px-3.5 text-base focus:outline-none focus-visible:ring-2'
+                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-base focus:outline-none focus-visible:ring-2'
                   />
                 </>
               )}
@@ -314,7 +314,7 @@ export function AlertGrowthLanding({
             <button
               type='submit'
               disabled={isPending}
-              className='h-12 w-full rounded-[var(--profile-action-radius)] border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-sm font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
+              className='h-12 w-full rounded-(--profile-action-radius) border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-sm font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
             >
               {isPending ? 'Sending…' : 'Get alerts'}
             </button>
@@ -352,7 +352,7 @@ export function AlertGrowthLanding({
           {PROOF_POINTS.map(point => (
             <li
               key={point}
-              className='border-subtle text-secondary-token rounded-[var(--profile-action-radius)] border bg-surface-1 px-3.5 py-3 text-app'
+              className='border-subtle text-secondary-token rounded-(--profile-action-radius) border bg-surface-1 px-3.5 py-3 text-app'
             >
               {point}
             </li>
@@ -390,8 +390,8 @@ function ChannelToggle({
       onClick={onSelect}
       className={
         pressed
-          ? 'border-default bg-surface-1 text-primary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-app font-semibold disabled:opacity-60'
-          : 'border-subtle bg-surface-0 text-secondary-token flex-1 rounded-[var(--profile-action-radius)] border px-4 py-3 text-app font-semibold disabled:opacity-60'
+          ? 'border-default bg-surface-1 text-primary-token flex-1 rounded-(--profile-action-radius) border px-4 py-3 text-app font-semibold disabled:opacity-60'
+          : 'border-subtle bg-surface-0 text-secondary-token flex-1 rounded-(--profile-action-radius) border px-4 py-3 text-app font-semibold disabled:opacity-60'
       }
     >
       {label}
@@ -410,7 +410,7 @@ function SubscribedState({
     return (
       <div
         role='status'
-        className='bg-surface-1 border-subtle rounded-[var(--profile-card-radius)] border p-5'
+        className='bg-surface-1 border-subtle rounded-(--profile-card-radius) border p-5'
         data-testid='alerts-landing-pending'
       >
         <h2 className='text-primary-token text-base font-semibold tracking-normal'>
@@ -428,7 +428,7 @@ function SubscribedState({
   return (
     <div
       role='status'
-      className='bg-surface-1 border-subtle rounded-[var(--profile-card-radius)] border p-5'
+      className='bg-surface-1 border-subtle rounded-(--profile-card-radius) border p-5'
       data-testid='alerts-landing-success'
     >
       <h2 className='text-primary-token text-base font-semibold tracking-normal'>

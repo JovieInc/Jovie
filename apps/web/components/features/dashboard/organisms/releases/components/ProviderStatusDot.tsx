@@ -74,7 +74,7 @@ function getProviderStatusConfig(
         label: PROVIDER_STATUS_LABELS.manual,
         icon: <TriangleAlert className='h-2.5 w-2.5' aria-hidden='true' />,
         className:
-          'border-[color:color-mix(in_oklab,var(--color-warning)_28%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-warning)_12%,transparent)] text-[var(--color-warning)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+          'border-[color:color-mix(in_oklab,var(--color-warning)_28%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-warning)_12%,transparent)] text-warning shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
       };
     default:
       return {

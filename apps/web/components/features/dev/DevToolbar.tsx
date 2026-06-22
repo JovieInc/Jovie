@@ -247,7 +247,7 @@ function getSwButtonProps(enabled: boolean) {
     className: `flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
       enabled
         ? 'text-accent bg-accent/10'
-        : 'text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2'
+        : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
     }`,
     'aria-label': enabled ? 'Disable service worker' : 'Enable service worker',
   };
@@ -727,7 +727,7 @@ export function DevToolbar({
         type='button'
         onClick={show}
         data-testid='dev-toolbar'
-        className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-default bg-surface-1 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-default shadow-md font-mono text-3xs transition-colors'
+        className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-default bg-surface-1 text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:border-default shadow-md font-mono text-3xs transition-colors'
         aria-label='Show Dev Toolbar'
         title='Show Dev Toolbar (⌘⇧D)'
       >
@@ -764,14 +764,14 @@ export function DevToolbar({
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder='Search flags...'
-              className='flex-1 bg-transparent text-[var(--color-text-primary)] placeholder:text-quaternary-token outline-none text-xs'
+              className='flex-1 bg-transparent text-(--color-text-primary) placeholder:text-quaternary-token outline-none text-xs'
               aria-label='Search Flags'
             />
             {search && (
               <button
                 type='button'
                 onClick={() => setSearch('')}
-                className='shrink-0 text-quaternary-token hover:text-[var(--color-text-primary)] transition-colors'
+                className='shrink-0 text-quaternary-token hover:text-(--color-text-primary) transition-colors'
                 aria-label='Clear Search'
               >
                 <X size={11} />
@@ -794,7 +794,7 @@ export function DevToolbar({
                   <button
                     type='button'
                     onClick={overridesCtx.clearOverrides}
-                    className='text-3xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline transition-colors'
+                    className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
                   >
                     clear all
                   </button>
@@ -906,7 +906,7 @@ export function DevToolbar({
           className={`inline-flex shrink-0 items-center gap-1 px-1.5 py-1 rounded text-3xs transition-colors ${
             designV1Enabled
               ? 'text-accent bg-accent/10 hover:bg-accent/15'
-              : 'text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2'
+              : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
           }`}
         >
           <span>New Design</span>
@@ -927,14 +927,14 @@ export function DevToolbar({
             className={`p-1.5 rounded transition-colors ${
               flagBadgeCtx?.showBadges
                 ? 'text-accent bg-accent/10'
-                : 'text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2'
+                : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
             }`}
             aria-label='Toggle Flag Badges'
           >
             <Flag size={12} />
           </button>
 
-          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+          <div className='w-px h-4 mx-1 bg-subtle' />
 
           {/* Theme picker */}
           {[
@@ -950,7 +950,7 @@ export function DevToolbar({
               className={`p-1.5 rounded transition-colors ${
                 mounted && theme === value
                   ? 'text-accent bg-accent/10'
-                  : 'text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2'
+                  : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
               }`}
               aria-label={label}
             >
@@ -958,14 +958,14 @@ export function DevToolbar({
             </button>
           ))}
 
-          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+          <div className='w-px h-4 mx-1 bg-subtle' />
 
           {sha && (
             <button
               type='button'
               onClick={() => copyToClipboard(sha, 'sha')}
               title={`Copy SHA: ${sha}`}
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
               aria-label='Copy SHA'
             >
               <CopyFieldIcon copied={copiedField === 'sha'} icon={Copy} />
@@ -979,7 +979,7 @@ export function DevToolbar({
               copyToClipboard(globalThis.location.pathname, 'route')
             }
             title={`Copy Route: ${globalThis.window === undefined ? '' : globalThis.location.pathname}`}
-            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors'
+            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label='Copy Route'
           >
             <CopyFieldIcon copied={copiedField === 'route'} icon={Route} />
@@ -990,7 +990,7 @@ export function DevToolbar({
             <Link
               href={APP_ROUTES.DESIGN_STUDIO}
               title='Open Design Studio'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
               aria-label='Design Studio'
             >
               <PanelsTopLeft size={11} />
@@ -1003,7 +1003,7 @@ export function DevToolbar({
           <Link
             href={APP_ROUTES.ADMIN}
             title='Open Admin Panel'
-            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors'
+            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label='Admin Panel'
           >
             <ExternalLink size={11} />
@@ -1019,7 +1019,7 @@ export function DevToolbar({
                 aria-label='Test Persona'
                 aria-expanded={personaPanelOpen}
                 aria-haspopup='menu'
-                className={`flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors ${
+                className={`flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors ${
                   personaSession?.active ? 'text-accent bg-accent/10' : ''
                 }`}
               >
@@ -1032,7 +1032,7 @@ export function DevToolbar({
               {personaPanelOpen && (
                 <div
                   role='menu'
-                  className='absolute bottom-full right-0 mb-2 w-72 overflow-hidden rounded-md border border-default bg-surface-1 text-[var(--color-text-primary)] shadow-lg'
+                  className='absolute bottom-full right-0 mb-2 w-72 overflow-hidden rounded-md border border-default bg-surface-1 text-(--color-text-primary) shadow-lg'
                 >
                   <div className='border-b border-subtle px-3 py-2'>
                     <div className='flex items-center justify-between gap-2'>
@@ -1058,7 +1058,7 @@ export function DevToolbar({
 
                   {personaSession &&
                   (!personaSession.enabled || !personaSession.trustedHost) ? (
-                    <div className='px-3 py-3 text-3xs text-[var(--color-text-tertiary)]'>
+                    <div className='px-3 py-3 text-3xs text-(--color-text-tertiary)'>
                       {personaSession.reason ??
                         'Test personas are unavailable on this host.'}
                     </div>
@@ -1093,7 +1093,7 @@ export function DevToolbar({
                                   {option.meta}
                                 </span>
                               </span>
-                              <span className='block truncate text-3xs text-[var(--color-text-tertiary)]'>
+                              <span className='block truncate text-3xs text-(--color-text-tertiary)'>
                                 {option.description}
                               </span>
                             </span>
@@ -1107,7 +1107,7 @@ export function DevToolbar({
                           role='menuitem'
                           disabled={Boolean(personaAction)}
                           onClick={handleExitPersona}
-                          className='mt-1 flex w-full items-center gap-2 border-t border-subtle px-3 py-2 text-left text-2xs text-[var(--color-text-tertiary)] transition-colors hover:bg-surface-2 hover:text-[var(--color-text-primary)] disabled:cursor-not-allowed disabled:opacity-50'
+                          className='mt-1 flex w-full items-center gap-2 border-t border-subtle px-3 py-2 text-left text-2xs text-(--color-text-tertiary) transition-colors hover:bg-surface-2 hover:text-(--color-text-primary) disabled:cursor-not-allowed disabled:opacity-50'
                         >
                           <span className='flex size-4 shrink-0 items-center justify-center'>
                             {personaAction === 'exit' ? (
@@ -1143,7 +1143,7 @@ export function DevToolbar({
                 clearSessionState === 'loading' || clearSessionState === 'done'
               }
               title='Clear all cookies, localStorage, and sessionStorage'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Clear Session'
             >
               <AsyncActionIcon state={clearSessionState} idleIcon={Trash2} />
@@ -1161,7 +1161,7 @@ export function DevToolbar({
                 unwaitlistState === 'loading' || unwaitlistState === 'done'
               }
               title='Approve your own waitlist entry (dev only)'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Unwaitlist'
             >
               <AsyncActionIcon state={unwaitlistState} idleIcon={UserCheck} />
@@ -1179,7 +1179,7 @@ export function DevToolbar({
                 syncClerkState === 'loading' || syncClerkState === 'done'
               }
               title='Sync Clerk user ID to DB (fixes clerk_id mismatch between dev/prod)'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Sync Clerk ID'
             >
               {syncClerkState === 'loading' && (
@@ -1234,7 +1234,7 @@ export function DevToolbar({
             promoteState !== 'idle' &&
             promoteState !== 'checking' && (
               <>
-                <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+                <div className='w-px h-4 mx-1 bg-subtle' />
                 <button
                   type='button'
                   onClick={handlePromote}
@@ -1258,13 +1258,13 @@ export function DevToolbar({
               </>
             )}
 
-          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+          <div className='w-px h-4 mx-1 bg-subtle' />
 
           {/* Expand/collapse + hide */}
           <button
             type='button'
             onClick={toggleOpen}
-            className='flex items-center gap-1 px-2 py-1 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors'
+            className='flex items-center gap-1 px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label={open ? 'Collapse Dev Toolbar' : 'Expand Dev Toolbar'}
           >
             <ExpandCollapseIcon open={open} />
@@ -1272,7 +1272,7 @@ export function DevToolbar({
           <button
             type='button'
             onClick={hide}
-            className='flex items-center px-2 py-1 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-surface-2 transition-colors'
+            className='flex items-center px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label='Hide Dev Toolbar'
           >
             <X size={13} />
@@ -1302,7 +1302,7 @@ function PlanToggleInner({
 
   return (
     <>
-      <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+      <div className='w-px h-4 mx-1 bg-subtle' />
       <div className='flex items-center gap-0.5'>
         <span className='text-3xs text-quaternary-token mr-0.5'>Plan</span>
         {(['free', 'pro', 'max'] as const).map(plan => (
@@ -1331,7 +1331,7 @@ function PlanToggleInner({
             className={`px-1.5 py-0.5 rounded text-3xs transition-colors ${
               plan === currentPlan
                 ? 'font-semibold text-accent bg-accent/10'
-                : 'text-quaternary-token hover:text-[var(--color-text-primary)] hover:bg-surface-2'
+                : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
             } ${switching ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             title={`Switch to ${plan} plan`}
             aria-label={`Switch to ${plan} plan`}
@@ -1362,7 +1362,7 @@ function OrphanOverrides({
           <button
             type='button'
             onClick={() => setExpanded(prev => !prev)}
-            className='text-3xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline transition-colors'
+            className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
           >
             {expanded ? 'hide' : 'inspect'}
           </button>
@@ -1427,7 +1427,7 @@ function FlagRow({
         <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm dark:bg-white' />
       </Switch.Root>
       <span
-        className={`flex-1 truncate ${isOverridden ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-tertiary)]'}`}
+        className={`flex-1 truncate ${isOverridden ? 'text-(--color-text-primary)' : 'text-(--color-text-tertiary)'}`}
       >
         {label}
       </span>
@@ -1441,7 +1441,7 @@ function FlagRow({
           type='button'
           onClick={onClear}
           title='Remove override'
-          className='shrink-0 text-quaternary-token hover:text-[var(--color-text-secondary)] transition-colors'
+          className='shrink-0 text-quaternary-token hover:text-(--color-text-secondary) transition-colors'
         >
           <X size={10} />
         </button>

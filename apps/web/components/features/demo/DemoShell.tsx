@@ -113,7 +113,7 @@ export function DemoShell({
                   <SidebarMenuButton
                     size='sm'
                     className='h-7 font-medium'
-                    aria-label='Open workspace selector'
+                    aria-label='Open Workspace Selector'
                   >
                     <div className='flex items-center gap-1.5 w-full'>
                       <BrandLogo size={14} className='rounded-sm' tone='auto' />
@@ -336,7 +336,7 @@ export function DemoShell({
                   {DEMO_ARTIST_NAME}
                 </span>
                 <ChevronRight className='size-3.5 shrink-0 text-quaternary-token' />
-                <span className='truncate font-[510] text-primary-token'>
+                <span className='truncate font-medium text-primary-token'>
                   {TAB_LABEL[activeTab]}
                 </span>
               </div>
@@ -392,11 +392,11 @@ export function DemoShell({
                         />
                       ))}
                       <PageToolbarActionButton
-                        label='Add view'
+                        label='Add View'
                         icon={<Plus className='size-3.5' aria-hidden='true' />}
                         iconOnly
                         tooltipLabel='Add View'
-                        ariaLabel='Add view'
+                        ariaLabel='Add View'
                       />
                     </>
                   ) : null

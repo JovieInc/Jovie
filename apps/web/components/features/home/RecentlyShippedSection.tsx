@@ -16,6 +16,7 @@ interface CompactRelease {
 }
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
+const VERSION_PREFIX = 'v';
 
 function parseRecentReleases(markdown: string, count = 3): CompactRelease[] {
   const lines = markdown.split('\n');
@@ -78,13 +79,13 @@ export function RecentlyShippedSection() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-page'>
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-linear-content'>
           <div className='reveal-on-scroll mb-10 flex flex-col items-center gap-3 text-center'>
             <Badge variant='outline' size='xl'>
               Recently Shipped
             </Badge>
             <h2 className='text-2xl md:text-3xl font-semibold tracking-tight'>
-              We ship fast
+              We Ship Fast
             </h2>
             <p className='text-sm md:text-base opacity-60 max-w-md'>
               See what we&apos;ve been building lately
@@ -92,36 +93,43 @@ export function RecentlyShippedSection() {
           </div>
 
           <div className='reveal-on-scroll grid gap-4 md:grid-cols-3'>
-            {releases.map(release => (
-              <div
-                key={release.version}
-                className='rounded-xl p-5 transition-colors'
-                style={{
-                  backgroundColor:
-                    'color-mix(in srgb, var(--linear-text-primary) 3%, transparent)',
-                  border:
-                    '1px solid color-mix(in srgb, var(--linear-text-primary) 8%, transparent)',
-                }}
-              >
-                <div className='flex items-center gap-2 mb-3'>
-                  <Badge variant='outline' className='font-mono text-2xs'>
-                    v{release.version}
-                  </Badge>
-                  {release.date && (
-                    <span className='text-xs text-tertiary-token'>
-                      {formatDate(release.date)}
-                    </span>
-                  )}
+            {releases.map(release => {
+              const versionLabel = `${VERSION_PREFIX}${release.version}`;
+
+              return (
+                <div
+                  key={release.version}
+                  className='rounded-xl p-5 transition-colors'
+                  style={{
+                    backgroundColor:
+                      'color-mix(in srgb, var(--linear-text-primary) 3%, transparent)',
+                    border:
+                      '1px solid color-mix(in srgb, var(--linear-text-primary) 8%, transparent)',
+                  }}
+                >
+                  <div className='flex items-center gap-2 mb-3'>
+                    <Badge variant='outline' className='font-mono text-2xs'>
+                      {versionLabel}
+                    </Badge>
+                    {release.date && (
+                      <span className='text-xs text-tertiary-token'>
+                        {formatDate(release.date)}
+                      </span>
+                    )}
+                  </div>
+                  <ul className='space-y-1.5'>
+                    {release.highlights.map(h => (
+                      <li
+                        key={h}
+                        className='text-sm leading-relaxed opacity-70'
+                      >
+                        {h}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className='space-y-1.5'>
-                  {release.highlights.map(h => (
-                    <li key={h} className='text-sm leading-relaxed opacity-70'>
-                      {h}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className='reveal-on-scroll mt-8 text-center'>

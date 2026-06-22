@@ -138,7 +138,7 @@ export function EntityCard({
         'group flex min-w-0 flex-col text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
         treatment === 'big' ? 'gap-0 overflow-hidden p-0' : 'gap-3 p-3',
         isPearl
-          ? 'rounded-[var(--profile-inner-radius)] border border-[color:var(--profile-pearl-border)] bg-[color:var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-2xl hover:bg-[color:var(--profile-pearl-bg-hover)]'
+          ? 'rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl hover:bg-(--profile-pearl-bg-hover)'
           : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',
         className
       )}
@@ -167,7 +167,7 @@ export function EntityCard({
             <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
               {model.datePill.month}
             </span>
-            <span className='text-[34px] font-[680] leading-none tracking-[-0.02em] tabular-nums'>
+            <span className='text-[34px] font-bold leading-none tracking-tighter tabular-nums'>
               {model.datePill.day}
             </span>
           </div>
@@ -201,7 +201,7 @@ export function EntityCard({
 
         <h3
           className={cn(
-            'min-w-0 font-[590] leading-tight tracking-[-0.02em] text-primary-token line-clamp-2',
+            'min-w-0 font-semibold leading-tight tracking-tighter text-primary-token line-clamp-2',
             size.titleClass
           )}
         >
@@ -222,7 +222,7 @@ export function EntityCard({
         >
           {model.price ? (
             <div className='min-w-0'>
-              <span className='text-sm font-[680] text-primary-token'>
+              <span className='text-sm font-bold text-primary-token'>
                 {model.price.original ? (
                   <>
                     {model.price.display}

@@ -11,6 +11,7 @@ import { TIM_WHITE_PROFILE } from './tim-white';
 
 const BLUR_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWExYTFhIi8+PC9zdmc+';
+const IMAGE_PLACEHOLDER = 'blur';
 
 const HOVER_MEDIA_QUERY = '(hover: hover) and (pointer: fine)';
 
@@ -155,7 +156,7 @@ function ReleasePopoverContent({
               label={DSP_LABELS[provider]}
               iconPath={config.iconPath}
               href={`${releaseHref}?dsp=${provider}`}
-              className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
+              className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
             />
           );
         })}
@@ -206,7 +207,7 @@ function ReleaseCard({
                 onHoverEnd(release.id);
               }
             }}
-            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-[var(--linear-duration-normal)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
+            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-[var(--linear-duration-normal)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-text-secondary)'
             style={{
               backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',
@@ -312,10 +313,10 @@ export function SeeItInActionCarousel({
       />
 
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-linear-content'>
           <div className='flex flex-col items-center gap-5 text-center reveal-on-scroll'>
             <h2 className='marketing-h2-linear text-primary-token'>
-              See it in action
+              See It In Action
             </h2>
             <p className='max-w-2xl marketing-lead-linear text-secondary-token'>
               Tim White&apos;s profile, releases, and smart links all powered by
@@ -342,7 +343,7 @@ export function SeeItInActionCarousel({
                     alt={`${PROFILE.name} profile photo`}
                     fill
                     sizes='96px'
-                    placeholder='blur'
+                    placeholder={IMAGE_PLACEHOLDER}
                     blurDataURL={BLUR_DATA_URL}
                     className='object-cover'
                   />

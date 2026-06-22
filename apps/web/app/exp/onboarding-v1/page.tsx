@@ -756,7 +756,7 @@ function SidebarShim({
     >
       <div className='flex items-center gap-2.5 h-7 pl-3 pr-2'>
         <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
-        <span className='text-app font-semibold tracking-[-0.02em] text-primary-token'>
+        <span className='text-app font-semibold tracking-tighter text-primary-token'>
           Jovie
         </span>
       </div>
@@ -834,7 +834,7 @@ function ReadyCard({ handle }: { handle: string }) {
         <Sparkles className='h-3 w-3' strokeWidth={2.5} />
         Welcome home
       </div>
-      <h3 className='mt-2 text-lg font-display tracking-[-0.02em] text-primary-token'>
+      <h3 className='mt-2 text-lg font-display tracking-tighter text-primary-token'>
         jov.ie/{name} is live.
       </h3>
       <p className='mt-2 text-app text-secondary-token leading-[1.55]'>
@@ -862,7 +862,7 @@ function WaitlistCard() {
       <div className='flex items-center gap-2 text-3xs uppercase tracking-[0.12em] text-amber-300/90 font-medium'>
         Saved for later
       </div>
-      <h3 className='mt-2 text-lg font-display tracking-[-0.02em] text-primary-token'>
+      <h3 className='mt-2 text-lg font-display tracking-tighter text-primary-token'>
         On the early-access list.
       </h3>
       <p className='mt-2 text-app text-secondary-token leading-[1.55]'>

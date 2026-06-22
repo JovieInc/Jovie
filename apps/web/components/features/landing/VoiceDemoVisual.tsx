@@ -52,7 +52,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
           <div
             key={i}
             className={cn(
-              'w-1.5 rounded-full bg-[var(--color-primary)]',
+              'w-1.5 rounded-full bg-(--color-primary)',
               isPlaying ? 'voice-bar-animate' : 'h-3'
             )}
             style={{
@@ -65,13 +65,13 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
       <button
         type='button'
         onClick={toggleDemo}
-        className='mt-5 inline-flex items-center gap-2 rounded-full border border-subtle bg-panel px-5 py-2 text-sm font-medium text-primary-token transition hover:bg-surface-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]'
+        className='mt-5 inline-flex items-center gap-2 rounded-full border border-subtle bg-panel px-5 py-2 text-sm font-medium text-primary-token transition hover:bg-surface-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-primary)'
         data-testid='voice-demo-play-btn'
         aria-label={isPlaying ? 'Stop voice sample' : 'Play voice sample demo'}
       >
         {isPlaying ? (
           <>
-            <span className='inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--color-primary)]' />
+            <span className='inline-block h-2 w-2 animate-pulse rounded-full bg-(--color-primary)' />
             Playing sample…
           </>
         ) : (

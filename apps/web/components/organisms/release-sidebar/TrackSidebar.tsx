@@ -363,7 +363,7 @@ export function TrackSidebar({
                       </span>
                     )}
                     {track.isrc ? (
-                      <span className='font-mono text-3xs tracking-[0.02em]'>
+                      <span className='font-mono text-3xs tracking-wider'>
                         {track.isrc}
                       </span>
                     ) : null}

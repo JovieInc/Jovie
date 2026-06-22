@@ -12,7 +12,7 @@ interface ArtistProfileSectionHeaderProps {
 }
 
 export const SHELL_H2_CLASS =
-  'text-[clamp(2.25rem,4.8vw,3.5rem)] font-[680] leading-[1.02] tracking-[-0.04em] text-primary-token text-balance';
+  'text-[clamp(2.25rem,4.8vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.04em] text-primary-token text-balance';
 
 export const SHELL_EYEBROW_CLASS =
   'text-xs font-medium uppercase tracking-[0.06em] text-secondary-token';

@@ -33,7 +33,7 @@ export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
 function AuthBrandFrame() {
   return (
     <section
-      aria-label='Product preview'
+      aria-label='Product Preview'
       className='absolute inset-0 flex flex-col'
     >
       {/* Spacer above the floating screenshot. */}
@@ -53,8 +53,8 @@ function AuthBrandFrame() {
       <div className='min-h-0 flex-1' />
 
       <div className='relative z-10 px-8 pb-4 sm:px-10'>
-        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
-          Built for Artists.
+        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
+          Built For Artists.
         </h2>
       </div>
     </section>

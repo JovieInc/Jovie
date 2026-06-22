@@ -248,14 +248,14 @@ function SmartLinkArtistLine({
 
   if (!hasFeatured) {
     return (
-      <p className='mt-1 text-[14px] font-[450] [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+      <p className='mt-1 text-[14px] font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
         {primaryName}
       </p>
     );
   }
 
   return (
-    <p className='mt-1 text-[14px] font-[450] [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+    <p className='mt-1 text-[14px] font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
       {primaryName}
       <span className='text-white/40'> feat. </span>
       {featuredArtists.map((fa, i) => (
@@ -390,7 +390,7 @@ export function ReleaseLandingPage({
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
           <div className='min-w-0 flex-1'>
-            <h1 className='text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+            <h1 className='text-[28px] font-semibold leading-[1.06] tracking-tighter text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
               {release.title}
             </h1>
             <SmartLinkArtistLine
@@ -459,7 +459,7 @@ export function ReleaseLandingPage({
                 {downloadUrl ? (
                   <Link
                     href={appendUTMParamsToUrl(downloadUrl, resolvedUtmParams)}
-                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/15'
+                    className='inline-flex h-8 items-center justify-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-(--color-text-tooltip) transition-colors hover:bg-white/15'
                   >
                     Download files
                   </Link>

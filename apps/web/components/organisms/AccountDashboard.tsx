@@ -27,7 +27,7 @@ export function AccountDashboard() {
         <ContentSurfaceCard className='p-5'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <CreditCard className='h-7 w-7 text-[var(--accent-analytics)]' />
+              <CreditCard className='h-7 w-7 text-(--accent-analytics)' />
             </div>
             <div className='ml-4'>
               <h3 className='text-mid font-semibold text-primary-token'>
@@ -49,7 +49,7 @@ export function AccountDashboard() {
         <ContentSurfaceCard className='p-5'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <User className='h-7 w-7 text-[var(--accent-speed)]' />
+              <User className='h-7 w-7 text-(--accent-speed)' />
             </div>
             <div className='ml-4'>
               <h3 className='text-mid font-semibold text-primary-token'>
@@ -73,7 +73,7 @@ export function AccountDashboard() {
         <ContentSurfaceCard className='p-5'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <Settings className='h-7 w-7 text-[var(--accent-conv)]' />
+              <Settings className='h-7 w-7 text-(--accent-conv)' />
             </div>
             <div className='ml-4'>
               <h3 className='text-mid font-semibold text-primary-token'>

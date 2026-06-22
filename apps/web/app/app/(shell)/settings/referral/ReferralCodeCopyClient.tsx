@@ -29,7 +29,7 @@ export function ReferralCodeCopyClient({
       </code>
       <Button variant='ghost' size='sm' onClick={handleCopy}>
         {copied ? (
-          <Check className='h-4 w-4 text-[var(--color-success)]' />
+          <Check className='h-4 w-4 text-success' />
         ) : (
           <Copy className='h-4 w-4' />
         )}

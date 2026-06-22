@@ -171,7 +171,7 @@ describe('DotBadge', () => {
       expect(badge).toHaveClass('rounded-full');
       expect(badge).toHaveClass('border');
       expect(badge).toHaveClass('font-[510]');
-      expect(badge).toHaveClass('tracking-[-0.01em]');
+      expect(badge).toHaveClass('tracking-tight');
     });
 
     it('applies dot base classes', () => {

@@ -5,10 +5,10 @@ import { DemoAuthShell } from './DemoAuthShell';
 import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
 
 const UTM_PRESETS = [
-  { label: 'Instagram story', detail: 'utm_source=instagram' },
-  { label: 'TikTok post', detail: 'utm_source=tiktok' },
-  { label: 'Press outreach', detail: 'utm_source=press' },
-  { label: 'Paid campaign', detail: 'utm_medium=paid' },
+  { label: 'Instagram Story', detail: 'utm_source=instagram' },
+  { label: 'TikTok Post', detail: 'utm_source=tiktok' },
+  { label: 'Press Outreach', detail: 'utm_source=press' },
+  { label: 'Paid Campaign', detail: 'utm_medium=paid' },
 ] as const;
 
 export function DemoReleaseTrackedLinksSurface() {
@@ -29,7 +29,7 @@ export function DemoReleaseTrackedLinksSurface() {
             data-testid='demo-release-tracked-links-capture'
           >
             <div className='rounded-2xl border border-subtle bg-surface-1 px-4 py-3'>
-              <p className='text-2xs font-[510] tracking-[-0.01em] text-tertiary-token'>
+              <p className='text-2xs font-medium tracking-tight text-tertiary-token'>
                 Release row
               </p>
               <div className='mt-2 flex items-center justify-between gap-4'>
@@ -41,7 +41,7 @@ export function DemoReleaseTrackedLinksSurface() {
                     {release.artistNames?.join(', ') ?? 'Unknown artist'}
                   </p>
                 </div>
-                <div className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-[510] text-secondary-token'>
+                <div className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-medium text-secondary-token'>
                   Share
                 </div>
               </div>
@@ -75,7 +75,7 @@ export function DemoReleaseTrackedLinksSurface() {
                           {preset.detail}
                         </p>
                       </div>
-                      <span className='rounded-full border border-subtle px-2.5 py-1 text-2xs font-[510] text-secondary-token'>
+                      <span className='rounded-full border border-subtle px-2.5 py-1 text-2xs font-medium text-secondary-token'>
                         Copy
                       </span>
                     </div>

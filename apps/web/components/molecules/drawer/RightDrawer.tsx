@@ -128,7 +128,7 @@ export function RightDrawer({
           'overflow-hidden',
           'outline-none focus:outline-none focus:ring-0',
           'border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
-          'shadow-[var(--linear-app-drawer-shadow)]',
+          'shadow-(--linear-app-drawer-shadow)',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-cinematic ease-cinematic',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',

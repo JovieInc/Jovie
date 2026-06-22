@@ -86,14 +86,14 @@ export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
 function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
   const isSystem = event.actor?.type === 'system';
   return (
-    <div className='group relative flex items-start gap-3 rounded-md px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1 focus-within:bg-surface-1'>
+    <div className='group relative flex items-start gap-3 rounded-md px-1.5 py-1 transition-[background-color] duration-subtle hover:bg-surface-1 focus-within:bg-surface-1'>
       <div
         aria-hidden='true'
         className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle) group-last:hidden'
       />
       <ActivityIcon action={event.action} />
       <div className='min-w-0 flex-1'>
-        <p className='text-app leading-[18px] tracking-[-0.01em] text-secondary-token'>
+        <p className='text-app leading-[18px] tracking-tight text-secondary-token'>
           {event.description}
         </p>
         <div className='mt-0.5 flex items-center gap-1.5 text-2xs text-tertiary-token'>
@@ -129,7 +129,7 @@ export function ActivityFeed({
       <div
         className='space-y-0.5'
         role='feed'
-        aria-label='Activity feed'
+        aria-label='Activity Feed'
         aria-busy='true'
       >
         <ActivityFeedSkeleton rows={4} />
@@ -152,7 +152,7 @@ export function ActivityFeed({
   );
 
   return (
-    <div className='space-y-0.5' role='feed' aria-label='Activity feed'>
+    <div className='space-y-0.5' role='feed' aria-label='Activity Feed'>
       {sorted.map(event => (
         <ActivityEventRow key={event.id} event={event} />
       ))}

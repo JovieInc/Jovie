@@ -205,7 +205,7 @@ export const DrawerEditableTextField = React.memo(
               aria-label={`Edit ${label}`}
               className={cn(
                 'h-8 w-full rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
-                monospace && 'font-mono tracking-[0.02em]',
+                monospace && 'font-mono tracking-wider',
                 inputClassName
               )}
             />
@@ -233,7 +233,7 @@ export const DrawerEditableTextField = React.memo(
               <span
                 className={cn(
                   'block truncate text-app text-primary-token',
-                  monospace && 'font-mono tracking-[0.02em]',
+                  monospace && 'font-mono tracking-wider',
                   !hasValue && 'italic text-tertiary-token',
                   displayClassName,
                   !hasValue && emptyClassName
@@ -248,7 +248,7 @@ export const DrawerEditableTextField = React.memo(
             <span
               className={cn(
                 'block min-w-0 w-full truncate text-app text-primary-token',
-                monospace && 'font-mono tracking-[0.02em]',
+                monospace && 'font-mono tracking-wider',
                 !hasValue && 'italic text-tertiary-token',
                 displayClassName,
                 !hasValue && emptyClassName

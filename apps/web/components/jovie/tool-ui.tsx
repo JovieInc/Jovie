@@ -191,7 +191,7 @@ function ToolActivityRow({
         <div
           title={getToolStatusTitle(event)}
           className={cn(
-            'truncate font-semibold tracking-[-0.01em]',
+            'truncate font-semibold tracking-tight',
             isError && 'text-red-500',
             isInline ? 'text-xs' : 'text-app'
           )}
