@@ -13,6 +13,7 @@ vi.mock('next/image', () => ({
       placeholder: _placeholder,
       quality: _quality,
       sizes: _sizes,
+      unoptimized: _unoptimized,
       ...props
     }: any) => <img src={src} alt={alt} {...props} />
   ),
