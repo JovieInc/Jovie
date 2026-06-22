@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
 import { TEST_AUTH_BYPASS_MODE, TEST_MODE_HEADER } from '../lib/auth/test-mode';
+import { resolveWebServerWarmupProfile } from './e2e/utils/warmup-profile';
 import {
   ensureDevTestAuthPersona,
   resolveDevTestAuthPersona,
@@ -19,6 +20,7 @@ config({ path: path.join(repoRoot, '.env.test') }); // Fallback defaults
 
 const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
+const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 
 const SENSITIVE_PATTERNS = [
   'dummy',
@@ -164,33 +166,34 @@ async function globalSetup() {
     return;
   }
 
-  // Warm up critical Turbopack routes before tests start
-  // This pre-compiles /signin and /app so auth.setup.ts doesn't timeout waiting
+  console.log(`🔥 Warming up routes for ${webServerWarmupProfile} profile...`);
   const baseURL = process.env.BASE_URL || 'http://localhost:3100';
-  console.log('🔥 Warming up Turbopack routes...');
   const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
-  const warmupRoutes = [
-    '/',
-    '/signin',
-    '/api/handle/check?handle=e2e-warmup-handle',
-    '/api/dashboard/profile',
-    '/api/stripe/checkout',
-    '/api/stripe/pricing-options',
-    APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
-    APP_ROUTES.LIBRARY,
-    APP_ROUTES.RELEASES,
-    APP_ROUTES.TASKS,
-    APP_ROUTES.AUDIENCE,
-    APP_ROUTES.PRESENCE,
-    APP_ROUTES.EARNINGS,
-    APP_ROUTES.DASHBOARD_PROFILE,
-    `/${testProfile}`,
-    `/${testProfile}?mode=listen`,
-    `/${testProfile}?mode=tip`,
-    APP_ROUTES.ADMIN,
-    APP_ROUTES.ADMIN_CREATORS,
-    APP_ROUTES.ADMIN_USERS,
-  ];
+  const warmupRoutes =
+    webServerWarmupProfile === 'public'
+      ? ['/']
+      : [
+          '/',
+          '/signin',
+          '/api/handle/check?handle=e2e-warmup-handle',
+          '/api/dashboard/profile',
+          '/api/stripe/checkout',
+          '/api/stripe/pricing-options',
+          APP_ROUTES.CHAT, // auth.setup.ts navigates here — avoid first-visit 404
+          APP_ROUTES.LIBRARY,
+          APP_ROUTES.RELEASES,
+          APP_ROUTES.TASKS,
+          APP_ROUTES.AUDIENCE,
+          APP_ROUTES.PRESENCE,
+          APP_ROUTES.EARNINGS,
+          APP_ROUTES.DASHBOARD_PROFILE,
+          `/${testProfile}`,
+          `/${testProfile}?mode=listen`,
+          `/${testProfile}?mode=tip`,
+          APP_ROUTES.ADMIN,
+          APP_ROUTES.ADMIN_CREATORS,
+          APP_ROUTES.ADMIN_USERS,
+        ];
   for (const route of warmupRoutes) {
     try {
       const res = await fetch(`${baseURL}${route}`, {
@@ -205,31 +208,35 @@ async function globalSetup() {
     }
   }
 
-  const apiWarmupRequests = [
-    ...(process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
-      ? [
+  const apiWarmupRequests =
+    webServerWarmupProfile === 'public'
+      ? []
+      : [
+          ...(process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+            ? [
+                {
+                  body: JSON.stringify({
+                    persona:
+                      resolveDevTestAuthPersona(
+                        process.env.E2E_TEST_AUTH_PERSONA
+                      ) ?? 'creator-ready',
+                  }),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+                  },
+                  method: 'POST',
+                  route: '/api/dev/test-auth/session',
+                },
+              ]
+            : []),
           {
-            body: JSON.stringify({
-              persona:
-                resolveDevTestAuthPersona(process.env.E2E_TEST_AUTH_PERSONA) ??
-                'creator-ready',
-            }),
-            headers: {
-              'Content-Type': 'application/json',
-              [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
-            },
+            body: JSON.stringify({}),
+            headers: { 'Content-Type': 'application/json' },
             method: 'POST',
-            route: '/api/dev/test-auth/session',
+            route: '/api/onboarding/welcome-chat',
           },
-        ]
-      : []),
-    {
-      body: JSON.stringify({}),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-      route: '/api/onboarding/welcome-chat',
-    },
-  ];
+        ];
 
   for (const request of apiWarmupRequests) {
     try {

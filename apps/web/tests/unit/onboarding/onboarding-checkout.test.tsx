@@ -51,9 +51,15 @@ vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
     main,
+    containerClassName: _containerClassName,
+    contentClassName: _contentClassName,
+    rightPanel: _rightPanel,
     ...props
   }: {
     readonly main?: React.ReactNode;
+    readonly containerClassName?: string;
+    readonly contentClassName?: string;
+    readonly rightPanel?: React.ReactNode;
     readonly [key: string]: unknown;
   }) => (
     <div data-testid='app-shell-frame' {...props}>
