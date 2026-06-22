@@ -140,10 +140,19 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     for line in raw.split(whereSeparator: \.isNewline) {
       let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty else { continue }
-      guard let lineData = trimmed.data(using: .utf8),
-            let json = try JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-            let type = json["type"] as? String
-      else {
+      guard let lineData = trimmed.data(using: .utf8) else {
+        throw MobileChatClientError.decodingFailed
+      }
+
+      let jsonObject: Any
+      do {
+        jsonObject = try JSONSerialization.jsonObject(with: lineData)
+      } catch {
+        throw MobileChatClientError.decodingFailed
+      }
+
+      guard let json = jsonObject as? [String: Any],
+            let type = json["type"] as? String else {
         throw MobileChatClientError.decodingFailed
       }
 
