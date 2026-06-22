@@ -21,7 +21,7 @@ gh_retry() {
     local err
     err="$(<"$err_file")"
     if [[ "$attempt" -eq "$attempts" ]] \
-      || ! grep -qiE 'HTTP (429|502|503|504)|rate limit|timed out|timeout|couldn'\''t respond' <<<"$err"; then
+      || ! grep -qiE 'HTTP (429|502|503|504)|rate limit|timed out|timeout|couldn'\''t respond|stream error|CANCEL|connection reset|unexpected EOF' <<<"$err"; then
       echo "$err" >&2
       rm -f "$err_file"
       return 1

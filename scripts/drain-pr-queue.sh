@@ -31,7 +31,7 @@ label() {  # label <num> <label>
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
-SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
+if ! SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
   --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
   [ .[] | {
     n: .number,
@@ -44,7 +44,33 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
             | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
             | (.name // .context)
             | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]
-  } ]')"
+  } ]')"; then
+  if [[ "${GITHUB_EVENT_NAME:-}" == "pull_request" && -n "${GITHUB_EVENT_PATH:-}" ]]; then
+    event_pr="$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")"
+    if [[ -n "$event_pr" ]]; then
+      echo "WARN: full PR queue sweep failed; falling back to current PR #$event_pr" >&2
+      SNAP="$(gh_retry pr view "$event_pr" -R "$REPO" \
+        --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
+        [ {
+          n: .number,
+          t: (.title[0:48]),
+          draft: .isDraft,
+          m: .mergeable,
+          head: .headRefName,
+          L: [.labels[].name],
+          fail: [ .statusCheckRollup[]?
+                  | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
+                  | (.name // .context)
+                  | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]
+        } ]')"
+    else
+      echo "ERROR: full PR queue sweep failed and pull_request payload has no PR number" >&2
+      exit 1
+    fi
+  else
+    exit 1
+  fi
+fi
 
 # --- ENROLL: non-draft, mergeable, green, not opted-out, not already queued ---
 echo "=== ENROLL (clean → +merge-queue) ==="
