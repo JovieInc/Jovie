@@ -83,7 +83,7 @@ const ActivityItem = memo(function ActivityItem({
         <ActivityGlyph icon={activity.icon} />
       </span>
       <div className='min-w-0 flex-1'>
-        <p className='text-app leading-5 tracking-[-0.01em] text-secondary-token'>
+        <p className='text-app leading-5 tracking-tight text-secondary-token'>
           <span className='tabular-nums text-tertiary-token'>
             {formatTimeAgo(activity.timestamp)}
           </span>
@@ -147,7 +147,7 @@ export function DashboardActivityFeed({
           <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
             <Zap className='h-4 w-4 text-tertiary-token' aria-hidden='true' />
           </div>
-          <h3 className='text-app font-caption tracking-[-0.01em] text-secondary-token'>
+          <h3 className='text-app font-caption tracking-tight text-secondary-token'>
             Activity
           </h3>
         </div>

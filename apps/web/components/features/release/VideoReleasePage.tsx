@@ -85,12 +85,12 @@ export function VideoReleasePage({
       returnLabel={`Back to ${artist.name}`}
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-          <h1 className='text-mid font-[510] leading-[1.2] tracking-[-0.01em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+          <h1 className='text-mid font-medium leading-[1.2] tracking-tight text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
             {release.title}
           </h1>
           <Link
             href={`/${artist.handle}`}
-            className='mt-1 block text-app font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
+            className='mt-1 block text-app font-book text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
           >
             {artist.name}
           </Link>
@@ -130,8 +130,8 @@ export function VideoReleasePage({
             href={youtubeUrl}
             target='_blank'
             rel='noopener noreferrer'
-            aria-label='Watch on YouTube (opens in new tab)'
-            className='inline-flex items-center gap-1.5 text-app font-[450] text-white/40 transition-colors hover:text-white/60'
+            aria-label='Watch On YouTube (Opens In New Tab)'
+            className='inline-flex items-center gap-1.5 text-app font-book text-white/40 transition-colors hover:text-white/60'
           >
             <ExternalLink className='size-3.5' />
             Watch on YouTube

@@ -180,7 +180,7 @@ function AudienceQualityCaptureCard() {
                   <p className='text-app font-semibold text-primary-token'>
                     Advanced Quality Filtering
                   </p>
-                  <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
+                  <p className='mt-1 text-xs leading-normal text-secondary-token'>
                     Apply the same quality logic across audience views, exports,
                     and downstream automations.
                   </p>
@@ -231,7 +231,7 @@ function SyncSettingsCaptureCard() {
                 <p className='text-app font-semibold text-primary-token'>
                   Always in sync
                 </p>
-                <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
+                <p className='mt-1 text-xs leading-normal text-secondary-token'>
                   New releases, top tracks, and linked surfaces stay aligned.
                 </p>
               </div>
@@ -282,7 +282,7 @@ function AlwaysInSyncToggle() {
       <span className='text-xs font-semibold text-primary-token'>
         Always In Sync
       </span>
-      <span className='flex h-7 w-12 items-center rounded-full bg-[color:var(--color-accent)] px-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'>
+      <span className='flex h-7 w-12 items-center rounded-full bg-accent px-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'>
         <span className='ml-auto h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] dark:bg-white' />
       </span>
     </div>
@@ -305,7 +305,7 @@ function QualitySignalRow({
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-app font-semibold text-primary-token'>{label}</p>
-          <p className='mt-1 text-xs leading-[1.5] text-secondary-token'>
+          <p className='mt-1 text-xs leading-normal text-secondary-token'>
             {detail}
           </p>
         </div>
@@ -348,7 +348,7 @@ function SyncSurfacePill({
 }>) {
   return (
     <div className='rounded-2xl border border-subtle bg-surface-1 px-3 py-3'>
-      <p className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
+      <p className='text-2xs font-semibold tracking-tight text-secondary-token'>
         {label}
       </p>
       <p className='mt-1 text-sm font-semibold text-primary-token'>{value}</p>

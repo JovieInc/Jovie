@@ -71,7 +71,7 @@ export function AnalyticsCard({
       iconClassName={cn('text-accent-token', iconClassName)}
       headerRight={headerRight}
       headerClassName='gap-2'
-      labelClassName='text-app text-secondary-token tracking-[-0.01em]'
+      labelClassName='text-app text-secondary-token tracking-tight'
       valueClassName='text-3xl font-semibold tracking-[-0.022em]'
       subtitleClassName='text-app text-tertiary-token'
       aria-label={ariaLabel ?? `${title} metric`}

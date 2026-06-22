@@ -136,12 +136,12 @@ export function BentoFeatureGrid() {
       aria-labelledby='bento-heading'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='mx-auto max-w-linear-content'>
           <h2
             id='bento-heading'
             className='marketing-h2-linear text-primary-token'
           >
-            A command center for your career.
+            A Command Center For Your Career.
           </h2>
 
           <div className='mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2'>

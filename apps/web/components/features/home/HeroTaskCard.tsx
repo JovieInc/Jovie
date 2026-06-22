@@ -54,7 +54,7 @@ export function HeroTaskCard({
           </p>
           <h3
             className={[
-              'mt-1 font-[580] tracking-[-0.02em] text-white',
+              'mt-1 font-[580] tracking-tighter text-white',
               compact ? 'text-app leading-5' : 'text-sm leading-5',
             ].join(' ')}
           >

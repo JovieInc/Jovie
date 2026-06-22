@@ -99,7 +99,7 @@ export function CopyableUrlRow({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center transition-[background-color,border-color] duration-150',
+        'flex items-center transition-[background-color,border-color] duration-subtle',
         surface === 'boxed'
           ? 'border border-(--linear-app-frame-seam) bg-surface-0 hover:bg-surface-1'
           : 'border border-transparent bg-transparent hover:bg-surface-1/80',
@@ -115,7 +115,7 @@ export function CopyableUrlRow({
       )}
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-secondary-token',
+          'min-w-0 flex-1 truncate font-mono tracking-tight text-secondary-token',
           styles.value,
           'leading-none',
           valueClassName
@@ -129,7 +129,7 @@ export function CopyableUrlRow({
       </span>
       <span
         className={cn(
-          'inline-flex shrink-0 items-center gap-1 transition-opacity duration-150',
+          'inline-flex shrink-0 items-center gap-1 transition-opacity duration-subtle',
           actionsVisibility === 'hover' &&
             'opacity-0 focus-within:opacity-100 group-hover:opacity-100'
         )}

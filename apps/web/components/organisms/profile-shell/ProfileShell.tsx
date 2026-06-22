@@ -192,10 +192,10 @@ export function ProfileShell({
         <PublicSurfaceShell
           backgroundPattern={backgroundPattern}
           showGradientBlurs={showGradientBlurs}
-          className='min-h-dvh bg-[color:var(--profile-stage-bg)] text-primary-token font-medium tracking-tight md:min-h-dvh'
+          className='min-h-dvh bg-(--profile-stage-bg) text-primary-token font-medium tracking-tight md:min-h-dvh'
         >
           <div
-            className='pointer-events-none absolute inset-0 bg-[var(--profile-stage-overlay)]'
+            className='pointer-events-none absolute inset-0 bg-(--profile-stage-overlay)'
             aria-hidden='true'
           />
 
@@ -271,7 +271,7 @@ export function ProfileShell({
                     showShopButton) && (
                     <PublicSurfaceFooter className='mt-auto pt-6 sm:pt-8'>
                       <nav
-                        className='mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-[color:var(--profile-dock-border)] bg-[var(--profile-dock-bg)] px-2 py-2 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl sm:gap-3'
+                        className='mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-(--profile-dock-border) bg-(--profile-dock-bg) px-2 py-2 shadow-(--profile-dock-shadow) backdrop-blur-2xl sm:gap-3'
                         aria-label='Profile Modes'
                         data-testid='profile-mode-nav'
                       >
@@ -282,8 +282,8 @@ export function ProfileShell({
                           data-testid='profile-trigger'
                           className={`transition-[background-color,color,box-shadow] ${
                             !mode || mode === 'profile'
-                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                              ? 'bg-(--profile-pearl-bg-active) text-primary-token'
+                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
                           }`}
                           onClick={() => {
                             router.push(`/${artist.handle}`);
@@ -299,8 +299,8 @@ export function ProfileShell({
                             data-testid='contact-trigger'
                             className={`transition-[background-color,color,box-shadow] ${
                               mode === 'contact'
-                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                                ? 'bg-(--profile-pearl-bg-active) text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
                             }`}
                             onClick={() => {
                               router.push(`/${artist.handle}?mode=contact`);
@@ -317,8 +317,8 @@ export function ProfileShell({
                             data-testid='tour-trigger'
                             className={`transition-[background-color,color,box-shadow] ${
                               isTourModeActive
-                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                                ? 'bg-(--profile-pearl-bg-active) text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
                             }`}
                             onClick={() => {
                               router.push(`/${artist.handle}?mode=tour`);
@@ -334,7 +334,7 @@ export function ProfileShell({
                             variant='pearl'
                             ariaLabel='Shop'
                             data-testid='shop-trigger'
-                            className='border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            className='border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
                             onClick={() => {
                               window.open(
                                 `/${artist.handle}/shop`,
@@ -358,8 +358,8 @@ export function ProfileShell({
                             data-testid='pay-trigger'
                             className={`transition-[background-color,color,box-shadow] ${
                               isPayModeActive
-                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                                ? 'bg-(--profile-pearl-bg-active) text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
                             }`}
                             onClick={() => {
                               if (isMobile) {

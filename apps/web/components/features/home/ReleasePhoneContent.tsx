@@ -61,7 +61,7 @@ export function ReleasePhoneContent({
               key={key}
               label={DSP_LABELS[key] ?? 'Spotify'}
               iconPath={config.iconPath}
-              className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
+              className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
             />
           );
         })}

@@ -190,7 +190,7 @@ export function CookieBannerSection() {
                 <Shield className='h-3.5 w-3.5' aria-hidden='true' />
               </div>
               <div className='min-w-0 flex-1'>
-                <p className='text-xs leading-[1.5] text-secondary-token'>
+                <p className='text-xs leading-normal text-secondary-token'>
                   We use cookies for essential functionality and to improve your
                   experience.{' '}
                   <Link

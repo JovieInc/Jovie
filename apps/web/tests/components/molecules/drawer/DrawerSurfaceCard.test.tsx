@@ -47,7 +47,7 @@ describe('DrawerSurfaceCard', () => {
     expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-none');
 
     expect(LINEAR_SURFACE.contentContainer).toContain('shadow-none');
-    expect(LINEAR_SURFACE.popover).toContain('shadow-[var(--shadow-popover)]');
+    expect(LINEAR_SURFACE.popover).toContain('shadow-(--shadow-popover)');
   });
 
   it('drawer cards are one tier above content containers', () => {

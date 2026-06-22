@@ -591,7 +591,7 @@ export function JovieChat({
           {isDragOver && (
             <motion.div
               data-testid='chat-attachment-dropzone'
-              className='absolute inset-0 z-50 flex items-center justify-center rounded-[var(--linear-app-shell-radius)] border border-dashed border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_82%,black),color-mix(in_oklab,var(--linear-app-content-surface)_70%,black))] p-6 backdrop-blur-md'
+              className='absolute inset-0 z-50 flex items-center justify-center rounded-(--linear-app-shell-radius) border border-dashed border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_82%,black),color-mix(in_oklab,var(--linear-app-content-surface)_70%,black))] p-6 backdrop-blur-md'
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

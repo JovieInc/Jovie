@@ -40,24 +40,24 @@ export default function UILayout({
       <div className='flex h-screen bg-page text-primary-token'>
         <aside className='sticky top-0 flex h-screen w-52 shrink-0 flex-col overflow-y-auto border-r border-subtle py-6'>
           <div className='px-4 pb-4'>
-            <span className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+            <span className='text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
               UI Demo
             </span>
-            <p className='mt-0.5 text-[11px] text-tertiary-token'>
+            <p className='mt-0.5 text-2xs text-tertiary-token'>
               Linear parity review
             </p>
           </div>
 
           {NAV_ITEMS.map(group => (
             <div key={group.label} className='px-2'>
-              <p className='px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-tertiary-token'>
+              <p className='px-2 pb-1 pt-3 text-3xs font-semibold uppercase tracking-wider text-tertiary-token'>
                 {group.label}
               </p>
               {group.items.map(item => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className='flex items-center justify-between rounded px-2 py-1.5 text-[13px] transition-colors hover:bg-surface-1 text-tertiary-token data-[status=done]:text-primary-token'
+                  className='flex items-center justify-between rounded px-2 py-1.5 text-app transition-colors hover:bg-surface-1 text-tertiary-token data-[status=done]:text-primary-token'
                   data-status={item.status}
                 >
                   {item.label}

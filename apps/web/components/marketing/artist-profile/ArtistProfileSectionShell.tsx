@@ -3,7 +3,7 @@ import { MarketingContainer } from '@/components/marketing';
 import { cn } from '@/lib/utils';
 
 const PAGE_CHROME_ALIGNED_CONTAINER_CLASS =
-  '!max-w-[var(--linear-content-max)] !px-5 sm:!px-6 lg:!px-0';
+  '!max-w-linear-content !px-5 sm:!px-6 lg:!px-0';
 
 interface ArtistProfileSectionShellProps {
   readonly id?: string;

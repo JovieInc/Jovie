@@ -217,7 +217,7 @@ function PayloadBlock(props: Readonly<{ label: string; value: string }>) {
   return (
     <div className='space-y-1.5'>
       <p className='text-xs font-semibold text-primary-token'>{props.label}</p>
-      <pre className='overflow-x-auto rounded-xl border border-subtle bg-surface-0 px-3 py-2 text-2xs leading-[1.5] text-secondary-token whitespace-pre-wrap'>
+      <pre className='overflow-x-auto rounded-xl border border-subtle bg-surface-0 px-3 py-2 text-2xs leading-normal text-secondary-token whitespace-pre-wrap'>
         {props.value}
       </pre>
     </div>

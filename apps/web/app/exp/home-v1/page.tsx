@@ -474,7 +474,7 @@ function HeroBrutalist({ draft, onDraft, onSubmit, onScrollNext }: HeroProps) {
               {EYEBROW}
             </span>
           </div>
-          <p className='text-xs uppercase tracking-[0.06em] text-(--color-bg-surface-0)/55 leading-[1.5] max-w-[26ch]'>
+          <p className='text-xs uppercase tracking-[0.06em] text-(--color-bg-surface-0)/55 leading-normal max-w-[26ch]'>
             ED. 01 / 2026 — A studio for artists who&apos;d rather make than
             manage.
           </p>
@@ -592,7 +592,7 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
         >
           {HEADLINE}
         </h1>
-        <p className='mt-7 text-base lg:text-lg leading-[1.5] text-white/60 max-w-[52ch]'>
+        <p className='mt-7 text-base lg:text-lg leading-normal text-white/60 max-w-[52ch]'>
           {SUBHEAD}
         </p>
         <Link

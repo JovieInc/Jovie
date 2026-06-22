@@ -56,7 +56,7 @@ export function DotBadge({
     <Badge
       variant='outline'
       className={cn(
-        'w-fit whitespace-nowrap shadow-none tracking-[-0.01em]',
+        'w-fit whitespace-nowrap shadow-none tracking-tight',
         SIZE_CLASSES[size],
         variant.className,
         className

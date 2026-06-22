@@ -55,7 +55,7 @@ export default async function MoodHubPage({
 
   return (
     <div className='mx-auto max-w-6xl px-4 py-16'>
-      <nav className='mb-6 text-[13px] text-white/40'>
+      <nav className='mb-6 text-app text-white/40'>
         <Link href='/playlists' className='hover:text-white/60'>
           Playlists
         </Link>
@@ -65,7 +65,7 @@ export default async function MoodHubPage({
         </span>
       </nav>
 
-      <h1 className='text-[48px] font-[510] leading-[1.0] tracking-[-1.056px] text-white'>
+      <h1 className='text-5xl font-medium leading-none tracking-[-1.056px] text-(--color-text-tooltip)'>
         {decoded.charAt(0).toUpperCase() + decoded.slice(1)} Playlists
       </h1>
 

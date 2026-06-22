@@ -499,7 +499,7 @@ export function ProfileCompactSurface({
     >
       <div
         ref={setNotificationsPortalContainer}
-        className='relative flex h-full w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)]'
+        className='relative flex h-full w-full flex-col overflow-hidden bg-(--profile-content-bg)'
         data-testid='profile-compact-surface'
         data-mode={activeVisiblePrimaryTab}
         data-presentation={presentation}
@@ -579,7 +579,7 @@ export function ProfileCompactSurface({
 
               <p
                 className={cn(
-                  'profile-cover-mode-title absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-normal text-[color:var(--profile-status-pill-fg)]',
+                  'profile-cover-mode-title absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-normal text-(--profile-status-pill-fg)',
                   isHomeMode && 'hidden'
                 )}
                 data-testid={
@@ -628,7 +628,7 @@ export function ProfileCompactSurface({
                     href={profileHref}
                     prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-[color:var(--profile-status-pill-fg)] drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-(--profile-status-pill-fg) drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}

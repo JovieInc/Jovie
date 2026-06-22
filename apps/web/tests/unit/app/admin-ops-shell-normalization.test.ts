@@ -105,7 +105,7 @@ describe('admin ops shell normalization', () => {
 
     expect(source).not.toContain('uppercase');
     expect(source).not.toMatch(/\btracking-\[/);
-    expect(source).toContain('font-[510]');
+    expect(source).toContain('font-medium');
     expect(source).toContain('getAccentCssVars');
     expect(source).toContain('HUD_TONE_ACCENT');
   });

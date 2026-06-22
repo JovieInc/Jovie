@@ -97,7 +97,7 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
       <p className='mb-3 text-xs font-[560] text-primary-token'>Selected Run</p>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='truncate text-app font-[590] text-primary-token'>
+          <p className='truncate text-app font-semibold text-primary-token'>
             {artifact.title}
           </p>
           <p className='mt-1 text-xs leading-5 text-secondary-token'>

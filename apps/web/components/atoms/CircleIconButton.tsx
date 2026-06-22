@@ -127,10 +127,10 @@ const variantStyles: Record<
   pearl: {
     buttonVariant: 'ghost',
     className: cn(
-      'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token backdrop-blur-xl',
-      'shadow-[var(--profile-pearl-shadow)]',
-      'hover:bg-[var(--profile-pearl-bg-hover)] hover:text-primary-token',
-      'active:bg-[var(--profile-pearl-bg-active)]'
+      'border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-primary-token backdrop-blur-xl',
+      'shadow-(--profile-pearl-shadow)',
+      'hover:bg-(--profile-pearl-bg-hover) hover:text-primary-token',
+      'active:bg-(--profile-pearl-bg-active)'
     ),
   },
   pearlQuiet: {
@@ -138,9 +138,9 @@ const variantStyles: Record<
     className: cn(
       'border border-transparent bg-transparent text-primary-token/78 backdrop-blur-xl',
       'shadow-none',
-      'hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] hover:text-primary-token hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
-      'focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] focus-visible:text-primary-token focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]',
-      'active:bg-[var(--profile-pearl-bg-active)] active:text-primary-token'
+      'hover:border-(--profile-pearl-border) hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] hover:text-primary-token hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
+      'focus-visible:border-(--profile-pearl-border) focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] focus-visible:text-primary-token focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]',
+      'active:bg-(--profile-pearl-bg-active) active:text-primary-token'
     ),
   },
 };

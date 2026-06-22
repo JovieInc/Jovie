@@ -114,7 +114,7 @@ function FunnelStage({
           {label}
         </span>
         <span className='flex items-baseline gap-1.5'>
-          <span className='tabular-nums text-mid font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+          <span className='tabular-nums text-mid font-semibold leading-none tracking-tighter text-primary-token'>
             {numberFormatter.format(value)}
           </span>
           {rate && (

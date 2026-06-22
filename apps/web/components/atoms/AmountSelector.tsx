@@ -36,8 +36,8 @@ export const AmountSelector = memo(function AmountSelector({
         'group relative flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-2xl border text-center transition-[background-color,border-color,box-shadow,color,opacity] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         isSelected
-          ? 'border-[color:var(--profile-pearl-primary-bg)] bg-[var(--profile-pearl-primary-bg)] text-[var(--profile-pearl-primary-fg)] ring-1 ring-white/10'
-          : 'border-black/6 bg-white text-primary-token ring-1 ring-black/[0.03] hover:border-black/10 hover:bg-[var(--profile-pearl-bg-hover)] hover:ring-black/[0.05] dark:border-white/10 dark:bg-(--color-text-tooltip) dark:ring-white/[0.04] dark:hover:border-white/14 dark:hover:bg-[var(--profile-pearl-bg-hover)] dark:hover:ring-white/[0.06]',
+          ? 'border-(--profile-pearl-primary-bg) bg-(--profile-pearl-primary-bg) text-(--profile-pearl-primary-fg) ring-1 ring-white/10'
+          : 'border-black/6 bg-white text-primary-token ring-1 ring-black/[0.03] hover:border-black/10 hover:bg-(--profile-pearl-bg-hover) hover:ring-black/[0.05] dark:border-white/10 dark:bg-(--color-text-tooltip) dark:ring-white/[0.04] dark:hover:border-white/14 dark:hover:bg-(--profile-pearl-bg-hover) dark:hover:ring-white/[0.06]',
         className
       )}
     >
@@ -45,7 +45,7 @@ export const AmountSelector = memo(function AmountSelector({
         className={cn(
           'text-3xs font-medium tracking-[0.08em]',
           isSelected
-            ? 'text-[var(--profile-pearl-primary-fg)]/72'
+            ? 'text-(--profile-pearl-primary-fg)/72'
             : 'text-secondary-token'
         )}
         aria-hidden
