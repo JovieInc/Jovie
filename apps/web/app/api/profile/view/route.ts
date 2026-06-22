@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Pro feature: exclude the artist's own visits from analytics
+    // Exclude authenticated owner self-views from profile view counts
     if (await shouldExcludeSelfByHandle(handle)) {
       return NextResponse.json(
         { success: true, filtered: true },
