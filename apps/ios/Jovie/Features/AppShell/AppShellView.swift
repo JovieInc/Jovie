@@ -399,23 +399,18 @@ private struct AppNavigationMenu: View {
             } else {
               VStack(spacing: JovieSpacing.small) {
                 ForEach(recentConversations.prefix(5)) { conversation in
-                  Button {
+                  RecentConversationMenuRow(
+                    title: conversation.title ?? "New Conversation",
+                    accessibilityID: "recent-conversation-\(conversation.id)"
+                  ) {
                     onSelectConversation(conversation.id)
-                  } label: {
-                    HStack {
-                      Text(conversation.title ?? "New Conversation")
-                        .font(JovieFont.body(size: 15))
-                        .foregroundStyle(JovieColor.textPrimary)
-                        .lineLimit(1)
-                      Spacer()
-                    }
-                    .padding(.vertical, JovieSpacing.small)
                   }
-                  .buttonStyle(.plain)
                 }
               }
+              .frame(maxWidth: .infinity, alignment: .leading)
             }
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.top, JovieSpacing.medium)
         }
 
@@ -426,7 +421,33 @@ private struct AppNavigationMenu: View {
       .padding(.bottom, JovieSpacing.xLarge)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
-    .accessibilityIdentifier("shell-menu")
+  }
+}
+
+private struct RecentConversationMenuRow: View {
+  let title: String
+  let accessibilityID: String
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack {
+        Text(title)
+          .lineLimit(1)
+
+        Spacer(minLength: 0)
+      }
+      .font(JovieFont.body(size: 15, weight: .medium))
+      .foregroundStyle(JovieColor.textPrimary)
+      .padding(.vertical, 13)
+      .padding(.horizontal, JovieSpacing.medium)
+      .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityLabel(title)
+    .accessibilityIdentifier(accessibilityID)
   }
 }
 
