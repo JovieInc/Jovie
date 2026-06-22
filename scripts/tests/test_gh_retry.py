@@ -78,6 +78,57 @@ class TestGhRetryHelper:
         assert "gh-retry" in result.stderr
         assert counter.read_text(encoding="utf-8").strip() == "3"
 
+    @pytest.mark.parametrize(
+        "transient_error",
+        [
+            "stream error: stream ID 1; CANCEL; received from peer",
+            "unexpected end of JSON input",
+        ],
+    )
+    def test_retries_github_transport_truncation_then_succeeds(
+        self, tmp_path: Path, transient_error: str
+    ) -> None:
+        counter = tmp_path / "calls"
+        counter.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                count_file="${GH_RETRY_TEST_COUNTER:?}"
+                count=$(<"$count_file")
+                count=$((count + 1))
+                echo "$count" >"$count_file"
+                if [[ "$count" -lt 2 ]]; then
+                  echo "${GH_RETRY_TEST_ERROR:?}" >&2
+                  exit 1
+                fi
+                echo '["ok"]'
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        script = textwrap.dedent(
+            f"""\
+            set -euo pipefail
+            source "{_GH_RETRY}"
+            export PATH="{tmp_path}:$PATH"
+            export GH_RETRY_ATTEMPTS=3
+            export GH_RETRY_BASE_DELAY=0
+            export GH_RETRY_TEST_COUNTER="{counter}"
+            export GH_RETRY_TEST_ERROR="{transient_error}"
+            out=$(gh_retry pr list --json statusCheckRollup)
+            test "$out" = '["ok"]'
+            """
+        )
+        result = _run_bash(script)
+        assert result.returncode == 0, result.stderr
+        assert "gh-retry" in result.stderr
+        assert counter.read_text(encoding="utf-8").strip() == "2"
+
     def test_does_not_retry_permanent_errors(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
@@ -112,7 +163,74 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
-    def test_drain_script_uses_gh_retry_for_pr_list(self) -> None:
+    def test_drain_script_uses_bulk_status_check_rollup_and_taste_approval(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
         assert 'gh_retry pr list' in content
+        assert "--limit 200" in content
+        assert "statusCheckRollup" in content
+        assert 'tim-approved' in content
+        assert 'approved:taste' in content
+        assert "gh_retry pr checks" not in content
+
+    def test_red_status_check_rollup_blocks_enqueue(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":123,"t":"Red CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-red","L":[],"fail":["Typecheck"]}]
+                JSON
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #123" not in result.stdout
+        assert "=== BLOCKED (red checks" in result.stdout
+        assert "#123" in result.stdout
+        assert "Typecheck" in result.stdout
+
+    def test_taste_approved_needs_human_pr_can_enqueue(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]}]
+                JSON
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #456" in result.stdout
+        assert "[dry-run] would +merge-queue on #789" not in result.stdout
+        assert "=== SURFACE (human decision; not touched) ===" in result.stdout
+        assert "#789" in result.stdout

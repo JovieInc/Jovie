@@ -21,6 +21,8 @@ if [[ "$ACTION" == "-resolvePackageDependencies" ]]; then
   exit 0
 fi
 
+"$SCRIPT_DIR/ensure-configuration.sh"
+
 run_with_timeout() {
   local timeout_seconds="$1"
   shift

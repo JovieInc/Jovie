@@ -1,5 +1,6 @@
 import ClerkKit
 import Darwin
+import Foundation
 import Observation
 import SwiftUI
 
@@ -223,7 +224,7 @@ private struct AppContentView: View {
           initialTab: appState.launchMode.opensChatOnLaunch ? .chat : .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
-          chatEnabled: appState.loadedDashboardResponse?.chatEnabled ?? false,
+          chatEnabled: appState.loadedDashboardResponse != nil,
           recentConversations: chatRepository?.conversations ?? [],
           onSelectConversation: { conversationID in
             Task { await chatRepository?.openConversation(conversationID) }
@@ -268,11 +269,14 @@ private struct AppContentView: View {
       }
 
       if chatRepository == nil {
-        let repository = ChatRepository(
-          client: MobileChatClient(
+        let chatClient: any MobileChatClientProtocol = appState.launchMode.usesLiveClerk
+          ? MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
             tokenProvider: ClerkTokenProvider()
-          ),
+          )
+          : OfflineMobileChatClient()
+        let repository = ChatRepository(
+          client: chatClient,
           cache: ChatCache(),
           clerkUserID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
@@ -281,6 +285,20 @@ private struct AppContentView: View {
         chatRepository = repository
       }
     }
+  }
+}
+
+private struct OfflineMobileChatClient: MobileChatClientProtocol {
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
+  }
+
+  func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
+    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
   }
 }
 
@@ -304,7 +322,7 @@ private struct MobileChatPlaceholderView: View {
               .foregroundStyle(JovieColor.textPrimary)
               .multilineTextAlignment(.center)
 
-            Text(isOffline ? "Offline. Drafts stay on this device." : "Native chat is in alpha for internal testers.")
+            Text(isOffline ? "Offline. Drafts stay on this device." : "Ask Jovie about your profile, releases, and next moves.")
               .font(JovieFont.body(size: 15))
               .foregroundStyle(JovieColor.textTertiary)
               .multilineTextAlignment(.center)

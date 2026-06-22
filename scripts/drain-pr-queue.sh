@@ -31,7 +31,7 @@ label() {  # label <num> <label>
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
-SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
+SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
   --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
   [ .[] | {
     n: .number,
@@ -53,7 +53,8 @@ echo "$SNAP" | jq -c '.[]
   | select(.m=="MERGEABLE")
   | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="merge-queue" or .=="fast") | not)' \
+  | select([.L[]] | any(.=="hold" or .=="gated" or .=="merge-queue" or .=="fast") | not)
+  | select( (([.L[]]|index("needs-human"))|not) or ([.L[]]|any(.=="tim-approved" or .=="approved:taste")))' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     echo "  #$n  $t"

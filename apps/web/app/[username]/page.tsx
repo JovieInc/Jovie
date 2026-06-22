@@ -6,7 +6,6 @@ import { notFound } from 'next/navigation';
 // API (cookies(), headers()) in this RSC tree.
 
 import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
@@ -19,10 +18,6 @@ import {
   getProfileVisitorState,
   supportsDirectProfileClaim,
 } from '@/lib/claim/visitor-state';
-import {
-  buildBreadcrumbObject,
-  buildListenActions,
-} from '@/lib/constants/schemas';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
@@ -41,6 +36,7 @@ import {
   PROFILE_ERROR_METADATA,
 } from '@/lib/profile/metadata';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
+import { generateProfileStructuredData } from '@/lib/seo/structured-data';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
@@ -53,210 +49,10 @@ import {
   USERNAME_PATTERN,
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
-import {
-  CreatorProfile,
-  convertCreatorProfileToArtist,
-  LegacySocialLink,
-} from '@/types/db';
+import { convertCreatorProfileToArtist } from '@/types/db';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { getProfileStaticParams } from './_lib/profile-static-params';
 import { getProfileAndLinks } from './_lib/public-profile-loader';
-
-/** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
-const MAX_EVENT_SCHEMAS = 5;
-
-/**
- * Map ticketStatus enum to schema.org Event properties.
- */
-function mapTicketStatus(status: string): {
-  eventStatus: string;
-  availability: string | null;
-} {
-  switch (status) {
-    case 'cancelled':
-      return {
-        eventStatus: 'https://schema.org/EventCancelled',
-        availability: null,
-      };
-    case 'sold_out':
-      return {
-        eventStatus: 'https://schema.org/EventScheduled',
-        availability: 'https://schema.org/SoldOut',
-      };
-    default:
-      return {
-        eventStatus: 'https://schema.org/EventScheduled',
-        availability: 'https://schema.org/InStock',
-      };
-  }
-}
-
-/**
- * Generate a single @graph JSON-LD object for artist profile SEO.
- * Includes ProfilePage, MusicGroup, BreadcrumbList, and MusicEvent schemas.
- */
-function generateProfileStructuredData(
-  profile: CreatorProfile,
-  genres: string[] | null,
-  links: LegacySocialLink[],
-  tourDates: TourDateViewModel[],
-  entityLinks: import('@/lib/entity/sameAs').EntityIdentityLink[] = []
-) {
-  const artistName = profile.display_name || profile.username;
-  const normalizedUsername =
-    profile.username_normalized || profile.username.toLowerCase();
-  const profileUrl = `${BASE_URL}/${normalizedUsername}`;
-
-  // Build canonical sameAs: KB identifiers (MB/Wikidata/ISNI) + DSP + social
-  const uniqueSocialUrls = buildEntitySameAs(
-    {
-      musicbrainzId: profile.musicbrainz_id,
-      spotifyUrl: profile.spotify_url,
-      appleMusicUrl: profile.apple_music_url,
-      youtubeUrl: profile.youtube_url,
-    },
-    entityLinks,
-    links.map(l => ({ platform: l.platform, url: l.url ?? '' }))
-  );
-
-  // Build ListenAction from all DSP links (profile columns + social links table)
-  const DSP_PLATFORMS: Record<string, string> = {
-    spotify: 'Spotify',
-    apple_music: 'Apple Music',
-    youtube: 'YouTube',
-    soundcloud: 'SoundCloud',
-    deezer: 'Deezer',
-    tidal: 'Tidal',
-  };
-  const dspUrls = new Map<string, { url: string; name: string }>();
-  // Profile columns first (highest priority)
-  if (profile.spotify_url)
-    dspUrls.set('spotify', { url: profile.spotify_url, name: 'Spotify' });
-  if (profile.apple_music_url)
-    dspUrls.set('apple_music', {
-      url: profile.apple_music_url,
-      name: 'Apple Music',
-    });
-  if (profile.youtube_url)
-    dspUrls.set('youtube', { url: profile.youtube_url, name: 'YouTube' });
-  // Social links table (fill gaps)
-  for (const link of links) {
-    const platform = link.platform?.toLowerCase() ?? '';
-    if (DSP_PLATFORMS[platform] && link.url && !dspUrls.has(platform)) {
-      dspUrls.set(platform, { url: link.url, name: DSP_PLATFORMS[platform] });
-    }
-  }
-  const listenActions = buildListenActions(
-    [...dspUrls.entries()].map(([id, d]) => ({ providerId: id, url: d.url }))
-  );
-
-  const musicGroupSchema: Record<string, unknown> = {
-    '@type': 'MusicGroup',
-    '@id': `${profileUrl}#musicgroup`,
-    name: artistName,
-    description: profile.bio || `Music by ${artistName}`,
-    url: profileUrl,
-    sameAs: uniqueSocialUrls,
-    genre: genres && genres.length > 0 ? genres : ['Music'],
-    ...(profile.avatar_url && {
-      image: {
-        '@type': 'ImageObject',
-        url: profile.avatar_url,
-        name: `${artistName} profile photo`,
-      },
-    }),
-    ...(profile.location && {
-      location: {
-        '@type': 'Place',
-        name: profile.location,
-      },
-    }),
-    ...(profile.active_since_year && {
-      foundingDate: String(profile.active_since_year),
-    }),
-    ...(profile.is_verified && {
-      additionalProperty: {
-        '@type': 'PropertyValue',
-        name: 'verified',
-        value: true,
-      },
-    }),
-    ...(listenActions.length > 0 && { potentialAction: listenActions }),
-  };
-
-  const profilePageSchema: Record<string, unknown> = {
-    '@type': 'ProfilePage',
-    '@id': `${profileUrl}#profilepage`,
-    mainEntity: { '@id': `${profileUrl}#musicgroup` },
-    url: profileUrl,
-    name: `${artistName} | Jovie`,
-    ...(profile.created_at && { dateCreated: profile.created_at }),
-    ...(profile.updated_at && { dateModified: profile.updated_at }),
-  };
-
-  const breadcrumbSchema = buildBreadcrumbObject([
-    { name: 'Home', url: BASE_URL },
-    { name: artistName, url: profileUrl },
-  ]);
-
-  // MusicEvent schemas for upcoming tour dates (capped at MAX_EVENT_SCHEMAS)
-  const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => {
-    const { eventStatus, availability } = mapTicketStatus(td.ticketStatus);
-    const eventName = td.title || `${artistName} at ${td.venueName}`;
-
-    const locationParts: Record<string, unknown> = {
-      '@type': 'Place',
-      name: td.venueName,
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: td.city,
-        ...(td.region && { addressRegion: td.region }),
-        addressCountry: td.country,
-      },
-    };
-
-    if (td.latitude != null && td.longitude != null) {
-      locationParts.geo = {
-        '@type': 'GeoCoordinates',
-        latitude: td.latitude,
-        longitude: td.longitude,
-      };
-    }
-
-    const event: Record<string, unknown> = {
-      '@type': 'MusicEvent',
-      '@id': `${profileUrl}#event-${td.id}`,
-      name: eventName,
-      startDate: td.startDate,
-      location: locationParts,
-      performer: { '@id': `${profileUrl}#musicgroup` },
-      eventStatus,
-      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-    };
-
-    if (td.ticketUrl && availability) {
-      event.offers = {
-        '@type': 'Offer',
-        url: td.ticketUrl,
-        availability,
-      };
-    }
-
-    return event;
-  });
-
-  const graph = [
-    profilePageSchema,
-    musicGroupSchema,
-    breadcrumbSchema,
-    ...eventSchemas,
-  ];
-
-  return {
-    '@context': 'https://schema.org',
-    '@graph': graph,
-  };
-}
 
 // Profile loader (fetch + cache + per-request memo) lives in
 // _lib/public-profile-loader.ts so per-mode routes (plan PR 3a-2b) can
