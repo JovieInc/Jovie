@@ -445,6 +445,10 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.12'
       - name: Validate CI harness manifest and generated docs
         run: pnpm ci:harness:check
       - name: Validate CI branching policy
@@ -460,6 +464,8 @@ jobs:
           pnpm --filter=@jovie/web run lint:contrast-ratchet
       - name: Validate flaky quarantine ledger
         run: node .github/scripts/quarantine-ledger.mjs validate
+      - name: Run merge-queue drain regression tests
+        run: pip install pytest --quiet && pytest scripts/tests/test_gh_retry.py -v
       - name: Write remediation summary
         if: always()
         run: |
