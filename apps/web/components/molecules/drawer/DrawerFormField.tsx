@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_FIELD_LABEL_CLASSNAME =
-  'text-2xs font-caption tracking-[-0.01em] text-secondary-token';
+  'text-2xs font-caption tracking-tight text-secondary-token';
 
 export const DRAWER_FIELD_HELPER_CLASSNAME =
   'text-3xs leading-[14px] text-tertiary-token';
