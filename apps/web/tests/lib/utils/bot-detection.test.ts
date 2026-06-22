@@ -228,6 +228,86 @@ describe('Bot Detection', () => {
       expect(result.isBot).toBe(false);
       expect(result.userAgent).toBe('');
     });
+
+    describe('datacenter ASN detection', () => {
+      const chromeUserAgent =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+      it('should flag Azure datacenter ASN with a normal browser UA', () => {
+        const request = createMockRequest(chromeUserAgent, {
+          headers: { 'x-vercel-ip-asn': '8075' },
+        });
+
+        const result = detectBot(request);
+
+        expect(result.isBot).toBe(true);
+        expect(result.reason).toBe('datacenter_asn');
+        expect(result.asn).toBe(8075);
+        expect(result.shouldBlock).toBe(false);
+      });
+
+      it('should flag AWS datacenter ASN from Cloudflare header', () => {
+        const request = createMockRequest(chromeUserAgent, {
+          headers: { 'cf-ip-asn': '16509' },
+        });
+
+        const result = detectBot(request);
+
+        expect(result.isBot).toBe(true);
+        expect(result.reason).toBe('datacenter_asn');
+        expect(result.asn).toBe(16509);
+      });
+
+      it('should not flag residential ASN', () => {
+        const request = createMockRequest(chromeUserAgent, {
+          headers: { 'x-vercel-ip-asn': '7018' },
+        });
+
+        const result = detectBot(request);
+
+        expect(result.isBot).toBe(false);
+        expect(result.asn).toBe(7018);
+      });
+    });
+
+    describe('high-velocity zero-click heuristic', () => {
+      const chromeUserAgent =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+      it('should flag members with high visits and zero conversions', () => {
+        const request = createMockRequest(chromeUserAgent);
+
+        const result = detectBot(request, '/api/audience/visit', {
+          memberVisits: 40,
+          memberConversions: 0,
+        });
+
+        expect(result.isBot).toBe(true);
+        expect(result.reason).toBe('high_velocity_zero_click');
+      });
+
+      it('should not flag members below the visit threshold', () => {
+        const request = createMockRequest(chromeUserAgent);
+
+        const result = detectBot(request, '/api/audience/visit', {
+          memberVisits: 39,
+          memberConversions: 0,
+        });
+
+        expect(result.isBot).toBe(false);
+      });
+
+      it('should not flag members with conversions', () => {
+        const request = createMockRequest(chromeUserAgent);
+
+        const result = detectBot(request, '/api/audience/visit', {
+          memberVisits: 40,
+          memberConversions: 1,
+        });
+
+        expect(result.isBot).toBe(false);
+      });
+    });
   });
 
   describe('createBotResponse', () => {

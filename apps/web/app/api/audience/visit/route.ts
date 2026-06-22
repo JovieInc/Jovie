@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { shouldExcludeSelfByProfileId } from '@/lib/analytics/self-exclusion';
 import {
   checkVisitRateLimit,
   getRateLimitHeaders,
@@ -484,7 +485,6 @@ export async function POST(request: NextRequest) {
     const botResult = detectBot(request, '/api/audience/visit', {
       userAgent: resolvedUserAgent,
     });
-    const audienceTags = botResult.isBot ? ['bot'] : [];
     // Use the client-provided referrer (document.referrer) if available.
     // The HTTP Referer header on same-origin fetch() is the current page URL,
     // NOT the external referrer, so we filter out self-referrals from the fallback.
@@ -553,6 +553,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (await shouldExcludeSelfByProfileId(profileId)) {
+      return NextResponse.json(
+        { success: true, fingerprint: 'self-filtered' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const fingerprint = createFingerprint(resolvedIpAddress, resolvedUserAgent);
 
     // Block check: reject visits from blocked fingerprints
@@ -611,14 +618,24 @@ export async function POST(request: NextRequest) {
             )
             .limit(1);
 
-          const mergedTags = mergeAudienceTags(existing?.tags, audienceTags);
+          const actionCount = Array.isArray(existing?.latestActions)
+            ? existing.latestActions.length
+            : 0;
+          const velocityBotResult = detectBot(request, '/api/audience/visit', {
+            userAgent: resolvedUserAgent,
+            memberVisits: existing?.visits ?? 0,
+            memberConversions: actionCount,
+          });
+          const effectiveAudienceTags =
+            botResult.isBot || velocityBotResult.isBot ? ['bot'] : [];
+          const mergedTags = mergeAudienceTags(
+            existing?.tags,
+            effectiveAudienceTags
+          );
           const isBotAudienceMember = mergedTags.includes('bot');
           const updatedVisits = isBotAudienceMember
             ? (existing?.visits ?? 0)
             : (existing?.visits ?? 0) + 1;
-          const actionCount = Array.isArray(existing?.latestActions)
-            ? existing.latestActions.length
-            : 0;
           const updatedIntent = isBotAudienceMember
             ? 'low'
             : deriveIntentLevel(updatedVisits, actionCount);
