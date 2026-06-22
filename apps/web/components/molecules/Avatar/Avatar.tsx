@@ -155,6 +155,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
 
   const { width, height, className: sizeClass, textSize } = SIZE_MAP[size];
   const roundedClass = ROUNDED_MAP[rounded];
+  const shouldUseBlurPlaceholder = width >= 40;
   const blurDataURL = useMemo(() => {
     if (BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS]) {
       return BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS];
@@ -164,6 +165,9 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   }, [width]);
   const initials = generateInitials(name);
   const unoptimized = src ? shouldBypassImageOptimization(src) : false;
+  const placeholderProps = shouldUseBlurPlaceholder
+    ? ({ placeholder: 'blur', blurDataURL } as const)
+    : ({ placeholder: 'empty' } as const);
 
   // Map avatar size to a sensible badge size
   const getBadgeSize = (): 'sm' | 'md' | 'lg' => {
@@ -184,15 +188,15 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           className={cn(
             sizeClass,
             roundedClass,
-            'flex items-center justify-center bg-surface-2 text-white',
+            'flex items-center justify-center bg-surface-2 text-primary-token',
             BORDER_RING,
-            'shadow-sm transition-colors duration-200'
+            'shadow-sm transition-colors duration-subtle'
           )}
           aria-hidden='true'
         >
           <span
             className={cn(
-              'font-medium leading-none select-none text-white',
+              'font-medium leading-none select-none text-primary-token',
               textSize
             )}
           >
@@ -217,7 +221,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           'overflow-hidden text-primary-token',
           isLoaded && 'bg-surface-1',
           BORDER_RING,
-          'shadow-sm transition-colors duration-200'
+          'shadow-sm transition-colors duration-subtle'
         )}
         aria-hidden='true'
       >
@@ -229,12 +233,11 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           height={height}
           priority={priority}
           quality={quality}
-          placeholder='blur'
-          blurDataURL={blurDataURL}
           sizes={sizes ?? `${width}px`}
           unoptimized={unoptimized}
+          {...placeholderProps}
           className={cn(
-            'object-cover object-center transition-opacity duration-300 ease-out',
+            'object-cover object-center transition-opacity duration-subtle ease-out',
             isLoaded ? 'opacity-100' : 'opacity-0'
           )}
           onLoad={() => setIsLoaded(true)}
