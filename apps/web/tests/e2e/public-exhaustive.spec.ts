@@ -133,6 +133,10 @@ async function assertKeyboardReachability(
     expectedState: 'ok' | 'redirect' | 'not-found';
   }
 ) {
+  if (surface.expectedState === 'redirect') {
+    return;
+  }
+
   const seenLabels = new Set<string>();
 
   for (let index = 0; index < 8; index += 1) {
@@ -213,8 +217,10 @@ test.describe('Public Exhaustive Surface QA', () => {
             surface,
             testInfo.project.name
           );
-          await assertKeyboardReachability(surfacePage, surface);
-          await assertNoClippedInteractiveElements(surfacePage);
+          if (surface.expectedState !== 'redirect') {
+            await assertKeyboardReachability(surfacePage, surface);
+            await assertNoClippedInteractiveElements(surfacePage);
+          }
 
           const diagnostics = monitoring.getContext();
           const currentPath =

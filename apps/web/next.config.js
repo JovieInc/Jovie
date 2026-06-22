@@ -260,6 +260,7 @@ const nextConfig = {
     ];
 
     const legacyAppRedirects = [
+      { source: '/account', destination: '/app/settings/account' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
       // NOTE: shell-owned aliases such as /app/profile, /app/tipping,

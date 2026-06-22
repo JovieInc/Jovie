@@ -1099,10 +1099,10 @@ function InputRow({
             animate={reducedMotion ? undefined : { height: measuredHeight }}
             transition={reducedMotion ? undefined : SPRING_HEIGHT}
             className={cn(
-              'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token',
+              'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token text-[15px]',
               isHero
-                ? 'min-h-7 px-2 py-0.5 text-[15px] font-[450] leading-6 text-primary-token sm:text-[16px]'
-                : 'min-h-6 px-1.5 py-[1px] text-[15px] leading-6 text-primary-token',
+                ? 'min-h-7 px-2 py-0.5 font-[450] leading-6 text-primary-token sm:text-[16px]'
+                : 'min-h-6 px-1.5 py-[1px] leading-6 text-primary-token',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
               // isFocused→isExpanded). Using focus-visible:outline-none keeps

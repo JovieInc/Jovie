@@ -215,15 +215,6 @@ const MAX_ONBOARDING_MESSAGES_PER_REQUEST = 50;
 const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
 const MAX_MOBILE_TEXT_LENGTH = 4000;
 const MAX_WELCOME_INITIAL_REPLY_LENGTH = 2000;
-const MOBILE_CHAT_RUNTIME_DISABLED_EVENT = {
-  type: 'error',
-  errorCode: 'MOBILE_CHAT_RUNTIME_DISABLED',
-  message: 'Native chat is not enabled for this build.',
-} as const;
-const MOBILE_CHAT_NDJSON_HEADERS = {
-  ...NO_STORE_HEADERS,
-  'Content-Type': 'application/x-ndjson; charset=utf-8',
-} as const;
 let releaseTaskClassifierModulePromise: Promise<ReleaseTaskClassifierModule> | null =
   null;
 const PROMPTFOO_CONFIG_PATH = 'tests/eval/promptfoo/promptfooconfig.yaml';
@@ -843,10 +834,6 @@ function parseMobileChatTurnRequest(value: Record<string, unknown>): {
     text: value.text.trim(),
     source: value.source,
   };
-}
-
-function ndjsonEvent(event: Record<string, unknown>): string {
-  return `${JSON.stringify(event)}\n`;
 }
 
 function buildDefaultWebChatBody(
@@ -2155,10 +2142,18 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
   return {
     ...basePayload,
     parsedRequest: parsed,
-    status: 501,
-    headers: MOBILE_CHAT_NDJSON_HEADERS,
-    events: [MOBILE_CHAT_RUNTIME_DISABLED_EVENT],
-    responseText: ndjsonEvent(MOBILE_CHAT_RUNTIME_DISABLED_EVENT),
+    status: 200,
+    headers: NO_STORE_HEADERS,
+    contractOnly: true,
+    handlerReached: true,
+    responseJson: {
+      message:
+        'This deterministic mobile route eval stops at the chat handler boundary.',
+    },
+    responseText: JSON.stringify({
+      message:
+        'This deterministic mobile route eval stops at the chat handler boundary.',
+    }),
   };
 }
 

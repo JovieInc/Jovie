@@ -10,6 +10,11 @@
 2. Apply the **`merge-queue`** label (this is Graphite's enqueue trigger). Automation does this for you:
    - Agent pipeline, Dependabot, Sentry/main autofix, screenshots, and landing sweep apply `merge-queue` after their gates pass (see `.github/workflows/`).
    - Humans/agents can do it directly: `gh pr edit <pr> --add-label merge-queue` (or `gt merge`, or the Graphite app).
+   - If a PR is later hard-gated with `needs-human`, `hold`, or `gated`, remove
+     `merge-queue` so it stops occupying Graphite queue slots.
+   - `fast` is not a general priority label. Use it only for PRs explicitly
+     classified as emergency/hotfix/incident; ordinary generated branches with
+     `fast` are gated for human review by the merge-queue guard.
 3. Graphite enqueues the PR, rebases it on `main`, waits for the required checks, and squash-merges.
 4. `linear-sync-on-merge.yml` transitions the Linear issue to `Done` on merge as before.
 
@@ -55,5 +60,9 @@ Agent commit signing (each identity that authors merges):
 ## Monitoring & troubleshooting
 
 - Queue status: Graphite dashboard (not the GitHub "merge queue" UI, which is now unused).
-- **PR not merging after labeling:** confirm the `merge-queue` label is applied, required checks are green, and `graphite-app` is a ruleset bypass actor. If Graphite can't push, the bypass actor is missing.
+- **PR not merging after labeling:** confirm the `merge-queue` label is applied, required checks are green, no hard-gate label (`needs-human`, `hold`, `gated`) is present, and `graphite-app` is a ruleset bypass actor. If Graphite can't push, the bypass actor is missing.
+- **Stale Graphite draft after a downstack MQ draft closes:** resubmit the
+  source PR with `gt submit --always --update-only --no-edit --no-interactive
+  --no-verify`. If the stale `gtmq_*` draft remains, cancel/retry the queue
+  entry from the Graphite dashboard. Do not close `gtmq_*` PRs from GitHub.
 - **Want to bypass for an emergency:** use Graphite's "merge now" in the dashboard; there is no GitHub-side bypass actor for humans.

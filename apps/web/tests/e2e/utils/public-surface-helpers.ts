@@ -36,6 +36,24 @@ export function createPublicMonitoring(page: Page) {
 }
 
 export async function installPublicRouteMocks(page: Page) {
+  await page.route(/^https:\/\/[^/]+\.myshopify\.com\/.*$/i, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: [
+        '<!doctype html>',
+        '<html lang="en">',
+        '<head><title>External storefront</title></head>',
+        '<body>',
+        '<main>',
+        '<h1>External Shopify storefront</h1>',
+        '<a href="/">Continue shopping</a>',
+        '</main>',
+        '</body>',
+        '</html>',
+      ].join(''),
+    })
+  );
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );

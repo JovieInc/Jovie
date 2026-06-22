@@ -73,6 +73,10 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe('feature flag registry integrity', () => {
+  it('keeps runtime app flags default-on for internal v1 access', () => {
+    expect(Object.values(APP_FLAG_DEFAULTS).every(Boolean)).toBe(true);
+  });
+
   it('keeps all runtime app-flag references registered', () => {
     const sourceFiles = collectSourceFiles(WEB_ROOT);
     const registeredFlags = new Set<string>(Object.keys(APP_FLAG_KEYS));

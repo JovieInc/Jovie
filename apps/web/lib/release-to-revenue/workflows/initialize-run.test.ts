@@ -30,6 +30,21 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+const { mockGenerateDistributionDraftsForRun } = vi.hoisted(() => ({
+  mockGenerateDistributionDraftsForRun: vi.fn(),
+}));
+
+vi.mock('../distribution-drafts', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('../distribution-drafts')>();
+  return {
+    ...actual,
+    generateDistributionDraftsForRun: mockGenerateDistributionDraftsForRun,
+  };
+});
+
+import { DISTRIBUTION_DRAFT_EXPECTED_COUNTS } from '../distribution-drafts';
+
 const mockSyncStoreListingForRun = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ merchCardIds: ['card-1'] })
 );
@@ -44,6 +59,28 @@ import { initializeReleaseToRevenueRun } from './initialize-run';
 describe('initializeReleaseToRevenueRun', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGenerateDistributionDraftsForRun.mockResolvedValue({
+      releaseLink: 'https://jov.ie/timwhite/launch-track',
+      merchDropLink: 'https://jov.ie/timwhite/merch',
+      items: Array.from(
+        { length: DISTRIBUTION_DRAFT_EXPECTED_COUNTS.total },
+        (_, index) => ({
+          id: `draft-${index}`,
+          channel:
+            index < DISTRIBUTION_DRAFT_EXPECTED_COUNTS.socialPosts
+              ? 'social_post'
+              : 'sms',
+          platform:
+            index < DISTRIBUTION_DRAFT_EXPECTED_COUNTS.socialPosts
+              ? 'instagram'
+              : 'sms',
+          variant: 'announcement',
+          body: `Draft ${index}`,
+          status: 'pending',
+          createdAt: '2026-06-20T08:00:00.000Z',
+        })
+      ),
+    });
   });
 
   it('marks valid runs as waiting_for_approval', async () => {
@@ -78,8 +115,19 @@ describe('initializeReleaseToRevenueRun', () => {
       expect.objectContaining({
         status: 'waiting_for_approval',
         currentStep: 'awaiting_approval',
+        stepOutputs: expect.objectContaining({
+          distributionDrafts: expect.objectContaining({
+            items: expect.arrayContaining([
+              expect.objectContaining({ status: 'pending' }),
+            ]),
+          }),
+          storeListing: { merchCardIds: ['card-1'] },
+        }),
       })
     );
+    expect(
+      updateSet.mock.calls[0]?.[0].stepOutputs.distributionDrafts.items
+    ).toHaveLength(DISTRIBUTION_DRAFT_EXPECTED_COUNTS.total);
     expect(mockMarkWorkflowFailed).not.toHaveBeenCalled();
   });
 

@@ -85,9 +85,39 @@ describe('ci-harness risk classifier', () => {
     expect(risk.matchedRules.map(rule => rule.id)).toEqual(['public-ui']);
   });
 
-  it('keeps package manifest dependency changes in the env-config smoke lane', () => {
+  it('does not escalate dependency-only semver bumps to smoke', () => {
+    const risk = classifyCiRisk(
+      ['apps/web/package.json', 'pnpm-lock.yaml'],
+      manifest,
+      {
+        isDependencyOnlyPackageManifestChange: file =>
+          file === 'apps/web/package.json',
+      }
+    );
+
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.requiresPreview).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
+  it('does not escalate root devDependency bumps with lockfile to smoke', () => {
+    const risk = classifyCiRisk(['package.json', 'pnpm-lock.yaml'], manifest, {
+      diffBase: 'HEAD~1',
+    });
+
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.requiresPreview).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
+  it('keeps package manifest changes that alter scripts in the env-config smoke lane', () => {
     const risk = classifyCiRisk(['package.json'], manifest, {
       isVersionOnlyPackageManifestChange: () => false,
+      isDependencyOnlyPackageManifestChange: () => false,
     });
 
     expect(risk.riskLevel).toBe('high');

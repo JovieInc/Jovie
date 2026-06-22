@@ -64,6 +64,25 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "profile", app: app)
   }
 
+  func testProfileLoadErrorRetryRestoresDashboard() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-profile-error",
+      expectedElementDescription: "\"Retry\""
+    ) {
+      $0.buttons["Retry"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Couldn't load your profile."].exists)
+    attachScreenshot(named: "profile-error", app: app)
+
+    app.buttons["Retry"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Retry did not restore the dashboard.\n\(app.debugDescription)"
+    )
+  }
+
   func testNeedsOnboardingLaunchShowsContinueOnWeb() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
@@ -225,6 +244,31 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testRecentConversationSelectionOpensCachedChat() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-recent-conversations",
+      expectedElementDescription: "\"Copy URL\""
+    ) {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["More"].tap()
+
+    let recentConversation = app.buttons["recent-conversation-conv_ui_recent_launch"]
+    XCTAssertTrue(
+      recentConversation.waitForExistence(timeout: 3),
+      "Recent conversation row did not appear.\n\(app.debugDescription)"
+    )
+
+    recentConversation.tap()
+
+    XCTAssertTrue(
+      app.staticTexts["Here is the cached launch plan."].waitForExistence(timeout: 5),
+      "Cached conversation content did not appear after selecting a recent conversation.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists || app.textFields["Ask Jovie"].exists)
+  }
+
   func testVenueModeLaunchShowsFullscreenQR() {
     let app = launchMockApp(launchArgument: "-ui-testing-venue-mode", expectedElementDescription: "\"Done\"") {
       $0.buttons["Done"]
@@ -235,11 +279,25 @@ final class JovieUITests: XCTestCase {
   }
 
   func testCopyURLButtonShowsCopiedState() throws {
-    // Pre-existing flake: tap timing is unreliable in CI; the "Copied" state
-    // sometimes resolves before the assertion fires, especially on slower runners.
-    // Tracked in JOV-1972. Skipped here instead of via -skip-testing: xcodebuild
-    // flag which is unreliable across Xcode versions.
-    throw XCTSkip("Pre-existing flake — tracked in JOV-1972")
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["dashboard-copy-url-button"]
+    }
+
+    let copyURLButton = app.buttons["dashboard-copy-url-button"]
+    XCTAssertTrue(
+      copyURLButton.waitForExistence(timeout: 3),
+      "Copy URL button did not appear.\n\(app.debugDescription)"
+    )
+
+    copyURLButton.tap()
+
+    let copiedState = NSPredicate(format: "label == %@ OR value == %@", "Copied", "Copied")
+    let copiedExpectation = expectation(for: copiedState, evaluatedWith: copyURLButton)
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [copiedExpectation], timeout: 2),
+      .completed,
+      "Copy URL button did not show copied state.\n\(app.debugDescription)"
+    )
   }
 
   func testLiveAuthViewRenders() throws {

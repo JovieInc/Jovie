@@ -9,7 +9,9 @@ enum LaunchMode: Equatable {
   case uiTestingAuthCallback
   case uiTestingSignedOut
   case uiTestingReady
+  case uiTestingProfileError
   case uiTestingChat
+  case uiTestingRecentConversations
   case uiTestingSettings
   case uiTestingVenueMode
   case uiTestingNeedsOnboarding
@@ -23,7 +25,9 @@ enum LaunchMode: Equatable {
          .uiTestingAuthCallback,
          .uiTestingSignedOut,
          .uiTestingReady,
+         .uiTestingProfileError,
          .uiTestingChat,
+         .uiTestingRecentConversations,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingNeedsOnboarding,
@@ -48,6 +52,10 @@ enum LaunchMode: Equatable {
     self == .uiTestingVenueMode
   }
 
+  var recoversProfileErrorOnRetry: Bool {
+    self == .uiTestingProfileError
+  }
+
   var clearsStoredClerkSession: Bool {
     self == .uiTestingLiveAuth
   }
@@ -64,7 +72,9 @@ enum LaunchMode: Equatable {
          .uiTestingAuthCallback,
          .uiTestingSignedOut,
          .uiTestingReady,
+         .uiTestingProfileError,
          .uiTestingChat,
+         .uiTestingRecentConversations,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingNeedsOnboarding,
@@ -100,8 +110,16 @@ enum LaunchMode: Equatable {
       return .uiTestingReady
     }
 
+    if arguments.contains("-ui-testing-profile-error") {
+      return .uiTestingProfileError
+    }
+
     if arguments.contains("-ui-testing-chat") {
       return .uiTestingChat
+    }
+
+    if arguments.contains("-ui-testing-recent-conversations") {
+      return .uiTestingRecentConversations
     }
 
     if arguments.contains("-ui-testing-settings") {

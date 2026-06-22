@@ -435,3 +435,18 @@ Reference docs for common agent lookups:
 | `docs/DB_MIGRATIONS.md` | How do I create/run migrations? What are the invariants? |
 | `docs/TESTING_GUIDELINES.md` | Testing philosophy, patterns, and when to write tests |
 | `docs/DOPPLER_SETUP.md` | How to set up and use Doppler for secrets management |
+
+## Pre-commit review (agents)
+
+Run CodeRabbit **locally before committing** to catch issues before CI. CodeRabbit
+is a metered plan, so PR auto-review is OFF (`.coderabbit.yaml` `auto_review.enabled: false`)
+— shifting it left to pre-commit conserves reviews and catches problems earlier:
+
+```bash
+coderabbit review --agent --type uncommitted --base main -c AGENTS.md   # before committing
+coderabbit review --agent --type committed   --base main -c AGENTS.md   # already-committed branch work
+```
+
+Address blocking findings before committing. CI-side review is the gbrain-aware
+Claude reviewer (`.github/workflows/claude-review.yml`); on a PR you can still
+invoke CodeRabbit on-demand with `@coderabbitai review`.

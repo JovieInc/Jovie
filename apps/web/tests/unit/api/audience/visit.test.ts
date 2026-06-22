@@ -17,6 +17,7 @@ const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockRecordAudienceEvent = vi.hoisted(() =>
   vi.fn().mockResolvedValue(undefined)
 );
+const mockShouldExcludeSelfByProfileId = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicVisitLimiter: {
@@ -75,6 +76,10 @@ vi.mock('@/lib/audience/record-audience-event', () => ({
   recordAudienceEvent: mockRecordAudienceEvent,
 }));
 
+vi.mock('@/lib/analytics/self-exclusion', () => ({
+  shouldExcludeSelfByProfileId: mockShouldExcludeSelfByProfileId,
+}));
+
 const { POST } = await import('@/app/api/audience/visit/route');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -97,6 +102,7 @@ describe('POST /api/audience/visit', () => {
     mockDoesTableExist.mockResolvedValue(true);
     mockCaptureWarning.mockReset();
     mockCaptureError.mockReset();
+    mockShouldExcludeSelfByProfileId.mockResolvedValue(false);
   });
 
   it('returns 429 when rate limited', async () => {
@@ -484,6 +490,38 @@ describe('POST /api/audience/visit', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
+  });
+
+  it('skips recording when the authenticated owner views their own profile', async () => {
+    mockShouldExcludeSelfByProfileId.mockResolvedValueOnce(true);
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      success: true,
+      fingerprint: 'self-filtered',
+    });
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+    expect(mockRecordAudienceEvent).not.toHaveBeenCalled();
   });
 
   it('records visit for valid public profile', async () => {

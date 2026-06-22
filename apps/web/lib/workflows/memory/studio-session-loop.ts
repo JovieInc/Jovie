@@ -2,7 +2,7 @@
  * Studio Session Memory Loop (gh-9869 v0)
  *
  * Thin runner / workflow executor.
- * - Gate: FEATURE_MEMORY_STUDIO_SESSION_V0 (default false)
+ * - Gate: FEATURE_MEMORY_STUDIO_SESSION_V0 (default true for internal v1)
  * - Uses AgentHarness for enrichment + opportunity proposal
  * - Full evidence/provenance on every fact (memory source records + observations)
  * - Reuses patterns from lib/connectors/workflows/execute-approved-action.ts (CAS, logging, captureError)

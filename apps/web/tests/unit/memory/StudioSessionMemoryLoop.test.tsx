@@ -63,7 +63,7 @@ describe('studio-session memory loop (gh-9869 v0)', () => {
     vi.clearAllMocks();
   });
 
-  it('is gated off by default (MEMORY_STUDIO_SESSION_V0=false)', async () => {
+  it('gates off when MEMORY_STUDIO_SESSION_V0 is disabled', async () => {
     mockIsEnabled.mockReturnValue(false);
 
     const result = await runStudioSessionMemoryLoop({

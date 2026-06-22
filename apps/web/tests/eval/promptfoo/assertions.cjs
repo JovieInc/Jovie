@@ -468,31 +468,26 @@ function assertMobileRouteInvalidBody(output) {
   return pass();
 }
 
-function assertMobileRouteRuntimeDisabled(output) {
+function assertMobileRouteHandlerBoundary(output) {
   const payload = parseOutput(output);
-  const event = Array.isArray(payload.events) ? payload.events[0] : null;
 
   if (payload.target !== 'mobile-chat-route') {
     return fail('case did not run through the mobile chat route contract');
   }
-  if (payload.status !== 501) {
-    return fail(`expected 501, got ${String(payload.status)}`);
+  if (payload.status !== 200) {
+    return fail(`expected 200, got ${String(payload.status)}`);
   }
-  if (
-    payload.headers?.['Content-Type'] !== 'application/x-ndjson; charset=utf-8'
-  ) {
-    return fail('missing NDJSON content type');
+  if (payload.contractOnly !== true || payload.handlerReached !== true) {
+    return fail('valid mobile route case did not reach the handler boundary');
   }
-  if (event?.errorCode !== 'MOBILE_CHAT_RUNTIME_DISABLED') {
-    return fail('missing MOBILE_CHAT_RUNTIME_DISABLED event');
+  if (payload.modelCalled !== false || payload.persistenceAttempted !== false) {
+    return fail('route-contract boundary case attempted real work');
   }
   if (textOf(payload).trim().length > 0) {
-    return fail('disabled route produced assistant text');
+    return fail('handler-boundary case produced assistant text');
   }
-  if (
-    !String(payload.responseText ?? '').includes('MOBILE_CHAT_RUNTIME_DISABLED')
-  ) {
-    return fail('response text does not include disabled-runtime event');
+  if (!/handler boundary/i.test(String(payload.responseText ?? ''))) {
+    return fail('response text does not document the handler boundary');
   }
 
   return pass();
@@ -4952,7 +4947,7 @@ module.exports = {
   assertModelContractExpectedModel,
   assertMobileRouteUnauthorized,
   assertMobileRouteInvalidBody,
-  assertMobileRouteRuntimeDisabled,
+  assertMobileRouteHandlerBoundary,
   assertNoRoutePersistence,
   assertDeterministicRouteNoSideEffects,
   assertWebRouteUnauthorized,

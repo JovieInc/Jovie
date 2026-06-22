@@ -8,10 +8,12 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+import { assertSeedDatabaseTarget } from './seed-database-guard';
 
 const { creatorProfiles, discogReleases, providerLinks } = schema;
 
 async function main() {
+  assertSeedDatabaseTarget({ scriptName: 'seed-video-release.ts' });
   // Find any claimed demo profile to attach the video release to
   const profiles = await db
     .select({
