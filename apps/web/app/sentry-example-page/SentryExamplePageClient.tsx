@@ -100,7 +100,7 @@ export function SentryExamplePageClient() {
               className='border-[color-mix(in_oklab,var(--linear-success)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-success)_10%,var(--linear-app-content-surface))] p-4'
             >
               <div className='flex items-center justify-center gap-2 text-app font-semibold text-primary-token'>
-                <CheckCircle2 className='h-4 w-4 text-[var(--linear-success)]' />
+                <CheckCircle2 className='h-4 w-4 text-(--linear-success)' />
                 Error sent to Sentry.
               </div>
             </ContentSurfaceCard>
@@ -113,7 +113,7 @@ export function SentryExamplePageClient() {
             >
               <div className='space-y-2 text-center'>
                 <div className='flex items-center justify-center gap-2 text-app font-semibold text-primary-token'>
-                  <TriangleAlert className='h-4 w-4 text-[var(--linear-warning)]' />
+                  <TriangleAlert className='h-4 w-4 text-(--linear-warning)' />
                   Sentry connectivity looks blocked.
                 </div>
                 <p className='text-app leading-5 text-secondary-token'>
