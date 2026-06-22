@@ -172,19 +172,26 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   // Consume a navigation request raised by an App Intent (Siri / Shortcuts /
   // Spotlight). Chat-bound requests land on Profile when chat is unavailable.
   private func applyPendingIntentNavigation() {
-    guard let request = intentStore.consume() else { return }
-    guard chatEnabled else { return }
+    var state = AppShellIntentNavigationState(
+      selectedTab: selectedTab,
+      chatDraft: chatDraft,
+      pendingRequest: intentStore.consume()
+    )
+    let previousTab = selectedTab
 
-    switch request {
-    case .openChat, .continueLastConversation:
+    guard AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: chatEnabled,
+      state: &state
+    ) else { return }
+
+    chatDraft = state.chatDraft
+
+    if state.selectedTab != previousTab {
       withAnimation(.easeInOut(duration: 0.25)) {
-        selectedTab = .chat
+        selectedTab = state.selectedTab
       }
-    case let .sendMessage(text):
-      chatDraft = text
-      withAnimation(.easeInOut(duration: 0.25)) {
-        selectedTab = .chat
-      }
+    } else {
+      selectedTab = state.selectedTab
     }
   }
 
