@@ -15,7 +15,7 @@ export function SettingsGroupHeading({
   return (
     <h3
       className={cn(
-        'text-app font-caption tracking-[-0.01em] text-secondary-token',
+        'text-app font-caption tracking-tight text-secondary-token',
         className
       )}
     >
