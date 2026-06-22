@@ -1,5 +1,6 @@
 import ClerkKit
 import Darwin
+import Foundation
 import Observation
 import SwiftUI
 
@@ -268,11 +269,14 @@ private struct AppContentView: View {
       }
 
       if chatRepository == nil {
-        let repository = ChatRepository(
-          client: MobileChatClient(
+        let chatClient: any MobileChatClientProtocol = appState.launchMode.usesLiveClerk
+          ? MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
             tokenProvider: ClerkTokenProvider()
-          ),
+          )
+          : OfflineMobileChatClient()
+        let repository = ChatRepository(
+          client: chatClient,
           cache: ChatCache(),
           clerkUserID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
@@ -281,6 +285,20 @@ private struct AppContentView: View {
         chatRepository = repository
       }
     }
+  }
+}
+
+private struct OfflineMobileChatClient: MobileChatClientProtocol {
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
+  }
+
+  func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
+    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
   }
 }
 
