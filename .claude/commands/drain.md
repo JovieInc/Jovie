@@ -16,20 +16,24 @@ queue, not this command, is what keeps `main` green.
   Graphite app push to `main`; those calls fail and bypass the queue.
 - **Enroll = add the `merge-queue` label.** Fast-track an unblocker = add `fast`.
   That is the only way a PR enters the queue.
+- **Dequeue hard gates = remove only the `merge-queue` label.** A PR with
+  `needs-human`, `hold`, or `gated` must not keep occupying Graphite MQ slots.
 - **Never retarget to `integration/loop-*`.** That model is dormant; agents go to `main`.
 - **Never close a PR you didn't open.** Surface superseded/stale ones to the human.
 - **Never touch `gtmq_*` draft PRs** (author `app/graphite-app`) — that's the queue working.
-- **Opt-outs:** `needs-human`, `hold`, `gated` → leave for a human.
+- **Opt-outs:** `needs-human`, `hold`, `gated` → leave the PR for a human after
+  removing `merge-queue` if it was already enrolled.
 
 ## Phase 0 — Classify + enroll the clean bucket
 
 ```bash
 DRY_RUN=1 bash scripts/drain-pr-queue.sh   # preview the buckets
-bash scripts/drain-pr-queue.sh             # apply: +merge-queue on clean PRs, +needs-conflict-resolution on conflicts
+bash scripts/drain-pr-queue.sh             # apply: -merge-queue on hard gates, +merge-queue on clean PRs, +needs-conflict-resolution on conflicts
 ```
 
 The script enrolls every non-draft, `MERGEABLE`, green, non-opted-out PR and
-prints four work buckets: **CONFLICT**, **BLOCKED**, **SURFACE**, **GRAPHITE MQ**.
+prints five work buckets: **DEQUEUE**, **CONFLICT**, **BLOCKED**, **SURFACE**,
+**GRAPHITE MQ**.
 
 ## Phase 1 — Kill systemic blockers first
 
@@ -74,8 +78,10 @@ re-run Phase 0 to enroll anything now green.
 
 ## Phase 3 — Surface, don't act
 
-For the **SURFACE** bucket (`needs-human`) and any duplicate/superseded PRs,
-**report to the human with a recommendation** — do not close or merge. Detect dupes:
+For the **SURFACE** bucket (`needs-human`, `hold`, `gated`) and any
+duplicate/superseded PRs, **report to the human with a recommendation** — do
+not close or merge. The drain strips `merge-queue` from hard-gated PRs before
+surfacing them. Detect dupes:
 
 ```bash
 gh pr list --state open --json number,title --limit 100 \
