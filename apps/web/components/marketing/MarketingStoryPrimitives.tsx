@@ -93,7 +93,7 @@ export function ArtistNotificationFloatingCardView({
           <Icon className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <div className='min-w-0 flex-1'>
-          <p className='text-sm font-semibold leading-[1.35] tracking-[-0.02em] text-primary-token'>
+          <p className='text-sm font-semibold leading-[1.35] tracking-tighter text-primary-token'>
             {card.title}
           </p>
           {card.detail ? (
@@ -243,7 +243,7 @@ export function ArtistProfileReactivationVisual({
             </span>
             <div className='min-w-0'>
               <div className='flex items-center gap-2 text-2xs text-white/60'>
-                <p className='font-medium tracking-[-0.01em]'>
+                <p className='font-medium tracking-tight'>
                   {notification.appName}
                 </p>
                 <span>{notification.timeLabel}</span>
@@ -312,7 +312,7 @@ export function ArtistProfileReactivationVisual({
                     <p className='text-app leading-normal text-secondary-token'>
                       {output.detail}
                     </p>
-                    <p className='text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
+                    <p className='text-xs font-medium tracking-tight text-tertiary-token'>
                       {output.destination}
                     </p>
                   </div>
@@ -352,9 +352,9 @@ function WorkflowCell({
 
   let textClass: string;
   if (tone === 'audience') {
-    textClass = 'text-sm font-medium tracking-[-0.02em] text-secondary-token';
+    textClass = 'text-sm font-medium tracking-tighter text-secondary-token';
   } else if (tone === 'message') {
-    textClass = 'text-sm font-medium tracking-[-0.02em] text-white/88';
+    textClass = 'text-sm font-medium tracking-tighter text-white/88';
   } else {
     textClass = 'text-mid font-semibold tracking-[-0.03em] text-primary-token';
   }
