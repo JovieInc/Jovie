@@ -225,6 +225,31 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testRecentConversationSelectionOpensCachedChat() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-recent-conversations",
+      expectedElementDescription: "\"Copy URL\""
+    ) {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["More"].tap()
+
+    let recentConversation = app.buttons["recent-conversation-conv_ui_recent_launch"]
+    XCTAssertTrue(
+      recentConversation.waitForExistence(timeout: 3),
+      "Recent conversation row did not appear.\n\(app.debugDescription)"
+    )
+
+    recentConversation.tap()
+
+    XCTAssertTrue(
+      app.staticTexts["Here is the cached launch plan."].waitForExistence(timeout: 5),
+      "Cached conversation content did not appear after selecting a recent conversation.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists || app.textFields["Ask Jovie"].exists)
+  }
+
   func testVenueModeLaunchShowsFullscreenQR() {
     let app = launchMockApp(launchArgument: "-ui-testing-venue-mode", expectedElementDescription: "\"Done\"") {
       $0.buttons["Done"]
