@@ -789,7 +789,7 @@ export async function POST(request: NextRequest) {
               if (racedMember) {
                 const racedTags = mergeAudienceTags(
                   racedMember.tags,
-                  audienceTags
+                  effectiveAudienceTags
                 );
                 const racedIsBot = racedTags.includes('bot');
                 const racedActionCount = Array.isArray(
