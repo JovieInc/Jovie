@@ -325,3 +325,141 @@ JSON
         assert "[dry-run] would +merge-queue on #654" in result.stdout
         assert "gh-retry" in result.stderr
         assert counter.read_text(encoding="utf-8").strip() == "2"
+
+    def test_queued_conflict_is_dequeued_and_labeled_for_resolution(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":777,"t":"Queued conflict","draft":false,"m":"CONFLICTING","ms":"DIRTY","head":"codex/jov-777-conflict","L":["merge-queue"],"fail":[]}]
+JSON
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "DIRTY: 1" in result.stdout
+        assert "=== DEQUEUE (non-clean" in result.stdout
+        assert "[dry-run] would -merge-queue on #777" in result.stdout
+        assert "[dry-run] would +needs-conflict-resolution on #777" in result.stdout
+        assert "[dry-run] would +merge-queue on #777" not in result.stdout
+
+    def test_queued_red_required_checks_are_dequeued(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":888,"t":"Queued red CI","draft":false,"m":"MERGEABLE","ms":"BLOCKED","head":"codex/jov-888-red","L":["merge-queue"],"fail":[]}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '["PR Ready"]'
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "BLOCKED: 1" in result.stdout
+        assert "[dry-run] would -merge-queue on #888" in result.stdout
+        assert "checks=PR Ready" in result.stdout
+        assert "=== BLOCKED (red checks" in result.stdout
+        assert "#888" in result.stdout
+        assert "[dry-run] would +merge-queue on #888" not in result.stdout
+
+    def test_queued_unstable_state_is_dequeued_even_with_empty_required_checks(
+        self, tmp_path: Path
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":889,"t":"Queued stale Graphite state","draft":false,"m":"MERGEABLE","ms":"UNSTABLE","head":"codex/jov-889-unstable","L":["merge-queue"],"fail":[]}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "UNSTABLE: 1" in result.stdout
+        assert "[dry-run] would -merge-queue on #889" in result.stdout
+        assert "mergeStateStatus=UNSTABLE" in result.stdout
+        assert "[dry-run] would +merge-queue on #889" not in result.stdout
+
+    def test_gtmq_drafts_are_report_only_even_when_labeled(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{"n":999,"t":"Graphite draft","draft":false,"m":"CONFLICTING","ms":"DIRTY","head":"gtmq_spec_abc123","L":["merge-queue","needs-conflict-resolution"],"fail":[]}]
+JSON
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "gtmq: 1" in result.stdout
+        assert "=== GRAPHITE MQ in-flight (leave) ===" in result.stdout
+        assert "#999" in result.stdout
+        assert "[dry-run] would -merge-queue on #999" not in result.stdout
+        assert "[dry-run] would +needs-conflict-resolution on #999" not in result.stdout

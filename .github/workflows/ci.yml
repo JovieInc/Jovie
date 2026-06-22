@@ -52,7 +52,20 @@ jobs:
     outputs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
     steps:
+      - id: graphite-token
+        name: Check Graphite token configuration
+        env:
+          GRAPHITE_TOKEN: ${{ secrets.GRAPHITE_TOKEN }}
+        run: |
+          if [ -z "${GRAPHITE_TOKEN:-}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GRAPHITE_TOKEN is not configured; Graphite CI Optimizations will not scan PRs."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - id: graphite
+        if: steps.graphite-token.outputs.configured == 'true'
         continue-on-error: true
         uses: withgraphite/graphite-ci-action@main
         with:
@@ -1373,6 +1386,10 @@ jobs:
     if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: ./.github/actions/setup-node-pnpm
@@ -1438,7 +1455,20 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
 
-      - name: Build app for public Lighthouse
+      - name: Download build artifact
+        id: download-build
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.download-build.outcome == 'success'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+
+      - name: Build app fallback for public Lighthouse
+        if: steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -1484,12 +1514,16 @@ jobs:
 
           pnpm run test:lighthouse:public:launch
 
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
+          if [ "${{ matrix.shard }}" = "0" ]; then
+            mkdir -p tests/.auth
+            echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+            pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
+          fi
         env:
           CI: true
           BASE_URL: http://127.0.0.1:3000
+          PUBLIC_LIGHTHOUSE_SHARD_INDEX: ${{ matrix.shard }}
+          PUBLIC_LIGHTHOUSE_TOTAL_SHARDS: '2'
           PROFILE_MOBILE_PERF_BUDGETS: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -1500,7 +1534,7 @@ jobs:
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1576,8 +1610,21 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Build app for dashboard Lighthouse
+      - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: download-build
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+
+      - name: Build app fallback for dashboard Lighthouse
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -1658,7 +1705,7 @@ jobs:
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1722,7 +1769,20 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Build app for onboarding Lighthouse
+      - name: Download build artifact
+        id: download-build
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.download-build.outcome == 'success'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+
+      - name: Build app fallback for onboarding Lighthouse
+        if: steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -1805,7 +1865,7 @@ jobs:
     # Do NOT depend on neon-db — it only runs on push / testing-labeled / drizzle PRs,
     # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
     # its own ephemeral branch below and does not reuse the shared neon-db branch.
-    needs: [optimize_ci, ci-fast, ci-path-changes]
+    needs: [optimize_ci, ci-fast, ci-path-changes, ci-build-public]
     if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1857,7 +1917,20 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Build app for admin Lighthouse
+      - name: Download build artifact
+        id: download-build
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.download-build.outcome == 'success'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+
+      - name: Build app fallback for admin Lighthouse
+        if: steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -1940,7 +2013,7 @@ jobs:
     # Informational baseline run — first PR establishes the budget; once
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
+    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true') }}
     continue-on-error: true
     runs-on: ubuntu-latest
@@ -1993,7 +2066,20 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Build app for chat Lighthouse
+      - name: Download build artifact
+        id: download-build
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.download-build.outcome == 'success'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+
+      - name: Build app fallback for chat Lighthouse
+        if: steps.download-build.outcome != 'success'
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -2542,7 +2628,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/3', '2/3', '3/3']
+        shard: ['1/6', '2/6', '3/6', '4/6', '5/6', '6/6']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -2583,7 +2669,7 @@ jobs:
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Retry budget comes from apps/web/tests/quarantine.json
           RETRY_FLAG="--retry=${{ steps.quarantine.outputs.unit_default_retries }}"
-          # Use shard-specific output file so Codecov Test Analytics receives all 3 shards
+          # Use shard-specific output file so Codecov Test Analytics receives all 6 shards
           # (a shared filename causes only the last upload to be recorded)
           # Note: vitest runs from apps/web/, so path is relative to that directory
           SHARD_SLUG="${{ matrix.shard }}"
@@ -3442,7 +3528,7 @@ jobs:
     # Preview deploys are the default QA surface for internal PRs.
     # Keep this independent from the main deploy gate so review happens before merge.
     needs: [optimize_ci, ci-fast, ci-path-changes, ci-risk-classifier]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_build == 'true' || needs.ci-risk-classifier.outputs.requires_preview == 'true')) }}
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-risk-classifier.outputs.requires_preview == 'true' || contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
