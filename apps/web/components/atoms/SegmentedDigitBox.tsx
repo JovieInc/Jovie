@@ -56,16 +56,16 @@ export function SegmentedDigitBox({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-2xl border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-150',
+        'relative flex items-center justify-center rounded-2xl border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-subtle',
         boxSizeClassName,
-        'border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl',
+        'border-(--profile-pearl-border) bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl',
         isFocused
-          ? 'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] ring-2 ring-[rgb(var(--focus-ring))]/18 shadow-[0_14px_30px_rgba(15,17,24,0.12)]'
-          : 'hover:bg-[var(--profile-pearl-bg-hover)]',
+          ? 'border-(--profile-pearl-border) bg-(--profile-pearl-bg-hover) ring-2 ring-[rgb(var(--focus-ring))]/18 shadow-[0_14px_30px_rgba(15,17,24,0.12)]'
+          : 'hover:bg-(--profile-pearl-bg-hover)',
         error &&
           'border-red-500/55 bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,rgba(127,29,29,0.12))] ring-2 ring-red-500/14',
         disabled && 'opacity-50 cursor-not-allowed',
-        'active:bg-[var(--profile-pearl-bg-hover)]'
+        'active:bg-(--profile-pearl-bg-hover)'
       )}
     >
       <input
@@ -107,8 +107,8 @@ export function SegmentedDigitBox({
         <span
           className={cn(
             'pointer-events-none absolute inset-0 flex items-center justify-center',
-            'transition-transform duration-100',
-            'animate-in zoom-in-90 duration-100'
+            'transition-transform duration-fast',
+            'animate-in zoom-in-90 duration-fast'
           )}
           aria-hidden='true'
         >
