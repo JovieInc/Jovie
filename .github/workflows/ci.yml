@@ -988,10 +988,13 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_SMOKE" == "true" && "$E2E_SMOKE_RESULT" != "success" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_SMOKE" == "true" && "$E2E_SMOKE_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
             echo "❌ Risk classifier requires E2E smoke evidence, but ci-e2e-smoke result was $E2E_SMOKE_RESULT"
             echo "Likely fix: inspect the E2E Smoke job artifact, then run pnpm run test:web:smoke locally with the relevant env."
             exit 1
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" && "$IS_DEPENDABOT" == "true" && "$E2E_SMOKE_RESULT" == "skipped" ]]; then
+            echo "Dependabot PR: E2E smoke intentionally skipped (no repository secrets) — treating as waived."
           fi
 
           if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
@@ -2798,7 +2801,9 @@ jobs:
     # Gated: runs with 'testing' label or deterministic high-risk classification.
     # Full E2E runs on merge to main anyway.
     needs: [optimize_ci, ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true')) }}
+    # Dependabot PRs cannot access repository secrets (NEON_API_KEY, etc.), so skip
+    # this job — same pattern as neon-db, preview deploy, and lighthouse PR lanes.
+    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
