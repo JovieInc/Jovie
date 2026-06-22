@@ -78,10 +78,10 @@ function DateBox({
 
   return (
     <div className='flex w-11 shrink-0 flex-col items-center justify-center'>
-      <span className='text-3xs font-semibold tracking-[0.02em] text-white/52'>
+      <span className='text-3xs font-semibold tracking-wider text-white/52'>
         {displayDate.month}
       </span>
-      <span className='mt-1 text-xl font-bold leading-none tracking-[-0.02em] text-(--color-text-tooltip) tabular-nums'>
+      <span className='mt-1 text-xl font-bold leading-none tracking-tighter text-(--color-text-tooltip) tabular-nums'>
         {displayDate.day}
       </span>
     </div>
@@ -126,7 +126,7 @@ function TourDateRow({
         <p className='min-w-0 truncate text-mid font-medium tracking-[-0.03em] text-(--color-text-tooltip)'>
           {item.date.venueName}
         </p>
-        <p className='mt-0.5 min-w-0 truncate text-xs font-medium tracking-[-0.01em] text-white/52'>
+        <p className='mt-0.5 min-w-0 truncate text-xs font-medium tracking-tight text-white/52'>
           {location}
         </p>
       </div>
@@ -150,7 +150,7 @@ function TourDateRow({
           target='_blank'
           rel='noopener noreferrer'
           className={cn(
-            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-[-0.01em] transition-[border-color,background-color,opacity] duration-subtle hover:opacity-90',
+            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-tight transition-[border-color,background-color,opacity] duration-subtle hover:opacity-90',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -159,7 +159,7 @@ function TourDateRow({
       ) : (
         <span
           className={cn(
-            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-[-0.01em]',
+            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-tight',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -188,7 +188,7 @@ function TourDatesContent({
       renderMode === 'preview' ? (
         <button
           type='button'
-          className='inline-flex h-11 items-center rounded-full bg-white px-5 text-app font-semibold tracking-[-0.01em] text-black dark:bg-white dark:text-black'
+          className='inline-flex h-11 items-center rounded-full bg-white px-5 text-app font-semibold tracking-tight text-black dark:bg-white dark:text-black'
           disabled
         >
           Event Alerts

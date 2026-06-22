@@ -192,7 +192,7 @@ function CountdownGrid({
       {countdown.label ? (
         <p
           className={cn(
-            'font-medium tracking-[-0.01em] text-white/68',
+            'font-medium tracking-tight text-white/68',
             compact ? 'text-3xs' : 'text-xs'
           )}
         >
@@ -241,7 +241,7 @@ function DatePill({
       </span>
       <span
         className={cn(
-          'font-bold leading-none tracking-[-0.02em] tabular-nums',
+          'font-bold leading-none tracking-tighter tabular-nums',
           compact ? 'mt-0.5 text-xs' : 'mt-1 text-xl'
         )}
       >
@@ -381,7 +381,7 @@ export function ProfileMediaCard({
   return (
     <article
       className={cn(
-        'relative min-w-0 overflow-hidden rounded-3xl border border-white/8 bg-[color:var(--profile-drawer-bg)] text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.7)]',
+        'relative min-w-0 overflow-hidden rounded-3xl border border-white/8 bg-(--profile-drawer-bg) text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.7)]',
         compact && 'rounded-xl',
         className
       )}

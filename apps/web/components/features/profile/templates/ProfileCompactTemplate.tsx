@@ -711,7 +711,7 @@ export function ProfileCompactTemplate({
         profileAccentStyle={profileAccentStyle}
         compactSurface={
           <div
-            className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:mx-auto md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+            className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
           >
             <ProfileCompactSurface
