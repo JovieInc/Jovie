@@ -1051,7 +1051,7 @@ jobs:
 
   ci-build-public:
     name: Build (public routes)
-    needs: [optimize_ci, ci-path-changes]
+    needs: [optimize_ci, ci-path-changes, ci-risk-classifier]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
     # On PRs to main: always runs (non-fork) for build validation. Part of the merge gate.
     # Merge queue intentionally skips build (already validated on the PR).
@@ -1071,11 +1071,12 @@ jobs:
         id: check_changes
         shell: bash
         run: |
-          # Run when UI/component paths or public QA inputs changed.
+          # Run when UI/component paths, public QA inputs, or risk-triggered smoke changed.
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
+          REQUIRES_SMOKE="${{ needs.ci-risk-classifier.outputs.requires_smoke }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_PUBLIC_LIGHTHOUSE" == "true" || "$REQUIRES_SMOKE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"

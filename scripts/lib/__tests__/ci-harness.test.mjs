@@ -135,6 +135,20 @@ describe('ci-harness risk classifier', () => {
     expect(risk.blocksUnattendedAutoMerge).toBe(true);
   });
 
+  it('does not require web smoke for iOS-only workflow dependency bumps', () => {
+    const risk = classifyCiRisk(
+      [
+        '.github/workflows/ios-testflight.yml',
+        '.github/workflows/ios-signing-bootstrap.yml',
+      ],
+      manifest
+    );
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
   it('does not require smoke for documentation-only agent control plane edits', () => {
     const risk = classifyCiRisk(['.claude/rules/ui.md'], manifest);
     expect(risk.riskLevel).toBe('low');
