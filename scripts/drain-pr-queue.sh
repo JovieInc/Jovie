@@ -17,7 +17,7 @@
 #   DRY_RUN=1   classify and print only; apply no labels
 set -euo pipefail
 
-# shellcheck source=lib/gh-retry.sh
+# shellcheck source=scripts/lib/gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
@@ -31,8 +31,39 @@ label() {  # label <num> <label>
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
-SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
-  --json number,title,isDraft,mergeable,labels,headRefName,author,statusCheckRollup --jq '
+failed_checks_for_pr() {
+  local number="$1"
+  local fail_json
+  if ! fail_json="$(gh_retry pr checks "$number" -R "$REPO" \
+    --json name,bucket,state --jq '
+      [ .[]
+        | select((.bucket // "") == "fail" or ((.state // "") | test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED")))
+        | (.name // "")
+        | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not)
+      ]')"; then
+    echo "    !! failed to fetch checks for #$number; leaving it out of enroll" >&2
+    printf '%s\n' '["check status unavailable"]'
+    return 0
+  fi
+  if ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$fail_json"; then
+    echo "    !! invalid check payload for #$number; leaving it out of enroll" >&2
+    printf '%s\n' '["check status unavailable"]'
+    return 0
+  fi
+  printf '%s\n' "$fail_json"
+}
+
+needs_check_snapshot() {
+  jq -e '
+    select(.draft | not)
+    | select(.m == "MERGEABLE")
+    | select((.head | startswith("gtmq_")) | not)
+    | select([.L[]] | any(. == "needs-human") | not)
+  ' >/dev/null <<<"$1"
+}
+
+SNAP_BASE="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
+  --json number,title,isDraft,mergeable,labels,headRefName,author --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
@@ -40,11 +71,20 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 100 \
     m: .mergeable,
     head: .headRefName,
     L: [.labels[].name],
-    fail: [ .statusCheckRollup[]?
-            | select((.conclusion//"")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED"))
-            | (.name // .context)
-            | select((. | test("advisory|Preview Deploy|Slop Gate"; "i")) | not) ]
+    fail: []
   } ]')"
+
+SNAP="$(
+  jq -c '.[]' <<<"$SNAP_BASE" | while read -r pr; do
+    if needs_check_snapshot "$pr"; then
+      n=$(jq -r '.n' <<<"$pr")
+      fail_json="$(failed_checks_for_pr "$n")"
+      jq -c --argjson fail "$fail_json" '.fail = $fail' <<<"$pr"
+    else
+      printf '%s\n' "$pr"
+    fi
+  done | jq -s '.'
+)"
 
 # --- ENROLL: non-draft, mergeable, green, not opted-out, not already queued ---
 echo "=== ENROLL (clean → +merge-queue) ==="
