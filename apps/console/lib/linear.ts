@@ -121,7 +121,8 @@ export async function fetchTasteInbox(
         'User-Agent': 'Jovie-Console/1.0',
       },
       body: JSON.stringify({ query }),
-      context: 'linear:fetchTasteInbox',
+      timeoutMs: 10_000,
+      context: 'linear.taste-inbox',
     });
   } catch (err) {
     return {

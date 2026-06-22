@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { boundedFetch } from './bounded-fetch';
 import type { CaptureTarget } from './capture-target';
 
 const execFileAsync = promisify(execFile);
@@ -56,7 +57,7 @@ export async function captureWebScreenshot(params: {
   const endpoint = `${CLOUDFLARE_SCREENSHOT_URL}/${accountId}/browser-rendering/screenshot`;
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await boundedFetch(endpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -67,7 +68,8 @@ export async function captureWebScreenshot(params: {
         viewport: { width: 1280, height: 720 },
         gotoOptions: { waitUntil: 'networkidle0', timeout: 45_000 },
       }),
-      signal: AbortSignal.timeout(60_000),
+      timeoutMs: 60_000,
+      context: 'cloudflare.screenshot',
     });
 
     if (!response.ok) {
