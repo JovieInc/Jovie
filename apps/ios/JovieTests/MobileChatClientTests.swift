@@ -29,6 +29,10 @@ private final class MockChatURLProtocol: URLProtocol {
 
   override func startLoading() {
     guard let handler = Self.requestHandler else {
+      client?.urlProtocol(
+        self,
+        didFailWithError: NSError(domain: "MockChatURLProtocol", code: -1)
+      )
       return
     }
 
@@ -43,6 +47,23 @@ private final class MockChatURLProtocol: URLProtocol {
   }
 
   override func stopLoading() {}
+}
+
+private final class RequestRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var request: URLRequest?
+
+  func record(_ request: URLRequest) {
+    lock.lock()
+    defer { lock.unlock() }
+    self.request = request
+  }
+
+  func recordedRequest() -> URLRequest? {
+    lock.lock()
+    defer { lock.unlock() }
+    return request
+  }
 }
 
 @Suite(.serialized)
@@ -84,13 +105,10 @@ struct MobileChatClientTests {
   }
 
   @Test func parsesChatStreamEvents() async throws {
+    let requestRecorder = RequestRecorder()
     let tokenProvider = MockChatTokenProvider(tokens: ["chat-token"])
     MockChatURLProtocol.requestHandler = { request in
-      #expect(request.url?.path == "/api/mobile/v1/chat/turns")
-      #expect(request.httpMethod == "POST")
-      #expect(request.timeoutInterval == 7)
-      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer chat-token")
-      #expect(request.value(forHTTPHeaderField: "Accept") == "application/x-ndjson")
+      requestRecorder.record(request)
 
       let ndjson = """
       {"type":"turn.reserved","conversationId":"conv_1","turnId":"turn_1","clientTurnId":"client_turn_1"}
@@ -106,6 +124,13 @@ struct MobileChatClientTests {
 
     let client = makeClient(tokenProvider: tokenProvider)
     let events = try await client.sendTurn(makeTurnRequest())
+    let request = try #require(requestRecorder.recordedRequest())
+
+    #expect(request.url?.path == "/api/mobile/v1/chat/turns")
+    #expect(request.httpMethod == "POST")
+    #expect(request.timeoutInterval == 7)
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer chat-token")
+    #expect(request.value(forHTTPHeaderField: "Accept") == "application/x-ndjson")
 
     #expect(events == [
       .turnReserved(conversationId: "conv_1", turnId: "turn_1", clientTurnId: "client_turn_1"),
