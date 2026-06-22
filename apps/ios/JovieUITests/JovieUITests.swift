@@ -127,6 +127,10 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(app.textFields["Ask Jovie"].exists)
+    XCTAssertTrue(
+      app.staticTexts["Ask Jovie about your profile, releases, and next moves."].exists,
+      "Chat empty state did not explain the online intro behavior.\n\(app.debugDescription)"
+    )
     let profileTab = app.buttons["shell-tab-profile"]
     let chatTab = app.buttons["shell-tab-chat"]
     XCTAssertTrue(
@@ -142,6 +146,22 @@ final class JovieUITests: XCTestCase {
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
       "Bottom nav did not switch to Profile.\n\(app.debugDescription)"
     )
+  }
+
+  func testOfflineChatLaunchShowsCachedHistoryIntro() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-offline",
+      expectedElementDescription: "\"Ask Jovie (offline)\""
+    ) {
+      $0.textFields["Ask Jovie (offline)"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Ask Jovie"].exists)
+    XCTAssertTrue(
+      app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
+      "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
   }
 
   func testSwipeNavigatesBetweenProfileAndChat() {

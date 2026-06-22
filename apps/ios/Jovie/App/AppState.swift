@@ -77,6 +77,10 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
+    case .uiTestingChatOffline:
+      route = .ready
+      dashboardState = .loaded(.previewReady)
+      isOffline = true
     case .uiTestingProfileError:
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
