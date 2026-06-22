@@ -34,7 +34,7 @@ export function DemoReleaseDetail({
     <div className='flex h-full flex-col'>
       {/* Header */}
       <div className='flex min-h-10 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 py-2'>
-        <div className='min-w-0 flex-1 text-app font-medium tracking-[-0.01em] text-secondary-token'>
+        <div className='min-w-0 flex-1 text-app font-medium tracking-tight text-secondary-token'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
         <DrawerInlineIconButton

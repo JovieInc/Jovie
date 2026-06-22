@@ -29,7 +29,7 @@ export function DemoReleaseTrackedLinksSurface() {
             data-testid='demo-release-tracked-links-capture'
           >
             <div className='rounded-2xl border border-subtle bg-surface-1 px-4 py-3'>
-              <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
+              <p className='text-2xs font-medium tracking-tight text-tertiary-token'>
                 Release row
               </p>
               <div className='mt-2 flex items-center justify-between gap-4'>

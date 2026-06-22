@@ -83,7 +83,7 @@ export function UnreleasedReleaseHero({
         returnLabel={`Back to ${artist.name}`}
         heroOverlay={
           <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-            <h1 className='text-3xl font-semibold leading-[1.06] tracking-[-0.02em] text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+            <h1 className='text-3xl font-semibold leading-[1.06] tracking-tighter text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
               {release.title}
             </h1>
             <Link

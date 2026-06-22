@@ -348,7 +348,7 @@ function SyncSurfacePill({
 }>) {
   return (
     <div className='rounded-2xl border border-subtle bg-surface-1 px-3 py-3'>
-      <p className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
+      <p className='text-2xs font-semibold tracking-tight text-secondary-token'>
         {label}
       </p>
       <p className='mt-1 text-sm font-semibold text-primary-token'>{value}</p>
