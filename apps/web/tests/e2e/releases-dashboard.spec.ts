@@ -155,7 +155,7 @@ async function ensureReleasesVisible(
 
   const knownFallbackStates = [
     ['disconnected', page.getByTestId('releases-empty-state-disconnected')],
-    ['connected-empty', page.getByText('No releases yet')],
+    ['connected-empty', page.getByText('No Releases Yet')],
     ['importing', page.getByTestId('spotify-import-progress-banner')],
     ['failed', page.getByTestId('releases-empty-state-failed')],
     ['partial', page.getByTestId('releases-empty-state-partial')],

@@ -80,7 +80,7 @@ async function resolveReleaseState(
   const candidates = [
     ['disconnected', page.getByTestId('releases-empty-state-disconnected')],
     ['disconnected', page.getByRole('heading', { name: 'Connect Spotify' })],
-    ['connected-empty', page.getByText('No releases yet')],
+    ['connected-empty', page.getByText('No Releases Yet')],
     ['importing', page.getByTestId('spotify-import-progress-banner')],
     ['failed', page.getByTestId('releases-empty-state-failed')],
     ['partial', page.getByTestId('releases-empty-state-partial')],
@@ -142,7 +142,7 @@ async function assertDemoFixtureState(
   }
 
   if (state === 'connected-empty') {
-    await expect(page.getByText('No releases yet')).toBeVisible();
+    await expect(page.getByText('No Releases Yet')).toBeVisible();
     return;
   }
 

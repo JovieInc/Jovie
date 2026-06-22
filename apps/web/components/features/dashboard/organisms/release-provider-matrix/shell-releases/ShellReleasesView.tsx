@@ -232,7 +232,7 @@ function ReleasesListContent({
           <h3 className='text-app font-caption text-primary-token'>
             No Releases Yet
           </h3>
-          <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
+          <p className='mt-0.5 max-w-sm text-xs leading-normal text-secondary-token'>
             {canCreateManualReleases
               ? 'Sync from Spotify or create one manually to start generating smart links.'
               : 'Sync from Spotify to start generating smart links.'}
