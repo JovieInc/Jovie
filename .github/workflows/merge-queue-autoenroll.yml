@@ -38,4 +38,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          # Merge-queue sweep hits GitHub GraphQL under load; give transient 504s
+          # a longer retry window than the gh-retry default (5 × 2s backoff).
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
         run: bash scripts/drain-pr-queue.sh

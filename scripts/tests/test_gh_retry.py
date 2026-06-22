@@ -20,6 +20,9 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GH_RETRY = _REPO_ROOT / "scripts" / "lib" / "gh-retry.sh"
 _DRAIN_SCRIPT = _REPO_ROOT / "scripts" / "drain-pr-queue.sh"
+_MERGE_QUEUE_WORKFLOW = (
+    _REPO_ROOT / ".github" / "workflows" / "merge-queue-autoenroll.yml"
+)
 
 
 def _run_bash(script: str, *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -250,3 +253,8 @@ class TestDrainPrQueueWiring:
         assert "hard-gated PR should not fetch checks" not in result.stderr
         assert "=== SURFACE (human decision; not touched) ===" in result.stdout
         assert "#456" in result.stdout
+
+    def test_merge_queue_workflow_sets_longer_gh_retry_budget(self) -> None:
+        content = _MERGE_QUEUE_WORKFLOW.read_text(encoding="utf-8")
+        assert "GH_RETRY_ATTEMPTS: 8" in content
+        assert "GH_RETRY_MAX_DELAY: 60" in content
