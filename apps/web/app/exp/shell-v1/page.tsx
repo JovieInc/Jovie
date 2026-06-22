@@ -2503,7 +2503,7 @@ function ShellV1ExperimentContent() {
                 : `padding-bottom var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
-          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
+          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'>
             {/* Static grain overlay — adds a subtle paper roughness so the
               dark surface doesn't read as flat slab. Pointer-events off,
               no animation; GPU-composited at zero per-frame cost. */}
@@ -2998,7 +2998,7 @@ function FloatingSidebarLayer({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: same as above */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: same */}
       <div
-        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)] overflow-hidden'
+        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-(--linear-app-shell-radius) border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-(--linear-app-shell-shadow) overflow-hidden'
         style={{
           transform: visible
             ? 'translateX(0)'

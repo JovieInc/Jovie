@@ -183,7 +183,7 @@ function NavItem({
       <Link
         href={href}
         aria-current={isActive ? 'page' : undefined}
-        className={`block rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-app)] font-medium transition-colors ${
+        className={`block rounded-(--radius-sm) px-2 py-1.5 text-[length:var(--text-app)] font-medium transition-colors ${
           isActive
             ? 'bg-interactive-hover text-primary-token'
             : 'text-tertiary-token hover:bg-interactive-hover hover:text-secondary-token'

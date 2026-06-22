@@ -430,7 +430,7 @@ function StudioIntro({
 }: Readonly<{ title: string; description: string }>) {
   return (
     <div className='mb-6 flex flex-col gap-2'>
-      <h1 className='text-2xl font-semibold tracking-[-0.02em]'>{title}</h1>
+      <h1 className='text-2xl font-semibold tracking-tighter'>{title}</h1>
       <p className='max-w-3xl text-sm leading-6 text-white/55'>{description}</p>
     </div>
   );
