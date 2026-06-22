@@ -78,6 +78,42 @@ describe('Avatar Component', () => {
       expect(mockedImage.mock.calls[0]?.[0].unoptimized).toBe(false);
     });
 
+    it('skips blur placeholders for sub-40px avatars', () => {
+      render(
+        <Avatar
+          src='/avatars/default-user.png'
+          alt='User avatar'
+          name='John Doe'
+          size='sm'
+        />
+      );
+
+      const mockedImage = vi.mocked(Image);
+      expect(mockedImage.mock.calls[0]?.[0]).toMatchObject({
+        placeholder: 'empty',
+      });
+      expect(mockedImage.mock.calls[0]?.[0]).not.toHaveProperty('blurDataURL');
+    });
+
+    it('keeps blur placeholders for avatars rendered at 40px or larger', () => {
+      render(
+        <Avatar
+          src='/avatars/default-user.png'
+          alt='User avatar'
+          name='John Doe'
+          size='md'
+        />
+      );
+
+      const mockedImage = vi.mocked(Image);
+      expect(mockedImage.mock.calls[0]?.[0]).toMatchObject({
+        placeholder: 'blur',
+      });
+      expect(mockedImage.mock.calls[0]?.[0].blurDataURL).toEqual(
+        expect.stringContaining('data:image/webp;base64,')
+      );
+    });
+
     it('applies aria-hidden on inner container', () => {
       const { container } = render(
         <Avatar
