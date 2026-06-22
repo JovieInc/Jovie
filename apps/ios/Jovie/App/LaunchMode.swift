@@ -14,6 +14,7 @@ enum LaunchMode: Equatable {
   case uiTestingChatOffline
   case uiTestingSettings
   case uiTestingVenueMode
+  case uiTestingQRUnavailable
   case uiTestingNeedsOnboarding
   case uiTestingSplash
 
@@ -30,6 +31,7 @@ enum LaunchMode: Equatable {
          .uiTestingChatOffline,
          .uiTestingSettings,
          .uiTestingVenueMode,
+         .uiTestingQRUnavailable,
          .uiTestingNeedsOnboarding,
          .uiTestingSplash:
       return false
@@ -77,6 +79,7 @@ enum LaunchMode: Equatable {
          .uiTestingChatOffline,
          .uiTestingSettings,
          .uiTestingVenueMode,
+         .uiTestingQRUnavailable,
          .uiTestingNeedsOnboarding,
          .uiTestingSplash:
       return "ie.jov.Jovie"
@@ -128,6 +131,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-venue-mode") {
       return .uiTestingVenueMode
+    }
+
+    if arguments.contains("-ui-testing-qr-unavailable") {
+      return .uiTestingQRUnavailable
     }
 
     if arguments.contains("-ui-testing-needs-onboarding") {

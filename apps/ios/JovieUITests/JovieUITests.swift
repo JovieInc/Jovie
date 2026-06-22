@@ -64,6 +64,22 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "profile", app: app)
   }
 
+  func testReadyLaunchWithoutQRShowsUnavailableFallback() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-qr-unavailable",
+      expectedElementDescription: "\"QR unavailable\""
+    ) {
+      $0.buttons["QR unavailable"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Tim White"].exists)
+    XCTAssertTrue(app.buttons["Copy URL"].exists)
+    XCTAssertTrue(
+      app.buttons["QR unavailable"].exists,
+      "Dashboard did not show the no-payload QR fallback.\n\(app.debugDescription)"
+    )
+  }
+
   func testProfileLoadErrorRetryRestoresDashboard() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-profile-error",

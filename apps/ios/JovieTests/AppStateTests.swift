@@ -592,6 +592,30 @@ struct AppStateTests {
     #expect(appState.launchMode.opensChatOnLaunch == true)
   }
 
+  @Test func qrUnavailableLaunchModeLoadsReadyProfileWithoutQRPayload() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingQRUnavailable,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReadyWithoutQR))
+    guard case let .loaded(response) = appState.dashboardState else {
+      Issue.record("QR unavailable launch mode did not load a ready dashboard.")
+      return
+    }
+    #expect(response.qrPayload == nil)
+  }
+
   @Test func billingURLRedirectsToWebBillingSettings() {
     let repository = MockRepository(
       nextResult: .success(

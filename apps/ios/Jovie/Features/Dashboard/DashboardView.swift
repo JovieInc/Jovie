@@ -293,7 +293,7 @@ struct DashboardView: View {
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity)
       .disabled(response.qrPayload == nil)
-      .accessibilityLabel("Profile QR Code")
+      .accessibilityLabel(response.qrPayload == nil ? "QR unavailable" : "Profile QR Code")
       .accessibilityIdentifier("profile-qr-button")
 
       Text(response.publicProfileURL ?? "jov.ie")
