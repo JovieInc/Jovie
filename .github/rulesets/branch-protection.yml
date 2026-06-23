@@ -50,10 +50,10 @@
 #    would be stuck forever. Instead, auto-approve checks for
 #    scope-judge status internally before enabling auto-merge.
 #
-# 6. merge_queue enabled (lightweight)
-#    PRs enter the merge queue after checks pass. The queue reruns only
-#    ci-fast (merge_group trigger) against latest main to catch integration conflicts.
-#    Slower checks are intentionally kept out of the merge queue.
+# 6. Graphite merge queue (not GitHub native merge_queue)
+#    PRs enter Graphite's queue via the merge-queue label. Graphite rebases on
+#    main and reruns the same aggregate PR lane (CI / PR Ready) — no merge_group
+#    trigger and no pinned leaf jobs. Batch failures bisect to the culprit PR.
 #
 # 7. Fork PR Gate (required status check)
 #    Since required_approving_review_count is 0, fork PRs from external

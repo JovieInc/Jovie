@@ -194,7 +194,7 @@ describe('ci-harness artifact formatter', () => {
       'ci-structural-contract'
     );
     expect(artifact.nextLocalCommands).toContain(
-      'pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs'
+      'pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet'
     );
   });
 });

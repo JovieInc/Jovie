@@ -1,14 +1,24 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  bisectBatchFailure,
   compareRatchetCounts,
   detectChangedFileOverlap,
   detectIssueOverlap,
   fastTrackPolicy,
   isAutonomousBranch,
+  MERGE_QUEUE_REPO_PATHS,
   parseMergeQueueTimeline,
+  parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
   requiredStatusDecision,
+  validateAggregateRequiredChecks,
+  validateLiveMergeQueueRuleset,
+  validateMergeQueueRepoConfig,
 } from '../merge-queue-guard.mjs';
+
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
 const greenStatuses = [
   { name: 'PR Ready', conclusion: 'SUCCESS' },
@@ -158,6 +168,103 @@ describe('fast-track policy', () => {
 
     expect(policy.removeFast).toBe(false);
     expect(policy.allowed).toBe(true);
+  });
+});
+
+describe('aggregate required checks', () => {
+  it('accepts only aggregate contexts and rejects pinned individual jobs', () => {
+    const ok = validateAggregateRequiredChecks([
+      'CI / PR Ready',
+      'CI / Migration Guard',
+      'Fork PR Gate',
+    ]);
+    expect(ok.ok).toBe(true);
+
+    const bad = validateAggregateRequiredChecks([
+      'CI / PR Ready',
+      'CI / ci-fast',
+      'CI / Typecheck',
+    ]);
+    expect(bad.ok).toBe(false);
+    expect(bad.forbidden).toContain('CI / ci-fast');
+    expect(bad.forbidden).toContain('CI / Typecheck');
+  });
+
+  it('validates checked-in branch protection and CI workflow wiring', () => {
+    const branchProtectionYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
+      'utf8'
+    );
+    const ciWorkflowYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
+      'utf8'
+    );
+
+    const result = validateMergeQueueRepoConfig({
+      branchProtectionYaml,
+      ciWorkflowYaml,
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(parseRequiredStatusChecksFromYaml(branchProtectionYaml)).toEqual([
+      'CI / PR Ready',
+      'CI / Migration Guard',
+      'Fork PR Gate',
+    ]);
+  });
+
+  it('validates the live ruleset shape used by Graphite merge queue', () => {
+    const liveRuleset = {
+      bypass_actors: [
+        {
+          actor_id: 158384,
+          actor_type: 'Integration',
+          bypass_mode: 'always',
+        },
+      ],
+      rules: [
+        { type: 'pull_request' },
+        {
+          type: 'required_status_checks',
+          parameters: [
+            { context: 'PR Ready' },
+            { context: 'Migration Guard' },
+            { context: 'Fork PR Gate', integration_id: 2934433 },
+          ],
+        },
+        { type: 'non_fast_forward' },
+        { type: 'required_linear_history' },
+      ],
+    };
+
+    const result = validateLiveMergeQueueRuleset(liveRuleset);
+    expect(result.ok).toBe(true);
+    expect(result.hasGraphiteBypass).toBe(true);
+  });
+});
+
+describe('batch bisection', () => {
+  it('isolates one failing PR and requeues siblings instead of failing the batch', () => {
+    const batch = ['pr-1', 'pr-2', 'pr-bad', 'pr-4', 'pr-5'];
+    const failing = new Set(['pr-bad']);
+    const batchPasses = subset => !subset.some(id => failing.has(id));
+
+    const result = bisectBatchFailure(batch, batchPasses);
+
+    expect(result.batchFailed).toBe(true);
+    expect(result.culprit).toBe('pr-bad');
+    expect(result.requeued).toEqual(['pr-1', 'pr-2', 'pr-4', 'pr-5']);
+    expect(result.bisectSteps).toBeGreaterThan(0);
+  });
+
+  it('returns no culprit when the whole batch passes', () => {
+    const batch = ['pr-1', 'pr-2'];
+    const result = bisectBatchFailure(batch, () => true);
+
+    expect(result.batchFailed).toBe(false);
+    expect(result.culprit).toBeNull();
+    expect(result.requeued).toEqual([]);
   });
 });
 

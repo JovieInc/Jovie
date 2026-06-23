@@ -1,6 +1,6 @@
 # Merge Queue (Graphite)
 
-`main` merges go through the **Graphite merge queue**, not GitHub's native merge queue. Graphite rebases each PR on the latest `main`, runs the required checks against the rebased commit, and merges when green — batching stack-aware so independent PRs test in parallel.
+`main` merges go through the **Graphite merge queue**, not GitHub's native merge queue. Graphite rebases each PR on the latest `main`, runs the required aggregate checks against the rebased commit, and merges when green — batching stack-aware so independent PRs test in parallel.
 
 > History: this repo previously used GitHub's native merge queue (a `merge_queue` rule in the `Main Branch Protection` ruleset). That was retired on 2026-06-18 — the two systems are mutually exclusive, and Graphite owns the queue now.
 
@@ -20,7 +20,41 @@
 
 Do **not** use `gh pr merge --auto` to merge to `main` — with the native queue retired it merges directly and **bypasses Graphite**. Use the label.
 
-## Required configuration
+## Verified configuration (2026-06-20, JOV-3291 / #11175)
+
+Repo-side guardrails live in `scripts/lib/merge-queue-guard.mjs` and are enforced by `pnpm ci:merge-queue:check` (Structural Contract lane). Live ruleset verification: `pnpm ci:merge-queue:verify` (needs `gh` auth).
+
+### Required checks: aggregates only
+
+Graphite and branch protection must wait on **aggregate** contexts only — never individual CI jobs (`ci-fast`, `Typecheck`, `Unit Tests`, Lighthouse lanes, …). Pinning a leaf job causes a batch failure to evict siblings instead of bisecting to the culprit.
+
+| Context | Role |
+| --- | --- |
+| `CI / PR Ready` | Single merge gate — aggregates ci-fast, unit tests, build, Lighthouse, risk-triggered smoke/preview |
+| `CI / Migration Guard` | Path-gated schema/migration safety (independent aggregate) |
+| `Fork PR Gate` | Blocks unreviewed fork PRs (auto-passes for agents + team) |
+
+**Queue CI = PR CI.** Graphite does not use GitHub `merge_group` events. Speculative queue runs trigger the same `pull_request` workflow (`ci.yml` → `PR Ready` lane). There is no separate slim merge-queue lane.
+
+### Graphite dashboard (`app.graphite.com/settings/merge-queue`) — OWL/human verify
+
+These settings have no CLI/API; confirm in the Graphite UI after any queue incident:
+
+| Setting | Expected value | Why |
+| --- | --- | --- |
+| Merge strategy | Squash | Matches `required_linear_history` + agent squash flow |
+| Merge queue label | `merge-queue` | Matches automation in `drain-pr-queue.sh`, agent pipeline |
+| Auto-enqueue rule | PRs labeled `merge-queue` | Matches auto-enroll workflow |
+| Optimistic / parallel batching | **On** | Independent PRs test in parallel under agent volume |
+| Parallel batch size | **4** | Balances throughput vs. bisection cost (tune in dashboard) |
+| Bisect on batch failure | **On** | One bad PR must not fail its siblings — isolate culprit, requeue rest |
+| CI optimization | **On** | `optimize_ci` job in `ci.yml` skips redundant PR CI Graphite re-validates |
+| Queue timeout | **≤ 60 min** | Prevents a regression from hanging the queue |
+| Max queue depth | **12** | Matches `READY_THRESHOLD` in `agent-pipeline.yml` pressure guard |
+| Per-agent enqueue rate | **≤ 6/hour** | Prevents one agent from flooding the queue (set in Graphite if available) |
+| Push actor | `graphite-app` | Must be able to push through protected `main` |
+
+Bisection behavior is also unit-tested in `scripts/lib/__tests__/merge-queue-guard.test.mjs` (`bisectBatchFailure`) so a single failing PR in a batch requeues siblings instead of failing the whole batch.
 
 ### GitHub (ruleset `Main Branch Protection`, id `10512119`) — `gh`-configurable
 
@@ -28,6 +62,14 @@ Do **not** use `gh pr merge --auto` to merge to `main` — with the native queue
 - `required_linear_history`, `required_signatures`, `non_fast_forward`, `deletion`, `pull_request` (0 approvals).
 - **No `merge_queue` rule** (retired).
 - **Bypass actor: `graphite-app` (App ID `158384`), `bypass_mode: always`** — required so Graphite can merge through the protected branch. Source-of-record: `.github/rulesets/branch-protection.yml`.
+
+Verify live ruleset:
+
+```bash
+gh api repos/JovieInc/Jovie/rulesets/10512119 \
+  --jq '.rules[] | select(.type=="required_status_checks") | .parameters'
+pnpm ci:merge-queue:verify
+```
 
 ### Signed commits (human/admin apply)
 
@@ -48,15 +90,6 @@ Agent commit signing (each identity that authors merges):
 - **Graphite squash merges:** Graphite's merge commit must also be signed — configure signing on the Graphite push actor before enabling `required_signatures` in production.
 - **Verification:** `security.yml` runs `commit-signature-check` on every `main` push and warns when an unsigned commit lands.
 
-### Graphite (`app.graphite.com/settings/merge-queue`) — dashboard-only (no CLI/API)
-
-- **Merge strategy:** Squash.
-- **Merge queue label:** `merge-queue`.
-- **Auto-enqueue rule:** enqueue PRs labeled `merge-queue`.
-- **Timeout:** cap queue duration so a regression can't hang the queue.
-- **CI optimization / fast-track:** enable if available on the plan (skips redundant CI on already-validated commits / fast-forwards trivially-clean PRs).
-- **Push access:** make `graphite-app` the push actor for `main`.
-
 ## Monitoring & troubleshooting
 
 - Queue status: Graphite dashboard (not the GitHub "merge queue" UI, which is now unused).
@@ -65,4 +98,13 @@ Agent commit signing (each identity that authors merges):
   source PR with `gt submit --always --update-only --no-edit --no-interactive
   --no-verify`. If the stale `gtmq_*` draft remains, cancel/retry the queue
   entry from the Graphite dashboard. Do not close `gtmq_*` PRs from GitHub.
+- **Batch failure stalled siblings:** confirm Graphite **bisect on batch failure** is enabled in the dashboard. Repo guardrails only allow aggregate required checks — pinned leaf jobs break bisection.
 - **Want to bypass for an emergency:** use Graphite's "merge now" in the dashboard; there is no GitHub-side bypass actor for humans.
+
+## Local verification
+
+```bash
+pnpm ci:merge-queue:check          # repo source-of-record (CI Structural Contract)
+pnpm ci:merge-queue:verify         # + live GitHub ruleset when gh is authenticated
+pnpm ci:harness:test -- merge-queue-guard
+```
