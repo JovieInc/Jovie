@@ -1,4 +1,4 @@
 {
-  "count": 3057,
-  "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count."
+  "count": 3061,
+  "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count. Corrected 3057→3061 on 2026-06-23: #11689 set the baseline 4 below the true post-sweep count and was admin-merged past its own red ratchet, leaving main RED and failing every PR's Unit Tests. Drive back down via JOV-3466 (tokenize the 4 stragglers)."
 }
