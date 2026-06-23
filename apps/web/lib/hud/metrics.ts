@@ -10,10 +10,17 @@ import { env } from '@/lib/env-server';
 import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
 import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
+import { mapHermesEventsToAgentRunArtifacts } from '@/lib/hud/hermes-events';
+import { getHermesEventsPayload } from '@/lib/hud/hermes-events-store';
 import { buildHudMetricSources } from '@/lib/hud/source-trust';
 import { getHudQuarantineMetrics } from '@/lib/testing/quarantine-ledger.server';
 import { logger } from '@/lib/utils/logger';
 import type { HudAccessMode, HudMetrics } from '@/types/hud';
+
+function buildHudAgentRuns(): HudMetrics['agentRuns'] {
+  const { events } = getHermesEventsPayload();
+  return mapHermesEventsToAgentRunArtifacts(events);
+}
 
 function buildHudTestingMetrics(): HudMetrics['testing'] {
   const quarantine = getHudQuarantineMetrics();
@@ -317,6 +324,7 @@ export function buildDegradedHudMetrics(
       githubOwner: env.HUD_GITHUB_OWNER,
       githubRepo: env.HUD_GITHUB_REPO,
     }),
+    agentRuns: buildHudAgentRuns(),
     generatedAtIso: fetchedAtIso,
   };
 }
@@ -419,6 +427,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     deployments,
     aiOps,
     sources,
+    agentRuns: buildHudAgentRuns(),
     generatedAtIso: fetchedAtIso,
   };
 }
