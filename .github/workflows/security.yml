@@ -9,11 +9,16 @@
 name: Security Scanning
 
 on:
-  # Risk-tiered CI: Gitleaks/Trivy/TruffleHog/Scorecard run on merged code
-  # (post-merge on main) + nightly — NOT on every PR/merge-queue batch. Running
-  # the full security suite per-PR saturated runners and stalled the queue
-  # (2026-06-22). Secrets are still caught pre-commit by the local gitleaks hook.
+  # Risk-tiered CI (JOV-3461). The FAST secret scans (gitleaks + trufflehog,
+  # diff-scoped via `scan-secrets.sh ci-pr`) run on PRs — a leaked key on a
+  # PUBLIC repo is scraped within seconds of hitting main, so secret detection
+  # must gate pre-merge (EVENT-class). The HEAVY scans (Trivy full-tree, CodeQL,
+  # Scorecard) stay post-merge on main + nightly — they saturated runners and
+  # stalled the queue when run per-PR (2026-06-22). Per-job `if:` guards below
+  # keep the heavy ones off the PR path.
   push:
+    branches: ['main']
+  pull_request:
     branches: ['main']
   schedule:
     - cron: '0 6 * * *' # Nightly at 06:00 UTC
@@ -77,6 +82,9 @@ jobs:
   trivy:
     name: Trivy Vulnerability Scanning
     runs-on: ubuntu-latest
+    # Heavy full-tree scan stays off the PR path (post-merge on main + nightly).
+    # Only the fast diff-scoped secret scans (gitleaks/trufflehog) gate PRs.
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       security-events: write
