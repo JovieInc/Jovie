@@ -12,12 +12,14 @@
 name: CodeQL Security Analysis
 
 on:
+  # Risk-tiered CI: CodeQL runs on the merged code (post-merge on main) + nightly
+  # deep scan — NOT on every PR/merge-queue batch. Running 5-language CodeQL on
+  # each PR saturated the runner pool and stalled the Graphite queue (2026-06-22).
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
   schedule:
-    - cron: '36 13 * * 1' # Weekly on Monday at 13:36 UTC
+    - cron: '36 5 * * *' # Nightly at 05:36 UTC
+  workflow_dispatch:
 
 permissions: {}
 
