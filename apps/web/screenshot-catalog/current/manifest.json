@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-23T02:30:06.730Z",
-    "gitSha": "f631b66e1ae7c908b2c066a655b8dda1b9ee694a",
+    "capturedAt": "2026-06-23T10:22:57.678Z",
+    "gitSha": "876a563af88ca354fccd6f98ca2ae0d747e8351d",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-23T02:30:31.940Z",
-    "gitSha": "f631b66e1ae7c908b2c066a655b8dda1b9ee694a",
+    "capturedAt": "2026-06-23T10:23:22.864Z",
+    "gitSha": "876a563af88ca354fccd6f98ca2ae0d747e8351d",
     "imagePath": "artist-profile-built-for-artists-section-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-23T02:31:20.707Z",
-    "gitSha": "f631b66e1ae7c908b2c066a655b8dda1b9ee694a",
+    "capturedAt": "2026-06-23T10:24:11.561Z",
+    "gitSha": "876a563af88ca354fccd6f98ca2ae0d747e8351d",
     "imagePath": "artist-profile-reactivation-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-23T02:31:45.041Z",
-    "gitSha": "f631b66e1ae7c908b2c066a655b8dda1b9ee694a",
+    "capturedAt": "2026-06-23T10:24:35.956Z",
+    "gitSha": "876a563af88ca354fccd6f98ca2ae0d747e8351d",
     "imagePath": "artist-profile-monetization-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-06-23T02:32:09.764Z",
-    "gitSha": "f631b66e1ae7c908b2c066a655b8dda1b9ee694a",
+    "capturedAt": "2026-06-23T10:25:00.780Z",
+    "gitSha": "876a563af88ca354fccd6f98ca2ae0d747e8351d",
     "imagePath": "artist-profile-power-features-section-desktop.png"
   },
   {
@@ -608,8 +608,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-06-23T02:40:47.797Z",
-    "gitSha": "f631b66e1ae7c908b2c066a655b8dda1b9ee694a",
+    "capturedAt": "2026-06-23T10:33:38.764Z",
+    "gitSha": "876a563af88ca354fccd6f98ca2ae0d747e8351d",
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"
   },
