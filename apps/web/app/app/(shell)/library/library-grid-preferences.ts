@@ -1,11 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { LibraryGridDensity } from './library-data';
+import type { LibraryGridDensity, LibraryViewMode } from './library-data';
 
 export const LIBRARY_GRID_DENSITY_STORAGE_KEY = 'jovie:library-grid-density';
+export const LIBRARY_VIEW_MODE_STORAGE_KEY = 'jovie:library-view-mode';
 
 export const DEFAULT_LIBRARY_GRID_DENSITY: LibraryGridDensity = 'comfortable';
+export const DEFAULT_LIBRARY_VIEW_MODE: LibraryViewMode = 'list';
 
 export const LIBRARY_GRID_DENSITY_OPTIONS: readonly {
   readonly value: LibraryGridDensity;
@@ -62,4 +64,51 @@ export function useLibraryGridDensity(): {
   }, []);
 
   return { density, setDensity };
+}
+
+function parseLibraryViewMode(value: string | null): LibraryViewMode {
+  if (value === 'grid' || value === 'list' || value === 'table') {
+    return value;
+  }
+  return DEFAULT_LIBRARY_VIEW_MODE;
+}
+
+export function readLibraryViewMode(): LibraryViewMode {
+  if (typeof window === 'undefined') return DEFAULT_LIBRARY_VIEW_MODE;
+
+  try {
+    return parseLibraryViewMode(
+      window.localStorage.getItem(LIBRARY_VIEW_MODE_STORAGE_KEY)
+    );
+  } catch {
+    return DEFAULT_LIBRARY_VIEW_MODE;
+  }
+}
+
+export function writeLibraryViewMode(view: LibraryViewMode): void {
+  try {
+    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, view);
+  } catch {
+    // Ignore storage access errors.
+  }
+}
+
+export function useLibraryViewMode(): {
+  readonly view: LibraryViewMode;
+  readonly setView: (view: LibraryViewMode) => void;
+} {
+  const [view, setViewState] = useState<LibraryViewMode>(
+    DEFAULT_LIBRARY_VIEW_MODE
+  );
+
+  useEffect(() => {
+    setViewState(readLibraryViewMode());
+  }, []);
+
+  const setView = useCallback((next: LibraryViewMode) => {
+    setViewState(next);
+    writeLibraryViewMode(next);
+  }, []);
+
+  return { view, setView };
 }
