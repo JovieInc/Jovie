@@ -1,3 +1,5 @@
+import type { FactoryHealthSnapshot } from './factory-health';
+import { renderFactoryHealthStrip } from './factory-health';
 import type { TasteIssue } from './linear';
 
 export interface DashboardIssueView extends TasteIssue {
@@ -10,6 +12,7 @@ export interface DashboardRenderInput {
   readonly fetchedAt: string;
   readonly available: boolean;
   readonly error?: string;
+  readonly factoryHealth: FactoryHealthSnapshot;
 }
 
 const LABEL_STYLES: Record<
@@ -112,7 +115,7 @@ export function renderTasteInboxHtml(input: DashboardRenderInput): string {
     body{background:var(--bg-page);color:var(--text-primary);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;line-height:1.5;padding:24px 20px}
     a{color:var(--accent-blue);text-decoration:none}
     a:hover{text-decoration:underline}
-    .shell{max-width:760px;margin:0 auto}
+    .shell{max-width:960px;margin:0 auto}
     header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px}
   </style>
 </head>
@@ -122,6 +125,7 @@ export function renderTasteInboxHtml(input: DashboardRenderInput): string {
       <h1 style="font-size:16px;font-weight:600;letter-spacing:-0.01em;">Taste Inbox</h1>
       <p style="font-size:12px;color:var(--text-muted);margin-top:6px;">${statusLine}</p>
     </header>
+    ${renderFactoryHealthStrip(input.factoryHealth)}
     ${errorBanner}
     ${renderSection('Taste calls', tasteIssues, 'taste call')}
     ${renderSection('Human actions', humanIssues, 'human action')}

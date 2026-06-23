@@ -13,6 +13,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCaptureTarget } from '../lib/capture-target';
+import { fetchFactoryHealthMetrics } from '../lib/factory-health';
 import { fetchTasteInbox } from '../lib/linear';
 import {
   type DashboardIssueView,
@@ -39,7 +40,16 @@ export async function runTasteInboxSweep(): Promise<{
   readonly available: boolean;
 }> {
   const apiKey = process.env.LINEAR_API_KEY;
-  const inbox = await fetchTasteInbox(apiKey);
+  const [inbox, factoryHealth] = await Promise.all([
+    fetchTasteInbox(apiKey),
+    fetchFactoryHealthMetrics({
+      linearApiKey: apiKey,
+      githubToken:
+        process.env.HUD_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? undefined,
+      githubOwner: process.env.HUD_GITHUB_OWNER,
+      githubRepo: process.env.HUD_GITHUB_REPO,
+    }),
+  ]);
 
   const views: DashboardIssueView[] = [];
 
@@ -80,6 +90,7 @@ export async function runTasteInboxSweep(): Promise<{
     fetchedAt: inbox.fetchedAt,
     available: inbox.available,
     error: inbox.error,
+    factoryHealth,
   });
 
   await writeFile(INDEX_PATH, html, 'utf8');

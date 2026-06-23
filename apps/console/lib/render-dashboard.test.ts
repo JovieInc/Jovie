@@ -1,11 +1,74 @@
 import { describe, expect, it } from 'vitest';
+import type { FactoryHealthSnapshot } from './factory-health';
 import { renderTasteInboxHtml } from './render-dashboard';
 
+const FACTORY_HEALTH_FIXTURE: FactoryHealthSnapshot = {
+  computedAt: '2026-06-20T12:00:00.000Z',
+  metrics: [
+    {
+      id: 'cycle-time',
+      label: 'Cycle time',
+      value: '—',
+      subtitle: 'Set HUD_GITHUB_TOKEN or GITHUB_TOKEN',
+      availability: 'not_configured',
+      trend7d: [0, 0, 0, 0, 0, 0, 0],
+    },
+    {
+      id: 'autonomy-ratio',
+      label: 'Autonomy ratio',
+      value: '—',
+      subtitle: 'Set HUD_GITHUB_TOKEN or GITHUB_TOKEN',
+      availability: 'not_configured',
+      trend7d: [0, 0, 0, 0, 0, 0, 0],
+    },
+    {
+      id: 'incident-mttr',
+      label: 'Incident MTTR',
+      value: '—',
+      subtitle: 'Not instrumented — observability pipeline (#10936)',
+      availability: 'not_instrumented',
+      trend7d: [0, 0, 0, 0, 0, 0, 0],
+    },
+    {
+      id: 'code-shelf-life',
+      label: 'Code shelf life',
+      value: '—',
+      subtitle: 'Not instrumented — git churn telemetry pending',
+      availability: 'not_instrumented',
+      trend7d: [0, 0, 0, 0, 0, 0, 0],
+    },
+    {
+      id: 'cost-per-pr',
+      label: 'Cost / merged PR',
+      value: '—',
+      subtitle: 'Not instrumented — model + CI spend ledger pending',
+      availability: 'not_instrumented',
+      trend7d: [0, 0, 0, 0, 0, 0, 0],
+    },
+  ],
+};
+
 describe('renderTasteInboxHtml', () => {
+  it('renders factory-health strip above inbox sections', () => {
+    const html = renderTasteInboxHtml({
+      fetchedAt: '2026-06-20T12:00:00.000Z',
+      available: true,
+      factoryHealth: FACTORY_HEALTH_FIXTURE,
+      issues: [],
+    });
+
+    const stripIndex = html.indexOf('data-testid="factory-health-strip"');
+    const tasteIndex = html.indexOf('Taste calls');
+    expect(stripIndex).toBeGreaterThan(-1);
+    expect(tasteIndex).toBeGreaterThan(stripIndex);
+    expect(html).toContain('Factory health');
+  });
+
   it('renders only labelled issues and includes taste screenshots', () => {
     const html = renderTasteInboxHtml({
       fetchedAt: '2026-06-20T12:00:00.000Z',
       available: true,
+      factoryHealth: FACTORY_HEALTH_FIXTURE,
       issues: [
         {
           id: '1',
@@ -45,6 +108,7 @@ describe('renderTasteInboxHtml', () => {
     const html = renderTasteInboxHtml({
       fetchedAt: '2026-06-20T12:00:00.000Z',
       available: true,
+      factoryHealth: FACTORY_HEALTH_FIXTURE,
       issues: [
         {
           id: '2',
