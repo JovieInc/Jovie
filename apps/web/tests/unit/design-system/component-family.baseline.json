@@ -1,0 +1,9 @@
+{
+  "counts": {
+    "button": 41,
+    "palette": 4,
+    "emptyState": 12,
+    "shell": 21
+  },
+  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands."
+}
