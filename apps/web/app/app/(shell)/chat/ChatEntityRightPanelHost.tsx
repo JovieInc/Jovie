@@ -33,6 +33,8 @@ import {
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   EntityCard,
+  entityCardArtStyle,
+  KIND_PRESETS,
 } from '@/components/organisms/entity-card';
 import {
   type ContextMenuItemType,
@@ -572,6 +574,7 @@ function ChatReleaseEntityPanel({
     usePlanGate();
   const [showTasksUpgrade, setShowTasksUpgrade] = useState(true);
   const releaseDate = formatReleaseDate(release?.releaseDate);
+  const releaseArtStyle = entityCardArtStyle(KIND_PRESETS.music.accent);
   const visibleProviders = release?.providers.filter(provider => provider.url);
   const hasMedia =
     Boolean(release?.artworkUrl) ||
@@ -636,7 +639,10 @@ function ChatReleaseEntityPanel({
           <div className='min-h-0 flex-1 overflow-y-auto'>
             <div className='px-4 py-4'>
               <div className='system-b-chat-release-summary'>
-                <div className='system-b-chat-release-artwork'>
+                <div
+                  className='system-b-chat-release-artwork'
+                  style={releaseArtStyle}
+                >
                   {release.artworkUrl ? (
                     <Image
                       src={release.artworkUrl}
@@ -1068,7 +1074,9 @@ export function ChatEntityRightPanelHost({
     const liveProfilePreview =
       enablePreviewPanel && isPreviewPanelOpen ? (
         <ErrorBoundary fallback={null}>
-          <ProfileContactSidebar />
+          <div className='system-b-chat-profile-preview-card'>
+            <ProfileContactSidebar />
+          </div>
         </ErrorBoundary>
       ) : null;
 
