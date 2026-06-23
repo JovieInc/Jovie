@@ -22,6 +22,10 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   openDesktopAuthUrl: (authUrl: string) => openDesktopAuthUrlMock(authUrl),
 }));
 
+function getAuthUrlParam(): string | null {
+  return new URLSearchParams(searchParamsState.value).get('auth_url');
+}
+
 describe('DesktopAuthPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,12 +33,31 @@ describe('DesktopAuthPage', () => {
       'auth_url=%2Fauth%2Fstart%3Fclient%3Delectron%26intent%3Dsign_in%26return_to%3D%252Fapp%252Fsettings%26code_challenge%3DabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ%26code_challenge_method%3DS256';
   });
 
-  it('waits for an explicit continue click before opening browser auth', async () => {
+  it('server-renders the handoff instead of a blank Suspense fallback', async () => {
     const { default: DesktopAuthPage } = await import(
       '../../../app/desktop-auth/page'
     );
 
-    render(<DesktopAuthPage />);
+    render(
+      await DesktopAuthPage({
+        searchParams: Promise.resolve({
+          auth_url: getAuthUrlParam() ?? undefined,
+        }),
+      })
+    );
+
+    expect(screen.getByTestId('desktop-auth-handoff')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Continue in Browser' })
+    ).toBeInTheDocument();
+  });
+
+  it('waits for an explicit continue click before opening browser auth', async () => {
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const expectedAuthUrl = new URL(
       '/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fsettings&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
@@ -67,11 +90,11 @@ describe('DesktopAuthPage', () => {
       ok: false,
       reason: 'open-external-failed',
     });
-    const { default: DesktopAuthPage } = await import(
-      '../../../app/desktop-auth/page'
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
     );
 
-    render(<DesktopAuthPage />);
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const continueButton = screen.getByRole('button', {
       name: 'Continue in Browser',
@@ -104,11 +127,11 @@ describe('DesktopAuthPage', () => {
     openDesktopAuthUrlMock.mockRejectedValueOnce(
       new Error('browser open rejected')
     );
-    const { default: DesktopAuthPage } = await import(
-      '../../../app/desktop-auth/page'
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
     );
 
-    render(<DesktopAuthPage />);
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const continueButton = screen.getByRole('button', {
       name: 'Continue in Browser',
@@ -143,11 +166,11 @@ describe('DesktopAuthPage', () => {
         resolveOpen = resolve;
       })
     );
-    const { default: DesktopAuthPage } = await import(
-      '../../../app/desktop-auth/page'
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
     );
 
-    render(<DesktopAuthPage />);
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const continueButton = screen.getByRole('button', {
       name: 'Continue in Browser',
