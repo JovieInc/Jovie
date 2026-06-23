@@ -1,5 +1,5 @@
 {
-  "_comment": "Contrast ratchet baseline — counts of hardcoded raw-color violations (JOV-11026/11038). To reduce: fix violations then run `pnpm --filter web lint:contrast-ratchet --update`. CI fails if counts exceed these baselines.",
+  "_comment": "Contrast ratchet fallback baseline — counts of hardcoded raw-color violations (JOV-11026/11038). Normal PRs compare HEAD counts to current base/main and should not edit this shared counter for routine decreases. Use --update only from a serialized maintenance job or when git base history is unavailable.",
   "bareTextBlack": 90,
   "bareBgWhite": 73,
   "bareTextWhite": 238,

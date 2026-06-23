@@ -1,4 +1,4 @@
 {
   "count": 5050,
-  "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count."
+  "note": "Fallback count for arbitrary Tailwind values in apps/web/{components,app}. Normal PRs compare HEAD to current base/main and should not edit this shared counter for routine decreases; update only through a serialized maintenance job or when git base history is unavailable."
 }
