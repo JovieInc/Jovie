@@ -9,12 +9,14 @@
 name: Security Scanning
 
 on:
+  # Risk-tiered CI: Gitleaks/Trivy/TruffleHog/Scorecard run on merged code
+  # (post-merge on main) + nightly — NOT on every PR/merge-queue batch. Running
+  # the full security suite per-PR saturated runners and stalled the queue
+  # (2026-06-22). Secrets are still caught pre-commit by the local gitleaks hook.
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
   schedule:
-    - cron: '0 6 * * 1' # Weekly on Monday at 6:00 AM UTC
+    - cron: '0 6 * * *' # Nightly at 06:00 UTC
   workflow_dispatch:
 
 # Default permissions - each job specifies its own required permissions
