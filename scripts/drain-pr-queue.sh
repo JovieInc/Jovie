@@ -49,11 +49,16 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
   out_file="$(mktemp)"
   err_file="$(mktemp)"
 
+  # TERMINAL failures only. Pending/queued/in-progress mean CI isn't done yet, and
+  # `cancelled` is almost always a zombie left by `concurrency: cancel-in-progress`
+  # (a superseded run) — none of those are real failures. Counting them as failures
+  # is what made the drain loop dequeue green PRs every 20 min and starve the queue
+  # for 6h on 2026-06-22. Only FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED count.
   local jq_filter='[
     .[]
     | select(
-        ((.bucket // "") | test("fail|pending|cancel"; "i"))
-        or ((.state // "") | test("FAIL|ERROR|CANCEL|TIMED_OUT|ACTION_REQUIRED|PENDING|QUEUED|IN_PROGRESS|WAITING"; "i"))
+        ((.bucket // "") | test("^fail$"; "i"))
+        or ((.state // "") | test("^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE)$"; "i"))
       )
     | select(((.name // "") | test("advisory|Preview Deploy|Slop Gate"; "i")) | not)
     | (.name // .workflow // .description // "unnamed check")
@@ -150,15 +155,21 @@ echo "$SNAP" | jq -c '.[]
     unlabel "$n" merge-queue
   done
 
-# --- DEQUEUE: conflicted, red, unknown, or explicitly queued-for-fix PRs ---
-echo "=== DEQUEUE (non-clean → -merge-queue) ==="
+# --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
+# Do NOT dequeue on mergeStateStatus alone. A MERGEABLE PR flickers to BLOCKED
+# whenever a required check has a zombie `cancelled`/`queued` run left behind by
+# `concurrency: cancel-in-progress` (the ruleset evaluates required checks by
+# name and a non-success duplicate pins it BLOCKED). Stripping merge-queue on
+# that transient state un-enrolled green PRs every 20 min and starved the queue
+# for 6h on 2026-06-22. Dequeue only on: needs-conflict-resolution, a real
+# merge conflict (m != MERGEABLE), or actually-failing checks (.fail).
+echo "=== DEQUEUE (conflict / failing → -merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
   | select([.L[]] | index("merge-queue"))
   | select((.head|startswith("gtmq_"))|not)
   | select(([.L[]] | any(.=="needs-human-taste" or .=="needs-human" or .=="hold" or .=="gated")) | not)
   | select(
       ([.L[]] | any(.=="needs-conflict-resolution"))
-      or ((.ms // "CLEAN") != "CLEAN")
       or (.m != "MERGEABLE")
       or (.fail|length>0)
     )' \
@@ -167,7 +178,6 @@ echo "$SNAP" | jq -c '.[]
     reason=$(jq -r '
       [
         (if ([.L[]] | any(.=="needs-conflict-resolution")) then "needs-conflict-resolution" else empty end),
-        (if (.ms // "CLEAN") != "CLEAN" then "mergeStateStatus=" + (.ms // "UNKNOWN") else empty end),
         (if .m != "MERGEABLE" then "mergeable=" + (.m // "UNKNOWN") else empty end),
         (if (.fail|length)>0 then "checks=" + (.fail|join(",")) else empty end)
       ] | join("; ")
@@ -176,12 +186,17 @@ echo "$SNAP" | jq -c '.[]
     unlabel "$n" merge-queue
   done
 
-# --- ENROLL: non-draft, mergeable, green, not opted-out, not already queued ---
-echo "=== ENROLL (clean → +merge-queue) ==="
+# --- ENROLL: non-draft, mergeable, no FAILING checks, not opted-out, not queued ---
+# Enroll on mergeable + no actually-failing checks. We deliberately do NOT require
+# mergeStateStatus==CLEAN: zombie cancelled/queued required-check runs (from
+# cancel-in-progress) pin otherwise-green PRs at BLOCKED, and gating enrollment on
+# CLEAN meant those PRs never entered the queue. Enrolling a not-yet-green PR is
+# safe — Graphite re-validates and the dequeue step above removes any that truly
+# fail. `.fail` only counts terminal failing checks, not pending/queued ones.
+echo "=== ENROLL (mergeable + not failing → +merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
-  | select((.ms // "CLEAN")=="CLEAN")
   | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
   | select([.L[]] | any(.=="needs-human-taste" or .=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)' \
