@@ -16,6 +16,7 @@ export interface TasteIssue {
   readonly createdAt: string;
   /** One-line description of why this is blocked, pulled from the first line of the description. */
   readonly blockingReason: string;
+  readonly description: string | null;
 }
 
 export interface TasteInboxResult {
@@ -166,6 +167,7 @@ export async function fetchTasteInbox(
         priorityLabel: n.priorityLabel,
         createdAt: n.createdAt,
         blockingReason: extractBlockingReason(n.description),
+        description: n.description,
       };
     })
     .filter((i): i is TasteIssue => i !== null);

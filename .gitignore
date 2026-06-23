@@ -23,6 +23,9 @@ packages/ui/coverage/
 /artifacts/
 apps/web/test-results/
 apps/web/artifacts/
+apps/console/node_modules
+apps/console/.next
+apps/console/public/taste-inbox/screenshots/
 
 # next.js
 /.next/

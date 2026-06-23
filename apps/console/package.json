@@ -9,12 +9,13 @@
   "scripts": {
     "dev": "next dev --port 3003",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3003",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sweep": "tsx scripts/taste-inbox-sweep.ts"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -26,6 +27,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "4.1.8",
+    "tsx": "^4.20.5",
     "typescript": "^6.0.3",
     "vitest": "4.1.8"
   }
