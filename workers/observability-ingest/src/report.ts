@@ -57,13 +57,17 @@ export function parseObservabilityReport(
   const occurred_at =
     typeof record.occurred_at === 'string' ? record.occurred_at : undefined;
 
-  const metadata =
+  const metadata: Record<string, string> | undefined =
     record.metadata && typeof record.metadata === 'object'
-      ? Object.fromEntries(
-          Object.entries(record.metadata as Record<string, unknown>).filter(
-            ([, entry]) => typeof entry === 'string'
-          )
-        )
+      ? Object.entries(record.metadata as Record<string, unknown>).reduce<
+          Record<string, string>
+        >((entries, [key, entry]) => {
+          if (typeof entry === 'string') {
+            entries[key] = entry;
+          }
+
+          return entries;
+        }, {})
       : undefined;
 
   return {
