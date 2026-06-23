@@ -79,6 +79,8 @@ These rules will block your changes if violated.
 
 ## Repo Workflow
 
+**How code reaches `main` is canonical in [`docs/PR_FLOW.md`](docs/PR_FLOW.md)** — small PRs to `main`, risk-tiered CI (heavy scans run post-merge/nightly, never on the PR path), per-PR auto-merge that tolerates transient/zombie checks, and a screenshot-gated 👍 as the only human (taste) step. Read it before changing CI triggers, the merge queue, or how you stack PRs.
+
 1. Read the relevant files before editing.
 2. State the plan for multi-file or risky changes (use plan mode for 3+ steps, schema, or refactors).
 3. Mark the Linear issue `In Progress` BEFORE editing files (see [`.claude/rules/linear.md`](.claude/rules/linear.md)). `Done` is automated on merge; `In Review` is automated for orchestrator-dispatched PRs but must be set manually for ad-hoc PRs.
@@ -177,6 +179,7 @@ Examples:
 
 - `AGENTS.md` is a symlink to this file — do not replace it with a standalone file.
 - `DESIGN.md` is the visual source of truth (read before any UI decision).
+- `docs/PR_FLOW.md` is the canonical PR/CI/merge flow (how to ship, CI tiers, the taste gate).
 - `CODEX.md` is the Codex bootstrap wrapper.
 - `apps/web/tests/TESTING.md` is the deep test reference.
 - `LESSONS.md` collects post-mortems from human corrections.
