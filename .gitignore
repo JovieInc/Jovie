@@ -4,6 +4,7 @@
 /node_modules
 scripts/node_modules
 apps/web/node_modules
+apps/console/node_modules
 /.bundle/
 /vendor/bundle/
 /.pnp
