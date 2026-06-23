@@ -388,23 +388,31 @@ describe('ChatPageClient', () => {
     expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
   });
 
-  it('does not hydrate the profile right panel from ambient preview state without a panel query', () => {
+  it('hydrates preview data on chat and registers the live profile panel when preview is open', () => {
     mockPreviewPanelState.isOpen = true;
 
     renderChatPage();
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
-    expect(hasRegisteredRightPanel()).toBe(false);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
+    expect(hasRegisteredRightPanel()).toBe(true);
+    expect(mockSetPreviewData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'testartist',
+      })
+    );
   });
 
-  it('clears preview data while profile panel hydration is inactive', () => {
+  it('keeps preview data hydrated on chat even when the profile panel is closed', () => {
     mockPreviewPanelState.isOpen = false;
 
     renderChatPage();
 
     expect(hasRegisteredRightPanel()).toBe(false);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
+    expect(mockSetPreviewData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'testartist',
+      })
+    );
   });
 
   it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {

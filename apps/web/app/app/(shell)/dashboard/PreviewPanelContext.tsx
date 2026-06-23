@@ -178,6 +178,10 @@ export function usePreviewPanelState(): PreviewPanelStateContextValue {
   return context;
 }
 
+export function useOptionalPreviewPanelState(): PreviewPanelStateContextValue | null {
+  return useContext(PreviewPanelStateContext);
+}
+
 /**
  * Hook for accessing preview panel data (previewData, setPreviewData).
  * Use this when you need to read/write the preview data.
