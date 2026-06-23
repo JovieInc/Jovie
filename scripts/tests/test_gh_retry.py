@@ -353,7 +353,7 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "DIRTY: 1" in result.stdout
-        assert "=== DEQUEUE (non-clean" in result.stdout
+        assert "=== DEQUEUE (conflict / failing" in result.stdout
         assert "[dry-run] would -merge-queue on #777" in result.stdout
         assert "[dry-run] would +needs-conflict-resolution on #777" in result.stdout
         assert "[dry-run] would +merge-queue on #777" not in result.stdout
@@ -395,7 +395,7 @@ JSON
         assert "#888" in result.stdout
         assert "[dry-run] would +merge-queue on #888" not in result.stdout
 
-    def test_queued_unstable_state_is_dequeued_even_with_empty_required_checks(
+    def test_unstable_state_with_no_failures_stays_enrolled(
         self, tmp_path: Path
     ) -> None:
         fake_gh = tmp_path / "gh"
@@ -428,8 +428,10 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "UNSTABLE: 1" in result.stdout
-        assert "[dry-run] would -merge-queue on #889" in result.stdout
-        assert "mergeStateStatus=UNSTABLE" in result.stdout
+        # 2026-06-22 stall fix: a MERGEABLE PR that is UNSTABLE/BLOCKED only because
+        # of a zombie cancelled/queued required-check (no TERMINAL failure) must NOT
+        # be dequeued. It stays enrolled and untouched so Graphite can land it.
+        assert "[dry-run] would -merge-queue on #889" not in result.stdout
         assert "[dry-run] would +merge-queue on #889" not in result.stdout
 
     def test_gtmq_drafts_are_report_only_even_when_labeled(self, tmp_path: Path) -> None:
