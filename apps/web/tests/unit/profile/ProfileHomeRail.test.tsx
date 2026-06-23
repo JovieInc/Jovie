@@ -54,6 +54,31 @@ function makePublicRelease(
 }
 
 describe('ProfileHomeRail', () => {
+  it('renders alerts above content cards in the home rail DOM order (JOV-11084)', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={makeRelease({ title: 'Never Say A Word' })}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+      />
+    );
+
+    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
+    const carousel = screen.getByTestId('profile-home-carousel');
+
+    expect(alertsCard.compareDocumentPosition(carousel)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Never Say A Word' })
+    ).toBeInTheDocument();
+  });
+
   it('pins the alerts bento above the carousel and renders no carousel when empty', () => {
     render(
       <ProfileHomeRail
@@ -94,10 +119,14 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    expect(
-      screen.getByTestId('profile-home-alerts-fallback-card')
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
+    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
+    const carousel = screen.getByTestId('profile-home-carousel');
+
+    expect(alertsCard).toBeInTheDocument();
+    expect(carousel).toBeInTheDocument();
+    expect(alertsCard.compareDocumentPosition(carousel)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
     expect(
       screen.getByRole('heading', { name: 'The Deep End' })
     ).toBeInTheDocument();
