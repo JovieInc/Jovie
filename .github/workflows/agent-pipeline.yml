@@ -444,7 +444,7 @@ jobs:
             --method POST \
             --field "labels[]=systemic-blocker" || true
 
-          gh pr comment "$PR_NUMBER" --body "## Systemic CI Blocker Detected
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "systemic-ci-blocker" "## Systemic CI Blocker Detected
 
           This PR's CI failures appear to be systemic (same checks failing on 3+ PRs):
 
@@ -507,7 +507,7 @@ jobs:
             --method POST \
             --field "labels[]=agent-remediation-requested" || true
 
-          gh pr comment "$PR_NUMBER" --body "## Agent Remediation Queued
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "agent-remediation-queued" "## Agent Remediation Queued
 
           Privileged workflow execution is intentionally restricted for security.
 
@@ -804,7 +804,7 @@ jobs:
             --method POST \
             --field "labels[]=queue-deferred" || true
 
-          gh pr comment "$PR_NUMBER" --body "## Auto-Merge Deferred
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "auto-merge-deferred" "## Auto-Merge Deferred
 
           This PR passed the automated quality gates and was auto-approved, but it was **not** added to the merge queue automatically.
 

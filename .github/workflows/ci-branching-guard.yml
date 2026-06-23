@@ -61,4 +61,4 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           RECOMMENDED: ${{ steps.guard.outputs.recommended }}
         run: |
-          gh pr comment "$PR_NUMBER" --body "**CI Branching Guard (warn)** — agent PR targets main. Retarget to \`${RECOMMENDED:-integration/loop-ui}\` via \`scripts/loop-integration-ship.sh\`. Exemptions: hotfix/*, needs-human, train PRs. Policy: .claude/rules/ci-branching.md"
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "ci-branching-guard" "**CI Branching Guard (warn)** — agent PR targets main. Retarget to \`${RECOMMENDED:-integration/loop-ui}\` via \`scripts/loop-integration-ship.sh\`. Exemptions: hotfix/*, needs-human, train PRs. Policy: .claude/rules/ci-branching.md"

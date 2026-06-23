@@ -38,6 +38,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Graphite merge-queue group drafts don't inherit member labels, so a
+          # `big-pr`-bypassed member would fail size guard on the synthetic draft and
+          # abort the whole merge group. Members were already size-checked individually.
+          # Exit 0 (not skip) so the required "PR Size Guard" context reports success.
+          title=$(gh pr view "$PR" -R "$REPO" --json title -q '.title')
+          case "$title" in
+            '[Graphite MQ]'*)
+              echo "✅ Graphite merge-queue group draft — size guard not applicable (members checked individually)"; exit 0;;
+          esac
+
           labels=$(gh pr view "$PR" -R "$REPO" --json labels -q '[.labels[].name]|join(",")')
           case ",$labels," in
             *,big-pr,*|*,codemod,*)
