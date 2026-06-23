@@ -1,9 +1,12 @@
 import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3112';
 const ELECTRON_CDP_URL =
   process.env.ELECTRON_CDP_URL ?? 'http://localhost:9223';
+const ELECTRON_APP_ROUTE = '/app/library?view=releases&runtime=electron';
+const SMOKE_RELEASE_TITLE = 'Native Auth Smoke Release';
 const MACOS_PROTOCOL_OPEN_BUNDLE_ID =
   process.env.JOVIE_PROTOCOL_OPEN_BUNDLE_ID?.trim() || null;
 const MAGIC_CODE = '424242';
@@ -14,13 +17,17 @@ const SMOKE_CLIENT_IP =
 const CLEAR_ELECTRON_AUTH_ON_START =
   process.env.SMOKE_CLEAR_ELECTRON_AUTH === '1';
 const SKIP_START_SIGN_OUT = process.env.SMOKE_SKIP_START_SIGNOUT === '1';
+const GRANT_SMOKE_APP_ACCESS = process.env.SMOKE_GRANT_APP_ACCESS === '1';
 const REQUEST_TIMEOUT_MS = parsePositiveInteger(
   process.env.SMOKE_REQUEST_TIMEOUT_MS,
   180_000
 );
 const SMOKE_AUTH_EVIDENCE_KEY = 'jovie.desktopAuth.smokeAuthEvidence';
+const DESKTOP_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const WEB_ROOT = fileURLToPath(new URL('../../web/', import.meta.url));
 
 let playwrightChromium;
+const electronRendererIssues = [];
 
 function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -642,15 +649,17 @@ async function waitForAppSessionCookie(context, label) {
 }
 
 async function requestRedirect(page, targetUrl, label) {
-  const response = await page.request.get(targetUrl, {
+  const response = await page.context().request.get(targetUrl, {
     maxRedirects: 0,
     timeout: REQUEST_TIMEOUT_MS,
-    headers: {
-      'x-forwarded-for': SMOKE_CLIENT_IP,
-    },
   });
+
   const location = response.headers().location;
-  if (location) {
+  if (
+    response.status() >= 300 &&
+    response.status() < 400 &&
+    location
+  ) {
     return new URL(location, targetUrl).toString();
   }
 
@@ -720,6 +729,15 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     `/auth/callback?state=${encodeURIComponent(authState)}`,
     callbackOrigin
   ).toString();
+  const existingSessionCallback = await requestNativeCallbackRedirect(
+    page,
+    callbackPath,
+    'auth callback existing-browser-session'
+  ).catch(() => null);
+  if (existingSessionCallback) {
+    return existingSessionCallback;
+  }
+
   await page.goto(authPageUrl, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
@@ -743,15 +761,11 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     );
   }
 
-  const callbackPromise = Promise.race([
-    waitForNativeProtocolRequest(page, parsed.pathname),
-    waitForNativeRedirectResponse(page, parsed.pathname),
-  ]);
   const authAction =
     parsed.pathname === '/signup' || parsed.pathname === '/sign-up'
-      ? signUpFresh(page, email, callbackPath)
-      : signInExisting(page, email, callbackPath);
-  await authAction.catch(error => {
+      ? signUpFresh(page, email)
+      : signInExisting(page, email);
+  const authActionResult = authAction.catch(error => {
     if (
       error instanceof Error &&
       /Execution context was destroyed|Target page, context or browser has been closed/i.test(
@@ -762,8 +776,14 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     }
     throw error;
   });
+  await Promise.race([authActionResult, sleep(8_000)]);
+  await waitForAppSessionCookie(page.context(), 'auth-state-signin');
 
-  return await callbackPromise;
+  return await requestNativeCallbackRedirect(
+    page,
+    callbackPath,
+    'auth callback completed-session'
+  );
 }
 
 async function requestNativeCallback(page, authUrl, email) {
@@ -807,7 +827,32 @@ function openNativeCallback(callbackUrl) {
     return;
   }
 
+  if (shouldOpenNativeCallbackViaSecondInstance()) {
+    execFileSync(
+      'pnpm',
+      ['--dir', DESKTOP_ROOT, 'exec', 'electron', '.', callbackUrl],
+      {
+        stdio: 'ignore',
+      }
+    );
+    return;
+  }
+
   execFileSync('open', [callbackUrl], { stdio: 'ignore' });
+}
+
+function shouldOpenNativeCallbackViaSecondInstance() {
+  if (process.platform !== 'darwin') return false;
+  try {
+    const { hostname } = new URL(BASE_URL);
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1'
+    );
+  } catch {
+    return false;
+  }
 }
 
 function redactTicketFromUrl(urlString) {
@@ -820,6 +865,109 @@ function redactTicketFromUrl(urlString) {
   } catch {
     return '[unparseable-url]';
   }
+}
+
+function isExpectedElectronAppRoute(urlString) {
+  try {
+    const url = new URL(urlString);
+    return (
+      url.pathname === '/app/library' &&
+      url.searchParams.get('view') === 'releases' &&
+      url.searchParams.get('runtime') === 'electron'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function shouldUseLocalDevAccessSetup() {
+  if (GRANT_SMOKE_APP_ACCESS) return true;
+
+  try {
+    const { hostname } = new URL(BASE_URL);
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getCdpRemoteObjectPreview(remoteObject) {
+  if (!remoteObject || typeof remoteObject !== 'object') return '';
+  if ('value' in remoteObject) return String(remoteObject.value);
+  if (typeof remoteObject.description === 'string') {
+    return remoteObject.description;
+  }
+  if (typeof remoteObject.unserializableValue === 'string') {
+    return remoteObject.unserializableValue;
+  }
+  return typeof remoteObject.type === 'string' ? remoteObject.type : '';
+}
+
+function getCdpExceptionPreview(exceptionDetails) {
+  return (
+    exceptionDetails?.exception?.description ??
+    exceptionDetails?.exception?.value ??
+    exceptionDetails?.text ??
+    'unknown exception'
+  );
+}
+
+function recordElectronRendererIssue(issue) {
+  electronRendererIssues.push({
+    ...issue,
+    message: String(issue.message ?? '').slice(0, 500),
+  });
+}
+
+function formatElectronRendererIssue(issue) {
+  return `${issue.kind} ${issue.level ?? issue.type ?? ''} ${issue.url ?? ''}: ${
+    issue.message
+  }`.trim();
+}
+
+function isLocalDevelopmentRendererWarning(issue) {
+  if (!shouldUseLocalDevAccessSetup()) return false;
+  const message = String(issue.message ?? '');
+  if (
+    message.includes('Electron sandboxed_renderer.bundle.js script failed') ||
+    message.includes(
+      "Cannot destructure property 'preloadScripts' of 'binding.startupData'"
+    )
+  ) {
+    return true;
+  }
+
+  const level = issue.level ?? issue.type ?? '';
+  if (level !== 'warning') return false;
+
+  return (
+    message.includes(
+      'Electron Security Warning (Insecure Content-Security-Policy)'
+    ) ||
+    message.includes('Clerk has been loaded with development keys') ||
+    (/^The resource .* was preloaded using link preload but not used within a few seconds from the window's load event\./.test(
+      message
+    ) &&
+      message.includes('/_next/static/'))
+  );
+}
+
+function assertNoElectronRendererIssues(label) {
+  const unexpectedIssues = electronRendererIssues.filter(
+    issue => !isLocalDevelopmentRendererWarning(issue)
+  );
+  if (unexpectedIssues.length === 0) return;
+  const summary = unexpectedIssues
+    .slice(0, 10)
+    .map(formatElectronRendererIssue)
+    .join(' | ');
+  throw new Error(
+    `${label} emitted ${unexpectedIssues.length} unexpected Electron renderer console/log issue(s): ${summary}`
+  );
 }
 
 async function fetchJson(url) {
@@ -870,6 +1018,32 @@ function isDesktopAuthRouteHandoffTarget(target) {
       isAuthRoute &&
       (url.searchParams.get('runtime') === 'electron' ||
         redirectUrl.includes('runtime=electron'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function authUrlTargetsExpectedElectronRoute(rawAuthUrl) {
+  try {
+    const url = new URL(rawAuthUrl, BASE_URL);
+    const returnTo =
+      url.searchParams.get('return_to') ??
+      url.searchParams.get('redirect_url') ??
+      '';
+    return returnTo === ELECTRON_APP_ROUTE;
+  } catch {
+    return false;
+  }
+}
+
+function isExpectedDesktopAuthHandoffTarget(target) {
+  if (!isDesktopAuthHandoffTarget(target)) return false;
+
+  try {
+    const url = new URL(target.url);
+    return authUrlTargetsExpectedElectronRoute(
+      url.searchParams.get('auth_url')
     );
   } catch {
     return false;
@@ -936,6 +1110,9 @@ class CdpPage {
 
     this.socket.addEventListener('message', event => {
       const message = JSON.parse(event.data);
+      if (message.method) {
+        this.#recordEvent(message.method, message.params);
+      }
       if (!message.id) return;
       const pending = this.#pending.get(message.id);
       if (!pending) return;
@@ -948,8 +1125,41 @@ class CdpPage {
     });
 
     await this.send('Runtime.enable');
+    await this.send('Log.enable').catch(() => undefined);
     await this.send('Page.enable');
     return this;
+  }
+
+  #recordEvent(method, params = {}) {
+    if (method === 'Runtime.consoleAPICalled') {
+      const args = Array.isArray(params.args) ? params.args : [];
+      recordElectronRendererIssue({
+        kind: 'console',
+        type: params.type ?? 'log',
+        url: this.target.url,
+        message: args.map(getCdpRemoteObjectPreview).join(' '),
+      });
+      return;
+    }
+
+    if (method === 'Runtime.exceptionThrown') {
+      recordElectronRendererIssue({
+        kind: 'exception',
+        url: this.target.url,
+        message: getCdpExceptionPreview(params.exceptionDetails),
+      });
+      return;
+    }
+
+    if (method === 'Log.entryAdded') {
+      const entry = params.entry ?? {};
+      recordElectronRendererIssue({
+        kind: 'log',
+        level: entry.level ?? 'unknown',
+        url: entry.url ?? this.target.url,
+        message: entry.text ?? 'unknown log entry',
+      });
+    }
   }
 
   send(method, params = {}) {
@@ -1044,9 +1254,9 @@ async function waitForDesktopAuthHandoff(page, label, timeout = 30_000) {
 }
 
 async function startElectronBrowserAuth() {
-  const electronAuthUrl = `${BASE_URL}/signin?redirect_url=${encodeURIComponent('/app/chat?runtime=electron')}`;
+  const electronAuthUrl = `${BASE_URL}/signin?redirect_url=${encodeURIComponent(ELECTRON_APP_ROUTE)}`;
   const existingAuthTarget = (await getElectronTargets()).find(
-    isDesktopAuthHandoffTarget
+    isExpectedDesktopAuthHandoffTarget
   );
   if (existingAuthTarget) {
     const existingAuthPage = await connectCdpPage(existingAuthTarget);
@@ -1061,7 +1271,10 @@ async function startElectronBrowserAuth() {
 
     const existingHandoffUrl = new URL(existingAuthTarget.url);
     const rawExistingAuthUrl = existingHandoffUrl.searchParams.get('auth_url');
-    if (rawExistingAuthUrl) {
+    if (
+      rawExistingAuthUrl &&
+      authUrlTargetsExpectedElectronRoute(rawExistingAuthUrl)
+    ) {
       return new URL(rawExistingAuthUrl, BASE_URL).toString();
     }
   }
@@ -1084,7 +1297,7 @@ async function startElectronBrowserAuth() {
 
   const initialAuthTarget = await waitForElectronTarget(
     target =>
-      isDesktopAuthHandoffTarget(target) ||
+      isExpectedDesktopAuthHandoffTarget(target) ||
       isDesktopAuthRouteHandoffTarget(target),
     'desktop auth handoff or route fallback'
   );
@@ -1111,7 +1324,7 @@ async function startElectronBrowserAuth() {
     }
 
     authTarget = await waitForElectronTarget(
-      isDesktopAuthHandoffTarget,
+      isExpectedDesktopAuthHandoffTarget,
       'desktop auth handoff'
     );
   }
@@ -1132,58 +1345,6 @@ async function startElectronBrowserAuth() {
   return new URL(rawAuthUrl, BASE_URL).toString();
 }
 
-async function findAuthenticatedElectronPage(expectedUserId) {
-  const deadline = Date.now() + 60_000;
-  const unwaitlistedTargets = new Set();
-
-  while (Date.now() < deadline) {
-    const targets = (await getElectronTargets()).filter(isBaseUrlTarget);
-    for (const target of targets) {
-      const page = await connectCdpPage(target).catch(() => null);
-      if (!page) continue;
-      try {
-        if (!unwaitlistedTargets.has(target.id)) {
-          const unwaitlistResult = await page.evaluate(`(async () => {
-            const body = document.body?.innerText ?? '';
-            if (!/waitlist/i.test(body)) return null;
-            const response = await fetch('/api/dev/unwaitlist', {
-              method: 'POST',
-            });
-            return { status: response.status, ok: response.ok };
-          })()`);
-          if (unwaitlistResult) {
-            unwaitlistedTargets.add(target.id);
-            if (!unwaitlistResult.ok && unwaitlistResult.status !== 404) {
-              throw new Error(
-                `Dev unwaitlist failed with ${unwaitlistResult.status}`
-              );
-            }
-            await page.navigate(`${BASE_URL}/app/chat?runtime=electron`);
-            page.close();
-            continue;
-          }
-        }
-
-        const matched = await page.evaluate(`(() => {
-          return Boolean(
-            window.Clerk?.loaded &&
-              window.Clerk?.user?.id === ${JSON.stringify(expectedUserId)} &&
-              window.Clerk?.session
-          );
-        })()`);
-        if (matched) return page;
-        page.close();
-      } catch {
-        page.close();
-      }
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  throw new Error('Electron did not become authenticated');
-}
-
 function parseStoredSmokeAuthEvidence(value, expectedUserId, minCapturedAt) {
   if (typeof value !== 'string' || value.length === 0) return null;
 
@@ -1192,6 +1353,7 @@ function parseStoredSmokeAuthEvidence(value, expectedUserId, minCapturedAt) {
     if (
       parsed?.apiOk === true &&
       parsed?.userId === expectedUserId &&
+      isExpectedElectronAppRoute(parsed.url) &&
       typeof parsed?.capturedAt === 'number' &&
       parsed.capturedAt >= minCapturedAt
     ) {
@@ -1238,6 +1400,7 @@ async function captureElectronAuthEvidence(page, expectedUserId) {
     const api = await fetch('/api/mobile/v1/me', {
       headers: { Authorization: 'Bearer ' + token },
     });
+    const routeUrl = new URL(window.location.href);
     const state = {
       url: window.location.href,
       userId: window.Clerk.user.id,
@@ -1245,11 +1408,15 @@ async function captureElectronAuthEvidence(page, expectedUserId) {
       hasToken: Boolean(token),
       apiStatus: api.status,
       apiOk: api.ok,
+      isExpectedRoute:
+        routeUrl.pathname === '/app/library' &&
+        routeUrl.searchParams.get('view') === 'releases' &&
+        routeUrl.searchParams.get('runtime') === 'electron',
       capturedAt: Date.now(),
       evidenceSource: 'clerk-token',
     };
 
-    if (state.apiOk) {
+    if (state.apiOk && state.isExpectedRoute) {
       try {
         window.localStorage.setItem(
           ${JSON.stringify(SMOKE_AUTH_EVIDENCE_KEY)},
@@ -1260,6 +1427,46 @@ async function captureElectronAuthEvidence(page, expectedUserId) {
 
     return state;
   })()`);
+}
+
+async function captureElectronReloadSurfaceEvidence(page, preReloadEvidence) {
+  if (!preReloadEvidence?.apiOk) return null;
+
+  const shell = await page.evaluate(`(() => {
+    const bodyText = document.body?.innerText ?? '';
+    const routeUrl = new URL(window.location.href);
+    const releaseTitle = ${JSON.stringify(SMOKE_RELEASE_TITLE)};
+    return {
+      url: window.location.href,
+      readyState: document.readyState,
+      title: document.title,
+      hasReleaseTitle: bodyText.includes(releaseTitle),
+      hasEmptyLibraryState: bodyText.includes('No Library Items'),
+      isExpectedRoute:
+        routeUrl.pathname === '/app/library' &&
+        routeUrl.searchParams.get('view') === 'releases' &&
+        routeUrl.searchParams.get('runtime') === 'electron',
+      textSample: bodyText.slice(0, 500),
+    };
+  })()`);
+
+  if (
+    shell?.readyState === 'complete' &&
+    shell.isExpectedRoute &&
+    shell.hasReleaseTitle &&
+    !shell.hasEmptyLibraryState
+  ) {
+    return {
+      ...preReloadEvidence,
+      url: shell.url,
+      isExpectedRoute: true,
+      hasReleaseTitle: true,
+      evidenceSource: 'server-rendered-releases-shell-reload',
+      textSample: shell.textSample,
+    };
+  }
+
+  return null;
 }
 
 async function findSignedInElectronPage() {
@@ -1358,7 +1565,6 @@ async function waitForElectronSignedOut() {
 async function waitForElectronAuth(expectedUserId, label) {
   const deadline = Date.now() + 120_000;
   const minCapturedAt = Date.now();
-  const unwaitlistedTargets = new Set();
   let lastState = null;
   let lastError = null;
 
@@ -1378,23 +1584,24 @@ async function waitForElectronAuth(expectedUserId, label) {
           return storedEvidence;
         }
 
-        if (!unwaitlistedTargets.has(target.id)) {
-          const unwaitlistResult = await page.evaluate(`(async () => {
-            const body = document.body?.innerText ?? '';
-            if (!/waitlist/i.test(body)) return null;
-            const response = await fetch('/api/dev/unwaitlist', {
-              method: 'POST',
-            });
-            return { status: response.status, ok: response.ok };
-          })()`);
-          if (unwaitlistResult) {
-            unwaitlistedTargets.add(target.id);
-            if (!unwaitlistResult.ok && unwaitlistResult.status !== 404) {
-              throw new Error(
-                `Dev unwaitlist failed with ${unwaitlistResult.status}`
+        if (shouldUseLocalDevAccessSetup()) {
+          const isWaitlistPage = await page
+            .evaluate(`(() => {
+              const pathname = window.location.pathname;
+              const bodyText = document.body?.innerText ?? '';
+              const bodyHtml = document.body?.innerHTML ?? '';
+              return (
+                pathname === '/waitlist' ||
+                /waitlist/i.test(bodyText) ||
+                /NEXT_REDIRECT;replace;\\/waitlist/.test(bodyHtml)
               );
-            }
-            await page.navigate(`${BASE_URL}/app/chat?runtime=electron`);
+            })()`)
+            .catch(() => false);
+
+          if (isWaitlistPage) {
+            await ensureLocalDevAccess(expectedUserId);
+            await sleep(5500);
+            await page.navigate(`${BASE_URL}${ELECTRON_APP_ROUTE}`);
             continue;
           }
         }
@@ -1402,8 +1609,13 @@ async function waitForElectronAuth(expectedUserId, label) {
         const state = await captureElectronAuthEvidence(page, expectedUserId);
         if (state) {
           lastState = state;
-          if (state.apiOk) {
+          if (state.apiOk && state.isExpectedRoute) {
             return state;
+          }
+          if (state.apiOk) {
+            lastError = `authenticated Electron page was ${redactTicketFromUrl(
+              state.url
+            )}`;
           }
         }
       } catch (error) {
@@ -1417,10 +1629,102 @@ async function waitForElectronAuth(expectedUserId, label) {
   }
 
   throw new Error(
-    `${label} API call failed with ${
-      lastState?.apiStatus ?? lastError ?? 'unknown'
+    `${label} did not reach ${ELECTRON_APP_ROUTE}; ${
+      lastError ?? `last API status=${lastState?.apiStatus ?? 'unknown'}`
     }`
   );
+}
+
+async function assertCleanElectronReleasesSurface(expectedUserId) {
+  const target = await waitForElectronTarget(
+    target => isBaseUrlTarget(target) && isExpectedElectronAppRoute(target.url),
+    'authenticated Electron releases route',
+    30_000
+  );
+  const page = await connectCdpPage(target);
+  try {
+    await ensureLocalDevAccess(expectedUserId);
+    const preReloadEvidence = await readStoredSmokeAuthEvidence(
+      page,
+      expectedUserId,
+      0
+    );
+    await page
+      .send('Page.reload', { ignoreCache: true })
+      .catch(() => page.navigate(`${BASE_URL}${ELECTRON_APP_ROUTE}`));
+
+    let state = null;
+    let reloadSurface = null;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      await sleep(500);
+      state = await captureElectronAuthEvidence(page, expectedUserId);
+      if (state?.apiOk && state.isExpectedRoute) {
+        break;
+      }
+      reloadSurface = await captureElectronReloadSurfaceEvidence(
+        page,
+        preReloadEvidence
+      );
+      if (reloadSurface) {
+        state = reloadSurface;
+        break;
+      }
+    }
+
+    if (!state?.apiOk || !state.isExpectedRoute) {
+      throw new Error(
+        `Electron releases reload did not stay authenticated: ${
+          state ? JSON.stringify(state) : 'missing state'
+        }`
+      );
+    }
+  } finally {
+    page.close();
+  }
+
+  assertNoElectronRendererIssues('Electron releases surface');
+}
+
+function parseJsonObject(value, label) {
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch {}
+
+  throw new Error(`${label} did not return JSON: ${value.slice(0, 200)}`);
+}
+
+function grantLocalDevAccess(clerkUserId, entryId) {
+  const args = [
+    '--dir',
+    WEB_ROOT,
+    'exec',
+    'tsx',
+    'scripts/grant-desktop-smoke-access.ts',
+    '--clerk-user-id',
+    clerkUserId,
+    '--email',
+    getStableSmokeEmail(),
+  ];
+
+  if (entryId) {
+    args.push('--entry-id', entryId);
+  }
+
+  const output = execFileSync('pnpm', args, { encoding: 'utf8' });
+
+  return parseJsonObject(output, 'Local dev access grant');
+}
+
+async function ensureLocalDevAccess(expectedUserId) {
+  if (!shouldUseLocalDevAccessSetup()) return;
+
+  const result = grantLocalDevAccess(expectedUserId);
+  if (!result?.ok) {
+    throw new Error(
+      `Local dev app-access setup failed: ${JSON.stringify(result)}`
+    );
+  }
 }
 
 async function signOutElectron() {
@@ -1428,7 +1732,7 @@ async function signOutElectron() {
 
   try {
     await page.evaluate(`(async () => {
-      const redirectUrl = '/signin?redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron';
+      const redirectUrl = '${ELECTRON_APP_ROUTE}';
       await window.Clerk?.signOut?.({ redirectUrl })?.catch?.(() => undefined);
       return true;
     })()`);
@@ -1440,16 +1744,13 @@ async function signOutElectron() {
 }
 
 async function signOutOrClearElectronAuth() {
-  try {
-    return await signOutElectron();
-  } catch (error) {
-    if (!CLEAR_ELECTRON_AUTH_ON_START) {
-      throw error;
-    }
-
+  if (CLEAR_ELECTRON_AUTH_ON_START) {
+    await signOutElectron().catch(() => undefined);
     await clearElectronAuthStorage();
     return await waitForElectronSignedOut();
   }
+
+  return await signOutElectron();
 }
 
 async function clearElectronAuthStorage() {
@@ -1513,9 +1814,10 @@ async function main() {
 
   try {
     if (!SKIP_START_SIGN_OUT) {
-      await signOutElectron().catch(() => undefined);
       if (CLEAR_ELECTRON_AUTH_ON_START) {
         await clearElectronAuthStorage();
+      } else {
+        await signOutElectron().catch(() => undefined);
       }
     }
 
@@ -1540,9 +1842,6 @@ async function main() {
     await fresh.context.close();
 
     const signedOut = await signOutOrClearElectronAuth();
-    if (CLEAR_ELECTRON_AUTH_ON_START) {
-      await clearElectronAuthStorage();
-    }
 
     const existing = await newAuthContext(browser, fapiHost, testingToken);
     const existingSignin = await signInWithFreshTicket(
@@ -1563,6 +1862,7 @@ async function main() {
       'existing-signin'
     );
     await existing.context.close();
+    await assertCleanElectronReleasesSurface(existingSignin.userId);
 
     console.log(
       JSON.stringify(

@@ -28,6 +28,7 @@ import {
   buildLibraryViewRoute,
   isDemoRoutePath,
 } from '@/constants/routes';
+import { useUserSafe } from '@/hooks/useClerkSafe';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
@@ -172,6 +173,8 @@ export function DashboardNav(_: DashboardNavProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const { isLoaded: isUserLoaded, user } = useUserSafe();
+  const hasLoadedUser = isUserLoaded && Boolean(user?.id);
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
@@ -180,8 +183,9 @@ export function DashboardNav(_: DashboardNavProps) {
   const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
-  const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
-    usePlanGate();
+  const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } = usePlanGate(
+    { enabled: hasLoadedUser }
+  );
   const { data: taskStats } = useTaskStatsQuery(profileId, {
     enabled: !isDemo && canAccessTasksWorkspace,
     seenAt: tasksSeenAt,
@@ -199,7 +203,7 @@ export function DashboardNav(_: DashboardNavProps) {
     refetch: refetchConversations,
   } = useChatConversationsQuery({
     limit: 10,
-    enabled: threadsVisible,
+    enabled: hasLoadedUser && threadsVisible,
   });
 
   useEffect(() => {

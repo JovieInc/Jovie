@@ -21,10 +21,15 @@ export type DesktopSecurityReporter = (
 
 /**
  * Structured security telemetry for the Electron shell.
- * Uses console.error so hosted log drains can forward to Sentry later.
+ * Packaged apps stay console-quiet by default; enable this only while
+ * debugging desktop security events locally.
  */
 export function createDesktopSecurityReporter(): DesktopSecurityReporter {
   return (event, detail) => {
+    if (process.env.JOVIE_DESKTOP_SECURITY_CONSOLE !== '1') {
+      return;
+    }
+
     const payload: DesktopSecurityEventDetail = {
       event,
       detail,

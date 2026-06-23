@@ -15,6 +15,8 @@ import {
   generalLimiter,
   getClientIP,
 } from '@/lib/rate-limit';
+import { RATE_LIMITERS } from '@/lib/rate-limit/config';
+import { MemoryRateLimiter } from '@/lib/rate-limit/memory-limiter';
 import { trackServerEvent } from '@/lib/server-analytics';
 
 export const runtime = 'nodejs';
@@ -22,6 +24,9 @@ export const runtime = 'nodejs';
 const SIGN_IN_TOKEN_TTL_SECONDS = 60;
 const SESSION_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 const DEFAULT_SESSION_TOKEN_TEMPLATE = '';
+const LOCAL_NATIVE_EXCHANGE_LIMITER = new MemoryRateLimiter(
+  RATE_LIMITERS.general
+);
 
 interface NativeExchangeRequest {
   client?: unknown;
@@ -65,6 +70,19 @@ function isRealBrowserAuthHarnessEnabled(): boolean {
     !isProductionRuntimeEnvironment() &&
     Boolean(env.JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN?.trim())
   );
+}
+
+function isLoopbackRequest(request: Request): boolean {
+  const hostname = new URL(request.url).hostname.toLowerCase();
+  return (
+    hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+  );
+}
+
+function getNativeExchangeLimiter(request: Request) {
+  return isLoopbackRequest(request)
+    ? LOCAL_NATIVE_EXCHANGE_LIMITER
+    : generalLimiter;
 }
 
 async function trackAuthEvent(
@@ -148,7 +166,7 @@ export async function POST(request: Request) {
     const state = payload.state;
     const codeVerifier = payload.codeVerifier;
     if (!isRealBrowserAuthHarnessEnabled()) {
-      const rateLimit = await generalLimiter.limit(
+      const rateLimit = await getNativeExchangeLimiter(request).limit(
         `auth:exchange:${
           typeof client === 'string' ? client.trim() || 'unknown' : 'unknown'
         }:${getClientIP(request)}`

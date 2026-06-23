@@ -10,6 +10,7 @@ import {
   type MenuItemConstructorOptions,
   screen,
   shell,
+  type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import {
@@ -36,17 +37,26 @@ import {
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
 
+const DESKTOP_APP_NAME = APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie';
+const USER_DATA_DIR_BY_ENV = {
+  local: 'Jovie Local',
+  staging: 'Jovie Staging',
+} as const;
+
+app.setName(DESKTOP_APP_NAME);
+
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
-if (APP_ENV === 'staging') {
-  app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
-} else if (APP_ENV === 'local') {
-  app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Local'));
+if (APP_ENV === 'staging' || APP_ENV === 'local') {
+  app.setPath(
+    'userData',
+    path.join(app.getPath('appData'), USER_DATA_DIR_BY_ENV[APP_ENV])
+  );
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
-const APP_ENTRY_URL = buildAppUrl('/app/chat');
+const APP_ENTRY_URL = buildAppUrl('/app/library?view=releases');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
@@ -132,6 +142,8 @@ const AUTH_HANDOFF_WINDOW_BOUNDS = {
 } as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
+const reportDesktopCspEvent =
+  APP_ENV === 'local' ? () => undefined : reportDesktopSecurityEvent;
 
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
@@ -142,7 +154,8 @@ let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 
-app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
+autoUpdater.logger = null;
+autoUpdater.allowDowngrade = false;
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -820,7 +833,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   installDesktopCspWatchdog({
     session: win.webContents.session,
     appOrigin: APP_ORIGIN,
-    report: reportDesktopSecurityEvent,
+    report: reportDesktopCspEvent,
   });
 
   win.once('ready-to-show', () => {
@@ -993,8 +1006,8 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   function sendNavState(): void {
     if (win.isDestroyed()) return;
     const state: NavState = {
-      canGoBack: win.webContents.canGoBack(),
-      canGoForward: win.webContents.canGoForward(),
+      canGoBack: canNavigateBack(win.webContents),
+      canGoForward: canNavigateForward(win.webContents),
     };
     win.webContents.send(NAV_STATE_CHANNEL, state);
   }
@@ -1031,8 +1044,23 @@ function refreshApplicationMenu(): void {
   Menu.setApplicationMenu(buildApplicationMenu());
 }
 
+function canNavigateBack(webContents: WebContents): boolean {
+  return webContents.navigationHistory?.canGoBack() ?? webContents.canGoBack();
+}
+
+function canNavigateForward(webContents: WebContents): boolean {
+  return (
+    webContents.navigationHistory?.canGoForward() ??
+    webContents.canGoForward()
+  );
+}
+
+function canCheckForDesktopUpdates(): boolean {
+  return process.platform !== 'linux' && app.isPackaged;
+}
+
 function checkForUpdatesFromMenu(): void {
-  if (process.platform === 'linux') {
+  if (!canCheckForDesktopUpdates()) {
     return;
   }
 
@@ -1047,11 +1075,10 @@ function checkForUpdatesFromMenu(): void {
 }
 
 function scheduleDesktopAutoUpdate(): void {
-  if (process.platform === 'linux') {
+  if (!canCheckForDesktopUpdates()) {
     return;
   }
 
-  autoUpdater.allowDowngrade = false;
   autoUpdater.checkForUpdatesAndNotify().catch(() => {
     // Network unavailable or no update server configured yet — non-fatal
   });
@@ -1069,6 +1096,7 @@ function buildUpdateMenuItem(): MenuItemConstructorOptions {
     label: updateReadyToInstall
       ? 'Restart to install update…'
       : 'Check for updates…',
+    enabled: canCheckForDesktopUpdates() || updateReadyToInstall,
     click: checkForUpdatesFromMenu,
   };
 }
@@ -1194,14 +1222,14 @@ ipcMain.handle(
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && !win.isDestroyed() && win.webContents.canGoBack())
+  if (win && !win.isDestroyed() && canNavigateBack(win.webContents))
     win.webContents.goBack();
 });
 
 ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && !win.isDestroyed() && win.webContents.canGoForward())
+  if (win && !win.isDestroyed() && canNavigateForward(win.webContents))
     win.webContents.goForward();
 });
 

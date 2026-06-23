@@ -28,7 +28,7 @@ function assertDisposition(
 test('desktop disposition keeps authenticated app and auth callback routes in-app', () => {
   assertDisposition(productionPolicy, 'in-app', [
     'https://jov.ie/app',
-    'https://jov.ie/app/chat?runtime=electron',
+    'https://jov.ie/app/releases?runtime=electron',
     'https://jov.ie/app/settings/usage',
     'https://jov.ie/desktop-auth?auth_url=https%3A%2F%2Fjov.ie%2Fsignin',
     'https://jov.ie/auth/native-complete?client=electron&state=state_123',
