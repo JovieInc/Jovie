@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
 
@@ -142,6 +142,17 @@ async function processFailure(
     runId: run.databaseId,
     identifier: filed.identifier,
     error: filed.error,
+  });
+
+  // Compound the failure signature to gbrain, keyed by workflow (idempotent → a
+  // recurring failure on the same workflow updates one page). Makes "has this
+  // workflow failed before, and how was it resolved" recallable.
+  gbrainLearn({
+    slug: `ci-failures/${gbrainSlug(run.workflowName)}`,
+    title: `CI failure: ${run.workflowName} on main`,
+    body: `Workflow "${run.workflowName}" failed on main.\n\n- Latest run: ${run.databaseId} (${run.createdAt})\n- Title: ${run.displayTitle}\n- URL: ${run.url}\n- Linear: ${filed.identifier ?? 'not filed'}`,
+    tags: ['type:ci-failure', `workflow:${gbrainSlug(run.workflowName)}`],
+    type: 'ci-failure',
   });
 }
 
