@@ -420,7 +420,7 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8)
+        version: 0.45.2(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8)
       exceljs:
         specifier: 4.4.0
         version: 4.4.0
@@ -637,7 +637,7 @@ importers:
         version: 0.31.10
       drizzle-zod:
         specifier: ^0.8.3
-        version: 0.8.3(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8))(zod@4.3.6)
+        version: 0.8.3(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8))(zod@4.3.6)
       eslint:
         specifier: ^10.2.1
         version: 10.4.1(jiti@2.6.1)
@@ -670,7 +670,7 @@ importers:
         version: 8.5.15
       promptfoo:
         specifier: 0.121.12
-        version: 0.121.12(@neondatabase/serverless@1.1.0)(@swc/helpers@0.5.23)(@types/json-schema@7.0.15)(@types/node@22.19.15)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(babel-plugin-macros@3.1.0)(bufferutil@4.1.0)(encoding@0.1.13)(pg@8.20.0)(playwright-core@1.60.0)(postgres@3.4.8)(socks@2.8.7)(utf-8-validate@6.0.6)
+        version: 0.121.12(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@swc/helpers@0.5.23)(@types/json-schema@7.0.15)(@types/node@22.19.15)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(babel-plugin-macros@3.1.0)(bufferutil@4.1.0)(encoding@0.1.13)(pg@8.20.0)(playwright-core@1.60.0)(postgres@3.4.8)(socks@2.8.7)(utf-8-validate@6.0.6)
       storybook:
         specifier: ^10.3.3
         version: 10.3.3(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(utf-8-validate@6.0.6)
@@ -800,6 +800,15 @@ importers:
       vitest:
         specifier: 4.1.8
         version: 4.1.8(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.0)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.4(@types/node@25.5.0)(typescript@6.0.3))(vite@6.4.3(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))
+
+  workers/observability-ingest:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20250317.0
+        version: 4.20260621.1
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
 
 packages:
 
@@ -1762,6 +1771,9 @@ packages:
     peerDependencies:
       react: 19.2.4
       react-dom: 19.2.4
+
+  '@cloudflare/workers-types@4.20260621.1':
+    resolution: {integrity: sha512-c4xrf4shZdDOK1ihh1UKzlS/3MDYiGThT/Oqr4Y3qR9NLCSNzHB7rt+Vk/LOp0ZSNjA+7WNJEQsOhpiQtpT2GA==}
 
   '@coinbase/wallet-sdk@4.3.7':
     resolution: {integrity: sha512-z6e5XDw6EF06RqkeyEa+qD0dZ2ZbLci99vx3zwDY//XO8X7166tqKJrR2XlQnzVmtcUuJtCd5fCvr9Cu6zzX7w==}
@@ -18122,6 +18134,8 @@ snapshots:
       - supports-color
       - typescript
 
+  '@cloudflare/workers-types@4.20260621.1': {}
+
   '@coinbase/wallet-sdk@4.3.7(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@6.0.6)(zod@4.3.6)':
     dependencies:
       '@noble/hashes': 1.8.0
@@ -27164,8 +27178,9 @@ snapshots:
       esbuild: 0.28.1
       tsx: 4.21.0
 
-  drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8):
+  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8):
     optionalDependencies:
+      '@cloudflare/workers-types': 4.20260621.1
       '@neondatabase/serverless': 1.1.0
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.20.0
@@ -27174,9 +27189,9 @@ snapshots:
       pg: 8.20.0
       postgres: 3.4.8
 
-  drizzle-zod@0.8.3(drizzle-orm@0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8))(zod@4.3.6):
+  drizzle-zod@0.8.3(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8))(zod@4.3.6):
     dependencies:
-      drizzle-orm: 0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8)
+      drizzle-orm: 0.45.2(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8)
       zod: 4.3.6
 
   dunder-proto@1.0.1:
@@ -32562,7 +32577,7 @@ snapshots:
 
   promisepipe@3.0.0: {}
 
-  promptfoo@0.121.12(@neondatabase/serverless@1.1.0)(@swc/helpers@0.5.23)(@types/json-schema@7.0.15)(@types/node@22.19.15)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(babel-plugin-macros@3.1.0)(bufferutil@4.1.0)(encoding@0.1.13)(pg@8.20.0)(playwright-core@1.60.0)(postgres@3.4.8)(socks@2.8.7)(utf-8-validate@6.0.6):
+  promptfoo@0.121.12(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@swc/helpers@0.5.23)(@types/json-schema@7.0.15)(@types/node@22.19.15)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(babel-plugin-macros@3.1.0)(bufferutil@4.1.0)(encoding@0.1.13)(pg@8.20.0)(playwright-core@1.60.0)(postgres@3.4.8)(socks@2.8.7)(utf-8-validate@6.0.6):
     dependencies:
       '@anthropic-ai/sdk': 0.97.1(zod@4.3.6)
       '@apidevtools/json-schema-ref-parser': 15.3.5(@types/json-schema@7.0.15)
@@ -32604,7 +32619,7 @@ snapshots:
       debounce: 3.0.0
       dedent: 1.7.2(babel-plugin-macros@3.1.0)
       dotenv: 17.4.2
-      drizzle-orm: 0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8)
+      drizzle-orm: 0.45.2(@cloudflare/workers-types@4.20260621.1)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(@upstash/redis@1.38.0)(better-sqlite3@12.10.0)(pg@8.20.0)(postgres@3.4.8)
       execa: 9.6.1
       express: 5.2.1
       exsolve: 1.0.8

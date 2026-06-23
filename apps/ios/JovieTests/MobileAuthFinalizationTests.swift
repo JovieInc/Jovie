@@ -131,6 +131,8 @@ struct MobileAuthFinalizationTests {
       apiBaseURL: URL(string: "https://jov.ie")!,
       webBaseURL: URL(string: "https://jov.ie")!,
       sentryDSN: nil,
+      observabilityIngestURL: nil,
+      observabilityIngestSecret: nil,
       observabilityEnvironment: "test",
       clerkRedirectUrl: "ie.jov.jovie://callback",
       clerkCallbackUrlScheme: "ie.jov.jovie"
