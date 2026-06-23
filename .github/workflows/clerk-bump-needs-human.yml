@@ -41,9 +41,14 @@ jobs:
           set -euo pipefail
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          # Only flag a DECLARED @clerk/* dependency change in package.json.
+          # Do NOT scan pnpm-lock.yaml: an unrelated bump (e.g. @radix-ui)
+          # reshuffles the lockfile and re-adds @clerk/* transitive entries as
+          # "+" lines, which false-triggered needs-human on non-Clerk PRs.
+          # A real @clerk bump always edits the package.json version spec.
           if git diff --unified=0 "$BASE_SHA" "$HEAD_SHA" -- \
-              apps/web/package.json package.json pnpm-lock.yaml \
-              | grep -E '^\+.*@clerk/' >/dev/null; then
+              apps/web/package.json package.json \
+              | grep -E '^\+\s*"@clerk/' >/dev/null; then
             echo "clerk_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "clerk_changed=false" >> "$GITHUB_OUTPUT"
