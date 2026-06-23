@@ -173,13 +173,13 @@ export default async function MerchProductPage({
                 <p className='text-xs font-semibold uppercase leading-none text-white/50 [letter-spacing:0]'>
                   {card.productType}
                 </p>
-                <h1 className='mt-3 text-4xl font-semibold leading-[1.02] text-white [letter-spacing:0] sm:text-[42px]'>
+                <h1 className='mt-3 text-4xl font-semibold leading-[1.02] text-primary-token [letter-spacing:0] sm:text-[42px]'>
                   {card.title}
                 </h1>
                 <p className='mt-4 text-mid leading-6 text-white/64'>
                   {card.description}
                 </p>
-                <p className='mt-4 text-mid font-semibold text-white'>
+                <p className='mt-4 text-mid font-semibold text-primary-token'>
                   {formatPrice(card.retailPriceCents)}
                 </p>
               </div>
