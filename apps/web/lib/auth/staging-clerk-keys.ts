@@ -255,15 +255,7 @@ export async function resolvePublishableKeyStaticFirst(): Promise<
     return undefined;
   }
 
-  // Preview/local/CI: use deployment-scoped runtime env keys only.
-  // Never call headers() here — it opts ISR profile routes into dynamic rendering
-  // and breaks public-route CI (standalone server, no middleware injection).
-  // Preview deployments already receive the correct Clerk pair via env vars;
-  // per-request host routing is only needed on VERCEL_ENV=production above.
-  const runtimePk = runtimePublicEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
-  const runtimeSk = process.env.CLERK_SECRET_KEY || undefined;
-  if (runtimePk && runtimeSk) {
-    return runtimePk;
-  }
-  return undefined;
+  // Staging, preview, and local: fall back to the per-request header so the
+  // correct environment-specific Clerk instance is used.
+  return resolvePublishableKeyFromHeaders();
 }

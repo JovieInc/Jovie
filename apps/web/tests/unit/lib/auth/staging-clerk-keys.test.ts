@@ -350,49 +350,29 @@ describe('resolvePublishableKeyStaticFirst', () => {
     expect(headersMock).not.toHaveBeenCalled();
   });
 
-  it('uses the runtime key pair on preview without calling headers()', async () => {
+  it('falls back to headers() on staging (VERCEL_ENV=preview)', async () => {
     process.env.VERCEL_ENV = 'preview';
+    headersMock.mockResolvedValue(
+      new Headers({
+        'x-clerk-publishable-key': 'pk_live_staging_example',
+      })
+    );
 
     const result = await resolvePublishableKeyStaticFirst();
-    expect(result).toBe('pk_live_production_example');
-    expect(headersMock).not.toHaveBeenCalled();
+    expect(result).toBe('pk_live_staging_example');
+    expect(headersMock).toHaveBeenCalledOnce();
   });
 
-  it('uses the runtime key pair on preview when staging override keys exist', async () => {
-    process.env.VERCEL_ENV = 'preview';
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
-    process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
-
-    const result = await resolvePublishableKeyStaticFirst();
-    expect(result).toBe('pk_live_production_example');
-    expect(headersMock).not.toHaveBeenCalled();
-  });
-
-  it('uses the runtime key pair in local dev without calling headers()', async () => {
+  it('falls back to headers() in local dev (VERCEL_ENV unset)', async () => {
     delete process.env.VERCEL_ENV;
+    headersMock.mockResolvedValue(
+      new Headers({
+        'x-clerk-publishable-key': 'pk_test_local_example',
+      })
+    );
 
     const result = await resolvePublishableKeyStaticFirst();
-    expect(result).toBe('pk_live_production_example');
-    expect(headersMock).not.toHaveBeenCalled();
-  });
-
-  it('returns undefined in CI when only the publishable key is configured', async () => {
-    delete process.env.VERCEL_ENV;
-    delete process.env.CLERK_SECRET_KEY;
-
-    const result = await resolvePublishableKeyStaticFirst();
-    expect(result).toBeUndefined();
-    expect(headersMock).not.toHaveBeenCalled();
-  });
-
-  it('uses runtime keys in CI when staging override keys exist without calling headers()', async () => {
-    process.env.CI = 'true';
-    delete process.env.VERCEL_ENV;
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
-    process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
-
-    const result = await resolvePublishableKeyStaticFirst();
-    expect(result).toBe('pk_live_production_example');
-    expect(headersMock).not.toHaveBeenCalled();
+    expect(result).toBe('pk_test_local_example');
+    expect(headersMock).toHaveBeenCalledOnce();
   });
 });

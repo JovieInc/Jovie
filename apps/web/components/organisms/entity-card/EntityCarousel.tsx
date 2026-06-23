@@ -95,7 +95,7 @@ export function EntityCarousel({
   return (
     <ul
       className={cn(
-        'flex w-full min-w-0 max-w-full snap-x snap-mandatory list-none gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'flex snap-x snap-mandatory list-none gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
       data-testid={dataTestId ?? 'entity-carousel'}
