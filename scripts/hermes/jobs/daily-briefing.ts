@@ -16,6 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 
 import { chat } from '../lib/free-model-router';
+import { gbrainRecall } from '../lib/gbrain';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import { sendTelegram } from '../lib/telegram-client';
@@ -149,16 +150,29 @@ async function main(): Promise<void> {
       2
     );
 
+    // Recall durable founder context (priorities, decisions, open threads) so the
+    // brief is memory-aware, not just yesterday's mechanical counts. Soft-degrades to ''.
+    const memory = gbrainRecall(
+      `founder priorities decisions blockers ${merged
+        .map(p => p.title)
+        .join(' ')
+        .slice(0, 200)}`,
+      5
+    );
+    const memoryBlock = memory
+      ? `\n\nRelevant long-term context (from gbrain):\n${memory}`
+      : '';
+
     const result = await chat(
       [
         {
           role: 'system',
           content:
-            'You are Hermes, an always-on chief-of-staff for a pre-PMF founder. Write a terse morning briefing (≤200 words, Markdown). Lead with what shipped, then what to focus on today. No emoji except where signaling. Plain language. No filler.',
+            'You are Hermes, an always-on chief-of-staff for a pre-PMF founder. Write a terse morning briefing (≤200 words, Markdown). Lead with what shipped, then what to focus on today. Use the long-term context to connect yesterday to ongoing priorities. No emoji except where signaling. Plain language. No filler.',
         },
         {
           role: 'user',
-          content: `Yesterday's data (UTC):\n\`\`\`json\n${context}\n\`\`\``,
+          content: `Yesterday's data (UTC):\n\`\`\`json\n${context}\n\`\`\`${memoryBlock}`,
         },
       ],
       { caller: JOB, need: 'reasoning', maxTokens: 600, temperature: 0.4 }
