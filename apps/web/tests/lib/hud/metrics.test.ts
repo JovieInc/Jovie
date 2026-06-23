@@ -204,6 +204,18 @@ describe('getHudMetrics', () => {
     expect(metrics.aiOps.counts.blocked).toBe(1);
   });
 
+  it('includes live Hermes agent runs in the HUD payload', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.agentRuns).toEqual([]);
+  });
+
   it('includes per-source trust metadata in the HUD payload', async () => {
     mockGetHudDeployments.mockResolvedValueOnce({
       availability: 'not_configured',

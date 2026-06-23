@@ -234,6 +234,14 @@ export const ServerEnvSchema = z.object({
 
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
+  // Hermes HUD events ingest authentication
+  HERMES_HUD_API_KEY: z.string().optional(),
+  HUD_AGENT_RUNS_FIXTURES: z
+    .string()
+    .optional()
+    .describe(
+      'Set to 1 to show fixture Agent OS runs when live ingest is empty'
+    ),
 
   // OpenAI (for vision model fallback in asset extraction)
   OPENAI_API_KEY: z.string().optional(),
@@ -463,6 +471,8 @@ export const ENV_KEYS = [
   'VERCEL_PRODUCTION_DEPLOY_HOOK',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'HERMES_HUD_API_KEY',
+  'HUD_AGENT_RUNS_FIXTURES',
   'OPENAI_API_KEY',
   'ELEVENLABS_API_KEY',
   'ELEVENLABS_WEBHOOK_SECRET',

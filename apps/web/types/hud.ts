@@ -1,3 +1,4 @@
+import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import type { HermesAiOpsSummary } from '@/types/ai-ops';
 
 export type HudAccessMode = 'admin' | 'kiosk';
@@ -108,6 +109,8 @@ export interface HudMetrics {
   };
   deployments: HudDeployments;
   aiOps: HermesAiOpsSummary;
+  /** Live Hermes events mapped for Agent OS runs panel (laptop ingest). */
+  agentRuns: AgentRunArtifact[];
   /** Per-source fetch metadata for ops metric cards (freshness + failure states). */
   sources: Record<HudMetricSourceKey, HudMetricSourceTrust>;
   generatedAtIso: string;
