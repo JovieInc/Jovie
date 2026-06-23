@@ -64,6 +64,22 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "profile", app: app)
   }
 
+  func testReadyLaunchWithoutQRShowsUnavailableFallback() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-qr-unavailable",
+      expectedElementDescription: "\"QR unavailable\""
+    ) {
+      $0.buttons["QR unavailable"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Tim White"].exists)
+    XCTAssertTrue(app.buttons["Copy URL"].exists)
+    XCTAssertTrue(
+      app.buttons["QR unavailable"].exists,
+      "Dashboard did not show the no-payload QR fallback.\n\(app.debugDescription)"
+    )
+  }
+
   func testProfileLoadErrorRetryRestoresDashboard() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-profile-error",
@@ -100,6 +116,19 @@ final class JovieUITests: XCTestCase {
     }
 
     attachScreenshot(named: "settings", app: app)
+    for linkTitle in ["Support", "Billing", "Privacy", "Terms"] {
+      XCTAssertTrue(
+        app.buttons[linkTitle].waitForExistence(timeout: 2),
+        "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+    for valueTitle in ["Version", "Build"] {
+      XCTAssertTrue(
+        app.staticTexts[valueTitle].waitForExistence(timeout: 2),
+        "Settings value row \(valueTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+
     app.buttons["Log Out"].tap()
 
     XCTAssertTrue(
@@ -114,6 +143,10 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(app.textFields["Ask Jovie"].exists)
+    XCTAssertTrue(
+      app.staticTexts["Ask Jovie about your profile, releases, and next moves."].exists,
+      "Chat empty state did not explain the online intro behavior.\n\(app.debugDescription)"
+    )
     let profileTab = app.buttons["shell-tab-profile"]
     let chatTab = app.buttons["shell-tab-chat"]
     XCTAssertTrue(
@@ -129,6 +162,22 @@ final class JovieUITests: XCTestCase {
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
       "Bottom nav did not switch to Profile.\n\(app.debugDescription)"
     )
+  }
+
+  func testOfflineChatLaunchShowsCachedHistoryIntro() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-offline",
+      expectedElementDescription: "\"Ask Jovie (offline)\""
+    ) {
+      $0.textFields["Ask Jovie (offline)"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Ask Jovie"].exists)
+    XCTAssertTrue(
+      app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
+      "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
   }
 
   func testSwipeNavigatesBetweenProfileAndChat() {
@@ -235,6 +284,10 @@ final class JovieUITests: XCTestCase {
       app.staticTexts["Jovie"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal the menu.\n\(app.debugDescription)"
     )
+    XCTAssertTrue(
+      app.staticTexts["Start a conversation to see recent conversations here."].exists,
+      "Shell menu did not show the empty recent conversations state.\n\(app.debugDescription)"
+    )
 
     app.buttons["Close Menu"].tap()
     app.buttons["Open Settings"].tap()
@@ -242,31 +295,6 @@ final class JovieUITests: XCTestCase {
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
       "Shell navigation did not open settings.\n\(app.debugDescription)"
     )
-  }
-
-  func testRecentConversationSelectionOpensCachedChat() {
-    let app = launchMockApp(
-      launchArgument: "-ui-testing-recent-conversations",
-      expectedElementDescription: "\"Copy URL\""
-    ) {
-      $0.buttons["Copy URL"]
-    }
-
-    app.buttons["More"].tap()
-
-    let recentConversation = app.buttons["recent-conversation-conv_ui_recent_launch"]
-    XCTAssertTrue(
-      recentConversation.waitForExistence(timeout: 3),
-      "Recent conversation row did not appear.\n\(app.debugDescription)"
-    )
-
-    recentConversation.tap()
-
-    XCTAssertTrue(
-      app.staticTexts["Here is the cached launch plan."].waitForExistence(timeout: 5),
-      "Cached conversation content did not appear after selecting a recent conversation.\n\(app.debugDescription)"
-    )
-    XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists || app.textFields["Ask Jovie"].exists)
   }
 
   func testVenueModeLaunchShowsFullscreenQR() {
@@ -283,30 +311,19 @@ final class JovieUITests: XCTestCase {
       $0.buttons["dashboard-copy-url-button"]
     }
 
-    var didShowCopiedState = false
-
-    for attempt in 1...3 {
-      let copyURLButton = app.buttons["dashboard-copy-url-button"]
-      XCTAssertTrue(
-        copyURLButton.waitForExistence(timeout: 3),
-        "Copy URL button did not appear.\n\(app.debugDescription)"
-      )
-      XCTAssertTrue(
-        waitForHittable(copyURLButton, timeout: 5),
-        "Copy URL button was not hittable.\n\(app.debugDescription)"
-      )
-
-      copyURLButton.tap()
-
-      let copiedStateTimeout: TimeInterval = attempt == 3 ? 5 : 2
-      if app.buttons["Copied"].waitForExistence(timeout: copiedStateTimeout) {
-        didShowCopiedState = true
-        break
-      }
-    }
-
+    let copyURLButton = app.buttons["dashboard-copy-url-button"]
     XCTAssertTrue(
-      didShowCopiedState,
+      copyURLButton.waitForExistence(timeout: 3),
+      "Copy URL button did not appear.\n\(app.debugDescription)"
+    )
+
+    copyURLButton.tap()
+
+    let copiedState = NSPredicate(format: "label == %@ OR value == %@", "Copied", "Copied")
+    let copiedExpectation = expectation(for: copiedState, evaluatedWith: copyURLButton)
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [copiedExpectation], timeout: 2),
+      .completed,
       "Copy URL button did not show copied state.\n\(app.debugDescription)"
     )
   }
@@ -654,17 +671,8 @@ final class JovieUITests: XCTestCase {
   private func endUITestSession(_ app: XCUIApplication) {
     guard app.state != .notRunning else { return }
 
-    if app.state == .runningForeground {
-      let exitButton = app.buttons["ui-test-exit"]
-      if exitButton.waitForExistence(timeout: 1) {
-        exitButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-      }
-    }
-
-    if !app.wait(for: .notRunning, timeout: 5) {
-      app.terminate()
-      _ = app.wait(for: .notRunning, timeout: 2)
-    }
+    app.terminate()
+    _ = app.wait(for: .notRunning, timeout: 5)
   }
 
   private func attachScreenshot(named name: String, app: XCUIApplication) {

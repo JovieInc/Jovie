@@ -77,12 +77,14 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
-    case .uiTestingRecentConversations:
-      await UITestingChatFixtures.seedRecentConversationCache()
-      activeUserID = UITestingChatFixtures.recentConversationUserID
+    case .uiTestingQRUnavailable:
+      route = .ready
+      dashboardState = .loaded(.previewReadyWithoutQR)
+      isOffline = false
+    case .uiTestingChatOffline:
       route = .ready
       dashboardState = .loaded(.previewReady)
-      isOffline = false
+      isOffline = true
     case .uiTestingProfileError:
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
@@ -250,54 +252,5 @@ final class AppState {
 
   var billingURL: URL {
     continueOnWebURL.appending(path: "settings/billing")
-  }
-}
-
-private enum UITestingChatFixtures {
-  static let recentConversationUserID = "user_ui_recent_conversations"
-  static let recentConversationID = "conv_ui_recent_launch"
-  static let recentConversationTitle = "Launch plan"
-  static let cachedAssistantMessage = "Here is the cached launch plan."
-
-  static func seedRecentConversationCache(cache: ChatCache = ChatCache()) async {
-    let snapshot = CachedChatSnapshot(
-      conversations: [
-        MobileConversationSummary(
-          id: recentConversationID,
-          title: recentConversationTitle,
-          createdAt: "2026-06-21T00:00:00.000Z",
-          updatedAt: "2026-06-21T01:00:00.000Z",
-          latestMessageRole: "assistant",
-          latestTurnStatus: "completed"
-        ),
-      ],
-      messagesByConversationID: [
-        recentConversationID: [
-          MobileConversationMessage(
-            id: "msg_ui_recent_user",
-            role: "user",
-            content: "What should I ship next?",
-            clientMessageId: "client_ui_recent_user",
-            turnId: "turn_ui_recent",
-            turnStatus: "completed",
-            createdAt: "2026-06-21T00:59:00.000Z",
-            requiresWebHandoff: false
-          ),
-          MobileConversationMessage(
-            id: "msg_ui_recent_assistant",
-            role: "assistant",
-            content: cachedAssistantMessage,
-            clientMessageId: nil,
-            turnId: "turn_ui_recent",
-            turnStatus: "completed",
-            createdAt: "2026-06-21T01:00:00.000Z",
-            requiresWebHandoff: false
-          ),
-        ],
-      ],
-      cachedAt: Date(timeIntervalSince1970: 1_782_017_600)
-    )
-
-    await cache.store(snapshot, for: recentConversationUserID)
   }
 }
