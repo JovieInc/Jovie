@@ -637,11 +637,13 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.getByTestId('profile-home-alerts-fallback-card')
-    ).toHaveTextContent('Alerts');
-    expect(screen.getByTestId('profile-home-carousel')).toHaveTextContent(
-      'Listen'
+    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
+    const carousel = screen.getByTestId('profile-home-carousel');
+
+    expect(alertsCard).toHaveTextContent('Alerts');
+    expect(carousel).toHaveTextContent('Listen');
+    expect(alertsCard.compareDocumentPosition(carousel)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
     );
     expect(
       screen.queryByTestId('profile-hero-status-pill')
