@@ -8,7 +8,6 @@ import { notFound } from 'next/navigation';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
-import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
@@ -355,7 +354,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         releases={releases}
         merchCards={merchCards}
       />
-      <ProfileAeoContent content={aeoContent} />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
