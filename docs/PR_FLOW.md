@@ -47,13 +47,37 @@ runs **only what it touches**; everything heavy runs post-merge or nightly.
 
 Rules:
 - **Heavy scans never gate a PR or a `gtmq_*` merge-queue batch.** Running CodeQL
-  ×5 + the security suite per-PR saturated the runner pool and made Graphite
-  retry-storm itself into a 6-hour stall. They scan the *merged* code on `main` +
-  nightly. Secrets are still caught pre-commit by the local gitleaks hook.
+  ×5 + the full security suite per-PR saturated the runner pool and made Graphite
+  retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
+  *merged* code on `main` + nightly.
+- **Exception — secret scanning gates PRs.** A diff-scoped gitleaks + trufflehog
+  runs on every PR (~10s, 1 slot): a leaked key on this **public** repo is scraped
+  within seconds of hitting `main`, so it is EVENT-class and must be caught
+  pre-merge. The full-history secret scan stays nightly.
 - **The PR gate is the only merge gate.** Keep it under a few minutes. If a lane
   isn't required for correctness of *this* diff, path-gate it or move it off-PR.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
+
+### Does my change need the heavy lane, a preview, or taste approval?
+
+Most PRs auto-merge on the fast gate. These paths are the exceptions — know them
+before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
+
+| If your diff touches… | What happens |
+|---|---|
+| `auth-identity`, `billing-money`, `db-migrations`, `proxy-middleware`, `env-config`, `agent-control-plane`, CI workflows | **High risk** → smoke + preview evidence required, and **unattended auto-merge is blocked** (a human/orchestrator must clear it). Expect a `needs-human` hold — that's by design, not a bug. |
+| Public UI / profile surfaces | **Medium** → preview deploy + Lighthouse/a11y run; does *not* block auto-merge. |
+| Anything else (logic, tests, docs, internal app) | Fast gate only → auto-merges when green. |
+
+- **Want a preview deploy** when it isn't auto-triggered? Add the `deploy-preview`
+  (or `testing`) label — see [`release.md`](../.claude/rules/release.md).
+- **Taste-touching change** (design / UX / copy)? Put a **screenshot in the PR body**
+  and a maintainer's 👍/`/approve` clears `needs-human-taste`. Accepted screenshot
+  forms (the `taste-approve` matcher): markdown `![alt](url)`, an `<img>` tag, a
+  direct image URL (`.png/.jpg/.gif/.webp`), or a `github.com/user-attachments` /
+  `user-images.githubusercontent.com` link. A non-matching link silently fails the
+  gate — use one of these.
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
