@@ -1,7 +1,10 @@
 import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { formatLocationString } from '@/lib/utils/string-utils';
 import { KIND_PRESETS } from './kind-presets';
 import type {
+  EntityAccent,
   EntityCardModel,
   EntityCardStatus,
   EntityStatusTone,
@@ -225,6 +228,111 @@ export function chatTourDateContextToEntityCard(
     href: null,
     cta: null,
     meta: 'Tour Date Context',
+  };
+}
+
+const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
+
+function getTourEyebrow(
+  isNearYou: boolean,
+  distanceKm: number | null | undefined
+): string {
+  if (!isNearYou) {
+    return 'Next Show';
+  }
+
+  return distanceKm === null || distanceKm === undefined
+    ? 'Near You'
+    : `${Math.round(distanceKm)} km away`;
+}
+
+function getTimezoneAbbrev(
+  date: Date,
+  timezone: string | null | undefined
+): string | null {
+  if (!timezone) {
+    return null;
+  }
+
+  try {
+    return (
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        timeZoneName: 'short',
+      })
+        .formatToParts(date)
+        .find(part => part.type === 'timeZoneName')?.value ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+export interface TourDateEntityOptions {
+  readonly isNearYou?: boolean;
+  readonly distanceKm?: number | null;
+}
+
+/**
+ * Tour page card → unified model. Call-site wires `cta` / `secondaryCta`
+ * onClick handlers for analytics and calendar fallback.
+ */
+export function tourDateToEntityCard(
+  tourDate: TourDateViewModel,
+  options: TourDateEntityOptions = {}
+): EntityCardModel {
+  const date = toDate(tourDate.startDate);
+  const location = formatLocationString([
+    tourDate.city,
+    tourDate.region,
+    tourDate.country,
+  ]);
+  const isSoldOut = tourDate.ticketStatus === 'sold_out';
+  const isCancelled = tourDate.ticketStatus === 'cancelled';
+  const canBuyTickets =
+    Boolean(tourDate.ticketUrl) && !isCancelled && !isSoldOut;
+  const timezoneAbbr = date ? getTimezoneAbbrev(date, tourDate.timezone) : null;
+  const doorsMeta = tourDate.startTime
+    ? `Doors: ${tourDate.startTime}${timezoneAbbr ? ` ${timezoneAbbr}` : ''}`
+    : null;
+  const accent: EntityAccent = options.isNearYou ? 'blue' : 'orange';
+
+  let primaryLabel = 'Add To Calendar';
+  if (isCancelled) {
+    primaryLabel = 'Cancelled';
+  } else if (canBuyTickets) {
+    primaryLabel = 'Get Tickets';
+  }
+
+  return {
+    id: tourDate.id,
+    kind: 'show',
+    imageUrl: null,
+    imageAlt: tourDate.venueName,
+    accent,
+    eyebrow: getTourEyebrow(options.isNearYou ?? false, options.distanceKm),
+    title: tourDate.title ?? 'Live',
+    meta: [tourDate.venueName, location].filter(Boolean).join(' · ') || null,
+    secondaryMeta: doorsMeta,
+    datePill: date
+      ? {
+          month: monthFormatter.format(date),
+          day: dayFormatter.format(date),
+        }
+      : null,
+    status: isSoldOut ? { label: 'Sold Out', tone: 'scheduled' } : null,
+    interactive: true,
+    cta: {
+      label: primaryLabel,
+      href: canBuyTickets ? tourDate.ticketUrl : null,
+      external: canBuyTickets,
+      disabled: isCancelled,
+    },
+    secondaryCta:
+      canBuyTickets && !isCancelled
+        ? { label: 'Add To Calendar', href: null }
+        : null,
   };
 }
 

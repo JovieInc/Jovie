@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { EntityCard } from './EntityCard';
@@ -85,5 +85,35 @@ describe('EntityCard', () => {
     render(<EntityCard model={noLink} />);
     const el = screen.getByTestId('entity-card-music');
     expect(el.tagName).toBe('DIV');
+  });
+
+  it('renders interactive CTAs as real controls instead of a whole-card link', () => {
+    const onCalendar = vi.fn();
+    const interactive: EntityCardModel = {
+      id: 't1',
+      kind: 'show',
+      title: 'Live',
+      imageAlt: 'The Venue',
+      interactive: true,
+      cta: {
+        label: 'Get Tickets',
+        href: 'https://tickets.test/show',
+        external: true,
+      },
+      secondaryCta: {
+        label: 'Add To Calendar',
+        onClick: onCalendar,
+      },
+    };
+
+    render(<EntityCard model={interactive} treatment='big' />);
+    const card = screen.getByTestId('entity-card-show');
+    expect(card.tagName).toBe('DIV');
+    expect(screen.getByRole('link', { name: 'Get Tickets' })).toHaveAttribute(
+      'href',
+      'https://tickets.test/show'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add To Calendar' }));
+    expect(onCalendar).toHaveBeenCalledTimes(1);
   });
 });

@@ -3,6 +3,7 @@ export type {
   ChatTourDateContextInput,
   ReleaseEntityInput,
   ShowEntityInput,
+  TourDateEntityOptions,
 } from './adapters';
 export {
   chatReleaseContextToEntityCard,
@@ -10,6 +11,7 @@ export {
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
+  tourDateToEntityCard,
 } from './adapters';
 export { EntityCard } from './EntityCard';
 export { EntityCarousel } from './EntityCarousel';
