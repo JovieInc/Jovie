@@ -1,6 +1,5 @@
 import ClerkKit
 import Darwin
-import Foundation
 import Observation
 import SwiftUI
 
@@ -269,14 +268,11 @@ private struct AppContentView: View {
       }
 
       if chatRepository == nil {
-        let chatClient: any MobileChatClientProtocol = appState.launchMode.usesLiveClerk
-          ? MobileChatClient(
+        let repository = ChatRepository(
+          client: MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
             tokenProvider: ClerkTokenProvider()
-          )
-          : OfflineMobileChatClient()
-        let repository = ChatRepository(
-          client: chatClient,
+          ),
           cache: ChatCache(),
           clerkUserID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
@@ -285,20 +281,6 @@ private struct AppContentView: View {
         chatRepository = repository
       }
     }
-  }
-}
-
-private struct OfflineMobileChatClient: MobileChatClientProtocol {
-  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
-    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
-  }
-
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
-    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
-  }
-
-  func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
-    throw MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
   }
 }
 
@@ -322,7 +304,11 @@ private struct MobileChatPlaceholderView: View {
               .foregroundStyle(JovieColor.textPrimary)
               .multilineTextAlignment(.center)
 
-            Text(isOffline ? "Offline. Drafts stay on this device." : "Ask Jovie about your profile, releases, and next moves.")
+            Text(
+              isOffline
+                ? "Offline. Drafts stay on this device and cached history remains available."
+                : "Ask Jovie about your profile, releases, and next moves."
+            )
               .font(JovieFont.body(size: 15))
               .foregroundStyle(JovieColor.textTertiary)
               .multilineTextAlignment(.center)
@@ -334,7 +320,7 @@ private struct MobileChatPlaceholderView: View {
 
         Spacer(minLength: 48)
 
-        ChatComposerPreview(draft: $draft)
+        ChatComposerPreview(draft: $draft, isOffline: isOffline)
           .padding(.horizontal, JovieSpacing.large)
           .padding(.bottom, JovieSpacing.medium)
       }
@@ -345,12 +331,13 @@ private struct MobileChatPlaceholderView: View {
 
 private struct ChatComposerPreview: View {
   @Binding var draft: String
+  let isOffline: Bool
 
   var body: some View {
     let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
 
     HStack(spacing: JovieSpacing.medium) {
-      TextField("Ask Jovie", text: $draft)
+      TextField(isOffline ? "Ask Jovie (offline)" : "Ask Jovie", text: $draft)
         .textInputAutocapitalization(.sentences)
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
