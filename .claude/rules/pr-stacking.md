@@ -1,5 +1,10 @@
 # PR Stacking & Size
 
+> Part of the canonical [`docs/PR_FLOW.md`](../../docs/PR_FLOW.md). Default: small
+> sibling PRs to `main`; dependent work uses a `gt` stack; a mechanical sweep ships
+> as one `big-pr` PR — **never** N base-on-base micro-PRs (that collapsed the queue
+> on 2026-06-22, #11689).
+
 Small, reviewable PRs that move through the Graphite merge queue fast. Big PRs
 clog the queue, recursively rebase, and can't be reviewed for taste — so we cap
 size and stack instead.

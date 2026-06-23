@@ -1,5 +1,11 @@
 # CI Branching (24/7 Agent Development)
 
+> **Default is small sibling PRs straight to `main`** — see the canonical
+> [`docs/PR_FLOW.md`](../../docs/PR_FLOW.md). The integration-branch / train model
+> below is an **option** for a coordinated multi-agent wave on one domain, not the
+> default. Reach for it only when >3 agents touch the same domain in the same
+> window; otherwise ship direct-to-main and let the queue parallelize.
+
 Canonical branching policy for parallel agent work. Supplements [`.claude/rules/release.md`](release.md) PR discipline and [`.claude/rules/swarm.md`](swarm.md) swarm coordination.
 
 ## Architecture
