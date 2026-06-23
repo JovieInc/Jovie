@@ -724,7 +724,7 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [touch-action:pan-y] [will-change:scroll-position]',
+              'overflow-x-clip overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [touch-action:pan-y] [will-change:scroll-position]',
               homeContentScrollClassName,
               showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
               !isHomeMode &&
