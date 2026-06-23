@@ -164,3 +164,9 @@ apps/extension/
 
 # Vitest junit output (generated; never commit — caused recurring PR conflicts)
 *.junit.xml
+
+# Internal console app
+apps/console/node_modules
+apps/console/.next
+apps/console/public/taste-inbox/screenshots/
+apps/console/data/
