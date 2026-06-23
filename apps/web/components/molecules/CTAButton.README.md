@@ -1,9 +1,9 @@
-# CTAButton (components/atoms/CTAButton)
+# CTAButton (components/molecules/CTAButton)
 
 A token-driven call-to-action built on `@jovie/ui`'s `Button` primitive. It preserves shadcn focus and hover affordances, adds micro-interactions for pressed states, and keeps analytics-friendly link handling consistent across internal and external destinations.
 
 ```tsx
-import { CTAButton } from '@/components/atoms/CTAButton';
+import { CTAButton } from '@/components/molecules/CTAButton';
 
 <CTAButton href='/pricing' icon={<SparklesIcon />}>
   Join the waitlist

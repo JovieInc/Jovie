@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { Sparkles } from 'lucide-react';
 import {
   CTAButton,
   type CTAButtonProps,
@@ -26,11 +27,7 @@ export const Primary: Story = {
 export const WithIcon: Story = {
   args: {
     children: 'Upgrade to Pro',
-    icon: (
-      <span aria-hidden className='h-4 w-4'>
-        ✨
-      </span>
-    ),
+    icon: <Sparkles aria-hidden className='h-4 w-4' />,
   },
 };
 
