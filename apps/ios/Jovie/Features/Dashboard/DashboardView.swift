@@ -293,7 +293,7 @@ struct DashboardView: View {
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity)
       .disabled(response.qrPayload == nil)
-      .accessibilityLabel("Profile QR Code")
+      .accessibilityLabel(response.qrPayload == nil ? "QR unavailable" : "Profile QR Code")
       .accessibilityIdentifier("profile-qr-button")
 
       Text(response.publicProfileURL ?? "jov.ie")
@@ -353,15 +353,11 @@ struct DashboardView: View {
   private func copyURL(_ value: String?) {
     guard let value else { return }
     UIPasteboard.general.string = value
-    withAnimation(.none) {
-      didCopyURL = true
-    }
+    didCopyURL = true
 
-    Task { @MainActor in
+    Task {
       try? await Task.sleep(for: .seconds(2))
-      withAnimation(.none) {
-        didCopyURL = false
-      }
+      didCopyURL = false
     }
   }
 }

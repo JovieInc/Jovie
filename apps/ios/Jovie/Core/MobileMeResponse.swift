@@ -40,6 +40,18 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     continueOnWebURL: "https://jov.ie/app"
   )
 
+  static let previewReadyWithoutQR = MobileMeResponse(
+    state: .ready,
+    displayName: "Tim White",
+    username: "tim",
+    publicProfileURL: "https://jov.ie/tim",
+    qrPayload: nil,
+    avatarURL: nil,
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: true,
+    continueOnWebURL: "https://jov.ie/app"
+  )
+
   static let previewNeedsOnboarding = MobileMeResponse(
     state: .needsOnboarding,
     displayName: nil,

@@ -11,9 +11,10 @@ enum LaunchMode: Equatable {
   case uiTestingReady
   case uiTestingProfileError
   case uiTestingChat
-  case uiTestingRecentConversations
+  case uiTestingChatOffline
   case uiTestingSettings
   case uiTestingVenueMode
+  case uiTestingQRUnavailable
   case uiTestingNeedsOnboarding
   case uiTestingSplash
 
@@ -27,9 +28,10 @@ enum LaunchMode: Equatable {
          .uiTestingReady,
          .uiTestingProfileError,
          .uiTestingChat,
-         .uiTestingRecentConversations,
+         .uiTestingChatOffline,
          .uiTestingSettings,
          .uiTestingVenueMode,
+         .uiTestingQRUnavailable,
          .uiTestingNeedsOnboarding,
          .uiTestingSplash:
       return false
@@ -45,7 +47,7 @@ enum LaunchMode: Equatable {
   }
 
   var opensChatOnLaunch: Bool {
-    self == .uiTestingChat
+    self == .uiTestingChat || self == .uiTestingChatOffline
   }
 
   var opensVenueModeOnLaunch: Bool {
@@ -74,9 +76,10 @@ enum LaunchMode: Equatable {
          .uiTestingReady,
          .uiTestingProfileError,
          .uiTestingChat,
-         .uiTestingRecentConversations,
+         .uiTestingChatOffline,
          .uiTestingSettings,
          .uiTestingVenueMode,
+         .uiTestingQRUnavailable,
          .uiTestingNeedsOnboarding,
          .uiTestingSplash:
       return "ie.jov.Jovie"
@@ -118,8 +121,8 @@ enum LaunchMode: Equatable {
       return .uiTestingChat
     }
 
-    if arguments.contains("-ui-testing-recent-conversations") {
-      return .uiTestingRecentConversations
+    if arguments.contains("-ui-testing-chat-offline") {
+      return .uiTestingChatOffline
     }
 
     if arguments.contains("-ui-testing-settings") {
@@ -128,6 +131,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-venue-mode") {
       return .uiTestingVenueMode
+    }
+
+    if arguments.contains("-ui-testing-qr-unavailable") {
+      return .uiTestingQRUnavailable
     }
 
     if arguments.contains("-ui-testing-needs-onboarding") {

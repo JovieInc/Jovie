@@ -172,19 +172,26 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   // Consume a navigation request raised by an App Intent (Siri / Shortcuts /
   // Spotlight). Chat-bound requests land on Profile when chat is unavailable.
   private func applyPendingIntentNavigation() {
-    guard let request = intentStore.consume() else { return }
-    guard chatEnabled else { return }
+    var state = AppShellIntentNavigationState(
+      selectedTab: selectedTab,
+      chatDraft: chatDraft,
+      pendingRequest: intentStore.consume()
+    )
+    let previousTab = selectedTab
 
-    switch request {
-    case .openChat, .continueLastConversation:
+    guard AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: chatEnabled,
+      state: &state
+    ) else { return }
+
+    chatDraft = state.chatDraft
+
+    if state.selectedTab != previousTab {
       withAnimation(.easeInOut(duration: 0.25)) {
-        selectedTab = .chat
+        selectedTab = state.selectedTab
       }
-    case let .sendMessage(text):
-      chatDraft = text
-      withAnimation(.easeInOut(duration: 0.25)) {
-        selectedTab = .chat
-      }
+    } else {
+      selectedTab = state.selectedTab
     }
   }
 
@@ -399,18 +406,23 @@ private struct AppNavigationMenu: View {
             } else {
               VStack(spacing: JovieSpacing.small) {
                 ForEach(recentConversations.prefix(5)) { conversation in
-                  RecentConversationMenuRow(
-                    title: conversation.title ?? "New Conversation",
-                    accessibilityID: "recent-conversation-\(conversation.id)"
-                  ) {
+                  Button {
                     onSelectConversation(conversation.id)
+                  } label: {
+                    HStack {
+                      Text(conversation.title ?? "New Conversation")
+                        .font(JovieFont.body(size: 15))
+                        .foregroundStyle(JovieColor.textPrimary)
+                        .lineLimit(1)
+                      Spacer()
+                    }
+                    .padding(.vertical, JovieSpacing.small)
                   }
+                  .buttonStyle(.plain)
                 }
               }
-              .frame(maxWidth: .infinity, alignment: .leading)
             }
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.top, JovieSpacing.medium)
         }
 
@@ -421,33 +433,7 @@ private struct AppNavigationMenu: View {
       .padding(.bottom, JovieSpacing.xLarge)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
-  }
-}
-
-private struct RecentConversationMenuRow: View {
-  let title: String
-  let accessibilityID: String
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      HStack {
-        Text(title)
-          .lineLimit(1)
-
-        Spacer(minLength: 0)
-      }
-      .font(JovieFont.body(size: 15, weight: .medium))
-      .foregroundStyle(JovieColor.textPrimary)
-      .padding(.vertical, 13)
-      .padding(.horizontal, JovieSpacing.medium)
-      .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityLabel(title)
-    .accessibilityIdentifier(accessibilityID)
+    .accessibilityIdentifier("shell-menu")
   }
 }
 

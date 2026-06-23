@@ -51,7 +51,6 @@ final class ChatRepository {
 
   func openConversation(_ conversationID: String) async {
     activeConversationID = conversationID
-    await hydrateConversationFromCache(conversationID)
 
     do {
       let detail = try await client.fetchConversation(id: conversationID, limit: 100)
