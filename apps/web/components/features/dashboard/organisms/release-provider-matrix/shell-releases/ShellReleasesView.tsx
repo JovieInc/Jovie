@@ -69,7 +69,10 @@ import {
   useReleaseRightPanelTableMeta,
 } from '../useReleaseRightPanelTableMeta';
 import { releaseStatusToShell } from './release-adapters';
-import { ShellReleaseRow } from './ShellReleaseRow';
+import {
+  ShellReleaseRow,
+  type ShellReleaseSyncStatus,
+} from './ShellReleaseRow';
 
 /**
  * Match a release against a single filter value. Field-level operator
@@ -158,6 +161,7 @@ interface ReleasesListContentProps {
   >;
   readonly isSmartLinkLocked: (id: string) => boolean;
   readonly getSmartLinkLockReason: (id: string) => SmartLinkLockReason | null;
+  readonly getSyncStatus: (id: string) => ShellReleaseSyncStatus;
   readonly onConnectSpotify: () => void;
   readonly onNewRelease: () => void;
   readonly onSync: () => void;
@@ -178,6 +182,7 @@ function ReleasesListContent({
   actionMenusByReleaseId,
   isSmartLinkLocked,
   getSmartLinkLockReason,
+  getSyncStatus,
   onConnectSpotify,
   onNewRelease,
   onSync,
@@ -309,6 +314,7 @@ function ReleasesListContent({
           smartLinkLockReason={
             isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
           }
+          syncStatus={getSyncStatus(r.id)}
         />
       ))}
     </div>
@@ -449,6 +455,20 @@ export function ShellReleasesView({
       return lockReasons.get(releaseId) ?? null;
     },
     [lockReasons]
+  );
+
+  // Per-row in-flight agent state, derived from real mutation signals:
+  // a refresh is tracked per-release; an ISRC rescan applies to the
+  // currently-edited release. Idle rows resolve to `null` (no chrome).
+  const getSyncStatus = useCallback(
+    (releaseId: string): ShellReleaseSyncStatus => {
+      if (refreshingReleaseId === releaseId) return 'refreshing';
+      if (isRescanningIsrc && editingRelease?.id === releaseId) {
+        return 'rescanning-isrc';
+      }
+      return null;
+    },
+    [refreshingReleaseId, isRescanningIsrc, editingRelease?.id]
   );
 
   const visibleReleases = useMemo(() => applyPills(rows, pills), [rows, pills]);
@@ -942,6 +962,7 @@ export function ShellReleasesView({
             actionMenusByReleaseId={actionMenusByReleaseId}
             isSmartLinkLocked={isSmartLinkLocked}
             getSmartLinkLockReason={getSmartLinkLockReason}
+            getSyncStatus={getSyncStatus}
             onConnectSpotify={() => setSpotifySearchOpen(true)}
             onNewRelease={handleNewRelease}
             onSync={handleSync}
