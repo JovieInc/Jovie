@@ -90,7 +90,12 @@
     "typecheck": {
       "description": "Runs TypeScript compiler in noEmit mode to verify type correctness across the workspace",
       "dependsOn": ["^typecheck"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "tsconfig.*.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "tsconfig.json",
+        "tsconfig.*.json",
+        "package.json"
+      ],
       "outputs": [".cache/tsbuildinfo"]
     },
     "dev": {

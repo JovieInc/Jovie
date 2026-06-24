@@ -156,6 +156,7 @@
     "ci:branching-guard:validate": "node scripts/ci-branching-guard.mjs validate",
     "ci:merge-queue:check": "node scripts/ci-merge-queue-check.mjs validate",
     "ci:merge-queue:verify": "node scripts/ci-merge-queue-check.mjs verify",
+    "ci:typecheck-gate-guard": "node scripts/ci-typecheck-gate-guard.mjs",
     "ci:harness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__",
     "qa:swarm:list": "node scripts/qa-swarm/cli.mjs list",
     "qa:swarm:propose": "node scripts/qa-swarm/cli.mjs propose",

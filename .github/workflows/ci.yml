@@ -472,6 +472,8 @@ jobs:
         run: pnpm ci:branching-guard:validate
       - name: Validate Graphite merge queue config
         run: pnpm ci:merge-queue:check
+      - name: Verify typecheck gate uses --force (JOV-3499)
+        run: pnpm ci:typecheck-gate-guard
       - name: Run actionlint
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
       - name: Run structural repo guardrails
@@ -650,19 +652,16 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-turbo-
-      - name: Cache TypeScript artifacts
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: |
-            .cache/tsbuildinfo
-            apps/web/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsc-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-tsc-
+      # NOTE: tsbuildinfo restore intentionally removed (JOV-3499).
+      # A stale tsbuildinfo from GH Actions cache can convince tsc --incremental that no
+      # types changed, producing a false green even after --force bypasses the Turbo cache.
+      # The merge gate must be a fresh tsc run; the cost is ~1–2 extra minutes per PR.
       - name: Run typecheck
         env:
           TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
-        run: pnpm turbo typecheck --affected
+        # --force bypasses Turbo's remote cache so a stale SUCCESS from a prior commit
+        # cannot be replayed as the merge gate result. See JOV-3499.
+        run: pnpm turbo typecheck --affected --force
 
   neon-db:
     name: Neon DB
