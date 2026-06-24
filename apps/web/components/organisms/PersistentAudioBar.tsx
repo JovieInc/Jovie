@@ -17,6 +17,7 @@ import {
   resolveLyricsReturnRoute,
 } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { isFormElement } from '@/lib/utils/keyboard';
@@ -63,9 +64,16 @@ export function PersistentAudioBar({
     stop,
     onError,
   } = useTrackAudioPlayer();
+  const prefersReducedMotion = useReducedMotion();
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [waveformOn, setWaveformOn] = useState(true);
+  // Cinematic reveal (JOV-3487): the shell bar lands into place from the
+  // bottom on first play. Starts un-revealed so the CSS transition has an
+  // off-screen "from" frame to interpolate from; flips to revealed on the
+  // next frame after a track becomes active. Resets per track so a fresh
+  // track replays the reveal even without an unmount.
+  const [revealed, setRevealed] = useState(false);
   const lastNonLyricsPathRef = useRef<string>(APP_ROUTES.LIBRARY);
   const currentPathWithSearch = useMemo(() => {
     if (!pathname) return APP_ROUTES.LIBRARY;
@@ -87,6 +95,31 @@ export function PersistentAudioBar({
   useEffect(() => {
     setBarCollapsed(false);
   }, [playbackState.activeTrackId]);
+
+  // Drive the cinematic reveal. No active track → no reveal (un-revealed so
+  // the next first-play animates in). Reduced motion → snap revealed (no
+  // translate frame ever paints). Otherwise paint one un-revealed frame, then
+  // flip to revealed on the next animation frame so the bar decelerates into
+  // place from below.
+  useEffect(() => {
+    if (!playbackState.activeTrackId) {
+      setRevealed(false);
+      return;
+    }
+    if (prefersReducedMotion) {
+      setRevealed(true);
+      return;
+    }
+    setRevealed(false);
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => setRevealed(true));
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [playbackState.activeTrackId, prefersReducedMotion]);
 
   useEffect(() => {
     if (!isLyricsRoutePath(pathname) && pathname) {
@@ -376,8 +409,15 @@ export function PersistentAudioBar({
           maxHeight: barCollapsed
             ? 0
             : 'var(--linear-app-audio-bar-max-height)',
-          opacity: barCollapsed ? 0 : 1,
-          transform: barCollapsed ? 'translateY(10px)' : 'translateY(0)',
+          opacity: revealed && !barCollapsed ? 1 : 0,
+          transform: !revealed
+            ? 'translateY(100%)'
+            : barCollapsed
+              ? 'translateY(10px)'
+              : 'translateY(0)',
+          // Keyed on collapse only — the reveal is purely visual (transform +
+          // opacity), so the bar stays interactive the instant it mounts
+          // rather than waiting out the slide-in.
           pointerEvents: barCollapsed ? 'none' : 'auto',
           transition: SHELL_AUDIO_BAR_TRANSITION,
         }}
