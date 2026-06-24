@@ -19,17 +19,6 @@ mac:
   extendInfo:
     NSAppTransportSecurity:
       NSAllowsArbitraryLoads: false
-    # Register the jovie:// scheme so staging Mac builds can receive the
-    # auth deep link (jovie://auth/complete). Without this the system browser
-    # drops the redirect and staging desktop login silently fails.
-    # ponytail: shares the jovie:// scheme with prod — if both are installed on
-    # one machine LaunchServices routes the deep link to one arbitrarily. Give
-    # staging a distinct jovie-staging:// scheme (web callback + main.ts per-env)
-    # if simultaneous prod+staging QA installs become a real need. See JOV follow-up.
-    CFBundleURLTypes:
-      - CFBundleURLName: Jovie Auth
-        CFBundleURLSchemes:
-          - jovie
   notarize: true
   target:
     - target: dmg
