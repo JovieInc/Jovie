@@ -2,8 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import * as Sentry from '@sentry/nextjs';
-import { CheckCircle2, TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
@@ -17,21 +17,6 @@ class SentryExampleFrontendError extends Error {
 
 export function SentryExamplePageClient() {
   const [hasSentError, setHasSentError] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
-
-  useEffect(() => {
-    async function checkConnectivity() {
-      try {
-        const result = await Sentry.diagnoseSdkConnectivity();
-        setIsConnected(result !== 'sentry-unreachable');
-      } catch (error) {
-        console.error('Failed to check Sentry connectivity:', error);
-        setIsConnected(false);
-      }
-    }
-
-    checkConnectivity();
-  }, []);
 
   return (
     <StandaloneProductPage width='md' centered>
@@ -88,7 +73,6 @@ export function SentryExamplePageClient() {
                   'This error is raised on the frontend of the example page.'
                 );
               }}
-              disabled={!isConnected}
             >
               Throw Sample Error
             </Button>
@@ -105,24 +89,6 @@ export function SentryExamplePageClient() {
               </div>
             </ContentSurfaceCard>
           ) : null}
-
-          {isConnected ? null : (
-            <ContentSurfaceCard
-              surface='nested'
-              className='border-[color-mix(in_oklab,var(--linear-warning)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))] p-4'
-            >
-              <div className='space-y-2 text-center'>
-                <div className='flex items-center justify-center gap-2 text-app font-semibold text-primary-token'>
-                  <TriangleAlert className='h-4 w-4 text-(--linear-warning)' />
-                  Sentry connectivity looks blocked.
-                </div>
-                <p className='text-app leading-5 text-secondary-token'>
-                  Network requests to Sentry may be blocked by an ad blocker or
-                  local filtering rule.
-                </p>
-              </div>
-            </ContentSurfaceCard>
-          )}
         </div>
       </ContentSurfaceCard>
     </StandaloneProductPage>
