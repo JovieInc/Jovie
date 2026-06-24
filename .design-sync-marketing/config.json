@@ -1,0 +1,18 @@
+{
+  "_note": "projectId is filled by the lead when the Claude Design marketing project is created (JOV-3502 Part 2).",
+  "projectId": "TODO-set-by-lead-in-part-2",
+  "pkg": "apps/web/components/marketing",
+  "globalName": "JovieMarketing",
+  "shape": "tree",
+  "entry": "apps/web/components/marketing/index.ts",
+  "buildCmd": "node .design-sync-marketing/build-css.mjs",
+  "readmeHeader": ".design-sync-marketing/conventions.md",
+  "cfg": {
+    "tsconfig": ".design-sync-marketing/tsconfig.designsync.json"
+  },
+  "cssEntry": "apps/web/.ds-design-sync-marketing.css",
+  "extraFonts": [".design-sync-marketing/fonts.css"],
+  "runtimeFontPrefixes": ["SF Pro", "SF Mono", "Open Sans", "Fira"],
+  "extraEntries": [".design-sync-marketing/preview-canvas.tsx"],
+  "provider": { "component": "DesignSyncCanvas" }
+}
