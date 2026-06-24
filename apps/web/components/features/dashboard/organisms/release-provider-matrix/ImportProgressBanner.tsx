@@ -46,7 +46,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
         <span className='max-w-45 truncate text-secondary-token'>
           {artistName ? `Importing ${artistName}` : 'Importing from Spotify'}
         </span>
-        <span className='shrink-0 text-tertiary-token'>
+        <span className='shrink-0 text-tertiary-token tabular-nums'>
           · {totalCount > 0 ? `${importedCount}/${totalCount}` : importedCount}
         </span>
       </div>
@@ -76,7 +76,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
                 ? `Importing releases from ${artistName}...`
                 : 'Importing releases from Spotify...'}
             </span>
-            <span className='shrink-0 text-2xs text-secondary-token'>
+            <span className='shrink-0 text-2xs text-secondary-token tabular-nums'>
               {totalCount > 0
                 ? `${importedCount} of ${totalCount} imported`
                 : `${importedCount} imported`}

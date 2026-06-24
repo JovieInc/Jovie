@@ -26,7 +26,7 @@ export function TableIconButton({
       size='icon'
       onClick={onClick}
       aria-label={ariaLabel}
-      className={cn('h-8 w-8', className)}
+      className={cn('h-10 w-10', className)}
     >
       {icon}
     </Button>

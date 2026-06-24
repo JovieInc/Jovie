@@ -71,6 +71,22 @@ describe('Button', () => {
     expect(btn.className).not.toContain('text-accent-foreground');
   });
 
+  it('uses tactile press feedback with a static opt-out', () => {
+    render(
+      <>
+        <Button>Press</Button>
+        <Button static>Static</Button>
+      </>
+    );
+
+    expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
+      'active:scale-[0.96]'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Static' }).className
+    ).not.toContain('active:scale-[0.96]');
+  });
+
   it('uses the Jovie focus token', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button');

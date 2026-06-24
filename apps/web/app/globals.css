@@ -899,6 +899,7 @@ body {
     letter-spacing: -0.011em;
     /* -0.165px at 15px = -0.011em */
     line-height: 1.65;
+    text-wrap: pretty;
   }
   .marketing-kicker {
     display: inline-flex;
@@ -1304,7 +1305,10 @@ body {
     border: 1px solid var(--linear-border-subtle);
     border-radius: var(--linear-radius-sm, 8px);
     cursor: pointer;
-    transition: all var(--linear-duration-fast) var(--linear-ease);
+    transition:
+      background-color var(--linear-duration-fast) var(--linear-ease),
+      border-color var(--linear-duration-fast) var(--linear-ease),
+      color var(--linear-duration-fast) var(--linear-ease);
     letter-spacing: -0.011em;
   }
   .accordion-trigger:hover {
@@ -1584,7 +1588,13 @@ body {
     box-shadow:
       var(--shadow-button-inset),
       0 1px 1px rgba(0, 0, 0, 0.14);
-    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+      background-color var(--ds-motion-subtle-duration)
+      var(--ds-motion-subtle-easing),
+      border-color var(--ds-motion-subtle-duration)
+      var(--ds-motion-subtle-easing),
+      box-shadow var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
+      color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
     &:hover {
       background-color: var(--color-btn-primary-hover);
     }
@@ -2136,7 +2146,7 @@ body {
     @apply transition-shadow duration-subtle ease-subtle hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
   }
   .input-focus-glow {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-slow;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-[box-shadow,border-color] duration-slow;
     --tw-ring-color: color-mix(
       in oklab,
       var(--color-focus-ring) 40%,
@@ -2725,28 +2735,28 @@ body {
 @keyframes pb-eq-a {
   0%,
   100% {
-    height: 50%;
+    transform: scaleY(0.5);
   }
   50% {
-    height: 80%;
+    transform: scaleY(0.8);
   }
 }
 @keyframes pb-eq-b {
   0%,
   100% {
-    height: 70%;
+    transform: scaleY(0.7);
   }
   50% {
-    height: 42%;
+    transform: scaleY(0.42);
   }
 }
 @keyframes pb-eq-c {
   0%,
   100% {
-    height: 55%;
+    transform: scaleY(0.55);
   }
   50% {
-    height: 78%;
+    transform: scaleY(0.78);
   }
 }
 

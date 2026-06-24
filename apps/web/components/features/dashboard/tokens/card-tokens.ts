@@ -81,7 +81,7 @@ export const cardTokens = {
     hover: tw`
       hover:bg-surface-2
       hover:border-default
-      transition-all ${timing.normal} ${timing.easing}
+      transition-[background-color,border-color,box-shadow] ${timing.normal} ${timing.easing}
     `,
 
     active: tw`

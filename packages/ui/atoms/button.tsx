@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:opacity-50 disabled:pointer-events-none',
+  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:opacity-50 disabled:pointer-events-none',
   {
     variants: {
       variant: {
@@ -36,18 +36,18 @@ const buttonVariants = cva(
         'frosted-outline':
           'backdrop-blur-sm bg-transparent border border-subtle hover:bg-surface-1/20 dark:hover:bg-surface-2/10',
         // Canonical white pill CTA — high-contrast hero/auth pill used across
-        // marketing headers and homepage sign-in. Calm color/opacity feedback
-        // only — no decorative scale/translate. See .claude/rules/ui.md.
+        // marketing headers and homepage sign-in.
         whitePill:
           'border border-white/88 bg-white text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/95 font-medium tracking-normal sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]',
       },
       size: {
-        default: 'h-8 px-3 py-1.5',
-        sm: 'h-7 px-2.5 text-xs',
+        default:
+          'h-8 px-3 py-1.5 before:absolute before:left-1/2 before:top-1/2 before:h-10 before:min-w-10 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        sm: 'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-10 before:min-w-10 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
         lg: 'h-10 px-4 py-2 text-sm',
         xl: 'h-12 px-6 py-3 text-sm',
         hero: 'h-14 px-10 py-4 text-base font-semibold',
-        icon: 'h-8 w-8',
+        icon: 'h-10 w-10',
       },
     },
     defaultVariants: {
@@ -62,6 +62,7 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   readonly asChild?: boolean;
   readonly loading?: boolean;
+  readonly static?: boolean;
 }
 
 // Helper to compute data-state attribute
@@ -111,6 +112,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size,
       asChild = false,
       loading = false,
+      static: isStatic = false,
       disabled,
       children,
       ...props
@@ -125,6 +127,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       ref,
       className: cn(
         buttonVariants({ variant, size, className }),
+        !isStatic && !isDisabled && 'active:scale-[0.96]',
         isDisabled && 'pointer-events-none'
       ),
       'aria-disabled': isDisabled || undefined,

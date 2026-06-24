@@ -49,7 +49,7 @@ export interface CircleIconButtonProps
   readonly children: React.ReactNode;
   /** Accessible label for screen readers */
   readonly ariaLabel: string;
-  /** Button size - xs: 32px, sm: 36px, md: 40px, lg: 44px */
+  /** Button size - xs/sm/md: 40px, lg: 44px */
   readonly size?: CircleIconButtonSize;
   /** Visual variant */
   readonly variant?: CircleIconButtonVariant;
@@ -60,10 +60,10 @@ export interface CircleIconButtonProps
 }
 
 const sizeStyles: Record<CircleIconButtonSize, string> = {
-  xs: 'h-8 w-8', // 32px - compact, good for dense UIs
-  sm: 'h-9 w-9', // 36px - default for most use cases
-  md: 'h-10 w-10', // 40px - standard touch target
-  lg: 'h-11 w-11', // 44px - large touch target (mobile-first)
+  xs: 'h-10 w-10',
+  sm: 'h-10 w-10',
+  md: 'h-10 w-10',
+  lg: 'h-11 w-11',
 };
 
 const iconSizeStyles: Record<CircleIconButtonSize, string> = {

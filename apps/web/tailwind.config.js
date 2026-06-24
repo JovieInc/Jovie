@@ -79,12 +79,16 @@ module.exports = {
         'investor-table': '47.5rem',
       },
 
-      // Border radius - Linear-extracted values
+      // Border radius - System B canonical values
       borderRadius: {
-        xs: 'var(--radius-xs)', // 2px — tags, tiny elements
-        DEFAULT: 'var(--radius-default)', // 4px — buttons (Linear exact)
-        xl: 'var(--radius-xl)', // 10px — large cards
-        '3xl': 'var(--radius-3xl)', // 14px — large modals
+        xs: 'var(--radius-xs)',
+        sm: 'var(--radius-sm)',
+        DEFAULT: 'var(--radius-default)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+        '2xl': 'var(--radius-2xl)',
+        '3xl': 'var(--radius-3xl)',
         dialog: 'var(--app-dialog-radius)',
         'sidebar-floating': 'var(--app-shell-sidebar-floating-radius)',
         pill: 'var(--radius-pill)', // 48px — pill buttons
