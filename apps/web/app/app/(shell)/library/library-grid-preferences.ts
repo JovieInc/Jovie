@@ -19,6 +19,53 @@ export const LIBRARY_GRID_DENSITY_OPTIONS: readonly {
   { value: 'spacious', label: 'L', tooltip: 'Large cards' },
 ] as const;
 
+function readStoredPreference<T extends string>(
+  storageKey: string,
+  parse: (value: string | null) => T,
+  defaultValue: T
+): T {
+  if (typeof window === 'undefined') return defaultValue;
+
+  try {
+    return parse(window.localStorage.getItem(storageKey));
+  } catch {
+    return defaultValue;
+  }
+}
+
+function writeStoredPreference(storageKey: string, value: string): void {
+  try {
+    window.localStorage.setItem(storageKey, value);
+  } catch {
+    // Ignore storage access errors.
+  }
+}
+
+function useStoredPreference<T extends string>(
+  defaultValue: T,
+  read: () => T,
+  write: (value: T) => void
+): {
+  readonly value: T;
+  readonly setValue: (value: T) => void;
+} {
+  const [value, setValueState] = useState<T>(defaultValue);
+
+  useEffect(() => {
+    setValueState(read());
+  }, [read]);
+
+  const setValue = useCallback(
+    (next: T) => {
+      setValueState(next);
+      write(next);
+    },
+    [write]
+  );
+
+  return { value, setValue };
+}
+
 function parseLibraryGridDensity(value: string | null): LibraryGridDensity {
   if (value === 'compact' || value === 'comfortable' || value === 'spacious') {
     return value;
@@ -27,43 +74,28 @@ function parseLibraryGridDensity(value: string | null): LibraryGridDensity {
 }
 
 export function readLibraryGridDensity(): LibraryGridDensity {
-  if (typeof window === 'undefined') return DEFAULT_LIBRARY_GRID_DENSITY;
-
-  try {
-    return parseLibraryGridDensity(
-      window.localStorage.getItem(LIBRARY_GRID_DENSITY_STORAGE_KEY)
-    );
-  } catch {
-    return DEFAULT_LIBRARY_GRID_DENSITY;
-  }
+  return readStoredPreference(
+    LIBRARY_GRID_DENSITY_STORAGE_KEY,
+    parseLibraryGridDensity,
+    DEFAULT_LIBRARY_GRID_DENSITY
+  );
 }
 
 export function writeLibraryGridDensity(density: LibraryGridDensity): void {
-  try {
-    window.localStorage.setItem(LIBRARY_GRID_DENSITY_STORAGE_KEY, density);
-  } catch {
-    // Ignore storage access errors.
-  }
+  writeStoredPreference(LIBRARY_GRID_DENSITY_STORAGE_KEY, density);
 }
 
 export function useLibraryGridDensity(): {
   readonly density: LibraryGridDensity;
   readonly setDensity: (density: LibraryGridDensity) => void;
 } {
-  const [density, setDensityState] = useState<LibraryGridDensity>(
-    DEFAULT_LIBRARY_GRID_DENSITY
+  const { value, setValue } = useStoredPreference(
+    DEFAULT_LIBRARY_GRID_DENSITY,
+    readLibraryGridDensity,
+    writeLibraryGridDensity
   );
 
-  useEffect(() => {
-    setDensityState(readLibraryGridDensity());
-  }, []);
-
-  const setDensity = useCallback((next: LibraryGridDensity) => {
-    setDensityState(next);
-    writeLibraryGridDensity(next);
-  }, []);
-
-  return { density, setDensity };
+  return { density: value, setDensity: setValue };
 }
 
 function parseLibraryViewMode(value: string | null): LibraryViewMode {
@@ -74,41 +106,26 @@ function parseLibraryViewMode(value: string | null): LibraryViewMode {
 }
 
 export function readLibraryViewMode(): LibraryViewMode {
-  if (typeof window === 'undefined') return DEFAULT_LIBRARY_VIEW_MODE;
-
-  try {
-    return parseLibraryViewMode(
-      window.localStorage.getItem(LIBRARY_VIEW_MODE_STORAGE_KEY)
-    );
-  } catch {
-    return DEFAULT_LIBRARY_VIEW_MODE;
-  }
+  return readStoredPreference(
+    LIBRARY_VIEW_MODE_STORAGE_KEY,
+    parseLibraryViewMode,
+    DEFAULT_LIBRARY_VIEW_MODE
+  );
 }
 
 export function writeLibraryViewMode(view: LibraryViewMode): void {
-  try {
-    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, view);
-  } catch {
-    // Ignore storage access errors.
-  }
+  writeStoredPreference(LIBRARY_VIEW_MODE_STORAGE_KEY, view);
 }
 
 export function useLibraryViewMode(): {
   readonly view: LibraryViewMode;
   readonly setView: (view: LibraryViewMode) => void;
 } {
-  const [view, setViewState] = useState<LibraryViewMode>(
-    DEFAULT_LIBRARY_VIEW_MODE
+  const { value, setValue } = useStoredPreference(
+    DEFAULT_LIBRARY_VIEW_MODE,
+    readLibraryViewMode,
+    writeLibraryViewMode
   );
 
-  useEffect(() => {
-    setViewState(readLibraryViewMode());
-  }, []);
-
-  const setView = useCallback((next: LibraryViewMode) => {
-    setViewState(next);
-    writeLibraryViewMode(next);
-  }, []);
-
-  return { view, setView };
+  return { view: value, setView: setValue };
 }

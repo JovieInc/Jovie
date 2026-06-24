@@ -536,6 +536,25 @@ const CatalogArtworkCell = memo(function CatalogArtworkCell({
 
 const libraryColumnHelper = createColumnHelper<LibraryReleaseAsset>();
 
+function createLibraryTypeColumn(
+  metaClassName: string,
+  size: number,
+  minSize: number
+) {
+  return libraryColumnHelper.display({
+    id: 'type',
+    header: 'Type',
+    cell: ({ row }) => (
+      <span className='system-b-library-meta-text truncate text-tertiary-token'>
+        {formatLibraryItemType(row.original)}
+      </span>
+    ),
+    size,
+    minSize,
+    meta: { className: metaClassName },
+  });
+}
+
 // Slice 1 minimal catalog column set: status · artwork · title · artist · type.
 // Slice 2/3 adds BPM/key/energy/rating/waveform/DSP columns + the Tracks fold-in.
 const LIBRARY_CATALOG_COLUMNS = [
@@ -582,18 +601,7 @@ const LIBRARY_CATALOG_COLUMNS = [
     enableSorting: false,
     meta: { className: 'hidden md:table-cell px-2' },
   }),
-  libraryColumnHelper.display({
-    id: 'type',
-    header: 'Type',
-    cell: ({ row }) => (
-      <span className='system-b-library-meta-text truncate text-tertiary-token'>
-        {formatLibraryItemType(row.original)}
-      </span>
-    ),
-    size: 120,
-    minSize: 96,
-    meta: { className: 'hidden sm:table-cell pl-2 pr-3' },
-  }),
+  createLibraryTypeColumn('hidden sm:table-cell pl-2 pr-3', 120, 96),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
 const LIBRARY_TABLE_COLUMNS = [
@@ -622,18 +630,7 @@ const LIBRARY_TABLE_COLUMNS = [
     minSize: 108,
     meta: { className: 'hidden md:table-cell px-2' },
   }),
-  libraryColumnHelper.display({
-    id: 'type',
-    header: 'Type',
-    cell: ({ row }) => (
-      <span className='system-b-library-meta-text truncate text-tertiary-token'>
-        {formatLibraryItemType(row.original)}
-      </span>
-    ),
-    size: 104,
-    minSize: 88,
-    meta: { className: 'hidden lg:table-cell px-2' },
-  }),
+  createLibraryTypeColumn('hidden lg:table-cell px-2', 104, 88),
   libraryColumnHelper.display({
     id: 'providers',
     header: 'Providers',
@@ -1427,9 +1424,27 @@ function AssetGrid({
   );
 }
 
-function LibraryDataTable({
+function useLibraryTableRowState(selectedId: string | null) {
+  const getRowId = useMemo(() => (asset: LibraryReleaseAsset) => asset.id, []);
+  const rowSelection = useMemo<RowSelectionState>(
+    () => (selectedId ? { [selectedId]: true } : {}),
+    [selectedId]
+  );
+  const getRowClassName = useCallback(
+    (asset: LibraryReleaseAsset) =>
+      asset.id === selectedId ? 'system-b-library-table-row-selected' : '',
+    [selectedId]
+  );
+
+  return { getRowId, rowSelection, getRowClassName };
+}
+
+function LibraryReleaseTable({
   assets,
   selectedId,
+  columns,
+  hideHeader,
+  rowTestIdPrefix,
   playingPreviewId,
   onSelect,
   onTogglePreview,
@@ -1437,89 +1452,33 @@ function LibraryDataTable({
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly selectedId: string | null;
-  readonly playingPreviewId: string | null;
+  readonly columns: ColumnDef<LibraryReleaseAsset, unknown>[];
+  readonly hideHeader?: boolean;
+  readonly rowTestIdPrefix: 'library-release-row' | 'library-catalog-row';
+  readonly playingPreviewId?: string | null;
   readonly onSelect: (id: string) => void;
-  readonly onTogglePreview: LibraryPreviewToggle;
+  readonly onTogglePreview?: LibraryPreviewToggle;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
 }) {
   const tableData = useMemo(() => [...assets], [assets]);
   const previewContext = useMemo(
-    () => ({ playingPreviewId, onTogglePreview }),
+    () => ({
+      playingPreviewId: playingPreviewId ?? null,
+      onTogglePreview: onTogglePreview ?? noopPreviewToggle,
+    }),
     [onTogglePreview, playingPreviewId]
   );
-  const getRowId = useMemo(() => (asset: LibraryReleaseAsset) => asset.id, []);
-  const getRowTestId = useMemo(
-    () => (asset: LibraryReleaseAsset) => `library-release-row-${asset.id}`,
-    []
-  );
-  const rowSelection = useMemo<RowSelectionState>(
-    () => (selectedId ? { [selectedId]: true } : {}),
-    [selectedId]
-  );
-  const getRowClassName = useCallback(
-    (asset: LibraryReleaseAsset) =>
-      asset.id === selectedId ? 'system-b-library-table-row-selected' : '',
-    [selectedId]
+  const { getRowId, rowSelection, getRowClassName } =
+    useLibraryTableRowState(selectedId);
+  const getRowTestId = useCallback(
+    (asset: LibraryReleaseAsset) => `${rowTestIdPrefix}-${asset.id}`,
+    [rowTestIdPrefix]
   );
 
-  return (
-    <LibraryPreviewContext.Provider value={previewContext}>
-      <UnifiedTable<LibraryReleaseAsset>
-        data={tableData}
-        columns={LIBRARY_TABLE_COLUMNS}
-        onRowClick={asset => onSelect(asset.id)}
-        getRowId={getRowId}
-        getRowTestId={getRowTestId}
-        rowSelection={rowSelection}
-        getRowClassName={getRowClassName}
-        getContextMenuItems={getContextMenuItems}
-        enableVirtualization={assets.length >= 20}
-        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
-        minWidth={LIBRARY_TABLE_MIN_WIDTH}
-        hideHeader
-        className='system-b-library-table'
-        containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
-        skeletonRows={SKELETON_ROW_COUNT.TABLE}
-        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-      />
-    </LibraryPreviewContext.Provider>
-  );
-}
-
-// Table mode: dense catalog grid with a visible column header (status · artwork
-// · title · artist · type). Distinct from List mode, which hides the header and
-// folds artwork/title/artist into a single release cell.
-function LibraryCatalogTable({
-  assets,
-  selectedId,
-  onSelect,
-  getContextMenuItems,
-}: {
-  readonly assets: readonly LibraryReleaseAsset[];
-  readonly selectedId: string | null;
-  readonly onSelect: (id: string) => void;
-  readonly getContextMenuItems: LibraryContextMenuBuilder;
-}) {
-  const tableData = useMemo(() => [...assets], [assets]);
-  const getRowId = useMemo(() => (asset: LibraryReleaseAsset) => asset.id, []);
-  const getRowTestId = useMemo(
-    () => (asset: LibraryReleaseAsset) => `library-catalog-row-${asset.id}`,
-    []
-  );
-  const rowSelection = useMemo<RowSelectionState>(
-    () => (selectedId ? { [selectedId]: true } : {}),
-    [selectedId]
-  );
-  const getRowClassName = useCallback(
-    (asset: LibraryReleaseAsset) =>
-      asset.id === selectedId ? 'system-b-library-table-row-selected' : '',
-    [selectedId]
-  );
-
-  return (
+  const table = (
     <UnifiedTable<LibraryReleaseAsset>
       data={tableData}
-      columns={LIBRARY_CATALOG_COLUMNS}
+      columns={columns}
       onRowClick={asset => onSelect(asset.id)}
       getRowId={getRowId}
       getRowTestId={getRowTestId}
@@ -1529,11 +1488,22 @@ function LibraryCatalogTable({
       enableVirtualization={assets.length >= 20}
       rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
       minWidth={LIBRARY_TABLE_MIN_WIDTH}
+      hideHeader={hideHeader}
       className='system-b-library-table'
       containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
       skeletonRows={SKELETON_ROW_COUNT.TABLE}
       skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
     />
+  );
+
+  if (!onTogglePreview) {
+    return table;
+  }
+
+  return (
+    <LibraryPreviewContext.Provider value={previewContext}>
+      {table}
+    </LibraryPreviewContext.Provider>
   );
 }
 
@@ -2577,16 +2547,21 @@ export function LibrarySurface({
                 getContextMenuItems={getContextMenuItems}
               />
             ) : view === 'table' ? (
-              <LibraryCatalogTable
+              <LibraryReleaseTable
                 assets={visibleAssets}
                 selectedId={selectedId}
+                columns={LIBRARY_CATALOG_COLUMNS}
+                rowTestIdPrefix='library-catalog-row'
                 onSelect={openAsset}
                 getContextMenuItems={getContextMenuItems}
               />
             ) : (
-              <LibraryDataTable
+              <LibraryReleaseTable
                 assets={visibleAssets}
                 selectedId={selectedId}
+                columns={LIBRARY_TABLE_COLUMNS}
+                hideHeader
+                rowTestIdPrefix='library-release-row'
                 playingPreviewId={playingPreviewId}
                 onSelect={openAsset}
                 onTogglePreview={handleTogglePreview}
