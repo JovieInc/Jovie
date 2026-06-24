@@ -12,12 +12,17 @@ import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomation
 /**
  * Cloudflare Turnstile widget for the onboarding chat (JOV-2132 PR 3).
  *
- * Loads the Turnstile script and mounts a Managed widget inside the onboarding
- * composer security panel. The resulting token is passed back via `onToken`,
- * then consumed by the chat client on the first /api/chat POST in
+ * Loads the Turnstile script and mounts a fully invisible (executed) Turnstile
+ * widget inside the onboarding composer. The resulting token is passed back via
+ * `onToken`, then consumed by the chat client on the first /api/chat POST in
  * `mode='onboarding'`. Subsequent messages within the same session rely on the
  * signed session cookie + the session-lifetime rate limiter and do NOT
  * re-verify.
+ *
+ * The widget uses `appearance: 'execute'` (fully invisible/managed mode) —
+ * no visible UI, no "Security Check" panel, no bordered widget frame. If
+ * Cloudflare requires interaction or the challenge fails, the error surfaces
+ * as a compact toast in OnboardingShell, never as inline Turnstile UI (JOV-3305).
  *
  * In local development, the widget short-circuits and the chat handler's
  * dev-mode skip kicks in.
@@ -163,6 +168,10 @@ export function isOnboardingTurnstilePanelVisible(
 ): boolean {
   if (instruction) return true;
   if (!siteKey) return true;
+  // In execute (invisible) mode, 'interactive' status should never fire.
+  // We keep the check for defensive completeness but it will be unreachable
+  // in normal operation. Only error/timeout/expired/unsupported surface
+  // the compact error panel — never the bordered widget frame (JOV-3305).
   return (
     state.status === 'interactive' ||
     state.status === 'error' ||
@@ -246,7 +255,7 @@ export function OnboardingTurnstile({
       commitState(DEFAULT_STATE);
       widgetIdRef.current = turnstile.render(containerRef.current, {
         sitekey: siteKey,
-        appearance: 'interaction-only',
+        appearance: 'execute',
         size: 'flexible',
         theme: 'dark',
         callback: token => {
