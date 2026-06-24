@@ -40,8 +40,12 @@ export const FEATURE_FLAGS = {
   SHOW_HOME_REFRESH_2026: true,
   SHOW_MARKETING_FULL_FOOTER: true,
   SHOW_MARKETING_CENTER_NAV: true,
-  SHOW_HOME_V1_DESIGN: true,
-  SHOW_PUBLIC_PROFILE_V1_DESIGN: true,
+  // V1_DESIGN flags have INVERTED semantics: true = render the OLD design.
+  // #11484 ("default feature flags on") blanket-flipped every flag false→true,
+  // which silently reverted the homepage to HomeV1Design and bypassed the V2
+  // hero + sections that same PR enabled. Restore the pre-#11484 known-good state.
+  SHOW_HOME_V1_DESIGN: false,
+  SHOW_PUBLIC_PROFILE_V1_DESIGN: false,
 } as const;
 
 export type MarketingStaticFlagName = keyof typeof FEATURE_FLAGS;
