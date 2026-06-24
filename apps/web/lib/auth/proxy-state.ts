@@ -3,6 +3,7 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import {
+  CanonicalUserState,
   type ProxyUserStateProjection,
   resolveCanonicalState,
   toProxyUserState,
@@ -287,6 +288,17 @@ const NEEDS_ONBOARDING_STATE: ProxyUserState = toProxyUserState(
 );
 
 /**
+ * Fail-closed fallback for DB failures. When the database is unreachable and
+ * no stale cache is available, route the user to the waitlist instead of
+ * onboarding. This prevents waitlist-pending users from bypassing the gate
+ * during a DB outage — the needsOnboarding path skips the waitlist check and
+ * would grant onboarding access to unapproved users.
+ */
+const FAIL_CLOSED_WAITLIST_STATE: ProxyUserState = toProxyUserState(
+  CanonicalUserState.WAITLIST_PENDING
+);
+
+/**
  * Execute the database query with retry logic and per-attempt timeouts.
  *
  * Uses `withRetry` to recover from Neon cold starts (which can take several
@@ -442,7 +454,7 @@ export async function getUserState(
           clerkUserId,
           operation: 'getProxyUserState',
           errorType: 'transient',
-          fallback: 'needs-onboarding',
+          fallback: 'fail-closed-waitlist',
         }
       );
     } else {
@@ -450,11 +462,11 @@ export async function getUserState(
         clerkUserId,
         operation: 'getProxyUserState',
         errorType: isTransient ? 'transient' : 'persistent',
-        fallback: 'needs-onboarding',
+        fallback: 'fail-closed-waitlist',
       });
     }
 
-    return { ...NEEDS_ONBOARDING_STATE };
+    return { ...FAIL_CLOSED_WAITLIST_STATE };
   }
 }
 
