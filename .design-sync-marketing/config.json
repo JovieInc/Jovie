@@ -2,13 +2,11 @@
   "projectId": "9d09246a-0747-489c-ac3f-143a485ef333",
   "pkg": "apps/web/components/marketing",
   "globalName": "JovieMarketing",
-  "shape": "tree",
+  "shape": "package",
   "entry": "apps/web/components/marketing/index.ts",
   "buildCmd": "node .design-sync-marketing/build-css.mjs",
   "readmeHeader": ".design-sync-marketing/conventions.md",
-  "cfg": {
-    "tsconfig": ".design-sync-marketing/tsconfig.designsync.json"
-  },
+  "tsconfig": ".design-sync-marketing/tsconfig.designsync.json",
   "cssEntry": "apps/web/.ds-design-sync-marketing.css",
   "extraFonts": [".design-sync-marketing/fonts.css"],
   "runtimeFontPrefixes": ["SF Pro", "SF Mono", "Open Sans", "Fira"],
