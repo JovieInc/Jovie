@@ -71,7 +71,7 @@ describe('OnboardingTurnstile', () => {
         expect.any(HTMLElement),
         expect.objectContaining({
           sitekey: 'site-key',
-          appearance: 'interaction-only',
+          appearance: 'execute',
           size: 'flexible',
         })
       );
