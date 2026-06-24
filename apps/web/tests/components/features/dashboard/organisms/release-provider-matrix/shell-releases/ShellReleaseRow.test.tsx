@@ -273,3 +273,122 @@ describe('ShellReleaseRow audio affordance', () => {
     );
   });
 });
+
+describe('ShellReleaseRow enrichment', () => {
+  it('renders a release-type badge derived from real release data', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Materia',
+          releaseType: 'album',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Album')).toBeInTheDocument();
+  });
+
+  it('falls back to a Single badge for unmapped release types', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Mystery',
+          // Force an out-of-map value to exercise the fallback.
+          releaseType: 'unknown' as never,
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Single')).toBeInTheDocument();
+  });
+
+  it('omits the inline sync status and agent pulse when idle', () => {
+    const { container } = render(
+      <ShellReleaseRow
+        release={fakeRelease({ id: 'r1', title: 'Idle', previewUrl: null })}
+        isSelected={false}
+        onSelect={() => undefined}
+        syncStatus={null}
+      />
+    );
+
+    expect(screen.queryByText('Syncing…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rescanning ISRC…')).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[title="Agent working"]')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the inline sync status and agent pulse while refreshing', () => {
+    const { container } = render(
+      <ShellReleaseRow
+        release={fakeRelease({ id: 'r1', title: 'Syncing', previewUrl: null })}
+        isSelected={false}
+        onSelect={() => undefined}
+        syncStatus='refreshing'
+      />
+    );
+
+    expect(screen.getByText('Syncing…')).toBeInTheDocument();
+    expect(
+      container.querySelector('[title="Agent working"]')
+    ).toBeInTheDocument();
+  });
+
+  it('labels an in-flight ISRC rescan distinctly', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({ id: 'r1', title: 'Rescan', previewUrl: null })}
+        isSelected={false}
+        onSelect={() => undefined}
+        syncStatus='rescanning-isrc'
+      />
+    );
+
+    expect(screen.getByText('Rescanning ISRC…')).toBeInTheDocument();
+  });
+
+  it('keeps a stable row height across idle and syncing states (no layout shift)', () => {
+    const release = fakeRelease({
+      id: 'r1',
+      title: 'Stable Row',
+      previewUrl: null,
+    });
+
+    const idle = render(
+      <ShellReleaseRow
+        release={release}
+        isSelected={false}
+        onSelect={() => undefined}
+        syncStatus={null}
+      />
+    );
+    const idleRow = idle.container.querySelector('[data-shell-release-row]');
+    expect(idleRow?.className).toContain('h-14');
+    idle.unmount();
+
+    const syncing = render(
+      <ShellReleaseRow
+        release={release}
+        isSelected={false}
+        onSelect={() => undefined}
+        syncStatus='refreshing'
+      />
+    );
+    const syncingRow = syncing.container.querySelector(
+      '[data-shell-release-row]'
+    );
+    // Same fixed row height token in both states — the sync chrome lives
+    // inside the existing single-line subtitle and an absolutely-positioned
+    // pulse, so adding it cannot reflow the row.
+    expect(syncingRow?.className).toContain('h-14');
+  });
+});

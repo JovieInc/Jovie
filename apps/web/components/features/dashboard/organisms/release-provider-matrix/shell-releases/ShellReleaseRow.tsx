@@ -21,6 +21,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { ShellListRowFrame } from '@/components/organisms/table';
+import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
@@ -29,15 +30,47 @@ import {
   type EntityPopoverData,
 } from '@/components/shell/EntityPopover';
 import { StatusBadge } from '@/components/shell/StatusBadge';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import { TypeBadge } from '@/components/shell/TypeBadge';
+import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
 export type ShellRowLockReason = 'scheduled' | 'cap' | null;
+
+/**
+ * In-flight agent state for a release row, mirroring the experiment's
+ * inline "Syncing artwork…" affordance. Driven by real production signals
+ * (the parent's `refreshingReleaseId` / ISRC rescan), not mock data.
+ */
+export type ShellReleaseSyncStatus = 'refreshing' | 'rescanning-isrc' | null;
+
+const SHELL_RELEASE_SYNC_LABEL: Record<
+  NonNullable<ShellReleaseSyncStatus>,
+  string
+> = {
+  refreshing: 'Syncing…',
+  'rescanning-isrc': 'Rescanning ISRC…',
+};
+
+/**
+ * Short, capitalized release-type label for the inline `TypeBadge`. Mirrors
+ * the canonical labels used in the release filter/add surfaces so the row
+ * agrees with the rest of the releases experience.
+ */
+const RELEASE_TYPE_BADGE_LABEL: Record<ReleaseType, string> = {
+  single: 'Single',
+  ep: 'EP',
+  album: 'Album',
+  compilation: 'Comp',
+  live: 'Live',
+  mixtape: 'Mixtape',
+  music_video: 'Video',
+  other: 'Other',
+};
 export const shellReleaseRowTypography = {
   title: 'truncate text-app font-caption text-primary-token leading-[1.2]',
-  subtitle: 'truncate text-2xs text-tertiary-token leading-[1.3] mt-0.5',
+  subtitle: 'truncate text-2xs text-tertiary-token leading-[1.3]',
 } as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -93,8 +126,10 @@ function useArtworkPlayback(release: ReleaseViewModel) {
 
 const ArtworkCell = memo(function ArtworkCell({
   release,
+  isSyncing,
 }: {
   readonly release: ReleaseViewModel;
+  readonly isSyncing: boolean;
 }) {
   const { previewUrl, isTrackPlaying, handleTogglePlayback } =
     useArtworkPlayback(release);
@@ -107,6 +142,7 @@ const ArtworkCell = memo(function ArtworkCell({
         title={release.title}
         size={40}
       />
+      {isSyncing ? <AgentPulse className='rounded-sm' /> : null}
       {hasPreview ? (
         <button
           type='button'
@@ -118,7 +154,10 @@ const ArtworkCell = memo(function ArtworkCell({
           aria-pressed={isTrackPlaying}
           data-testid={`shell-release-play-${release.id}`}
           className={cn(
-            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+            // Always renders white-on-black scrim in both themes — pair the
+            // light/dark utilities so the play glyph stays legible on the
+            // `bg-black/50` overlay (satisfies no-hardcoded-theme-colors).
+            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
             isTrackPlaying
               ? 'opacity-100'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -203,8 +242,9 @@ const SmartLinkCell = memo(function SmartLinkCell({
 
 /**
  * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
- * provider-matrix cells with: artwork + title + artists + status + drop date
- * + DSP avatar stack + smart link + more menu.
+ * provider-matrix cells with: artwork (+ agent pulse when syncing) + title
+ * + type badge + artists (+ inline sync status) + status + drop date +
+ * DSP avatar stack + smart link + more menu.
  *
  * The outer `<div>` is the click + keyboard target (parent `<div role="listbox">`)
  * Inner interactive elements (smart link, more-menu) stop propagation so
@@ -216,12 +256,19 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   onSelect,
   actionMenuItems,
   smartLinkLockReason = null,
+  syncStatus = null,
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
   readonly onSelect: () => void;
   readonly actionMenuItems?: TableActionMenuItem[];
   readonly smartLinkLockReason?: ShellRowLockReason;
+  /**
+   * In-flight agent state for this release (refresh / ISRC rescan). When set,
+   * the artwork shows an `AgentPulse` and the artist line appends a status
+   * label. Degrades to nothing when `null` (the common idle case).
+   */
+  readonly syncStatus?: ShellReleaseSyncStatus;
 }) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
@@ -230,6 +277,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   );
   const status = releaseStatusToShell(release.status);
   const artistLabel = release.artistNames?.join(', ') ?? '';
+  const typeLabel = RELEASE_TYPE_BADGE_LABEL[release.releaseType] ?? 'Single';
+  const syncLabel = syncStatus ? SHELL_RELEASE_SYNC_LABEL[syncStatus] : null;
   const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
   const { playbackState } = useTrackAudioPlayer();
   const isActiveTrack = playbackState.activeTrackId === release.id;
@@ -270,19 +319,34 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       interactive
       className='group/row flex h-14 items-center gap-3 px-3'
     >
-      <ArtworkCell release={release} />
+      <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 
       <div className='min-w-0 flex-1'>
-        <EntityHoverLink
-          entity={releaseEntity}
-          className={cn(
-            shellReleaseRowTypography.title,
-            'inline-flex w-full max-w-full hover:no-underline'
-          )}
-        >
-          {release.title}
-        </EntityHoverLink>
-        <div className={shellReleaseRowTypography.subtitle}>{artistLabel}</div>
+        <div className='flex min-w-0 items-center gap-1.5'>
+          <EntityHoverLink
+            entity={releaseEntity}
+            className={cn(
+              shellReleaseRowTypography.title,
+              'inline-flex min-w-0 hover:no-underline'
+            )}
+          >
+            {release.title}
+          </EntityHoverLink>
+          <TypeBadge label={typeLabel} />
+        </div>
+        <div className='mt-0.5 flex min-w-0 items-center'>
+          <span className={shellReleaseRowTypography.subtitle}>
+            {artistLabel}
+          </span>
+          {syncLabel ? (
+            <span className='ml-1 inline-flex shrink-0 items-center text-2xs text-accent-blue'>
+              <span aria-hidden='true' className='mr-1 text-quaternary-token'>
+                ·
+              </span>
+              <span className='whitespace-nowrap'>{syncLabel}</span>
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
