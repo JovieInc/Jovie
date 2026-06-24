@@ -91,7 +91,27 @@ async function main() {
     ...selectedUrls.map(url => `--collect.url=${url}`),
   ];
 
-  await runCommand('pnpm', args, process.env);
+  // Retry once on failure to absorb transient Chrome DevTools flakes
+  // (PROTOCOL_TIMEOUT / "Waiting for DevTools protocol response has exceeded
+  // the allotted time"), which fail lhci collection and were jamming the
+  // Graphite merge queue. Real assertion/perf failures are deterministic, so
+  // they still fail the retry — this clears flakes without masking regressions.
+  // ponytail: blanket retry-once; per-error classification only if a real
+  // perf regression ever slips through a borderline retry.
+  const MAX_ATTEMPTS = 2;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await runCommand('pnpm', args, process.env);
+      return;
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS) throw error;
+      console.error(
+        `Public Lighthouse attempt ${attempt}/${MAX_ATTEMPTS} failed; retrying once. Cause: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
 }
 
 void main().catch(error => {
