@@ -196,6 +196,60 @@ describe('staging Clerk key resolution', () => {
     await expect(resolvePublishableKeyFromHeaders()).resolves.toBeUndefined();
   });
 
+  describe('resolveClerkKeys memoization (#10992)', () => {
+    it('caches ok results so env reads are not repeated on the hot path', () => {
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+
+      const first = resolveClerkKeys('staging.jov.ie');
+      delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+      delete process.env.CLERK_SECRET_KEY_STAGING;
+
+      const second = resolveClerkKeys('staging.jov.ie');
+      expect(second).toBe(first);
+      expect(second.publishableKey).toBe('pk_live_staging_example');
+    });
+
+    it('does not cache staging_missing so a later secret key can resolve', () => {
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+
+      expect(resolveClerkKeys('staging.jov.ie').status).toBe('staging_missing');
+
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+      expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+        publishableKey: 'pk_live_staging_example',
+        secretKey: 'sk_live_staging_example',
+        status: 'ok',
+      });
+    });
+
+    it('does not cache staging_inherits_prod so a corrected env can resolve', () => {
+      expect(resolveClerkKeys('staging.jov.ie').status).toBe(
+        'staging_inherits_prod'
+      );
+
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+      expect(resolveClerkKeys('staging.jov.ie').status).toBe('ok');
+    });
+
+    it('bounds the cache with FIFO eviction at 50 hostnames', () => {
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+
+      const evictedHost = 'memo-evict-probe.example';
+      const first = resolveClerkKeys(evictedHost);
+      expect(resolveClerkKeys(evictedHost)).toBe(first);
+
+      for (let i = 0; i < 50; i++) {
+        resolveClerkKeys(`memo-filler-${i}.example`);
+      }
+
+      expect(_resolveClerkKeysCache.size).toBe(50);
+      expect(resolveClerkKeys(evictedHost)).not.toBe(first);
+    });
+  });
+
   it('prefers the middleware-injected publishable key header when present', async () => {
     headersMock.mockResolvedValue(
       new Headers({
