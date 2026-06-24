@@ -451,10 +451,12 @@ describe('proxy-state.ts', () => {
 
       const result = await getUserState('clerk_123');
 
-      // Should return safe fallback (onboarding — waitlist gate is disabled)
+      // Should return fail-closed fallback (waitlist) on database error.
+      // This prevents waitlist-pending users from bypassing the gate
+      // during a DB outage.
       expect(result).toEqual({
-        needsWaitlist: false,
-        needsOnboarding: true,
+        needsWaitlist: true,
+        needsOnboarding: false,
         isActive: false,
         isBanned: false,
       });
@@ -579,8 +581,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: false,
-        needsOnboarding: true,
+        needsWaitlist: true,
+        needsOnboarding: false,
         isActive: false,
         isBanned: false,
       });
@@ -628,8 +630,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: false,
-        needsOnboarding: true,
+        needsWaitlist: true,
+        needsOnboarding: false,
         isActive: false,
         isBanned: false,
       });
