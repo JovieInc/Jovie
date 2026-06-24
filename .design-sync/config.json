@@ -1,0 +1,30 @@
+{
+  "projectId": "91388086-ff4d-4acd-bc09-985c1827579d",
+  "pkg": "@jovie/ui",
+  "globalName": "JovieUI",
+  "shape": "package",
+  "entry": "packages/ui/index.ts",
+  "buildCmd": "node .design-sync/build-css.mjs",
+  "readmeHeader": ".design-sync/conventions.md",
+  "cssEntry": ".ds-design-sync.css",
+  "extraFonts": ["../../.design-sync/fonts.css"],
+  "runtimeFontPrefixes": ["SF Pro", "SF Mono", "Open Sans", "Fira"],
+  "extraEntries": ["../../.design-sync/preview-canvas.tsx"],
+  "provider": { "component": "DesignSyncCanvas" },
+  "componentSrcMap": {
+    "DesignSyncCanvas": null,
+    "Form": null,
+    "Tabs": null,
+    "TabsPrimitive": null,
+    "TabsRoot": null
+  },
+  "overrides": {
+    "Dialog": { "cardMode": "single", "viewport": "560x420" },
+    "AlertDialog": { "cardMode": "single", "viewport": "520x360" },
+    "Sheet": { "cardMode": "single", "viewport": "640x440" },
+    "Select": { "cardMode": "single", "viewport": "360x360" },
+    "DropdownMenu": { "cardMode": "single", "viewport": "360x360" },
+    "Popover": { "cardMode": "single", "viewport": "400x320" },
+    "Tooltip": { "cardMode": "single", "viewport": "360x240" }
+  }
+}

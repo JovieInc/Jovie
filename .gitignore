@@ -169,3 +169,10 @@ apps/extension/
 
 # Vitest junit output (generated; never commit — caused recurring PR conflicts)
 *.junit.xml
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.design-sync/sb-reference/
+packages/ui/.ds-design-sync.css
