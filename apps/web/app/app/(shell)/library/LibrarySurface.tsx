@@ -23,6 +23,7 @@ import {
   Pause,
   PlayCircle,
   Shirt,
+  Table2,
   Video,
   X,
 } from 'lucide-react';
@@ -97,11 +98,13 @@ import {
   type LibraryGridDensity,
   type LibraryReleaseAsset,
   type LibraryView,
+  type LibraryViewMode,
   libraryAssetMatchesView,
 } from './library-data';
 import {
   LIBRARY_GRID_DENSITY_OPTIONS,
   useLibraryGridDensity,
+  useLibraryViewMode,
 } from './library-grid-preferences';
 import {
   countLibrarySavedViewMatches,
@@ -140,7 +143,6 @@ const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   { variant: 'text', width: '96px' },
 ];
 
-type LibraryViewMode = 'grid' | 'list';
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
 type LibraryPreviewToggle = (
@@ -520,7 +522,79 @@ const ProvidersCell = memo(function ProvidersCell({
   );
 });
 
+const CatalogArtworkCell = memo(function CatalogArtworkCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    <span className='system-b-library-artwork-shell relative block h-9 w-9 overflow-hidden'>
+      <LibraryMediaThumbnail asset={asset} size='row' />
+    </span>
+  );
+});
+
 const libraryColumnHelper = createColumnHelper<LibraryReleaseAsset>();
+
+// Slice 1 minimal catalog column set: status · artwork · title · artist · type.
+// Slice 2/3 adds BPM/key/energy/rating/waveform/DSP columns + the Tracks fold-in.
+const LIBRARY_CATALOG_COLUMNS = [
+  libraryColumnHelper.display({
+    id: 'status',
+    header: 'Status',
+    cell: ({ row }) => <StatusCell asset={row.original} />,
+    size: 112,
+    minSize: 96,
+    meta: { className: 'pl-2.5 pr-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'artwork',
+    header: 'Artwork',
+    cell: ({ row }) => <CatalogArtworkCell asset={row.original} />,
+    size: 56,
+    minSize: 56,
+    enableSorting: false,
+    meta: { className: 'px-2' },
+  }),
+  libraryColumnHelper.accessor('title', {
+    id: 'title',
+    header: 'Title',
+    cell: ({ row }) => (
+      <span className='system-b-library-release-title block truncate'>
+        {row.original.title}
+      </span>
+    ),
+    minSize: 180,
+    size: 9999,
+    enableSorting: false,
+    meta: { className: 'px-2' },
+  }),
+  libraryColumnHelper.accessor('artist', {
+    id: 'artist',
+    header: 'Artist',
+    cell: ({ row }) => (
+      <span className='system-b-library-meta-text block truncate text-tertiary-token'>
+        {row.original.artist}
+      </span>
+    ),
+    size: 160,
+    minSize: 120,
+    enableSorting: false,
+    meta: { className: 'hidden md:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'type',
+    header: 'Type',
+    cell: ({ row }) => (
+      <span className='system-b-library-meta-text truncate text-tertiary-token'>
+        {formatLibraryItemType(row.original)}
+      </span>
+    ),
+    size: 120,
+    minSize: 96,
+    meta: { className: 'hidden sm:table-cell pl-2 pr-3' },
+  }),
+] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
 const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.accessor('title', {
@@ -765,7 +839,7 @@ function LibraryRail({
 
   return (
     <nav
-      aria-label='Library filters'
+      aria-label='Library Filters'
       className={cn(
         'system-b-library-rail flex min-h-0 flex-col p-2.5',
         className
@@ -1034,20 +1108,28 @@ function ViewToggle({
   return (
     <div className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5')}>
       <PageToolbarActionButton
-        label='Grid view'
+        label='Grid View'
         icon={<Grid3x3 className={PAGE_TOOLBAR_ICON_CLASS} />}
         active={view === 'grid'}
         onClick={() => onView('grid')}
         iconOnly
-        tooltipLabel='Grid view'
+        tooltipLabel='Grid View'
       />
       <PageToolbarActionButton
-        label='List view'
+        label='List View'
         icon={<LayoutList className={PAGE_TOOLBAR_ICON_CLASS} />}
         active={view === 'list'}
         onClick={() => onView('list')}
         iconOnly
-        tooltipLabel='List view'
+        tooltipLabel='List View'
+      />
+      <PageToolbarActionButton
+        label='Table View'
+        icon={<Table2 className={PAGE_TOOLBAR_ICON_CLASS} />}
+        active={view === 'table'}
+        onClick={() => onView('table')}
+        iconOnly
+        tooltipLabel='Table View'
       />
     </div>
   );
@@ -1064,7 +1146,7 @@ function GridDensityToggle({
     <fieldset
       className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5 border-0 p-0')}
       data-testid='library-grid-density-toggle'
-      aria-label='Card size'
+      aria-label='Card Size'
     >
       {LIBRARY_GRID_DENSITY_OPTIONS.map(option => (
         <PageToolbarActionButton
@@ -1404,6 +1486,57 @@ function LibraryDataTable({
   );
 }
 
+// Table mode: dense catalog grid with a visible column header (status · artwork
+// · title · artist · type). Distinct from List mode, which hides the header and
+// folds artwork/title/artist into a single release cell.
+function LibraryCatalogTable({
+  assets,
+  selectedId,
+  onSelect,
+  getContextMenuItems,
+}: {
+  readonly assets: readonly LibraryReleaseAsset[];
+  readonly selectedId: string | null;
+  readonly onSelect: (id: string) => void;
+  readonly getContextMenuItems: LibraryContextMenuBuilder;
+}) {
+  const tableData = useMemo(() => [...assets], [assets]);
+  const getRowId = useMemo(() => (asset: LibraryReleaseAsset) => asset.id, []);
+  const getRowTestId = useMemo(
+    () => (asset: LibraryReleaseAsset) => `library-catalog-row-${asset.id}`,
+    []
+  );
+  const rowSelection = useMemo<RowSelectionState>(
+    () => (selectedId ? { [selectedId]: true } : {}),
+    [selectedId]
+  );
+  const getRowClassName = useCallback(
+    (asset: LibraryReleaseAsset) =>
+      asset.id === selectedId ? 'system-b-library-table-row-selected' : '',
+    [selectedId]
+  );
+
+  return (
+    <UnifiedTable<LibraryReleaseAsset>
+      data={tableData}
+      columns={LIBRARY_CATALOG_COLUMNS}
+      onRowClick={asset => onSelect(asset.id)}
+      getRowId={getRowId}
+      getRowTestId={getRowTestId}
+      rowSelection={rowSelection}
+      getRowClassName={getRowClassName}
+      getContextMenuItems={getContextMenuItems}
+      enableVirtualization={assets.length >= 20}
+      rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
+      minWidth={LIBRARY_TABLE_MIN_WIDTH}
+      className='system-b-library-table'
+      containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
+      skeletonRows={SKELETON_ROW_COUNT.TABLE}
+      skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
+    />
+  );
+}
+
 function EmptyCatalog() {
   return (
     <PageShell
@@ -1732,7 +1865,7 @@ function AssetDrawer({
       <button
         type='button'
         onClick={onClose}
-        aria-label='Close asset details'
+        aria-label='Close Asset Details'
         {...closedInteractiveProps}
         className={cn(
           'system-b-library-icon-button grid h-7 w-7 place-items-center',
@@ -2008,7 +2141,8 @@ function LibraryStatusBar({
   readonly view: LibraryViewMode;
   readonly activePreviewTitle: string | null;
 }) {
-  const viewLabel = view === 'grid' ? 'Grid' : 'List';
+  const viewLabel =
+    view === 'grid' ? 'Grid' : view === 'table' ? 'Table' : 'List';
   const idleSummary = `${SORT_LABELS[sort]} - ${viewLabel}`;
   const playbackSummary = activePreviewTitle
     ? `Playing ${activePreviewTitle}`
@@ -2048,7 +2182,7 @@ export function LibrarySurface({
   );
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
-  const [view, setView] = useState<LibraryViewMode>('list');
+  const { view, setView } = useLibraryViewMode();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -2440,6 +2574,13 @@ export function LibrarySurface({
                 gridDensity={gridDensity}
                 onSelect={openAsset}
                 onTogglePreview={handleTogglePreview}
+                getContextMenuItems={getContextMenuItems}
+              />
+            ) : view === 'table' ? (
+              <LibraryCatalogTable
+                assets={visibleAssets}
+                selectedId={selectedId}
+                onSelect={openAsset}
                 getContextMenuItems={getContextMenuItems}
               />
             ) : (
