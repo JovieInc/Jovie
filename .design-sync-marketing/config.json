@@ -1,6 +1,5 @@
 {
-  "_note": "projectId is filled by the lead when the Claude Design marketing project is created (JOV-3502 Part 2).",
-  "projectId": "TODO-set-by-lead-in-part-2",
+  "projectId": "9d09246a-0747-489c-ac3f-143a485ef333",
   "pkg": "apps/web/components/marketing",
   "globalName": "JovieMarketing",
   "shape": "tree",
