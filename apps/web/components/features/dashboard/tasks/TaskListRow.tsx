@@ -1,7 +1,7 @@
 'use client';
 
 import { UserAvatar } from '@jovie/ui';
-import { Disc3 } from 'lucide-react';
+import { Disc3, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import { DueChip } from '@/components/shell/DueChip';
@@ -10,8 +10,10 @@ import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 import {
   getTaskAssigneeVisual,
+  getTaskCategoryLabel,
   getTaskPriorityVisual,
   getTaskStageVisual,
+  isTaskAgentWorking,
 } from './task-presentation';
 
 interface TaskListRowProps {
@@ -107,6 +109,36 @@ function TaskAssigneeInline({
   );
 }
 
+function TaskCategoryInline({ label }: Readonly<{ label: string }>) {
+  return (
+    <span
+      className='inline-flex min-w-0 max-w-full items-center gap-1 text-tertiary-token'
+      title={`Category ${label}`}
+    >
+      <Tag className='h-3 w-3 shrink-0' aria-hidden='true' />
+      <span className='truncate'>{label}</span>
+    </span>
+  );
+}
+
+function TaskAgentWorkingGlyph() {
+  return (
+    <span
+      className='inline-flex h-4 w-4 shrink-0 items-center justify-center text-accent-blue'
+      title='Jovie is working on this'
+    >
+      <span className='relative inline-grid h-3 w-3 place-items-center'>
+        <span
+          aria-hidden='true'
+          className='absolute inset-0 rounded-full bg-accent-blue-subtle anim-calm-halo'
+        />
+        <Sparkles className='relative h-3 w-3' strokeWidth={2.25} />
+      </span>
+      <span className='sr-only'>Jovie working</span>
+    </span>
+  );
+}
+
 export const TaskListRow = memo(function TaskListRow({
   task,
   artistName,
@@ -117,6 +149,13 @@ export const TaskListRow = memo(function TaskListRow({
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const isDone = task.status === 'done';
   const isCancelled = task.status === 'cancelled';
+  const isMuted = isDone || isCancelled;
+  const categoryLabel = getTaskCategoryLabel(task.category);
+  const agentWorking = isTaskAgentWorking(
+    task.assigneeKind,
+    task.status,
+    task.agentStatus
+  );
 
   return (
     <ShellListRowFrame
@@ -124,34 +163,47 @@ export const TaskListRow = memo(function TaskListRow({
       isSelected={isSelected}
       interaction='task-row-group'
       className={cn(
-        'group/row grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
+        'group/row flex h-full items-center gap-3 px-3 py-1.5 transition-[opacity] duration-subtle ease-subtle',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
     >
-      <TaskStageGlyph task={task} />
+      <span className='flex shrink-0 items-center'>
+        <TaskStageGlyph task={task} />
+      </span>
 
       <div className='min-w-0 flex-1'>
-        <p
-          className={cn(
-            'truncate text-app font-semibold leading-[17px] text-primary-token',
-            isDone && 'text-secondary-token',
-            isCancelled && 'text-tertiary-token'
-          )}
-        >
-          {task.title}
-        </p>
+        <div className='flex min-w-0 items-center gap-1.5'>
+          <p
+            className={cn(
+              'min-w-0 truncate text-app font-semibold leading-tight text-primary-token',
+              isDone && 'text-secondary-token',
+              isCancelled && 'text-tertiary-token'
+            )}
+          >
+            {task.title}
+          </p>
+          {agentWorking ? <TaskAgentWorkingGlyph /> : null}
+        </div>
 
         <div
           data-testid={`task-list-row-meta-${task.id}`}
           className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-3xs leading-none text-secondary-token'
         >
+          {task.dueAt ? (
+            <DueChip dueIso={task.dueAt.toISOString()} muted={isMuted} />
+          ) : null}
           <span className='shrink-0 truncate text-tertiary-token'>
             {stage.label}
           </span>
           <span className='shrink-0 truncate font-semibold text-tertiary-token'>
             J-{task.taskNumber}
           </span>
+          {categoryLabel ? (
+            <div className='min-w-0 max-w-full overflow-hidden text-left'>
+              <TaskCategoryInline label={categoryLabel} />
+            </div>
+          ) : null}
           <div className='min-w-0 max-w-full overflow-hidden text-left'>
             <TaskPriorityInline task={task} />
           </div>
@@ -175,17 +227,7 @@ export const TaskListRow = memo(function TaskListRow({
         </div>
       </div>
 
-      <div className='flex shrink-0 items-center justify-end gap-1.5'>
-        <div className='flex shrink-0 items-center justify-end'>
-          {task.dueAt ? (
-            <DueChip
-              dueIso={task.dueAt.toISOString()}
-              muted={isDone || isCancelled}
-            />
-          ) : null}
-        </div>
-        <div className='shrink-0'>{actionSlot}</div>
-      </div>
+      <div className='flex shrink-0 items-center justify-end'>{actionSlot}</div>
     </ShellListRowFrame>
   );
 });
