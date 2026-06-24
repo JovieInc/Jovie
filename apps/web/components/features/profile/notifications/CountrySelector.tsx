@@ -3,73 +3,89 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { Check, ChevronDown } from 'lucide-react';
 import { memo, useCallback } from 'react';
+import { cn } from '@/lib/utils';
+import 'flag-icons/css/flag-icons.min.css';
 
 export interface CountryOption {
   code: string;
   dialCode: string;
-  flag: string;
   label: string;
 }
 
 const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
 
+// SVG flag (flag-icons) keyed by ISO 3166-1 alpha-2 code. Replaces flag emoji
+// — no emoji in UI (see .claude/rules/ui.md). Sized by font-size; the flag
+// background image is clipped to the rounded corners.
+function CountryFlag({ code }: { readonly code: string }) {
+  return (
+    <span
+      aria-hidden='true'
+      className={cn(
+        'fi rounded-sm text-base leading-none',
+        `fi-${code.toLowerCase()}`
+      )}
+    />
+  );
+}
+
 // Countries supported by Twilio SMS (sorted by usage/popularity)
 export const COUNTRY_OPTIONS: CountryOption[] = [
   // North America
-  { code: 'US', dialCode: '+1', flag: '🇺🇸', label: 'United States' },
-  { code: 'CA', dialCode: '+1', flag: '🇨🇦', label: 'Canada' },
-  { code: 'MX', dialCode: '+52', flag: '🇲🇽', label: 'Mexico' },
+  { code: 'US', dialCode: '+1', label: 'United States' },
+  { code: 'CA', dialCode: '+1', label: 'Canada' },
+  { code: 'MX', dialCode: '+52', label: 'Mexico' },
   // Europe
-  { code: 'GB', dialCode: '+44', flag: '🇬🇧', label: 'United Kingdom' },
-  { code: 'DE', dialCode: '+49', flag: '🇩🇪', label: 'Germany' },
-  { code: 'FR', dialCode: '+33', flag: '🇫🇷', label: 'France' },
-  { code: 'ES', dialCode: '+34', flag: '🇪🇸', label: 'Spain' },
-  { code: 'IT', dialCode: '+39', flag: '🇮🇹', label: 'Italy' },
-  { code: 'NL', dialCode: '+31', flag: '🇳🇱', label: 'Netherlands' },
-  { code: 'BE', dialCode: '+32', flag: '🇧🇪', label: 'Belgium' },
-  { code: 'CH', dialCode: '+41', flag: '🇨🇭', label: 'Switzerland' },
-  { code: 'AT', dialCode: '+43', flag: '🇦🇹', label: 'Austria' },
-  { code: 'SE', dialCode: '+46', flag: '🇸🇪', label: 'Sweden' },
-  { code: 'NO', dialCode: '+47', flag: '🇳🇴', label: 'Norway' },
-  { code: 'DK', dialCode: '+45', flag: '🇩🇰', label: 'Denmark' },
-  { code: 'FI', dialCode: '+358', flag: '🇫🇮', label: 'Finland' },
-  { code: 'IE', dialCode: '+353', flag: '🇮🇪', label: 'Ireland' },
-  { code: 'PT', dialCode: '+351', flag: '🇵🇹', label: 'Portugal' },
-  { code: 'PL', dialCode: '+48', flag: '🇵🇱', label: 'Poland' },
-  { code: 'CZ', dialCode: '+420', flag: '🇨🇿', label: 'Czech Republic' },
-  { code: 'GR', dialCode: '+30', flag: '🇬🇷', label: 'Greece' },
-  { code: 'RO', dialCode: '+40', flag: '🇷🇴', label: 'Romania' },
-  { code: 'HU', dialCode: '+36', flag: '🇭🇺', label: 'Hungary' },
+  { code: 'GB', dialCode: '+44', label: 'United Kingdom' },
+  { code: 'DE', dialCode: '+49', label: 'Germany' },
+  { code: 'FR', dialCode: '+33', label: 'France' },
+  { code: 'ES', dialCode: '+34', label: 'Spain' },
+  { code: 'IT', dialCode: '+39', label: 'Italy' },
+  { code: 'NL', dialCode: '+31', label: 'Netherlands' },
+  { code: 'BE', dialCode: '+32', label: 'Belgium' },
+  { code: 'CH', dialCode: '+41', label: 'Switzerland' },
+  { code: 'AT', dialCode: '+43', label: 'Austria' },
+  { code: 'SE', dialCode: '+46', label: 'Sweden' },
+  { code: 'NO', dialCode: '+47', label: 'Norway' },
+  { code: 'DK', dialCode: '+45', label: 'Denmark' },
+  { code: 'FI', dialCode: '+358', label: 'Finland' },
+  { code: 'IE', dialCode: '+353', label: 'Ireland' },
+  { code: 'PT', dialCode: '+351', label: 'Portugal' },
+  { code: 'PL', dialCode: '+48', label: 'Poland' },
+  { code: 'CZ', dialCode: '+420', label: 'Czech Republic' },
+  { code: 'GR', dialCode: '+30', label: 'Greece' },
+  { code: 'RO', dialCode: '+40', label: 'Romania' },
+  { code: 'HU', dialCode: '+36', label: 'Hungary' },
   // Asia Pacific
-  { code: 'AU', dialCode: '+61', flag: '🇦🇺', label: 'Australia' },
-  { code: 'NZ', dialCode: '+64', flag: '🇳🇿', label: 'New Zealand' },
-  { code: 'JP', dialCode: '+81', flag: '🇯🇵', label: 'Japan' },
-  { code: 'KR', dialCode: '+82', flag: '🇰🇷', label: 'South Korea' },
-  { code: 'SG', dialCode: '+65', flag: '🇸🇬', label: 'Singapore' },
-  { code: 'HK', dialCode: '+852', flag: '🇭🇰', label: 'Hong Kong' },
-  { code: 'TW', dialCode: '+886', flag: '🇹🇼', label: 'Taiwan' },
-  { code: 'MY', dialCode: '+60', flag: '🇲🇾', label: 'Malaysia' },
-  { code: 'PH', dialCode: '+63', flag: '🇵🇭', label: 'Philippines' },
-  { code: 'TH', dialCode: '+66', flag: '🇹🇭', label: 'Thailand' },
-  { code: 'ID', dialCode: '+62', flag: '🇮🇩', label: 'Indonesia' },
-  { code: 'VN', dialCode: '+84', flag: '🇻🇳', label: 'Vietnam' },
-  { code: 'IN', dialCode: '+91', flag: '🇮🇳', label: 'India' },
-  { code: 'PK', dialCode: '+92', flag: '🇵🇰', label: 'Pakistan' },
+  { code: 'AU', dialCode: '+61', label: 'Australia' },
+  { code: 'NZ', dialCode: '+64', label: 'New Zealand' },
+  { code: 'JP', dialCode: '+81', label: 'Japan' },
+  { code: 'KR', dialCode: '+82', label: 'South Korea' },
+  { code: 'SG', dialCode: '+65', label: 'Singapore' },
+  { code: 'HK', dialCode: '+852', label: 'Hong Kong' },
+  { code: 'TW', dialCode: '+886', label: 'Taiwan' },
+  { code: 'MY', dialCode: '+60', label: 'Malaysia' },
+  { code: 'PH', dialCode: '+63', label: 'Philippines' },
+  { code: 'TH', dialCode: '+66', label: 'Thailand' },
+  { code: 'ID', dialCode: '+62', label: 'Indonesia' },
+  { code: 'VN', dialCode: '+84', label: 'Vietnam' },
+  { code: 'IN', dialCode: '+91', label: 'India' },
+  { code: 'PK', dialCode: '+92', label: 'Pakistan' },
   // Middle East
-  { code: 'IL', dialCode: '+972', flag: '🇮🇱', label: 'Israel' },
-  { code: 'AE', dialCode: '+971', flag: '🇦🇪', label: 'United Arab Emirates' },
-  { code: 'SA', dialCode: '+966', flag: '🇸🇦', label: 'Saudi Arabia' },
+  { code: 'IL', dialCode: '+972', label: 'Israel' },
+  { code: 'AE', dialCode: '+971', label: 'United Arab Emirates' },
+  { code: 'SA', dialCode: '+966', label: 'Saudi Arabia' },
   // South America
-  { code: 'BR', dialCode: '+55', flag: '🇧🇷', label: 'Brazil' },
-  { code: 'AR', dialCode: '+54', flag: '🇦🇷', label: 'Argentina' },
-  { code: 'CL', dialCode: '+56', flag: '🇨🇱', label: 'Chile' },
-  { code: 'CO', dialCode: '+57', flag: '🇨🇴', label: 'Colombia' },
-  { code: 'PE', dialCode: '+51', flag: '🇵🇪', label: 'Peru' },
+  { code: 'BR', dialCode: '+55', label: 'Brazil' },
+  { code: 'AR', dialCode: '+54', label: 'Argentina' },
+  { code: 'CL', dialCode: '+56', label: 'Chile' },
+  { code: 'CO', dialCode: '+57', label: 'Colombia' },
+  { code: 'PE', dialCode: '+51', label: 'Peru' },
   // Africa
-  { code: 'ZA', dialCode: '+27', flag: '🇿🇦', label: 'South Africa' },
-  { code: 'NG', dialCode: '+234', flag: '🇳🇬', label: 'Nigeria' },
-  { code: 'KE', dialCode: '+254', flag: '🇰🇪', label: 'Kenya' },
-  { code: 'EG', dialCode: '+20', flag: '🇪🇬', label: 'Egypt' },
+  { code: 'ZA', dialCode: '+27', label: 'South Africa' },
+  { code: 'NG', dialCode: '+234', label: 'Nigeria' },
+  { code: 'KE', dialCode: '+254', label: 'Kenya' },
+  { code: 'EG', dialCode: '+20', label: 'Egypt' },
 ];
 
 interface CountryOptionButtonProps {
@@ -98,7 +114,7 @@ const CountryOptionButton = memo(function CountryOptionButton({
       }`}
       style={FONT_SYNTHESIS_STYLE}
     >
-      <span className='text-base'>{option.flag}</span>
+      <CountryFlag code={option.code} />
       <span className='flex-1 text-left'>{option.label}</span>
       <span className='text-tertiary-token'>{option.dialCode}</span>
       {isSelected && <Check className='w-4 h-4 text-primary-token' />}
@@ -134,9 +150,9 @@ export function CountrySelector({
           type='button'
           className='flex h-12 items-center gap-1.5 rounded-full px-3 text-mid font-semibold tracking-[-0.015em] text-primary-token transition-colors hover:text-primary-token focus-visible:outline-none'
           style={FONT_SYNTHESIS_STYLE}
-          aria-label='Select country code'
+          aria-label='Select Country Code'
         >
-          <span>{country.flag}</span>
+          <CountryFlag code={country.code} />
           <span>{country.dialCode}</span>
           <ChevronDown className='w-3.5 h-3.5 text-tertiary-token' />
         </button>
