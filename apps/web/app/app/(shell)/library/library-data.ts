@@ -33,6 +33,8 @@ export type LibraryAspectRatio = '1:1' | '16:9' | '9:16';
 
 export type LibraryGridDensity = 'compact' | 'comfortable' | 'spacious';
 
+export type LibraryViewMode = 'grid' | 'list' | 'table';
+
 export type LibraryMediaOrientation = 'landscape' | 'portrait';
 
 export interface LibraryReleaseAsset {
