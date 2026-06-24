@@ -1,4 +1,4 @@
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -78,11 +78,11 @@ describe('TaskListRow', () => {
     );
   });
 
-  it('renders shell due metadata through the compact chip contract', () => {
+  it('renders shell due metadata inline inside the wrapping meta row', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-25T12:00:00.000Z'));
 
-    const { getByText } = fastRender(
+    const { getByText, getByTestId } = fastRender(
       <TaskListRow
         task={{
           ...mockTask,
@@ -96,5 +96,60 @@ describe('TaskListRow', () => {
     const dueChip = getByText('Due tomorrow').closest('span');
     expect(dueChip).toHaveClass('uppercase');
     expect(dueChip?.parentElement?.className).toContain('h-5');
+    // The due chip now lives in the inline meta row, not a separate right rail.
+    expect(getByTestId('task-list-row-meta-task-1')).toContainElement(
+      dueChip as HTMLElement
+    );
+  });
+
+  it('renders a Title-Cased category label when present and nothing when absent', () => {
+    const withCategory = fastRender(
+      <TaskListRow
+        task={{ ...mockTask, category: 'distribution' }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    expect(
+      within(withCategory.container).getByText('Distribution')
+    ).toBeInTheDocument();
+
+    const withoutCategory = fastRender(
+      <TaskListRow
+        task={{ ...mockTask, category: null }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    expect(
+      within(withoutCategory.container).queryByText('Distribution')
+    ).toBeNull();
+  });
+
+  it('shows the agent-working glyph only for live Jovie in-progress work', () => {
+    const working = fastRender(
+      <TaskListRow
+        task={{
+          ...mockTask,
+          assigneeKind: 'jovie',
+          status: 'in_progress',
+          agentStatus: 'drafting',
+        }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    expect(
+      within(working.container).getByText('Jovie working')
+    ).toBeInTheDocument();
+
+    const human = fastRender(
+      <TaskListRow
+        task={{ ...mockTask, assigneeKind: 'human', agentStatus: 'idle' }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    expect(within(human.container).queryByText('Jovie working')).toBeNull();
   });
 });
