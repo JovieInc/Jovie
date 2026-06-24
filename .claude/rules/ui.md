@@ -38,6 +38,8 @@ apps/web/components/
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by a drift ratchet (`apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`) — the count may only go DOWN. Converge to tokens; never add new arbitrary values.
 
+**Server-import isolation:** `apps/web/components/{atoms,molecules,organisms}` are shared presentation layers that must bundle for the browser. Files in these layers must not import server-only specifiers (`server-only`, `@clerk/nextjs/server`, `drizzle-orm`, `@/lib/db/*`, `next/headers`, `/actions` modules, etc.) or contain `'use server'`. Violations are tracked by a drift ratchet (`apps/web/tests/unit/design-system/server-imports-ratchet.test.ts`) — the count may only go DOWN. Move server dependencies to a feature wrapper or API route.
+
 ## New Component Pattern
 
 | Type | Location | When to use |
