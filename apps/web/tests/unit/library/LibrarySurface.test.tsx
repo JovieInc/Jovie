@@ -202,13 +202,14 @@ function renderLibraryWithSidebarOverride(
 }
 
 function clickGridView() {
-  fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Grid View' }));
 }
 
 describe('LibrarySurface', () => {
   const baseMatchMedia = window.matchMedia;
 
   beforeEach(() => {
+    window.localStorage.clear();
     audioMock.playbackState = { ...audioMock.basePlaybackState };
     audioMock.toggleTrack.mockClear();
     audioMock.seek.mockClear();
@@ -486,7 +487,7 @@ describe('LibrarySurface', () => {
 
     expect(stickyCard).toBeInTheDocument();
     expect(stickyCard).toContainElement(
-      screen.getByRole('button', { name: 'Close asset details' })
+      screen.getByRole('button', { name: 'Close Asset Details' })
     );
     expect(
       within(stickyRail).getByRole('heading', { name: 'Take Me Over' })
@@ -517,7 +518,7 @@ describe('LibrarySurface', () => {
     fireEvent.click(assetCardButton);
 
     const closeButton = screen.getByRole('button', {
-      name: 'Close asset details',
+      name: 'Close Asset Details',
     });
     const openReleaseLink = screen.getByRole('link', {
       name: /Open Release/u,
@@ -566,7 +567,7 @@ describe('LibrarySurface', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
     clickGridView();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
+    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
 
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(
@@ -574,6 +575,59 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+  });
+
+  it('switches to the catalog table view with explicit columns and persists the choice', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+      }),
+    ]);
+
+    // Defaults to list (header hidden, release rows present).
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+
+    // Catalog rows render with the minimal column header.
+    expect(
+      screen.getByTestId('library-catalog-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-catalog-row-release-2')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Status' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Title' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Artist' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Type' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+    expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+    expect(window.localStorage.getItem('jovie:library-view-mode')).toBe(
+      'table'
+    );
+
+    // No regression: switching back to list restores release rows.
+    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('library-catalog-row-release-1')
+    ).not.toBeInTheDocument();
+    expect(window.localStorage.getItem('jovie:library-view-mode')).toBe('list');
   });
 
   it('starts the persistent player from real production preview data', () => {
@@ -802,7 +856,7 @@ describe('LibrarySurface', () => {
     expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     expect(
-      screen.getByRole('navigation', { name: 'Library filters' })
+      screen.getByRole('navigation', { name: 'Library Filters' })
     ).toBeInTheDocument();
     expect(
       screen.getByTestId('library-saved-filter-views')
