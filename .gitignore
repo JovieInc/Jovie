@@ -18,6 +18,9 @@ apps/console/node_modules
 .design-sync/node_modules
 .design-sync-marketing/dist/
 apps/web/.ds-design-sync-marketing.css
+.design-sync/dist/
+apps/web/.ds-design-sync-home.css
+.design-sync/previews/_images.ts
 
 # testing
 /coverage
