@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { useAppFlag } from '@/lib/flags/client';
+import { usePlanGate } from '@/lib/queries';
 
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
@@ -110,6 +111,7 @@ export function JovieChat({
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
+  const { chatFileUploadLimit, isPro: isProUser } = usePlanGate();
   const chatEntityPanel = useOptionalChatEntityPanel();
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
@@ -163,6 +165,7 @@ export function JovieChat({
     accept: fileAccept,
     aggregate,
   } = useChatFileAttachments({
+    fileUploadLimit: chatFileUploadLimit,
     onError: error => setChatError({ type: 'unknown', message: error }),
     onAudioUploaded: handleAudioUploaded,
     disabled: isLoading || isSubmitting,
@@ -536,6 +539,8 @@ export function JovieChat({
             aggregate={aggregate}
             isUploading={isUploading}
             onRemove={removeFile}
+            lockedCount={aggregate.locked}
+            isPro={isProUser}
             onCollapse={() => setManifestCollapsed(true)}
           />
         </div>
@@ -549,6 +554,8 @@ export function JovieChat({
             aggregate={aggregate}
             isUploading={isUploading}
             onRemove={removeFile}
+            lockedCount={aggregate.locked}
+            isPro={isProUser}
             collapsed
             onExpand={() => setManifestCollapsed(false)}
           />

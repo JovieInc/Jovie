@@ -209,3 +209,11 @@
   justify-content: center;
   color: var(--color-text-secondary-token);
 }
+
+/* ── Chat Upload Pay Gate ─────────────────────────────────────────────── */
+
+:where(.system-b-chat-upload-pay-gate) {
+  border-top: 1px solid
+    color-mix(in oklab, var(--color-border-focus) 20%, transparent);
+  background: color-mix(in oklab, var(--color-border-focus) 6%, transparent);
+}

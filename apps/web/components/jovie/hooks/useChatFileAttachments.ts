@@ -70,7 +70,8 @@ export type FileUploadStatus =
   | 'processing'
   | 'ready'
   | 'error'
-  | 'duplicate';
+  | 'duplicate'
+  | 'locked';
 
 export interface PendingFile {
   readonly id: string;
@@ -93,6 +94,8 @@ export interface PendingFile {
 }
 
 interface UseChatFileAttachmentsOptions {
+  /** Max files per batch from the user's plan. Null = unlimited. */
+  readonly fileUploadLimit?: number | null;
   readonly onError: (message: string) => void;
   readonly onAudioUploaded?: (result: {
     readonly fileName: string;
@@ -123,6 +126,7 @@ export interface UseChatFileAttachmentsReturn {
     readonly queued: number;
     readonly errors: number;
     readonly duplicates: number;
+    readonly locked: number;
     readonly totalBytes: number;
     readonly uploadedBytes: number;
     readonly overallPct: number;
@@ -267,6 +271,7 @@ async function expandZip(file: File): Promise<File[]> {
 // ── Hook ────────────────────────────────────────────────────────────────
 
 export function useChatFileAttachments({
+  fileUploadLimit = null,
   onError,
   onAudioUploaded,
   disabled = false,
@@ -504,36 +509,52 @@ export function useChatFileAttachments({
         batchBytes += file.size;
       }
 
+      // Determine the effective upload limit: plan limit (or hard cap)
+      const planLimit = fileUploadLimit ?? MAX_FILES_PER_MESSAGE;
+      const hardCap = MAX_FILES_PER_MESSAGE;
+
       setPendingFiles(prev => {
-        const remaining = MAX_FILES_PER_MESSAGE - prev.length;
-        if (remaining <= 0) {
-          onError(
-            `Max ${MAX_FILES_PER_MESSAGE} files per message. Remaining skipped.`
-          );
-          return prev;
+        // Hard cap: never exceed MAX_FILES_PER_MESSAGE total files in state
+        const totalSlots = Math.max(0, hardCap - prev.length);
+        if (totalSlots <= 0) return prev;
+
+        // All candidates up to the hard cap are added to the manifest
+        const toAddAll = candidates.slice(0, totalSlots);
+
+        // But only files within the plan quota are uploadable (status = 'queued')
+        // Files beyond the plan quota are marked as 'locked' — they appear in
+        // the manifest with a lock icon + upgrade CTA but are NOT uploaded
+        const existingUploadable = prev.filter(
+          f => f.status !== 'duplicate' && f.status !== 'locked'
+        ).length;
+        const planSlots = Math.max(0, planLimit - existingUploadable);
+
+        const markedCandidates = toAddAll.map((c, i) => {
+          // Duplicates don't count against the plan quota
+          if (c.status === 'duplicate') return c;
+          // Files beyond the plan quota but within the hard cap are locked
+          if (i >= planSlots) {
+            return { ...c, status: 'locked' as FileUploadStatus };
+          }
+          return c;
+        });
+
+        if (markedCandidates.some(c => c.status === 'locked')) {
+          const _lockedCount = markedCandidates.filter(
+            c => c.status === 'locked'
+          ).length;
+          // Don't error — this is a soft gate, not a rejection
+          // The UI will show the upgrade prompt in the manifest
         }
-        const toAdd = candidates.slice(0, remaining);
-        if (candidates.length > remaining) {
-          onError(
-            `Only ${remaining} more file${remaining === 1 ? '' : 's'} can be added (max ${MAX_FILES_PER_MESSAGE}).`
-          );
-        }
-        return [...prev, ...toAdd];
+
+        return [...prev, ...markedCandidates];
       });
 
-      // Filter candidates to only include those that were actually added
-      const addedIds = new Set<string>();
-      pendingFilesRef.current.forEach(f => addedIds.add(f.id));
-      const uploadableCandidates = candidates.filter(
-        c =>
-          // Duplicates are always added (they don't count against upload slots)
-          c.status === 'duplicate' || addedIds.has(c.id)
+      // Only upload files that are within the plan quota (status = 'queued', not 'locked')
+      const toUpload = candidates.filter(
+        c => c.status !== 'duplicate' && c.status !== 'locked'
       );
 
-      // Phase 3: Upload non-duplicate files in parallel (max 6)
-      const toUpload = uploadableCandidates.filter(
-        c => c.status !== 'duplicate'
-      );
       if (toUpload.length === 0) return;
 
       setIsUploading(true);
@@ -555,7 +576,7 @@ export function useChatFileAttachments({
       await Promise.all(workers);
       setIsUploading(false);
     },
-    [onError, uploadSingleFile]
+    [onError, uploadSingleFile, fileUploadLimit]
   );
 
   const addFiles = useCallback(
@@ -626,6 +647,7 @@ export function useChatFileAttachments({
     const duplicates = pendingFiles.filter(
       f => f.status === 'duplicate'
     ).length;
+    const locked = pendingFiles.filter(f => f.status === 'locked').length;
     const totalBytes = pendingFiles.reduce((s, f) => s + f.size, 0);
     const uploadedBytes = pendingFiles
       .filter(f => f.status === 'ready')
@@ -646,6 +668,7 @@ export function useChatFileAttachments({
       queued,
       errors,
       duplicates,
+      locked,
       totalBytes,
       uploadedBytes,
       overallPct,

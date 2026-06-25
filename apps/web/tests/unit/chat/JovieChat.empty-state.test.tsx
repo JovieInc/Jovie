@@ -109,6 +109,12 @@ vi.mock('@/lib/queries', () => ({
       list: (profileId: string) => ['events', 'list', profileId],
     },
   },
+  usePlanGate: () => ({
+    isPro: true,
+    chatFileUploadLimit: null,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 vi.mock('@/components/jovie/components', async () => {

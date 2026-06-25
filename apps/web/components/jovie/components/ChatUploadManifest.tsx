@@ -7,15 +7,12 @@ import {
   Check,
   ChevronDown,
   Copy,
-  FileArchive,
-  FileAudio2,
-  FileImage,
-  FileText,
-  FileVideo,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-
+import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { fileKindIcon } from './file-kind-icons';
 
@@ -27,23 +24,6 @@ function _formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024 * 1024)
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-function _kindIcon(kind: PendingFile['kind']) {
-  switch (kind) {
-    case 'audio':
-      return <FileAudio2 className='h-3.5 w-3.5' />;
-    case 'video':
-      return <FileVideo className='h-3.5 w-3.5' />;
-    case 'image':
-      return <FileImage className='h-3.5 w-3.5' />;
-    case 'archive':
-      return <FileArchive className='h-3.5 w-3.5' />;
-    case 'document':
-      return <FileText className='h-3.5 w-3.5' />;
-    default:
-      return <FileText className='h-3.5 w-3.5' />;
-  }
 }
 
 function statusColor(status: PendingFile['status']): string {
@@ -79,6 +59,10 @@ function statusText(f: PendingFile): string {
 }
 
 interface ChatUploadManifestProps {
+  /** Files locked behind the pay gate (over plan quota) */
+  readonly lockedCount?: number;
+  /** Whether the user is Pro (controls whether lock CTA shows) */
+  readonly isPro?: boolean;
   readonly files: PendingFile[];
   readonly aggregate: {
     readonly total: number;
@@ -97,6 +81,8 @@ interface ChatUploadManifestProps {
 }
 
 export function ChatUploadManifest({
+  lockedCount = 0,
+  isPro = true,
   files,
   aggregate,
   isUploading,
@@ -245,6 +231,8 @@ export function ChatUploadManifest({
                 <AlertCircle className='h-3.5 w-3.5 shrink-0 text-error' />
               ) : f.status === 'duplicate' ? (
                 <Copy className='h-3.5 w-3.5 shrink-0 text-warning' />
+              ) : f.status === 'locked' ? (
+                <Lock className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
               ) : f.status !== 'queued' ? (
                 <div className='system-b-chat-upload-manifest-mini-bar'>
                   <div
@@ -263,6 +251,31 @@ export function ChatUploadManifest({
             {files.filter(f => f.status === 'duplicate').length} duplicate
             {files.filter(f => f.status === 'duplicate').length > 1 ? 's' : ''}{' '}
             skipped
+          </div>
+        ) : null}
+
+        {/* Pay gate: locked files over plan quota */}
+        {lockedCount > 0 && !isPro ? (
+          <div className='system-b-chat-upload-pay-gate'>
+            <div className='flex items-center gap-2 px-3 py-2.5'>
+              <Lock className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+              <div className='min-w-0 flex-1'>
+                <p className='text-xs font-medium text-primary-token'>
+                  {lockedCount} file{lockedCount > 1 ? 's' : ''} locked
+                </p>
+                <p className='text-xs text-tertiary-token'>
+                  Upgrade to Pro for unlimited file uploads
+                </p>
+              </div>
+              <Button
+                variant='secondary'
+                size='sm'
+                asChild
+                className='shrink-0'
+              >
+                <Link href={APP_ROUTES.PRICING}>Upgrade to Pro</Link>
+              </Button>
+            </div>
           </div>
         ) : null}
       </div>
