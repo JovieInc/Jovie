@@ -1,8 +1,6 @@
 'use client';
 
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ImagePlus } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import {
   useCallback,
   useEffect,
@@ -13,7 +11,6 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { useAppFlag } from '@/lib/flags/client';
-import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
@@ -26,17 +23,18 @@ import {
   ErrorDisplay,
   ScrollToBottom,
 } from './components';
+import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
+import { ChatFileChips } from './components/ChatFileChips';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
+import { ChatUploadManifest } from './components/ChatUploadManifest';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
-  useChatAudioAttachments,
-  useChatImageAttachments,
+  useChatFileAttachments,
   useChatJankMonitor,
   useJovieChat,
   useStickToBottom,
 } from './hooks';
-import type { ChatAudioUploadResult } from './hooks/useChatAudioAttachments';
 import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD = 12;
@@ -67,8 +65,7 @@ export function JovieChat({
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
-  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
@@ -124,7 +121,14 @@ export function JovieChat({
   });
 
   const handleAudioUploaded = useCallback(
-    (result: ChatAudioUploadResult) => {
+    (result: {
+      fileName: string;
+      previewUrl: string;
+      releaseId: string;
+      releaseTitle: string;
+      inference: import('@/lib/chat/infer-audio-entity').AudioEntityInference;
+      prompt: string;
+    }) => {
       const focusKey = `audio-upload:${result.releaseId}`;
       chatEntityPanel?.upsertContext({
         kind: 'release',
@@ -147,41 +151,37 @@ export function JovieChat({
   );
 
   const {
-    pendingAudio,
-    isProcessing: isAudioProcessing,
-    addFiles: addAudioFiles,
-    clearAudio,
-    accept: audioAccept,
-  } = useChatAudioAttachments({
-    onError: error => setChatError({ type: 'unknown', message: error }),
-    onUploaded: handleAudioUploaded,
-    disabled: isLoading || isSubmitting,
-  });
-
-  const {
-    pendingImages,
+    pendingFiles,
     isDragOver,
-    isProcessing: isImageProcessing,
+    isUploading,
+    hasReadyFiles,
     addFiles,
-    removeImage,
-    clearImages,
+    removeFile,
+    clearFiles,
     toFileUIParts,
     dropZoneRef,
-  } = useChatImageAttachments({
+    accept: fileAccept,
+    aggregate,
+  } = useChatFileAttachments({
     onError: error => setChatError({ type: 'unknown', message: error }),
-    onAudioFiles: addAudioFiles,
+    onAudioUploaded: handleAudioUploaded,
     disabled: isLoading || isSubmitting,
   });
 
-  const openImagePicker = useCallback(() => {
-    imageFileInputRef.current?.click();
+  // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
+  const [manifestCollapsed, setManifestCollapsed] = useState(false);
+  const showManifest =
+    pendingFiles.length > 0 &&
+    (isUploading ||
+      aggregate.done < aggregate.total ||
+      manifestCollapsed === false);
+  const showChips = !isUploading && hasReadyFiles;
+
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
   }, []);
 
-  const openAudioPicker = useCallback(() => {
-    audioFileInputRef.current?.click();
-  }, []);
-
-  const handleImageFileChange = useCallback(
+  const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) addFiles(e.target.files);
       e.target.value = '';
@@ -189,40 +189,32 @@ export function JovieChat({
     [addFiles]
   );
 
-  const handleAudioFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files) addAudioFiles(e.target.files);
-      e.target.value = '';
-    },
-    [addAudioFiles]
-  );
-
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
-      const imageFiles = Array.from(e.clipboardData.items)
-        .filter(item => item.type.startsWith('image/'))
+      const files = Array.from(e.clipboardData.items)
+        .filter(item => item.kind === 'file')
         .map(item => item.getAsFile())
         .filter((f): f is File => f !== null);
-      if (imageFiles.length > 0) {
+      if (files.length > 0) {
         e.preventDefault();
-        addFiles(imageFiles);
+        addFiles(files);
       }
     },
     [addFiles]
   );
 
-  const handleSubmitWithImages = useCallback(
+  const handleSubmitWithFiles = useCallback(
     (e?: React.FormEvent) => {
       if (isLoading || isSubmitting) return;
       const files = toFileUIParts();
       notifyJankSend();
       handleSubmit(e, files.length > 0 ? files : undefined);
-      clearImages();
+      clearFiles();
     },
     [
       handleSubmit,
       toFileUIParts,
-      clearImages,
+      clearFiles,
       isLoading,
       isSubmitting,
       notifyJankSend,
@@ -497,19 +489,15 @@ export function JovieChat({
     ref: inputRef,
     value: input,
     onChange: setInput,
-    onSubmit: handleSubmitWithImages,
+    onSubmit: handleSubmitWithFiles,
     isLoading,
     isSubmitting,
     isStreaming,
     onStop: stop,
-    onImageAttach: openImagePicker,
-    onAudioAttach: openAudioPicker,
-    isImageProcessing,
-    isAudioProcessing,
-    pendingImages,
-    pendingAudio,
-    onRemoveImage: removeImage,
-    onRemoveAudio: clearAudio,
+    onFileAttach: openFilePicker,
+    isFileProcessing: isUploading,
+    pendingFiles,
+    onRemoveFile: removeFile,
     onPaste: handlePaste,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,
@@ -518,6 +506,13 @@ export function JovieChat({
     onAddEntity: chipTray.addEntity,
     profileId,
     onPickerOpenChange: setComposerPickerOpen,
+    isDragOver,
+    aggregate,
+    showManifest,
+    showChips,
+    manifestCollapsed,
+    onCollapseManifest: () => setManifestCollapsed(true),
+    onExpandManifest: () => setManifestCollapsed(false),
   } as const;
 
   const composerSurface = (
@@ -530,6 +525,40 @@ export function JovieChat({
           Sending too fast. Please wait a second before your next message.
         </p>
       )}
+
+      {/* Upload manifest (expanded while uploading, collapses when done) */}
+      {showManifest && !manifestCollapsed ? (
+        <div className='mb-2.5'>
+          <ChatUploadManifest
+            files={pendingFiles}
+            aggregate={aggregate}
+            isUploading={isUploading}
+            onRemove={removeFile}
+            onCollapse={() => setManifestCollapsed(true)}
+          />
+        </div>
+      ) : null}
+
+      {/* Collapsed upload indicator */}
+      {showManifest && manifestCollapsed ? (
+        <div className='mb-2.5'>
+          <ChatUploadManifest
+            files={pendingFiles}
+            aggregate={aggregate}
+            isUploading={isUploading}
+            onRemove={removeFile}
+            collapsed
+            onExpand={() => setManifestCollapsed(false)}
+          />
+        </div>
+      ) : null}
+
+      {/* Ready file chips */}
+      {showChips ? (
+        <div className='mb-2.5'>
+          <ChatFileChips files={pendingFiles} onRemove={removeFile} />
+        </div>
+      ) : null}
 
       <ChatInput
         {...chatInputProps}
@@ -567,55 +596,22 @@ export function JovieChat({
         {/* Registers entity providers (release, artist) for the slash menu */}
         {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
 
-        {/* Hidden file inputs for composer attachments */}
+        {/* Hidden file input for composer attachments */}
         <input
-          ref={imageFileInputRef}
+          ref={fileInputRef}
           type='file'
-          accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
-          onChange={handleImageFileChange}
+          accept={fileAccept}
+          onChange={handleFileChange}
           multiple
-          className='hidden'
-          tabIndex={-1}
-        />
-        <input
-          ref={audioFileInputRef}
-          type='file'
-          accept={audioAccept}
-          onChange={handleAudioFileChange}
           className='hidden'
           tabIndex={-1}
         />
 
         {/* Drag-and-drop overlay */}
-        <AnimatePresence initial={false}>
-          {isDragOver && (
-            <motion.div
-              data-testid='chat-attachment-dropzone'
-              className='absolute inset-0 z-50 flex items-center justify-center rounded-(--linear-app-shell-radius) border border-dashed border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_82%,black),color-mix(in_oklab,var(--linear-app-content-surface)_70%,black))] p-6 backdrop-blur-md'
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className='flex min-h-40 w-full max-w-sm flex-col items-center justify-center gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 px-6 py-8 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.95)]'>
-                <ImagePlus
-                  className='h-7 w-7 text-secondary-token'
-                  aria-hidden='true'
-                  strokeWidth={2.25}
-                />
-                <div>
-                  <p className='text-sm font-semibold text-primary-token'>
-                    Drop files to attach
-                  </p>
-                  <p className='mt-1 text-xs leading-5 text-secondary-token'>
-                    Images up to 4 files / 10 MB each, or one audio file up to
-                    150 MB.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <ChatDropZoneOverlay
+          isDragOver={isDragOver}
+          pendingFiles={pendingFiles}
+        />
 
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
             Empty chat intentionally renders only the composer. Thread state

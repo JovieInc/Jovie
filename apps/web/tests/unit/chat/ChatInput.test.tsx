@@ -168,11 +168,11 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
   });
 
-  it('opens the attachment dropdown when clicking the plus button', async () => {
+  it('opens the file attach menu when clicking the plus button', async () => {
     const user = userEvent.setup();
-    const onImageAttach = vi.fn();
+    const onFileAttach = vi.fn();
     const { getByRole } = fastRender(
-      withProviders(<ChatInput {...baseProps} onImageAttach={onImageAttach} />)
+      withProviders(<ChatInput {...baseProps} onFileAttach={onFileAttach} />)
     );
 
     const textarea = getByRole('textbox', { name: /chat message input/i });
@@ -180,12 +180,12 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
 
     // Click the plus button to open the attachment dropdown
-    await user.click(getByRole('button', { name: /attachment options/i }));
+    await user.click(getByRole('button', { name: /Attach Files/i }));
 
     // Dropdown menu receives focus when opened (standard Radix behavior)
     expect(getByRole('menu')).toBeInTheDocument();
     expect(
-      getByRole('menuitem', { name: /attach image/i })
+      getByRole('menuitem', { name: /Attach Files/i })
     ).toBeInTheDocument();
     expect(screen.queryByText('Attachments')).not.toBeInTheDocument();
     expect(
@@ -196,10 +196,10 @@ describe('ChatInput', () => {
 
   it('keeps composer controls at stable dimensions while using heavier icons', () => {
     const { getByRole } = fastRender(
-      withProviders(<ChatInput {...baseProps} onImageAttach={vi.fn()} />)
+      withProviders(<ChatInput {...baseProps} onFileAttach={vi.fn()} />)
     );
 
-    const attachButton = getByRole('button', { name: /attachment options/i });
+    const attachButton = getByRole('button', { name: /Attach Files/i });
     const sendButton = getByRole('button', { name: /send message/i });
 
     expect(attachButton.className).toContain('h-9');
@@ -278,7 +278,7 @@ describe('ChatInput', () => {
   it('renders the tokenized composer geometry', () => {
     fastRender(
       withProviders(
-        <ChatInput {...baseProps} value='' onImageAttach={vi.fn()} />
+        <ChatInput {...baseProps} value='' onFileAttach={vi.fn()} />
       )
     );
 
@@ -302,7 +302,7 @@ describe('ChatInput', () => {
     });
 
     for (const buttonName of [
-      /attachment options/i,
+      /Attach Files/i,
       /dictation unavailable/i,
       /send message/i,
     ]) {
@@ -319,13 +319,13 @@ describe('ChatInput', () => {
           {...baseProps}
           value=''
           variant='hero'
-          onImageAttach={vi.fn()}
+          onFileAttach={vi.fn()}
         />
       )
     );
 
     const attachButton = screen.getByRole('button', {
-      name: /attachment options/i,
+      name: /Attach Files/i,
     });
     const inlineField = screen.getByTestId('chat-input-inline-field');
 
@@ -340,7 +340,7 @@ describe('ChatInput', () => {
         <ChatInput
           {...baseProps}
           value=''
-          onImageAttach={vi.fn()}
+          onFileAttach={vi.fn()}
           variant='hero'
         />
       )
@@ -371,7 +371,7 @@ describe('ChatInput', () => {
         <ChatInput
           {...baseProps}
           value='draft message'
-          onImageAttach={vi.fn()}
+          onFileAttach={vi.fn()}
           variant='hero'
         />
       )
@@ -389,23 +389,29 @@ describe('ChatInput', () => {
   });
 
   it('renders the grid layout (not pill) for hero variant when pending images are present', () => {
-    const pendingImages = [
+    const pendingFiles = [
       {
         id: 'p1',
         name: 'preview.png',
+        size: 1024,
         mediaType: 'image/png',
+        kind: 'image',
+        progress: 100,
+        speed: 0,
+        status: 'ready',
+        kindLabel: 'PNG · image',
         previewUrl: 'blob:mock',
         dataUrl: 'data:image/png;base64,AAAA',
-      },
+      } as const,
     ];
     fastRender(
       withProviders(
         <ChatInput
           {...baseProps}
           value=''
-          onImageAttach={vi.fn()}
-          pendingImages={pendingImages}
-          onRemoveImage={vi.fn()}
+          onFileAttach={vi.fn()}
+          pendingFiles={pendingFiles}
+          onRemoveFile={vi.fn()}
           variant='hero'
         />
       )

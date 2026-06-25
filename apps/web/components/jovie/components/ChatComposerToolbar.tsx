@@ -7,15 +7,7 @@ import {
   DropdownMenuTrigger,
   SimpleTooltip,
 } from '@jovie/ui';
-import {
-  ArrowUp,
-  FileAudio2,
-  ImagePlus,
-  Loader2,
-  Mic,
-  MicOff,
-  Plus,
-} from 'lucide-react';
+import { ArrowUp, Loader2, Mic, MicOff, Paperclip, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useRef } from 'react';
 
@@ -113,8 +105,7 @@ export function ComposerSendButton({
 }
 
 export interface ComposerAttachButtonProps {
-  readonly isImageProcessing: boolean;
-  readonly isAudioProcessing?: boolean;
+  readonly isFileProcessing: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   /**
@@ -126,23 +117,20 @@ export interface ComposerAttachButtonProps {
   readonly plusMenuOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  readonly onImageAttach: () => void;
-  readonly onAudioAttach?: () => void;
+  readonly onFileAttach: () => void;
 }
 
 export function ComposerAttachButton({
-  isImageProcessing,
-  isAudioProcessing = false,
+  isFileProcessing,
   isLoading,
   isSubmitting,
   disabled = false,
   plusMenuOpen,
   onOpenChange,
   onMouseDown,
-  onImageAttach,
-  onAudioAttach,
+  onFileAttach,
 }: ComposerAttachButtonProps) {
-  const isProcessing = isImageProcessing || isAudioProcessing;
+  const isProcessing = isFileProcessing;
 
   return (
     <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
@@ -155,7 +143,7 @@ export function ComposerAttachButton({
             'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
-          aria-label='Attachment options'
+          aria-label='Attach Files'
         >
           {isProcessing ? (
             <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
@@ -175,23 +163,15 @@ export function ComposerAttachButton({
         <DropdownMenuItem
           className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
           onSelect={() => {
-            onImageAttach();
+            onFileAttach();
           }}
         >
-          <ImagePlus className='h-3.5 w-3.5' />
-          Attach image
+          <Paperclip className='h-3.5 w-3.5' />
+          Attach files
+          <span className='ml-auto text-2xs text-tertiary-token'>
+            Drop or browse
+          </span>
         </DropdownMenuItem>
-        {onAudioAttach ? (
-          <DropdownMenuItem
-            className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
-            onSelect={() => {
-              onAudioAttach();
-            }}
-          >
-            <FileAudio2 className='h-3.5 w-3.5' />
-            Attach audio
-          </DropdownMenuItem>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
