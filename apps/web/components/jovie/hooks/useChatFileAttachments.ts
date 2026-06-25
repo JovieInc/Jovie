@@ -221,12 +221,39 @@ async function quickHash(file: File): Promise<string> {
     8
   );
   dv.setFloat64(0, file.size, true);
-  let h = 0x811_9_9de7;
-  for (let i = 0; i < hashBuf.length; i++) {
-    h ^= hashBuf[i];
-    h = Math.imul(h, 0x0100_0193);
+  let h = 0x811c9dc5;
+  for (const byte of hashBuf) {
+    h ^= byte;
+    h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+function shouldSkipZipEntry(name: string): boolean {
+  return (
+    name.startsWith('__MACOSX/') || name.startsWith('.') || name.includes('/.')
+  );
+}
+
+function guessMimeFromExtension(ext: string): string {
+  if (['wav', 'aiff', 'flac', 'mp3', 'aac', 'm4a'].includes(ext)) {
+    return `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
+  }
+  if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) {
+    return `video/${ext === 'mov' ? 'quicktime' : ext}`;
+  }
+  if (['png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'tiff'].includes(ext)) {
+    return `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  }
+  if (ext === 'pdf') return 'application/pdf';
+  return 'application/octet-stream';
+}
+
+function isZipFile(file: File): boolean {
+  return (
+    file.type === 'application/zip' ||
+    file.type === 'application/x-zip-compressed'
+  );
 }
 
 async function expandZip(file: File): Promise<File[]> {
@@ -236,36 +263,256 @@ async function expandZip(file: File): Promise<File[]> {
     const entries: File[] = [];
     for (const name of Object.keys(zip.files)) {
       const entry = zip.files[name];
-      if (entry.dir) continue;
-      if (
-        name.startsWith('__MACOSX/') ||
-        name.startsWith('.') ||
-        name.includes('/.')
-      )
-        continue;
+      if (entry.dir || shouldSkipZipEntry(name)) continue;
       const blob = await entry.async('blob');
       const ext = name.split('.').pop()?.toLowerCase() ?? '';
-      let mime = 'application/octet-stream';
-      if (['wav', 'aiff', 'flac', 'mp3', 'aac', 'm4a'].includes(ext)) {
-        mime = `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
-      } else if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) {
-        mime = `video/${ext === 'mov' ? 'quicktime' : ext}`;
-      } else if (
-        ['png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'tiff'].includes(ext)
-      ) {
-        mime = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-      } else if (ext === 'pdf') {
-        mime = 'application/pdf';
-      }
-      const expanded = new File([blob], name.split('/').pop() ?? name, {
-        type: mime,
-      });
-      entries.push(expanded);
+      const mime = guessMimeFromExtension(ext);
+      entries.push(
+        new File([blob], name.split('/').pop() ?? name, { type: mime })
+      );
     }
     return entries;
   } catch {
     return [];
   }
+}
+
+function formatAggregateSpeed(
+  totalSpeed: number,
+  isUploading: boolean
+): string {
+  if (totalSpeed > 0) return formatSpeed(totalSpeed);
+  if (isUploading) return 'connecting…';
+  return '—';
+}
+
+function formatAggregateEta(
+  etaSeconds: number,
+  isUploading: boolean,
+  done: number,
+  total: number
+): string {
+  if (isUploading) return formatEta(etaSeconds);
+  if (done === total && total > 0) return 'Complete';
+  return '—';
+}
+
+type UploadFileUpdater = (id: string, patch: Partial<PendingFile>) => void;
+
+async function uploadImageAttachment(
+  file: File,
+  id: string,
+  updateFile: UploadFileUpdater
+): Promise<void> {
+  try {
+    let processedFile = file;
+    if (isHeicLikeMimeType(file.type)) {
+      try {
+        processedFile = await convertHeicToJpeg(file);
+      } catch {
+        updateFile(id, {
+          status: 'error',
+          error: 'Could not process HEIC. Try JPEG or PNG.',
+        });
+        return;
+      }
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Read failed'));
+      reader.readAsDataURL(processedFile);
+    });
+    const previewUrl = URL.createObjectURL(processedFile);
+    updateFile(id, {
+      status: 'ready',
+      progress: 100,
+      dataUrl,
+      previewUrl,
+      mediaType: processedFile.type,
+    });
+  } catch {
+    updateFile(id, {
+      status: 'error',
+      error: `Failed to read ${file.name}.`,
+    });
+  }
+}
+
+async function uploadAudioAttachment(
+  file: File,
+  id: string,
+  updateFile: UploadFileUpdater,
+  onAudioUploaded?: UseChatFileAttachmentsOptions['onAudioUploaded']
+): Promise<void> {
+  updateFile(id, { status: 'uploading', progress: 0 });
+  try {
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/library/audio/upload-token',
+    });
+    const response = await fetch('/api/chat/audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        blobUrl: blob.url,
+        blobPathname: blob.pathname,
+        fileName: file.name,
+        fileMimeType: file.type,
+        fileSizeBytes: file.size,
+      }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      readonly previewUrl?: string;
+      readonly releaseId?: string;
+      readonly releaseTitle?: string;
+      readonly prompt?: string;
+      readonly inference?: import('@/lib/chat/infer-audio-entity').AudioEntityInference;
+      readonly error?: string;
+    };
+    if (!response.ok || !body.previewUrl || !body.prompt || !body.inference) {
+      throw new Error(body.error ?? 'Audio upload failed');
+    }
+    onAudioUploaded?.({
+      fileName: file.name,
+      previewUrl: body.previewUrl,
+      releaseId: body.releaseId ?? '',
+      releaseTitle: body.releaseTitle ?? '',
+      inference: body.inference,
+      prompt: body.prompt,
+    });
+    updateFile(id, {
+      status: 'ready',
+      progress: 100,
+      blobUrl: blob.url,
+      previewUrl: body.previewUrl,
+    });
+  } catch (err) {
+    updateFile(id, {
+      status: 'error',
+      error: err instanceof Error ? err.message : 'Upload failed',
+    });
+  }
+}
+
+async function uploadGenericAttachment(
+  file: File,
+  id: string,
+  updateFile: UploadFileUpdater
+): Promise<void> {
+  updateFile(id, { status: 'uploading', progress: 0 });
+  try {
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/chat/files/upload-token',
+    });
+    updateFile(id, {
+      status: 'ready',
+      progress: 100,
+      blobUrl: blob.url,
+    });
+  } catch (err) {
+    updateFile(id, {
+      status: 'error',
+      error: err instanceof Error ? err.message : 'Upload failed',
+    });
+  }
+}
+
+async function expandRawFiles(
+  rawFiles: File[],
+  onError: (message: string) => void
+): Promise<File[]> {
+  const expanded: File[] = [];
+  for (const file of rawFiles) {
+    if (isZipFile(file)) {
+      const inner = await expandZip(file);
+      if (inner.length === 0) {
+        onError(`Could not read ${file.name}. Is it a valid ZIP?`);
+        continue;
+      }
+      expanded.push(...inner);
+      continue;
+    }
+    expanded.push(file);
+  }
+  return expanded;
+}
+
+async function buildPendingCandidate(
+  file: File,
+  seenHashes: Map<string, string>
+): Promise<{ candidate: PendingFile; file: File } | null> {
+  const kind = detectKind(file);
+  const maxBytes =
+    kind === 'audio' ? AUDIO_MAX_FILE_SIZE_BYTES : CHAT_FILE_MAX_SIZE;
+  if (file.size > maxBytes) {
+    return null;
+  }
+
+  let hashPrefix: string | undefined;
+  try {
+    hashPrefix = await quickHash(file);
+  } catch {
+    /* skip dedup */
+  }
+
+  const id = generateId();
+  let status: FileUploadStatus = 'queued';
+  let duplicateOf: string | undefined;
+  if (hashPrefix && seenHashes.has(hashPrefix)) {
+    status = 'duplicate';
+    duplicateOf = seenHashes.get(hashPrefix);
+  } else if (hashPrefix) {
+    seenHashes.set(hashPrefix, id);
+  }
+
+  const previewUrl =
+    kind === 'image' || kind === 'video'
+      ? URL.createObjectURL(file)
+      : undefined;
+
+  return {
+    file,
+    candidate: {
+      id,
+      name: file.name,
+      size: file.size,
+      mediaType: file.type || 'application/octet-stream',
+      kind,
+      progress: 0,
+      speed: 0,
+      status,
+      hashPrefix,
+      kindLabel: buildKindLabel(file, kind),
+      previewUrl,
+      duplicateOf,
+    },
+  };
+}
+
+function markCandidatesForPlanQuota(
+  candidates: PendingFile[],
+  prev: PendingFile[],
+  planLimit: number,
+  hardCap: number
+): PendingFile[] {
+  const totalSlots = Math.max(0, hardCap - prev.length);
+  if (totalSlots <= 0) return [];
+
+  const toAddAll = candidates.slice(0, totalSlots);
+  const existingUploadable = prev.filter(
+    f => f.status !== 'duplicate' && f.status !== 'locked'
+  ).length;
+  const planSlots = Math.max(0, planLimit - existingUploadable);
+
+  return toAddAll.map((candidate, index) => {
+    if (candidate.status === 'duplicate') return candidate;
+    if (index >= planSlots) {
+      return { ...candidate, status: 'locked' as FileUploadStatus };
+    }
+    return candidate;
+  });
 }
 
 // ── Hook ────────────────────────────────────────────────────────────────
@@ -306,255 +553,67 @@ export function useChatFileAttachments({
 
   const uploadSingleFile = useCallback(
     async (file: File, id: string, kind: FileKind) => {
-      // Images: base64 data URL for inline AI SDK
       if (kind === 'image') {
-        try {
-          let processedFile = file;
-          if (isHeicLikeMimeType(file.type)) {
-            try {
-              processedFile = await convertHeicToJpeg(file);
-            } catch {
-              updateFile(id, {
-                status: 'error',
-                error: 'Could not process HEIC. Try JPEG or PNG.',
-              });
-              return;
-            }
-          }
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error('Read failed'));
-            reader.readAsDataURL(processedFile);
-          });
-          const previewUrl = URL.createObjectURL(processedFile);
-          updateFile(id, {
-            status: 'ready',
-            progress: 100,
-            dataUrl,
-            previewUrl,
-            mediaType: processedFile.type,
-          });
-          return;
-        } catch {
-          updateFile(id, {
-            status: 'error',
-            error: `Failed to read ${file.name}.`,
-          });
-          return;
-        }
-      }
-
-      // Audio: existing pipeline with inference
-      if (kind === 'audio') {
-        updateFile(id, { status: 'uploading', progress: 0 });
-        try {
-          const blob = await upload(file.name, file, {
-            access: 'public',
-            handleUploadUrl: '/api/library/audio/upload-token',
-          });
-          const response = await fetch('/api/chat/audio', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              blobUrl: blob.url,
-              blobPathname: blob.pathname,
-              fileName: file.name,
-              fileMimeType: file.type,
-              fileSizeBytes: file.size,
-            }),
-          });
-          const body = (await response.json().catch(() => ({}))) as {
-            readonly previewUrl?: string;
-            readonly releaseId?: string;
-            readonly releaseTitle?: string;
-            readonly prompt?: string;
-            readonly inference?: import('@/lib/chat/infer-audio-entity').AudioEntityInference;
-            readonly error?: string;
-          };
-          if (
-            !response.ok ||
-            !body.previewUrl ||
-            !body.prompt ||
-            !body.inference
-          ) {
-            throw new Error(body.error ?? 'Audio upload failed');
-          }
-          onAudioUploaded?.({
-            fileName: file.name,
-            previewUrl: body.previewUrl,
-            releaseId: body.releaseId ?? '',
-            releaseTitle: body.releaseTitle ?? '',
-            inference: body.inference,
-            prompt: body.prompt,
-          });
-          updateFile(id, {
-            status: 'ready',
-            progress: 100,
-            blobUrl: blob.url,
-            previewUrl: body.previewUrl,
-          });
-        } catch (err) {
-          updateFile(id, {
-            status: 'error',
-            error: err instanceof Error ? err.message : 'Upload failed',
-          });
-        }
+        await uploadImageAttachment(file, id, updateFile);
         return;
       }
-
-      // Video, documents, other: generic blob upload
-      updateFile(id, { status: 'uploading', progress: 0 });
-      try {
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/chat/files/upload-token',
-        });
-        updateFile(id, {
-          status: 'ready',
-          progress: 100,
-          blobUrl: blob.url,
-        });
-      } catch (err) {
-        updateFile(id, {
-          status: 'error',
-          error: err instanceof Error ? err.message : 'Upload failed',
-        });
+      if (kind === 'audio') {
+        await uploadAudioAttachment(file, id, updateFile, onAudioUploaded);
+        return;
       }
+      await uploadGenericAttachment(file, id, updateFile);
     },
     [onAudioUploaded, updateFile]
   );
 
   const processBatch = useCallback(
     async (rawFiles: File[]) => {
-      // Phase 1: Expand zips
-      const expanded: File[] = [];
-      for (const file of rawFiles) {
-        if (
-          file.type === 'application/zip' ||
-          file.type === 'application/x-zip-compressed'
-        ) {
-          const inner = await expandZip(file);
-          if (inner.length === 0) {
-            onError(`Could not read ${file.name}. Is it a valid ZIP?`);
-            continue;
-          }
-          expanded.push(...inner);
-        } else {
-          expanded.push(file);
-        }
-      }
+      const expanded = await expandRawFiles(rawFiles, onError);
 
-      // Phase 2: Validate, detect kind, hash for dedup
       const candidates: PendingFile[] = [];
       const seenHashes = new Map<string, string>();
       let batchBytes = 0;
       const fileById = new Map<string, File>();
 
       for (const file of expanded) {
-        const kind = detectKind(file);
-        const maxBytes =
-          kind === 'audio' ? AUDIO_MAX_FILE_SIZE_BYTES : CHAT_FILE_MAX_SIZE;
-        if (file.size > maxBytes) {
-          onError(`${file.name} exceeds ${formatBytes(maxBytes)}. Skipped.`);
-          continue;
-        }
         if (batchBytes + file.size > CHAT_BATCH_MAX_SIZE) {
           onError(
             `Batch exceeds ${formatBytes(CHAT_BATCH_MAX_SIZE)}. Remaining files skipped.`
           );
           break;
         }
-        // Count check is deferred to the atomic setPendingFiles updater
-        // to avoid stale pendingFilesRef during concurrent batch processing.
 
-        let hashPrefix: string | undefined;
-        try {
-          hashPrefix = await quickHash(file);
-        } catch {
-          /* skip dedup */
+        const built = await buildPendingCandidate(file, seenHashes);
+        if (!built) {
+          const kind = detectKind(file);
+          const maxBytes =
+            kind === 'audio' ? AUDIO_MAX_FILE_SIZE_BYTES : CHAT_FILE_MAX_SIZE;
+          onError(`${file.name} exceeds ${formatBytes(maxBytes)}. Skipped.`);
+          continue;
         }
 
-        const id = generateId();
-        let status: FileUploadStatus = 'queued';
-        let duplicateOf: string | undefined;
-
-        if (hashPrefix && seenHashes.has(hashPrefix)) {
-          status = 'duplicate';
-          duplicateOf = seenHashes.get(hashPrefix)!;
-        } else if (hashPrefix) {
-          seenHashes.set(hashPrefix, id);
-        }
-
-        let previewUrl: string | undefined;
-        if (kind === 'image' || kind === 'video') {
-          previewUrl = URL.createObjectURL(file);
-        }
-
-        fileById.set(id, file);
-        candidates.push({
-          id,
-          name: file.name,
-          size: file.size,
-          mediaType: file.type || 'application/octet-stream',
-          kind,
-          progress: 0,
-          speed: 0,
-          status,
-          hashPrefix,
-          kindLabel: buildKindLabel(file, kind),
-          previewUrl,
-          duplicateOf,
-        });
+        fileById.set(built.candidate.id, built.file);
+        candidates.push(built.candidate);
         batchBytes += file.size;
       }
 
-      // Determine the effective upload limit: plan limit (or hard cap)
       const planLimit = fileUploadLimit ?? MAX_FILES_PER_MESSAGE;
       const hardCap = MAX_FILES_PER_MESSAGE;
+      let markedToAdd: PendingFile[] = [];
 
       setPendingFiles(prev => {
-        // Hard cap: never exceed MAX_FILES_PER_MESSAGE total files in state
-        const totalSlots = Math.max(0, hardCap - prev.length);
-        if (totalSlots <= 0) return prev;
-
-        // All candidates up to the hard cap are added to the manifest
-        const toAddAll = candidates.slice(0, totalSlots);
-
-        // But only files within the plan quota are uploadable (status = 'queued')
-        // Files beyond the plan quota are marked as 'locked' — they appear in
-        // the manifest with a lock icon + upgrade CTA but are NOT uploaded
-        const existingUploadable = prev.filter(
-          f => f.status !== 'duplicate' && f.status !== 'locked'
-        ).length;
-        const planSlots = Math.max(0, planLimit - existingUploadable);
-
-        const markedCandidates = toAddAll.map((c, i) => {
-          // Duplicates don't count against the plan quota
-          if (c.status === 'duplicate') return c;
-          // Files beyond the plan quota but within the hard cap are locked
-          if (i >= planSlots) {
-            return { ...c, status: 'locked' as FileUploadStatus };
-          }
-          return c;
-        });
-
-        if (markedCandidates.some(c => c.status === 'locked')) {
-          const _lockedCount = markedCandidates.filter(
-            c => c.status === 'locked'
-          ).length;
-          // Don't error — this is a soft gate, not a rejection
-          // The UI will show the upgrade prompt in the manifest
-        }
-
-        return [...prev, ...markedCandidates];
+        markedToAdd = markCandidatesForPlanQuota(
+          candidates,
+          prev,
+          planLimit,
+          hardCap
+        );
+        return [...prev, ...markedToAdd];
       });
 
-      // Only upload files that are within the plan quota (status = 'queued', not 'locked')
-      const toUpload = candidates.filter(
+      const toUpload = markedToAdd.filter(
         c => c.status !== 'duplicate' && c.status !== 'locked'
       );
-
       if (toUpload.length === 0) return;
 
       setIsUploading(true);
@@ -564,8 +623,10 @@ export function useChatFileAttachments({
       const runNext = async (): Promise<void> => {
         const next = queue.shift();
         if (!next) return;
-        const file = fileById.get(next.id)!;
-        await uploadSingleFile(file, next.id, next.kind);
+        const queuedFile = fileById.get(next.id);
+        if (queuedFile) {
+          await uploadSingleFile(queuedFile, next.id, next.kind);
+        }
         if (queue.length > 0) await runNext();
       };
 
@@ -672,17 +733,8 @@ export function useChatFileAttachments({
       totalBytes,
       uploadedBytes,
       overallPct,
-      speed:
-        totalSpeed > 0
-          ? formatSpeed(totalSpeed)
-          : isUploading
-            ? 'connecting…'
-            : '—',
-      eta: isUploading
-        ? formatEta(etaSeconds)
-        : done === total && total > 0
-          ? 'Complete'
-          : '—',
+      speed: formatAggregateSpeed(totalSpeed, isUploading),
+      eta: formatAggregateEta(etaSeconds, isUploading, done, total),
     };
   }, [pendingFiles, isUploading]);
 

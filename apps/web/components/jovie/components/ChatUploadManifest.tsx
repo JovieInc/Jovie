@@ -58,6 +58,71 @@ function statusText(f: PendingFile): string {
   }
 }
 
+function FileManifestRow({ file }: { readonly file: PendingFile }) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.15 }}
+      className='system-b-chat-upload-manifest-row'
+    >
+      <span className='system-b-chat-upload-manifest-thumb'>
+        {file.previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={file.previewUrl}
+            alt={file.name}
+            className='h-full w-full object-cover'
+          />
+        ) : (
+          <span className='text-secondary-token'>
+            {fileKindIcon(file.kind)}
+          </span>
+        )}
+      </span>
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-xs text-primary-token'>{file.name}</p>
+        <p className={`text-xs ${statusColor(file.status)}`}>
+          {statusText(file)}
+        </p>
+      </div>
+      <FileRowTrailingIcon file={file} />
+    </motion.div>
+  );
+}
+
+function FileRowTrailingIcon({ file }: { readonly file: PendingFile }) {
+  switch (file.status) {
+    case 'ready':
+      return (
+        <Check
+          className='h-3.5 w-3.5 shrink-0 text-accent-green'
+          strokeWidth={2.5}
+        />
+      );
+    case 'error':
+      return <AlertCircle className='h-3.5 w-3.5 shrink-0 text-error' />;
+    case 'duplicate':
+      return <Copy className='h-3.5 w-3.5 shrink-0 text-warning' />;
+    case 'locked':
+      return <Lock className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />;
+    case 'uploading':
+    case 'processing':
+      return (
+        <div className='system-b-chat-upload-manifest-mini-bar'>
+          <div
+            className='system-b-chat-upload-manifest-mini-bar-fill'
+            style={{ width: `${file.progress}%` }}
+          />
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
 interface ChatUploadManifestProps {
   /** Files locked behind the pay gate (over plan quota) */
   readonly lockedCount?: number;
@@ -92,6 +157,8 @@ export function ChatUploadManifest({
   onCollapse,
 }: ChatUploadManifestProps) {
   const visibleFiles = files.filter(f => f.status !== 'duplicate');
+  const duplicateCount = files.filter(f => f.status === 'duplicate').length;
+  const hasDuplicates = duplicateCount > 0;
 
   if (files.length === 0) return null;
 
@@ -193,64 +260,14 @@ export function ChatUploadManifest({
       <div className='system-b-chat-upload-manifest-list'>
         <AnimatePresence mode='popLayout'>
           {visibleFiles.map(f => (
-            <motion.div
-              key={f.id}
-              layout
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-              className='system-b-chat-upload-manifest-row'
-            >
-              <span className='system-b-chat-upload-manifest-thumb'>
-                {f.previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={f.previewUrl}
-                    alt={f.name}
-                    className='h-full w-full object-cover'
-                  />
-                ) : (
-                  <span className='text-secondary-token'>
-                    {fileKindIcon(f.kind)}
-                  </span>
-                )}
-              </span>
-              <div className='min-w-0 flex-1'>
-                <p className='truncate text-xs text-primary-token'>{f.name}</p>
-                <p className={`text-xs ${statusColor(f.status)}`}>
-                  {statusText(f)}
-                </p>
-              </div>
-              {f.status === 'ready' ? (
-                <Check
-                  className='h-3.5 w-3.5 shrink-0 text-accent-green'
-                  strokeWidth={2.5}
-                />
-              ) : f.status === 'error' ? (
-                <AlertCircle className='h-3.5 w-3.5 shrink-0 text-error' />
-              ) : f.status === 'duplicate' ? (
-                <Copy className='h-3.5 w-3.5 shrink-0 text-warning' />
-              ) : f.status === 'locked' ? (
-                <Lock className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-              ) : f.status !== 'queued' ? (
-                <div className='system-b-chat-upload-manifest-mini-bar'>
-                  <div
-                    className='system-b-chat-upload-manifest-mini-bar-fill'
-                    style={{ width: `${f.progress}%` }}
-                  />
-                </div>
-              ) : null}
-            </motion.div>
+            <FileManifestRow key={f.id} file={f} />
           ))}
         </AnimatePresence>
         {/* Duplicate summary */}
-        {files.filter(f => f.status === 'duplicate').length > 0 ? (
+        {hasDuplicates ? (
           <div className='flex items-center gap-2 px-2 py-1.5 text-xs text-warning'>
             <Copy className='h-3 w-3' />
-            {files.filter(f => f.status === 'duplicate').length} duplicate
-            {files.filter(f => f.status === 'duplicate').length > 1 ? 's' : ''}{' '}
-            skipped
+            {duplicateCount} duplicate{duplicateCount > 1 ? 's' : ''} skipped
           </div>
         ) : null}
 

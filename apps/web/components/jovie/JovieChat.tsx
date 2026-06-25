@@ -14,21 +14,8 @@ import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
 
 import { deriveChatRailContextTargets } from './chat-context-rail';
-import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
-import {
-  ChatConversationComposerSkeleton,
-  ChatEmptyStateComposerRegion,
-  ChatInput,
-  ChatMessage,
-  ChatMessageSkeleton,
-  ErrorDisplay,
-  ScrollToBottom,
-} from './components';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
-import { ChatFileChips } from './components/ChatFileChips';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
-import { ChatUploadManifest } from './components/ChatUploadManifest';
-import { ChatUsageAlert } from './components/ChatUsageAlert';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
   useChatFileAttachments,
@@ -36,6 +23,14 @@ import {
   useJovieChat,
   useStickToBottom,
 } from './hooks';
+import {
+  CHAT_COMPOSER_DOCK_CLASSNAME,
+  ChatComposerSurface,
+  ChatEmptyStateComposerRegion,
+  ChatInlineError,
+  ChatLoadingConversationSkeleton,
+  ChatThreadMessages,
+} from './JovieChatSections';
 import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD = 12;
@@ -470,26 +465,10 @@ export function JovieChat({
     };
   }, [scrollContainerRef, scrollThreadToBottom, shouldReservePickerClearance]);
 
-  // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
-    return (
-      <div
-        className='system-b-chat-conversation-loading'
-        data-testid='chat-loading-conversation-skeleton'
-        aria-busy='true'
-        aria-live='polite'
-      >
-        <div className='system-b-chat-conversation-loading-viewport'>
-          <ChatMessageSkeleton />
-        </div>
-        <div className='system-b-chat-conversation-loading-dock'>
-          <ChatConversationComposerSkeleton />
-        </div>
-      </div>
-    );
+    return <ChatLoadingConversationSkeleton />;
   }
 
-  // Shared ChatInput props for both views
   const chatInputProps = {
     ref: inputRef,
     value: input,
@@ -511,84 +490,33 @@ export function JovieChat({
     onAddEntity: chipTray.addEntity,
     profileId,
     onPickerOpenChange: setComposerPickerOpen,
-    isDragOver,
-    aggregate,
-    showManifest,
-    showChips,
-    manifestCollapsed,
-    onCollapseManifest: () => setManifestCollapsed(true),
-    onExpandManifest: () => setManifestCollapsed(false),
   } as const;
 
   const composerSurface = (
-    <div className='mx-auto w-full max-w-[45rem]'>
-      {/* Usage alert remains in the composer slot; message failures render in the transcript. */}
-      <ChatUsageAlert />
-
-      {isRateLimited && (
-        <p className='mb-1.5 text-xs text-tertiary-token' aria-live='polite'>
-          Sending too fast. Please wait a second before your next message.
-        </p>
-      )}
-
-      {/* Upload manifest (expanded while uploading, collapses when done) */}
-      {showManifest && !manifestCollapsed ? (
-        <div className='mb-2.5'>
-          <ChatUploadManifest
-            files={pendingFiles}
-            aggregate={aggregate}
-            isUploading={isUploading}
-            onRemove={removeFile}
-            lockedCount={aggregate.locked}
-            isPro={isProUser}
-            onCollapse={() => setManifestCollapsed(true)}
-          />
-        </div>
-      ) : null}
-
-      {/* Collapsed upload indicator */}
-      {showManifest && manifestCollapsed ? (
-        <div className='mb-2.5'>
-          <ChatUploadManifest
-            files={pendingFiles}
-            aggregate={aggregate}
-            isUploading={isUploading}
-            onRemove={removeFile}
-            lockedCount={aggregate.locked}
-            isPro={isProUser}
-            collapsed
-            onExpand={() => setManifestCollapsed(false)}
-          />
-        </div>
-      ) : null}
-
-      {/* Ready file chips */}
-      {showChips ? (
-        <div className='mb-2.5'>
-          <ChatFileChips files={pendingFiles} onRemove={removeFile} />
-        </div>
-      ) : null}
-
-      <ChatInput
-        {...chatInputProps}
-        placeholder='Ask jovie...'
-        variant={showThreadView ? 'compact' : 'hero'}
-      />
-    </div>
+    <ChatComposerSurface
+      chatInputProps={chatInputProps}
+      showThreadView={showThreadView}
+      isRateLimited={isRateLimited}
+      showManifest={showManifest}
+      manifestCollapsed={manifestCollapsed}
+      showChips={showChips}
+      pendingFiles={pendingFiles}
+      aggregate={aggregate}
+      isUploading={isUploading}
+      isPro={isProUser}
+      onRemoveFile={removeFile}
+      onCollapseManifest={() => setManifestCollapsed(true)}
+      onExpandManifest={() => setManifestCollapsed(false)}
+    />
   );
 
   const inlineChatError = chatError ? (
-    <div
-      className='mx-auto w-full max-w-[44rem] pb-4'
-      data-testid='chat-inline-error-slot'
-    >
-      <ErrorDisplay
-        chatError={chatError}
-        onRetry={handleRetry}
-        isLoading={isLoading}
-        isSubmitting={isSubmitting}
-      />
-    </div>
+    <ChatInlineError
+      chatError={chatError}
+      onRetry={handleRetry}
+      isLoading={isLoading}
+      isSubmitting={isSubmitting}
+    />
   ) : null;
 
   return (
@@ -640,109 +568,26 @@ export function JovieChat({
                 </ChatEmptyStateComposerRegion>
               </div>
             ) : (
-              <div>
-                {shouldVirtualizeMessages ? (
-                  <div
-                    ref={totalSizeRef}
-                    className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                    style={{
-                      position: 'relative',
-                      height: virtualizedMessageViewportHeight,
-                      minHeight: virtualizedMinHeight || undefined,
-                    }}
-                  >
-                    {virtualizer.getVirtualItems().map(virtualItem => {
-                      const message = messages[virtualItem.index];
-                      const index = virtualItem.index;
-                      const isThinking =
-                        message.role === 'assistant' &&
-                        message.status === 'pending';
-                      return (
-                        <div
-                          key={message.id}
-                          data-index={virtualItem.index}
-                          ref={virtualizer.measureElement}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            transform: `translateY(${virtualItem.start}px)`,
-                          }}
-                        >
-                          <div className='pb-4'>
-                            <ChatMessage
-                              id={message.id}
-                              role={message.role}
-                              parts={message.parts}
-                              isStreaming={
-                                isStreaming && index === lastAssistantIndex
-                              }
-                              isThinking={isThinking}
-                              avatarUrl={
-                                message.role === 'user' ? avatarUrl : undefined
-                              }
-                              profileId={profileId}
-                              skipEntrance={knownMessageIdsRef.current.has(
-                                message.id
-                              )}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div
-                    ref={totalSizeRef}
-                    className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                    style={{
-                      paddingBottom: messageViewportPaddingBottom,
-                    }}
-                  >
-                    {messages.map((message, index) => {
-                      const isThinking =
-                        message.role === 'assistant' &&
-                        message.status === 'pending';
-                      return (
-                        <div key={message.id} className='pb-4'>
-                          <ChatMessage
-                            id={message.id}
-                            role={message.role}
-                            parts={message.parts}
-                            isStreaming={
-                              isStreaming && index === lastAssistantIndex
-                            }
-                            isThinking={isThinking}
-                            avatarUrl={
-                              message.role === 'user' ? avatarUrl : undefined
-                            }
-                            profileId={profileId}
-                            skipEntrance={knownMessageIdsRef.current.has(
-                              message.id
-                            )}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {inlineChatError}
-
-                <div
-                  ref={bottomSentinelRef}
-                  aria-hidden
-                  className='h-px w-full shrink-0'
-                  data-testid='chat-bottom-sentinel'
-                />
-
-                {/* Scroll to bottom button */}
-                <ScrollToBottom
-                  visible={!isStuckToBottom}
-                  onClick={() => scrollToBottom()}
-                />
-              </div>
+              <ChatThreadMessages
+                messages={messages}
+                shouldVirtualizeMessages={shouldVirtualizeMessages}
+                virtualizer={virtualizer}
+                virtualizedMessageViewportHeight={
+                  virtualizedMessageViewportHeight
+                }
+                virtualizedMinHeight={virtualizedMinHeight}
+                messageViewportPaddingBottom={messageViewportPaddingBottom}
+                totalSizeRef={totalSizeRef}
+                bottomSentinelRef={bottomSentinelRef}
+                isStreaming={isStreaming}
+                lastAssistantIndex={lastAssistantIndex}
+                avatarUrl={avatarUrl}
+                profileId={profileId}
+                knownMessageIds={knownMessageIdsRef.current}
+                inlineChatError={inlineChatError}
+                isStuckToBottom={isStuckToBottom}
+                onScrollToBottom={() => scrollToBottom()}
+              />
             )}
           </div>
 
