@@ -16,6 +16,7 @@ apps/console/node_modules
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+.design-sync-marketing/dist/
 apps/web/.ds-design-sync-marketing.css
 
 # testing

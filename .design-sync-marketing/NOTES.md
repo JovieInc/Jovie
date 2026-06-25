@@ -148,8 +148,31 @@ repo's app-source tree:
    override covers resolver behaviour, and exact per-module mappings don't scale (wildcard
    matches first, and the dir set is open-ended).
 
-**State:** bundle-only sync blocked on (2). Options to finish: (a) upstream fix to the
-design-sync converter's `tsconfigPathsPlugin` (try `/index.*` before bare dir / check
-`isFile`); (b) ship a pre-built `dist/` of the landing sections so the converter uses the
-real-dist path instead of synth-entry; (c) author a hand-built upload layout per the
-skill's "off-script layout" allowance. Tracked on JOV-3502.
+**RESOLVED (2026-06-24) via pre-built dist (option b).** `prebuild.mjs` bundles the 13
+sections with native esbuild (which resolves `@/*` correctly + applies the stubs) into
+`dist/landing.mjs` (react externalized). The converter then re-bundles that module — it has
+no `@/*` imports left, so the resolver bug never fires. 13 components + bundle + styles
+uploaded to the "Jovie Marketing (Code Sync)" project (`9d09246a-…`), validate clean
+(`--no-render-check`; floor-card previews — bundle-only). The converter bug is still worth
+fixing upstream (try `/index.*`/`isFile()` before a bare dir) — tracked on JOV-3514.
+
+## One-command re-sync (working procedure)
+
+```bash
+# 1. stage converter (once per clone) — see the package SKILL.md §7
+mkdir -p .ds-sync && cp -r <skill>/package-*.mjs <skill>/resync.mjs <skill>/lib <skill>/storybook .ds-sync/
+echo '{"name":"ds-sync-deps","private":true}' > .ds-sync/package.json
+(cd .ds-sync && npm i esbuild ts-morph @types/react)
+# 2. build
+node .design-sync-marketing/build-css.mjs                 # scoped tailwind css
+node .design-sync-marketing/prebuild.mjs                  # -> dist/landing.mjs (sidesteps the converter resolver bug)
+node .ds-sync/package-build.mjs --config .design-sync-marketing/config.json \
+  --node-modules apps/web/node_modules --entry .design-sync-marketing/dist/landing.mjs --out ./ds-bundle
+node .ds-sync/package-validate.mjs ./ds-bundle --no-render-check
+# 3. upload via the DesignSync MCP (atomic path; project pinned in config.json)
+```
+
+To author rich preview cards later (instead of floor cards), drop `--no-render-check`,
+install playwright+chromium, and author `.design-sync/previews/<Name>.tsx` per the skill —
+but note `.design-sync/` collides with the @jovie/ui sync, so author into a throwaway
+worktree or after that sync's dir is free.
