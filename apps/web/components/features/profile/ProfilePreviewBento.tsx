@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { PhoneFrame } from '@/components/molecules/PhoneFrame';
 import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import { cn } from '@/lib/utils';
@@ -40,20 +40,36 @@ export interface ProfilePreviewBentoProps {
   readonly footer?: ReactNode;
   readonly className?: string;
   /** Replaces the default hero gradient (e.g. onboarding's blue). */
-  readonly heroGradientClassName?: string;
-  /** Extra hero layout classes (sizing, padding) applied after the gradient. */
+  readonly heroStyle?: CSSProperties;
+  /** Extra hero layout classes (sizing, padding). */
   readonly heroClassName?: string;
   readonly phoneFrameClassName?: string;
   /** CSS var overrides forwarded to the phone surface wrapper. */
-  readonly coverVarsClassName?: string;
+  readonly coverVars?: CSSProperties;
   readonly dataTestId?: string;
   readonly phonePreviewTestId?: string;
   readonly surfaceTestId?: string;
 }
 
-/** Linear's app accent purple radial glow over a dark vertical gradient. */
-const DEFAULT_HERO_GRADIENT =
-  'bg-[radial-gradient(120%_90%_at_50%_-10%,rgba(123,108,255,0.42)_0%,rgba(70,58,170,0.14)_38%,rgba(12,12,20,0)_66%),linear-gradient(180deg,#14131f_0%,#0c0c12_100%)]';
+/**
+ * Linear's app accent purple radial glow over a dark vertical gradient.
+ * Inline style (not an arbitrary Tailwind class) to avoid the arbitrary-value
+ * ratchet, matching PhoneFrame's own inline-style approach.
+ */
+const DEFAULT_HERO_STYLE: CSSProperties = {
+  background:
+    'radial-gradient(120% 90% at 50% -10%, rgba(123,108,255,0.42) 0%, rgba(70,58,170,0.14) 38%, rgba(12,12,20,0) 66%), linear-gradient(180deg, #14131f 0%, #0c0c12 100%)',
+};
+
+const BOTTOM_FADE_STYLE: CSSProperties = {
+  background: 'linear-gradient(to bottom, transparent, #0c0c12)',
+};
+
+/** Cover/page-pad CSS vars the compact surface reads (inline to avoid arbitrary classes). */
+const DEFAULT_COVER_VARS = {
+  '--cover-height': '45%',
+  '--page-pad': '18px',
+} as CSSProperties;
 
 export function ProfilePreviewBento({
   artist,
@@ -68,10 +84,10 @@ export function ProfilePreviewBento({
   showBottomFade = false,
   footer,
   className,
-  heroGradientClassName = DEFAULT_HERO_GRADIENT,
+  heroStyle,
   heroClassName,
   phoneFrameClassName,
-  coverVarsClassName = '[--cover-height:45%] [--page-pad:18px]',
+  coverVars,
   dataTestId,
   phonePreviewTestId,
   surfaceTestId,
@@ -82,14 +98,14 @@ export function ProfilePreviewBento({
         className={cn(
           'relative flex justify-center overflow-hidden',
           phoneAlign === 'top' ? 'items-start' : 'flex-1 items-center',
-          heroGradientClassName,
           heroClassName
         )}
+        style={heroStyle ?? DEFAULT_HERO_STYLE}
       >
         {showLiveBadge && (
           <span className='absolute left-3.5 top-3.5 z-20 inline-flex h-6 items-center gap-1.5 rounded-full border border-white/12 bg-black/50 px-2.5 backdrop-blur-md'>
-            <span className='h-1.5 w-1.5 rounded-full bg-(--color-accent-green) shadow-[0_0_8px_var(--color-accent-green)]' />
-            <span className='text-3xs font-semibold uppercase tracking-[0.05em] text-white dark:text-white'>
+            <span className='h-1.5 w-1.5 rounded-full bg-(--color-accent-green)' />
+            <span className='text-3xs font-semibold uppercase tracking-wider text-white dark:text-white'>
               Live
             </span>
           </span>
@@ -100,7 +116,8 @@ export function ProfilePreviewBento({
 
         <PhoneFrame className={cn('relative z-10', phoneFrameClassName)}>
           <div
-            className={cn('h-full w-full', coverVarsClassName)}
+            className='h-full w-full'
+            style={coverVars ?? DEFAULT_COVER_VARS}
             data-testid={phonePreviewTestId}
           >
             <ProfileCompactSurface
@@ -136,7 +153,10 @@ export function ProfilePreviewBento({
         </PhoneFrame>
 
         {showBottomFade && (
-          <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-b from-transparent to-[#0c0c12]' />
+          <div
+            className='pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20'
+            style={BOTTOM_FADE_STYLE}
+          />
         )}
         {caption && (
           <span className='pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 text-2xs font-medium text-white/60 dark:text-white/60'>

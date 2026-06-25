@@ -260,13 +260,15 @@ function ProfileBentoView({
             align='end'
             aria-label='Profile Actions'
             trigger={
-              <button
+              <Button
                 type='button'
+                variant='ghost'
+                size='icon'
                 aria-label='Profile Actions'
-                className='inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/14 bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-black/60 dark:text-white'
+                className='rounded-full border border-white/14 bg-black/40 text-white backdrop-blur-md hover:bg-black/60 dark:text-white'
               >
                 <MoreVertical className='h-4 w-4' />
-              </button>
+              </Button>
             }
           />
         }
