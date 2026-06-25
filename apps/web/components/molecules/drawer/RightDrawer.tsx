@@ -63,12 +63,16 @@ export function RightDrawer({
 }: RightDrawerProps) {
   const asideRef = useRef<HTMLElement>(null);
   const isMobile = useBreakpointDown('lg');
-  const [hasHydrated, setHasHydrated] = useState(false);
+  const [hasAnimated, setHasAnimated] = useState(false);
 
-  // Suppress width/opacity transition on first paint to prevent layout shift
-  // when the right panel mounts after hydration.
+  // Suppress the width/opacity transition on first paint so the panel appears
+  // at its final size instead of animating in on hydration. The transition
+  // class is now constant (no transition-none -> live class swap, which was the
+  // one-frame flash on Windows Chrome); only the inline duration is gated, and
+  // it's cleared after the first painted frame so subsequent opens animate.
   useEffect(() => {
-    setHasHydrated(true);
+    const raf = requestAnimationFrame(() => setHasAnimated(true));
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Prevent background scroll when mobile drawer is open
@@ -151,16 +155,20 @@ export function RightDrawer({
       className={cn(
         'z-10 shrink-0 h-full min-h-0 flex flex-col',
         'outline-none focus:outline-none focus:ring-0',
-        hasHydrated
-          ? 'transition-[width,opacity] duration-cinematic ease-cinematic'
-          : 'transition-none',
         'overflow-hidden',
+        'transition-[width,opacity] duration-cinematic ease-cinematic',
         isOpen
           ? 'visible opacity-100'
           : 'opacity-0 pointer-events-none invisible',
         className
       )}
-      style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
+      style={{
+        width: isOpen ? width : 0,
+        maxWidth: '100vw',
+        transitionDuration: hasAnimated ? undefined : '0ms',
+        willChange: hasAnimated ? 'width, opacity' : 'auto',
+        contain: 'layout style paint',
+      }}
     >
       <div
         className='relative flex h-full min-h-0 flex-col'
