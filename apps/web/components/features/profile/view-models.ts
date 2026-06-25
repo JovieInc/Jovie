@@ -158,3 +158,37 @@ export function buildProfilePreviewLinks(
     isVisible: link.isVisible ?? true,
   }));
 }
+
+/**
+ * Build a mock {@link Artist} for the live-profile phone preview from the
+ * dashboard preview-panel fields. Mirrors the shape used by `ProfilePreview`
+ * so the compact surface renders the public profile without a DB round-trip.
+ */
+export function buildPreviewArtistFromProfile(input: {
+  readonly username: string;
+  readonly displayName: string;
+  readonly avatarUrl?: string | null;
+  readonly bio?: string | null;
+}): Artist {
+  const name = input.displayName.trim() ? input.displayName : input.username;
+  return {
+    id: 'preview',
+    owner_user_id: 'preview-owner',
+    handle: input.username,
+    spotify_id: '',
+    name,
+    image_url: input.avatarUrl || undefined,
+    tagline: input.bio?.trim() || undefined,
+    theme: {},
+    settings: {},
+    spotify_url: undefined,
+    apple_music_url: undefined,
+    youtube_url: undefined,
+    venmo_handle: undefined,
+    published: true,
+    is_verified: false,
+    is_featured: false,
+    marketing_opt_out: false,
+    created_at: new Date().toISOString(),
+  };
+}

@@ -1,8 +1,7 @@
 'use client';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { PhoneFrame } from '@/components/molecules/PhoneFrame';
-import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
+import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -321,59 +320,25 @@ export function OnboardingProfileRail({
           isInline ? 'px-0 py-2' : 'lg:w-95 lg:px-4 lg:py-4'
         )}
       >
-        <div
-          className={cn(
-            'relative flex w-full items-center justify-center overflow-hidden rounded-3xl bg-[linear-gradient(145deg,#0A2A88_0%,#0B6CFF_52%,#7AC7FF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.26),0_30px_80px_rgba(0,48,160,0.34)]',
-            isInline
-              ? 'min-h-114 max-w-86 p-4'
-              : 'h-full min-h-155 max-h-170 max-w-87 p-5'
+        <ProfilePreviewBento
+          artist={previewArtist}
+          socialLinks={previewLinks}
+          genres={previewArtist.genres}
+          profileHref={profileHref}
+          dataTestId='onboarding-profile-bento'
+          phonePreviewTestId='onboarding-phone-preview'
+          surfaceTestId='onboarding-profile-compact-surface'
+          className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
+          heroGradientClassName='bg-[linear-gradient(145deg,#0A2A88_0%,#0B6CFF_52%,#7AC7FF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.26),0_30px_80px_rgba(0,48,160,0.34)]'
+          heroClassName={cn(
+            'w-full rounded-3xl',
+            isInline ? 'min-h-114 p-4' : 'min-h-155 max-h-170 p-5'
           )}
-          data-testid='onboarding-profile-bento'
-        >
-          <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_42%,rgba(0,0,0,0.20)_100%)]' />
-          <PhoneFrame
-            className={cn(
-              'relative z-10',
-              isInline ? 'h-105 w-50 sm:h-120 sm:w-57' : 'h-148 w-71'
-            )}
-          >
-            <div
-              className='h-full w-full [--cover-height:45%] [--page-pad:18px]'
-              data-testid='onboarding-phone-preview'
-            >
-              <ProfileCompactSurface
-                renderMode='preview'
-                presentation='embedded'
-                artist={previewArtist}
-                socialLinks={previewLinks}
-                contacts={[]}
-                showPayButton={false}
-                genres={previewArtist.genres}
-                drawerOpen={false}
-                drawerView='menu'
-                activeMode='profile'
-                onDrawerOpenChange={() => {}}
-                onDrawerViewChange={() => {}}
-                onBack={() => {}}
-                onOpenMenu={() => {}}
-                onPlayClick={() => {}}
-                onShare={() => {}}
-                onModeSelect={() => {}}
-                profileHref={profileHref}
-                dataTestId='onboarding-profile-compact-surface'
-                isSubscribed
-                hideBackButton
-                hideJovieBranding
-                hideMoreMenu
-                renderInteractiveOverlays={false}
-                renderSemanticHeading={false}
-                headerSocialLinksOverride={[]}
-                resolveNearbyTour={false}
-              />
-            </div>
-          </PhoneFrame>
-          <DspMatchStrip matches={dspMatches} />
-        </div>
+          phoneFrameClassName={
+            isInline ? 'h-105 w-50 sm:h-120 sm:w-57' : 'h-148 w-71'
+          }
+          overlay={<DspMatchStrip matches={dspMatches} />}
+        />
       </div>
     </aside>
   );
