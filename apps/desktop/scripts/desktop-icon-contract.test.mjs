@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import sharp from 'sharp';
 
+// .icns files are macOS-specific and cannot be generated on Linux CI
+const isMacOS = process.platform === 'darwin';
+
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const assetsRoot = join(desktopRoot, 'assets');
 const webRoot = join(desktopRoot, '..', 'web');
@@ -128,8 +131,14 @@ test('legacy icon-source.png remains for reference but is no longer the producti
 test('packaged production and staging icons use the rounded desktop profile', async () => {
   await assertRoundedTransparentPng(productionPngPath, ICON_SIZE);
   await assertRoundedTransparentPng(stagingPngPath, ICON_SIZE);
-  await assertIcnsFile(productionIcnsPath);
-  await assertIcnsFile(stagingIcnsPath);
+
+  // .icns files are macOS-specific; skip this assertion on other platforms
+  if (!isMacOS) {
+    console.log('Skipping .icns file assertions on non-macOS platform');
+  } else {
+    await assertIcnsFile(productionIcnsPath);
+    await assertIcnsFile(stagingIcnsPath);
+  }
 
   const expectedProductionIcon = await readFile(canonicalIconPath);
   const productionIcon = await readFile(productionPngPath);
