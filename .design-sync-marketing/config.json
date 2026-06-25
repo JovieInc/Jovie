@@ -4,7 +4,7 @@
   "globalName": "JovieMarketing",
   "shape": "package",
   "entry": ".design-sync-marketing/landing-entry.ts",
-  "buildCmd": "node .design-sync-marketing/build-css.mjs",
+  "buildCmd": "node .design-sync-marketing/build-css.mjs && node .design-sync-marketing/prebuild.mjs",
   "readmeHeader": ".design-sync-marketing/conventions.md",
   "tsconfig": ".design-sync-marketing/tsconfig.designsync.json",
   "cssEntry": "apps/web/.ds-design-sync-marketing.css",
