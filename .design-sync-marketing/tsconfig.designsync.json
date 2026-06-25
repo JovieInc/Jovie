@@ -41,27 +41,5 @@
         "../../.design-sync-marketing/stubs/sentry-passthrough.tsx"
       ]
     }
-  },
-  "include": [
-    "../apps/web/components/marketing/**/*.ts",
-    "../apps/web/components/marketing/**/*.tsx",
-    "../apps/web/components/features/home/**/*.ts",
-    "../apps/web/components/features/home/**/*.tsx",
-    "../apps/web/data/**/*.ts",
-    "../apps/web/lib/utils.ts",
-    "../apps/web/lib/utils/**/*.ts",
-    "../apps/web/lib/flags/**/*.ts",
-    "../apps/web/lib/featureFlags.ts",
-    "../apps/web/constants/**/*.ts",
-    "../packages/ui/**/*.ts",
-    "../packages/ui/**/*.tsx",
-    "stubs/**/*.ts",
-    "stubs/**/*.tsx",
-    "preview-canvas.tsx"
-  ],
-  "exclude": [
-    "../node_modules",
-    "../apps/web/node_modules",
-    "../packages/ui/node_modules"
-  ]
+  }
 }

@@ -121,3 +121,35 @@ EOF
 
 The initial spike measured ~1,025 KB. Expect a similar or smaller figure once
 scoped (the full-app bundle without mocks was larger).
+
+## Converter findings — driving /design-sync Part 2 (JOV-3502, 2026-06-24)
+
+Drove the real `/design-sync` converter (skill v2.1.187, `package-build.mjs`) against
+this kit. Reconciled config to schema (`shape: package`, top-level `tsconfig`), scoped
+to the landing via `landing-entry.ts` (the 13 artist-profile sections) + `componentSrcMap`
+(fixes `[ZERO_MATCH]`). The esbuild bundle-proof passes, but the **converter does not
+complete** — it hits two bugs in its own `lib/bundle.mjs` `tsconfigPathsPlugin` for this
+repo's app-source tree:
+
+1. **Comment-strip corrupts the tsconfig (FIXED here).** The plugin strips `/* */` with a
+   naive regex that pairs the `/*` in `@/*` path keys with the `*/` in `**/*` `include`
+   globs, deleting every `paths` entry between them → `JSON.parse` fails → `paths` silently
+   drop → all `next/*` stubs are ignored → real Next leaks in (`next/dist/.../gzip-size` →
+   `fs/stream/zlib`, browser-bundle fatal). **Workaround applied:** removed `include`/
+   `exclude` from `tsconfig.designsync.json` (the converter bundles from `--entry`, not
+   `include`), so no `*/` exists to close the false comment. Do NOT re-add `**/*` globs to
+   this tsconfig.
+2. **Directory-vs-file resolution (BLOCKER — not config-fixable).** After (1), the plugin
+   resolves wildcard `@/*` imports to a *directory* (`existsSync(stem)` with empty ext
+   matches `apps/web/lib/utils/` before trying `utils.ts`/`/index.ts`), so `@/lib/utils`,
+   `@jovie/ui`, barrel imports, etc. fail with "is a directory". Native esbuild
+   (`tsconfig:` option) resolves these correctly; the converter's custom plugin does not,
+   and the fix lives in `lib/bundle.mjs` which the skill says NOT to fork. No `cfg.*`
+   override covers resolver behaviour, and exact per-module mappings don't scale (wildcard
+   matches first, and the dir set is open-ended).
+
+**State:** bundle-only sync blocked on (2). Options to finish: (a) upstream fix to the
+design-sync converter's `tsconfigPathsPlugin` (try `/index.*` before bare dir / check
+`isFile`); (b) ship a pre-built `dist/` of the landing sections so the converter uses the
+real-dist path instead of synth-entry; (c) author a hand-built upload layout per the
+skill's "off-script layout" allowance. Tracked on JOV-3502.
