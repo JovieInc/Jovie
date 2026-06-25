@@ -89,7 +89,7 @@ export function ProgressIndicator({
               key={step.id}
               className={(() => {
                 const baseClasses =
-                  'flex flex-col items-center space-y-1 transition-[color,opacity] duration-200 flex-1';
+                  'flex flex-col items-center space-y-1 transition-colors duration-subtle flex-1';
                 if (isCompleted) return `${baseClasses} text-success`;
                 if (isCurrent) return `${baseClasses} text-info`;
                 return `${baseClasses} text-quaternary-token`;
@@ -99,7 +99,7 @@ export function ProgressIndicator({
               <div
                 className={(() => {
                   const baseClasses =
-                    'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-[background-color,border-color,color] duration-200';
+                    'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-colors duration-subtle';
                   if (isCompleted) {
                     return `${baseClasses} bg-surface-1 border-success/20 text-success`;
                   }
