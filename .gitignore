@@ -10,6 +10,15 @@ apps/console/node_modules
 /.pnp
 .pnp.js
 
+# design-sync build artifacts (skill scratch + generated bundle; durable inputs live in .design-sync-marketing/)
+/.ds-sync/
+/ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.design-sync-marketing/dist/
+apps/web/.ds-design-sync-marketing.css
+
 # testing
 /coverage
 apps/web/coverage/
