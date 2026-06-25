@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebar';
 
@@ -117,6 +117,10 @@ vi.mock('@/lib/queries', () => ({
 describe('ProfileContactSidebar scroll contract', () => {
   it('uses child-owned scrolling without the legacy full-height wrapper', () => {
     const { container } = render(<ProfileContactSidebar />);
+
+    // The rail opens in the preview (bento) mode; the editing tabs live behind
+    // the "Edit profile" button.
+    fireEvent.click(screen.getByRole('button', { name: /edit profile/i }));
 
     const shellBody = container.querySelector('[data-scroll-strategy="child"]');
     const tabbedCard = screen.getByTestId('profile-contact-tabbed-card');
