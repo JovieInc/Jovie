@@ -192,7 +192,7 @@ doppler run --project jovie-web --config dev -- \
 
 # Diagnose iOS/native redirect gaps
 doppler run --project jovie-web --config dev -- \
-  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "myapp://|jov.ie"
+  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
 
 # Preview a patch (mutations require --dry-run first)
 doppler run --project jovie-web --config dev -- \

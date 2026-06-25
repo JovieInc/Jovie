@@ -50,7 +50,7 @@ const PAIRS: ReadonlyArray<readonly [BentoCard, BentoCard]> = [
 
 export function HomeBentoPairs() {
   return (
-    <section className='border-t border-black/[0.08] bg-(--color-bg-base) px-6 py-32 sm:py-36'>
+    <section className='border-t border-black/[0.08] bg-(--color-bg-paper) px-6 py-32 sm:py-36'>
       <div className='mx-auto max-w-300'>
         <p className='mb-5 font-[var(--marketing-font-body)] text-sm font-medium text-black/55'>
           What it does
