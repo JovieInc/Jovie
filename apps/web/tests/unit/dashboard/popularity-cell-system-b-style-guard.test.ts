@@ -10,7 +10,7 @@ const sourcePath = join(
 );
 
 const forbiddenMotionClasses =
-  /\b(?:transition-all|transition-transform|duration-\d+|active:scale|active:translate|hover:-translate|group-hover:scale)\b|\btransition-\[[^\]]*transform[^\]]*\]/;
+  /\b(?:transition-all|transition-transform|duration-\d+|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b|\btransition-\[[^\]]*transform[^\]]*\]/;
 
 describe('PopularityCell System B style guard', () => {
   it('keeps popularity bar changes bounded to color and width', async () => {

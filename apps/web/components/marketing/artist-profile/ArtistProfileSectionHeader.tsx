@@ -18,7 +18,7 @@ export const SHELL_EYEBROW_CLASS =
   'text-xs font-medium uppercase tracking-[0.06em] text-secondary-token';
 
 export const SHELL_LEAD_CLASS =
-  'text-[clamp(1.0625rem,1.4vw,1.25rem)] leading-[1.45] text-secondary-token';
+  'text-[clamp(1.0625rem,1.4vw,1.25rem)] leading-[1.45] text-secondary-token text-pretty';
 
 export function ArtistProfileSectionHeader({
   headline,

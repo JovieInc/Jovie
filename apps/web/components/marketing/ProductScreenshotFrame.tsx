@@ -75,7 +75,7 @@ export function ProductScreenshotFrame({
         aria-hidden={ariaHidden}
         className={cn(
           'block h-full w-full bg-(--color-bg-base) object-contain',
-          isPhone ? 'rounded-3xl' : 'rounded-lg'
+          isPhone ? 'rounded-[calc(var(--radius-3xl)-0.375rem)]' : 'rounded-lg'
         )}
       />
     </div>

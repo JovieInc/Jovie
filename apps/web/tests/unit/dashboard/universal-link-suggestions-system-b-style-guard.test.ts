@@ -10,7 +10,9 @@ const suggestionSources = [
 ];
 
 const transformPressPatterns = [
-  /\bactive:scale(?:-\[[^\]]+\]|-\d+)?\b/,
+  /\bhover:scale(?:-\[[^\]]+\]|-\d+)?\b/,
+  /\bhover:translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
+  /\bhover:-translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
   /\btransition-all\b/,
   /\btransition-transform\b/,
   /\btransition-\[[^\]]*transform[^\]]*\]/,

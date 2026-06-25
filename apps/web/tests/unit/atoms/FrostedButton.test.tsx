@@ -72,11 +72,11 @@ describe('FrostedButton', () => {
     expect(button).toBeDisabled();
   });
 
-  it('keeps shared press feedback free of decorative transforms', () => {
+  it('keeps shared hover feedback free of decorative transforms', () => {
     render(<FrostedButton>Motion safe</FrostedButton>);
     const button = screen.getByRole('button', { name: 'Motion safe' });
     expect(button.className).not.toMatch(
-      /\b(?:transition-all|duration-\d+|active:scale|active:translate|transform|motion-reduce:transform-none)\b/
+      /\b(?:transition-all|duration-\d+|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
     );
   });
 

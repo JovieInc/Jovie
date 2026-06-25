@@ -1328,19 +1328,19 @@ html[data-profile-initial-mode]
   --radius-xs: 2px;
   /* Tags/badges — extracted: 2px on issue labels */
   --radius-sm: 8px;
-  /* Sidebar items, buttons */
-  --radius-md: 6px;
-  /* Input fields — extracted: 6px on inputs & sidebar buttons */
-  --radius-default: 8px;
-  /* Buttons */
-  --radius-lg: 8px;
-  /* Cards, menus — extracted: 8px on marketing cards */
-  --radius-xl: 12px;
-  /* Large cards, panels — extracted: 12px on feature sections */
-  --radius-2xl: 16px;
-  /* Modals, sheets — extracted: 16px on elevated panels */
-  --radius-3xl: 22px;
-  /* Large modals — extracted: 22px on hero sections */
+  /* Badges, issue rows, small cards */
+  --radius-md: 10px;
+  /* Inner cards, drawer cards, properties panels */
+  --radius-default: 4px;
+  /* Marketing buttons */
+  --radius-lg: 12px;
+  /* App shell frame, content surface cards */
+  --radius-xl: 16px;
+  /* Large decorative elements */
+  --radius-2xl: 20px;
+  /* Modals, sheets, large nested surfaces */
+  --radius-3xl: 24px;
+  /* Large modals and phone shells */
   --radius-pill: 9999px;
   /* All app buttons / inputs / tabs — canonical Jovie DS true pill */
   --radius-full: 9999px;

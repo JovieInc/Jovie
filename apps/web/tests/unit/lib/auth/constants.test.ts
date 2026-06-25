@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { AUTH_CLASSES, sanitizeRedirectUrl } from '@/lib/auth/constants';
 
 describe('AUTH_CLASSES', () => {
-  it('keeps OAuth mobile feedback free of transform motion', () => {
+  it('keeps OAuth mobile hover feedback free of transform motion', () => {
     expect(AUTH_CLASSES.oauthButtonMobile).toContain('touch-manipulation');
     expect(AUTH_CLASSES.oauthButtonMobile).toContain('transition-[opacity]');
     expect(AUTH_CLASSES.oauthButtonMobile).toContain('active:opacity-[0.92]');
     expect(AUTH_CLASSES.oauthButtonMobile).not.toMatch(
-      /\b(?:transition-all|transition-transform|active:scale|active:translate|hover:-translate)\b/
+      /\b(?:transition-all|transition-transform|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
     );
   });
 });

@@ -132,7 +132,8 @@ function generateInitials(name?: string): string {
  * - Accessibility support with proper ARIA attributes
  * - Dark mode support
  */
-const BORDER_RING = '';
+const BORDER_RING =
+  'outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10';
 
 const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   {

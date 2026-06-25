@@ -7,7 +7,7 @@ const appRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const sourcePath = join(appRoot, 'components/molecules/PaySelector.tsx');
 
 const forbiddenPresetMotionClasses =
-  /\b(?:transition-all|transition-transform|duration-\d+|active:scale|active:translate|hover:-translate|group-hover:scale)\b|\btransition-\[[^\]]*transform[^\]]*\]/;
+  /\b(?:transition-all|transition-transform|duration-\d+|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b|\btransition-\[[^\]]*transform[^\]]*\]/;
 
 describe('PaySelector System B style guard', () => {
   it('keeps amount preset state changes visually stable', async () => {

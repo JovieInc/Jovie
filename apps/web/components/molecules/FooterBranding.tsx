@@ -61,7 +61,7 @@ function getLogoLinkClass(mark: string, isLinear: boolean): string {
   if (isLinear) {
     return 'rounded-md p-1 -m-1 focus-ring-themed transition-opacity duration-150 ease-out hover:opacity-80';
   }
-  return 'rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1';
+  return 'rounded-md p-1 -m-1 focus-ring-themed transition-colors duration-150 ease-out hover:bg-surface-1';
 }
 
 export function FooterBranding({

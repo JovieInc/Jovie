@@ -325,10 +325,10 @@ export default function CheckoutSuccessPage() {
     contentClassName = 'space-y-6 px-5 py-5 text-center sm:px-6';
   } else if (isVisible) {
     contentClassName =
-      'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6';
+      'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-[opacity,transform] duration-700 ease-out sm:px-6';
   } else {
     contentClassName =
-      'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6';
+      'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-[opacity,transform] duration-700 ease-out sm:px-6';
   }
 
   const successSubtitle = isOnboardingUpgrade

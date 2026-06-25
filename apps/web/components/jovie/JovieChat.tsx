@@ -587,7 +587,7 @@ export function JovieChat({
         />
 
         {/* Drag-and-drop overlay */}
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {isDragOver && (
             <motion.div
               data-testid='chat-attachment-dropzone'
