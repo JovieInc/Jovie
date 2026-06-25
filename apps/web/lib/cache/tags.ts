@@ -103,7 +103,7 @@ export function createSmartLinkContentTag(profileId: string): string {
  * Strips control characters except tab (0x09) that would crash response headers.
  * Cache tags with user-provided input (usernames, slugs) must be sanitized.
  */
-const INVALID_HEADER_CHARS = /[\x00-\x08\x0A-\x1F\x7F]/g;
+const INVALID_HEADER_CHARS = /[\x00-\x08\x0A-\x1F\x7F\u0100-\uFFFF]/g;
 
 /**
  * Sanitize a cache tag value by removing characters invalid in HTTP headers.
