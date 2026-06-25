@@ -83,44 +83,12 @@ These are all build-time constants (no API calls). Safe in the preview sandbox.
    props used by marketing components. If a new prop is used that the stub
    doesn't forward, update the stub.
 
-## esbuild bundle probe
+## Bundle probe
 
-Run this from the repo root to verify the marketing barrel bundles clean:
-
-```bash
-node --input-type=module <<'EOF'
-import { build } from 'esbuild';
-// Adjust esbuild path if the pnpm version changes
-const result = await build({
-  entryPoints: ['apps/web/components/marketing/index.ts'],
-  bundle: true,
-  format: 'esm',
-  platform: 'browser',
-  write: false,
-  logLevel: 'warning',
-  alias: {
-    'server-only':         'apps/web/.storybook/empty-module.js',
-    'next/headers':        'apps/web/.storybook/empty-module.js',
-    'next/cache':          'apps/web/.storybook/empty-module.js',
-    'next/navigation':     'apps/web/.storybook/next-navigation-mock.js',
-    'next/image':          '.design-sync-marketing/stubs/next-image.tsx',
-    'next/link':           '.design-sync-marketing/stubs/next-link.tsx',
-    'next/font/local':     '.design-sync-marketing/stubs/next-font-local.js',
-    '@clerk/nextjs':       'apps/web/.storybook/clerk-mock.jsx',
-    '@clerk/nextjs/server':'.design-sync-marketing/stubs/sentry-passthrough.tsx',
-    '@sentry/react':       '.design-sync-marketing/stubs/sentry-passthrough.tsx',
-    '@sentry/browser':     '.design-sync-marketing/stubs/sentry-passthrough.tsx',
-    '@sentry/nextjs':      '.design-sync-marketing/stubs/sentry-passthrough.tsx',
-  },
-  tsconfig: '.design-sync-marketing/tsconfig.designsync.json',
-});
-const bytes = result.outputFiles?.[0]?.contents?.byteLength ?? 0;
-console.log(`bundle: ${(bytes / 1024).toFixed(0)} KB, ${result.errors.length} errors`);
-EOF
-```
-
-The initial spike measured ~1,025 KB. Expect a similar or smaller figure once
-scoped (the full-app bundle without mocks was larger).
+`prebuild.mjs` IS the bundle step (and the canonical stub mapping — `@clerk/nextjs/server`
+→ `.storybook/clerk-server-mock.js`, sentry → `sentry-passthrough.tsx`). Run it to verify the
+landing tree bundles clean for the browser; it writes `dist/landing.mjs` and prints size + error
+count. The scoped landing bundle is ~1,020 KB.
 
 ## Converter findings — driving /design-sync Part 2 (JOV-3502, 2026-06-24)
 
