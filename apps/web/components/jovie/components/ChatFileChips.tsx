@@ -71,7 +71,7 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
               {f.name}
             </span>
             <Check
-              className='h-3 w-3 shrink-0 text-[oklch(72%_0.19_149)]'
+              className='h-3 w-3 shrink-0 text-accent-green'
               strokeWidth={2.5}
             />
             <Button

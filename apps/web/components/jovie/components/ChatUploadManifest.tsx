@@ -29,7 +29,7 @@ function _formatBytes(bytes: number): string {
 function statusColor(status: PendingFile['status']): string {
   switch (status) {
     case 'ready':
-      return 'text-[oklch(72%_0.19_149)]';
+      return 'text-accent-green';
     case 'error':
       return 'text-error';
     case 'duplicate':
@@ -131,7 +131,7 @@ export function ChatUploadManifest({
             <span key={f.id} className='system-b-chat-upload-manifest-thumb'>
               {f.status === 'ready' ? (
                 <span className='system-b-chat-upload-manifest-thumb-done'>
-                  <Check className='h-3.5 w-3.5 text-[oklch(72%_0.19_149)]' />
+                  <Check className='h-3.5 w-3.5 text-accent-green' />
                 </span>
               ) : (
                 <span className='opacity-50'>{fileKindIcon(f.kind)}</span>
@@ -147,11 +147,11 @@ export function ChatUploadManifest({
     <div className='system-b-chat-upload-manifest'>
       {/* Header */}
       <div className='flex items-center gap-3 px-3.5 py-3'>
-        <span className='flex h-6 w-6 items-center justify-center rounded-lg bg-[oklch(60%_0.27_277/16%)]'>
+        <span className='flex h-6 w-6 items-center justify-center rounded-lg bg-accent-purple-subtle'>
           {isUploading ? (
-            <Loader2 className='h-3.5 w-3.5 animate-spin text-[oklch(60%_0.27_277)]' />
+            <Loader2 className='h-3.5 w-3.5 animate-spin text-accent-purple' />
           ) : (
-            <Check className='h-3.5 w-3.5 text-[oklch(72%_0.19_149)]' />
+            <Check className='h-3.5 w-3.5 text-accent-green' />
           )}
         </span>
         <div className='min-w-0 flex-1'>
@@ -224,7 +224,7 @@ export function ChatUploadManifest({
               </div>
               {f.status === 'ready' ? (
                 <Check
-                  className='h-3.5 w-3.5 shrink-0 text-[oklch(72%_0.19_149)]'
+                  className='h-3.5 w-3.5 shrink-0 text-accent-green'
                   strokeWidth={2.5}
                 />
               ) : f.status === 'error' ? (
