@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import {
   Check,
   FileArchive,
@@ -12,8 +14,9 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 
 import type { PendingFile } from '../hooks/useChatFileAttachments';
+import { fileKindIcon } from './file-kind-icons';
 
-function kindIcon(kind: PendingFile['kind']) {
+function _kindIcon(kind: PendingFile['kind']) {
   switch (kind) {
     case 'audio':
       return <FileAudio2 className='h-3 w-3' />;
@@ -61,7 +64,7 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
                   className='h-full w-full object-cover'
                 />
               ) : (
-                kindIcon(f.kind)
+                fileKindIcon(f.kind, 'h-3 w-3')
               )}
             </span>
             <span className='max-w-[120px] truncate text-xs text-secondary-token'>
@@ -71,14 +74,16 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
               className='h-3 w-3 shrink-0 text-[oklch(72%_0.19_149)]'
               strokeWidth={2.5}
             />
-            <button
+            <Button
               type='button'
+              variant='ghost'
+              size='icon'
               onClick={() => onRemove(f.id)}
-              className='ml-0.5 flex h-4 w-4 items-center justify-center rounded-full hover:bg-surface-2'
+              className='ml-0.5 h-4 w-4 rounded-full'
               aria-label={`Remove ${f.name}`}
             >
               <X className='h-3 w-3 text-tertiary-token' />
-            </button>
+            </Button>
           </motion.span>
         ))}
       </AnimatePresence>

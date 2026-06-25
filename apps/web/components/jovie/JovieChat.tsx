@@ -210,11 +210,13 @@ export function JovieChat({
       notifyJankSend();
       handleSubmit(e, files.length > 0 ? files : undefined);
       clearFiles();
+      setManifestCollapsed(false);
     },
     [
       handleSubmit,
       toFileUIParts,
       clearFiles,
+      setManifestCollapsed,
       isLoading,
       isSubmitting,
       notifyJankSend,

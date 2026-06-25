@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import {
   AlertCircle,
   Check,
@@ -15,6 +17,7 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 
 import type { PendingFile } from '../hooks/useChatFileAttachments';
+import { fileKindIcon } from './file-kind-icons';
 
 const _ACCENT = '#7170ff';
 
@@ -26,7 +29,7 @@ function _formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function kindIcon(kind: PendingFile['kind']) {
+function _kindIcon(kind: PendingFile['kind']) {
   switch (kind) {
     case 'audio':
       return <FileAudio2 className='h-3.5 w-3.5' />;
@@ -109,10 +112,11 @@ export function ChatUploadManifest({
   if (collapsed) {
     return (
       <div className='system-b-chat-upload-manifest system-b-chat-upload-manifest-collapsed'>
-        <button
+        <Button
           type='button'
+          variant='ghost'
           onClick={onExpand}
-          className='flex w-full items-center gap-3 px-3 py-2.5'
+          className='flex w-full items-center gap-3 px-3 py-2.5 justify-start'
         >
           <span className='flex h-5 w-5 items-center justify-center'>
             <Loader2 className='h-4 w-4 animate-spin text-primary-token' />
@@ -129,7 +133,7 @@ export function ChatUploadManifest({
             {aggregate.overallPct}%
           </span>
           <ChevronDown className='h-3.5 w-3.5 text-tertiary-token' />
-        </button>
+        </Button>
         <div className='system-b-chat-upload-manifest-bar'>
           <div
             className='system-b-chat-upload-manifest-bar-fill'
@@ -144,7 +148,7 @@ export function ChatUploadManifest({
                   <Check className='h-3.5 w-3.5 text-[oklch(72%_0.19_149)]' />
                 </span>
               ) : (
-                <span className='opacity-50'>{kindIcon(f.kind)}</span>
+                <span className='opacity-50'>{fileKindIcon(f.kind)}</span>
               )}
             </span>
           ))}
@@ -178,14 +182,16 @@ export function ChatUploadManifest({
           {aggregate.overallPct}%
         </span>
         {onCollapse ? (
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon'
             onClick={onCollapse}
-            className='flex h-5 w-5 items-center justify-center rounded-md hover:bg-surface-2'
+            className='h-5 w-5 rounded-md'
             aria-label='Collapse Upload Manifest'
           >
             <ChevronDown className='h-3.5 w-3.5 rotate-180 text-tertiary-token' />
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -220,7 +226,7 @@ export function ChatUploadManifest({
                   />
                 ) : (
                   <span className='text-secondary-token'>
-                    {kindIcon(f.kind)}
+                    {fileKindIcon(f.kind)}
                   </span>
                 )}
               </span>

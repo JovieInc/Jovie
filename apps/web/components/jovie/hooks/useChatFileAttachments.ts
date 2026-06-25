@@ -460,13 +460,8 @@ export function useChatFileAttachments({
           );
           break;
         }
-        const currentCount = pendingFilesRef.current.length + candidates.length;
-        if (currentCount >= MAX_FILES_PER_MESSAGE) {
-          onError(
-            `Max ${MAX_FILES_PER_MESSAGE} files per message. Remaining skipped.`
-          );
-          break;
-        }
+        // Count check is deferred to the atomic setPendingFiles updater
+        // to avoid stale pendingFilesRef during concurrent batch processing.
 
         let hashPrefix: string | undefined;
         try {
@@ -509,10 +504,36 @@ export function useChatFileAttachments({
         batchBytes += file.size;
       }
 
-      setPendingFiles(prev => [...prev, ...candidates]);
+      setPendingFiles(prev => {
+        const remaining = MAX_FILES_PER_MESSAGE - prev.length;
+        if (remaining <= 0) {
+          onError(
+            `Max ${MAX_FILES_PER_MESSAGE} files per message. Remaining skipped.`
+          );
+          return prev;
+        }
+        const toAdd = candidates.slice(0, remaining);
+        if (candidates.length > remaining) {
+          onError(
+            `Only ${remaining} more file${remaining === 1 ? '' : 's'} can be added (max ${MAX_FILES_PER_MESSAGE}).`
+          );
+        }
+        return [...prev, ...toAdd];
+      });
+
+      // Filter candidates to only include those that were actually added
+      const addedIds = new Set<string>();
+      pendingFilesRef.current.forEach(f => addedIds.add(f.id));
+      const uploadableCandidates = candidates.filter(
+        c =>
+          // Duplicates are always added (they don't count against upload slots)
+          c.status === 'duplicate' || addedIds.has(c.id)
+      );
 
       // Phase 3: Upload non-duplicate files in parallel (max 6)
-      const toUpload = candidates.filter(c => c.status !== 'duplicate');
+      const toUpload = uploadableCandidates.filter(
+        c => c.status !== 'duplicate'
+      );
       if (toUpload.length === 0) return;
 
       setIsUploading(true);
