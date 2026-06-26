@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.6.56",
+  "version": "26.6.55",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -58,7 +58,6 @@
     "test:seo:ratchet": "vitest run tests/app/robots.test.ts tests/app/sitemap.test.ts tests/app/seo-ratchet.test.ts tests/unit/lib/seo/metadata-contract.test.ts tests/unit/lib/seo/robots-http-guard.test.ts",
     "test:seo:http": "tsx scripts/seo-ratchet-guard.ts",
     "test:quarantine-ledger": "tsx scripts/check-quarantine-ledger.ts",
-    "test:reliability-detectors": "tsx scripts/check-reliability-detectors.ts",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",
     "test:seo": "vitest run --config=vitest.config.mts tests/app/robots.test.ts tests/app/sitemap.test.ts tests/unit/ci/seo-ratchet.test.ts tests/unit/seo/guardrail-check.test.ts",
@@ -99,7 +98,7 @@
     "e2e:smoke": "SMOKE_ONLY=1 playwright test --config=playwright.config.smoke.ts",
     "e2e:smoke:mobile": "SMOKE_ONLY=1 playwright test --config=playwright.config.smoke.mobile.ts",
     "e2e:smoke:tagged": "SMOKE_ONLY=1 E2E_FAST_ITERATION=1 playwright test -g @smoke",
-    "e2e:auth-smoke": "SMOKE_ONLY=1 playwright test tests/e2e/smoke-auth.spec.ts --config=playwright.config.smoke.ts",
+    "e2e:auth-smoke": "SMOKE_ONLY=1 playwright test tests/e2e/smoke-auth.spec.ts",
     "e2e:smoke:noauth": "playwright test -g @smoke --config=playwright.config.noauth.ts",
     "e2e:full": "playwright test",
     "e2e:full:fast": "node scripts/run-playwright-fast.mjs",
@@ -248,7 +247,6 @@
     "heic2any": "^0.0.4",
     "isomorphic-dompurify": "3.12.0",
     "jose": "^6.2.2",
-    "jszip": "^3.10.1",
     "lucide-react": "^1.16.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^12.38.0",
