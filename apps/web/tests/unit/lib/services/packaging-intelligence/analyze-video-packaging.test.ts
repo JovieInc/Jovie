@@ -161,4 +161,42 @@ describe('analyzeVideoPackaging', () => {
     expect(result.transcriptSource).toBe('asr');
     expect(result.first30sHookText).toBe('ASR transcript hook');
   });
+
+  it('handles no transcript available from any source', async () => {
+    mockFetchVideoCaptions.mockResolvedValueOnce([]);
+
+    mockAnalyzePackagingWithLlm.mockResolvedValueOnce({
+      output: {
+        transcriptSummary: '(no transcript available) - inferred from title',
+        promise: {
+          title: 'Untitled video',
+          thumbnail: 'no thumbnail',
+          combined: 'Unable to determine promise without transcript.',
+        },
+        niche: {
+          label: 'Other',
+          category: 'other' as const,
+          confidence: 0.1,
+          rationale: 'No transcript or metadata available.',
+        },
+        first30sDeliversPromise: false,
+        first30sAssessment: 'No transcript to assess.',
+      },
+      modelUsed: PACKAGING_INTELLIGENCE_MODEL,
+      promptTokens: 50,
+      completionTokens: 30,
+    });
+
+    const result = await analyzeVideoPackaging({
+      videoId: 'demoVideo123',
+      title: 'Untitled Video',
+      description: '',
+    });
+
+    expect(result.transcriptSource).toBe('none');
+    expect(result.first30sHookText).toBe('');
+    expect(result.transcriptSummary).toBe(
+      '(no transcript available) - inferred from title'
+    );
+  });
 });
