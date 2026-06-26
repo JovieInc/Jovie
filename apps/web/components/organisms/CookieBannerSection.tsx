@@ -65,11 +65,13 @@ export function CookieBannerSection() {
     }
   }, [visible]);
 
-  // Publish banner height + 16px bottom offset as CSS custom property on :root
-  // so layout regions (profile shells, QR coordination) reserve the exact space
-  // occupied by the fixed bottom-right card (bottom-4 + measured h).
-  // Cleared on hide/consent for zero layout impact. Matches useCookieBannerHeight
-  // total offset for toasts.
+  // Publish banner height + bottom offset + a separation gap as a CSS custom
+  // property on :root so layout regions (profile shells, QR coordination)
+  // reserve the exact space occupied by the fixed bottom-right card
+  // (bottom-4 = 16px + measured h) PLUS a 12px gap so chrome stacked above the
+  // banner (e.g. the public-profile bottom tab nav) never abuts or overlaps it
+  // (JOV-3555 — regression of JOV-1982). Cleared on hide/consent for zero
+  // layout impact. Matches useCookieBannerHeight total offset for toasts.
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -85,10 +87,16 @@ export function CookieBannerSection() {
     );
     if (!banner) return;
 
+    // 16px = banner's `bottom-4` inset from the viewport bottom.
+    // 12px = separation gap between the banner top and any chrome stacked above
+    // it (bottom tab nav) so both surfaces stay clear and fully tappable.
+    const BANNER_BOTTOM_INSET_PX = 16;
+    const BANNER_SEPARATION_GAP_PX = 12;
+
     const update = () => {
       root.style.setProperty(
         '--cookie-banner-h',
-        `${banner.getBoundingClientRect().height + 16}px`
+        `${banner.getBoundingClientRect().height + BANNER_BOTTOM_INSET_PX + BANNER_SEPARATION_GAP_PX}px`
       );
     };
 

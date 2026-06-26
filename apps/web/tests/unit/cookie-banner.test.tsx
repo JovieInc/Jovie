@@ -103,6 +103,20 @@ describe('CookieBannerSection', () => {
     });
   });
 
+  // JOV-3555: the published reservation must include the banner's 16px bottom
+  // inset PLUS a 12px separation gap so the public-profile bottom tab nav stacked
+  // above it never abuts/overlaps the banner. jsdom reports 0 measured height, so
+  // the value reduces to 16 + 12 = 28px.
+  it('reserves bottom inset + separation gap above the measured banner height', async () => {
+    setCookie('jv_cc_required=1');
+    render(<CookieBannerSection />);
+    await vi.waitFor(() => {
+      const h =
+        document.documentElement.style.getPropertyValue('--cookie-banner-h');
+      expect(h).toBe('28px');
+    });
+  });
+
   it('does not render Manage toggle or full bar chrome in floating card mode', () => {
     setCookie('jv_cc_required=1');
     render(<CookieBannerSection />);

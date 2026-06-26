@@ -207,7 +207,7 @@ function TourDatesContent({
 
     return (
       <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
-        <p className='text-base font-semibold tracking-[-0.018em] text-(--color-text-tooltip)'>
+        <p className='text-base font-semibold tracking-[-0.018em] dark:text-white'>
           No Events
         </p>
         <p className='mt-2 max-w-[25ch] text-xs leading-5 text-white/52'>
