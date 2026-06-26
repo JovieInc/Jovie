@@ -4720,9 +4720,91 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+  production-oauth-gate:
+    name: Production OAuth Gate (rollback on auth break)
+    needs: [promote-production]
+    if: ${{ always() && needs.promote-production.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Probe production Google + Apple OAuth redirect URIs
+        id: oauth-probe
+        run: |
+          # Hits the Google + Apple authorize endpoints with the EXACT redirect_uri
+          # Clerk hands them and fails ONLY on a real provider rejection
+          # (redirect_uri_mismatch / invalid_request). This is the gap the
+          # staging canary cannot cover: production runs a different Clerk
+          # instance + different OAuth clients than staging.
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          attempt=1
+          max_attempts=3
+          until CI=true SMOKE_ONLY=1 BASE_URL="https://jov.ie" pnpm exec playwright test tests/e2e/oauth-providers.spec.ts --project=chromium --reporter=line; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "oauth_status=failed" >> "$GITHUB_OUTPUT"
+              echo "❌ Production OAuth probe failed after ${max_attempts} attempts — Google/Apple reject Clerk's redirect_uri."
+              exit 1
+            fi
+            sleep_seconds=$((attempt * 15))
+            echo "⚠ OAuth probe attempt ${attempt}/${max_attempts} failed; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
+          echo "oauth_status=passed" >> "$GITHUB_OUTPUT"
+          echo "✅ Production Google + Apple accept Clerk's redirect_uri"
+      - name: Auto-rollback on confirmed OAuth break
+        # Roll back ONLY on a confirmed provider rejection (oauth_status=failed),
+        # never on an infra/setup failure — a spurious rollback of a healthy
+        # deploy is worse than a one-cycle delay.
+        if: ${{ failure() && steps.oauth-probe.outputs.oauth_status == 'failed' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          echo "Production OAuth gate FAILED. Triggering auto-rollback..."
+          ./node_modules/.bin/vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1 || {
+            echo "Auto-rollback failed or not supported. Manual intervention required."
+            exit 1
+          }
+          echo "Auto-rollback completed"
+      - name: Slack alert on OAuth failure
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -sS -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n \
+              --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              '{
+                text: "🚨 Production OAuth Gate FAILED — Google/Apple reject Clerk redirect_uri. Auto-rollback triggered.",
+                attachments: [{
+                  color: "danger",
+                  fields: [
+                    {title: "Fix", value: "Re-sync consoles via the /auth-console-sync skill (FAPI host likely changed).", short: false},
+                    {title: "Run", value: $run_url, short: false}
+                  ]
+                }]
+              }')" || echo "Slack alert failed (non-fatal)"
+
   deploy-notify:
     name: Notify production deploy
-    needs: [deploy-staging, canary-health-gate, promote-production, sentry-error-gate]
+    needs: [deploy-staging, canary-health-gate, promote-production, sentry-error-gate, production-oauth-gate]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -4738,7 +4820,7 @@ jobs:
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
 
       - name: Slack notify (production deploy)
-        if: ${{ needs.promote-production.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.promote-production.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && (needs.production-oauth-gate.result == 'success' || needs.production-oauth-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
