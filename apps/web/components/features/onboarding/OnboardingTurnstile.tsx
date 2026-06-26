@@ -1,7 +1,6 @@
 'use client';
 
 import { Skeleton } from '@jovie/ui';
-import { RotateCcw, ShieldAlert, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -10,22 +9,24 @@ import { cn } from '@/lib/utils';
 import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
 /**
- * Cloudflare Turnstile widget for the onboarding chat (JOV-2132 PR 3).
+ * Cloudflare Turnstile widget for the onboarding chat.
  *
- * Loads the Turnstile script and mounts a fully invisible (executed) Turnstile
- * widget inside the onboarding composer. The resulting token is passed back via
- * `onToken`, then consumed by the chat client on the first /api/chat POST in
- * `mode='onboarding'`. Subsequent messages within the same session rely on the
- * signed session cookie + the session-lifetime rate limiter and do NOT
- * re-verify.
+ * Mounts a fully invisible (`appearance: 'execute'`) Turnstile widget. On the
+ * happy path it renders NOTHING the user can see — the token is minted silently
+ * and handed back via `onToken`, then consumed by the chat client on the first
+ * `/api/chat` POST. Subsequent messages rely on the signed session cookie and do
+ * not re-verify.
  *
- * The widget uses `appearance: 'execute'` (fully invisible/managed mode) —
- * no visible UI, no "Security Check" panel, no bordered widget frame. If
- * Cloudflare requires interaction or the challenge fails, the error surfaces
- * as a compact toast in OnboardingShell, never as inline Turnstile UI (JOV-3305).
+ * The visible "Security Check" panel, the headings, the "Verified" celebration
+ * beat, and the misconfig wall were removed (JOV-3563). The only thing this
+ * component ever shows is the bare Cloudflare widget itself, and ONLY when
+ * Cloudflare genuinely requires interaction. Hard failures (error / timeout /
+ * unsupported / unconfigured) and expiry surface through `onStateChange`, which
+ * `OnboardingShell` routes to a single compact toast — never an inline card.
+ * Expiry/timeout silently re-issue so an in-progress chat is never re-walled.
  *
- * In local development, the widget short-circuits and the chat handler's
- * dev-mode skip kicks in.
+ * In local development / E2E the widget short-circuits and the chat handler's
+ * dev-mode skip owns trust.
  */
 
 declare global {
@@ -78,107 +79,23 @@ interface OnboardingTurnstileProps {
 }
 
 const LOCAL_DEV_BYPASS_TOKEN = 'local-dev-turnstile-bypass';
-const DEFAULT_STATE: OnboardingTurnstileState = {
-  status: 'loading',
-  message: 'Checking your browser before your first message.',
-};
+const DEFAULT_STATE: OnboardingTurnstileState = { status: 'loading' };
 
 function getTurnstile() {
   return globalThis.window.turnstile;
 }
 
-function getStateCopy(state: OnboardingTurnstileState) {
-  if (state.message) return state.message;
-  switch (state.status) {
-    case 'interactive':
-      return 'Required before your first message.';
-    case 'verified':
-      return 'Verification complete.';
-    case 'expired':
-      return 'Verification expired. Complete the check again to send.';
-    case 'timeout':
-      return 'Verification timed out. Retry the check to send.';
-    case 'error':
-      return 'Verification failed. Retry the check or refresh the page.';
-    case 'unsupported':
-      return 'This browser cannot complete the security check. Try another browser or disable restrictive extensions.';
-    case 'unconfigured':
-      return 'Turnstile is not configured.';
-    case 'bypassed':
-      return 'Local development verification bypassed.';
-    case 'loading':
-    default:
-      return DEFAULT_STATE.message;
-  }
-}
-
-function getHeading(status: OnboardingTurnstileStatus) {
-  if (status === 'verified' || status === 'bypassed') return 'Verified';
-  if (status === 'error' || status === 'timeout' || status === 'expired') {
-    return 'Verification Needed';
-  }
-  if (status === 'unsupported' || status === 'unconfigured') {
-    return 'Verification Unavailable';
-  }
-  return 'Security Check';
-}
-
-type TurnstileTone = 'neutral' | 'success' | 'warning' | 'muted';
-
-const TONE_BADGE_CLASSES: Record<TurnstileTone, string> = {
-  neutral: 'border-subtle bg-surface-0 text-secondary-token',
-  success: 'border-success/30 bg-success/10 text-success',
-  warning: 'border-warning/30 bg-warning/10 text-warning',
-  muted: 'border-subtle bg-surface-0 text-tertiary-token',
-};
-
-function getStatusTone(status: OnboardingTurnstileStatus): TurnstileTone {
-  if (status === 'verified' || status === 'bypassed') return 'success';
-  if (status === 'error' || status === 'timeout' || status === 'expired') {
-    return 'warning';
-  }
-  if (status === 'unsupported' || status === 'unconfigured') return 'muted';
-  return 'neutral';
-}
-
-function TurnstileStatusIcon({
-  status,
-  className,
-}: {
-  readonly status: OnboardingTurnstileStatus;
-  readonly className?: string;
-}) {
-  switch (getStatusTone(status)) {
-    case 'warning':
-      return <ShieldAlert className={className} strokeWidth={2} />;
-    case 'muted':
-      return <ShieldOff className={className} strokeWidth={2} />;
-    default:
-      return <ShieldCheck className={className} strokeWidth={2} />;
-  }
-}
-
-/** Hold the "Verified" confirmation briefly before the panel collapses. */
-const VERIFIED_MOMENT_MS = 600;
-
+/**
+ * Whether the chat should reserve inline space for the widget. True only when
+ * Cloudflare is running a genuine interactive challenge — every other state is
+ * either silent (no UI) or routed to the compact toast in OnboardingShell.
+ */
 export function isOnboardingTurnstilePanelVisible(
   state: OnboardingTurnstileState,
-  instruction?: string | null,
-  siteKey?: string | null
+  _instruction?: string | null,
+  _siteKey?: string | null
 ): boolean {
-  if (instruction) return true;
-  if (!siteKey) return true;
-  // In execute (invisible) mode, 'interactive' status should never fire.
-  // We keep the check for defensive completeness but it will be unreachable
-  // in normal operation. Only error/timeout/expired/unsupported surface
-  // the compact error panel — never the bordered widget frame (JOV-3305).
-  return (
-    state.status === 'interactive' ||
-    state.status === 'error' ||
-    state.status === 'expired' ||
-    state.status === 'timeout' ||
-    state.status === 'unsupported'
-  );
+  return state.status === 'interactive';
 }
 
 export function OnboardingTurnstile({
@@ -189,25 +106,18 @@ export function OnboardingTurnstile({
   resetSignal = 0,
 }: OnboardingTurnstileProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const panelRef = useRef<HTMLElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const lastResetSignalRef = useRef(resetSignal);
   const widgetDomId = useId();
-  const headingId = useId();
   const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
-  // True only while the brief "Verified" confirmation is held open after a
-  // *visible* challenge. Silent (invisible-first) verifications never set it,
-  // so the panel stays collapsed when the user never saw a challenge.
-  const [verifiedMoment, setVerifiedMoment] = useState(false);
   const [interactiveChallengeRequested, setInteractiveChallengeRequested] =
     useState(false);
   const [interactiveChallengeVisible, setInteractiveChallengeVisible] =
     useState(false);
-  const panelVisibleRef = useRef(false);
   const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const hasStaticBypass =
     process.env.NODE_ENV === 'development' ||
@@ -217,6 +127,12 @@ export function OnboardingTurnstile({
     hasStaticBypass || localAutomationBypass === true;
   const isRuntimeBypassPending =
     !hasStaticBypass && localAutomationBypass === null;
+  // `reducedMotion` / `instruction` / `focusSignal` are kept in the prop and
+  // hook surface for API stability with the shell but no longer drive any
+  // celebration motion or scroll-into-view of a panel that no longer exists.
+  void reducedMotion;
+  void instruction;
+  void focusSignal;
 
   useEffect(() => {
     setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
@@ -262,11 +178,6 @@ export function OnboardingTurnstile({
           onToken(token);
           setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
-          // Only celebrate when the user actually saw a challenge. Silent
-          // invisible-first verifications collapse straight away (no UI churn).
-          if (panelVisibleRef.current && !reducedMotion) {
-            setVerifiedMoment(true);
-          }
           commitState({ status: 'verified' });
         },
         'error-callback': code => {
@@ -274,24 +185,18 @@ export function OnboardingTurnstile({
           setInteractiveChallengeVisible(false);
           commitState({
             status: 'error',
-            message: `Verification failed (${code}). Retry the check or refresh the page.`,
+            message: `Verification failed (${code}). Refresh the page to try again.`,
           });
         },
         'expired-callback': () => {
           setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
-          commitState({
-            status: 'expired',
-            message: 'Verification expired. Complete the check again to send.',
-          });
+          commitState({ status: 'expired' });
         },
         'timeout-callback': () => {
           setInteractiveChallengeRequested(false);
           setInteractiveChallengeVisible(false);
-          commitState({
-            status: 'timeout',
-            message: 'Verification timed out. Retry the check to send.',
-          });
+          commitState({ status: 'timeout' });
         },
         'unsupported-callback': () => {
           setInteractiveChallengeRequested(false);
@@ -305,16 +210,9 @@ export function OnboardingTurnstile({
         'before-interactive-callback': () => {
           setInteractiveChallengeRequested(true);
           setInteractiveChallengeVisible(false);
-          commitState({
-            status: 'interactive',
-            message: 'Required before your first message.',
-          });
+          commitState({ status: 'interactive' });
         },
-        'after-interactive-callback': () =>
-          commitState({
-            status: 'loading',
-            message: 'Finishing verification...',
-          }),
+        'after-interactive-callback': () => commitState({ status: 'loading' }),
       });
     } catch (err) {
       commitState({
@@ -327,31 +225,17 @@ export function OnboardingTurnstile({
     commitState,
     isRuntimeBypassPending,
     onToken,
-    reducedMotion,
     shouldBypassTurnstile,
     siteKey,
   ]);
 
-  useEffect(() => {
-    if (!verifiedMoment) return;
-    const timer = setTimeout(
-      () => setVerifiedMoment(false),
-      VERIFIED_MOMENT_MS
-    );
-    return () => clearTimeout(timer);
-  }, [verifiedMoment]);
-
-  const resetWidget = useCallback(
-    (message = 'Verification reset. Complete the check to retry.') => {
-      clearWidget();
-      setVerifiedMoment(false);
-      setInteractiveChallengeRequested(false);
-      setInteractiveChallengeVisible(false);
-      commitState({ status: 'loading', message });
-      render();
-    },
-    [clearWidget, commitState, render]
-  );
+  const resetWidget = useCallback(() => {
+    clearWidget();
+    setInteractiveChallengeRequested(false);
+    setInteractiveChallengeVisible(false);
+    commitState({ status: 'loading' });
+    render();
+  }, [clearWidget, commitState, render]);
 
   useEffect(() => {
     if (isRuntimeBypassPending) return;
@@ -393,15 +277,20 @@ export function OnboardingTurnstile({
   useEffect(() => {
     if (lastResetSignalRef.current === resetSignal) return;
     lastResetSignalRef.current = resetSignal;
-    resetWidget('Verification reset. Complete the check to retry.');
+    resetWidget();
   }, [resetSignal, resetWidget]);
 
+  // Expiry/timeout silently re-issue a token so an in-progress chat is never
+  // re-walled with a visible challenge. A fresh execute pass usually resolves
+  // silently; only a genuine interactive requirement re-surfaces the widget.
   useEffect(() => {
-    if (focusSignal <= 0) return;
-    panelRef.current?.scrollIntoView({ block: 'nearest' });
-    panelRef.current?.focus({ preventScroll: true });
-  }, [focusSignal]);
+    if (state.status !== 'expired' && state.status !== 'timeout') return;
+    resetWidget();
+  }, [state.status, resetWidget]);
 
+  // Reveal the Cloudflare widget only once it has actually painted content,
+  // and only for a genuine interactive challenge. Until then it stays
+  // visually hidden so no empty box flashes.
   useEffect(() => {
     if (!interactiveChallengeRequested || interactiveChallengeVisible) return;
     const target = containerRef.current;
@@ -436,46 +325,17 @@ export function OnboardingTurnstile({
     };
   }, [interactiveChallengeRequested, interactiveChallengeVisible]);
 
-  const shouldShowPanel =
-    isOnboardingTurnstilePanelVisible(state, instruction, siteKey) ||
-    verifiedMoment;
-  // Track the panel's visibility so the success callback can tell a *visible*
-  // challenge (worth a "Verified" beat) from a silent invisible verification.
-  // Synced in an effect (never written during render) so the value reflects the
-  // last committed render when Cloudflare's async callback fires.
-  useEffect(() => {
-    panelVisibleRef.current = shouldShowPanel;
-  }, [shouldShowPanel]);
-
   if (isRuntimeBypassPending || shouldBypassTurnstile) {
     // No Turnstile UI in dev. The server-side dev-mode skip still owns trust.
     return null;
   }
 
-  const panelCopy = instruction ?? getStateCopy(state);
-  const isActionable =
-    state.status === 'error' ||
-    state.status === 'expired' ||
-    state.status === 'timeout';
-  const shouldShowWidgetFrame =
-    shouldShowPanel &&
-    siteKey &&
-    (state.status === 'interactive' ||
-      state.status === 'error' ||
-      state.status === 'expired' ||
-      state.status === 'timeout' ||
-      // Keep the frame reserved through the "Verified" beat so the panel
-      // collapses in one clean step instead of shrinking twice.
-      verifiedMoment ||
-      Boolean(instruction));
-  const shouldExposeWidgetContent =
-    interactiveChallengeVisible &&
-    (state.status === 'interactive' || state.status === 'loading');
-  const shouldShowWidgetSkeleton =
-    shouldShowWidgetFrame &&
-    !shouldExposeWidgetContent &&
-    state.status !== 'verified';
-  const tone = getStatusTone(state.status);
+  // Only a genuine interactive challenge reserves visible space. Everything
+  // else (loading, silent verify, hard failure, expiry) renders an off-screen
+  // widget so the token machinery keeps working without any visible chrome.
+  const showInteractiveWidget =
+    Boolean(siteKey) && state.status === 'interactive';
+  const showWidgetContent = interactiveChallengeVisible;
 
   return (
     <>
@@ -486,68 +346,18 @@ export function OnboardingTurnstile({
           onLoad={() => render()}
         />
       ) : null}
-      {shouldShowPanel ? (
-        <section
-          ref={panelRef}
-          aria-labelledby={headingId}
-          tabIndex={-1}
-          data-testid='onboarding-turnstile-panel'
-          data-turnstile-status={state.status}
-          className={cn(
-            'px-3 py-2.5 text-primary-token outline-none sm:px-3.5 sm:py-3',
-            'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-          )}
-        >
-          <div className='flex items-start gap-2.5'>
-            <span
-              aria-hidden='true'
-              data-testid='onboarding-turnstile-icon'
-              data-turnstile-icon={state.status}
-              className={cn(
-                'mt-px flex size-7 shrink-0 items-center justify-center rounded-lg border transition-colors duration-subtle',
-                TONE_BADGE_CLASSES[tone]
-              )}
-            >
-              <TurnstileStatusIcon status={state.status} className='size-4' />
-            </span>
-            <div className='flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between'>
-              <div className='min-w-0'>
-                <p
-                  id={headingId}
-                  className='text-app font-medium leading-5 text-primary-token'
-                >
-                  {getHeading(state.status)}
-                </p>
-                <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-xs'>
-                  {panelCopy}
-                </p>
-              </div>
-              {isActionable ? (
-                <button
-                  type='button'
-                  onClick={() => resetWidget()}
-                  className='inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-                >
-                  <RotateCcw className='size-3.5' aria-hidden='true' />
-                  Retry Verification
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </section>
-      ) : null}
       {siteKey ? (
         <div
           className={cn(
-            shouldShowWidgetFrame
+            showInteractiveWidget
               ? 'relative mt-2 overflow-hidden rounded-lg border border-subtle bg-surface-0 p-1.5'
-              : 'sr-only h-0 overflow-hidden',
-            !shouldShowPanel && 'sr-only h-0 overflow-hidden'
+              : 'sr-only h-0 overflow-hidden'
           )}
           data-testid='onboarding-turnstile-widget-frame'
-          aria-hidden={!shouldShowWidgetFrame ? 'true' : undefined}
+          data-turnstile-status={state.status}
+          aria-hidden={showInteractiveWidget ? undefined : 'true'}
         >
-          {shouldShowWidgetSkeleton ? (
+          {showInteractiveWidget && !showWidgetContent ? (
             <Skeleton
               aria-hidden='true'
               data-testid='onboarding-turnstile-widget-skeleton'
@@ -560,9 +370,7 @@ export function OnboardingTurnstile({
             id={`cf-turnstile-${widgetDomId}`}
             className={cn(
               'relative min-h-16',
-              shouldExposeWidgetContent
-                ? '[&>div]:visible'
-                : '[&>div]:invisible'
+              showWidgetContent ? '[&>div]:visible' : '[&>div]:invisible'
             )}
           />
         </div>
