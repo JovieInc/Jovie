@@ -65,7 +65,11 @@ function FlagEnvCell({
           effective ? 'bg-accent' : 'bg-surface-3'
         } ${overridden ? '' : 'opacity-70'}`}
       >
-        <Switch.Thumb className='block h-3 w-3 translate-x-0.5 rounded-full bg-white shadow-sm transition-transform data-[state=checked]:translate-x-3.5 dark:bg-white' />
+        <Switch.Thumb
+          className={`block h-3 w-3 rounded-full bg-white shadow-sm transition-transform dark:bg-white ${
+            effective ? 'translate-x-3.5' : 'translate-x-0.5'
+          }`}
+        />
       </Switch.Root>
       {/* Reserve the reset slot in every cell so toggling never shifts layout. */}
       <button
@@ -93,7 +97,7 @@ function FlagNameCell({
       <span className='block truncate font-medium text-primary-token'>
         {name}
       </span>
-      <span className='line-clamp-2 block max-w-[34rem] text-xs leading-[17px] text-secondary-token'>
+      <span className='line-clamp-2 block text-xs leading-snug text-secondary-token'>
         {description}
       </span>
     </div>
