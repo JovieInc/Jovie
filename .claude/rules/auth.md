@@ -50,7 +50,12 @@ old `meetjovie` / `jov.ie/__clerk` callbacks).
 - **Single source of truth:** `apps/web/lib/auth/oauth-redirect-uris.expected.json`. Print/verify with `pnpm tsx scripts/auth-redirect-uris.ts [--verify prod|staging]`.
 - **These consoles have NO CLI/API.** To register/update redirect URIs, run the **`/auth-console-sync`** skill — it drives a logged-in browser (claude-in-chrome, not headless `/browse`). Do not ask the user to do it manually.
 - **If you change a Clerk instance / FAPI host** (unification, key rotation, new instance): update the snapshot JSON AND re-run `/auth-console-sync` **before shipping**. `apps/web/tests/unit/auth/fapi-host-snapshot.test.ts` fails on host drift to force this.
-- **Guardrails:** `apps/web/tests/e2e/oauth-providers.spec.ts` (`@production-smoke`) probes the Google/Apple authorize endpoints with the real redirect_uri. It runs in the canary (staging, pre-promote) and the `production-oauth-gate` (post-promote, **auto-rolls-back prod** on a confirmed rejection). Don't verify OAuth by clicking the in-app button — Clerk's invisible bot-protection gates automated clicks.
+- **Guardrails (defense in depth):**
+  - `apps/web/tests/unit/auth/fapi-host-snapshot.test.ts` — FAPI host drift fails the build.
+  - `apps/web/tests/unit/security/csp-fapi-sync.test.ts` — CSP must allow every FAPI host (a missing host silently blocks Clerk JS).
+  - `apps/web/tests/e2e/oauth-providers.spec.ts` (`@production-smoke`) — probes the Google/Apple authorize endpoints with the real redirect_uri; runs in the canary (staging, pre-promote) and the `production-oauth-gate` (post-promote, **auto-rolls-back prod** on a confirmed rejection).
+  - `.github/workflows/auth-sentinel.yml` — **continuous** curl monitor (every 15 min) of prod `/api/health`, `/api/health/keys`, `/signin` render, and the Google/Apple redirect_uri; pages `#alerts-production`. This is what catches auth that breaks *between* deploys (console edits, key rotation, expired Apple secret).
+  - Don't verify OAuth by clicking the in-app button — Clerk's invisible bot-protection gates automated clicks; hit the provider authorize URL directly.
 
 ## Local Auth Bypass For Perf and E2E
 
