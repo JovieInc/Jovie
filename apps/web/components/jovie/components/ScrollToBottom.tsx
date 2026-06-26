@@ -26,12 +26,11 @@ export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
           exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
           transition={{ duration: 0.15 }}
           className='system-b-scroll-to-bottom'
-          aria-label='Scroll to latest messages'
+          aria-label='Scroll To Latest Messages'
         >
           <span className='system-b-scroll-to-bottom-icon'>
             <ArrowDown className='h-3 w-3' />
-          </span>{' '}
-          Latest
+          </span>
         </motion.button>
       )}
     </AnimatePresence>
