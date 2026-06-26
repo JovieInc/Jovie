@@ -111,6 +111,7 @@ export const APP_ROUTES = {
   ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
   ADMIN_COSTS: '/app/admin/costs',
   ADMIN_SYSTEM: '/app/admin/system',
+  ADMIN_FEATURES: '/app/admin/features',
   FEATURE_FLAGS: '/app/feature-flags',
 
   // System
