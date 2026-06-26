@@ -9,6 +9,7 @@ import {
 import { streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { extractLastUserText } from '@/lib/chat/message-text';
@@ -77,25 +78,33 @@ export function isClientDisconnect(
 }
 
 /**
- * Selects the music-industry knowledge context relevant to the recent
- * conversation. Uses the last 3 user turns so follow-up questions retain
- * context from earlier turns.
+ * Collects the raw text of the most recent user turns (most-recent first),
+ * preserving any `@kind:id[label]` entity tokens verbatim so the server can
+ * resolve them. Used both for knowledge-context selection and entity hydration.
  */
-export function selectKnowledgeContextForTurn(uiMessages: UIMessage[]): string {
-  const recentUserText = [...uiMessages]
+export function recentUserTexts(uiMessages: UIMessage[], limit = 3): string[] {
+  return [...uiMessages]
     .reverse()
     .filter(m => m.role === 'user')
-    .slice(0, 3)
-    .flatMap(m =>
+    .slice(0, limit)
+    .map(m =>
       (m.parts ?? [])
         .filter(
           (p): p is { type: 'text'; text: string } =>
             p.type === 'text' && typeof p.text === 'string'
         )
         .map(p => p.text)
-    )
-    .join(' ');
-  return selectKnowledgeContext(recentUserText);
+        .join(' ')
+    );
+}
+
+/**
+ * Selects the music-industry knowledge context relevant to the recent
+ * conversation. Uses the last 3 user turns so follow-up questions retain
+ * context from earlier turns.
+ */
+export function selectKnowledgeContextForTurn(uiMessages: UIMessage[]): string {
+  return selectKnowledgeContext(recentUserTexts(uiMessages).join(' '));
 }
 
 export interface ExecuteChatTurnInput {
@@ -206,12 +215,25 @@ export async function executeChatTurn(
     if (!artistContext) {
       throw new Error('artistContext is required when mode is "app"');
     }
+    // Resolve `@kind:id[label]` entity tokens from the recent user turns against
+    // the artist's own catalog (the same `releases` rows that feed the
+    // right-rail entity panel) so the model recognises owned assets instead of
+    // mis-attributing them to another artist (JOV-3537).
+    const referencedEntities = buildReferencedEntitiesBlock({
+      userTexts: recentUserTexts(uiMessages),
+      ownedReleases: releases,
+      artist: {
+        displayName: artistContext.displayName,
+        username: artistContext.username,
+      },
+    });
     systemPrompt = buildSystemPrompt(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
       insightsEnabled,
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
       accountContext,
+      referencedEntities,
     });
   }
 
