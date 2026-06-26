@@ -116,6 +116,8 @@ export interface PlanGateEntitlements {
   aiDailyMessageLimit: number;
   /** AI pitch generations per release based on plan (null = unlimited) */
   aiPitchGenPerRelease: number | null;
+  /** Max files per chat upload batch (null = unlimited, Pro+) */
+  chatFileUploadLimit: number | null;
   /** Whether the user is on an active trial */
   isTrialing: boolean;
   /** Days remaining in the trial (null if not trialing). Rounded DOWN. */

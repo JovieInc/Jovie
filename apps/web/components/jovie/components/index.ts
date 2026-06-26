@@ -1,5 +1,7 @@
 export { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
+export { ChatDropZoneOverlay } from './ChatDropZoneOverlay';
 export { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
+export { ChatFileChips } from './ChatFileChips';
 export { ChatInput } from './ChatInput';
 export { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 export { ChatMarkdown } from './ChatMarkdown';
@@ -9,6 +11,7 @@ export {
   ChatMessageSkeleton,
 } from './ChatMessageSkeleton';
 export { ChatPitchCard } from './ChatPitchCard';
+export { ChatUploadManifest } from './ChatUploadManifest';
 export { EntityChip, type EntityChipData } from './EntityChip';
 export { ErrorDisplay } from './ErrorDisplay';
 export { FeedbackForm } from './FeedbackForm';
