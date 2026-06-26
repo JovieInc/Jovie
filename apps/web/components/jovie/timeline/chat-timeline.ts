@@ -557,8 +557,16 @@ function mergeServerMessages(
 
     const existing = messages[index];
     if (shouldKeepLocalContent(existing, serverMessage, options.receivedAt)) {
+      // Never downgrade an already-settled (`complete`) row. A prior refetch can
+      // promote the optimistic user row to `complete`; forcing it back to `sent`
+      // here oscillates its status across subsequent refetches, churning the
+      // memoized transcript and re-flashing it on send (JOV-3528).
+      const nextStatus =
+        serverMessage.role === 'user' && existing.status !== 'complete'
+          ? 'sent'
+          : existing.status;
       messages[index] = mergeServerMetadata(existing, serverMessage, {
-        status: serverMessage.role === 'user' ? 'sent' : existing.status,
+        status: nextStatus,
         receivedAt: options.receivedAt,
       });
       continue;
@@ -578,7 +586,14 @@ function mergeServerMessages(
     }
   }
 
-  const sortedMessages = sortTimeline(messages);
+  // Reuse the prior array reference when the merge changed nothing the renderer
+  // reads. Without this, every refetch hands the transcript a fresh array, which
+  // re-runs `messages.map` and the scroll/jank effects even though the content is
+  // identical — a contributor to the on-send flash (JOV-3528).
+  const sortedMessages = preserveTimelineIdentity(
+    state.messages,
+    sortTimeline(messages)
+  );
 
   return {
     ...state,
@@ -605,6 +620,23 @@ function mergeServerMessages(
       }
     ),
   };
+}
+
+/**
+ * Returns the previous messages array when `next` is element-wise reference
+ * identical (same order, same objects). Lets a no-op refetch leave the rendered
+ * list untouched so React skips re-running `messages.map` and dependent effects.
+ */
+function preserveTimelineIdentity(
+  previous: readonly ChatTimelineMessage[],
+  next: readonly ChatTimelineMessage[]
+): readonly ChatTimelineMessage[] {
+  if (previous === next) return previous;
+  if (previous.length !== next.length) return next;
+  for (let index = 0; index < previous.length; index++) {
+    if (previous[index] !== next[index]) return next;
+  }
+  return previous;
 }
 
 function normalizeServerMessage(
@@ -637,7 +669,7 @@ function mergeServerMetadata(
     readonly receivedAt: number;
   }
 ): ChatTimelineMessage {
-  return {
+  const merged: ChatTimelineMessage = {
     ...existing,
     status: options.status ?? existing.status,
     clientMessageId: serverMessage.clientMessageId ?? existing.clientMessageId,
@@ -646,6 +678,11 @@ function mergeServerMetadata(
     serverMessageId: serverMessage.id,
     updatedAt: Math.max(existing.updatedAt, options.receivedAt),
   };
+
+  // Metadata-only merges (server acknowledging an optimistic row) must not
+  // change the rendered identity. Preserve the original object when only
+  // non-rendered bookkeeping fields would change (JOV-3528).
+  return rowRenderEqual(existing, merged) ? existing : merged;
 }
 
 function mergeServerContent(
@@ -653,9 +690,19 @@ function mergeServerContent(
   serverMessage: ChatTimelineMessage,
   receivedAt: number
 ): ChatTimelineMessage {
-  return {
+  // Preserve the existing `parts` reference when the server payload is
+  // content-identical. A refetch (title polling, post-stream invalidation)
+  // otherwise hands every matched row a fresh `parts` array, which breaks the
+  // memoized `ChatMessage` reference check and replays its entrance animation —
+  // the whole transcript flashes blank then re-renders on each send
+  // (JOV-3528, regression of the JOV-2559 merge contract).
+  const nextParts = messagePartsEqual(existing.parts, serverMessage.parts)
+    ? existing.parts
+    : serverMessage.parts;
+
+  const merged: ChatTimelineMessage = {
     ...existing,
-    parts: serverMessage.parts,
+    parts: nextParts,
     status: 'complete',
     clientMessageId: serverMessage.clientMessageId ?? existing.clientMessageId,
     turnId: serverMessage.turnId ?? existing.turnId,
@@ -664,6 +711,74 @@ function mergeServerContent(
     updatedAt: Math.max(existing.updatedAt, receivedAt),
     completedAt: existing.completedAt ?? receivedAt,
   };
+
+  // If nothing the renderer reads changed, return the original object so React
+  // reconciliation treats the row as untouched (no remount, no entrance flash).
+  return rowRenderEqual(existing, merged) ? existing : merged;
+}
+
+/**
+ * Structural equality for the fields a rendered row depends on. Used to keep
+ * message object identity stable across no-op server merges so the memoized
+ * transcript does not re-render or replay entrance animations.
+ */
+function rowRenderEqual(
+  left: ChatTimelineMessage,
+  right: ChatTimelineMessage
+): boolean {
+  return (
+    left.id === right.id &&
+    left.role === right.role &&
+    left.status === right.status &&
+    left.parts === right.parts
+  );
+}
+
+/**
+ * Shallow-ish structural comparison of message parts. Avoids JSON.stringify on
+ * a path that runs on every conversation refetch. Returns true when both arrays
+ * describe the same renderable content.
+ */
+function messagePartsEqual(
+  left: readonly MessagePart[],
+  right: readonly MessagePart[]
+): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index++) {
+    if (!messagePartEqual(left[index], right[index])) return false;
+  }
+  return true;
+}
+
+function messagePartEqual(left: MessagePart, right: MessagePart): boolean {
+  if (left === right) return true;
+  if (left.type !== right.type) return false;
+
+  const leftText =
+    'text' in left && typeof left.text === 'string' ? left.text : undefined;
+  const rightText =
+    'text' in right && typeof right.text === 'string' ? right.text : undefined;
+  if (leftText !== rightText) return false;
+
+  const leftUrl =
+    'url' in left && typeof left.url === 'string' ? left.url : undefined;
+  const rightUrl =
+    'url' in right && typeof right.url === 'string' ? right.url : undefined;
+  if (leftUrl !== rightUrl) return false;
+
+  // Tool/dynamic parts carry richer payloads; fall back to a structural compare
+  // only for these (rare on the refetch path) so we never wrongly treat a
+  // changed tool result as identical.
+  const type = left.type;
+  if (
+    typeof type === 'string' &&
+    (type.startsWith('tool-') || type === 'dynamic-tool')
+  ) {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  return true;
 }
 
 function shouldKeepLocalContent(
