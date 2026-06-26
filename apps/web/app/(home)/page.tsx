@@ -1,7 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageArtistProfilesCarouselLazy } from '@/components/homepage/HomepageArtistProfilesCarouselLazy';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
@@ -455,12 +454,6 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
-      <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
-        <HomeTrustSection
-          label='Used by artists and teams with releases distributed through'
-          presentation='inline-strip'
-        />
-      </div>
       <HomepageStoryStack showUnlockedSections={showUnlockedSections} />
     </HomePageShell>
   );

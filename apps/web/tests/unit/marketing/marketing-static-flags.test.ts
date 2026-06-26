@@ -10,7 +10,7 @@ describe('marketing static flags', () => {
     vi.unstubAllEnvs();
   });
 
-  it('keeps every static marketing flag default-on except inverted V1 design toggles', async () => {
+  it('keeps every static marketing flag default-on except inverted V1 toggles and the hero-only homepage flags', async () => {
     const { FEATURE_FLAGS } = await importFlags();
 
     // *_V1_DESIGN flags use inverted semantics: true = OLD design. Production ships V2.
@@ -19,13 +19,24 @@ describe('marketing static flags', () => {
       'SHOW_PUBLIC_PROFILE_V1_DESIGN',
     ]);
 
+    // Homepage is intentionally collapsed to hero + minimal footer only; these
+    // gate the below-the-fold story stack and final CTA, so they ship off.
+    const heroOnlyOffFlags = new Set([
+      'SHOW_HOMEPAGE_UNLOCKED_SECTIONS',
+      'SHOW_HOMEPAGE_V2_FINAL_CTA',
+    ]);
+
     const defaultOnFlags = Object.entries(FEATURE_FLAGS)
-      .filter(([key]) => !invertedV1DesignFlags.has(key))
+      .filter(
+        ([key]) => !invertedV1DesignFlags.has(key) && !heroOnlyOffFlags.has(key)
+      )
       .map(([, value]) => value);
 
     expect(defaultOnFlags.every(Boolean)).toBe(true);
     expect(FEATURE_FLAGS.SHOW_HOME_V1_DESIGN).toBe(false);
     expect(FEATURE_FLAGS.SHOW_PUBLIC_PROFILE_V1_DESIGN).toBe(false);
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS).toBe(false);
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA).toBe(false);
   });
 
   it('shows marketing center navigation in production by default', async () => {
@@ -76,21 +87,21 @@ describe('marketing static flags', () => {
     expect(FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER).toBe(true);
   });
 
-  it('keeps the tightened homepage story visible in production by default', async () => {
+  it('collapses the homepage to hero + minimal footer in production by default', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_SHOW_HOMEPAGE_UNLOCKED_SECTIONS', '');
 
     const { FEATURE_FLAGS } = await importFlags();
 
-    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS).toBe(true);
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS).toBe(false);
   });
 
-  it('keeps the unlocked homepage story visible even when the env flag is false', async () => {
+  it('keeps the homepage story stack off regardless of the env flag', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_SHOW_HOMEPAGE_UNLOCKED_SECTIONS', 'false');
+    vi.stubEnv('NEXT_PUBLIC_SHOW_HOMEPAGE_UNLOCKED_SECTIONS', 'true');
 
     const { FEATURE_FLAGS } = await importFlags();
 
-    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS).toBe(true);
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS).toBe(false);
   });
 });

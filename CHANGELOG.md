@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.57] - 2026-06-27
+
+> The homepage is now a focused first impression: just the hero and a slim footer. The longer marketing story below the hero is turned off for now.
+
+### Changed
+
+- **Homepage collapsed to hero + minimal footer**: the below-the-fold story stack (product statement, trust strip, go-live steps, workspace, artist-profiles carousel, Friday rhythm, bento/loop/stat sections, pricing, FAQ) and the final CTA are flagged off via the existing static marketing flags (`SHOW_HOMEPAGE_UNLOCKED_SECTIONS`, `SHOW_HOMEPAGE_V2_FINAL_CTA`). The header keeps the logo and sign-in but drops the center nav (its anchors pointed at the now-hidden sections), and the homepage footer renders the minimal variant. Fully reversible by flipping the flags back on. Pages stay fully static (`revalidate = false`).
+
 ## [26.6.56] - 2026-06-26
 
 > Admins can now turn product features on and off per environment (dev, staging, prod) from a new Features panel, and changes take effect without a redeploy.
