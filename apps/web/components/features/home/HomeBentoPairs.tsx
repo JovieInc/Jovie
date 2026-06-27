@@ -59,7 +59,9 @@ export function HomeBentoPairs() {
           What it does
         </p>
         <h2 className='m-0 max-w-[20ch] font-[var(--marketing-font-display)] text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.028em] text-black dark:text-white'>
-          <span className='text-black/45 dark:text-white/45'>Turn attention</span>
+          <span className='text-black/45 dark:text-white/45'>
+            Turn attention
+          </span>
           <br />
           <span>into action.</span>
         </h2>
