@@ -47,8 +47,10 @@ describe('globals.css ui-feel quick wins (JOV-3368)', () => {
     );
   });
 
-  it('migrates btn-press from opacity to interactive-press', () => {
-    expect(source).toMatch(/\.btn-press\s*\{[^}]*interactive-press/);
+  it('migrates btn-press from opacity to scale press feedback', () => {
+    expect(source).toMatch(
+      /\.btn-press\s*\{[\s\S]*transition-transform[\s\S]*active:scale-\[0\.96\]/
+    );
     expect(source).not.toMatch(/\.btn-press\s*\{[^}]*active:opacity-80/);
   });
 });
