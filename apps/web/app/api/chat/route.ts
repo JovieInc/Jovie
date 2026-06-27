@@ -56,6 +56,7 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { extractLastUserText } from '@/lib/chat/message-text';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -2752,9 +2753,11 @@ export async function POST(req: Request) {
       onFinish: async ({ responseMessage, isAborted }) => {
         if (!reservedTurn || streamFailurePersisted) return;
 
-        const assistantText = extractUIMessageText(
-          responseMessage.parts as Array<{ type: string; text?: string }>
-        );
+        const assistantText = sanitizeAssistantResponse(
+          extractUIMessageText(
+            responseMessage.parts as Array<{ type: string; text?: string }>
+          )
+        ).text;
         const toolCalls = preparePersistedToolEventsForTurnFinish({
           parts: responseMessage.parts,
           isAborted,

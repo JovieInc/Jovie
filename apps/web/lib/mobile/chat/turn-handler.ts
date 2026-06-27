@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { UIMessage } from 'ai';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { fetchReleasesForChat } from '@/lib/chat/releases';
 import { executeChatTurn } from '@/lib/chat/run';
 import {
@@ -356,7 +357,7 @@ export async function handleMobileChatTurn(
           });
         }
 
-        const trimmed = fullText.trim();
+        const trimmed = sanitizeAssistantResponse(fullText.trim()).text;
         const finalText =
           trimmed.length > 0
             ? trimmed

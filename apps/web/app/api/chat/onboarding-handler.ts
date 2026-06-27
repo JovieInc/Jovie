@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai';
 import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { encodeToolEvents } from '@/lib/chat/tool-events';
@@ -601,7 +602,9 @@ async function persistAnonymousAssistantMessage({
   readonly responseMessage: UIMessage;
 }): Promise<void> {
   const now = new Date();
-  const assistantText = extractUIMessageText(responseMessage.parts);
+  const assistantText = sanitizeAssistantResponse(
+    extractUIMessageText(responseMessage.parts)
+  ).text;
   const toolCalls = encodeToolEvents(responseMessage.parts);
   await db
     .insert(chatMessages)
