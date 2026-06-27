@@ -10,8 +10,20 @@ const { authShellMock, authLayoutMock, routerPrefetchMock, searchParamsState } =
     searchParamsState: { value: '' },
   }));
 
+const replaceMock = vi.fn();
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
+  useRouter: () => ({
+    replace: replaceMock,
+  }),
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({
+    isLoaded: true,
+    isSignedIn: false,
+  }),
 }));
 
 vi.mock('@/lib/auth/gate', () => ({
@@ -53,7 +65,10 @@ describe('signin page', () => {
     authShellMock.mockReset();
     authLayoutMock.mockReset();
     routerPrefetchMock.mockReset();
+    replaceMock.mockReset();
     searchParamsState.value = '';
+    document.cookie =
+      '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   });
 
   it('renders AuthShell with the expected auth props', () => {

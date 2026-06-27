@@ -70,6 +70,34 @@ export function getAuthenticatedAuthRouteRedirect(
   return APP_ROUTES.DASHBOARD;
 }
 
+type AuthEntrySearchParams = {
+  get(name: string): string | null;
+};
+
+/**
+ * Client-side redirect for signed-in visitors on auth entry routes when the
+ * server render could not resolve canonical state (stale RSC payload, modal
+ * interception, or cookie/session timing). Mirrors the ACTIVE-user branch of
+ * `getAuthenticatedAuthRouteRedirect` without a canonical state lookup.
+ */
+export function getClientAuthenticatedAuthEntryRedirect(
+  searchParams: AuthEntrySearchParams
+): string {
+  const sanitizedRedirect = sanitizeRedirectUrl(
+    searchParams.get('redirect_url')
+  );
+
+  if (sanitizedRedirect && isWaitlistInviteRedirect(sanitizedRedirect)) {
+    return sanitizedRedirect;
+  }
+
+  if (sanitizedRedirect && !isAuthEntryRedirect(sanitizedRedirect)) {
+    return sanitizedRedirect;
+  }
+
+  return APP_ROUTES.DASHBOARD;
+}
+
 /**
  * Redirect destination for /start based on canonical access state.
  * Anonymous visitors and onboarding-eligible users may remain on /start.

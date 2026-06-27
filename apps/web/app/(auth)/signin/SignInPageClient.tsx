@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
+import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
@@ -183,24 +184,26 @@ export function SignInPageClient() {
   }
 
   return (
-    <AuthLayout
-      formTitle='Sign in'
-      showFormTitle={false}
-      showFooterPrompt={false}
-      layoutVariant='split'
-    >
-      <AuthRoutePrefetch href={signUpUrl} />
-      <SignInOauthErrorBanner />
-      <AuthShell
-        mode='sign-in'
-        forceOppositeModeHardNavigation
-        oppositeModeUrl={
-          desktopReturnRoute || mobileReturnRoute ? signUpUrl : undefined
-        }
-        fallbackRedirectUrl={fallbackRedirectUrl}
-        initialValues={initialValues}
-      />
-      <SignInTimeoutEscape />
-    </AuthLayout>
+    <AuthenticatedAuthEntryGuard>
+      <AuthLayout
+        formTitle='Sign in'
+        showFormTitle={false}
+        showFooterPrompt={false}
+        layoutVariant='split'
+      >
+        <AuthRoutePrefetch href={signUpUrl} />
+        <SignInOauthErrorBanner />
+        <AuthShell
+          mode='sign-in'
+          forceOppositeModeHardNavigation
+          oppositeModeUrl={
+            desktopReturnRoute || mobileReturnRoute ? signUpUrl : undefined
+          }
+          fallbackRedirectUrl={fallbackRedirectUrl}
+          initialValues={initialValues}
+        />
+        <SignInTimeoutEscape />
+      </AuthLayout>
+    </AuthenticatedAuthEntryGuard>
   );
 }

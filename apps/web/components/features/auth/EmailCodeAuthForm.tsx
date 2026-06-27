@@ -1,6 +1,7 @@
 'use client';
 
 import { useSignIn, useSignUp } from '@clerk/nextjs';
+import { useSearchParams } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { useCallback, useState } from 'react';
 import {
@@ -9,7 +10,13 @@ import {
   FormError,
   OtpInput,
 } from '@/features/auth/atoms';
-import { isBotProtectionError, parseClerkError } from '@/lib/auth/clerk-errors';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
+import {
+  isBotProtectionError,
+  isSessionExists,
+  parseClerkError,
+} from '@/lib/auth/clerk-errors';
 import type { AuthShellMode } from './AuthShell';
 
 /**
@@ -105,6 +112,8 @@ export function EmailCodeAuthForm({
   redirectUrl,
   initialEmailAddress,
 }: EmailCodeAuthFormProps) {
+  const searchParams = useSearchParams();
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   const signInState = useSignIn();
   const signUpState = useSignUp();
   const [step, setStep] = useState<EmailCodeStep>('email');
@@ -116,11 +125,25 @@ export function EmailCodeAuthForm({
   const isSignUp = mode === 'sign-up';
   const signIn = signInState.signIn;
   const signUp = signUpState.signUp;
-  const isReady = isSignUp ? Boolean(signUp) : Boolean(signIn);
+  const isReady =
+    (isSignUp ? Boolean(signUp) : Boolean(signIn)) &&
+    !(isAuthLoaded && isSignedIn);
+
+  const redirectSignedInVisitor = useCallback(() => {
+    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
+    globalThis.location?.assign(destination);
+  }, [searchParams]);
 
   const sendCode = useCallback(async () => {
     const trimmedEmail = emailAddress.trim();
-    if (!trimmedEmail || isPending || !isReady) return;
+    if (
+      !trimmedEmail ||
+      isPending ||
+      !isReady ||
+      (isAuthLoaded && isSignedIn)
+    ) {
+      return;
+    }
 
     setIsPending(true);
     setErrorMessage(null);
@@ -146,11 +169,27 @@ export function EmailCodeAuthForm({
       setCode('');
       setStep('code');
     } catch (error) {
+      if (isSessionExists(error)) {
+        redirectSignedInVisitor();
+        return;
+      }
+
       setErrorMessage(getSendErrorMessage(mode, error));
     } finally {
       setIsPending(false);
     }
-  }, [emailAddress, isPending, isReady, isSignUp, mode, signIn, signUp]);
+  }, [
+    emailAddress,
+    isAuthLoaded,
+    isPending,
+    isReady,
+    isSignedIn,
+    isSignUp,
+    mode,
+    redirectSignedInVisitor,
+    signIn,
+    signUp,
+  ]);
 
   const verifyCode = useCallback(
     async (submittedCode: string) => {
@@ -208,6 +247,10 @@ export function EmailCodeAuthForm({
     setCode('');
     setErrorMessage(null);
   }, []);
+
+  if (isAuthLoaded && isSignedIn) {
+    return null;
+  }
 
   if (step === 'code') {
     return (

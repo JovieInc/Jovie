@@ -5,6 +5,8 @@ import { getAuthenticatedAuthRouteRedirect } from '@/lib/auth/access-route-redir
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import { SignInPageClient } from './SignInPageClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SignInPage({
   searchParams,
 }: Readonly<{
