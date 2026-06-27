@@ -793,6 +793,7 @@ export function OnboardingChat({
   const [input, setInput] = useState(initialStarterPrompt);
   const latestInputRef = useRef(initialStarterPrompt);
   const [hasSentFirst, setHasSentFirst] = useState(false);
+  const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const [handleDraft, setHandleDraft] = useState<string | null>(null);
@@ -823,6 +824,12 @@ export function OnboardingChat({
   useEffect(() => {
     setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
   }, []);
+
+  useEffect(() => {
+    if (isTurnstileTokenUsable(turnstileToken, turnstileStatus)) {
+      setVerificationRequested(false);
+    }
+  }, [turnstileStatus, turnstileToken]);
 
   const transport = useMemo(
     () =>
@@ -902,6 +909,7 @@ export function OnboardingChat({
       const text = composeMessage(chipTray.chips, rawText).trim();
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
+        setVerificationRequested(true);
         onTurnstileRequired?.('Verify you are human to send');
         return;
       }
@@ -1015,6 +1023,7 @@ export function OnboardingChat({
     if (isAwaitingFirstToken) {
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
+        setVerificationRequested(true);
         onTurnstileRequired?.('Verify you are human to send');
       }
       return;
@@ -1088,8 +1097,12 @@ export function OnboardingChat({
     localAutomationBypass !== true;
   const shouldShowTurnstileBanner =
     Boolean(turnstilePanel) &&
-    (turnstilePanelVisible || shouldReserveStarterVerification) &&
-    (isAwaitingFirstToken || shouldReserveStarterVerification);
+    (turnstilePanelVisible ||
+      shouldReserveStarterVerification ||
+      verificationRequested) &&
+    (isAwaitingFirstToken ||
+      shouldReserveStarterVerification ||
+      verificationRequested);
   const hasComposerStatusBanner =
     shouldShowTurnstileBanner || chatError !== null;
   const composerStatusBanner = hasComposerStatusBanner ? (

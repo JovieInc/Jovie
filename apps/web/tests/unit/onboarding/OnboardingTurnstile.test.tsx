@@ -1,6 +1,10 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OnboardingTurnstile } from '@/components/features/onboarding/OnboardingTurnstile';
+import {
+  isOnboardingTurnstilePanelVisible,
+  ONBOARDING_TURNSTILE_LOADING_STALL_MS,
+  OnboardingTurnstile,
+} from '@/components/features/onboarding/OnboardingTurnstile';
 
 type TurnstileOptions = Parameters<
   NonNullable<Window['turnstile']>['render']
@@ -78,9 +82,9 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     );
 
     // The widget frame exists for the token machinery but stays off-screen.
-    expect(screen.getByTestId('onboarding-turnstile-widget-frame')).toHaveClass(
-      'sr-only'
-    );
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-frame')
+    ).toHaveAttribute('data-turnstile-mount', 'silent');
 
     act(() => renderMock.mock.calls[0]?.[1].callback('turnstile-token'));
     expect(onToken).toHaveBeenCalledWith('turnstile-token');
@@ -88,9 +92,9 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
       expect.objectContaining({ status: 'verified' })
     );
     // Still off-screen after a silent verification — no flash.
-    expect(screen.getByTestId('onboarding-turnstile-widget-frame')).toHaveClass(
-      'sr-only'
-    );
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-frame')
+    ).toHaveAttribute('data-turnstile-mount', 'silent');
   });
 
   it('reveals the bare widget only for a genuine interactive challenge', async () => {
@@ -112,7 +116,7 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     const frame = screen.getByTestId('onboarding-turnstile-widget-frame');
     const widgetTarget = document.querySelector('[id^="cf-turnstile-"]');
 
-    expect(frame).toHaveClass('sr-only');
+    expect(frame).toHaveAttribute('data-turnstile-mount', 'silent');
     expect(widgetTarget?.className).toContain('[&>div]:invisible');
 
     act(() => options?.['before-interactive-callback']?.());
@@ -132,9 +136,9 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'verified' })
     );
-    expect(screen.getByTestId('onboarding-turnstile-widget-frame')).toHaveClass(
-      'sr-only'
-    );
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-frame')
+    ).toHaveAttribute('data-turnstile-mount', 'silent');
   });
 
   it('routes hard failures to onStateChange without a visible panel', async () => {
@@ -154,9 +158,9 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'error' })
     );
-    expect(screen.getByTestId('onboarding-turnstile-widget-frame')).toHaveClass(
-      'sr-only'
-    );
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-frame')
+    ).toHaveAttribute('data-turnstile-mount', 'silent');
     expect(screen.queryByText('Security Check')).not.toBeInTheDocument();
 
     act(() => options?.['unsupported-callback']?.());
@@ -262,5 +266,56 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'loading' })
     );
+  });
+
+  it('reserves inline space when send is attempted during silent loading', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const { render: renderMock } = mockTurnstile();
+
+    render(
+      <OnboardingTurnstile
+        instruction='Verify you are human to send'
+        onToken={vi.fn()}
+        onStateChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-frame')
+    ).toHaveAttribute('data-turnstile-mount', 'inline');
+    expect(
+      isOnboardingTurnstilePanelVisible(
+        { status: 'loading' },
+        'Verify you are human to send'
+      )
+    ).toBe(true);
+  });
+
+  it('retries a stalled silent execute pass', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubEnv('NODE_ENV', 'test');
+      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+      const { render: renderMock, remove: removeMock } = mockTurnstile();
+
+      render(<OnboardingTurnstile onToken={vi.fn()} onStateChange={vi.fn()} />);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(renderMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(
+          ONBOARDING_TURNSTILE_LOADING_STALL_MS
+        );
+      });
+      expect(removeMock).toHaveBeenCalled();
+      expect(renderMock.mock.calls.length).toBeGreaterThan(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

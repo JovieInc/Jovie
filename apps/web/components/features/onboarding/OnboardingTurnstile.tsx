@@ -80,21 +80,26 @@ interface OnboardingTurnstileProps {
 
 const LOCAL_DEV_BYPASS_TOKEN = 'local-dev-turnstile-bypass';
 const DEFAULT_STATE: OnboardingTurnstileState = { status: 'loading' };
+/** How long execute-mode can stay token-less before we retry the widget. */
+export const ONBOARDING_TURNSTILE_LOADING_STALL_MS = 10_000;
+/** Retries before surfacing a hard failure toast in OnboardingShell. */
+export const ONBOARDING_TURNSTILE_MAX_LOADING_STALL_RETRIES = 2;
 
 function getTurnstile() {
   return globalThis.window.turnstile;
 }
 
 /**
- * Whether the chat should reserve inline space for the widget. True only when
- * Cloudflare is running a genuine interactive challenge — every other state is
- * either silent (no UI) or routed to the compact toast in OnboardingShell.
+ * Whether the chat should reserve inline space for the widget. True when
+ * Cloudflare needs interaction or the user already tried to send while the
+ * silent execute pass is still warming up.
  */
 export function isOnboardingTurnstilePanelVisible(
   state: OnboardingTurnstileState,
-  _instruction?: string | null,
+  instruction?: string | null,
   _siteKey?: string | null
 ): boolean {
+  if (instruction && state.status === 'loading') return true;
   return state.status === 'interactive';
 }
 
@@ -108,6 +113,8 @@ export function OnboardingTurnstile({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const lastResetSignalRef = useRef(resetSignal);
+  const loadingStallRetryCountRef = useRef(0);
+  const lastInstructionNudgeRef = useRef<string | null>(null);
   const widgetDomId = useId();
   const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
@@ -127,11 +134,9 @@ export function OnboardingTurnstile({
     hasStaticBypass || localAutomationBypass === true;
   const isRuntimeBypassPending =
     !hasStaticBypass && localAutomationBypass === null;
-  // `reducedMotion` / `instruction` / `focusSignal` are kept in the prop and
-  // hook surface for API stability with the shell but no longer drive any
-  // celebration motion or scroll-into-view of a panel that no longer exists.
+  const awaitingSendVerification =
+    Boolean(instruction) && state.status === 'loading';
   void reducedMotion;
-  void instruction;
   void focusSignal;
 
   useEffect(() => {
@@ -280,6 +285,62 @@ export function OnboardingTurnstile({
     resetWidget();
   }, [resetSignal, resetWidget]);
 
+  useEffect(() => {
+    if (!instruction || shouldBypassTurnstile || isRuntimeBypassPending) return;
+    if (state.status !== 'loading') return;
+    if (lastInstructionNudgeRef.current === instruction) return;
+    lastInstructionNudgeRef.current = instruction;
+    resetWidget();
+  }, [
+    instruction,
+    isRuntimeBypassPending,
+    resetWidget,
+    shouldBypassTurnstile,
+    state.status,
+  ]);
+
+  useEffect(() => {
+    if (shouldBypassTurnstile || isRuntimeBypassPending || !siteKey) return;
+    if (state.status !== 'loading') {
+      loadingStallRetryCountRef.current = 0;
+      return;
+    }
+
+    const timer = globalThis.setTimeout(() => {
+      if (
+        loadingStallRetryCountRef.current <
+        ONBOARDING_TURNSTILE_MAX_LOADING_STALL_RETRIES
+      ) {
+        loadingStallRetryCountRef.current += 1;
+        resetWidget();
+        return;
+      }
+
+      commitState({
+        status: 'error',
+        message:
+          'Security check is taking longer than expected. Refresh the page or try another browser.',
+      });
+    }, ONBOARDING_TURNSTILE_LOADING_STALL_MS);
+
+    return () => globalThis.clearTimeout(timer);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    resetWidget,
+    shouldBypassTurnstile,
+    siteKey,
+    state.status,
+  ]);
+
+  useEffect(() => {
+    if (!focusSignal || !containerRef.current) return;
+    containerRef.current.scrollIntoView({
+      block: 'nearest',
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  }, [focusSignal, reducedMotion]);
+
   // Expiry/timeout silently re-issue a token so an in-progress chat is never
   // re-walled with a visible challenge. A fresh execute pass usually resolves
   // silently; only a genuine interactive requirement re-surfaces the widget.
@@ -330,12 +391,14 @@ export function OnboardingTurnstile({
     return null;
   }
 
-  // Only a genuine interactive challenge reserves visible space. Everything
-  // else (loading, silent verify, hard failure, expiry) renders an off-screen
-  // widget so the token machinery keeps working without any visible chrome.
+  // Interactive challenges and send-while-loading both reserve inline space.
+  // The silent happy path keeps a sized off-screen mount so execute mode can
+  // actually run (zero-height containers can stall token minting in prod).
   const showInteractiveWidget =
-    Boolean(siteKey) && state.status === 'interactive';
-  const showWidgetContent = interactiveChallengeVisible;
+    Boolean(siteKey) &&
+    (state.status === 'interactive' || awaitingSendVerification);
+  const showWidgetContent =
+    interactiveChallengeVisible || awaitingSendVerification;
 
   return (
     <>
@@ -351,9 +414,10 @@ export function OnboardingTurnstile({
           className={cn(
             showInteractiveWidget
               ? 'relative mt-2 overflow-hidden rounded-lg border border-subtle bg-surface-0 p-1.5'
-              : 'sr-only h-0 overflow-hidden'
+              : 'pointer-events-none fixed top-0 -left-full -z-10 h-16 w-80 overflow-hidden opacity-0'
           )}
           data-testid='onboarding-turnstile-widget-frame'
+          data-turnstile-mount={showInteractiveWidget ? 'inline' : 'silent'}
           data-turnstile-status={state.status}
           aria-hidden={showInteractiveWidget ? undefined : 'true'}
         >
