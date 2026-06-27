@@ -11,7 +11,7 @@ const AGNOST_OTEL_ENDPOINT = 'https://otel.agnost.ai/v1/traces';
 /** Bounded OTLP export — observability sink must not hang cold starts. */
 const AGNOST_OTEL_TIMEOUT_MS = 10_000;
 
-const DEFAULT_AGNOST_ORG_ID = '3e2d4388-5d86-41f5-8f67-4a3bac08d72f';
+export const DEFAULT_AGNOST_ORG_ID = '3e2d4388-5d86-41f5-8f67-4a3bac08d72f';
 
 let agnostStarted = false;
 
