@@ -80,8 +80,10 @@ describe('AuthenticatedAuthEntryGuard', () => {
     });
   });
 
-  it('redirects when only the Clerk activity cookie is present', async () => {
+  it('waits for Clerk when only the activity cookie is present', async () => {
     document.cookie = '__client_uat=1700000000';
+    authState.isLoaded = false;
+    authState.isSignedIn = false;
 
     const { queryByText } = render(
       <AuthenticatedAuthEntryGuard>
@@ -92,7 +94,24 @@ describe('AuthenticatedAuthEntryGuard', () => {
     expect(queryByText('Sign-in form')).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('renders the sign-in form when a stale cookie outlives the session', async () => {
+    document.cookie = '__client_uat=1700000000';
+    authState.isLoaded = true;
+    authState.isSignedIn = false;
+
+    const { getByText } = render(
+      <AuthenticatedAuthEntryGuard>
+        <div>Sign-in form</div>
+      </AuthenticatedAuthEntryGuard>
+    );
+
+    await waitFor(() => {
+      expect(getByText('Sign-in form')).toBeInTheDocument();
+      expect(replaceMock).not.toHaveBeenCalled();
     });
   });
 });

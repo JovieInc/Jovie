@@ -43,8 +43,13 @@ export function AuthenticatedAuthEntryGuard({
       return;
     }
 
-    setIsRedirecting(true);
-    router.replace(getClientAuthenticatedAuthEntryRedirect(searchParams));
+    if (clerkSignedIn) {
+      setIsRedirecting(true);
+      router.replace(getClientAuthenticatedAuthEntryRedirect(searchParams));
+      return;
+    }
+
+    setIsRedirecting(false);
   }, [isLoaded, isSignedIn, router, searchParams]);
 
   if (isRedirecting) {
