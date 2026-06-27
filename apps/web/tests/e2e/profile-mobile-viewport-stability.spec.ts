@@ -630,9 +630,14 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         { timeout: 120_000 }
       );
       await waitForHydration(page);
-      await waitForAnyVisible(page, [
-        '[data-testid="profile-home-carousel"] a',
-      ]);
+      // Cold Turbopack route compile in the merge-queue lane can exceed the
+      // default VISIBILITY (20s) wait; give first-paint readiness the same
+      // budget as navigation so a slow cold compile reads as slow, not failed.
+      await waitForAnyVisible(
+        page,
+        ['[data-testid="profile-home-carousel"] a'],
+        SMOKE_TIMEOUTS.NAVIGATION
+      );
       await settleLayout(page);
       await expectNoDocumentOverflow(
         page,
@@ -696,7 +701,11 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       { timeout: 120_000 }
     );
     await waitForHydration(page);
-    await waitForAnyVisible(page, ['[data-testid="profile-home-carousel"] a']);
+    await waitForAnyVisible(
+      page,
+      ['[data-testid="profile-home-carousel"] a'],
+      SMOKE_TIMEOUTS.NAVIGATION
+    );
 
     const carousel = page.getByTestId('profile-home-carousel');
     await expect(carousel).toBeVisible();
@@ -748,7 +757,11 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           expect(response?.status() ?? 0).toBeLessThan(500);
 
           await waitForHydration(screenPage);
-          await waitForAnyVisible(screenPage, screen.readySelectors);
+          await waitForAnyVisible(
+            screenPage,
+            screen.readySelectors,
+            SMOKE_TIMEOUTS.NAVIGATION
+          );
           await settleLayout(screenPage);
 
           const snapshot = await collectViewportSnapshot(
@@ -799,9 +812,11 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
         );
         expect(response?.status() ?? 0).toBeLessThan(500);
         await waitForHydration(flowPage);
-        await waitForAnyVisible(flowPage, [
-          '[data-testid="profile-mobile-notifications-step-email"]',
-        ]);
+        await waitForAnyVisible(
+          flowPage,
+          ['[data-testid="profile-mobile-notifications-step-email"]'],
+          SMOKE_TIMEOUTS.NAVIGATION
+        );
 
         const rootSelector = '[data-testid="notifications-page"]';
         const activeFlow = flowPage.locator(
