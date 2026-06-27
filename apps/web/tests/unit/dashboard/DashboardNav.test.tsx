@@ -31,9 +31,7 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
       buildLibraryViewRoute('releases')
     );
-    expect(
-      getByRole('link', { name: 'Artist Profile' }).getAttribute('href')
-    ).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(getByRole('button', { name: 'Artist Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
       APP_ROUTES.SETTINGS_TOURING
     );
@@ -71,10 +69,11 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+    expect(getByRole('button', { name: 'Artist' })).toHaveAttribute(
       'aria-expanded',
       'true'
     );
+    expect(getByRole('button', { name: 'Tim White' })).toBeDefined();
     const releasesLink = getByRole('link', { name: 'Releases' });
     expect(releasesLink.getAttribute('href')).toBe(
       buildLibraryViewRoute('releases')
@@ -82,9 +81,6 @@ describe('DashboardNav', () => {
     expect(releasesLink.className).toContain(
       'grid-cols-[22px_minmax(0,1fr)_34px]'
     );
-    expect(
-      getByRole('link', { name: 'Artist Profile' }).getAttribute('href')
-    ).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
     expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
       APP_ROUTES.SETTINGS_TOURING
     );
@@ -249,10 +245,7 @@ describe('DashboardNav', () => {
       'href',
       buildLibraryViewRoute('releases')
     );
-    expect(getByRole('link', { name: 'Artist Profile' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.SETTINGS_ARTIST_PROFILE
-    );
+    expect(getByRole('button', { name: 'Artist Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_TOURING

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
@@ -170,6 +171,8 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
+  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
+    usePreviewPanelState();
   const queryClient = useQueryClient();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [threadReadAtById, setThreadReadAtById] =
@@ -226,8 +229,11 @@ export function DashboardNav(_: DashboardNavProps) {
     setTasksSeenAt(nextSeenAt);
   }, [pathname]);
 
-  // Settings nav: "General" (user) and artist name (or "Artist") groups
-  const artistSettingsLabel = artistName || 'Artist';
+  // Settings nav: "General" (user) and artist name (or "Artist") groups.
+  // In the chat shell the artist row itself shows the display name, so keep the
+  // section label generic to avoid duplicate "Tim White" buttons in the sidebar.
+  const artistSettingsLabel =
+    shellChatV1Enabled && !isInSettings ? 'Artist' : artistName || 'Artist';
   const moreLabel = 'More';
 
   // Memoize nav sections for dashboard (non-settings) mode
@@ -235,22 +241,33 @@ export function DashboardNav(_: DashboardNavProps) {
     readonly moreSection: MoreNavSection | null;
     readonly navSections: DashboardNavSection[];
   }>(() => {
-    const decorateItem = (item: NavItem): NavItem =>
-      item.id === 'tasks'
-        ? {
-            ...item,
-            badge: (() => {
-              if (isPlanGateLoading) return undefined;
-              if (canAccessTasksWorkspace)
-                return formatTaskBadge(taskStats, tasksSeenAt);
-              return (
-                <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-3xs font-semibold tracking-wider text-secondary-token'>
-                  Pro
-                </span>
-              );
-            })(),
-          }
-        : item;
+    const decorateItem = (item: NavItem): NavItem => {
+      if (item.id === 'tasks') {
+        return {
+          ...item,
+          badge: (() => {
+            if (isPlanGateLoading) return undefined;
+            if (canAccessTasksWorkspace)
+              return formatTaskBadge(taskStats, tasksSeenAt);
+            return (
+              <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-3xs font-semibold tracking-wider text-secondary-token'>
+                Pro
+              </span>
+            );
+          })(),
+        };
+      }
+
+      if (shellChatV1Enabled && !isInSettings && item.id === 'artist-profile') {
+        return {
+          ...item,
+          name: artistName || item.name,
+          href: APP_ROUTES.CHAT_PROFILE_PANEL,
+        };
+      }
+
+      return item;
+    };
 
     const audienceItem = primaryNavigation.find(item => item.id === 'audience');
     const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
@@ -297,7 +314,9 @@ export function DashboardNav(_: DashboardNavProps) {
   }, [
     canAccessTasksWorkspace,
     isPlanGateLoading,
+    artistName,
     artistSettingsLabel,
+    isInSettings,
     moreLabel,
     shellChatV1Enabled,
     taskStats,
@@ -421,6 +440,20 @@ export function DashboardNav(_: DashboardNavProps) {
     openCommandPalette();
   }, []);
 
+  const handleOpenArtistProfilePanel = useCallback(() => {
+    const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
+
+    if (isOnChat) {
+      openPreviewPanel();
+      return;
+    }
+
+    router.push(APP_ROUTES.CHAT);
+    queueMicrotask(() => {
+      openPreviewPanel();
+    });
+  }, [openPreviewPanel, pathname, router]);
+
   const activeThreadId = useMemo(() => {
     const chatPrefix = `${APP_ROUTES.CHAT}/`;
     if (!pathname.startsWith(chatPrefix)) return null;
@@ -474,11 +507,15 @@ export function DashboardNav(_: DashboardNavProps) {
     (item: NavItem, _index: number) => {
       const isReleasesItem = item.id === 'releases';
       const isSearchItem = item.id === 'search';
+      const opensArtistProfilePanel =
+        shellChatV1Enabled && !isInSettings && item.id === 'artist-profile';
       const isNewThreadItem =
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       let isActive = false;
       if (isNewThreadItem) {
         isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
+      } else if (opensArtistProfilePanel) {
+        isActive = isPreviewPanelOpen;
       } else if (!isSearchItem) {
         isActive = isItemActive(pathname, item);
       }
@@ -486,10 +523,11 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem && !isSearchItem;
-      const renderAsButton = isSearchItem;
+      const renderAsButton = isSearchItem || opensArtistProfilePanel;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
       else if (isSearchItem) onClick = handleSearchClick;
+      else if (opensArtistProfilePanel) onClick = handleOpenArtistProfilePanel;
 
       return (
         <NavMenuItem
@@ -517,9 +555,12 @@ export function DashboardNav(_: DashboardNavProps) {
       handleDemoNavClick,
       handlePrefetch,
       handleSearchClick,
+      handleOpenArtistProfilePanel,
       clearPendingReleasesShell,
       showPendingReleasesShell,
       isDemo,
+      isInSettings,
+      isPreviewPanelOpen,
       shellChatV1Enabled,
     ]
   );
