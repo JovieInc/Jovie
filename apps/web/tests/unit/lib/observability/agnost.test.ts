@@ -39,6 +39,6 @@ describe('agnost telemetry guards', () => {
       '@/lib/observability/agnost'
     );
     expect(shouldEnableAgnost()).toBe(true);
-    expect(getAgnostOrgId()).toBe('384ebd06-d9a5-48dd-ba22-7a51e430c173');
+    expect(getAgnostOrgId()).toBe('3e2d4388-5d86-41f5-8f67-4a3bac08d72f');
   });
 });
