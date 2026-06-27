@@ -12,6 +12,7 @@ import {
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
@@ -25,6 +26,8 @@ import {
 } from './hooks';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
+  CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
+  CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
   ChatComposerSurface,
   ChatEmptyStateComposerRegion,
   ChatInlineError,
@@ -554,10 +557,14 @@ export function JovieChat({
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
             Empty chat intentionally renders only the composer. Thread state
             owns the message viewport and the persistent bottom dock. */}
-        <div className='flex flex-1 flex-col overflow-hidden'>
+        <div className='relative flex flex-1 flex-col overflow-hidden'>
           <div
             ref={scrollContainerRef}
-            className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
+            className={cn(
+              'absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5',
+              showBottomComposer &&
+                CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME
+            )}
           >
             {!showThreadView ? (
               <div className='relative min-h-full'>
@@ -594,15 +601,22 @@ export function JovieChat({
 
           {/*
             Thread composer dock. Empty chat keeps the same composer surface centered
-            above, while active threads pin it below the message viewport.
+            in the scroll viewport; active threads float it over the transcript with
+            a scroll-behind fade so the last message never hard-stops at the input.
           */}
           {showBottomComposer ? (
-            <div
-              className={CHAT_COMPOSER_DOCK_CLASSNAME}
-              data-testid='chat-composer-dock'
-            >
-              {composerSurface}
-            </div>
+            <>
+              <div
+                aria-hidden='true'
+                className={CHAT_COMPOSER_SCROLL_FADE_CLASSNAME}
+              />
+              <div
+                className={CHAT_COMPOSER_DOCK_CLASSNAME}
+                data-testid='chat-composer-dock'
+              >
+                {composerSurface}
+              </div>
+            </>
           ) : null}
         </div>
       </div>

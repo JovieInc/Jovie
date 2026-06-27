@@ -2,7 +2,12 @@
 
 import type { Virtualizer } from '@tanstack/react-virtual';
 import type { ReactNode, RefCallback } from 'react';
-import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
+import {
+  CHAT_COMPOSER_DOCK_CLASSNAME,
+  CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
+  CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
+  CHAT_CONTENT_SHELL_CLASSNAME,
+} from './chat-layout';
 import {
   ChatConversationComposerSkeleton,
   ChatEmptyStateComposerRegion,
@@ -58,7 +63,7 @@ export function ChatComposerSurface({
   onExpandManifest,
 }: ChatComposerSurfaceProps) {
   return (
-    <div className='mx-auto w-full max-w-[45rem]'>
+    <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
       <ChatUsageAlert />
 
       {isRateLimited ? (
@@ -126,7 +131,7 @@ export function ChatInlineError({
 }: ChatInlineErrorProps) {
   return (
     <div
-      className='mx-auto w-full max-w-[44rem] pb-4'
+      className={`${CHAT_CONTENT_SHELL_CLASSNAME} pb-4`}
       data-testid='chat-inline-error-slot'
     >
       <ErrorDisplay
@@ -188,7 +193,7 @@ export function ChatThreadMessages({
       {shouldVirtualizeMessages ? (
         <div
           ref={totalSizeRef}
-          className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+          className={`${CHAT_CONTENT_SHELL_CLASSNAME} flex min-h-full flex-col`}
           style={{
             position: 'relative',
             height: virtualizedMessageViewportHeight,
@@ -232,7 +237,7 @@ export function ChatThreadMessages({
       ) : (
         <div
           ref={totalSizeRef}
-          className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+          className={`${CHAT_CONTENT_SHELL_CLASSNAME} flex min-h-full flex-col`}
           style={{
             paddingBottom: messageViewportPaddingBottom,
           }}
@@ -290,4 +295,9 @@ export function ChatLoadingConversationSkeleton() {
   );
 }
 
-export { CHAT_COMPOSER_DOCK_CLASSNAME, ChatEmptyStateComposerRegion };
+export {
+  CHAT_COMPOSER_DOCK_CLASSNAME,
+  CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
+  CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
+  ChatEmptyStateComposerRegion,
+};

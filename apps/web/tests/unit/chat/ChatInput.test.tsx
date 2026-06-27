@@ -348,8 +348,8 @@ describe('ChatInput', () => {
 
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.getAttribute('data-variant')).toBe('hero');
-    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 840px)');
-    expect(surface.style.borderRadius).toBe('36px');
+    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 45rem)');
+    expect(surface.style.borderRadius).toBe('999px');
 
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
       'min-h-13'
@@ -378,7 +378,7 @@ describe('ChatInput', () => {
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.style.borderRadius).toBe('36px');
+    expect(surface.style.borderRadius).toBe('24px');
 
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
       'min-h-22'
@@ -418,7 +418,7 @@ describe('ChatInput', () => {
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.style.borderRadius).toBe('36px'); // geometry still 36 for hero non-entity
+    expect(surface.style.borderRadius).toBe('24px'); // expanded hero geometry with attachments
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
     const container = inlineField.parentElement;
