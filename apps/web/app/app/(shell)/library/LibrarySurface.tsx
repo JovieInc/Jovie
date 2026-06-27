@@ -92,6 +92,7 @@ import {
   formatLibraryReleaseDate,
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
+  getLibraryDrawerHeroClass,
   getLibraryItemKind,
   LIBRARY_GRID_DENSITY_LAYOUT,
   type LibraryAssetKind,
@@ -1873,11 +1874,11 @@ function AssetDrawer({
                   actions={drawerHeaderActions}
                 />
                 <div className='space-y-3 overflow-visible px-3 pb-3 pt-3'>
-                  <div className='system-b-library-drawer-artwork overflow-hidden'>
+                  <div className='mx-auto flex max-h-72 w-full max-w-56 items-center justify-center overflow-hidden'>
                     <div
                       className={cn(
-                        'mx-auto w-full max-w-80',
-                        getLibraryAspectRatioClass(
+                        'system-b-library-drawer-artwork overflow-hidden',
+                        getLibraryDrawerHeroClass(
                           getLibraryAssetAspectRatio(current)
                         )
                       )}
@@ -1886,11 +1887,11 @@ function AssetDrawer({
                     </div>
                   </div>
 
-                  <div>
-                    <h2 className='system-b-library-drawer-title'>
+                  <div className='min-w-0'>
+                    <h2 className='system-b-library-drawer-title truncate'>
                       {current.title}
                     </h2>
-                    <p className='system-b-library-drawer-artist mt-1'>
+                    <p className='system-b-library-drawer-artist mt-1 truncate'>
                       {current.artist}
                     </p>
                   </div>
