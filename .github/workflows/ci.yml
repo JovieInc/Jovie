@@ -1465,41 +1465,16 @@ jobs:
         if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard != 0
         run: |
           echo "Waiting for shard 0 migrate/seed on shared Neon branch..."
-          pnpm --filter=@jovie/web exec node -e "
-            const { Client } = require('pg');
-            (async () => {
-              const client = new Client({ connectionString: process.env.DATABASE_URL });
-              await client.connect();
-              for (let attempt = 1; attempt <= 60; attempt++) {
-                const { rows } = await client.query(
-                  \"SELECT to_regclass('public.library_asset_approval_statuses') IS NOT NULL AS has_table\"
-                );
-                if (!rows[0]?.has_table) {
-                  console.log(\`Attempt \${attempt}/60: migrations not ready yet\`);
-                  await new Promise(resolve => setTimeout(resolve, 5000));
-                  continue;
-                }
-
-                const seeded = await client.query(
-                  \"SELECT COUNT(*)::int AS count FROM library_asset_approval_statuses WHERE approval_status = 'approved'\"
-                );
-                if ((seeded.rows[0]?.count ?? 0) > 0) {
-                  console.log(\`Shared Neon seed ready (\${seeded.rows[0].count} approved rows)\`);
-                  await client.end();
-                  return;
-                }
-
-                console.log(\`Attempt \${attempt}/60: seed markers not ready yet\`);
-                await new Promise(resolve => setTimeout(resolve, 5000));
-              }
-
-              await client.end();
-              throw new Error('Timed out waiting for shard 0 seed on shared Neon branch');
-            })().catch(error => {
-              console.error(error);
-              process.exit(1);
-            });
-          "
+          for attempt in $(seq 1 60); do
+            if pnpm --filter=@jovie/web exec tsx tests/wait-for-public-qa-seed.ts; then
+              echo "Shared Neon seed ready"
+              exit 0
+            fi
+            echo "Attempt ${attempt}/60: seed markers not ready yet"
+            sleep 5
+          done
+          echo "Timed out waiting for shard 0 seed on shared Neon branch"
+          exit 1
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
 

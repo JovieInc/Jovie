@@ -45,17 +45,29 @@ else
       --output json \
       --no-analytics \
       --no-color 2>/dev/null || echo "[]")"
-    BRANCH_ID="$(echo "$BRANCHES_JSON" | jq -r --arg name "$BRANCH_NAME" '.[] | select(.name == $name) | .id' | head -1)"
+    if ! echo "$BRANCHES_JSON" | jq -e . >/dev/null 2>&1; then
+      BRANCHES_JSON="[]"
+    fi
+    BRANCH_ID="$(echo "$BRANCHES_JSON" | jq -r --arg name "$BRANCH_NAME" '
+      (if type == "array" then . else (.branches // []) end)
+      | .[]
+      | select(.name == $name)
+      | .id
+    ' | head -1)"
   else
     echo "$CREATE_JSON"
     exit 1
   fi
 fi
 
-if [ -z "$BRANCH_ID" ] || [ -z "$RESOLVED_BRANCH_NAME" ]; then
+if [ -z "$RESOLVED_BRANCH_NAME" ]; then
   echo "Neon branch create response missing branch metadata."
   echo "$CREATE_JSON"
   exit 1
+fi
+
+if [ -z "$BRANCH_ID" ]; then
+  echo "Warning: branch_id unavailable for $RESOLVED_BRANCH_NAME; continuing with connection strings."
 fi
 
 DB_URL="$(npx neonctl connection-string "$RESOLVED_BRANCH_NAME" \

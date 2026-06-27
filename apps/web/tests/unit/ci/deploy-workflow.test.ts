@@ -388,6 +388,7 @@ describe('CI public lighthouse workflow', () => {
     expect(migrateStep).toContain('matrix.shard == 0');
     expect(seedStep).toContain('matrix.shard == 0');
     expect(waitStep).toContain('matrix.shard != 0');
+    expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
     expect(seedStep).toContain('tests/seed-test-data.ts');
   });
 });
