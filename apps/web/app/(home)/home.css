@@ -736,6 +736,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.home-bento-pairs-section {
+  /* Light band on the dark homepage shell — scopes --color-bg-base so black
+     marketing copy meets WCAG contrast (see .design-sync/NOTES.md). */
+  --color-bg-base: #f5f5f7;
+  background: var(--color-bg-base);
+}
+
 .homepage-outcome-section {
   overflow: hidden;
   padding-block: clamp(5rem, 8.5vw, 7.5rem) clamp(5rem, 8.5vw, 7.5rem);

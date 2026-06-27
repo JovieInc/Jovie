@@ -15,7 +15,12 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { createAdditionalProfile } from '@/app/app/(shell)/dashboard/actions/switch-profile';
+
+interface CreateProfileResult {
+  success: boolean;
+  error?: string;
+  profileId?: string;
+}
 
 interface CreateProfileDialogProps {
   readonly open: boolean;
@@ -53,10 +58,21 @@ export function CreateProfileDialog({
     }
 
     startTransition(async () => {
-      const result = await createAdditionalProfile({
-        displayName: displayName.trim(),
-        username: username.trim(),
-      });
+      let result: CreateProfileResult;
+      try {
+        const response = await fetch('/api/dashboard/profile/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            displayName: displayName.trim(),
+            username: username.trim(),
+          }),
+        });
+        result = (await response.json()) as CreateProfileResult;
+      } catch {
+        setError("Couldn't create profile. Try again.");
+        return;
+      }
 
       if (!result.success) {
         setError(result.error ?? "Couldn't create profile. Try again.");

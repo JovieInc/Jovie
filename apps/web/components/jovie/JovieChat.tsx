@@ -1,8 +1,6 @@
 'use client';
 
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ImagePlus } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import {
   useCallback,
   useEffect,
@@ -13,30 +11,26 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { useAppFlag } from '@/lib/flags/client';
-import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
+import { usePlanGate } from '@/lib/queries';
 
 import { deriveChatRailContextTargets } from './chat-context-rail';
-import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
-import {
-  ChatConversationComposerSkeleton,
-  ChatEmptyStateComposerRegion,
-  ChatInput,
-  ChatMessage,
-  ChatMessageSkeleton,
-  ErrorDisplay,
-  ScrollToBottom,
-} from './components';
+import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
-import { ChatUsageAlert } from './components/ChatUsageAlert';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
-  useChatAudioAttachments,
-  useChatImageAttachments,
+  useChatFileAttachments,
   useChatJankMonitor,
   useJovieChat,
   useStickToBottom,
 } from './hooks';
-import type { ChatAudioUploadResult } from './hooks/useChatAudioAttachments';
+import {
+  CHAT_COMPOSER_DOCK_CLASSNAME,
+  ChatComposerSurface,
+  ChatEmptyStateComposerRegion,
+  ChatInlineError,
+  ChatLoadingConversationSkeleton,
+  ChatThreadMessages,
+} from './JovieChatSections';
 import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD = 12;
@@ -67,8 +61,7 @@ export function JovieChat({
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
-  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
@@ -113,6 +106,7 @@ export function JovieChat({
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
+  const { chatFileUploadLimit, isPro: isProUser } = usePlanGate();
   const chatEntityPanel = useOptionalChatEntityPanel();
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
@@ -124,7 +118,14 @@ export function JovieChat({
   });
 
   const handleAudioUploaded = useCallback(
-    (result: ChatAudioUploadResult) => {
+    (result: {
+      fileName: string;
+      previewUrl: string;
+      releaseId: string;
+      releaseTitle: string;
+      inference: import('@/lib/chat/infer-audio-entity').AudioEntityInference;
+      prompt: string;
+    }) => {
       const focusKey = `audio-upload:${result.releaseId}`;
       chatEntityPanel?.upsertContext({
         kind: 'release',
@@ -147,41 +148,38 @@ export function JovieChat({
   );
 
   const {
-    pendingAudio,
-    isProcessing: isAudioProcessing,
-    addFiles: addAudioFiles,
-    clearAudio,
-    accept: audioAccept,
-  } = useChatAudioAttachments({
-    onError: error => setChatError({ type: 'unknown', message: error }),
-    onUploaded: handleAudioUploaded,
-    disabled: isLoading || isSubmitting,
-  });
-
-  const {
-    pendingImages,
+    pendingFiles,
     isDragOver,
-    isProcessing: isImageProcessing,
+    isUploading,
+    hasReadyFiles,
     addFiles,
-    removeImage,
-    clearImages,
+    removeFile,
+    clearFiles,
     toFileUIParts,
     dropZoneRef,
-  } = useChatImageAttachments({
+    accept: fileAccept,
+    aggregate,
+  } = useChatFileAttachments({
+    fileUploadLimit: chatFileUploadLimit,
     onError: error => setChatError({ type: 'unknown', message: error }),
-    onAudioFiles: addAudioFiles,
+    onAudioUploaded: handleAudioUploaded,
     disabled: isLoading || isSubmitting,
   });
 
-  const openImagePicker = useCallback(() => {
-    imageFileInputRef.current?.click();
+  // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
+  const [manifestCollapsed, setManifestCollapsed] = useState(false);
+  const showManifest =
+    pendingFiles.length > 0 &&
+    (isUploading ||
+      aggregate.done < aggregate.total ||
+      manifestCollapsed === false);
+  const showChips = !isUploading && hasReadyFiles;
+
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
   }, []);
 
-  const openAudioPicker = useCallback(() => {
-    audioFileInputRef.current?.click();
-  }, []);
-
-  const handleImageFileChange = useCallback(
+  const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) addFiles(e.target.files);
       e.target.value = '';
@@ -189,40 +187,34 @@ export function JovieChat({
     [addFiles]
   );
 
-  const handleAudioFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files) addAudioFiles(e.target.files);
-      e.target.value = '';
-    },
-    [addAudioFiles]
-  );
-
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
-      const imageFiles = Array.from(e.clipboardData.items)
-        .filter(item => item.type.startsWith('image/'))
+      const files = Array.from(e.clipboardData.items)
+        .filter(item => item.kind === 'file')
         .map(item => item.getAsFile())
         .filter((f): f is File => f !== null);
-      if (imageFiles.length > 0) {
+      if (files.length > 0) {
         e.preventDefault();
-        addFiles(imageFiles);
+        addFiles(files);
       }
     },
     [addFiles]
   );
 
-  const handleSubmitWithImages = useCallback(
+  const handleSubmitWithFiles = useCallback(
     (e?: React.FormEvent) => {
       if (isLoading || isSubmitting) return;
       const files = toFileUIParts();
       notifyJankSend();
       handleSubmit(e, files.length > 0 ? files : undefined);
-      clearImages();
+      clearFiles();
+      setManifestCollapsed(false);
     },
     [
       handleSubmit,
       toFileUIParts,
-      clearImages,
+      clearFiles,
+      setManifestCollapsed,
       isLoading,
       isSubmitting,
       notifyJankSend,
@@ -473,43 +465,23 @@ export function JovieChat({
     };
   }, [scrollContainerRef, scrollThreadToBottom, shouldReservePickerClearance]);
 
-  // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
-    return (
-      <div
-        className='system-b-chat-conversation-loading'
-        data-testid='chat-loading-conversation-skeleton'
-        aria-busy='true'
-        aria-live='polite'
-      >
-        <div className='system-b-chat-conversation-loading-viewport'>
-          <ChatMessageSkeleton />
-        </div>
-        <div className='system-b-chat-conversation-loading-dock'>
-          <ChatConversationComposerSkeleton />
-        </div>
-      </div>
-    );
+    return <ChatLoadingConversationSkeleton />;
   }
 
-  // Shared ChatInput props for both views
   const chatInputProps = {
     ref: inputRef,
     value: input,
     onChange: setInput,
-    onSubmit: handleSubmitWithImages,
+    onSubmit: handleSubmitWithFiles,
     isLoading,
     isSubmitting,
     isStreaming,
     onStop: stop,
-    onImageAttach: openImagePicker,
-    onAudioAttach: openAudioPicker,
-    isImageProcessing,
-    isAudioProcessing,
-    pendingImages,
-    pendingAudio,
-    onRemoveImage: removeImage,
-    onRemoveAudio: clearAudio,
+    onFileAttach: openFilePicker,
+    isFileProcessing: isUploading,
+    pendingFiles,
+    onRemoveFile: removeFile,
     onPaste: handlePaste,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,
@@ -521,36 +493,30 @@ export function JovieChat({
   } as const;
 
   const composerSurface = (
-    <div className='mx-auto w-full max-w-[45rem]'>
-      {/* Usage alert remains in the composer slot; message failures render in the transcript. */}
-      <ChatUsageAlert />
-
-      {isRateLimited && (
-        <p className='mb-1.5 text-xs text-tertiary-token' aria-live='polite'>
-          Sending too fast. Please wait a second before your next message.
-        </p>
-      )}
-
-      <ChatInput
-        {...chatInputProps}
-        placeholder='Ask jovie...'
-        variant={showThreadView ? 'compact' : 'hero'}
-      />
-    </div>
+    <ChatComposerSurface
+      chatInputProps={chatInputProps}
+      showThreadView={showThreadView}
+      isRateLimited={isRateLimited}
+      showManifest={showManifest}
+      manifestCollapsed={manifestCollapsed}
+      showChips={showChips}
+      pendingFiles={pendingFiles}
+      aggregate={aggregate}
+      isUploading={isUploading}
+      isPro={isProUser}
+      onRemoveFile={removeFile}
+      onCollapseManifest={() => setManifestCollapsed(true)}
+      onExpandManifest={() => setManifestCollapsed(false)}
+    />
   );
 
   const inlineChatError = chatError ? (
-    <div
-      className='mx-auto w-full max-w-[44rem] pb-4'
-      data-testid='chat-inline-error-slot'
-    >
-      <ErrorDisplay
-        chatError={chatError}
-        onRetry={handleRetry}
-        isLoading={isLoading}
-        isSubmitting={isSubmitting}
-      />
-    </div>
+    <ChatInlineError
+      chatError={chatError}
+      onRetry={handleRetry}
+      isLoading={isLoading}
+      isSubmitting={isSubmitting}
+    />
   ) : null;
 
   return (
@@ -567,55 +533,22 @@ export function JovieChat({
         {/* Registers entity providers (release, artist) for the slash menu */}
         {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
 
-        {/* Hidden file inputs for composer attachments */}
+        {/* Hidden file input for composer attachments */}
         <input
-          ref={imageFileInputRef}
+          ref={fileInputRef}
           type='file'
-          accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
-          onChange={handleImageFileChange}
+          accept={fileAccept}
+          onChange={handleFileChange}
           multiple
-          className='hidden'
-          tabIndex={-1}
-        />
-        <input
-          ref={audioFileInputRef}
-          type='file'
-          accept={audioAccept}
-          onChange={handleAudioFileChange}
           className='hidden'
           tabIndex={-1}
         />
 
         {/* Drag-and-drop overlay */}
-        <AnimatePresence initial={false}>
-          {isDragOver && (
-            <motion.div
-              data-testid='chat-attachment-dropzone'
-              className='absolute inset-0 z-50 flex items-center justify-center rounded-(--linear-app-shell-radius) border border-dashed border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_82%,black),color-mix(in_oklab,var(--linear-app-content-surface)_70%,black))] p-6 backdrop-blur-md'
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className='flex min-h-40 w-full max-w-sm flex-col items-center justify-center gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 px-6 py-8 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.95)]'>
-                <ImagePlus
-                  className='h-7 w-7 text-secondary-token'
-                  aria-hidden='true'
-                  strokeWidth={2.25}
-                />
-                <div>
-                  <p className='text-sm font-semibold text-primary-token'>
-                    Drop files to attach
-                  </p>
-                  <p className='mt-1 text-xs leading-5 text-secondary-token'>
-                    Images up to 4 files / 10 MB each, or one audio file up to
-                    150 MB.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <ChatDropZoneOverlay
+          isDragOver={isDragOver}
+          pendingFiles={pendingFiles}
+        />
 
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
             Empty chat intentionally renders only the composer. Thread state
@@ -635,109 +568,26 @@ export function JovieChat({
                 </ChatEmptyStateComposerRegion>
               </div>
             ) : (
-              <div>
-                {shouldVirtualizeMessages ? (
-                  <div
-                    ref={totalSizeRef}
-                    className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                    style={{
-                      position: 'relative',
-                      height: virtualizedMessageViewportHeight,
-                      minHeight: virtualizedMinHeight || undefined,
-                    }}
-                  >
-                    {virtualizer.getVirtualItems().map(virtualItem => {
-                      const message = messages[virtualItem.index];
-                      const index = virtualItem.index;
-                      const isThinking =
-                        message.role === 'assistant' &&
-                        message.status === 'pending';
-                      return (
-                        <div
-                          key={message.id}
-                          data-index={virtualItem.index}
-                          ref={virtualizer.measureElement}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            transform: `translateY(${virtualItem.start}px)`,
-                          }}
-                        >
-                          <div className='pb-4'>
-                            <ChatMessage
-                              id={message.id}
-                              role={message.role}
-                              parts={message.parts}
-                              isStreaming={
-                                isStreaming && index === lastAssistantIndex
-                              }
-                              isThinking={isThinking}
-                              avatarUrl={
-                                message.role === 'user' ? avatarUrl : undefined
-                              }
-                              profileId={profileId}
-                              skipEntrance={knownMessageIdsRef.current.has(
-                                message.id
-                              )}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div
-                    ref={totalSizeRef}
-                    className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                    style={{
-                      paddingBottom: messageViewportPaddingBottom,
-                    }}
-                  >
-                    {messages.map((message, index) => {
-                      const isThinking =
-                        message.role === 'assistant' &&
-                        message.status === 'pending';
-                      return (
-                        <div key={message.id} className='pb-4'>
-                          <ChatMessage
-                            id={message.id}
-                            role={message.role}
-                            parts={message.parts}
-                            isStreaming={
-                              isStreaming && index === lastAssistantIndex
-                            }
-                            isThinking={isThinking}
-                            avatarUrl={
-                              message.role === 'user' ? avatarUrl : undefined
-                            }
-                            profileId={profileId}
-                            skipEntrance={knownMessageIdsRef.current.has(
-                              message.id
-                            )}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {inlineChatError}
-
-                <div
-                  ref={bottomSentinelRef}
-                  aria-hidden
-                  className='h-px w-full shrink-0'
-                  data-testid='chat-bottom-sentinel'
-                />
-
-                {/* Scroll to bottom button */}
-                <ScrollToBottom
-                  visible={!isStuckToBottom}
-                  onClick={() => scrollToBottom()}
-                />
-              </div>
+              <ChatThreadMessages
+                messages={messages}
+                shouldVirtualizeMessages={shouldVirtualizeMessages}
+                virtualizer={virtualizer}
+                virtualizedMessageViewportHeight={
+                  virtualizedMessageViewportHeight
+                }
+                virtualizedMinHeight={virtualizedMinHeight}
+                messageViewportPaddingBottom={messageViewportPaddingBottom}
+                totalSizeRef={totalSizeRef}
+                bottomSentinelRef={bottomSentinelRef}
+                isStreaming={isStreaming}
+                lastAssistantIndex={lastAssistantIndex}
+                avatarUrl={avatarUrl}
+                profileId={profileId}
+                knownMessageIds={knownMessageIdsRef.current}
+                inlineChatError={inlineChatError}
+                isStuckToBottom={isStuckToBottom}
+                onScrollToBottom={() => scrollToBottom()}
+              />
             )}
           </div>
 
