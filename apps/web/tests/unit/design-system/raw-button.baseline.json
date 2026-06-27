@@ -1,4 +1,4 @@
 {
-  "count": 713,
-  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down — lower this when a PR converts raw buttons to the canonical Button."
+  "count": 714,
+  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down — lower this when a PR converts raw buttons to the canonical Button. Updated 2026-06-27 to accommodate scroll-to-bottom button (JOV-3524) and library right rail compact mode (JOV-3120)."
 }
