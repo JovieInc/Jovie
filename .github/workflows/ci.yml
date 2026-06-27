@@ -3411,6 +3411,9 @@ jobs:
           E2E_SKIP_SEED: '1'
           SMOKE_ONLY: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           VERCEL_ENV: development
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
