@@ -305,7 +305,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   const loadingImageProps = useMemo(() => {
     return {
       className: cn(
-        'transition-opacity duration-300',
+        'transition-opacity duration-cinematic',
         isLoading ? 'opacity-0' : 'opacity-100'
       ),
       onLoad: handleLoad,

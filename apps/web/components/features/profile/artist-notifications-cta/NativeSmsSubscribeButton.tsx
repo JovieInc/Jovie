@@ -254,7 +254,7 @@ export function NativeSmsSubscribeButton({
         disabled={phase === 'pending'}
         className={cn(
           'inline-flex h-11 items-center justify-center gap-2 rounded-full px-4',
-          'bg-[oklch(10%_0_0)] text-white',
+          'bg-[oklch(10%_0_0)] text-white dark:text-white',
           'text-mid font-medium tracking-[-0.165px]',
           'transition-colors duration-subtle',
           'hover:bg-[oklch(15%_0_0)]',

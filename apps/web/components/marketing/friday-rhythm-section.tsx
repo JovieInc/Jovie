@@ -198,7 +198,7 @@ export function FridayRhythmSection() {
   return (
     <section
       ref={sectionRef}
-      aria-label='Make every Friday count.'
+      aria-label='Make Every Friday Count.'
       className='homepage-friday-rhythm-section relative isolate bg-(--color-bg-hover)'
       data-testid='friday-rhythm-section'
     >
@@ -256,7 +256,7 @@ function FridayRhythmContent({
   return (
     <div className='homepage-friday-rhythm-content mx-auto w-full max-w-[var(--homepage-section-max)] px-[var(--homepage-page-gutter)] py-20 sm:py-24 md:py-0'>
       <div className='homepage-friday-rhythm-copy max-w-[45rem] text-left'>
-        <h2 className='homepage-friday-rhythm-title text-white'>
+        <h2 className='homepage-friday-rhythm-title text-white dark:text-white'>
           <span className='block'>Make Every Friday</span>
           <span className='block'>Count</span>
         </h2>
@@ -306,7 +306,7 @@ function FridayRhythmContent({
           aria-live={mode === 'mobile' ? 'polite' : 'off'}
           className='text-mid leading-6 text-white/56'
         >
-          <span className='font-medium text-white'>
+          <span className='font-medium text-white dark:text-white'>
             {activeFridays} Fridays.
           </span>{' '}
           Singles, merch, remixes, videos, and recaps.
@@ -325,7 +325,7 @@ function FridayRhythmContent({
 function RhythmReleaseKey() {
   return (
     <ul
-      aria-label='Friday release mix'
+      aria-label='Friday Release Mix'
       className='relative z-10 mx-auto mt-5 flex max-w-[44rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-2xs leading-none text-white/38'
     >
       {FRIDAY_RELEASE_KINDS.map(kind => (
@@ -381,7 +381,7 @@ function RhythmAtmosphere({
         return (
           <span
             key={`rhythm-star-${x}-${y}`}
-            className='absolute h-1 w-1 rounded-full bg-white'
+            className='absolute h-1 w-1 rounded-full bg-white dark:bg-surface-1'
             style={{
               left: `${x}%`,
               top: `${y}%`,
@@ -471,7 +471,9 @@ function RhythmModeButton({
       aria-pressed={active}
       className={cn(
         'rounded-full px-4 py-2 text-xs font-medium transition-colors duration-subtle',
-        active ? 'bg-white text-black' : 'text-white/58 hover:text-white'
+        active
+          ? 'bg-white dark:bg-surface-1 text-black dark:text-white'
+          : 'text-white/58 hover:text-white'
       )}
       onClick={onClick}
       type='button'

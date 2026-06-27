@@ -134,7 +134,7 @@ export default function HomeV1Page() {
         'home-v1 min-h-dvh w-full',
         variant === 'c'
           ? 'bg-(--color-cell-hover) text-(--color-bg-surface-0)'
-          : 'bg-(--color-bg-base) text-white'
+          : 'bg-(--color-bg-base) text-white dark:text-white'
       )}
       style={{
         fontFamily:
@@ -370,7 +370,7 @@ function ProductComposer({
           onChange={e => onDraft(e.target.value)}
           placeholder='Plan a release. Generate album art. Pitch playlists. Anything.'
           aria-label='Tell Jovie What You Need'
-          className='flex-1 bg-transparent text-mid text-white placeholder:text-white/35 outline-none'
+          className='flex-1 bg-transparent text-mid text-white dark:text-white placeholder:text-white dark:text-white/35 outline-none'
         />
         <button
           type='button'
@@ -415,7 +415,7 @@ function HeroConversation({
           {EYEBROW}
         </span>
         <h1
-          className='text-4xl lg:text-[42px] font-semibold leading-[1.06] text-white max-w-[18ch]'
+          className='text-4xl lg:text-[42px] font-semibold leading-[1.06] text-white dark:text-white max-w-[18ch]'
           style={{ letterSpacing: '-0.024em' }}
         >
           {HEADLINE}
@@ -584,7 +584,7 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
           {EYEBROW}
         </span>
         <h1
-          className='text-[60px] sm:text-[88px] lg:text-[116px] font-bold leading-[0.96] text-white'
+          className='text-[60px] sm:text-[88px] lg:text-[116px] font-bold leading-[0.96] text-white dark:text-white'
           style={{
             letterSpacing: '-0.038em',
             textWrap: 'balance' as React.CSSProperties['textWrap'],
@@ -650,7 +650,7 @@ function Composer({
           onChange={e => onDraft(e.target.value)}
           placeholder='Ask Jovie…' // ui-casing-allow: brand placeholder
           aria-label='Tell Jovie What You Need'
-          className='flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none'
+          className='flex-1 bg-transparent text-sm text-white dark:text-white placeholder:text-white dark:text-white/35 outline-none'
         />
         <button
           type='button'

@@ -63,10 +63,10 @@ export const AUTH_SURFACE = {
 export const AUTH_CLASSES = {
   /** Error message styling with fade-in animation */
   fieldError:
-    'text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200',
+    'text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
   /** Step transition animation for multi-step forms */
   stepTransition:
-    'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out',
+    'animate-in fade-in-0 slide-in-from-bottom-2 duration-cinematic ease-out',
   /** OAuth button touch optimization for mobile */
   oauthButtonMobile:
     'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] transition-[opacity] duration-subtle active:opacity-[0.92]',

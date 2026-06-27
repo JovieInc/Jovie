@@ -201,7 +201,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
                 sizes='160px'
                 unoptimized
               />
-              <span className='absolute inset-x-1 bottom-1 rounded bg-black/55 px-1.5 py-1 text-3xs font-medium text-white backdrop-blur'>
+              <span className='absolute inset-x-1 bottom-1 rounded bg-black/55 px-1.5 py-1 text-3xs font-medium text-white dark:text-white backdrop-blur'>
                 {candidate.styleLabel}
               </span>
             </button>

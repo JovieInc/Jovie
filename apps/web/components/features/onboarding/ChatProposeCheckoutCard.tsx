@@ -55,7 +55,7 @@ export function ChatProposeCheckoutCard({
       </div>
       <Link
         href={href}
-        className='inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed'
+        className='inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 focus-ring-themed'
       >
         Continue
         <ArrowRight className='h-4 w-4' aria-hidden />

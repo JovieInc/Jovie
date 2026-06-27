@@ -27,7 +27,7 @@ export function FilterSearchInput({
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Escape') {
         if (value) {
-          // Clear search first, then if pressed again close submenu
+          // Clear Search first, then if pressed again close submenu
           e.preventDefault();
           e.stopPropagation();
           onClear();
@@ -67,7 +67,7 @@ export function FilterSearchInput({
           className={cn(
             'w-full rounded-lg border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_48%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_34%,transparent)] py-1.5 pl-8 pr-6 text-xs',
             'text-primary-token placeholder:text-tertiary-token',
-            'transition-[background-color,border-color,box-shadow] duration-150',
+            'transition-[background-color,border-color,box-shadow] duration-subtle',
             'focus-visible:border-(--linear-border-focus) focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_44%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/14'
           )}
           aria-label={placeholder}
@@ -76,7 +76,7 @@ export function FilterSearchInput({
           <DrawerInlineIconButton
             onClick={onClear}
             className='absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
-            aria-label='Clear search'
+            aria-label='Clear Search'
           >
             <Icon name='X' className='h-3 w-3' />
           </DrawerInlineIconButton>

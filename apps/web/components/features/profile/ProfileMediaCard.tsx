@@ -291,7 +291,7 @@ function CardAction({
     </>
   );
   const className = cn(
-    'inline-flex w-full min-w-0 items-center rounded-xl bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-opacity duration-subtle hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
+    'inline-flex w-full min-w-0 items-center rounded-xl bg-white dark:bg-surface-1 text-black dark:text-white shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-opacity duration-subtle hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
     action.showChevron ? 'justify-between' : 'justify-center',
     compact
       ? 'min-h-11 gap-1 px-2.5 py-2 text-2xs font-bold'

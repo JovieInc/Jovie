@@ -58,8 +58,8 @@ export const CompletionBanner = memo(
         <button
           type='button'
           onClick={handleDismiss}
-          aria-label='Dismiss banner'
-          className='shrink-0 rounded-full border border-subtle bg-transparent p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          aria-label='Dismiss Banner'
+          className='shrink-0 rounded-full border border-subtle bg-transparent p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           <X className='h-4 w-4' aria-hidden='true' />
         </button>

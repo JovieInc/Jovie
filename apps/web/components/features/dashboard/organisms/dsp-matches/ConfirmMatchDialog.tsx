@@ -94,6 +94,7 @@ export function ConfirmMatchDialog({
       </DialogTitle>
 
       <DialogDescription>
+        {/* ui-casing-allow: sentence-case dialog body copy */}
         This will link your Jovie profile to your {PROVIDER_LABELS[providerId]}{' '}
         artist page, enabling cross-platform syncing.
       </DialogDescription>
@@ -130,7 +131,7 @@ export function ConfirmMatchDialog({
                     href={externalArtistUrl}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                    className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   >
                     <Icon name='ExternalLink' className='h-4 w-4' />
                   </a>
@@ -155,7 +156,7 @@ export function ConfirmMatchDialog({
         {confidenceBreakdown && (
           <ContentSurfaceCard surface='details' className='p-4'>
             <h4 className='mb-3 text-app font-caption text-primary-token'>
-              Match confidence breakdown
+              Match Confidence Breakdown
             </h4>
             <MatchConfidenceBreakdown
               breakdown={confidenceBreakdown}

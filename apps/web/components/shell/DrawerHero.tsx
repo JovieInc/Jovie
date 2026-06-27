@@ -92,7 +92,7 @@ function DrawerHeroArtworkSlot({
         aria-hidden='true'
         className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-subtle ease-subtle'
       >
-        <span className='h-8 w-8 rounded-full bg-white text-black grid place-items-center'>
+        <span className='h-8 w-8 rounded-full bg-white dark:bg-surface-1 text-black dark:text-white grid place-items-center'>
           <Play
             className='h-4 w-4 translate-x-px'
             strokeWidth={2.5}

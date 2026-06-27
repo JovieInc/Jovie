@@ -39,7 +39,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
-    'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0';
+    'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-subtle last:border-b-0';
   if (isChecked || isSelected) {
     return cn(baseClasses, rowState.selected);
   }

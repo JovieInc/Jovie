@@ -83,7 +83,7 @@ function PreviewAlertsPanel({
       ? 'Alerts On'
       : isSubscribed
         ? 'Manage alerts'
-        : 'Get alerts';
+        : 'Get Alerts';
   const resolvedBody =
     state.helper ??
     (state.kind === 'status'
@@ -105,7 +105,7 @@ function PreviewAlertsPanel({
         </div>
 
         <div className='space-y-1.5'>
-          <p className='text-xl font-semibold tracking-[-0.014em] text-white'>
+          <p className='text-xl font-semibold tracking-[-0.014em] text-white dark:text-white'>
             {resolvedTitle}
           </p>
           {resolvedBody ? (
@@ -116,9 +116,9 @@ function PreviewAlertsPanel({
         </div>
 
         {state.kind === 'button' ? (
-          <div className='inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-white'>
+          <div className='inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-white dark:text-white'>
             <Bell className='h-4 w-4' />
-            <span>{isSubscribed ? 'Manage alerts' : 'Get alerts'}</span>
+            <span>{isSubscribed ? 'Manage alerts' : 'Get Alerts'}</span>
           </div>
         ) : null}
 
@@ -129,7 +129,7 @@ function PreviewAlertsPanel({
             <div className='rounded-3xl border border-white/12 bg-white/[0.06] px-4 py-3 text-sm text-white/72'>
               {state.value || state.label}
             </div>
-            <div className='inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-black'>
+            <div className='inline-flex items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 py-2 text-sm font-semibold text-black dark:text-white'>
               {state.actionLabel || 'Continue'}
             </div>
           </div>
@@ -147,7 +147,7 @@ function PreviewAlertsPanel({
                 </div>
               ))}
             </div>
-            <div className='inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-black'>
+            <div className='inline-flex items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 py-2 text-sm font-semibold text-black dark:text-white'>
               {state.actionLabel || 'Verify'}
             </div>
           </div>
@@ -197,7 +197,7 @@ function SubscribePanel({
           previewNotificationsState ?? {
             kind: 'button',
             tone: 'quiet',
-            label: 'Get alerts',
+            label: 'Get Alerts',
           }
         }
         isSubscribed={isSubscribed}
@@ -269,7 +269,7 @@ function ProfileEmptyState({
 }>) {
   return (
     <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
-      <p className='text-base font-semibold tracking-[-0.018em] text-white'>
+      <p className='text-base font-semibold tracking-[-0.018em] text-white dark:text-white'>
         {title}
       </p>
       <p className='mt-2 max-w-[25ch] text-xs leading-5 text-white/52'>
@@ -302,7 +302,7 @@ function SettingsToggle({
       className={cn(
         'relative h-7 w-11 shrink-0 rounded-full border p-0.5 transition-colors duration-subtle',
         checked
-          ? 'border-white/40 bg-white'
+          ? 'border-white/40 bg-white dark:bg-surface-1'
           : 'border-white/14 bg-white/[0.08]',
         disabled && 'opacity-45'
       )}
@@ -311,7 +311,9 @@ function SettingsToggle({
       <span
         className={cn(
           'block h-6 w-6 rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle',
-          checked ? 'translate-x-4 bg-black' : 'translate-x-0 bg-white'
+          checked
+            ? 'translate-x-4 bg-black dark:bg-black'
+            : 'translate-x-0 bg-white dark:bg-surface-1'
         )}
       />
     </span>
@@ -341,7 +343,7 @@ function AlertsSettingsRow({
       className='flex min-h-15 w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
     >
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-medium tracking-[-0.005em] text-white'>
+        <p className='truncate text-sm font-medium tracking-[-0.005em] text-white dark:text-white'>
           {label}
         </p>
         <p className='truncate text-2xs leading-4 text-white/50'>
@@ -374,7 +376,7 @@ function AlertsSettingsView({
       data-testid='profile-alerts-settings'
     >
       <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-        <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
+        <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
           Alerts
         </h2>
         <span className='text-app font-medium text-white/52'>
@@ -508,7 +510,7 @@ export function ProfilePrimaryTabPanel({
         >
           <div>
             <div className='px-4 pb-2 pt-3'>
-              <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
+              <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
                 Music
               </h2>
             </div>
@@ -529,7 +531,7 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
+          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
             Music
           </h2>
         </div>
@@ -551,7 +553,7 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-tour'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white'>
+          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
             Events
           </h2>
         </div>

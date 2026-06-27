@@ -5775,7 +5775,7 @@ function DrawerDistribution({ release }: { release: Release }) {
                     className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                   >
                     <span
-                      className='h-4 w-4 rounded grid place-items-center text-3xs font-semibold text-white shrink-0'
+                      className='h-4 w-4 rounded grid place-items-center text-3xs font-semibold text-white dark:text-white shrink-0'
                       style={{
                         background:
                           p.status === 'missing'

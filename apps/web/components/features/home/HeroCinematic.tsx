@@ -42,7 +42,7 @@ export function HeroCinematic({
                     className='marketing-h1-linear hero-gradient-text mt-5 lg:text-left'
                     data-testid='hero-heading'
                   >
-                    The link your music deserves.
+                    The Link Your Music Deserves.
                   </h1>
 
                   <p className='marketing-lead-linear max-lg:mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
@@ -132,7 +132,7 @@ export function HeroCinematic({
                 className='marketing-h1-linear hero-gradient-text mt-3 max-w-[11ch] text-left sm:mt-4 lg:mt-5'
                 data-testid='hero-heading'
               >
-                The link your music deserves.
+                The Link Your Music Deserves.
               </h1>
 
               <p className='marketing-lead-linear mt-2 max-w-[30rem] text-mid text-secondary-token sm:mt-3 sm:text-lg md:mt-4'>
@@ -166,12 +166,12 @@ export function HeroCinematic({
 
       <nav
         className='relative z-10 max-lg:hidden items-center justify-center gap-1 pb-5 lg:flex'
-        aria-label='Phone mode tabs'
+        aria-label='Phone Mode Tabs'
       >
         {['/profile', '/tour', '/tip', '/listen'].map((label, i) => (
           <span
             key={label}
-            className='rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-all duration-slower'
+            className='rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-colors duration-slower'
             style={{
               backgroundColor:
                 i === 0 ? 'var(--linear-bg-surface-2)' : 'transparent',

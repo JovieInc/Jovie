@@ -11,6 +11,7 @@ export const revalidate = false;
 export const metadata: Metadata = {
   title: 'Voice Cloning for Creators | Jovie',
   description:
+    // ui-casing-allow: metadata sentence with brand name ElevenLabs
     'Turn any YouTube video into your trained AI voice in minutes. Consent-first cloning powered by ElevenLabs. Use it for promos, replies, and radio drops inside your Jovie flows.',
   metadataBase: new URL(BASE_URL),
   alternates: {
@@ -87,7 +88,7 @@ export default function VoiceLandingPage() {
           <div className='mx-auto max-w-3xl text-center'>
             <p className='homepage-section-eyebrow'>Four steps</p>
             <h2 className='marketing-h2-linear mt-3 text-primary-token'>
-              Your voice. Trained. Ready.
+              Your Voice. Trained. Ready.
             </h2>
             <p className='mt-3 text-mid leading-7 text-secondary-token'>
               Async, consent-first, and built on the same infra that powers
@@ -143,7 +144,7 @@ export default function VoiceLandingPage() {
           <div className='mx-auto max-w-3xl'>
             <div className='rounded-3xl border border-subtle bg-panel px-8 py-10'>
               <h3 className='text-xl font-semibold'>
-                Built for creators who care about consent.
+                Built For Creators Who Care About Consent.
               </h3>
               <ul className='mt-6 space-y-3 text-mid leading-7 text-secondary-token'>
                 <li>• Explicit opt-in recorded before any training run.</li>
@@ -182,11 +183,11 @@ export default function VoiceLandingPage() {
       </section>
 
       {/* Final CTA band */}
-      <section className='border-t border-subtle bg-black py-14 text-white'>
+      <section className='border-t border-subtle bg-black dark:bg-black py-14 text-white dark:text-white'>
         <div className={sectionWrapClassName}>
           <div className='mx-auto flex max-w-2xl flex-col items-center gap-4 text-center'>
             <h2 className='text-3xl font-semibold tracking-tight'>
-              Ready to sound like you — everywhere?
+              Ready To Sound Like You — Everywhere?
             </h2>
             <p className='text-white/70'>
               The same voice that fans already know, now available on demand.

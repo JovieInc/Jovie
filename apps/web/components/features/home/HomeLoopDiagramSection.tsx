@@ -10,7 +10,7 @@ const LOOP_LABELS = [
   { angle: -30, label: 'Capture' },
   { angle: 30, label: 'Route' },
   { angle: 150, label: 'Learn' },
-  { angle: 210, label: 'Next action' },
+  { angle: 210, label: 'Next Action' },
 ] as const;
 
 const FLATLINE_ITEMS = [
@@ -46,13 +46,13 @@ function loopPoint(angleDeg: number, radius: number) {
 
 export function HomeLoopDiagramSection() {
   return (
-    <section className='border-t border-white/[0.04] bg-black px-6 py-32 sm:py-40'>
+    <section className='border-t border-white/[0.04] bg-black dark:bg-black px-6 py-32 sm:py-40'>
       <div className='mx-auto grid max-w-300 gap-16 lg:grid-cols-[320px_1fr] lg:items-center'>
         <div>
           <h2 className='m-0 font-[var(--marketing-font-display)] text-[clamp(2rem,4.5vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-primary-token'>
-            Stop letting
+            Stop Letting
             <br />
-            momentum decay.
+            Momentum Decay.
           </h2>
           <p className='mt-5 mb-7 max-w-[32ch] font-[var(--marketing-font-body)] text-base leading-[1.5] text-tertiary-token'>
             Jovie shortens the time between fan signal and next action.
@@ -70,7 +70,7 @@ export function HomeLoopDiagramSection() {
               preserveAspectRatio='none'
               className='mt-2 h-20 w-full'
               role='img'
-              aria-label='Three sharp spikes that fall back to a flat line, illustrating one-off campaigns'
+              aria-label='Three Sharp Spikes That Fall Back To A Flat Line, Illustrating One-off Campaigns' // ui-casing-allow: descriptive chart aria-label
             >
               <line
                 x1='0'
@@ -128,7 +128,7 @@ export function HomeLoopDiagramSection() {
                 viewBox={`0 0 ${SIZE} 180`}
                 className='absolute left-1/2 -translate-x-1/2'
                 role='img'
-                aria-label='Closed loop showing release, capture, route, learn, next action stages connected to a glowing infinity center'
+                aria-label='Closed Loop Showing Release, Capture, Route, Learn, Next Action Stages Connected To A Glowing Infinity Center'
               >
                 <circle
                   cx={CX}

@@ -1046,7 +1046,7 @@ function InputRow({
               // the suppress intentional for both mouse and keyboard paths since
               // the surface-level glow IS the keyboard focus indicator for this
               // compound widget.
-              'focus:outline-none! focus-visible:outline-none! focus:ring-0! focus-visible:ring-0!',
+              'focus:outline-none! focus-visible:outline-none! focus-visible:ring-0! focus-visible:ring-0!',
               'focus:shadow-none! focus-visible:shadow-none! shadow-none [outline:none]',
               isAtMaxHeight ? 'overflow-y-auto' : 'overflow-hidden'
             )}

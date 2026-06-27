@@ -31,7 +31,7 @@ export function CurrentPlanCard({
           <div className='flex items-start gap-3.5'>
             <div
               className={cn(
-                'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white',
+                'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white dark:text-white',
                 isPro
                   ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
                   : 'bg-gradient-to-br from-amber-400 to-orange-500'

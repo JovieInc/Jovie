@@ -61,7 +61,7 @@ export function DemoReleasePresaveSurface() {
               <p className='mb-2 inline-flex rounded-full border border-white/[0.1] bg-black/35 px-2.5 py-1 text-2xs font-[520] uppercase tracking-[0.08em] text-white/72 backdrop-blur-xl'>
                 Out now
               </p>
-              <h1 className='text-3xl font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+              <h1 className='text-3xl font-semibold leading-[1.06] tracking-[-0.02em] text-white dark:text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
                 The Deep End
               </h1>
               <Link
@@ -76,7 +76,7 @@ export function DemoReleasePresaveSurface() {
           <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-4'>
             <div className='space-y-3'>
               <SmartLinkProviderButton
-                label='Listen everywhere'
+                label='Listen Everywhere'
                 href={THE_DEEP_END_LISTEN_URL}
               />
               <SmartLinkProviderButton

@@ -33,7 +33,7 @@ function getTicketStatusClassName(
   }
 
   return canBuyTickets
-    ? 'border-white/14 bg-white/[0.02] text-white'
+    ? 'border-white/14 bg-white/[0.02] text-white dark:text-white'
     : 'border-white/8 bg-transparent text-white/38';
 }
 

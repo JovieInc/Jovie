@@ -20,7 +20,7 @@ export function ArtistNotificationsLanding({
 }: Readonly<ArtistNotificationsLandingProps>) {
   return (
     <MarketingPageShell>
-      <main className='overflow-hidden bg-black text-primary-token'>
+      <main className='overflow-hidden bg-black dark:bg-black text-primary-token'>
         <div data-testid={ARTIST_NOTIFICATIONS_SECTION_TEST_IDS.hero}>
           <ArtistNotificationsHero hero={copy.hero} />
         </div>

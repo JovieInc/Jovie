@@ -23,10 +23,11 @@ interface RangeOption {
 }
 
 const RANGE_OPTIONS: RangeOption[] = [
-  { value: '7d', label: '7 days', requiresPro: false },
-  { value: '30d', label: '30 days', requiresPro: false },
-  { value: '90d', label: '90 days', requiresPro: true },
-  { value: 'all', label: 'All time', requiresPro: true },
+  // ui-casing-allow: numeric range label
+  { value: '7d', label: '7 Days', requiresPro: false },
+  { value: '30d', label: '30 Days', requiresPro: false },
+  { value: '90d', label: '90 Days', requiresPro: true },
+  { value: 'all', label: 'All Time', requiresPro: true },
 ];
 
 export function ProfileAnalyticsSummary() {
@@ -64,16 +65,16 @@ export function ProfileAnalyticsSummary() {
   return (
     <div
       className={cn(
-        'space-y-1 transition-opacity duration-150',
+        'space-y-1 transition-opacity duration-subtle',
         isFetching && 'opacity-50'
       )}
     >
       <DrawerPropertyRow
-        label='Profile views'
+        label='Profile Views'
         value={numberFormatter.format(profileViews)}
       />
       <DrawerPropertyRow
-        label='Link clicks'
+        label='Link Clicks'
         value={numberFormatter.format(totalClicks)}
       />
 

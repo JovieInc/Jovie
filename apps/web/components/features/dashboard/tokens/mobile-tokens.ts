@@ -32,8 +32,9 @@ export const mobileReleaseTokens = {
   },
   swipeActions: {
     button:
-      'flex w-16 flex-col items-center justify-center gap-1 text-white transition-colors',
-    label: 'text-3xs font-caption tracking-normal',
+      'flex w-16 flex-col items-center justify-center gap-1 text-white dark:text-white transition-colors',
+    // ui-casing-allow: tailwind class documentation string
+    label: 'Text-3xs Font-caption Tracking-normal',
     edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-accent))]',
     link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,var(--linear-info))]',
     locked:

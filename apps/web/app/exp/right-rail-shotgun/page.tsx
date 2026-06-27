@@ -76,10 +76,10 @@ const DSP_COLOR: Record<DspKey, string> = {
 };
 
 const DSP_STATUS_DOT: Record<DspStatus, string> = {
-  live: 'bg-white/35',
+  live: 'bg-white dark:bg-surface-1/35',
   pending: 'bg-amber-300/70',
   error: 'bg-rose-400/85',
-  missing: 'bg-white/12',
+  missing: 'bg-white dark:bg-surface-1/12',
 };
 
 const release = {
@@ -256,10 +256,10 @@ function TypeBadge({ type }: { type: 'Single' | 'EP' | 'Album' }) {
 
 function StatusBadge({ status }: { status: typeof release.status }) {
   const cfg: Record<typeof release.status, { label: string; dot: string }> = {
-    live: { label: 'Live', dot: 'bg-white/35' },
+    live: { label: 'Live', dot: 'bg-white dark:bg-surface-1/35' },
     scheduled: { label: 'Scheduled', dot: 'bg-amber-300/70' },
     announced: { label: 'Announced', dot: 'bg-cyan-300/75' },
-    draft: { label: 'Draft', dot: 'bg-white/15' },
+    draft: { label: 'Draft', dot: 'bg-white dark:bg-surface-1/15' },
     hidden: {
       label: 'Hidden',
       dot: 'bg-transparent border border-quaternary-token/45 border-dashed',
@@ -343,7 +343,7 @@ function ActionRow() {
     <div className='mt-3 flex items-center gap-1.5'>
       <button
         type='button'
-        className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium bg-white text-black hover:bg-white/90 transition-colors duration-subtle ease-out'
+        className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white hover:bg-white dark:bg-surface-1/90 transition-colors duration-subtle ease-out'
       >
         <Play
           className='h-3 w-3 translate-x-px'
@@ -493,7 +493,7 @@ function DistributionList({ compact }: { compact?: boolean }) {
           >
             <span
               className={cn(
-                'h-4 w-4 rounded-full grid place-items-center text-3xs font-semibold text-white shrink-0',
+                'h-4 w-4 rounded-full grid place-items-center text-3xs font-semibold text-white dark:text-white shrink-0',
                 status === 'missing'
                   ? 'bg-quaternary-token/40 opacity-60'
                   : DSP_COLOR[dsp]

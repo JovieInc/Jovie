@@ -10,7 +10,7 @@ const SUB_ITEMS = [
     number: '2.1',
     title: 'Streaming Links',
     description:
-      'One clean page for every link out — Spotify, Apple Music, YouTube Music, and more.',
+      'One clean page for every link out — Spotify, Apple Music, YouTube Music, and more.', // ui-casing-allow: marketing feature sentence
   },
   {
     number: '2.2',
@@ -70,7 +70,7 @@ export function PhoneProfileDemo() {
           transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
           opacity: isVisible ? 1 : 0,
           transition:
-            'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out',
+            'transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-subtle-easing)',
         }}
       >
         <div

@@ -7,7 +7,7 @@ import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
-  'h-6 w-6 flex items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[color] duration-150 hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token';
+  'h-6 w-6 flex items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[color] duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token';
 
 export interface DrawerLinkSectionProps {
   /** Section heading text */

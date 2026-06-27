@@ -70,7 +70,7 @@ export function PhoneTourMobileSection() {
               One profile. Every way fans support you.
             </span>
             <h2 className='marketing-h2-linear text-primary-token'>
-              The right action for every fan.
+              The Right Action For Every Fan.
             </h2>
             <p className='max-w-100 marketing-lead-linear text-secondary-token'>
               Every visitor sees the action most likely to convert in that
@@ -129,7 +129,7 @@ export function CrossfadeBlock({
           <div
             key={childKey}
             aria-hidden={index !== activeIndex}
-            className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+            className='transition-opacity duration-cinematic ease-subtle'
             style={{
               opacity: index === activeIndex ? 1 : 0,
               gridArea: '1 / 1',
@@ -345,7 +345,7 @@ export function PhoneShowcase({
             return (
               <div
                 key={mode.id}
-                className='absolute inset-0 px-5 transition-transform duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                className='absolute inset-0 px-5 transition-transform duration-cinematic ease-subtle'
                 style={{
                   transform,
                   opacity: isActive ? 1 : 0,
@@ -370,7 +370,7 @@ export function PhoneShowcase({
         <nav
           ref={tabRailRef}
           className='relative mt-4 flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-subtle bg-surface-0/80 p-1.5 shadow-[0_12px_28px_rgba(0,0,0,0.18)] [scrollbar-width:none] supports-[backdrop-filter]:bg-surface-0/70 supports-[backdrop-filter]:backdrop-blur-lg [&::-webkit-scrollbar]:hidden'
-          aria-label='Phone mode tabs'
+          aria-label='Phone Mode Tabs'
         >
           <div
             aria-hidden='true'
@@ -403,7 +403,7 @@ export function PhoneShowcase({
               ref={node => {
                 tabRefs.current[i] = node;
               }}
-              className={`relative z-10 rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-colors duration-300 ${
+              className={`relative z-10 rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-colors duration-cinematic ${
                 i === activeIndex
                   ? 'text-[var(--linear-text-primary)]'
                   : 'text-[var(--linear-text-quaternary)] hover:text-[var(--linear-text-secondary)]'

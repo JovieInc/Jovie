@@ -32,7 +32,7 @@ export function InsightsSummaryWidget() {
   }
 
   return (
-    <section aria-label='AI Insights summary' className='space-y-2'>
+    <section aria-label='AI Insights Summary' className='space-y-2'>
       {/* Header */}
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-1.5'>
@@ -46,7 +46,7 @@ export function InsightsSummaryWidget() {
         </div>
         <Link
           href={APP_ROUTES.INSIGHTS}
-          className='inline-flex items-center gap-1 rounded-lg border border-transparent px-1.5 py-1 text-2xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+          className='inline-flex items-center gap-1 rounded-lg border border-transparent px-1.5 py-1 text-2xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
         >
           <span>View all</span>
           <ChevronRight className='h-3 w-3' aria-hidden='true' />
@@ -58,7 +58,7 @@ export function InsightsSummaryWidget() {
         {insights.map(insight => (
           <li
             key={insight.id}
-            className='flex items-start gap-2 rounded-lg border border-transparent px-2 py-1.5 transition-[background-color,border-color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
+            className='flex items-start gap-2 rounded-lg border border-transparent px-2 py-1.5 transition-[background-color,border-color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
           >
             <InsightCategoryIcon category={insight.category} size='sm' />
             <p className='line-clamp-2 text-xs leading-snug text-secondary-token'>

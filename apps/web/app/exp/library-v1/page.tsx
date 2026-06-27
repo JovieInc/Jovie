@@ -1449,7 +1449,7 @@ function Poster({ asset }: { asset: Asset }) {
           ? '56.25%'
           : '125%'; // 4:5
   return (
-    <div className='relative w-full overflow-hidden bg-black'>
+    <div className='relative w-full overflow-hidden bg-black dark:bg-black'>
       <div style={{ paddingBottom: aspectPad }} />
       <div
         role='img'
@@ -1555,7 +1555,7 @@ export function Table({
                   fill={fav ? 'currentColor' : 'none'}
                 />
               </button>
-              <span className='h-8 w-9 rounded-xs overflow-hidden bg-black'>
+              <span className='h-8 w-9 rounded-xs overflow-hidden bg-black dark:bg-black'>
                 <span
                   className='block h-full w-full bg-center bg-cover'
                   style={{ backgroundImage: `url("${a.poster}")` }}
@@ -1677,7 +1677,7 @@ export function Drawer({
           </div>
 
           <div className='p-3'>
-            <div className='rounded-lg overflow-hidden border border-(--linear-app-shell-border) bg-black'>
+            <div className='rounded-lg overflow-hidden border border-(--linear-app-shell-border) bg-black dark:bg-black'>
               <Poster asset={asset} />
             </div>
           </div>

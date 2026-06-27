@@ -21,7 +21,7 @@ export function HomeStatQuoteSection({
 }: HomeStatQuoteSectionProps = {}) {
   const id = 'sq-purple';
   return (
-    <section className='relative overflow-hidden bg-black px-6 py-32 sm:py-40'>
+    <section className='relative overflow-hidden bg-black dark:bg-black px-6 py-32 sm:py-40'>
       <svg
         viewBox='0 0 1400 600'
         preserveAspectRatio='xMidYMid slice'

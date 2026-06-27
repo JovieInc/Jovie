@@ -89,7 +89,7 @@ export function DspMatchCard({
     <ContentSurfaceCard
       surface='details'
       className={cn(
-        'p-3.5 transition-[border-color,background-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0',
+        'p-3.5 transition-[border-color,background-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0',
         className
       )}
     >
@@ -125,7 +125,7 @@ export function DspMatchCard({
                   href={externalArtistUrl}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                  className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   title={`View on ${PROVIDER_LABELS[providerId]}`}
                 >
                   <Icon name='ExternalLink' className='h-3.5 w-3.5' />
@@ -154,7 +154,7 @@ export function DspMatchCard({
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           >
             <span>Confidence breakdown</span>
             <Icon

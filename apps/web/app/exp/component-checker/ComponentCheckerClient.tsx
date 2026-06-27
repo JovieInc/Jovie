@@ -161,7 +161,7 @@ function Toolbar({
 }: ToolbarProps) {
   return (
     <div
-      className='fixed left-4 top-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-xl border border-white/10 bg-black/80 p-3 text-white shadow-2xl backdrop-blur-md sm:flex-row sm:items-center sm:gap-3'
+      className='fixed left-4 top-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-xl border border-white/10 bg-black/80 p-3 text-white dark:text-white shadow-2xl backdrop-blur-md sm:flex-row sm:items-center sm:gap-3'
       data-testid='component-checker-toolbar'
     >
       <div className='flex items-center gap-2'>
@@ -172,7 +172,7 @@ function Toolbar({
           id='cc-category'
           value={variant.category}
           onChange={e => onCategoryChange(e.target.value as SectionCategory)}
-          className='rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/40'
+          className='rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs font-medium text-white dark:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40'
         >
           {SECTION_CATEGORIES_ORDERED.map(cat => (
             <option key={cat} value={cat}>
@@ -188,7 +188,7 @@ function Toolbar({
           id='cc-variant'
           value={variant.id}
           onChange={e => onVariantChange(e.target.value)}
-          className='max-w-65 truncate rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/40'
+          className='max-w-65 truncate rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs font-medium text-white dark:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40'
         >
           {variantsInCategory.map(v => (
             <option key={v.id} value={v.id}>

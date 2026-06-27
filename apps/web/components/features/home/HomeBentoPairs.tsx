@@ -58,7 +58,7 @@ export function HomeBentoPairs() {
         <p className='mb-5 font-[var(--marketing-font-body)] text-sm font-medium text-black/55'>
           What it does
         </p>
-        <h2 className='m-0 max-w-[20ch] font-[var(--marketing-font-display)] text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.028em] text-black'>
+        <h2 className='m-0 max-w-[20ch] font-[var(--marketing-font-display)] text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.028em] text-black dark:text-white'>
           <span className='text-black/45'>Turn attention</span>
           <br />
           <span>into action.</span>
@@ -79,7 +79,7 @@ export function HomeBentoPairs() {
 
 function BentoCardView({ card }: { readonly card: BentoCard }) {
   return (
-    <article className='flex flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white shadow-[0_18px_70px_-56px_rgba(0,0,0,0.45)]'>
+    <article className='flex flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white dark:bg-surface-1 shadow-[0_18px_70px_-56px_rgba(0,0,0,0.45)]'>
       <div
         className='relative h-80 overflow-hidden border-b border-black/[0.06]'
         style={{
@@ -90,7 +90,7 @@ function BentoCardView({ card }: { readonly card: BentoCard }) {
         {card.preview}
       </div>
       <div className='px-9 pt-9 pb-10 text-center'>
-        <h3 className='m-0 font-[var(--marketing-font-display)] text-xl font-semibold leading-[1.3] tracking-[-0.012em] text-black'>
+        <h3 className='m-0 font-[var(--marketing-font-display)] text-xl font-semibold leading-[1.3] tracking-[-0.012em] text-black dark:text-white'>
           {card.title}
         </h3>
         <p className='mx-auto mt-3 max-w-[46ch] font-[var(--marketing-font-body)] text-sm leading-[1.55] text-black/58'>
@@ -118,7 +118,7 @@ function SmartLinkPreview() {
     <div className='absolute inset-0 flex items-center justify-center'>
       <PreviewHalo color='var(--geist-purple-solid)' />
       <div className='relative flex flex-col items-center gap-3 font-[var(--marketing-font-body)]'>
-        <div className='flex h-14 w-14 items-center justify-center rounded-lg border border-black/10 bg-white text-lg font-bold text-black shadow-[0_12px_42px_-34px_rgba(0,0,0,0.55)]'>
+        <div className='flex h-14 w-14 items-center justify-center rounded-lg border border-black/10 bg-white dark:bg-surface-1 text-lg font-bold text-black dark:text-white shadow-[0_12px_42px_-34px_rgba(0,0,0,0.55)]'>
           j
         </div>
         <div className='flex gap-2 text-3xs font-medium uppercase tracking-[0.18em] text-black/45'>
@@ -142,7 +142,7 @@ function CountdownPreview() {
     <div className='absolute inset-0 flex items-center justify-center'>
       <PreviewHalo color='var(--geist-blue-solid)' />
       <div
-        className='relative font-[var(--marketing-font-display)] text-[64px] font-extrabold leading-none tracking-[-0.04em] text-black tabular-nums'
+        className='relative font-[var(--marketing-font-display)] text-[64px] font-extrabold leading-none tracking-[-0.04em] text-black dark:text-white tabular-nums'
         style={{ fontVariantNumeric: 'tabular-nums' }}
       >
         02&nbsp;:&nbsp;14&nbsp;:&nbsp;57
@@ -164,7 +164,7 @@ function TourPreview() {
         {cities.map(c => (
           <li
             key={c.city}
-            className='flex items-center justify-between rounded-lg border border-black/[0.08] bg-white px-3 py-2 font-[var(--marketing-font-body)] text-xs text-black shadow-[0_10px_32px_-28px_rgba(0,0,0,0.55)]'
+            className='flex items-center justify-between rounded-lg border border-black/[0.08] bg-white dark:bg-surface-1 px-3 py-2 font-[var(--marketing-font-body)] text-xs text-black dark:text-white shadow-[0_10px_32px_-28px_rgba(0,0,0,0.55)]'
           >
             <span>{c.city}</span>
             <span className='text-black/45'>{c.date}</span>
@@ -179,7 +179,7 @@ function TipPreview() {
   return (
     <div className='absolute inset-0 flex items-center justify-center'>
       <PreviewHalo color='var(--geist-green-solid)' />
-      <div className='relative flex items-baseline gap-1 font-[var(--marketing-font-display)] text-black'>
+      <div className='relative flex items-baseline gap-1 font-[var(--marketing-font-display)] text-black dark:text-white'>
         <span
           className='text-3xl font-semibold'
           style={{ color: 'var(--geist-green-solid)' }}

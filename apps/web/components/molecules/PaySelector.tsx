@@ -133,7 +133,7 @@ export function PaySelector({
         data-test='pay-selector'
       >
         <h3 id='pay-selector-heading' className='sr-only'>
-          Select amount
+          Select Amount
         </h3>
         {screenReaderDescription ? (
           <p className='sr-only'>{screenReaderDescription}</p>
@@ -147,8 +147,8 @@ export function PaySelector({
               {customMode ? (
                 <div className='flex min-h-23 items-center'>
                   <label className='w-full'>
-                    <span className='sr-only'>Custom amount</span>
-                    <div className='flex h-23 items-center rounded-3xl border border-white/12 bg-white/[0.03] px-4.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
+                    <span className='sr-only'>Custom Amount</span>
+                    <div className='flex h-23 items-center rounded-3xl border border-white/12 bg-white/[0.03] px-4.5 text-white dark:text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
                       <span className='mr-3 text-2xl font-medium tracking-[-0.04em] text-white/42'>
                         $
                       </span>
@@ -163,8 +163,8 @@ export function PaySelector({
                           );
                         }}
                         placeholder='0.00'
-                        className='h-full w-full bg-transparent text-3xl font-semibold tracking-[-0.05em] text-white outline-none placeholder:text-white/18'
-                        aria-label='Custom amount'
+                        className='h-full w-full bg-transparent text-3xl font-semibold tracking-[-0.05em] text-white dark:text-white outline-none placeholder:text-white dark:text-white/18'
+                        aria-label='Custom Amount'
                       />
                     </div>
                   </label>
@@ -172,7 +172,7 @@ export function PaySelector({
               ) : (
                 <fieldset
                   className='m-0 grid grid-cols-3 gap-3 border-0 p-0'
-                  aria-label='Amount options'
+                  aria-label='Amount Options'
                 >
                   {amounts.map((amount, idx) => {
                     const isSelected = idx === selectedIdx;
@@ -186,8 +186,8 @@ export function PaySelector({
                         className={cn(
                           'flex h-23 items-center justify-center rounded-3xl border text-center transition-[border-color,background-color,box-shadow,color,opacity] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isSelected
-                            ? 'border-white bg-white text-(--color-bg-input) shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
-                            : 'border-white/10 bg-white/[0.02] text-white hover:border-white/18 hover:bg-white/[0.04]'
+                            ? 'border-white bg-white dark:bg-surface-1 text-(--color-bg-input) shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
+                            : 'border-white/10 bg-white/[0.02] text-white dark:text-white hover:border-white/18 hover:bg-white/[0.04]'
                         )}
                       >
                         <span className='text-lg font-medium tracking-[-0.03em]'>
@@ -208,7 +208,7 @@ export function PaySelector({
                 aria-pressed={customMode}
                 aria-controls='pay-selector-heading'
               >
-                <span>Custom amount</span>
+                <span>Custom Amount</span>
                 <PencilLine className='h-3.5 w-3.5' />
               </button>
             </div>
@@ -264,7 +264,7 @@ export function PaySelector({
                     type='button'
                     onClick={handleContinue}
                     disabled={isLoading || !canContinue}
-                    className='flex h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-sm font-medium tracking-[-0.015em] text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
+                    className='flex h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-sm font-medium tracking-[-0.015em] text-white dark:text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={`Continue with ${paymentLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
                   >
                     {paymentLabel === 'Venmo' ? (
@@ -298,7 +298,7 @@ export function PaySelector({
   return (
     <div className={`space-y-5 ${className}`} data-test='pay-selector'>
       <h3 id='pay-selector-heading' className='sr-only'>
-        Select amount
+        Select Amount
       </h3>
       {screenReaderDescription ? (
         <p className='sr-only'>{screenReaderDescription}</p>
@@ -312,7 +312,7 @@ export function PaySelector({
 
       <fieldset
         className='grid grid-cols-3 gap-3 border-0 p-0 m-0'
-        aria-label='Amount options'
+        aria-label='Amount Options'
       >
         {amounts.map((amount, idx) => (
           <AmountSelector

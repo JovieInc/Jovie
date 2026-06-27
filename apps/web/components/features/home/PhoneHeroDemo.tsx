@@ -63,7 +63,7 @@ function ListenContent() {
               {dsp.name}
             </span>
           </div>
-          <span className='px-3 py-1 rounded-full text-2xs font-medium bg-white text-black'>
+          <span className='px-3 py-1 rounded-full text-2xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white'>
             Play
           </span>
         </div>
@@ -108,7 +108,7 @@ function PayContent() {
           </div>
         ))}
       </div>
-      <div className='flex items-center justify-center rounded-xl px-4 py-2.5 text-app font-medium bg-white text-black mt-1'>
+      <div className='flex items-center justify-center rounded-xl px-4 py-2.5 text-app font-medium bg-white dark:bg-surface-1 text-black dark:text-white mt-1'>
         Continue with Venmo
       </div>
     </div>
@@ -140,7 +140,7 @@ function TourContent() {
               {show.date} · {show.venue}
             </span>
           </div>
-          <span className='px-3 py-1 rounded-full text-2xs font-medium bg-white text-black'>
+          <span className='px-3 py-1 rounded-full text-2xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white'>
             Tickets
           </span>
         </div>
@@ -172,7 +172,7 @@ export function PhoneHeroDemo() {
             priority
           />
         </div>
-        <p className='mt-2.5 text-mid font-semibold text-white'>
+        <p className='mt-2.5 text-mid font-semibold text-white dark:text-white'>
           {PROFILE.name}
         </p>
         <p className='mt-0.5 text-2xs text-white/40 text-center px-4'>
@@ -193,7 +193,8 @@ export function PhoneHeroDemo() {
             width: `${100 / TABS.length}%`,
             transform: `translateX(${TABS.findIndex(t => t.id === activeTab) * 100}%)`,
             backgroundColor: 'rgba(255,255,255,0.08)',
-            transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition:
+              'transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing)',
           }}
         />
         {TABS.map(tab => (

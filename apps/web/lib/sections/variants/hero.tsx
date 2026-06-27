@@ -19,13 +19,13 @@ function HeroDemoContent() {
       <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
         <Link
           href='/start'
-          className='inline-flex h-10 items-center rounded-full bg-white px-5 text-sm font-semibold text-black transition-colors hover:bg-white/90'
+          className='inline-flex h-10 items-center rounded-full bg-white dark:bg-surface-1 px-5 text-sm font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
         >
           Claim my workspace
         </Link>
         <Link
           href='/pricing'
-          className='inline-flex h-10 items-center rounded-full border border-white/20 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/5'
+          className='inline-flex h-10 items-center rounded-full border border-white/20 px-5 text-sm font-semibold text-white dark:text-white transition-colors hover:bg-white dark:bg-surface-1/5'
         >
           See pricing
         </Link>

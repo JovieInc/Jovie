@@ -395,7 +395,7 @@ export function ProfileCompactSurface({
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
-    'h-9! w-9! border-white/14 bg-black/24 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
+    'h-9! w-9! border-white/14 bg-black/24 text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode

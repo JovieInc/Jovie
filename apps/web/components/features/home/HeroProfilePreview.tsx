@@ -78,7 +78,7 @@ export function HeroProfilePreview() {
           {MODE_IDS.map((mode, i) => (
             <div
               key={mode}
-              className='absolute inset-0 px-5 transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+              className='absolute inset-0 px-5 transition-opacity duration-cinematic ease-subtle'
               style={{
                 opacity: i === activeIndex ? 1 : 0,
                 pointerEvents: i === activeIndex ? 'auto' : 'none',

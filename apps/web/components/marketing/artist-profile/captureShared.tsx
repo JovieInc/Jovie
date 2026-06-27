@@ -186,16 +186,16 @@ export function CaptureActionPill({
         className={cn(
           'flex min-h-[4rem] items-center rounded-full px-2 py-1.5 transition-[background-color,transform,opacity] duration-subtle',
           isDone
-            ? 'justify-center bg-white text-black'
+            ? 'justify-center bg-white dark:bg-surface-1 text-black dark:text-white'
             : 'gap-2 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))]'
         )}
       >
         {isDone ? (
           <div className='flex items-center justify-center gap-2.5 px-3'>
-            <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-black text-white'>
+            <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-black dark:bg-black text-white dark:text-white'>
               <Check className='h-3.5 w-3.5' strokeWidth={2.4} />
             </span>
-            <span className='rounded-full bg-white px-1 text-xs font-semibold tracking-[-0.02em] text-black'>
+            <span className='rounded-full bg-white dark:bg-surface-1 px-1 text-xs font-semibold tracking-[-0.02em] text-black dark:text-white'>
               {capture.action.confirmedLabel}
             </span>
           </div>
@@ -226,8 +226,8 @@ export function CaptureActionPill({
               className={cn(
                 'rounded-full px-4 py-2.5 text-xs font-semibold tracking-[-0.02em] transition-[background-color,color,transform] duration-subtle',
                 isSubmitting
-                  ? 'scale-[0.96] bg-white/88 text-black'
-                  : 'bg-white text-black'
+                  ? 'scale-[0.96] bg-white/88 text-black dark:text-white'
+                  : 'bg-white dark:bg-surface-1 text-black dark:text-white'
               )}
             >
               {capture.action.ctaLabel}

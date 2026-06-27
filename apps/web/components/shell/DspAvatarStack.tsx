@@ -101,13 +101,13 @@ export function DspAvatarStack({
     >
       <button
         aria-describedby={popoverId}
-        aria-label='View DSP distribution details'
+        aria-label='View DSP Distribution Details'
         className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
         type='button'
       >
         <span
           className={cn(
-            'relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white',
+            'relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white dark:text-white',
             'ring-2 ring-(--system-b-bg-page)',
             primary.status === 'missing'
               ? 'opacity-40'
@@ -162,7 +162,7 @@ export function DspAvatarStack({
               >
                 <span
                   className={cn(
-                    'grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white',
+                    'grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white dark:text-white',
                     dsp.status === 'missing' ? 'opacity-45' : 'opacity-90'
                   )}
                   style={
