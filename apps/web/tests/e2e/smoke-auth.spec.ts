@@ -7,6 +7,7 @@ import {
   signInUser,
 } from '../helpers/clerk-auth';
 import {
+  chatComposerInputLocator,
   SMOKE_TIMEOUTS,
   smokeNavigateWithRetry,
 } from './utils/smoke-test-utils';
@@ -75,14 +76,23 @@ async function assertDashboardRouteLoaded(
   );
 
   if (path === APP_ROUTES.CHAT) {
-    const chatComposer = page
-      .getByRole('textbox', { name: /chat message input/i })
-      .or(page.getByPlaceholder(/ask jovie|chat message/i))
+    const composerSurface = page.locator(
+      '[data-testid="chat-composer-surface"]'
+    );
+    await expect(
+      composerSurface,
+      'Chat: composer surface did not render'
+    ).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+
+    const chatComposer = chatComposerInputLocator(page)
+      .or(page.getByPlaceholder(/ask jovie|ask a follow-up|chat message/i))
       .or(page.locator('textarea, [contenteditable="true"]'))
       .first();
 
     await expect(chatComposer, 'Chat: composer did not render').toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     return;
   }
