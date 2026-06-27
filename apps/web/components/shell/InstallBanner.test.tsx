@@ -37,7 +37,7 @@ describe('InstallBanner', () => {
   it('fires onDismiss when the dismiss button is clicked', () => {
     const onDismiss = vi.fn();
     render(<InstallBanner open onDismiss={onDismiss} />);
-    fireEvent.click(screen.getByLabelText('Dismiss prompt'));
+    fireEvent.click(screen.getByLabelText('Dismiss Prompt'));
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
