@@ -1,0 +1,29 @@
+{
+  "$comment": "Single source of truth for the OAuth redirect URIs that MUST be registered in the Google + Apple consoles for Clerk sign-in to work. Derived from each Clerk instance's FAPI host (decode the publishable key with decodeFapiHostFromPublishableKey). The console redirect_uri Clerk hands to Google/Apple is https://<fapi-host>/v1/oauth_callback. If a fapi host below changes, the Google/Apple consoles MUST be re-synced via the /auth-console-sync skill BEFORE shipping, or production sign-in breaks with redirect_uri_mismatch. Consumed by scripts/auth-redirect-uris.ts, apps/web/tests/unit/auth/fapi-host-snapshot.test.ts, and .claude/skills/auth-console-sync.",
+  "instances": {
+    "prod": { "appHost": "jov.ie", "fapiHost": "clerk.jov.ie" },
+    "staging": {
+      "appHost": "staging.jov.ie",
+      "fapiHost": "clerk.staging.jov.ie"
+    }
+  },
+  "google": {
+    "clientId": "418036700153-b4cqhpc99ugr5bjgog4pikc16gvv8r2u.apps.googleusercontent.com",
+    "consoleUrl": "https://console.cloud.google.com/auth/clients/418036700153-b4cqhpc99ugr5bjgog4pikc16gvv8r2u.apps.googleusercontent.com?project=jovie-338618",
+    "requiredRedirectUris": [
+      "https://clerk.jov.ie/v1/oauth_callback",
+      "https://clerk.staging.jov.ie/v1/oauth_callback"
+    ]
+  },
+  "apple": {
+    "serviceId": "ie.jov.signin",
+    "teamId": "G24T327LXT",
+    "consoleUrl": "https://developer.apple.com/account/resources/identifiers/list/serviceId",
+    "requiredDomains": ["clerk.jov.ie"],
+    "requiredReturnUrls": ["https://clerk.jov.ie/v1/oauth_callback"]
+  },
+  "native": {
+    "$comment": "Clerk-side allowlist (auth.redirect_urls / native applications), NOT a Google/Apple console setting. Apple App ID ie.jov.Jovie carries the Sign in with Apple capability; the iOS native flow completes back into the app at this scheme.",
+    "iosScheme": "ie.jov.jovie://auth/complete"
+  }
+}
