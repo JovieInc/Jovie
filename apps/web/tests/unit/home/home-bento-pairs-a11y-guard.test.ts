@@ -19,8 +19,13 @@ describe('HomeBentoPairs light-band a11y guard', () => {
     expect(componentSource).not.toMatch(
       /home-bento-pairs-section[^`]*bg-\(--color-bg-base\)/
     );
+    expect(componentSource).not.toContain('dark:bg-surface-1');
+    expect(componentSource).toMatch(/bg-white[^`]*dark:bg-white/);
     expect(homeCss).toMatch(
       /\.home-bento-pairs-section\s*\{[^}]*--color-bg-base:\s*#f5f5f7;/
+    );
+    expect(homeCss).toMatch(
+      /\.home-bento-pairs-section\s*\{[^}]*--color-text-secondary-token:/
     );
   });
 });

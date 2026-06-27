@@ -51,3 +51,9 @@ export function libraryApprovalStatusDotClasses(
   if (status === 'archived') return 'bg-tertiary-token';
   return 'bg-secondary-token';
 }
+
+export function isLibraryReleaseApprovedForPublic(
+  approvalStatus: LibraryApprovalStatus | null | undefined
+): boolean {
+  return approvalStatus === 'approved';
+}

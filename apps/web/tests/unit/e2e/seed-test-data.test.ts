@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildPublicReleaseApprovalSeedRow,
   isMissingPromoDownloadsRelationError,
   isRetryableSeedDatabaseError,
 } from '../../seed-test-data';
+
+describe('buildPublicReleaseApprovalSeedRow', () => {
+  it('marks seeded releases approved so public-profile fixtures stay visible', () => {
+    expect(
+      buildPublicReleaseApprovalSeedRow('profile-123', 'release-456')
+    ).toEqual({
+      creatorProfileId: 'profile-123',
+      assetId: 'release-456',
+      itemKind: 'release',
+      approvalStatus: 'approved',
+    });
+  });
+});
 
 describe('seedTestData database retry classifier', () => {
   it('treats Neon password auth failures as retryable', () => {

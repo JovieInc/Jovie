@@ -54,12 +54,12 @@ export function ArtistProfileSocialProof({
             <p className='text-sm font-medium tracking-[-0.02em] text-black dark:text-white'>
               {proofData.founderQuote.name}
             </p>
-            <p className='text-xs tracking-[-0.01em] text-black/56'>
+            <p className='text-xs tracking-[-0.01em] text-secondary-token'>
               {proofData.founderQuote.role}
             </p>
             <Link
               href={proofData.founderQuote.profileHref}
-              className='mt-3 inline-flex w-fit font-mono text-xs tracking-[-0.02em] text-black/56 transition-colors hover:text-black dark:hover:text-white'
+              className='mt-3 inline-flex w-fit font-mono text-xs tracking-[-0.02em] text-secondary-token transition-colors hover:text-primary-token'
             >
               {proofData.founderQuote.profileLabel}
             </Link>

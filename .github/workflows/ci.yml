@@ -1447,8 +1447,8 @@ jobs:
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        # Only migrate when we have a fresh ephemeral branch (DB-relevant changes).
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        # Shard 0 owns migrate/seed so matrix siblings reuse one Neon branch.
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard == 0
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1457,11 +1457,28 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard == 0
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+
+      - name: Wait for shared Neon seed (lighthouse shard > 0)
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard != 0
+        run: |
+          echo "Waiting for shard 0 migrate/seed on shared Neon branch..."
+          for attempt in $(seq 1 60); do
+            if pnpm --filter=@jovie/web exec tsx tests/wait-for-public-qa-seed.ts; then
+              echo "Shared Neon seed ready"
+              exit 0
+            fi
+            echo "Attempt ${attempt}/60: seed markers not ready yet"
+            sleep 5
+          done
+          echo "Timed out waiting for shard 0 seed on shared Neon branch"
+          exit 1
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Download build artifact
         id: download-build
@@ -2949,6 +2966,13 @@ jobs:
           NODE_ENV: test
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed public QA fixtures
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'

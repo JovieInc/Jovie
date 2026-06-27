@@ -149,7 +149,7 @@ export function PaySelector({
                   <label className='w-full'>
                     <span className='sr-only'>Custom Amount</span>
                     <div className='flex h-23 items-center rounded-3xl border border-white/12 bg-white/[0.03] px-4.5 text-white dark:text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
-                      <span className='mr-3 text-2xl font-medium tracking-[-0.04em] text-white/42'>
+                      <span className='mr-3 text-2xl font-medium tracking-[-0.04em] text-tertiary-token'>
                         $
                       </span>
                       <input
@@ -163,7 +163,7 @@ export function PaySelector({
                           );
                         }}
                         placeholder='0.00'
-                        className='h-full w-full bg-transparent text-3xl font-semibold tracking-[-0.05em] text-white dark:text-white outline-none placeholder:text-white dark:text-white/18'
+                        className='h-full w-full bg-transparent text-3xl font-semibold tracking-[-0.05em] text-primary-token outline-none placeholder:text-tertiary-token'
                         aria-label='Custom Amount'
                       />
                     </div>
@@ -204,7 +204,7 @@ export function PaySelector({
               <button
                 type='button'
                 onClick={handleCustomToggle}
-                className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/52 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-pressed={customMode}
                 aria-controls='pay-selector-heading'
               >
@@ -237,7 +237,7 @@ export function PaySelector({
               <button
                 type='button'
                 onClick={() => setShowOtherOptions(open => !open)}
-                className='flex w-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-white/48 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='flex w-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-expanded={showOtherOptions}
               >
                 <span className='h-px flex-1 bg-white/8' />

@@ -350,6 +350,49 @@ describe('canary health gate workflow', () => {
   });
 });
 
+describe('CI E2E smoke workflow', () => {
+  it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
+    const migrateStep = getStepBlock(
+      smokeJob,
+      'Run migrations (ephemeral Neon)'
+    );
+    const seedStep = getStepBlock(smokeJob, 'Seed public QA fixtures');
+
+    expect(migrateStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(seedStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(smokeJob).not.toContain('Export DATABASE_URL (main');
+  });
+});
+
+describe('CI public lighthouse workflow', () => {
+  it('seeds QA fixtures only on shard 0 to avoid matrix Neon races', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
+    const migrateStep = getStepBlock(
+      lighthouseJob,
+      'Run migrations (ephemeral Neon)'
+    );
+    const seedStep = getStepBlock(lighthouseJob, 'Seed public QA fixtures');
+    const waitStep = getStepBlock(
+      lighthouseJob,
+      'Wait for shared Neon seed (lighthouse shard > 0)'
+    );
+
+    expect(migrateStep).toContain('matrix.shard == 0');
+    expect(seedStep).toContain('matrix.shard == 0');
+    expect(waitStep).toContain('matrix.shard != 0');
+    expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
+    expect(seedStep).toContain('tests/seed-test-data.ts');
+  });
+});
+
 describe('CI public a11y workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
