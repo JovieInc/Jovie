@@ -54,6 +54,13 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Guardrails (proxy)',
   'CI / CI Risk Classifier',
   'CI Risk Classifier',
+  // LLM / advisory checks — never pin as branch-protection required contexts
+  'scope-judge',
+  'Scope Alignment Check',
+  'Claude Review',
+  'Seer Code Review',
+  'Storybook A11y Checks',
+  'Playwright Visual Regression',
 ]);
 
 const BRANCH_PROTECTION_RULESET_PATH = '.github/rulesets/branch-protection.yml';

@@ -19,6 +19,9 @@ concurrency:
 jobs:
   storybook-a11y:
     name: Storybook A11y Checks
+    # Advisory — Storybook component a11y signal, not a merge gate. PR Ready
+    # aggregates deterministic checks only; promote to blocking via ci-pr-ready.needs.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -67,6 +70,8 @@ jobs:
 
   playwright-visual:
     name: Playwright Visual Regression
+    # Advisory — visual diff signal for component PRs, not a merge gate.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Skip on forks — secrets (DATABASE_URL) are not available

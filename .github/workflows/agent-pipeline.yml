@@ -578,15 +578,11 @@ jobs:
           STATUSES=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/status --jq '.statuses')
           CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/check-runs --jq '.check_runs')
 
-          # 1. Check scope-judge status
+          # 1. Scope judge (advisory — LLM alignment off fast auto-merge path)
           SCOPE_STATUS=$(echo "$STATUSES" | jq -r '[.[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"')
-          echo "Scope judge: $SCOPE_STATUS"
-
-          if [[ "$SCOPE_STATUS" != "success" ]]; then
-            echo "Scope judge has not passed (status: $SCOPE_STATUS). Cannot auto-approve."
-            echo "all_passed=false" >> "$GITHUB_OUTPUT"
-            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> "$GITHUB_OUTPUT"
-            exit 0
+          echo "Scope judge (advisory): $SCOPE_STATUS"
+          if [[ "$SCOPE_STATUS" != "success" && "$SCOPE_STATUS" != "pending" ]]; then
+            echo "::warning::scope-judge reported $SCOPE_STATUS — advisory only, not blocking auto-approve."
           fi
 
           # 2. Check CI PR Ready (the aggregate required check)

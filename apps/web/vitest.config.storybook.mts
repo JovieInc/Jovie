@@ -28,6 +28,9 @@ export default defineConfig({
     // (Storybook's internal React 18 compat chunk occasionally fails to load)
     retry: process.env.CI ? 2 : 0,
   },
+  esbuild: {
+    target: 'esnext',
+  },
   resolve: {
     dedupe: [
       'react',
@@ -37,6 +40,11 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
+    // Default Vite browser target (chrome87) cannot esbuild-prebundle modern ESM
+    // (destructuring, etc.) pulled in transitively by Storybook stories.
+    esbuildOptions: {
+      target: 'esnext',
+    },
     include: [
       // React core
       'react',
@@ -103,19 +111,6 @@ export default defineConfig({
       // Form + context menu (pulled in via @jovie/ui barrel exports)
       'react-hook-form',
       '@radix-ui/react-context-menu',
-      // Server-side deps (referenced by stories indirectly)
-      '@sentry/nextjs',
-      'isomorphic-dompurify',
-      'drizzle-orm',
-      'drizzle-orm/pg-core',
-      'drizzle-orm/neon-http',
-      'drizzle-zod',
-      'zod',
-      '@upstash/ratelimit',
-      '@upstash/redis',
-      '@neondatabase/serverless',
-      'jose',
-      'stripe',
     ],
   },
 });
