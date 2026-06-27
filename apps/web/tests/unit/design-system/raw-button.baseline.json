@@ -1,4 +1,4 @@
 {
-  "count": 712,
-  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down — lower this when a PR converts raw buttons to the canonical Button."
+  "count": 692,
+  "note": "Raw <button> tags in apps/web/{components,app}, excluding test/spec/stories files. Ratchet only goes down — lower this when a PR converts raw buttons to the canonical Button."
 }

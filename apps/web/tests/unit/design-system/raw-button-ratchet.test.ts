@@ -35,6 +35,9 @@ const BASELINE_PATH = join(__dirname, 'raw-button.baseline.json');
 // `<Button` component (capital B) and any hypothetical `<buttonish` element.
 const RAW_BUTTON = /<button(?=[\s/>])/g;
 const SOURCE_EXT = /\.(tsx|ts)$/;
+// Test/spec/stories files are excluded: they mock UI for testing and should
+// not count toward production UI drift. Only real components/pages are ratcheted.
+const EXCLUDED_FILE = /\.(test|spec|stories)\./;
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
@@ -44,7 +47,7 @@ function walk(dir: string, out: string[]): void {
     if (s.isDirectory()) {
       if (entry === 'node_modules' || entry === '.next') continue;
       walk(full, out);
-    } else if (SOURCE_EXT.test(entry)) {
+    } else if (SOURCE_EXT.test(entry) && !EXCLUDED_FILE.test(entry)) {
       out.push(full);
     }
   }
