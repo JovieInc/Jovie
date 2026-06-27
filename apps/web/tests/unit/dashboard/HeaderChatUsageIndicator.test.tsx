@@ -31,6 +31,7 @@ describe('HeaderChatUsageIndicator', () => {
   it('renders near-limit copy in header', () => {
     mockUseChatUsageQuery.mockReturnValue({
       data: {
+        plan: 'free',
         remaining: 2,
         isNearLimit: true,
         isExhausted: false,
@@ -41,6 +42,23 @@ describe('HeaderChatUsageIndicator', () => {
 
     expect(getByRole('link')).toBeDefined();
     expect(getByText('2 messages left')).toBeDefined();
+  });
+
+  it('renders healthy paid plan usage in header', () => {
+    mockUseChatUsageQuery.mockReturnValue({
+      data: {
+        plan: 'pro',
+        remaining: 42,
+        isNearLimit: false,
+        isExhausted: false,
+      },
+    });
+
+    const { getByRole, getByText } = fastRender(<HeaderChatUsageIndicator />);
+
+    expect(getByRole('link')).toBeDefined();
+    expect(getByText('Pro')).toBeDefined();
+    expect(getByText('42 messages left')).toBeDefined();
   });
 
   it('suppresses the banner on nested demo routes', () => {

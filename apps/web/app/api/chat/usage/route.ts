@@ -4,11 +4,11 @@ import {
   getEntitlements,
   resolveChatUsagePlan,
 } from '@/lib/entitlements/registry';
-import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { aiChatDailyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
 import { getRedis } from '@/lib/redis';
-import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
+import type { UserPlan } from '@/types';
 
 export const runtime = 'nodejs';
 
@@ -89,6 +89,40 @@ function formatResetAt(resetTime: number): string | null {
   return new Date(resetTime).toISOString();
 }
 
+export function buildChatUsageSnapshot(params: {
+  readonly userId: string;
+  readonly entitlementPlan: UserPlan;
+}): ChatUsageSnapshot {
+  const plan = resolveChatUsagePlan(params.entitlementPlan);
+  const entitlements = getEntitlements(params.entitlementPlan);
+  const dailyLimit = entitlements.limits.aiDailyMessageLimit;
+  const status = aiChatDailyPlanAwareLimiter.getStatus(
+    params.userId,
+    params.entitlementPlan
+  );
+  const remaining = Math.max(0, Math.min(dailyLimit, status.remaining));
+  const used = Math.max(0, dailyLimit - remaining);
+  const warningThreshold = plan === 'free' ? 2 : 5;
+  const monthlyWindow = resolveMonthlyUsageWindow();
+  const monthlyLimit = dailyLimit * monthlyWindow.daysInMonth;
+  const monthlyUsed = Math.min(used, monthlyLimit);
+
+  return {
+    plan,
+    dailyLimit,
+    used,
+    remaining,
+    resetAt: formatResetAt(status.resetTime),
+    monthlyLimit,
+    monthlyUsed,
+    monthlyRemaining: Math.max(0, monthlyLimit - monthlyUsed),
+    monthlyResetAt: monthlyWindow.resetAt,
+    isExhausted: remaining <= 0,
+    warningThreshold,
+    isNearLimit: remaining > 0 && remaining <= warningThreshold,
+  };
+}
+
 export async function GET() {
   let userId: string | null;
   try {
@@ -106,55 +140,35 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const billing = await getUserBillingInfo();
-  if (!billing.success) {
-    // Billing unavailable — serve stale cached data if we have it
+  const entitlements = await getCurrentUserEntitlements();
+  if (!entitlements.isAuthenticated || !entitlements.userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const billingUnavailable = entitlements.billingVerification === 'unavailable';
+
+  if (billingUnavailable) {
     const cached = await readCachedChatUsage(userId);
     if (cached) {
       const stale: StaleChatUsageSnapshot = { ...cached, _stale: true };
       return NextResponse.json(stale, { headers: CACHE_HEADERS });
     }
 
-    logger.warn('Chat usage billing lookup failed with no cache fallback', {
+    logger.warn('Chat usage billing unavailable; serving degraded snapshot', {
       userId,
     });
-    return NextResponse.json(
-      { error: 'Billing service temporarily unavailable' },
-      {
-        status: 503,
-        headers: {
-          'Cache-Control': 'no-store',
-          'Retry-After': RETRY_AFTER_SERVICE,
-        },
-      }
-    );
+    const degraded = buildChatUsageSnapshot({
+      userId,
+      entitlementPlan: entitlements.plan,
+    });
+    const stale: StaleChatUsageSnapshot = { ...degraded, _stale: true };
+    return NextResponse.json(stale, { headers: CACHE_HEADERS });
   }
 
-  const plan = resolveChatUsagePlan(billing.data?.plan);
-  const entitlements = getEntitlements(plan);
-  const dailyLimit = entitlements.limits.aiDailyMessageLimit;
-  const status = aiChatDailyPlanAwareLimiter.getStatus(userId, plan);
-  const remaining = Math.max(0, Math.min(dailyLimit, status.remaining));
-  const used = Math.max(0, dailyLimit - remaining);
-  const warningThreshold = plan === 'free' ? 2 : 5;
-  const monthlyWindow = resolveMonthlyUsageWindow();
-  const monthlyLimit = dailyLimit * monthlyWindow.daysInMonth;
-  const monthlyUsed = Math.min(used, monthlyLimit);
-
-  const response: ChatUsageSnapshot = {
-    plan,
-    dailyLimit,
-    used,
-    remaining,
-    resetAt: formatResetAt(status.resetTime),
-    monthlyLimit,
-    monthlyUsed,
-    monthlyRemaining: Math.max(0, monthlyLimit - monthlyUsed),
-    monthlyResetAt: monthlyWindow.resetAt,
-    isExhausted: remaining <= 0,
-    warningThreshold,
-    isNearLimit: remaining > 0 && remaining <= warningThreshold,
-  };
+  const response = buildChatUsageSnapshot({
+    userId,
+    entitlementPlan: entitlements.plan,
+  });
 
   writeChatUsageCache(userId, response);
 
