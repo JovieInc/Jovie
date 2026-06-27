@@ -1,4 +1,5 @@
 import type { ChatRailContextTarget } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
+import { resolveChatRailContextLabel } from '@/lib/chat/context-label';
 import { parseTokens } from '@/lib/chat/tokens';
 import { encodeToolEvents } from '@/lib/chat/tool-events';
 import type { MessagePart } from './types';
@@ -92,7 +93,7 @@ export function deriveChatRailContextTargets({
       targets.push({
         kind: token.kind,
         id: token.id,
-        label: token.label,
+        label: resolveChatRailContextLabel(token.kind, token.label),
         source: 'message',
         focusKey: `message:${message.id}:entity:${token.kind}:${token.id}:${tokenIndex}`,
       });
@@ -104,7 +105,7 @@ export function deriveChatRailContextTargets({
         targets.push({
           kind: 'profile',
           id: profile.id,
-          label: profile.label,
+          label: resolveChatRailContextLabel('profile', profile.label),
           source: 'tool',
           focusKey: `tool:${event.toolCallId}:profile:${profile.id}`,
           toolCallId: event.toolCallId,
@@ -127,7 +128,7 @@ export function deriveChatRailContextTargets({
         targets.push({
           kind: field.kind,
           id,
-          label,
+          label: resolveChatRailContextLabel(field.kind, label),
           source: 'tool',
           focusKey: `tool:${event.toolCallId}:entity:${field.kind}:${id}`,
           toolCallId: event.toolCallId,

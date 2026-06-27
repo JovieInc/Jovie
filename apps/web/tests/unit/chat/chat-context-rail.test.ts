@@ -31,6 +31,30 @@ describe('deriveChatRailContextTargets', () => {
     );
   });
 
+  it('replaces template placeholder labels with kind fallbacks', () => {
+    const targets = deriveChatRailContextTargets({
+      messages: [
+        {
+          id: 'msg-template',
+          parts: [
+            {
+              type: 'text',
+              text: '@release:rel_1[<title>] and @artist:art_1[<name>] and @track:trk_1[<title>]',
+            },
+          ],
+        },
+      ],
+      profile: { id: 'profile-1', label: 'Tim White' },
+    });
+
+    expect(targets).toEqual([
+      expect.objectContaining({ kind: 'release', label: 'Release' }),
+      expect.objectContaining({ kind: 'artist', label: 'Artist' }),
+      expect.objectContaining({ kind: 'track', label: 'Track' }),
+    ]);
+    expect(targets.some(target => target.label?.includes('<'))).toBe(false);
+  });
+
   it('surfaces profile context and explicit entity ids from tool events', () => {
     const targets = deriveChatRailContextTargets({
       messages: [
