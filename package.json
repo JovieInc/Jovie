@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.6.54",
+  "version": "26.6.56",
   "private": true,
   "config": {
     "commitizen": {
@@ -103,6 +103,7 @@
     "ios:screenshots": "bash apps/ios/scripts/capture-screenshots.sh",
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",
+    "auth:redirect-uris": "tsx scripts/auth-redirect-uris.ts",
     "brand:generate": "tsx scripts/generate-brand-assets.ts",
     "lint": "node scripts/run-scoped-turbo-task.mjs lint",
     "lint:fix": "node scripts/turbo-local.mjs lint:fix",
@@ -134,6 +135,7 @@
     "test:coverage:diff": "tsx scripts/audit-test-coverage.ts --check-pr",
     "test:bug-to-test": "pnpm --filter @jovie/web run test:bug-to-test",
     "test:quarantine-ledger": "pnpm --filter @jovie/web run test:quarantine-ledger",
+    "test:reliability-detectors": "pnpm --filter @jovie/web run test:reliability-detectors",
     "admin:green": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green",
     "admin:green:record": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:record",
     "admin:green:watch": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:watch",

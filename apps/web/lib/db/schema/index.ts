@@ -415,6 +415,11 @@ export {
   webhookProviderEnum,
   workflowRunStatusEnum,
 } from './enums';
+// Feature flag per-environment overrides
+export {
+  type FeatureFlagOverrideRow,
+  featureFlagOverrides,
+} from './feature-flags';
 // Feedback
 export {
   type FeedbackItem,

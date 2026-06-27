@@ -5,6 +5,7 @@ import {
   Cable,
   CalendarDays,
   CheckSquare,
+  Flag,
   FolderKanban,
   Gauge,
   HandCoins,
@@ -233,6 +234,7 @@ const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   costs: Banknote,
   share_studio: Share2,
   system_map: Map,
+  features: Flag,
 };
 
 function buildAdminNavigationItems(
