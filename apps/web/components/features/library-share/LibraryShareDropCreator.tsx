@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -99,13 +100,15 @@ export function LibraryShareDropCreator({
           >
             {createdUrl}
           </span>
-          <button
+          <Button
             type='button'
+            variant='outline'
+            size='sm'
             onClick={() => {
               copyShareUrl(createdUrl).catch(() => {});
             }}
             aria-label='Copy Share Link'
-            className='inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border border-subtle px-2 text-xs font-medium text-primary-token transition-colors hover:bg-surface-2'
+            className='h-7 shrink-0 gap-1 rounded-lg px-2 text-xs font-medium normal-case'
             data-testid='library-share-copy-button'
           >
             {copied ? (
@@ -114,7 +117,7 @@ export function LibraryShareDropCreator({
               <Copy className='h-3.5 w-3.5' strokeWidth={2.25} />
             )}
             {copied ? 'Copied' : 'Copy'}
-          </button>
+          </Button>
           <a
             href={createdUrl}
             target='_blank'
@@ -127,18 +130,20 @@ export function LibraryShareDropCreator({
             Open
           </a>
         </div>
-        <button
+        <Button
           type='button'
+          variant='link'
+          size='sm'
           onClick={() => {
             setCreatedUrl(null);
             setCopied(false);
             setOpen(false);
           }}
-          className='mt-3 text-xs font-medium text-secondary-token transition-colors hover:text-primary-token'
+          className='mt-3 h-auto p-0 text-xs font-medium text-secondary-token normal-case hover:text-primary-token'
           data-testid='library-share-done-button'
         >
           Done
-        </button>
+        </Button>
       </div>
     );
   }
