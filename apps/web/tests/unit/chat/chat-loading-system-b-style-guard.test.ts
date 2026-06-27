@@ -39,7 +39,7 @@ function extractConversationLoadingBranch(source: string) {
   const start = source.indexOf(
     'export function ChatLoadingConversationSkeleton'
   );
-  const end = source.indexOf('export { CHAT_COMPOSER_DOCK_CLASSNAME', start);
+  const end = source.indexOf('CHAT_COMPOSER_DOCK_CLASSNAME,', start);
 
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
