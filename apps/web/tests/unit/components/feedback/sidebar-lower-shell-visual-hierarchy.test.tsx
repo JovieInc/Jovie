@@ -78,7 +78,7 @@ describe('Sidebar lower shell visual hierarchy', () => {
   it('lets users dismiss the current upgrade nudge for the session', () => {
     render(<SidebarUpgradeBanner />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss prompt' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
 
     expect(
       screen.queryByRole('button', { name: 'Start trial' })

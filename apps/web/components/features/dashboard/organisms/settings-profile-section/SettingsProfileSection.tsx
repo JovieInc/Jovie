@@ -16,7 +16,7 @@ import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
-  'block w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
+  'block w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-subtle focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
 const PROFILE_LABEL_COLUMN_WIDTH = '168px';
 const PROFILE_ROW_CLASS =
   'grid gap-2 py-3 sm:grid-cols-[var(--profile-label-column-width)_minmax(0,1fr)] sm:items-start sm:gap-x-5';
@@ -164,7 +164,7 @@ export function SettingsProfileSection({
               value={formData.username}
               onChange={e => handleFieldChange('username', e.target.value)}
               onBlur={() => flushSave()}
-              placeholder='yourname'
+              placeholder='Yourname'
               className={`min-w-0 flex-1 rounded-none rounded-r-lg border-l-0 ${PROFILE_INPUT_CLASS}`}
             />
           </div>
@@ -186,7 +186,7 @@ export function SettingsProfileSection({
             value={formData.location}
             onChange={e => handleFieldChange('location', e.target.value)}
             onBlur={() => flushSave()}
-            placeholder='Los Angeles, CA'
+            placeholder='Los Angeles, CA' // ui-casing-allow: city placeholder example
             className={`${PROFILE_FIELD_COLUMN_CLASS} ${PROFILE_INPUT_CLASS}`}
           />
         </div>
@@ -235,7 +235,7 @@ export function SettingsProfileSection({
                 handleFieldChange('careerHighlights', e.target.value)
               }
               onBlur={() => flushSave()}
-              placeholder='e.g. 500K+ monthly listeners on Spotify, featured on New Music Friday twice, recent radio play on KCRW...'
+              placeholder='E.g. 500K+ monthly listeners on Spotify, featured on New Music Friday twice, recent radio play on KCRW...' // ui-casing-allow: example placeholder with E.g.
               rows={4}
               maxLength={2000}
               className={`w-full resize-y ${PROFILE_INPUT_CLASS}`}

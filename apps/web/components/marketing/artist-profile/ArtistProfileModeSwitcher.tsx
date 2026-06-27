@@ -200,7 +200,7 @@ export function ArtistProfileModeSwitcher({
 
       <div
         className={cn(
-          'artist-profile-mode-switcher-tabs relative mx-auto mt-4 w-full max-w-[29rem] px-0 transition-opacity duration-300',
+          'artist-profile-mode-switcher-tabs relative mx-auto mt-4 w-full max-w-[29rem] px-0 transition-opacity duration-cinematic',
           tabsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
       >
@@ -248,7 +248,7 @@ export function ArtistProfileModeSwitcher({
               variant='linear-pill'
               layout='fill'
               size='sm'
-              aria-label='Profile modes'
+              aria-label='Profile Modes'
               className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
               triggerClassName='min-h-11 min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
             />
@@ -370,7 +370,7 @@ function AnimatedProfileModeTabs({
       className='mx-auto w-full'
     >
       <Tabs.List
-        aria-label='Profile modes'
+        aria-label='Profile Modes'
         className='relative grid w-full grid-cols-4 rounded-full border border-white/[0.09] bg-white/[0.045] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.24)] supports-[backdrop-filter]:backdrop-blur-xl'
       >
         {modes.map(mode => {
@@ -388,12 +388,12 @@ function AnimatedProfileModeTabs({
                   event.preventDefault();
                 }
               }}
-              className='relative z-10 flex min-h-11 min-w-0 items-center justify-center rounded-full px-1.5 text-center text-3xs font-semibold tracking-normal text-white/50 transition-colors duration-150 hover:text-white/78 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[state=active]:text-black sm:px-3.5 sm:text-xs'
+              className='relative z-10 flex min-h-11 min-w-0 items-center justify-center rounded-full px-1.5 text-center text-3xs font-semibold tracking-normal text-white/50 transition-colors duration-subtle hover:text-white/78 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[state=active]:text-black sm:px-3.5 sm:text-xs'
             >
               {isActive ? (
                 <motion.span
                   aria-hidden='true'
-                  className='absolute inset-0 z-[-1] rounded-full border border-white/30 bg-white shadow-[0_8px_22px_rgba(0,0,0,0.24)]'
+                  className='absolute inset-0 z-[-1] rounded-full border border-white/30 bg-white dark:bg-surface-1 shadow-[0_8px_22px_rgba(0,0,0,0.24)]'
                   layoutId='artist-profile-mode-active-tab'
                   transition={{
                     duration: reducedMotion ? 0 : undefined,

@@ -64,7 +64,7 @@ export function DrawerPropertyRow({
       type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'grid w-full text-left transition-[background-color] duration-150',
+        'grid w-full text-left transition-[background-color] duration-subtle',
         align === 'start' ? 'items-start' : 'items-center',
         styles.container,
         interactive &&

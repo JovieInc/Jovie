@@ -68,7 +68,7 @@ export function CollapsedContent({
   return (
     <span
       className={cn(
-        'min-w-0 whitespace-nowrap overflow-hidden text-ellipsis transition-[max-width,opacity] duration-200 ease-out',
+        'min-w-0 whitespace-nowrap overflow-hidden text-ellipsis transition-[max-width,opacity] duration-subtle ease-out',
         !defaultExpanded &&
           'max-w-0 opacity-0 group-hover/pill:max-w-[12rem] group-hover/pill:opacity-100 group-focus-within/pill:max-w-[12rem] group-focus-within/pill:opacity-100',
         defaultExpanded && 'max-w-[12rem] opacity-100'

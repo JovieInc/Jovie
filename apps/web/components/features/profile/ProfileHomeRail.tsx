@@ -88,8 +88,8 @@ function HomeAlertsCard({
   const sharedProps = {
     className:
       variant === 'bento'
-        ? 'group flex min-h-16 w-full min-w-0 items-center gap-3 rounded-(--profile-inner-radius) border border-white/10 bg-white/5 px-3.5 py-3 text-left text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90'
-        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 text-left text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90',
+        ? 'group flex min-h-16 w-full min-w-0 items-center gap-3 rounded-(--profile-inner-radius) border border-white/10 bg-white/5 px-3.5 py-3 text-left text-white dark:text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90'
+        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 text-left text-white dark:text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90',
     'data-testid':
       variant === 'bento'
         ? 'profile-home-alerts-fallback-card'

@@ -311,7 +311,7 @@ function PressPhotosSection({
         <div className='flex items-center gap-1.5'>
           {draftPhotos.length > 0 && (
             <Badge variant='outline' className='text-3xs tabular-nums'>
-              {draftPhotos.length} awaiting approval
+              {draftPhotos.length}Awaiting Approval
             </Badge>
           )}
           <Badge variant='secondary' className='text-3xs tabular-nums'>
@@ -369,12 +369,12 @@ function PressPhotosSection({
                 />
                 {/* DSP source badge */}
                 {photo.sourcePlatform && (
-                  <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white'>
+                  <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white dark:text-white'>
                     {photo.sourcePlatform.replace('_', ' ')}
                   </span>
                 )}
                 {/* Hidden label */}
-                <span className='absolute bottom-8 left-0 right-0 text-center text-3xs font-medium text-white drop-shadow-sm'>
+                <span className='absolute bottom-8 left-0 right-0 text-center text-3xs font-medium text-white dark:text-white drop-shadow-sm'>
                   Hidden until approved
                 </span>
                 {/* Delete button */}
@@ -383,8 +383,8 @@ function PressPhotosSection({
                     type='button'
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
-                    className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Delete imported photo'
+                    className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white dark:text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Delete Imported Photo'
                   >
                     {deletingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3 w-3 animate-spin' />
@@ -399,8 +399,8 @@ function PressPhotosSection({
                     type='button'
                     onClick={() => handleApprove(photo.id)}
                     disabled={approvingPhotoId === photo.id}
-                    className='absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-lg bg-white/90 py-1 text-2xs font-medium text-black transition hover:bg-white disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Approve press photo for public profile'
+                    className='absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-lg bg-white/90 py-1 text-2xs font-medium text-black dark:text-white transition hover:bg-white disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Approve Press Photo For Public Profile'
                   >
                     {approvingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3 w-3 animate-spin' />
@@ -437,7 +437,7 @@ function PressPhotosSection({
                   sizes='(max-width: 768px) 45vw, 160px'
                   className='object-cover'
                 />
-                <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white'>
+                <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-3xs font-medium capitalize text-white dark:text-white'>
                   {photo.status}
                 </span>
                 {onDelete && (
@@ -445,8 +445,8 @@ function PressPhotosSection({
                     type='button'
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
-                    className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Delete imported photo'
+                    className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white dark:text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Delete Imported Photo'
                   >
                     {deletingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3 w-3 animate-spin' />
@@ -486,8 +486,8 @@ function PressPhotosSection({
                     type='button'
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
-                    className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Delete press photo'
+                    className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white dark:text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Delete Press Photo'
                   >
                     {deletingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
@@ -517,7 +517,7 @@ function PressPhotosSection({
                   style={{ backgroundImage: `url(${previewUrl})` }}
                 />
                 <div className='absolute inset-0 bg-black/35' />
-                <div className='relative z-10 flex flex-col items-center gap-1 text-white'>
+                <div className='relative z-10 flex flex-col items-center gap-1 text-white dark:text-white'>
                   <LoaderCircle className='h-4 w-4 animate-spin' />
                   <span className='text-2xs font-medium'>
                     Uploading {uploadProgress}%
@@ -738,18 +738,18 @@ export function ProfileAboutTab({
         className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
       >
         <DrawerAsyncToggle
-          label='Photo downloads'
+          label='Photo Downloads'
           ariaLabel='Allow profile photo downloads on public pages'
           checked={allowPhotoDownloads}
           onToggle={updateAllowProfilePhotoDownloads}
           successMessage={on =>
             on
-              ? 'Photo downloads enabled for visitors'
-              : 'Photo downloads disabled'
+              ? 'Photo Downloads enabled for visitors'
+              : 'Photo Downloads disabled'
           }
         />
         <DrawerAsyncToggle
-          label='Show releases older than 90 days'
+          label='Show Releases Older Than 90 Days'
           ariaLabel='Keep showing releases older than 90 days on your public profile'
           checked={showOldReleases}
           onToggle={updateShowOldReleases}

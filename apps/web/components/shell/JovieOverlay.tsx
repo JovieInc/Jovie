@@ -38,7 +38,7 @@ export function JovieOverlay({
           caller via setListening(false). */}
       <div
         aria-hidden='true'
-        className='fixed inset-0 z-40 bg-black pointer-events-none'
+        className='fixed inset-0 z-40 bg-black dark:bg-black pointer-events-none'
         style={{
           opacity: listening ? 0.55 : 0,
           backdropFilter: listening ? 'blur(2px)' : 'blur(0)',

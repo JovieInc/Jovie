@@ -43,7 +43,7 @@ export function PhoneMockupPreview({
           className={cn(
             'relative w-full h-full rounded-3xl overflow-hidden',
             'border border-(--linear-app-frame-seam) bg-surface-0',
-            'transition-colors duration-300'
+            'transition-colors duration-cinematic'
           )}
         >
           {/* Profile header */}
@@ -58,7 +58,7 @@ export function PhoneMockupPreview({
                   'border-4 border-white/20',
                   'bg-surface-1',
                   'overflow-hidden',
-                  'transition-all duration-300',
+                  'transition-colors duration-cinematic',
                   isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
                 )}
               >
@@ -82,8 +82,8 @@ export function PhoneMockupPreview({
               {/* Username */}
               <h1
                 className={cn(
-                  'text-xl font-semibold text-white text-center',
-                  'transition-all duration-300',
+                  'text-xl font-semibold text-white dark:text-white text-center',
+                  'transition-colors duration-cinematic',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
                     : 'opacity-0 translate-y-2'
@@ -96,7 +96,7 @@ export function PhoneMockupPreview({
               <p
                 className={cn(
                   'text-sm text-white/80 text-center mt-1 max-w-xs',
-                  'transition-all duration-300 delay-100',
+                  'transition-colors duration-cinematic delay-100',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
                     : 'opacity-0 translate-y-2'
@@ -111,7 +111,7 @@ export function PhoneMockupPreview({
           <div
             className={cn(
               'p-4 space-y-3 h-[calc(100%-10rem)] overflow-y-auto',
-              'transition-all duration-300'
+              'transition-colors duration-cinematic'
             )}
           >
             <AnimatePresence>
@@ -147,7 +147,7 @@ export function PhoneMockupPreview({
                     tabIndex={-1}
                     className={cn(
                       'relative block rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 p-4 hover:bg-surface-1',
-                      'transition-all duration-200',
+                      'transition-colors duration-subtle',
                       'overflow-hidden',
                       activeLink === link.id && 'ring-2 ring-primary-500/20'
                     )}
@@ -159,7 +159,7 @@ export function PhoneMockupPreview({
                           'flex items-center justify-center',
                           'bg-surface-0',
                           'text-primary-token',
-                          'transition-all duration-200'
+                          'transition-colors duration-subtle'
                         )}
                       >
                         <SocialIcon
@@ -193,7 +193,7 @@ export function PhoneMockupPreview({
                       className={cn(
                         'absolute inset-0 -z-10 opacity-0',
                         'bg-linear-to-r from-primary-500/5 to-primary-600/5 dark:from-primary-400/5 dark:to-primary-500/5',
-                        'transition-opacity duration-300',
+                        'transition-opacity duration-cinematic',
                         activeLink === link.id && 'opacity-100'
                       )}
                       aria-hidden='true'
@@ -209,7 +209,7 @@ export function PhoneMockupPreview({
                     />
                   </div>
                   <h3 className='mb-1 text-app font-caption text-primary-token'>
-                    No links yet
+                    No Links Yet
                   </h3>
                   <p className='text-app text-secondary-token'>
                     Add your first link to see it here

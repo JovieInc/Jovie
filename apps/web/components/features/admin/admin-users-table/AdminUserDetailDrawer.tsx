@@ -41,9 +41,9 @@ function computeProfileCompleteness(user: AdminUserRow): {
   const fields: ProfileField[] = [
     { label: 'Name', filled: Boolean(user.name) },
     { label: 'Email', filled: Boolean(user.email) },
-    { label: 'Billing connected', filled: Boolean(user.stripeCustomerId) },
+    { label: 'Billing Connected', filled: Boolean(user.stripeCustomerId) },
     { label: 'Subscription', filled: Boolean(user.stripeSubscriptionId) },
-    { label: 'Active account', filled: !user.deletedAt },
+    { label: 'Active Account', filled: !user.deletedAt },
   ];
 
   const filled = fields.filter(f => f.filled).length;
@@ -71,7 +71,7 @@ function ProfileCompletenessBar({
       </div>
       <div className='h-1.5 w-full overflow-hidden rounded-full bg-surface-3'>
         <div
-          className='h-full rounded-full bg-brand-primary transition-all duration-300'
+          className='h-full rounded-full bg-brand-primary transition-colors duration-cinematic'
           style={{ width: `${score}%` }}
         />
       </div>

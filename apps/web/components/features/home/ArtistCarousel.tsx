@@ -46,7 +46,7 @@ export function ArtistCarousel({ artists }: ArtistCarouselProps) {
 
                 {/* Hover overlay with artist name */}
                 <div className='absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 transition-opacity duration-slower group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none'>
-                  <span className='text-white text-xs sm:text-sm font-medium text-center px-2'>
+                  <span className='text-white dark:text-white text-xs sm:text-sm font-medium text-center px-2'>
                     {artist.name}
                   </span>
                 </div>

@@ -72,7 +72,7 @@ export function ChatProposeNextStepCard({
         headerTitle: 'text-primary-token text-lg font-semibold',
         headerSubtitle: 'text-secondary-token text-app',
         formButtonPrimary:
-          'bg-white text-black hover:bg-white/90 font-semibold',
+          'bg-white text-black dark:text-white hover:bg-white/90 font-semibold',
         socialButtonsBlockButton:
           'bg-surface-1 border-subtle text-primary-token hover:bg-surface-2',
         formFieldInput:

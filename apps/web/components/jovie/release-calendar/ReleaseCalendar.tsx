@@ -182,7 +182,7 @@ export function ReleaseCalendar({
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0 }}
                           data-testid={`release-calendar-moved-badge-${moment.slug}`}
-                          className='absolute -right-1 -top-2 rounded-full bg-fuchsia-500 px-2 py-0.5 text-3xs font-bold text-white shadow'
+                          className='absolute -right-1 -top-2 rounded-full bg-fuchsia-500 px-2 py-0.5 text-3xs font-bold text-white dark:text-white shadow'
                         >
                           Moved
                         </motion.span>

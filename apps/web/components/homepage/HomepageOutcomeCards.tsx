@@ -48,7 +48,7 @@ export function HomepageOutcomeCards({
         <div className='homepage-outcome-header'>
           <h2
             id='homepage-outcome-cards-heading'
-            className='homepage-outcome-heading text-black'
+            className='homepage-outcome-heading text-black dark:text-white'
           >
             {headline}
           </h2>

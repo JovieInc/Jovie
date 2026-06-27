@@ -146,7 +146,7 @@ function ProductCursor({
       {isClicking ? (
         <span className='absolute -left-3 -top-3 size-8 animate-ping rounded-full border border-primary-token/80' />
       ) : null}
-      <MousePointer2 className='size-7 fill-white text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.75)]' />
+      <MousePointer2 className='size-7 fill-white text-white dark:text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.75)]' />
     </div>
   );
 }

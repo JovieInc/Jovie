@@ -50,7 +50,7 @@ export function LoadingSpinner({
         <span
           className={cn(
             'absolute inset-0 rounded-full border-2 border-current/20',
-            'transition-transform duration-200 ease-out motion-reduce:transition-none'
+            'transition-transform duration-subtle ease-out motion-reduce:transition-none'
           )}
         />
         <span

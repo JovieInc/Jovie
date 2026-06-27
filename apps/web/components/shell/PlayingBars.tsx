@@ -33,14 +33,16 @@ export function PlayingBars({
         <span
           className='w-1 rounded-sm bg-primary-token'
           style={{
-            animation: 'pb-eq-a 1400ms ease-in-out infinite',
+            animation:
+              'pb-eq-a var(--ds-motion-cinematic-duration) ease-in-out infinite',
             willChange: 'height',
           }}
         />
         <span
           className='w-1 rounded-sm bg-primary-token'
           style={{
-            animation: 'pb-eq-b 1100ms ease-in-out infinite',
+            animation:
+              'pb-eq-b var(--ds-motion-cinematic-duration) ease-in-out infinite',
             animationDelay: '-220ms',
             willChange: 'height',
           }}
@@ -48,7 +50,8 @@ export function PlayingBars({
         <span
           className='w-1 rounded-sm bg-primary-token'
           style={{
-            animation: 'pb-eq-c 1700ms ease-in-out infinite',
+            animation:
+              'pb-eq-c var(--ds-motion-cinematic-duration) ease-in-out infinite',
             animationDelay: '-480ms',
             willChange: 'height',
           }}

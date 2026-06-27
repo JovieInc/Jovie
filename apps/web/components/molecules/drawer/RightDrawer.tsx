@@ -130,7 +130,7 @@ export function RightDrawer({
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
           'overflow-hidden',
-          'outline-none focus:outline-none focus:ring-0',
+          'outline-none focus:outline-none focus-visible:ring-0',
           'border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
           'shadow-(--linear-app-drawer-shadow)',
           'pb-[env(safe-area-inset-bottom)]',
@@ -154,7 +154,7 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'z-10 shrink-0 h-full min-h-0 flex flex-col',
-        'outline-none focus:outline-none focus:ring-0',
+        'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
         'transition-[width,opacity] duration-cinematic ease-cinematic',
         isOpen

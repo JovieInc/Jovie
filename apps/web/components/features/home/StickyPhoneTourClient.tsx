@@ -162,7 +162,7 @@ export function StickyPhoneTourClient({
                 </div>
 
                 <div
-                  className='flex flex-col items-end justify-center gap-4 transition-all duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                  className='flex flex-col items-end justify-center gap-4 transition-colors duration-cinematic ease-subtle'
                   style={{
                     opacity: 1,
                     transform: 'translateX(0)',
@@ -174,7 +174,7 @@ export function StickyPhoneTourClient({
                     return (
                       <div
                         key={mode.id}
-                        className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                        className='text-right transition-colors duration-cinematic ease-subtle'
                         style={{
                           transform: isActive
                             ? 'translateX(0)'
@@ -190,7 +190,7 @@ export function StickyPhoneTourClient({
                               ? 'var(--linear-text-primary)'
                               : 'var(--linear-text-secondary)',
                             transition:
-                              'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
+                              'font-size var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), font-weight var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), color var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)',
                           }}
                         >
                           jov.ie/{artistHandle}

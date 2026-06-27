@@ -176,11 +176,11 @@ export function ReleasesView({
 
               <div className='min-w-0 flex-1 space-y-px'>
                 <div className='flex min-w-0 items-center gap-1.5'>
-                  <span className='truncate text-mid font-medium leading-tight tracking-[-0.028em] text-white'>
+                  <span className='truncate text-mid font-medium leading-tight tracking-[-0.028em] text-white dark:text-white'>
                     {release.title}
                   </span>
                   {index === 0 ? (
-                    <span className='inline-flex h-4 shrink-0 items-center rounded-full bg-white px-1.5 text-3xs font-semibold tracking-normal text-black'>
+                    <span className='inline-flex h-4 shrink-0 items-center rounded-full bg-white dark:bg-surface-1 px-1.5 text-3xs font-semibold tracking-normal text-black dark:text-white'>
                       Latest
                     </span>
                   ) : null}
@@ -195,7 +195,7 @@ export function ReleasesView({
                 </p>
               </div>
 
-              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle group-hover:opacity-90'>
+              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white dark:bg-surface-1 text-black dark:text-white transition-opacity duration-subtle group-hover:opacity-90'>
                 <Play className='ml-0.5 h-3 w-3 fill-current' />
               </span>
             </a>

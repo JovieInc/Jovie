@@ -46,12 +46,12 @@ export function ArtistProfileSocialProof({
       ) : null}
 
       {!proofData.hasRealQuotes && proofData.founderQuote ? (
-        <article className='mx-auto mt-6 max-w-280 overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-6 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
-          <blockquote className='max-w-[48rem] text-pretty text-[clamp(1.375rem,2.4vw,2rem)] font-semibold leading-[1.18] tracking-[-0.025em] text-black'>
+        <article className='mx-auto mt-6 max-w-280 overflow-hidden rounded-[1.9rem] border border-black/10 bg-white dark:bg-surface-1 px-6 py-6 text-black dark:text-white shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
+          <blockquote className='max-w-[48rem] text-pretty text-[clamp(1.375rem,2.4vw,2rem)] font-semibold leading-[1.18] tracking-[-0.025em] text-black dark:text-white'>
             “{proofData.founderQuote.quote}”
           </blockquote>
           <div className='mt-6 flex flex-col gap-1 text-left'>
-            <p className='text-sm font-medium tracking-[-0.02em] text-black'>
+            <p className='text-sm font-medium tracking-[-0.02em] text-black dark:text-white'>
               {proofData.founderQuote.name}
             </p>
             <p className='text-xs tracking-[-0.01em] text-black/56'>
@@ -59,7 +59,7 @@ export function ArtistProfileSocialProof({
             </p>
             <Link
               href={proofData.founderQuote.profileHref}
-              className='mt-3 inline-flex w-fit font-mono text-xs tracking-[-0.02em] text-black/56 transition-colors hover:text-black'
+              className='mt-3 inline-flex w-fit font-mono text-xs tracking-[-0.02em] text-black/56 transition-colors hover:text-black dark:hover:text-white'
             >
               {proofData.founderQuote.profileLabel}
             </Link>

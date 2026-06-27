@@ -79,7 +79,7 @@ function QrPreviewPanel({
           width={isDrawer ? 132 : 124}
           height={isDrawer ? 132 : 124}
           unoptimized
-          className='h-full w-full rounded-lg bg-white object-contain'
+          className='h-full w-full rounded-lg bg-white dark:bg-surface-1 object-contain'
         />
       ) : (
         <div className='space-y-2 text-center'>

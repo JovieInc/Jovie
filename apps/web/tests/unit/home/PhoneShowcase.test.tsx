@@ -87,7 +87,7 @@ describe('PhoneShowcase', () => {
     render(<PhoneShowcase modes={PHONE_SHOWCASE_MODES} autoRotate={false} />);
 
     expect(
-      screen.getByRole('navigation', { name: 'Phone mode tabs' })
+      screen.getByRole('navigation', { name: 'Phone Mode Tabs' })
     ).toBeInTheDocument();
   });
 });

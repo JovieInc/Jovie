@@ -57,7 +57,7 @@ export function ProfileHeaderV2({
               <div
                 className='mt-1.5 flex items-center gap-1'
                 role='tablist'
-                aria-label='Profile sections'
+                aria-label='Profile Sections'
               >
                 {modes.map(mode => {
                   const isActive = mode === activeMode;
@@ -101,7 +101,7 @@ export function ProfileHeaderV2({
         <div
           className='mt-3 flex items-center justify-center gap-2'
           role='tablist'
-          aria-label='Profile sections'
+          aria-label='Profile Sections'
         >
           {modes.map((mode, index) => {
             const isActive = index === activeIndex;
@@ -114,7 +114,7 @@ export function ProfileHeaderV2({
                 aria-selected={isActive}
                 aria-label={`View ${MODE_LABELS[mode]}`}
                 aria-controls={`profile-pane-${mode}`}
-                className={`rounded-full transition-all duration-200 ease-out ${
+                className={`rounded-full transition-colors duration-subtle ease-out ${
                   isActive
                     ? 'h-2 w-5 bg-primary'
                     : 'h-1.5 w-1.5 bg-muted/40 hover:bg-muted/60'

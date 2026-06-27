@@ -58,7 +58,7 @@ export function ProfileNavButton({
             ariaLabel='Open profile menu'
             className={cn(
               'group backdrop-blur-xl',
-              'transition-[opacity,transform,filter,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-95',
+              'transition-[opacity,transform,filter,background-color,box-shadow] duration-subtle ease-subtle hover:opacity-95',
               className
             )}
           >
@@ -149,8 +149,8 @@ export function ProfileNavButton({
         <ArrowLeft
           className={cn(
             'h-4 w-4 text-primary-token/78',
-            'transition-all duration-300 ease-out',
-            'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-300'
+            'transition-colors duration-cinematic ease-out',
+            'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-cinematic'
           )}
           aria-hidden='true'
         />

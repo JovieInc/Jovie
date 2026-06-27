@@ -191,7 +191,7 @@ function DesktopSurfaceCard({
       data-testid={testId}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
-        <h2 className='text-base font-semibold tracking-[-0.02em] text-white'>
+        <h2 className='text-base font-semibold tracking-[-0.02em] text-white dark:text-white'>
           {title}
         </h2>
         {actionLabel && onAction ? (
@@ -339,7 +339,7 @@ export function ProfileDesktopSurface({
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
   const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-app font-semibold tracking-[-0.01em] text-black transition-colors duration-subtle hover:bg-white/88';
+    'inline-flex h-11 items-center gap-2 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold tracking-[-0.01em] text-black dark:text-white transition-colors duration-subtle hover:bg-white dark:bg-surface-1/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -414,7 +414,7 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex max-w-205 items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex max-w-205 items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='line-clamp-2'>{artist.name}</span>
                   {artist.is_verified ? (
@@ -484,12 +484,12 @@ export function ProfileDesktopSurface({
                       <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
                         {formatMonth(tourDate.startDate)}
                       </div>
-                      <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white'>
+                      <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
                         {formatDay(tourDate.startDate)}
                       </div>
                     </div>
                     <div className='min-w-0'>
-                      <p className='truncate text-lg font-medium tracking-[-0.03em] text-white'>
+                      <p className='truncate text-lg font-medium tracking-[-0.03em] text-white dark:text-white'>
                         {tourDate.venueName}
                       </p>
                       <p className='truncate text-sm text-white/48'>
@@ -542,7 +542,7 @@ export function ProfileDesktopSurface({
                       />
                     </div>
                     <div className='min-w-0'>
-                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white'>
+                      <p className='truncate text-base font-medium tracking-[-0.03em] text-white dark:text-white'>
                         {release.title}
                       </p>
                       <p className='truncate text-app text-white/44'>
@@ -552,7 +552,7 @@ export function ProfileDesktopSurface({
                         )}
                       </p>
                     </div>
-                    <span className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-black/28 text-white'>
+                    <span className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-black/28 text-white dark:text-white'>
                       <Play className='ml-0.5 h-4 w-4 fill-current' />
                     </span>
                     <span className='flex items-center gap-1 text-white/30'>
@@ -580,7 +580,7 @@ export function ProfileDesktopSurface({
                 className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
               >
                 <span className='min-w-0'>
-                  <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white'>
+                  <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
                     Release Alerts
                   </span>
                   <span className='block truncate text-xs leading-5 text-white/48'>
@@ -694,7 +694,7 @@ export function ProfileDesktopSurface({
               handle={artist.handle}
               dspsOverride={mergedDSPs}
               containerClassName='max-w-none'
-              providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
+              providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white dark:text-white hover:bg-white/[0.08]'
               emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
               hideHelpText
             />
@@ -712,7 +712,7 @@ export function ProfileDesktopSurface({
                 />
               </div>
               <div>
-                <p className='text-xl font-semibold tracking-[-0.03em] text-white'>
+                <p className='text-xl font-semibold tracking-[-0.03em] text-white dark:text-white'>
                   {latestVisibleRelease?.title ?? 'Latest release'}
                 </p>
                 <p className='mt-1 text-sm text-white/48'>
@@ -758,12 +758,12 @@ export function ProfileDesktopSurface({
                   <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
                     {formatMonth(tourDate.startDate)}
                   </div>
-                  <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white'>
+                  <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
                     {formatDay(tourDate.startDate)}
                   </div>
                 </div>
                 <div className='min-w-0'>
-                  <p className='truncate text-xl font-medium tracking-[-0.03em] text-white'>
+                  <p className='truncate text-xl font-medium tracking-[-0.03em] text-white dark:text-white'>
                     {tourDate.venueName}
                   </p>
                   <div className='mt-1 flex items-center gap-2 text-sm text-white/48'>
@@ -831,7 +831,7 @@ export function ProfileDesktopSurface({
                   className={cn(
                     'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
-                      ? 'text-white'
+                      ? 'text-white dark:text-white'
                       : 'text-white/50 hover:text-white/78'
                   )}
                   aria-current={isActive ? 'page' : undefined}
@@ -839,7 +839,7 @@ export function ProfileDesktopSurface({
                   <Icon
                     className={cn(
                       'h-4 w-4 shrink-0 transition-colors duration-subtle',
-                      isActive && 'text-white'
+                      isActive && 'text-white dark:text-white'
                     )}
                   />
                   <span>{tab.label}</span>
@@ -851,7 +851,7 @@ export function ProfileDesktopSurface({
           <button
             type='button'
             onClick={onOpenMenu}
-            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
+            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
             aria-label='Menu'
           >
             <MoreHorizontal className='h-5 w-5' />

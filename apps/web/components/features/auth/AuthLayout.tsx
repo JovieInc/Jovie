@@ -106,7 +106,7 @@ function SplitLayoutContent({
               {footerPrompt}{' '}
               <Link
                 href={footerLinkHref}
-                className={`text-white underline ${LINK_FOCUS_CLASSES}`}
+                className={`text-white dark:text-white underline ${LINK_FOCUS_CLASSES}`}
               >
                 {footerLinkText}
               </Link>
@@ -174,7 +174,7 @@ function StackLayoutContent({
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-white underline ${LINK_FOCUS_CLASSES}`}
+            className={`text-white dark:text-white underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>
@@ -240,7 +240,7 @@ export function AuthLayout({
         // shell's frame-shell-gap), so this surface reads as an
         // extension of the shell, not a separate page. Hex-pinned
         // because auth is dark regardless of root theme preference.
-        'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
+        'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white dark:text-white [color-scheme:dark]',
         'bg-(--color-bg-base)',
         'p-2 sm:p-2',
         isKeyboardVisible && 'pt-1 pb-1',

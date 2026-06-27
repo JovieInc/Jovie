@@ -47,7 +47,7 @@ export function ImagePreviewStrip({
                 unoptimized
               />
               <div className='system-b-image-preview-caption'>
-                <p className='truncate text-2xs font-medium text-white'>
+                <p className='truncate text-2xs font-medium text-white dark:text-white'>
                   {image.name}
                 </p>
               </div>

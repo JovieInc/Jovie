@@ -268,13 +268,13 @@ export function ChatMerchOptionsCard({
                   </div>
                 )}
                 {mockupPending ? (
-                  <div className='absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/45 px-2 py-1.5 text-3xs font-medium text-white backdrop-blur'>
+                  <div className='absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/45 px-2 py-1.5 text-3xs font-medium text-white dark:text-white backdrop-blur'>
                     <Loader2 className='h-3 w-3 animate-spin' strokeWidth={2} />
                     Photorealistic preview pending
                   </div>
                 ) : null}
                 <div className='absolute left-2 top-2'>
-                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-3xs font-medium text-white backdrop-blur'>
+                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-3xs font-medium text-white dark:text-white backdrop-blur'>
                     Option {option.option_number}
                   </span>
                 </div>

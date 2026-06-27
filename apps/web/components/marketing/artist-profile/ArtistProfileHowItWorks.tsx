@@ -91,7 +91,7 @@ export function ArtistProfileHowItWorks({
                       {howItWorks.claim.resultSubtitle}
                     </p>
                   </div>
-                  <span className='rounded-full bg-white px-3 py-1.5 text-2xs font-semibold text-black'>
+                  <span className='rounded-full bg-white dark:bg-surface-1 px-3 py-1.5 text-2xs font-semibold text-black dark:text-white'>
                     {howItWorks.claim.ctaLabel}
                   </span>
                 </div>
@@ -137,7 +137,7 @@ export function ArtistProfileHowItWorks({
               </div>
               <div className='mt-3 h-2 overflow-hidden rounded-full bg-(--color-accent-green)/10'>
                 <div
-                  className='h-full rounded-full bg-(--color-accent-green) transition-[width] duration-700 ease-out'
+                  className='h-full rounded-full bg-(--color-accent-green) transition-[width] duration-cinematic ease-out'
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -201,7 +201,7 @@ export function ArtistProfileHowItWorks({
                 <HoverPopover
                   label={howItWorks.share.qrLabel}
                   content={
-                    <div className='rounded-[0.9rem] bg-white p-2.5 shadow-[0_14px_32px_rgba(0,0,0,0.16)]'>
+                    <div className='rounded-[0.9rem] bg-white dark:bg-surface-1 p-2.5 shadow-[0_14px_32px_rgba(0,0,0,0.16)]'>
                       <div className='grid grid-cols-7 gap-1'>
                         {QR_CELLS.map(cell => (
                           <span

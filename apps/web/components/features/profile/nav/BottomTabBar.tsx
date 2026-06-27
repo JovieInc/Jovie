@@ -110,7 +110,7 @@ export function BottomTabBar({
       )}
       data-testid='profile-tab-bar'
     >
-      <nav aria-label='Profile navigation' data-testid='profile-bottom-nav'>
+      <nav aria-label='Profile Navigation' data-testid='profile-bottom-nav'>
         <div
           className='grid items-center gap-1'
           style={{
@@ -131,7 +131,9 @@ export function BottomTabBar({
                 className={cn(
                   'relative flex min-h-13 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                  isActive ? 'text-white' : 'text-white/40 hover:text-white/62'
+                  isActive
+                    ? 'text-white dark:text-white'
+                    : 'text-white/40 hover:text-white/62'
                 )}
                 // aria-current="page" marks the active tab for screen readers
                 aria-current={isActive ? 'page' : undefined}
@@ -140,7 +142,7 @@ export function BottomTabBar({
                 <Icon
                   className={cn(
                     'h-5 w-5 shrink-0',
-                    isActive ? 'text-white' : 'text-white/52'
+                    isActive ? 'text-white dark:text-white' : 'text-white/52'
                   )}
                   aria-hidden='true'
                 />

@@ -38,13 +38,13 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
       <ul
         className='mt-3 flex snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:grid md:grid-cols-3 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden'
         data-testid='chat-analytics-signal-carousel'
-        aria-label='Top signals'
+        aria-label='Top Signals'
       >
         {result.insights.map(insight => (
           <li
             key={insight.id}
             className={cn(
-              'flex min-h-34 min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-lg border border-black/10 bg-white p-4 text-black shadow-[0_18px_60px_-48px_rgba(0,0,0,0.7)] md:min-w-0'
+              'flex min-h-34 min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-lg border border-black/10 bg-white dark:bg-surface-1 p-4 text-black dark:text-white shadow-[0_18px_60px_-48px_rgba(0,0,0,0.7)] md:min-w-0'
             )}
             data-testid='chat-analytics-signal-card'
           >
@@ -57,7 +57,7 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
               </span>
             </div>
             <div className='mt-4 min-w-0'>
-              <p className='text-pretty text-base font-semibold leading-[1.18] text-black'>
+              <p className='text-pretty text-base font-semibold leading-[1.18] text-black dark:text-white'>
                 {insight.title}
               </p>
               <p className='mt-3 line-clamp-2 text-xs leading-5 text-black/60'>

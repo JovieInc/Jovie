@@ -31,7 +31,7 @@ const TRUST_LOGOS = [
 
 export function HomeV1Design() {
   return (
-    <div className='min-h-screen bg-(--color-bg-base) text-white [color-scheme:dark]'>
+    <div className='min-h-screen bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
       <section
         className='relative isolate flex min-h-[100svh] overflow-hidden'
         aria-labelledby='home-hero-heading'
@@ -49,8 +49,8 @@ export function HomeV1Design() {
           <nav className='flex h-12 items-center justify-between'>
             <Link
               href={APP_ROUTES.HOME}
-              className='inline-flex items-center gap-2 text-white focus-ring-themed rounded-md'
-              aria-label='Jovie home'
+              className='inline-flex items-center gap-2 text-white dark:text-white focus-ring-themed rounded-md'
+              aria-label='Jovie Home'
             >
               <BrandLogo size={20} tone='white' aria-hidden />
               <span className='text-mid font-semibold'>Jovie</span>
@@ -66,7 +66,7 @@ export function HomeV1Design() {
                 href={buildHomepageStartHref(
                   HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT
                 )}
-                className='inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90'
+                className='inline-flex h-9 items-center gap-1.5 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
               >
                 Request Access
                 <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.4} />
@@ -85,7 +85,7 @@ export function HomeV1Design() {
                 priority
               />
               <div className='min-w-0 pr-2'>
-                <p className='truncate text-xs font-semibold text-white'>
+                <p className='truncate text-xs font-semibold text-white dark:text-white'>
                   {TIM_WHITE_PROFILE.name}
                 </p>
                 <p className='truncate text-2xs text-white/46'>
@@ -96,7 +96,7 @@ export function HomeV1Design() {
 
             <h1
               id='home-hero-heading'
-              className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white sm:text-[84px] lg:text-[116px] xl:text-[132px]'
+              className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white dark:text-white sm:text-[84px] lg:text-[116px] xl:text-[132px]'
             >
               Release Work, Finally Organized.
             </h1>
@@ -124,7 +124,7 @@ export function HomeV1Design() {
                   href={buildHomepageStartHref(
                     HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT
                   )}
-                  className='inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-black transition-colors hover:bg-white/90'
+                  className='inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white dark:bg-surface-1 px-5 text-sm font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
                 >
                   Request Access
                   <ArrowRight className='h-4 w-4' strokeWidth={2.4} />

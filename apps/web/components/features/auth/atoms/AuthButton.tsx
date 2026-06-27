@@ -14,7 +14,7 @@ const authButtonVariants = cva(
     // Mobile-optimized height matching Linear
     'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-10',
     // Keep hover states visual, never positional
-    'transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out',
+    'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out',
     // Press feedback stays visual, not positional
     'active:opacity-90',
     // Prevent text selection on touch

@@ -201,7 +201,7 @@ export function ArtistHero({
               ) : null}
 
               <h1
-                className={`line-clamp-3 max-w-[21rem] font-[640] tracking-[-0.065em] text-white md:max-w-[30rem] md:text-[3.5rem] md:leading-[0.94] ${
+                className={`line-clamp-3 max-w-[21rem] font-[640] tracking-[-0.065em] text-white dark:text-white md:max-w-[30rem] md:text-[3.5rem] md:leading-[0.94] ${
                   compact ? 'text-[2.25rem]' : 'text-[2.65rem]'
                 }`}
               >

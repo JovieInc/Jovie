@@ -31,7 +31,7 @@ import { describe, expect, it } from 'vitest';
  * Sibling of arbitrary-values-ratchet.test.ts / raw-button-ratchet.test.ts.
  */
 
-const WARN_ONLY = true;
+const WARN_ONLY = false;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // tests/unit/design-system → apps/web

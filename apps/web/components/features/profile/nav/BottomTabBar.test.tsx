@@ -63,7 +63,7 @@ describe('BottomTabBar — tab rendering', () => {
   it('renders the nav with accessible label', () => {
     render(<BottomTabBar {...makeProps()} />);
     expect(
-      screen.getByRole('navigation', { name: 'Profile navigation' })
+      screen.getByRole('navigation', { name: 'Profile Navigation' })
     ).toBeInTheDocument();
   });
 });

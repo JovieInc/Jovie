@@ -375,7 +375,7 @@ function Composer({
           aria-hidden={!hasHandle}
           tabIndex={hasHandle ? 0 : -1}
           className={cn(
-            'h-9 rounded-full bg-white text-black text-xs font-caption tracking-[-0.005em] flex items-center gap-1.5 transition-[opacity,transform,width,padding] duration-subtle ease-out',
+            'h-9 rounded-full bg-white dark:bg-surface-1 text-black dark:text-white text-xs font-caption tracking-[-0.005em] flex items-center gap-1.5 transition-[opacity,transform,width,padding] duration-subtle ease-out',
             hasHandle
               ? 'opacity-100 translate-x-0 px-3.5 hover:brightness-110 active:scale-[0.98]'
               : 'opacity-0 -translate-x-2 px-0 w-0 overflow-hidden pointer-events-none'
@@ -479,7 +479,7 @@ function Composer({
         <button
           type='button'
           onClick={() => onPickPlan(true)}
-          className='flex-1 h-11 rounded-xl bg-white text-black text-app font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out flex items-center justify-center gap-1.5'
+          className='flex-1 h-11 rounded-xl bg-white dark:bg-surface-1 text-black dark:text-white text-app font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out flex items-center justify-center gap-1.5'
         >
           Yes, start the trial{' '}
           <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -843,7 +843,7 @@ function ReadyCard({ handle }: { handle: string }) {
       </p>
       <Link
         href='/exp/shell-v1'
-        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white text-black text-xs font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
+        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white dark:bg-surface-1 text-black dark:text-white text-xs font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
       >
         <LayoutDashboard className='h-3.5 w-3.5' strokeWidth={2.5} />
         Open dashboard

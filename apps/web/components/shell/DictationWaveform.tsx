@@ -55,7 +55,7 @@ export function DictationWaveform({
                 ? `dict-bar ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) ${delay}ms infinite`
                 : 'none',
               opacity: active ? 1 : 0.4,
-              transition: `opacity 350ms ${EASE_CINEMATIC}`,
+              transition: `opacity var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
             }}
           />
         );

@@ -19,13 +19,13 @@ export function ArtistProfileOutcomeDuo({
     <section
       data-testid='artist-profile-outcome-duo'
       className={cn(
-        'homepage-profile-outcome-duo relative w-full bg-black',
+        'homepage-profile-outcome-duo relative w-full bg-black dark:bg-black',
         className
       )}
-      aria-label='Artist profiles outcomes'
+      aria-label='Artist Profiles Outcomes'
     >
       <div className='homepage-profile-outcome-inner mx-auto w-full'>
-        <h2 className='homepage-profile-outcome-heading mx-auto text-center text-white'>
+        <h2 className='homepage-profile-outcome-heading mx-auto text-center text-white dark:text-white'>
           {headline}
         </h2>
 
@@ -58,7 +58,7 @@ function OutcomeTile({
       <div className='relative z-[1] flex w-full flex-1 items-center justify-center'>
         {children}
       </div>
-      <h3 className='homepage-profile-outcome-title relative z-[1] text-center text-white'>
+      <h3 className='homepage-profile-outcome-title relative z-[1] text-center text-white dark:text-white'>
         {label}
       </h3>
     </article>
@@ -78,7 +78,7 @@ function DrawerHandle() {
 
 function DrawerTitle({ title }: Readonly<{ title: string }>) {
   return (
-    <p className='mb-4 px-1 text-base font-semibold tracking-[-0.02em] text-white'>
+    <p className='mb-4 px-1 text-base font-semibold tracking-[-0.02em] text-white dark:text-white'>
       {title}
     </p>
   );
@@ -107,7 +107,9 @@ function PayDrawerPreview({
               <span
                 className={cn(
                   'text-base font-semibold tracking-[-0.02em]',
-                  featured ? 'text-black' : 'text-white'
+                  featured
+                    ? 'text-black dark:text-white'
+                    : 'text-white dark:text-white'
                 )}
               >
                 {row.amount}
@@ -124,7 +126,7 @@ function PayDrawerPreview({
           );
         })}
       </div>
-      <div className='mt-4 block w-full rounded-xl bg-(--color-bg-base) py-4 text-center text-sm font-semibold tracking-[-0.01em] text-black'>
+      <div className='mt-4 block w-full rounded-xl bg-(--color-bg-base) py-4 text-center text-sm font-semibold tracking-[-0.01em] text-black dark:text-white'>
         {card.ctaLabel}
       </div>
     </div>
@@ -149,12 +151,12 @@ function TourDrawerPreview({
           >
             <span className='text-2xs font-medium uppercase leading-[1.1] tracking-[0.02em] text-white/56'>
               {row.month}
-              <strong className='mt-0.5 block text-lg font-semibold normal-case tracking-[-0.02em] text-white'>
+              <strong className='mt-0.5 block text-lg font-semibold normal-case tracking-[-0.02em] text-white dark:text-white'>
                 {row.day}
               </strong>
             </span>
             <span className='min-w-0'>
-              <span className='block truncate text-sm font-semibold tracking-[-0.02em] text-white'>
+              <span className='block truncate text-sm font-semibold tracking-[-0.02em] text-white dark:text-white'>
                 {row.venue}
               </span>
               <span className='mt-0.5 block truncate text-xs text-white/56'>

@@ -668,7 +668,7 @@ function TaskDocumentPanel({
                   <FileText className='h-5 w-5' />
                 </div>
                 <h2 className='mt-5 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
-                  Pick a task from the list to see what it needs.
+                  Pick A Task From The List To See What It Needs.
                 </h2>
                 <p className='mt-2 text-app leading-relaxed text-tertiary-token'>
                   Open a task to review its status, metadata, due state, and
@@ -822,7 +822,7 @@ function TaskDocumentPanel({
                 <button
                   type='button'
                   onClick={onClose}
-                  aria-label='Back to task list'
+                  aria-label='Back To Task List'
                   className='inline-flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
                 >
                   <ArrowLeft className='h-4 w-4' />
@@ -834,12 +834,12 @@ function TaskDocumentPanel({
               <textarea
                 ref={descriptionEditorRef}
                 id='task-context-editor'
-                aria-label='Task description'
+                aria-label='Task Description'
                 value={description}
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
                 placeholder='Start writing...'
-                className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+                className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
                 style={{ boxShadow: 'none' }}
               />
               {showDescriptionHelper && descriptionHelper ? (
@@ -878,10 +878,10 @@ function TaskTitleEditor({
         ref={textareaRef}
         value={value}
         rows={1}
-        aria-label='Task title'
+        aria-label='Task Title'
         onChange={event => onChange(event.target.value)}
-        placeholder='Untitled Task'
-        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+        placeholder='Untitled Task' // ui-casing-allow: default task title placeholder
+        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',
@@ -1246,7 +1246,7 @@ function useTaskActions({
                 ? [
                     {
                       id: 'generate-pitch',
-                      label: 'Generate pitch',
+                      label: 'Generate Pitch',
                       icon: <Sparkles className='h-4 w-4' />,
                       onClick: () => onGeneratePitch(task),
                     } satisfies ContextMenuItemType,

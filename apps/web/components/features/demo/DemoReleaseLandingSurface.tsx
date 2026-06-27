@@ -44,7 +44,7 @@ export function DemoReleaseLandingSurface() {
                   Creator Activation
                 </p>
                 <div className='mt-4 rounded-3xl bg-white/[0.05] px-4 py-5 text-center'>
-                  <p className='text-mid font-semibold text-white'>
+                  <p className='text-mid font-semibold text-white dark:text-white'>
                     {RELEASE.title}
                   </p>
                   <p className='mt-1 text-xs text-white/58'>
@@ -54,7 +54,7 @@ export function DemoReleaseLandingSurface() {
                 <div className='mt-5 flex justify-center'>
                   <a
                     href={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}
-                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 py-3 text-mid font-[600] tracking-[-0.02em] text-black'
+                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-mid font-[600] tracking-[-0.02em] text-black dark:text-white'
                   >
                     Use this sound
                   </a>

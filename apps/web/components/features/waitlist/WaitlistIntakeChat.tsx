@@ -288,12 +288,14 @@ export function WaitlistIntakeChat({
   }
 
   return (
-    <div className='flex min-h-dvh w-full bg-(--color-bg-base) text-white [color-scheme:dark]'>
+    <div className='flex min-h-dvh w-full bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
       <main className='mx-auto flex w-full max-w-260 flex-col px-4 py-5 sm:px-6 lg:px-8'>
         <header className='flex h-11 items-center justify-between'>
           <div className='inline-flex items-center gap-2'>
             <BrandLogo size={20} tone='white' aria-hidden />
-            <span className='text-mid font-semibold text-white'>Jovie</span>
+            <span className='text-mid font-semibold text-white dark:text-white'>
+              Jovie
+            </span>
           </div>
           {userEmail ? (
             <span className='hidden truncate text-xs text-white/42 sm:block'>
@@ -305,7 +307,7 @@ export function WaitlistIntakeChat({
         <section className='grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch'>
           <div className='flex min-h-140 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) shadow-[0_24px_90px_rgba(0,0,0,0.34)]'>
             <div className='border-b border-white/[0.07] px-4 py-3 sm:px-5'>
-              <h1 className='text-lg font-semibold leading-6 text-white'>
+              <h1 className='text-lg font-semibold leading-6 text-white dark:text-white'>
                 Request Access
               </h1>
               <p className='mt-1 text-app leading-5 text-white/52'>
@@ -331,7 +333,7 @@ export function WaitlistIntakeChat({
                     className={cn(
                       'max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-6',
                       message.role === 'user'
-                        ? 'bg-white text-black'
+                        ? 'bg-white dark:bg-surface-1 text-black dark:text-white'
                         : 'border border-white/[0.08] bg-white/[0.035] text-white/76'
                     )}
                   >
@@ -366,7 +368,7 @@ export function WaitlistIntakeChat({
                   placeholder={step?.placeholder}
                   disabled={saving}
                   aria-label={step?.prompt ?? 'Your answer'}
-                  className='h-11 min-w-0 flex-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-4 text-sm text-white outline-none placeholder:text-white/32 focus:border-white/24'
+                  className='h-11 min-w-0 flex-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-4 text-sm text-white dark:text-white outline-none placeholder:text-white dark:text-white/32 focus:border-white/24'
                 />
                 {step?.optional ? (
                   <button
@@ -381,7 +383,7 @@ export function WaitlistIntakeChat({
                 <button
                   type='submit'
                   disabled={saving}
-                  className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60 focus-ring-themed'
+                  className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white dark:bg-surface-1 text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 disabled:cursor-not-allowed disabled:opacity-60 focus-ring-themed'
                   aria-label={isFinalStep ? 'Save request' : 'Send answer'}
                 >
                   {isFinalStep ? (
@@ -395,7 +397,9 @@ export function WaitlistIntakeChat({
           </div>
 
           <aside className='hidden rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 lg:block'>
-            <h2 className='text-sm font-semibold text-white'>Saved Context</h2>
+            <h2 className='text-sm font-semibold text-white dark:text-white'>
+              Saved Context
+            </h2>
             <dl className='mt-4 space-y-3 text-app'>
               <ContextRow label='Handle' value={answers.handle} />
               <ContextRow label='Social' value={answers.primarySocialUrl} />

@@ -48,9 +48,9 @@ export function ReleaseNotificationsSection() {
               </span>
 
               <h2 className='mt-5 marketing-h2-linear text-primary-token'>
-                New release?
+                New Release?
                 <br />
-                Your fans already know.
+                Your Fans Already Know.
               </h2>
 
               <p className='mt-5 marketing-lead-linear text-secondary-token max-w-md'>
@@ -161,7 +161,7 @@ export function ReleaseNotificationsSection() {
                     <div className='flex items-center gap-2.5 px-4 py-3 border-b border-subtle'>
                       <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/80 to-teal-500/60'>
                         <Zap
-                          className='h-3 w-3 text-white'
+                          className='h-3 w-3 text-white dark:text-white'
                           aria-hidden='true'
                         />
                       </div>
@@ -205,7 +205,7 @@ export function ReleaseNotificationsSection() {
                       {/* Listen Now button */}
                       <button
                         type='button'
-                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)]'
+                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-[var(--linear-duration-normal)] ease-subtle'
                         style={{
                           background:
                             'linear-gradient(135deg, oklch(72% 0.16 75), oklch(68% 0.14 60))',

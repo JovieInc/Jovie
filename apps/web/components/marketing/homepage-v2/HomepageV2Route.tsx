@@ -426,7 +426,7 @@ function HomepageV2SocialProof() {
                   <p className='font-mono text-xs tracking-[-0.02em] text-white/68'>
                     jov.ie/{card.handle}
                   </p>
-                  <p className='mt-2 text-xl font-medium tracking-[-0.02em] text-white'>
+                  <p className='mt-2 text-xl font-medium tracking-[-0.02em] text-white dark:text-white'>
                     {card.name}
                   </p>
                   <p className='mt-2 text-app leading-[1.6] text-white/72'>

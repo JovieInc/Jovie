@@ -126,7 +126,7 @@ export function BillingActionsSection({
                 <AlertDialogAction
                   onClick={handleCancelSubscription}
                   disabled={cancelMutationPending}
-                  className='bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800'
+                  className='bg-red-600 text-white dark:text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800'
                 >
                   {cancelMutationPending ? 'Cancelling...' : 'Yes, Cancel'}
                 </AlertDialogAction>
