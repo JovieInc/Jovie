@@ -249,7 +249,7 @@ function ProfileBentoView({
         genres={previewData.genres}
         profileHref={previewData.profilePath}
         showLiveBadge
-        caption='Your live profile'
+        caption='Your Live Profile'
         phoneAlign='top'
         showBottomFade
         className='shrink-0'
@@ -265,15 +265,15 @@ function ProfileBentoView({
                 variant='ghost'
                 size='icon'
                 aria-label='Profile Actions'
-                className='rounded-full border border-white/14 bg-black/40 text-white backdrop-blur-md hover:bg-black/60 dark:text-white'
+                className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
               >
-                <MoreVertical className='h-4 w-4' />
+                <MoreVertical className='h-3.5 w-3.5' />
               </Button>
             }
           />
         }
         footer={
-          <div className='space-y-2.5 pt-2.5'>
+          <div className='space-y-2 pt-1.5'>
             <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
             <Button
               type='button'

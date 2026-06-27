@@ -17,8 +17,8 @@ import type { AnalyticsRange } from '@/types/analytics';
 const numberFormatter = new Intl.NumberFormat();
 
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
-  { value: '7d', label: '7 days' },
-  { value: '30d', label: '30 days' },
+  { value: '7d', label: '7D' }, // ui-casing-allow: compact range pill
+  { value: '30d', label: '30D' }, // ui-casing-allow: compact range pill
 ];
 
 interface ProfileSmartLinkAnalyticsProps {
@@ -35,11 +35,11 @@ function ProfileSmartLinkControl({
 
   return (
     <div
-      className='flex h-8 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5'
+      className='flex h-9 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-3'
       data-testid='profile-smart-link-control'
     >
       <Link2
-        className='h-3 w-3 shrink-0 text-tertiary-token'
+        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
         aria-hidden='true'
       />
       <span
@@ -59,9 +59,9 @@ function ProfileSmartLinkControl({
           toast.error('Failed to copy link');
         }}
         title='Copy profile link'
-        className='h-5 w-5 rounded-full text-tertiary-token'
+        className='h-6 w-6 rounded-full text-tertiary-token'
       >
-        <Copy className='h-3 w-3' />
+        <Copy className='h-3.5 w-3.5' />
       </DrawerInlineIconButton>
       <DrawerInlineIconButton
         onClick={event => {
@@ -69,9 +69,9 @@ function ProfileSmartLinkControl({
           globalThis.open(profileUrl, '_blank', 'noopener,noreferrer');
         }}
         title='Open profile link'
-        className='h-5 w-5 rounded-full text-tertiary-token'
+        className='h-6 w-6 rounded-full text-tertiary-token'
       >
-        <ExternalLink className='h-3 w-3' />
+        <ExternalLink className='h-3.5 w-3.5' />
       </DrawerInlineIconButton>
     </div>
   );
@@ -93,7 +93,7 @@ export function ProfileSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   const currentRangeLabel =
-    RANGE_OPTIONS.find(o => o.value === range)?.label ?? '30 days';
+    RANGE_OPTIONS.find(o => o.value === range)?.label ?? '30D';
 
   const content = (
     <>
@@ -124,22 +124,23 @@ export function ProfileSmartLinkAnalytics({
         {!showSkeleton && !isError && (
           <div
             className={cn(
-              'space-y-3 transition-opacity duration-subtle',
+              'space-y-1.5 transition-opacity duration-subtle',
               isFetching && 'opacity-50'
             )}
           >
             <div className='grid grid-cols-2 gap-3'>
               <AnalyticsMetric
-                label='Profile views'
+                label='Profile Views'
                 value={numberFormatter.format(profileViews)}
-                hint={`Last ${currentRangeLabel}`}
               />
               <AnalyticsMetric
-                label='Link clicks'
+                label='Link Clicks'
                 value={numberFormatter.format(totalClicks)}
-                hint={`Last ${currentRangeLabel}`}
               />
             </div>
+            <p className='text-3xs leading-[13px] text-tertiary-token'>
+              Last {currentRangeLabel}
+            </p>
           </div>
         )}
       </div>
@@ -173,7 +174,7 @@ function AnalyticsMetric({
 }: {
   readonly label: string;
   readonly value: string;
-  readonly hint: string;
+  readonly hint?: string;
   readonly className?: string;
 }) {
   return (
@@ -184,7 +185,9 @@ function AnalyticsMetric({
       <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
         {value}
       </p>
-      <p className='text-3xs leading-[13px] text-tertiary-token'>{hint}</p>
+      {hint ? (
+        <p className='text-3xs leading-[13px] text-tertiary-token'>{hint}</p>
+      ) : null}
     </div>
   );
 }

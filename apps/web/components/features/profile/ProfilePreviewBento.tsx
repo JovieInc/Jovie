@@ -67,7 +67,7 @@ const BOTTOM_FADE_STYLE: CSSProperties = {
 
 /** Cover/page-pad CSS vars the compact surface reads (inline to avoid arbitrary classes). */
 const DEFAULT_COVER_VARS = {
-  '--cover-height': '45%',
+  '--cover-height': '64%',
   '--page-pad': '18px',
 } as CSSProperties;
 
