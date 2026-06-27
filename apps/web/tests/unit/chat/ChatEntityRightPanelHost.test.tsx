@@ -279,7 +279,7 @@ describe('ChatEntityRightPanelHost', () => {
     });
   });
 
-  it('registers no right panel when preview is closed', () => {
+  it('keeps the profile sidebar mounted when preview is closed for cinematic close', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
 
@@ -289,7 +289,8 @@ describe('ChatEntityRightPanelHost', () => {
       </ChatEntityPanelProvider>
     );
 
-    expect(mockUseRegisterRightPanel).toHaveBeenLastCalledWith(null);
+    expect(mockUseRegisterRightPanel).toHaveBeenCalled();
+    expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
   });
 
   it('registers the profile sidebar when preview is open', () => {

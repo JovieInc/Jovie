@@ -382,10 +382,16 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('does not register chat header actions on the new-chat route', () => {
+  it('registers the artist profile rail toggle on the new-chat route', () => {
     renderChatPage();
 
-    expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
+    const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
+    expect(headerActions).not.toBeNull();
+    expect(headerActions).toEqual(
+      expect.objectContaining({
+        type: expect.anything(),
+      })
+    );
   });
 
   it('hydrates preview data on chat and registers the live profile panel when preview is open', () => {
@@ -402,12 +408,12 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('keeps preview data hydrated on chat even when the profile panel is closed', () => {
+  it('keeps the profile panel mounted on chat when closed so the rail can animate shut', () => {
     mockPreviewPanelState.isOpen = false;
 
     renderChatPage();
 
-    expect(hasRegisteredRightPanel()).toBe(false);
+    expect(hasRegisteredRightPanel()).toBe(true);
     expect(mockSetPreviewData).toHaveBeenCalledWith(
       expect.objectContaining({
         username: 'testartist',

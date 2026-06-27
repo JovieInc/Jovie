@@ -1016,8 +1016,7 @@ export function ChatEntityRightPanelHost({
   profileContext,
   threadTitle,
 }: Readonly<ChatEntityRightPanelHostProps>) {
-  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
-    usePreviewPanelState();
+  const { open: openPreviewPanel } = usePreviewPanelState();
   const { target, contextTargets, close, dismissContext } =
     useChatEntityPanel();
 
@@ -1071,14 +1070,13 @@ export function ChatEntityRightPanelHost({
       }
     }
 
-    const liveProfilePreview =
-      enablePreviewPanel && isPreviewPanelOpen ? (
-        <ErrorBoundary fallback={null}>
-          <div className='system-b-chat-profile-preview-card'>
-            <ProfileContactSidebar />
-          </div>
-        </ErrorBoundary>
-      ) : null;
+    const liveProfilePreview = enablePreviewPanel ? (
+      <ErrorBoundary fallback={null}>
+        <div className='system-b-chat-profile-preview-card'>
+          <ProfileContactSidebar />
+        </div>
+      </ErrorBoundary>
+    ) : null;
 
     if (contextCards && entityPanel) {
       return (
@@ -1148,7 +1146,6 @@ export function ChatEntityRightPanelHost({
     enableChatEntityPanels,
     enablePreviewPanel,
     handleOpenProfilePreview,
-    isPreviewPanelOpen,
     profileId,
     profileSpotifyArtistId,
     profileContext,

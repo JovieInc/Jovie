@@ -12,8 +12,14 @@ describe('AppShellRightRail', () => {
 
     const rail = screen.getByTestId('app-shell-right-rail');
 
-    expect(rail).toHaveAttribute('aria-label', 'Context panel');
-    expect(rail).toHaveClass('sticky', 'top-0', 'overflow-hidden');
+    expect(rail).toHaveAttribute('aria-label', 'Context Panel');
+    expect(rail).toHaveClass(
+      'sticky',
+      'top-0',
+      'overflow-hidden',
+      'duration-cinematic',
+      'ease-cinematic'
+    );
     expect(rail).toContainElement(screen.getByTestId('fixture-panel'));
   });
 

@@ -36,9 +36,12 @@ export function AppShellRightRail({
     <aside
       data-testid='app-shell-right-rail'
       data-shell-design={variant}
-      aria-label='Context panel'
+      aria-label='Context Panel'
       className={cn(
         'sticky top-0 z-10 flex h-full min-h-0 shrink-0 flex-col self-start overflow-hidden',
+        // Mirror the left sidebar mount language so inner drawer width changes
+        // reclaim canvas space with the same cinematic timing.
+        'transition-[width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',
         isShellChatV1 && 'lg:rounded-[var(--linear-app-shell-radius)]',
         className
       )}
