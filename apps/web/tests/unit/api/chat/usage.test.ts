@@ -1,32 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 const hoisted = vi.hoisted(() => ({
-  authMock: vi.fn(),
-  getUserBillingInfoMock: vi.fn(),
-  getEntitlementsMock: vi.fn(),
+  getCachedAuthMock: vi.fn(),
+  getCurrentUserEntitlementsMock: vi.fn(),
   getRedisMock: vi.fn(),
   getStatusMock: vi.fn(),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: hoisted.authMock,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: hoisted.getCachedAuthMock,
 }));
 
-vi.mock('@/lib/stripe/customer-sync', () => ({
-  getUserBillingInfo: hoisted.getUserBillingInfoMock,
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlementsMock,
 }));
-
-vi.mock('@/lib/entitlements/registry', async () => {
-  // Preserve real exports (including `resolveChatUsagePlan`, extracted from
-  // the route in 45ef3d68) while only substituting `getEntitlements`.
-  const actual = await vi.importActual<
-    typeof import('@/lib/entitlements/registry')
-  >('@/lib/entitlements/registry');
-  return {
-    ...actual,
-    getEntitlements: hoisted.getEntitlementsMock,
-  };
-});
 
 vi.mock('@/lib/redis', () => ({
   getRedis: hoisted.getRedisMock,
@@ -38,22 +26,56 @@ vi.mock('@/lib/rate-limit/limiters', () => ({
   },
 }));
 
-vi.mock('@/lib/http/headers', () => ({
-  RETRY_AFTER_SERVICE: '30',
-}));
-
 vi.mock('@/lib/utils/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn() },
 }));
 
+function makeEntitlements(
+  overrides: Partial<{
+    plan: 'free' | 'trial' | 'pro' | 'max' | 'founding' | 'growth';
+    billingVerification: 'verified' | 'unavailable' | 'missing_user';
+    isAuthenticated: boolean;
+    userId: string | null;
+  }> = {}
+) {
+  const plan = overrides.plan ?? 'free';
+  const ent =
+    ENTITLEMENT_REGISTRY[
+      plan === 'founding'
+        ? 'pro'
+        : plan === 'growth'
+          ? 'max'
+          : plan === 'trial'
+            ? 'trial'
+            : plan
+    ];
+  return {
+    userId: overrides.userId ?? 'user_123',
+    email: 'artist@example.com',
+    isAuthenticated: overrides.isAuthenticated ?? true,
+    isAdmin: false,
+    plan,
+    isPro: plan !== 'free',
+    hasAdvancedFeatures: plan === 'max' || plan === 'growth',
+    billingVerification: overrides.billingVerification ?? 'verified',
+    ...ent.booleans,
+    ...ent.limits,
+  };
+}
+
 describe('GET /api/chat/usage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'user_123' });
     hoisted.getRedisMock.mockReturnValue(null);
+    hoisted.getStatusMock.mockReturnValue({
+      remaining: 7,
+      resetTime: Date.UTC(2026, 4, 23, 7, 0, 0),
+    });
   });
 
   it('returns 401 when unauthenticated', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: null });
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: null });
 
     const { GET } = await import('@/app/api/chat/usage/route');
     const response = await GET();
@@ -64,18 +86,9 @@ describe('GET /api/chat/usage', () => {
   });
 
   it('returns usage snapshot for authenticated user on free plan', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.getUserBillingInfoMock.mockResolvedValue({
-      success: true,
-      data: { plan: 'free' },
-    });
-    hoisted.getEntitlementsMock.mockReturnValue({
-      limits: { aiDailyMessageLimit: 10 },
-    });
-    hoisted.getStatusMock.mockReturnValue({
-      remaining: 7,
-      resetTime: Date.UTC(2026, 4, 23, 7, 0, 0),
-    });
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements({ plan: 'free' })
+    );
 
     const { GET } = await import('@/app/api/chat/usage/route');
     const response = await GET();
@@ -95,50 +108,75 @@ describe('GET /api/chat/usage', () => {
   });
 
   it('returns usage for pro plan with correct warning threshold', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.getUserBillingInfoMock.mockResolvedValue({
-      success: true,
-      data: { plan: 'pro' },
-    });
-    hoisted.getEntitlementsMock.mockReturnValue({
-      limits: { aiDailyMessageLimit: 50 },
-    });
-    hoisted.getStatusMock.mockReturnValue({ remaining: 4 });
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements({ plan: 'pro' })
+    );
+    hoisted.getStatusMock.mockReturnValue({ remaining: 4, resetTime: 0 });
 
     const { GET } = await import('@/app/api/chat/usage/route');
     const response = await GET();
 
     const body = await response.json();
     expect(body.plan).toBe('pro');
+    expect(body.dailyLimit).toBe(100);
     expect(body.warningThreshold).toBe(5);
     expect(body.isNearLimit).toBe(true);
+    expect(hoisted.getStatusMock).toHaveBeenCalledWith('user_123', 'pro');
   });
 
-  it('returns 503 when billing unavailable and no cache', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.getUserBillingInfoMock.mockResolvedValue({ success: false });
-    hoisted.getRedisMock.mockReturnValue({
-      get: vi.fn().mockResolvedValue(null),
-    });
+  it('normalizes isPro-backed pro entitlements to pro usage limits', async () => {
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements({ plan: 'pro' })
+    );
+    hoisted.getStatusMock.mockReturnValue({ remaining: 88, resetTime: 0 });
 
     const { GET } = await import('@/app/api/chat/usage/route');
     const response = await GET();
 
-    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.plan).toBe('pro');
+    expect(body.dailyLimit).toBe(100);
+    expect(body.remaining).toBe(88);
   });
 
-  it('returns stale cached data when billing unavailable', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.getUserBillingInfoMock.mockResolvedValue({ success: false });
+  it('returns degraded usage when billing is unavailable and no cache', async () => {
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements({
+        plan: 'free',
+        billingVerification: 'unavailable',
+      })
+    );
+
+    const { GET } = await import('@/app/api/chat/usage/route');
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body._stale).toBe(true);
+    expect(body.plan).toBe('free');
+    expect(body.dailyLimit).toBe(10);
+  });
+
+  it('returns stale cached data when billing is unavailable', async () => {
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements({
+        plan: 'pro',
+        billingVerification: 'unavailable',
+      })
+    );
 
     const cachedSnapshot = {
-      plan: 'free',
-      dailyLimit: 10,
+      plan: 'pro',
+      dailyLimit: 100,
       used: 5,
-      remaining: 5,
+      remaining: 95,
       isExhausted: false,
-      warningThreshold: 2,
+      warningThreshold: 5,
       isNearLimit: false,
+      monthlyLimit: 3100,
+      monthlyUsed: 5,
+      monthlyRemaining: 3095,
+      monthlyResetAt: '2026-07-01T00:00:00.000Z',
     };
     hoisted.getRedisMock.mockReturnValue({
       get: vi.fn().mockResolvedValue(cachedSnapshot),
@@ -150,19 +188,15 @@ describe('GET /api/chat/usage', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body._stale).toBe(true);
-    expect(body.plan).toBe('free');
+    expect(body.plan).toBe('pro');
+    expect(body.remaining).toBe(95);
   });
 
   it('marks isExhausted when remaining is 0', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.getUserBillingInfoMock.mockResolvedValue({
-      success: true,
-      data: { plan: 'free' },
-    });
-    hoisted.getEntitlementsMock.mockReturnValue({
-      limits: { aiDailyMessageLimit: 10 },
-    });
-    hoisted.getStatusMock.mockReturnValue({ remaining: 0 });
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements({ plan: 'free' })
+    );
+    hoisted.getStatusMock.mockReturnValue({ remaining: 0, resetTime: 0 });
 
     const { GET } = await import('@/app/api/chat/usage/route');
     const response = await GET();
