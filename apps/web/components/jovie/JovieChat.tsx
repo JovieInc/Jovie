@@ -510,14 +510,15 @@ export function JovieChat({
     />
   );
 
-  const inlineChatError = chatError ? (
-    <ChatInlineError
-      chatError={chatError}
-      onRetry={handleRetry}
-      isLoading={isLoading}
-      isSubmitting={isSubmitting}
-    />
-  ) : null;
+  const inlineChatError =
+    chatError && !chatError.suppressComposerPause ? (
+      <ChatInlineError
+        chatError={chatError}
+        onRetry={handleRetry}
+        isLoading={isLoading}
+        isSubmitting={isSubmitting}
+      />
+    ) : null;
 
   return (
     <EntityResolutionProvider profileId={profileId}>

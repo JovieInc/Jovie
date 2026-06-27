@@ -505,6 +505,49 @@ describe('useJovieChat', () => {
     expect(result.current.chatError?.message).toBe('Server failed');
   });
 
+  it('does not pause the composer for recoverable tool stream failures', async () => {
+    mockMessages = [
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        createdAt: new Date(),
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'retouchImage',
+            toolCallId: 'tool-1',
+            state: 'output-error',
+            errorText: 'Retouch is not provisioned for this account.',
+          },
+        ],
+      },
+    ];
+
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+
+    act(() => {
+      result.current.setInput('Retouch my press photo');
+    });
+
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    act(() => {
+      onErrorHandler?.(
+        Object.assign(new Error('Retouch provider unavailable'), {
+          code: 'TOOL_UNPROVISIONED',
+        })
+      );
+    });
+
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.chatError).toBeNull();
+    expect(result.current.input).toBe('');
+  });
+
   it('marks album art generation prompts with a tool intent', async () => {
     const { result, rerender } = renderHook(() =>
       useJovieChat({ profileId: 'profile_1', conversationId: 'conv_123' })

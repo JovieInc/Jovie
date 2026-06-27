@@ -24,6 +24,7 @@ import type {
   ChatTelemetry,
   ReleaseContext,
 } from '@/lib/chat/types';
+import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
 
@@ -269,7 +270,10 @@ export async function executeChatTurn(
     );
   }
 
-  const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
+  const failSoftTools = wrapToolSetFailSoft(tools);
+  const toolNames = Object.keys(failSoftTools).sort((a, b) =>
+    a.localeCompare(b)
+  );
   const toolStepLimit = resolveChatToolStepLimit(
     planLimits.booleans.aiCanUseTools
   );
@@ -278,7 +282,7 @@ export async function executeChatTurn(
     model: gateway(selectedModel),
     system: systemPrompt,
     messages: modelMessages,
-    tools,
+    tools: failSoftTools,
     stopWhen: stepCountIs(toolStepLimit),
     prepareStep: ({ steps, stepNumber }) => {
       const restrictedTools = resolveImportBioRestrictedTools(
