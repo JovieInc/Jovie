@@ -77,20 +77,21 @@ function buildDb(state: BenchmarkState) {
 }
 
 function buildTx(state: BenchmarkState) {
-  const buildReturning = async (isConflictPath: boolean) => {
-    const isClickEvent = !isConflictPath;
-    const isAudience = isConflictPath;
-
+  const buildReturning = async (
+    insertKind: 'click' | 'audience' | 'daily_views'
+  ) => {
     await sleep(
-      isClickEvent ? state.delays.clickInsert : state.delays.audienceInsert
+      insertKind === 'click'
+        ? state.delays.clickInsert
+        : state.delays.audienceInsert
     );
 
-    if (isClickEvent) {
+    if (insertKind === 'click') {
       const eventId = `click-${state.clickEvents.length + 1}`;
       state.clickEvents.push({ id: eventId, linkType: 'social' });
       return [{ id: eventId }];
     }
-    if (isAudience) {
+    if (insertKind === 'audience') {
       if (state.audienceMember) return [];
       state.audienceMember = { ...DEFAULT_MEMBER };
       return [state.audienceMember];
@@ -111,15 +112,26 @@ function buildTx(state: BenchmarkState) {
       }),
     }),
     insert: () => {
-      let conflictPath = false;
+      let insertKind: 'click' | 'audience' | 'daily_views' = 'click';
       return {
-        values: () => ({
-          onConflictDoNothing: () => {
-            conflictPath = true;
-            return { returning: () => buildReturning(conflictPath) };
-          },
-          returning: () => buildReturning(conflictPath),
-        }),
+        values: (payload: Record<string, unknown>) => {
+          if (typeof payload.viewCount === 'number') {
+            insertKind = 'daily_views';
+          } else if (payload.type === 'anonymous') {
+            insertKind = 'audience';
+          } else {
+            insertKind = 'click';
+          }
+
+          return {
+            onConflictDoUpdate: async () => undefined,
+            onConflictDoNothing: () => {
+              insertKind = 'audience';
+              return { returning: () => buildReturning(insertKind) };
+            },
+            returning: () => buildReturning(insertKind),
+          };
+        },
       };
     },
     update: () => ({
@@ -158,6 +170,7 @@ async function runBenchmark(sampleSize: number) {
 
   vi.doMock('@/lib/db', () => ({
     db: buildDb(state),
+    doesTableExist: async () => true,
   }));
 
   vi.doMock('@/lib/rate-limit', () => ({
