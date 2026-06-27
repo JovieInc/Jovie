@@ -1539,7 +1539,14 @@ jobs:
 
           pnpm run test:lighthouse:public:launch
 
-          if [ "${{ matrix.shard }}" = "0" ]; then
+          # Pin the extra mobile-viewport-stability Playwright spec to the LIGHTER
+          # LHCI shard (shard 1 collects 9 URLs vs shard 0's 10). Both shards run
+          # in parallel and the merge gate waits on max(shard0, shard1); piling the
+          # ~1.5m spec onto the already-heavier shard 0 made it the gate long pole
+          # on every public-route gtmq batch. Running it on the lighter shard
+          # rebalances the only-2-way fan-out and lowers wall-clock with identical
+          # coverage. Deferred deeper lever (gtmq batch CI re-use): JOV-3604.
+          if [ "${{ matrix.shard }}" = "1" ]; then
             mkdir -p tests/.auth
             echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
             pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
