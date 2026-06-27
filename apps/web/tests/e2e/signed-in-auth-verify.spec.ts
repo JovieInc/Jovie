@@ -118,7 +118,7 @@ test.describe('Signed-in auth verification @smoke', () => {
 
       if (TEST_AUTH_BYPASS_ENABLED) {
         await smokeNavigateWithRetry(page, APP_ROUTES.SIGNIN);
-        await expect(page).toHaveURL(/\/signin/, {
+        await expect(page).toHaveURL(/\/app/, {
           timeout: SMOKE_TIMEOUTS.NAVIGATION,
         });
       } else {

@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   canAccessAppShell,
   getAuthenticatedAuthRouteRedirect,
+  getClientAuthenticatedAuthEntryRedirect,
   getStartRouteRedirect,
 } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
@@ -58,6 +59,30 @@ describe('access route matrix (JOV-3087)', () => {
           redirectUrl: '/waitlist/invite?token=secure-token',
         })
       ).toBe(APP_ROUTES.UNAVAILABLE);
+    });
+
+    it('maps client auth-entry redirects to dashboard by default', () => {
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(new URLSearchParams())
+      ).toBe(APP_ROUTES.DASHBOARD);
+    });
+
+    it('preserves safe redirect_url values for client auth-entry redirects', () => {
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(
+          new URLSearchParams('redirect_url=%2Fapp%2Fsettings')
+        )
+      ).toBe('/app/settings');
+    });
+
+    it('does not loop client auth-entry redirects back to /signin', () => {
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(
+          new URLSearchParams(
+            `redirect_url=${encodeURIComponent(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.SIGNIN}`)}`
+          )
+        )
+      ).toBe(APP_ROUTES.DASHBOARD);
     });
   });
 });

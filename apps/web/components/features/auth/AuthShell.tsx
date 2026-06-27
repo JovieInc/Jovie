@@ -9,11 +9,13 @@ import {
   AuthProviderButtonSlot,
   AuthProviderButtonSlots,
 } from '@/features/auth/AuthProviderButtons';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
   buildAuthRouteUrl,
   getDefaultSignUpFallbackRedirectUrl,
 } from '@/lib/auth/build-auth-route-url';
-import { parseClerkError } from '@/lib/auth/clerk-errors';
+import { isSessionExists, parseClerkError } from '@/lib/auth/clerk-errors';
 import { CLERK_COMPONENT_OPTIONS } from '@/lib/auth/clerk-options';
 import {
   getEnabledAuthOAuthProviders,
@@ -113,6 +115,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     compact = false,
   } = props;
   const searchParams = useSearchParams();
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   const clerk = useClerk();
   const signInState = useSignIn();
   const signUpState = useSignUp();
@@ -142,7 +145,15 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   );
   const activeAuthResource = isSignUp ? signUpState.signUp : signInState.signIn;
   const isAuthStartReady =
-    isMounted && clerk.loaded && Boolean(activeAuthResource);
+    isMounted &&
+    clerk.loaded &&
+    Boolean(activeAuthResource) &&
+    !(isAuthLoaded && isSignedIn);
+
+  const redirectSignedInVisitor = useCallback(() => {
+    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
+    globalThis.location?.assign(destination);
+  }, [searchParams]);
 
   const handleProviderSelect = useCallback(
     async (provider: PrimaryAuthOAuthProvider) => {
@@ -168,9 +179,19 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           : await signInState.signIn?.sso(redirectParams);
 
         if (!result || result.error) {
+          if (isSessionExists(result?.error)) {
+            redirectSignedInVisitor();
+            return;
+          }
+
           throw result?.error ?? new Error('Missing Clerk auth resource');
         }
       } catch (error) {
+        if (isSessionExists(error)) {
+          redirectSignedInVisitor();
+          return;
+        }
+
         setOauthError(
           error && typeof error === 'object' && 'errors' in error
             ? parseClerkError(error)
@@ -185,10 +206,15 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       mode,
       pendingProvider,
       resolvedRedirect,
+      redirectSignedInVisitor,
       signInState.signIn,
       signUpState.signUp,
     ]
   );
+
+  if (isAuthLoaded && isSignedIn) {
+    return null;
+  }
 
   const hasNoEnabledProviders = enabledOAuthProviders.length === 0;
   const showStablePlaceholder = !isAuthStartReady;
