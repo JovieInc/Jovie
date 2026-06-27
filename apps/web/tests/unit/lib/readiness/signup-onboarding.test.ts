@@ -9,7 +9,10 @@ import {
 describe('signup onboarding readiness', () => {
   it('passes only when every required production signup env var is present', () => {
     const env = Object.fromEntries(
-      REQUIRED_SIGNUP_ONBOARDING_ENV_KEYS.map(key => [key, `${key}-value`])
+      REQUIRED_SIGNUP_ONBOARDING_ENV_KEYS.map(key => [
+        key,
+        key === 'SESSION_SECRET' ? 'x'.repeat(32) : `${key}-value`,
+      ])
     );
 
     const result = checkSignupOnboardingReadiness({
@@ -21,6 +24,26 @@ describe('signup onboarding readiness', () => {
     expect(result.ok).toBe(true);
     expect(result.missing).toEqual([]);
     expect(result.present).toEqual([...REQUIRED_SIGNUP_ONBOARDING_ENV_KEYS]);
+  });
+
+  it('treats SESSION_SECRET shorter than 32 chars as missing for /start readiness', () => {
+    const env = Object.fromEntries(
+      REQUIRED_SIGNUP_ONBOARDING_ENV_KEYS.map(key => [
+        key,
+        key === 'SESSION_SECRET' ? 'x'.repeat(32) : `${key}-value`,
+      ])
+    );
+    env.SESSION_SECRET = 'too-short';
+
+    const result = checkSignupOnboardingReadiness({
+      env,
+      target: 'prd',
+      source: 'env',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual(['SESSION_SECRET']);
+    expect(result.present).not.toContain('SESSION_SECRET');
   });
 
   it('fails closed with redacted missing-key output', () => {

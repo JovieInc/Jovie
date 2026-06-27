@@ -29,8 +29,17 @@ interface CheckSignupOnboardingReadinessOptions {
   readonly source: SignupOnboardingReadinessSource;
 }
 
-function hasValue(value: string | undefined): boolean {
-  return typeof value === 'string' && value.trim().length > 0;
+const SESSION_SECRET_MIN_LENGTH = 32;
+
+function isSignupReadyValue(
+  key: SignupOnboardingEnvKey,
+  value: string | undefined
+): boolean {
+  if (typeof value !== 'string' || value.trim().length === 0) return false;
+  if (key === 'SESSION_SECRET') {
+    return value.trim().length >= SESSION_SECRET_MIN_LENGTH;
+  }
+  return true;
 }
 
 export function checkSignupOnboardingReadiness({
@@ -40,8 +49,8 @@ export function checkSignupOnboardingReadiness({
 }: CheckSignupOnboardingReadinessOptions): SignupOnboardingReadinessResult {
   const required =
     target === 'local' ? [] : [...REQUIRED_SIGNUP_ONBOARDING_ENV_KEYS];
-  const present = required.filter(key => hasValue(env[key]));
-  const missing = required.filter(key => !hasValue(env[key]));
+  const present = required.filter(key => isSignupReadyValue(key, env[key]));
+  const missing = required.filter(key => !isSignupReadyValue(key, env[key]));
 
   return {
     ok: missing.length === 0,
