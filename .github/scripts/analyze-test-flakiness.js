@@ -20,6 +20,7 @@ const path = require('path');
 
 // Configuration
 const ANALYSIS_LIMIT = 30; // Number of recent workflow runs to analyze
+const MAIN_BRANCH = 'main'; // Only main-branch runs — PR failures are deterministic, not flaky
 const FLAKY_FAILURE_THRESHOLD = 5; // % failure rate to flag as flaky
 const FLAKY_RETRY_THRESHOLD = 10; // % retry rate to flag as flaky
 const HIGH_FLAKINESS_THRESHOLD = 5; // Number of flaky tests to trigger alert
@@ -59,12 +60,31 @@ function githubRequest(path, token) {
 }
 
 /**
+ * Build the GitHub API path for completed workflow runs on a single branch.
+ * Restricting to main avoids counting PR-branch test failures as flakiness.
+ */
+function buildWorkflowRunsApiPath(
+  owner,
+  repo,
+  { limit = ANALYSIS_LIMIT, branch = MAIN_BRANCH } = {}
+) {
+  const params = new URLSearchParams({
+    per_page: String(limit),
+    status: 'completed',
+    branch,
+  });
+  return `/repos/${owner}/${repo}/actions/workflows/ci.yml/runs?${params}`;
+}
+
+/**
  * Fetch workflow runs
  */
 async function fetchWorkflowRuns(token, owner, repo) {
-  console.log(`Fetching last ${ANALYSIS_LIMIT} workflow runs...`);
+  console.log(
+    `Fetching last ${ANALYSIS_LIMIT} completed ${MAIN_BRANCH}-branch CI runs...`
+  );
   const data = await githubRequest(
-    `/repos/${owner}/${repo}/actions/workflows/ci.yml/runs?per_page=${ANALYSIS_LIMIT}&status=completed`,
+    buildWorkflowRunsApiPath(owner, repo),
     token
   );
   return data.workflow_runs;
@@ -348,7 +368,7 @@ function generateReport(
 
   // Summary section
   report += `## Summary\n\n`;
-  report += `- **Analysis Period**: Last ${totalRuns} CI runs\n`;
+  report += `- **Analysis Period**: Last ${totalRuns} \`${MAIN_BRANCH}\` branch CI runs\n`;
   report += `- **Runs with Retries**: ${runsWithRetries} (${retryRate}%)\n`;
   report += `- **Runs with Failures**: ${runsWithFailures} (${failureRate}%)\n`;
   report += `- **Flaky Tests Detected**: ${flakyTests.length}\n\n`;
@@ -530,9 +550,11 @@ if (require.main === module) {
 module.exports = {
   analyzeFlakiness,
   buildAttemptOneOutcomes,
+  buildWorkflowRunsApiPath,
   calculateMetrics,
   collectRunExecutions,
   extractTestExecutions,
+  MAIN_BRANCH,
   normalizeJobName,
   generateReport,
   shouldCountAsRetry,
