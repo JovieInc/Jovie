@@ -298,7 +298,15 @@ describe('OnboardingChat Turnstile gating', () => {
 
   it('keeps the first message local and shows verification guidance until a token exists', () => {
     const onTurnstileRequired = vi.fn();
-    render(<TurnstileHarness onTurnstileRequired={onTurnstileRequired} />);
+    render(
+      <OnboardingChat
+        turnstilePanel={<div data-testid='test-turnstile-panel' />}
+        turnstilePanelVisible={false}
+        turnstileStatus='loading'
+        turnstileToken={null}
+        onTurnstileRequired={onTurnstileRequired}
+      />
+    );
 
     const input = screen.getByLabelText('Chat message input');
     fireEvent.change(input, { target: { value: 'help me launch a song' } });
@@ -309,7 +317,8 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(onTurnstileRequired).toHaveBeenCalledWith(
       'Verify you are human to send'
     );
-    expect(screen.getByText('Verify you are human to send')).toBeVisible();
+    expect(screen.getByTestId('onboarding-turnstile-slot')).toBeInTheDocument();
+    expect(screen.getByTestId('test-turnstile-panel')).toBeInTheDocument();
   });
 
   it('auto-submits a starter prompt once when verification is ready', async () => {
