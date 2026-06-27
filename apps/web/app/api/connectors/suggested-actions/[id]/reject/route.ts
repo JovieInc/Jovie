@@ -31,7 +31,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     // CAS transition: pending → dismissed (WHERE status='pending' AND userId=:userId)
     const updated = await db
       .update(suggestedActions)
-      .set({ status: 'dismissed' })
+      .set({ status: 'rejected' })
       .where(
         and(
           eq(suggestedActions.id, id),

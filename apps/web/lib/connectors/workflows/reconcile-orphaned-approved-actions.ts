@@ -85,7 +85,7 @@ export async function recoverOrphanedApprovedAction(input: {
       return 'not-found';
     }
 
-    if (action.userId !== input.userId || action.status !== 'accepted') {
+    if (action.userId !== input.userId || action.status !== 'approved') {
       return 'not-accepted';
     }
 
@@ -145,7 +145,7 @@ export async function reconcileOrphanedAcceptedActions(
       .from(suggestedActions)
       .where(
         and(
-          eq(suggestedActions.status, 'accepted'),
+          eq(suggestedActions.status, 'approved'),
           workflowRunMissingForSuggestedAction()
         )
       )
