@@ -485,6 +485,8 @@ jobs:
           pnpm --filter=@jovie/web run lint:contrast-ratchet
       - name: Validate flaky quarantine ledger
         run: node .github/scripts/quarantine-ledger.mjs validate
+      - name: Validate reliability detector registry
+        run: pnpm --filter @jovie/web run test:reliability-detectors
       - name: Run merge-queue drain regression tests
         run: pip install pytest --quiet && pytest scripts/tests/test_gh_retry.py -v
       - name: Write remediation summary
@@ -493,12 +495,12 @@ jobs:
           {
             echo "### Structural Contract"
             echo
-            echo "This lane enforces the CI harness manifest, generated docs, Graphite merge-queue config, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, SEO/AEO ratchet, and contrast ratchet."
+            echo "This lane enforces the CI harness manifest, generated docs, Graphite merge-queue config, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, SEO/AEO ratchet, contrast ratchet, and reliability detector registry."
             echo
             echo "Next local command:"
             echo
             echo '```bash'
-            echo "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet"
+            echo "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm test:reliability-detectors"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
