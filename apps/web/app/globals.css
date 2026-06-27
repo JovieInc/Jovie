@@ -519,6 +519,10 @@ body {
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   /* Linear Typography Features - apply font features globally */
   body {
     font-feature-settings:
@@ -530,6 +534,7 @@ body {
        Nav items, buttons, and labels should have normal tracking.
        Body text classes (.text-linear, .marketing-lead-linear) apply their own. */
     text-rendering: optimizelegibility;
+    text-wrap: pretty;
   }
 }
 
@@ -717,10 +722,15 @@ body {
   .focus-ring-transparent-offset {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-transparent;
   }
+  /* Tactile press — transform only; never transition:all (DESIGN.md / JOV-3368) */
+  .interactive-press {
+    @apply transition-transform duration-subtle ease-subtle active:scale-[0.96];
+  }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-[background-color,transform] duration-normal ease-interactive disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
+    @apply active:scale-[0.96];
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -2015,6 +2025,17 @@ body {
   h5,
   h6 {
     @apply font-semibold tracking-tight;
+    text-wrap: balance;
+  }
+  /* Dynamic numerals — tabular figures for counters, timestamps, badges */
+  :where(.tabular-nums, time, [data-tabular-nums], kbd) {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Subtle 1px image edge — prevents floating assets on dark surfaces */
+  :where(img:not([role="presentation"]):not([aria-hidden="true"])) {
+    outline: 1px solid
+      color-mix(in oklab, var(--color-border-subtle) 55%, transparent);
+    outline-offset: -1px;
   }
   h1 {
     @apply text-4xl lg:text-5xl;
@@ -2033,6 +2054,23 @@ body {
   }
   h6 {
     @apply text-base lg:text-lg;
+  }
+  /* Interactive controls — tactile press via transform only (no transition:all) */
+  :where(
+      button:not(:disabled):not([data-static="true"]),
+      [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
+      summary
+    ) {
+    transition: transform var(--duration-subtle) var(--ease-subtle);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where(
+        button:not(:disabled):not([data-static="true"]),
+        [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
+        summary
+      ):active {
+      transform: scale(0.96);
+    }
   }
 }
 
@@ -2155,7 +2193,7 @@ body {
     );
   }
   .btn-press {
-    @apply transition-opacity duration-subtle ease-subtle active:opacity-80;
+    @apply interactive-press;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {
