@@ -79,7 +79,7 @@ export function HomeBentoPairs() {
 
 function BentoCardView({ card }: { readonly card: BentoCard }) {
   return (
-    <article className='flex flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white shadow-[0_18px_70px_-56px_rgba(0,0,0,0.45)] dark:bg-surface-1'>
+    <article className='flex flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white shadow-[0_18px_70px_-56px_rgba(0,0,0,0.45)] dark:bg-white'>
       <div
         className='relative h-80 overflow-hidden border-b border-black/[0.06]'
         style={{
@@ -118,7 +118,7 @@ function SmartLinkPreview() {
     <div className='absolute inset-0 flex items-center justify-center'>
       <PreviewHalo color='var(--geist-purple-solid)' />
       <div className='relative flex flex-col items-center gap-3 font-[var(--marketing-font-body)]'>
-        <div className='flex h-14 w-14 items-center justify-center rounded-lg border border-black/10 bg-white text-lg font-bold text-primary-token shadow-[0_12px_42px_-34px_rgba(0,0,0,0.55)] dark:bg-surface-1'>
+        <div className='flex h-14 w-14 items-center justify-center rounded-lg border border-black/10 bg-white text-lg font-bold text-primary-token shadow-[0_12px_42px_-34px_rgba(0,0,0,0.55)] dark:bg-white'>
           j
         </div>
         <div className='flex gap-2 text-3xs font-medium uppercase tracking-[0.18em] text-secondary-token'>
@@ -164,7 +164,7 @@ function TourPreview() {
         {cities.map(c => (
           <li
             key={c.city}
-            className='flex items-center justify-between rounded-lg border border-black/[0.08] bg-white px-3 py-2 font-[var(--marketing-font-body)] text-xs text-primary-token shadow-[0_10px_32px_-28px_rgba(0,0,0,0.55)] dark:bg-surface-1'
+            className='flex items-center justify-between rounded-lg border border-black/[0.08] bg-white px-3 py-2 font-[var(--marketing-font-body)] text-xs text-primary-token shadow-[0_10px_32px_-28px_rgba(0,0,0,0.55)] dark:bg-white'
           >
             <span>{c.city}</span>
             <span className='text-secondary-token'>{c.date}</span>
