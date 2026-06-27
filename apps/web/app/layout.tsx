@@ -254,6 +254,7 @@ export default async function RootLayout({
         {shouldMountGa && isValidGaMeasurementId(gaMeasurementId) ? (
           <script
             id='ga-consent-init'
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: script body is generated from a validated GA measurement ID.
             dangerouslySetInnerHTML={{
               __html: buildGoogleConsentInitScript(gaMeasurementId),
             }}
