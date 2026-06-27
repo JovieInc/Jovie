@@ -6,9 +6,17 @@ name: PR Size Guard
 # approved mechanical codemods (token sweeps, renames, generated output) with
 # the `big-pr` label. Thresholds tunable via repo vars PR_MAX_LINES / PR_MAX_FILES.
 
+# PR size can only change on a push (opened/synchronize/reopened), never on a
+# label event. This guard is a REQUIRED check, so re-running it on
+# labeled/unlabeled is not just wasteful: rapid label churn (the autonomous
+# merge loop does this constantly) cancels the in-flight run via
+# cancel-in-progress, leaving a CANCELLED/QUEUED run as the latest for a
+# required context → GitHub pins the PR BLOCKED even though it's green
+# (JOV-3580). The big-pr/codemod opt-out is still honored: it's read via
+# `gh pr view` at run time, which works on push events too.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
