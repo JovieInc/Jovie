@@ -97,6 +97,7 @@ import {
   type ChatTelemetry,
   type ReleaseContext,
 } from '@/lib/chat/types';
+import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -2722,7 +2723,7 @@ export async function POST(req: Request) {
       insightsEnabled,
       forceLightModel,
       lastUserText: userText,
-      tools,
+      tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,
       telemetry,
