@@ -414,7 +414,7 @@ export function OnboardingTurnstile({
           className={cn(
             showInteractiveWidget
               ? 'relative mt-2 overflow-hidden rounded-lg border border-subtle bg-surface-0 p-1.5'
-              : 'pointer-events-none fixed top-0 -left-[10000px] z-[-1] h-16 w-[300px] overflow-hidden opacity-0'
+              : 'pointer-events-none fixed top-0 -left-full -z-10 h-16 w-80 overflow-hidden opacity-0'
           )}
           data-testid='onboarding-turnstile-widget-frame'
           data-turnstile-mount={showInteractiveWidget ? 'inline' : 'silent'}
