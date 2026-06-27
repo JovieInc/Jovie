@@ -5,6 +5,9 @@ import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { captureError } from '@/lib/error-tracking';
 
 const hoisted = vi.hoisted(() => {
+  const writeDailyProfileViewsMock = vi.fn().mockResolvedValue(undefined);
+  const doesTableExistMock = vi.fn().mockResolvedValue(true);
+  const detectBotMock = vi.fn().mockReturnValue({ isBot: false, reason: null });
   const selectLimitMock = vi.fn().mockResolvedValue([{ id: 'profile_123' }]);
   const selectWhereMock = vi.fn().mockReturnValue({
     limit: selectLimitMock,
@@ -38,6 +41,9 @@ const hoisted = vi.hoisted(() => {
     );
 
   return {
+    writeDailyProfileViewsMock,
+    doesTableExistMock,
+    detectBotMock,
     selectMock,
     selectWhereMock,
     selectFromMock,
@@ -56,6 +62,15 @@ vi.mock('@/lib/db', () => ({
     select: hoisted.selectMock,
     update: hoisted.updateMock,
   },
+  doesTableExist: hoisted.doesTableExistMock,
+}));
+
+vi.mock('@/lib/analytics/daily-profile-views', () => ({
+  writeDailyProfileViews: hoisted.writeDailyProfileViewsMock,
+}));
+
+vi.mock('@/lib/utils/bot-detection', () => ({
+  detectBot: hoisted.detectBotMock,
 }));
 
 vi.mock('@/lib/db/schema', () => ({
@@ -381,6 +396,83 @@ describe('POST /api/track', () => {
       })
     );
     expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
+
+  it('increments daily_profile_views when a non-bot click is recorded (click-implies-view)', async () => {
+    const clickValuesMock = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+    });
+
+    hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
+      callback({
+        insert: vi.fn().mockReturnValue({
+          values: clickValuesMock,
+        }),
+      })
+    );
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'jv_cc={"essential":true,"analytics":false,"marketing":false}',
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'listen',
+        target: 'https://open.spotify.com/artist/example',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+
+    expect(response.status).toBe(200);
+    expect(hoisted.doesTableExistMock).toHaveBeenCalledWith(
+      'daily_profile_views'
+    );
+    expect(hoisted.writeDailyProfileViewsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile_123',
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      expect.any(Date),
+      { route: 'api/track' }
+    );
+  });
+
+  it('does not increment daily_profile_views for bot clicks', async () => {
+    hoisted.detectBotMock.mockReturnValueOnce({
+      isBot: true,
+      reason: 'User-Agent match',
+    });
+
+    const clickValuesMock = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+    });
+
+    hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
+      callback({
+        insert: vi.fn().mockReturnValue({
+          values: clickValuesMock,
+        }),
+      })
+    );
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'other',
+        target: 'https://example.com',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+
+    expect(response.status).toBe(200);
+    expect(hoisted.writeDailyProfileViewsMock).not.toHaveBeenCalled();
   });
 
   it('decodes percent-encoded x-vercel-ip-city before storing click events', async () => {

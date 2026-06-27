@@ -84,11 +84,11 @@ export async function getUserDashboardAnalytics(
     const hasDailyProfileViews = await doesTableExist(
       TABLE_NAMES.dailyProfileViews
     );
-    // Canonical total views: daily_profile_views (written atomically with member
-    // visits on /api/audience/visit). SUM(audience_members.visits) diverges because
-    // (1) member visits predate the daily aggregate table, (2) seed scripts write
-    // independent random values, and (3) other write paths (e.g. short-link scans)
-    // increment member visits without daily_profile_views.
+    // Canonical total views: daily_profile_views (written on /api/audience/visit
+    // and /api/track click-implies-view). SUM(audience_members.visits) diverges
+    // because (1) member visits predate the daily aggregate table, (2) seed scripts
+    // write independent random values, and (3) other write paths (e.g. short-link
+    // scans) increment member visits without daily_profile_views.
     const totalViewsSelect = hasDailyProfileViews
       ? drizzleSql`(
           select coalesce(sum(${dailyProfileViews.viewCount}), 0)
