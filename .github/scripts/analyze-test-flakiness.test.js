@@ -3,11 +3,22 @@ const assert = require('node:assert/strict');
 
 const {
   buildAttemptOneOutcomes,
+  buildWorkflowRunsApiPath,
   calculateMetrics,
   extractTestExecutions,
+  MAIN_BRANCH,
   normalizeJobName,
   shouldCountAsRetry,
 } = require('./analyze-test-flakiness');
+
+test('buildWorkflowRunsApiPath scopes flakiness analysis to main branch', () => {
+  const apiPath = buildWorkflowRunsApiPath('JovieInc', 'Jovie');
+
+  assert.ok(apiPath.includes('branch=main'));
+  assert.ok(apiPath.includes('status=completed'));
+  assert.ok(apiPath.includes('per_page=30'));
+  assert.equal(MAIN_BRANCH, 'main');
+});
 
 test('normalizeJobName strips matrix shard suffixes', () => {
   assert.equal(normalizeJobName('Unit Tests (1/3)'), 'Unit Tests');
@@ -151,6 +162,19 @@ test('calculateMetrics does not flag stable steps with workflow-only retries', (
   const flaky = calculateMetrics(testStats);
 
   assert.equal(flaky.length, 0);
+});
+
+test('extractTestExecutions ignores setup failures when test steps were skipped', () => {
+  const setupFailureJob = {
+    name: 'Unit Tests (2/3)',
+    conclusion: 'failure',
+    steps: [
+      { name: 'Setup Node.js and pnpm', conclusion: 'failure' },
+      { name: 'Run unit tests', conclusion: 'skipped' },
+    ],
+  };
+
+  assert.deepEqual(extractTestExecutions(setupFailureJob), []);
 });
 
 test('calculateMetrics flags only tests above thresholds', () => {
