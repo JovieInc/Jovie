@@ -372,9 +372,25 @@ describe('CI E2E smoke workflow', () => {
 });
 
 describe('CI public lighthouse workflow', () => {
-  it('seeds QA fixtures only on shard 0 to avoid matrix Neon races', () => {
+  it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
+    const downloadArtifactStep = getStepBlock(
+      lighthouseJob,
+      'Download Neon DB connection artifact'
+    );
+    const resolveDbStep = getStepBlock(
+      lighthouseJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const exportStep = getStepBlock(
+      lighthouseJob,
+      'Export DATABASE_URL (ephemeral branch)'
+    );
+    const failClosedStep = getStepBlock(
+      lighthouseJob,
+      'Fail if Neon DB URL is missing (Lighthouse)'
+    );
     const migrateStep = getStepBlock(
       lighthouseJob,
       'Run migrations (ephemeral Neon)'
@@ -385,11 +401,27 @@ describe('CI public lighthouse workflow', () => {
       'Wait for shared Neon seed (lighthouse shard > 0)'
     );
 
+    expect(downloadArtifactStep).toContain(
+      'name: neon-db-connection-${{ github.run_id }}'
+    );
+    expect(resolveDbStep).toContain(
+      'connection_file: /tmp/neon-db-connection/connection.json'
+    );
+    expect(failClosedStep).toContain(
+      'Refusing to run public Lighthouse against staging/production DBs'
+    );
     expect(migrateStep).toContain('matrix.shard == 0');
     expect(seedStep).toContain('matrix.shard == 0');
     expect(waitStep).toContain('matrix.shard != 0');
     expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
     expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(exportStep).toContain(
+      'steps.resolve-lighthouse-neon-db-url.outputs.database_url'
+    );
+    expect(lighthouseJob).not.toContain('Export DATABASE_URL (main');
+    expect(lighthouseJob).not.toContain(
+      '- name: Create ephemeral Neon database branch (with retry)'
+    );
   });
 });
 
