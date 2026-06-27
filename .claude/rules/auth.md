@@ -37,6 +37,21 @@ The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Cler
 3. Check CSP allows the decoded FAPI host in `connect-src`, `script-src`, `frame-src`
 4. If staging auth is broken, do not let `staging.jov.ie` fall back to production Clerk keys; fail closed to the auth-unavailable state instead
 
+## OAuth Console Redirect URIs (Google + Apple)
+
+Clerk hands Google/Apple a `redirect_uri` of `https://<fapi-host>/v1/oauth_callback`,
+where the FAPI host decodes from each instance's publishable key
+(`apps/web/lib/auth/decode-fapi-host.ts`). That URI **must** be registered in the
+Google OAuth client + Apple Service ID consoles, or sign-in fails with
+`Error 400: redirect_uri_mismatch` (the 2026-06-26 incident: the staging
+unification moved prod FAPI to `clerk.jov.ie` while the consoles still had the
+old `meetjovie` / `jov.ie/__clerk` callbacks).
+
+- **Single source of truth:** `apps/web/lib/auth/oauth-redirect-uris.expected.json`. Print/verify with `pnpm tsx scripts/auth-redirect-uris.ts [--verify prod|staging]`.
+- **These consoles have NO CLI/API.** To register/update redirect URIs, run the **`/auth-console-sync`** skill — it drives a logged-in browser (claude-in-chrome, not headless `/browse`). Do not ask the user to do it manually.
+- **If you change a Clerk instance / FAPI host** (unification, key rotation, new instance): update the snapshot JSON AND re-run `/auth-console-sync` **before shipping**. `apps/web/tests/unit/auth/fapi-host-snapshot.test.ts` fails on host drift to force this.
+- **Guardrails:** `apps/web/tests/e2e/oauth-providers.spec.ts` (`@production-smoke`) probes the Google/Apple authorize endpoints with the real redirect_uri. It runs in the canary (staging, pre-promote) and the `production-oauth-gate` (post-promote, **auto-rolls-back prod** on a confirmed rejection). Don't verify OAuth by clicking the in-app button — Clerk's invisible bot-protection gates automated clicks.
+
 ## Local Auth Bypass For Perf and E2E
 
 Local `/browse` auth is bypass-first, not Clerk-form-first.
