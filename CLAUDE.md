@@ -155,6 +155,17 @@ Skill hygiene rules:
 - If a skill workflow requires repeated shell logic, add or reuse a script instead of embedding long command prose in every skill.
 - When changing skill templates or generators, run the focused gstack checks from `.agents/skills/gstack/CLAUDE.md`.
 
+## Build before you build (prior-art gate)
+
+Before scoping or implementing anything that builds infrastructure, tooling, or re-implements a known software category (visual regression/diffing, scheduling, queues, auth, parsing, charts, date handling, state management, etc.), run the prior-art gate. This enforces gstack ETHOS §2 "Search Before Building" as a hard step, not advice:
+
+1. **Name the category** ("this is a visual-regression differ").
+2. **Scan prior art (~5 min):** does the existing stack already do it (framework feature / native / installed dep)? a standard OSS lib? a SaaS/API? Note licenses.
+3. **Decide adopt > wrap > build.** Only build for core product differentiation, or when every candidate fails a *stated* hard requirement.
+4. **Record it** on the issue/plan: category · candidates + links + license · adopt/wrap/build + one-line why. Infra/tooling work without this section is not ready to start.
+
+**Precedence:** §2 (Search Before Building) runs BEFORE §1 (Boil the Lake). "Completeness is cheap / prefer the fuller approach" governs how thoroughly you finish something you've *decided* to build — it never justifies rebuilding what already exists off the shelf.
+
 ## gstack
 
 Use /browse from gstack for all web browsing. Never use mcp__claude-in-chrome__* tools.
