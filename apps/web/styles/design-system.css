@@ -113,8 +113,10 @@
   --system-b-chat-action-card-min-height-compact: 132px;
   --system-b-chat-action-card-icon-size: 28px;
   --system-b-chat-action-card-primary-height: 32px;
-  --system-b-chat-message-content-max: 44rem;
+  --system-b-chat-message-content-max: 45rem;
   --system-b-chat-composer-max-width: 45rem;
+  --system-b-chat-composer-thread-scroll-padding: 9rem;
+  --system-b-chat-composer-scroll-fade-height: 7rem;
   --system-b-chat-loading-composer-height: 88px;
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
@@ -7929,6 +7931,51 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 .system-b-copy-link-icon[data-visible="true"] {
   opacity: 1;
+}
+
+:where(.system-b-chat-content-shell) {
+  width: 100%;
+  max-width: var(--system-b-chat-composer-max-width);
+  margin-inline: auto;
+}
+
+:where(.system-b-chat-composer-dock) {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: var(--space-2) var(--space-4)
+    calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: var(--system-b-app-content-surface);
+}
+
+@media (min-width: 640px) {
+  :where(.system-b-chat-composer-dock) {
+    padding: calc(var(--space-2) + var(--space-0-5)) var(--space-5)
+      var(--space-5);
+  }
+}
+
+:where(.system-b-chat-composer-scroll-fade) {
+  pointer-events: none;
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--system-b-chat-composer-scroll-fade-height);
+  background: linear-gradient(
+    to top,
+    var(--system-b-app-content-surface) 0%,
+    color-mix(in oklab, var(--system-b-app-content-surface) 80%, transparent)
+      45%,
+    transparent 100%
+  );
+}
+
+:where(.system-b-chat-composer-thread-scroll-padding) {
+  padding-bottom: var(--system-b-chat-composer-thread-scroll-padding);
 }
 
 :where(.system-b-chat-composer-surface) {

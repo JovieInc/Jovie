@@ -17,6 +17,7 @@ import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
 import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
 import { cn } from '@/lib/utils';
 
+import { CHAT_COMPOSER_MAX_WIDTH } from '../chat-layout';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import {
   HIDDEN_DIV_STYLES,
@@ -97,16 +98,17 @@ interface SurfaceGeometry {
 function geometryFor(
   mode: SurfaceMode,
   stacked: boolean,
-  variant: NonNullable<ChatInputProps['variant']>
+  variant: NonNullable<ChatInputProps['variant']>,
+  usePillLayout: boolean
 ): SurfaceGeometry {
   const width = '100%';
-  const isHero = variant === 'hero';
-  const maxWidth = isHero
-    ? 'min(calc(100vw - 32px), 840px)'
-    : 'min(calc(100vw - 32px), 720px)';
+  const maxWidth = `min(calc(100vw - 32px), ${CHAT_COMPOSER_MAX_WIDTH})`;
   if (stacked) return { width, maxWidth, borderRadius: 28 };
-  if (isHero && mode !== 'entity') return { width, maxWidth, borderRadius: 36 };
   if (mode === 'entity') return { width, maxWidth, borderRadius: 24 };
+  if (variant === 'hero' && usePillLayout) {
+    return { width, maxWidth, borderRadius: 999 };
+  }
+  if (variant === 'hero') return { width, maxWidth, borderRadius: 24 };
   return { width, maxWidth, borderRadius: 28 };
 }
 
@@ -575,7 +577,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     else if (picker.state.status === 'root') surfaceMode = 'root';
     else if (hasText || plusMenuOpen || isListening) surfaceMode = 'typing';
 
-    const geometry = geometryFor(surfaceMode, isStacked, variant);
+    const hasInlineContent = Boolean(value.trim()) || hasChips;
+    const hasOnlyRootSlashQuery =
+      picker.state.status === 'root' &&
+      value.trim().startsWith('/') &&
+      !hasChips;
+    const useHeroPill =
+      isHero &&
+      !hasPendingFiles &&
+      (!hasInlineContent || hasOnlyRootSlashQuery);
+    const geometry = geometryFor(surfaceMode, isStacked, variant, useHeroPill);
     const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
     const reserveInlinePickerSpace =
@@ -985,8 +996,10 @@ function InputRow({
 
   return (
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
-      <div
+      <motion.div
+        layout={!reducedMotion}
         ref={containerRef}
+        transition={reducedMotion ? undefined : TRANSITION_SURFACE}
         className={cn(
           'relative',
           useHeroPill
@@ -1123,7 +1136,7 @@ function InputRow({
             />
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

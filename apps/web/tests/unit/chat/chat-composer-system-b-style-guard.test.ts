@@ -41,6 +41,10 @@ describe('chat composer System B source contract', () => {
     );
 
     for (const className of [
+      'system-b-chat-content-shell',
+      'system-b-chat-composer-dock',
+      'system-b-chat-composer-scroll-fade',
+      'system-b-chat-composer-thread-scroll-padding',
       'system-b-chat-composer-surface',
       'system-b-chat-composer-picker-shell',
       'system-b-chat-composer-icon-button',

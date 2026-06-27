@@ -192,9 +192,7 @@ describe('JovieChat styling regressions', () => {
       ?.parentElement?.parentElement;
 
     expect(composerDock?.className).toContain(CHAT_COMPOSER_DOCK_CLASSNAME);
-    expect(composerDock?.className).toContain(
-      'max-lg:pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
-    );
+    expect(composerDock?.className).toContain('system-b-chat-composer-dock');
   });
 
   it('marks runtime conversation loading shell as busy for assistive technology', () => {
