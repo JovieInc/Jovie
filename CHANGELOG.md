@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.56] - 2026-06-26
+
+> Admins can now turn product features on and off per environment (dev, staging, prod) from a new Features panel, and changes take effect without a redeploy.
+
+### Added
+
+- **[internal] Admin Features page + runtime per-environment flag store**: new `/app/admin/features` page (admin-only) lists every runtime feature flag with an inline on/off switch for each of dev, staging, and prod. Toggles persist to a new `feature_flag_overrides` table and take effect on the next request — no redeploy. Reads are cached via `unstable_cache` + `revalidateTag('feature-flags')`, so the hot path stays read-free in steady state; an unset cell inherits the code default. The override layer is additive (absent row = no change).
+- **[internal] Flags now work in production**: `getAppFlagValue` consults the per-env override store, so a flag flipped in the admin panel changes server-rendered behavior in prod for all users. Dev-bar personal cookie overrides are now also honored in production for admins only (safe per-admin preview), instead of being ignored everywhere in prod.
+
 ## [26.6.54] - 2026-06-21
 
 > [internal] Design-taste jury loop: change-aware screenshot planning, multi-juror consensus, and auto-filed issue manifests with reference comps; repo hygiene removes leaked competitor-analysis doc and adds blocking brand-scrub CI guard. Restores changelog email subscription by wiring invisible Turnstile bot protection.
