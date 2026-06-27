@@ -4,12 +4,6 @@ import { gateway } from '@ai-sdk/gateway';
 import { generateObject } from '@/lib/ai/sdk';
 import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
 import { PACKAGING_INTELLIGENCE_MODEL } from '@/lib/constants/ai-models';
-import { captureError } from '@/lib/error-tracking';
-import { logger } from '@/lib/utils/logger';
-import {
-  buildPackagingSystemPrompt,
-  buildPackagingUserPrompt,
-} from './prompts';
 import { type PackagingLlmOutput, packagingLlmOutputSchema } from './types';
 
 export interface PackagingLlmAnalysisInput {
@@ -27,6 +21,27 @@ export interface PackagingLlmAnalysisResult {
   readonly modelUsed: string;
   readonly promptTokens: number;
   readonly completionTokens: number;
+}
+
+function buildPackagingSystemPrompt(): string {
+  return `You are a YouTube packaging intelligence extractor.
+Return structured JSON only. Extract title/thumbnail promise, niche, and whether the first 30 seconds deliver that promise.
+Classify niche into exactly one schema enum. Never invent facts absent from the provided metadata or transcript.`;
+}
+
+function buildPackagingUserPrompt(input: PackagingLlmAnalysisInput): string {
+  const thumbnailLine = input.thumbnailUrl
+    ? `Thumbnail URL: ${input.thumbnailUrl}`
+    : 'Thumbnail URL: not provided';
+
+  return `Analyze packaging for YouTube video ${input.videoId}.
+Title: ${input.title}
+Description: ${input.description}
+${thumbnailLine}
+Full transcript:
+${input.transcriptText || '(no transcript available)'}
+First 30 seconds transcript:
+${input.first30sHookText || '(no first-30s transcript available)'}`;
 }
 
 export async function analyzePackagingWithLlm(
@@ -57,21 +72,4 @@ export async function analyzePackagingWithLlm(
     promptTokens: usage.inputTokens ?? 0,
     completionTokens: usage.outputTokens ?? 0,
   };
-}
-
-export async function analyzePackagingWithLlmSafe(
-  input: PackagingLlmAnalysisInput
-): Promise<PackagingLlmAnalysisResult | null> {
-  try {
-    return await analyzePackagingWithLlm(input);
-  } catch (error) {
-    logger.error('[packaging-intelligence] LLM analysis failed', {
-      videoId: input.videoId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    await captureError('Packaging intelligence LLM analysis failed', error, {
-      videoId: input.videoId,
-    });
-    return null;
-  }
 }
