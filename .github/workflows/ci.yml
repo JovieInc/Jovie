@@ -1413,42 +1413,37 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed (saves Neon compute).
-        # Non-DB PRs skip branch creation and fall back to DATABASE_URL_MAIN for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        # Reuse the shared ephemeral branch from neon-db instead of DATABASE_URL_MAIN.
+        # Screenshot/UI-only PRs still need seeded profile fixtures for shard-0 Playwright.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: public-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: resolve-neon-db-url
+      - name: Resolve DATABASE_URL from Neon artifact
+        id: resolve-lighthouse-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: echo "DATABASE_URL=${{ steps.resolve-lighthouse-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
-      - name: Export DATABASE_URL (main — non-DB PR)
-        # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true'
-        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+      - name: Fail if Neon DB URL is missing (Lighthouse)
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run public Lighthouse against staging/production DBs."
+            exit 1
+          fi
 
       - name: Run migrations (ephemeral Neon)
         # Shard 0 owns migrate/seed so matrix siblings reuse one Neon branch.
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard == 0
+        if: matrix.shard == 0
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1457,14 +1452,14 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard == 0
+        if: matrix.shard == 0
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
 
       - name: Wait for shared Neon seed (lighthouse shard > 0)
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard != 0
+        if: matrix.shard != 0
         run: |
           echo "Waiting for shard 0 migrate/seed on shared Neon branch..."
           for attempt in $(seq 1 60); do
