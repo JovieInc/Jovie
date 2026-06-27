@@ -63,14 +63,15 @@ runs:
     - name: Create Neon branch (attempt 1)
       id: create-branch-attempt-1
       continue-on-error: true
-      uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
-      with:
-        project_id: ${{ inputs.project_id }}
-        branch_name: ${{ inputs.branch_name }}
-        parent_branch: ${{ inputs.parent_branch }}
-        role: ${{ inputs.role }}
-        api_key: ${{ inputs.api_key }}
-        expires_at: ${{ steps.compute-expiry.outputs.expires_at }}
+      shell: bash
+      env:
+        NEON_API_KEY: ${{ inputs.api_key }}
+        NEON_PROJECT_ID: ${{ inputs.project_id }}
+        BRANCH_NAME: ${{ inputs.branch_name }}
+        PARENT_BRANCH: ${{ inputs.parent_branch }}
+        ROLE_NAME: ${{ inputs.role }}
+        EXPIRES_AT: ${{ steps.compute-expiry.outputs.expires_at }}
+      run: bash "${{ github.action_path }}/create-branch.sh"
 
     - name: Aggressive cleanup on limit error
       if: steps.create-branch-attempt-1.outcome == 'failure'
@@ -85,14 +86,15 @@ runs:
     - name: Create Neon branch (attempt 2)
       id: create-branch-attempt-2
       if: steps.create-branch-attempt-1.outcome == 'failure'
-      uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
-      with:
-        project_id: ${{ inputs.project_id }}
-        branch_name: ${{ inputs.branch_name }}
-        parent_branch: ${{ inputs.parent_branch }}
-        role: ${{ inputs.role }}
-        api_key: ${{ inputs.api_key }}
-        expires_at: ${{ steps.compute-expiry.outputs.expires_at }}
+      shell: bash
+      env:
+        NEON_API_KEY: ${{ inputs.api_key }}
+        NEON_PROJECT_ID: ${{ inputs.project_id }}
+        BRANCH_NAME: ${{ inputs.branch_name }}
+        PARENT_BRANCH: ${{ inputs.parent_branch }}
+        ROLE_NAME: ${{ inputs.role }}
+        EXPIRES_AT: ${{ steps.compute-expiry.outputs.expires_at }}
+      run: bash "${{ github.action_path }}/create-branch.sh"
 
     - name: Set outputs from successful attempt
       id: set-outputs

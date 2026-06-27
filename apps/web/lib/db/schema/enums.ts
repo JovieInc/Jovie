@@ -753,9 +753,11 @@ export const contextFactKindEnum = pgEnum('context_fact_kind', [
 
 export const suggestedActionStatusEnum = pgEnum('suggested_action_status', [
   'pending',
-  'accepted',
-  'dismissed',
-  'completed',
+  'approved',
+  'executed',
+  'rejected',
+  'failed',
+  'expired',
 ]);
 
 export const agentRunStatusEnum = pgEnum('agent_run_status', [
