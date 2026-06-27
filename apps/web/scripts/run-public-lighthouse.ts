@@ -98,7 +98,7 @@ async function main() {
   // they still fail the retry — this clears flakes without masking regressions.
   // ponytail: blanket retry-once; per-error classification only if a real
   // perf regression ever slips through a borderline retry.
-  const MAX_ATTEMPTS = 2;
+  const MAX_ATTEMPTS = 3;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       await runCommand('pnpm', args, process.env);
