@@ -28,7 +28,7 @@ describe('ErrorDisplay', () => {
     expect(screen.getByText('Message paused')).toBeInTheDocument();
     expect(screen.getByText('CHAT_TIMEOUT · req_123')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry message' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Message' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

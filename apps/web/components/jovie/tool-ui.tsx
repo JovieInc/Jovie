@@ -7,6 +7,7 @@ import {
   type ProfileEditPreview,
   ProfileEditPreviewCard,
 } from '@/components/features/dashboard/organisms/ProfileEditPreviewCard';
+import { resolveToolFailurePresentation } from '@/lib/chat/tool-errors';
 import {
   encodeToolEvents,
   type PersistedToolEvent,
@@ -92,7 +93,15 @@ function getToolStatusBody(event: PersistedToolEvent): string | undefined {
   switch (event.state) {
     case 'running':
       return event.summary;
-    case 'failed':
+    case 'failed': {
+      const presentation = resolveToolFailurePresentation({
+        toolName: event.toolName,
+        errorCode: event.errorCode,
+        errorMessage: event.errorMessage ?? event.summary,
+        retryable: event.retryable,
+      });
+      return presentation.body;
+    }
     case 'denied':
       return event.errorMessage ?? event.summary;
     case 'needs-approval':
@@ -100,6 +109,19 @@ function getToolStatusBody(event: PersistedToolEvent): string | undefined {
     case 'succeeded':
       return event.summary ?? 'Completed';
   }
+}
+
+function getToolStatusNextStep(event: PersistedToolEvent): string | undefined {
+  if (event.state !== 'failed') {
+    return undefined;
+  }
+
+  return resolveToolFailurePresentation({
+    toolName: event.toolName,
+    errorCode: event.errorCode,
+    errorMessage: event.errorMessage ?? event.summary,
+    retryable: event.retryable,
+  }).nextStep;
 }
 
 const TOOL_STATUS_ICONS: Record<PersistedToolEvent['state'], typeof Loader2> = {
@@ -143,6 +165,7 @@ function ToolActivityRow({
   count: number;
 }>) {
   const body = getToolStatusBody(event);
+  const nextStep = getToolStatusNextStep(event);
   const isInline = variant === 'inline';
   const isError = event.state === 'failed' || event.state === 'denied';
   const isRunning = event.state === 'running';
@@ -206,6 +229,16 @@ function ToolActivityRow({
             )}
           >
             {body}
+          </div>
+        ) : null}
+        {nextStep ? (
+          <div
+            className={cn(
+              'mt-0.5 text-tertiary-token',
+              isInline ? 'line-clamp-2 text-3xs' : 'line-clamp-2 text-2xs'
+            )}
+          >
+            {nextStep}
           </div>
         ) : null}
         {showVerboseDetails ? (

@@ -97,6 +97,7 @@ import {
   type ChatTelemetry,
   type ReleaseContext,
 } from '@/lib/chat/types';
+import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -933,6 +934,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROFILE_REQUIRED' as const,
           error: 'Profile ID required',
         };
       }
@@ -940,6 +942,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PLAN_UNAVAILABLE' as const,
           error: 'Album art generation requires a Pro plan.',
         };
       }
@@ -948,6 +951,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROVIDER_UNAVAILABLE' as const,
           error: 'Album art generation is temporarily unavailable.',
         };
       }
@@ -985,6 +989,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             burstLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -998,6 +1003,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             dailyLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -1097,6 +1103,7 @@ function createGenerateAlbumArtTool(params: {
           return {
             success: false as const,
             retryable: false,
+            errorCode: 'PROVIDER_UNAVAILABLE' as const,
             error: 'Album art generation is temporarily unavailable.',
           };
         }
@@ -1107,6 +1114,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'TOOL_EXECUTION_FAILED' as const,
           error: 'Unable to generate album art. Please try again.',
         };
       }
@@ -2715,7 +2723,7 @@ export async function POST(req: Request) {
       insightsEnabled,
       forceLightModel,
       lastUserText: userText,
-      tools,
+      tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,
       telemetry,

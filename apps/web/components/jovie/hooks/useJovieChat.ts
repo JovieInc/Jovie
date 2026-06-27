@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
@@ -35,6 +36,7 @@ import {
   getErrorType,
   getPartsChangeFingerprint,
   getPreferredErrorMessage,
+  shouldSuppressChatPauseForToolFailure,
 } from '../utils';
 import { composeMessage, useChipTray } from './useChipTray';
 
@@ -226,6 +228,7 @@ export function useJovieChat({
   const activeClientTurnIdRef = useRef<string | null>(null);
   const streamRevisionRef = useRef(0);
   const lastAssistantPartsSignatureRef = useRef<string | null>(null);
+  const sdkMessagesRef = useRef<UIMessage[]>([]);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
   const [input, setInput] = useState('');
   const chipTray = useChipTray();
@@ -425,13 +428,20 @@ export function useJovieChat({
       const chatErrorType = getErrorType(error);
       const metadata = extractErrorMetadata(error);
 
+      const suppressComposerPause =
+        chatErrorType === 'tool' ||
+        isRecoverableToolErrorCode(metadata.errorCode);
+
       setChatError({
         type: chatErrorType,
         message: getPreferredErrorMessage(error, chatErrorType, metadata),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
-        failedMessage: lastAttemptedMessageRef.current,
+        failedMessage: suppressComposerPause
+          ? undefined
+          : lastAttemptedMessageRef.current,
+        suppressComposerPause,
       });
 
       if (lastAttemptedMessageRef.current) {
@@ -499,7 +509,28 @@ export function useJovieChat({
       setIsSubmitting(false);
     },
     onError: error => {
-      handleChatFailure(error, 'stream', activeClientTurnIdRef.current);
+      const clientTurnId = activeClientTurnIdRef.current;
+      const assistantMessage = getLastAssistantMessage(sdkMessagesRef.current);
+      const assistantParts = getMessageParts(assistantMessage);
+
+      if (
+        clientTurnId &&
+        shouldSuppressChatPauseForToolFailure(error, assistantParts)
+      ) {
+        dispatchTimelineEvent({
+          type: 'assistant.stream.completed',
+          conversationId: activeConversationId,
+          clientTurnId,
+          requestId: clientTurnId,
+          parts: assistantParts,
+          now: Date.now(),
+        });
+        activeClientTurnIdRef.current = null;
+        setIsSubmitting(false);
+        return;
+      }
+
+      handleChatFailure(error, 'stream', clientTurnId);
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
@@ -571,6 +602,10 @@ export function useJovieChat({
     existingConversation?.conversation?.id,
     persistedTimelineMessages,
   ]);
+
+  useEffect(() => {
+    sdkMessagesRef.current = sdkMessages;
+  }, [sdkMessages]);
 
   useEffect(() => {
     const clientTurnId = activeClientTurnIdRef.current;

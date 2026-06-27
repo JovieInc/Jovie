@@ -24,6 +24,7 @@ import type {
   ChatTelemetry,
   ReleaseContext,
 } from '@/lib/chat/types';
+
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
 

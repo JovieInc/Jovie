@@ -49,6 +49,12 @@ export function ErrorDisplay({
     }
   };
 
+  const isToolScopedFailure =
+    chatError.type === 'tool' || chatError.suppressComposerPause === true;
+  const headline = isToolScopedFailure
+    ? 'Action could not finish'
+    : 'Message paused';
+
   return (
     <div
       role='alert'
@@ -63,13 +69,13 @@ export function ErrorDisplay({
         <div className='min-w-0 flex-1'>
           <div>
             <p className='text-app font-medium leading-5 text-primary-token'>
-              Message paused
+              {headline}
             </p>
             <p className='text-xs leading-5 text-secondary-token'>
               {chatError.message}
             </p>
             <p className='text-xs leading-5 text-tertiary-token'>
-              {getNextStepMessage(chatError.type)}
+              {getNextStepMessage(chatError.type, chatError.errorCode)}
             </p>
           </div>
 
@@ -87,7 +93,7 @@ export function ErrorDisplay({
                 size='sm'
                 onClick={handleCopySupportCode}
                 className='h-7 gap-1 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em]'
-                aria-label='Copy support reference'
+                aria-label='Copy Support Reference'
               >
                 <Copy className='size-3' />
                 {copied ? 'Copied' : 'Copy'}
@@ -95,19 +101,21 @@ export function ErrorDisplay({
             </div>
           )}
 
-          {chatError.failedMessage && !chatError.retryAfter && (
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              onClick={onRetry}
-              disabled={isLoading || isSubmitting}
-              className='mt-2 h-7 gap-1.5 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
-            >
-              <RefreshCw className='size-3.5' />
-              Retry message
-            </Button>
-          )}
+          {!isToolScopedFailure &&
+            chatError.failedMessage &&
+            !chatError.retryAfter && (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={onRetry}
+                disabled={isLoading || isSubmitting}
+                className='mt-2 h-7 gap-1.5 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
+              >
+                <RefreshCw className='size-3.5' />
+                Retry Message
+              </Button>
+            )}
         </div>
       </div>
     </div>
