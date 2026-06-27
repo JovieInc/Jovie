@@ -14,6 +14,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { isStripeConnectPlatformProfileBlocked } from '@/lib/stripe/connect-errors';
 import { getStripeConnectReadiness } from '@/lib/stripe/connect-readiness';
 
 export const runtime = 'nodejs';
@@ -59,6 +60,8 @@ export async function GET() {
       );
     }
 
+    const onboardingAvailable = !isStripeConnectPlatformProfileBlocked();
+
     // If no Stripe account, return disconnected status
     if (!profile.stripeAccountId) {
       return NextResponse.json(
@@ -67,6 +70,7 @@ export async function GET() {
           onboardingComplete: false,
           payoutsEnabled: false,
           email: null,
+          onboardingAvailable,
         },
         { headers: NO_STORE_HEADERS }
       );
@@ -86,6 +90,7 @@ export async function GET() {
         payoutsEnabled:
           readiness?.payoutsEnabled ?? profile.stripePayoutsEnabled,
         email: readiness?.payoutEmail ?? null,
+        onboardingAvailable,
       },
       { headers: NO_STORE_HEADERS }
     );
