@@ -1,5 +1,6 @@
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { writeDailyProfileViews } from '@/lib/analytics/daily-profile-views';
 import { shouldExcludeSelfByProfileId } from '@/lib/analytics/self-exclusion';
 import {
   checkVisitRateLimit,
@@ -19,11 +20,7 @@ import {
   invalidateColumnExistenceCache,
 } from '@/lib/db';
 import { isMissingColumnError, unwrapPgError } from '@/lib/db/errors';
-import {
-  audienceMembers,
-  audienceReferrers,
-  dailyProfileViews,
-} from '@/lib/db/schema/analytics';
+import { audienceMembers, audienceReferrers } from '@/lib/db/schema/analytics';
 import {
   creatorDistributionEvents,
   creatorProfiles,
@@ -262,26 +259,6 @@ async function writeReferrer(
   }
 }
 
-async function writeDailyProfileViews(
-  tx: DbOrTransaction,
-  profileId: string,
-  viewDate: string,
-  now: Date
-): Promise<void> {
-  try {
-    await incrementDailyProfileViews(tx, profileId, viewDate, now);
-  } catch (error) {
-    if (!isMissingDailyProfileViewsTableError(error)) {
-      throw error;
-    }
-    await captureWarning(
-      '[audience/visit] daily_profile_views table missing; skipping aggregate write',
-      error,
-      { profileId, viewDate }
-    );
-  }
-}
-
 async function writeInstagramActivation(
   tx: DbOrTransaction,
   profileId: string,
@@ -323,90 +300,6 @@ async function writeInstagramActivation(
       { profileId }
     );
   }
-}
-
-async function incrementDailyProfileViews(
-  tx: DbOrTransaction,
-  profileId: string,
-  viewDate: string,
-  now: Date
-): Promise<void> {
-  const values = {
-    creatorProfileId: profileId,
-    viewDate,
-    viewCount: 1,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  try {
-    await tx
-      .insert(dailyProfileViews)
-      .values(values)
-      .onConflictDoUpdate({
-        target: [
-          dailyProfileViews.creatorProfileId,
-          dailyProfileViews.viewDate,
-        ],
-        set: {
-          viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-          updatedAt: now,
-        },
-      });
-    return;
-  } catch (error) {
-    const isMissingConflictTarget =
-      error instanceof Error &&
-      (error.message.includes('42P10') ||
-        error.message.includes(
-          'there is no unique or exclusion constraint matching the ON CONFLICT specification'
-        ));
-
-    if (!isMissingConflictTarget) {
-      throw error;
-    }
-
-    logger.warn(
-      '[Audience Visit] Missing conflict target for daily_profile_views upsert, using safe fallback update path'
-    );
-  }
-
-  const [updatedExisting] = await tx
-    .update(dailyProfileViews)
-    .set({
-      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(dailyProfileViews.creatorProfileId, profileId),
-        eq(dailyProfileViews.viewDate, viewDate)
-      )
-    )
-    .returning({ id: dailyProfileViews.id });
-
-  if (updatedExisting) {
-    return;
-  }
-
-  await tx.insert(dailyProfileViews).values(values).onConflictDoNothing();
-
-  await tx
-    .update(dailyProfileViews)
-    .set({
-      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(dailyProfileViews.creatorProfileId, profileId),
-        eq(dailyProfileViews.viewDate, viewDate)
-      )
-    );
-}
-
-function isMissingDailyProfileViewsTableError(error: unknown): boolean {
-  return unwrapPgError(error).code === '42P01';
 }
 
 function isMissingAudienceReferrersTableError(error: unknown): boolean {
@@ -846,7 +739,9 @@ export async function POST(request: NextRequest) {
           }
 
           if (visitRecorded && compatibility.hasDailyProfileViewsTable) {
-            await writeDailyProfileViews(tx, profileId, viewDate, now);
+            await writeDailyProfileViews(tx, profileId, viewDate, now, {
+              route: 'audience/visit',
+            });
           }
 
           if (
