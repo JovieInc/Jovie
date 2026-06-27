@@ -4766,11 +4766,45 @@ jobs:
           done
           echo "oauth_status=passed" >> "$GITHUB_OUTPUT"
           echo "✅ Production Google + Apple accept Clerk's redirect_uri"
-      - name: Auto-rollback on confirmed OAuth break
-        # Roll back ONLY on a confirmed provider rejection (oauth_status=failed),
-        # never on an infra/setup failure — a spurious rollback of a healthy
-        # deploy is worse than a one-cycle delay.
-        if: ${{ failure() && steps.oauth-probe.outputs.oauth_status == 'failed' }}
+      - name: Verify a real authenticated session loads on production
+        id: session-probe
+        if: ${{ steps.oauth-probe.outputs.oauth_status == 'passed' }}
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+        run: |
+          # Exchanges a Backend-minted sign_in_token through Clerk JS for the
+          # dedicated auth-monitor user and asserts /app authenticates. Catches
+          # session-creation / JWT / proxy-state / post-auth regressions the
+          # redirect probe can't. Skips cleanly if the secret is unavailable.
+          if [ -z "${CLERK_SECRET_KEY}" ]; then
+            echo "ℹ️ CLERK_SECRET_KEY not available — skipping real-session check."
+            echo "session_status=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          attempt=1
+          max_attempts=3
+          until CI=true SMOKE_ONLY=1 BASE_URL="https://jov.ie" pnpm exec playwright test tests/e2e/auth-session-monitor.spec.ts --project=chromium --reporter=line; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "session_status=failed" >> "$GITHUB_OUTPUT"
+              echo "❌ Real authenticated session failed on production after ${max_attempts} attempts."
+              exit 1
+            fi
+            sleep_seconds=$((attempt * 15))
+            echo "⚠ Session probe attempt ${attempt}/${max_attempts} failed; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
+          echo "session_status=passed" >> "$GITHUB_OUTPUT"
+          echo "✅ Real authenticated session loads on production"
+      - name: Auto-rollback on confirmed auth break
+        # Roll back ONLY on a confirmed auth failure (a provider redirect
+        # rejection OR a real-session failure), never on infra/setup flake — a
+        # spurious rollback of a healthy deploy is worse than a one-cycle delay.
+        if: ${{ failure() && (steps.oauth-probe.outputs.oauth_status == 'failed' || steps.session-probe.outputs.session_status == 'failed') }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

@@ -139,3 +139,53 @@ struct MobileAuthFinalizationTests {
     )
   }
 }
+
+/// Deterministic guard for the iOS sign-in entry point.
+///
+/// iOS opens `<webBaseURL>/auth/start` in an `ASWebAuthenticationSession`; the
+/// Google/Apple OAuth then happens INSIDE that web session against the web app's
+/// Clerk FAPI (clerk.jov.ie) — the same redirect contract the web snapshot tests
+/// guard (apps/web/lib/auth/oauth-redirect-uris.expected.json). So the
+/// iOS-specific failure mode is the app targeting the WRONG web host/path/scheme
+/// (e.g. a stale meetjovie.com, http, or a changed path). This locks that down:
+/// if anyone repoints the iOS auth URL, the build fails before it ships.
+@Suite struct MobileBrowserAuthURLBuilderGuardTests {
+  @Test func signInURLTargetsRegisteredProdHostAndPath() throws {
+    let url = try #require(
+      MobileBrowserAuthURLBuilder.signInURL(
+        baseURL: URL(string: "https://jov.ie")!,
+        returnRoute: "/app",
+        codeChallenge: "test-code-challenge"
+      )
+    )
+    let components = try #require(
+      URLComponents(url: url, resolvingAgainstBaseURL: false)
+    )
+    #expect(components.scheme == "https")
+    #expect(components.host == "jov.ie")
+    #expect(components.path == "/auth/start")
+
+    let items = Dictionary(
+      uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value) }
+    )
+    #expect(items["client"] == "ios")
+    #expect(items["intent"] == "sign_in")
+    #expect(items["return_to"] == "/app")
+    #expect(items["code_challenge"] == "test-code-challenge")
+    #expect(items["code_challenge_method"] == "S256")
+  }
+
+  @Test func signInURLStaysOnConfiguredWebHostOverHTTPS() throws {
+    // Whatever host the app is configured with, the auth URL must stay on it and
+    // stay HTTPS — never cross-origin to a stale host or drop to http.
+    let url = try #require(
+      MobileBrowserAuthURLBuilder.signInURL(
+        baseURL: URL(string: "https://staging.jov.ie")!,
+        codeChallenge: "c"
+      )
+    )
+    #expect(url.scheme == "https")
+    #expect(url.host == "staging.jov.ie")
+    #expect(url.path == "/auth/start")
+  }
+}
