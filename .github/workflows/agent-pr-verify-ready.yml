@@ -27,8 +27,7 @@ jobs:
         startsWith(github.event.pull_request.head.ref, 'linear/') ||
         startsWith(github.event.pull_request.head.ref, 'claude/') ||
         startsWith(github.event.pull_request.head.ref, 'codegen-bot/') ||
-        startsWith(github.event.pull_request.head.ref, 'codex/') ||
-        contains(github.event.pull_request.head.ref, '/jov-')
+        startsWith(github.event.pull_request.head.ref, 'codex/')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 25
