@@ -22,6 +22,10 @@ const OPERATIONAL_CONTROL_PANEL = join(
   TEST_DIR,
   '../../../components/features/admin/OperationalControlPanel.tsx'
 );
+const DEFAULT_ALIVE_WAR_ROOM_PANEL = join(
+  TEST_DIR,
+  '../../../components/features/admin/DefaultAliveWarRoomPanel.tsx'
+);
 
 const OPS_COMPONENT_FILES = [
   OPS_PAGE,
@@ -51,6 +55,18 @@ describe('admin ops shell normalization', () => {
 
     expect(source).toContain('OperationalControlPanel');
     expect(source).toContain('<OperationalControlPanel');
+  });
+
+  it('mounts the Default Alive war room panel ahead of operational controls', () => {
+    const pageSource = readSource(OPS_PAGE);
+    const panelSource = readSource(DEFAULT_ALIVE_WAR_ROOM_PANEL);
+
+    expect(pageSource).toContain('DefaultAliveWarRoomPanel');
+    expect(pageSource).toContain('<DefaultAliveWarRoomPanel');
+    expect(panelSource).toContain("data-testid='default-alive-war-room-panel'");
+    expect(pageSource.indexOf('DefaultAliveWarRoomPanel')).toBeLessThan(
+      pageSource.indexOf('OperationalControlPanel')
+    );
   });
 
   it('surfaces nightly testing agent health on the shell ops page', () => {

@@ -6,6 +6,7 @@ import type {
   DailyBucket,
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
+import { DefaultAliveWarRoomPanel } from '@/components/features/admin/DefaultAliveWarRoomPanel';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { APP_ROUTES } from '@/constants/routes';
@@ -285,6 +286,8 @@ export default async function AdminOpsPage({
           </span>
         ) : null}
       </div>
+
+      <DefaultAliveWarRoomPanel />
 
       <OperationalControlPanel />
 

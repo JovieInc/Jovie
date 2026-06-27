@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "lastVerifiedAt": null,
+  "lastVerifiedBy": null,
+  "cashConstraintUsd": 400,
+  "cashTruth": {
+    "balanceUsd": 400,
+    "verified": false,
+    "source": "manual-until-cfo-verifies",
+    "notes": "Operating truth until JOV-1859 reconciles Mercury and obligations."
+  },
+  "burnFreeze": {
+    "active": true,
+    "effectiveAt": "2026-06-27",
+    "notes": "Nonessential spend frozen until runway stabilizes or bridge closes."
+  },
+  "vendors": [
+    {
+      "id": "vercel",
+      "label": "Vercel",
+      "monthlyUsd": 20,
+      "renewalDate": "2026-07-01",
+      "owner": "ops",
+      "action": "keep",
+      "impact": "Production deploys and preview environments."
+    },
+    {
+      "id": "neon",
+      "label": "Neon Postgres",
+      "monthlyUsd": 19,
+      "renewalDate": "2026-07-05",
+      "owner": "ops",
+      "action": "keep",
+      "impact": "Primary database for product and admin surfaces."
+    },
+    {
+      "id": "clerk",
+      "label": "Clerk",
+      "monthlyUsd": 25,
+      "renewalDate": "2026-07-10",
+      "owner": "ops",
+      "action": "defer",
+      "impact": "Auth for creators and admin; defer only with migration plan."
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter",
+      "monthlyUsd": 0,
+      "renewalDate": null,
+      "owner": "ops",
+      "action": "cut",
+      "impact": "Paid model calls blocked; Hermes uses free-tier routing only."
+    }
+  ],
+  "nextPayments": [
+    {
+      "id": "vercel-july",
+      "label": "Vercel team plan",
+      "amountUsd": 20,
+      "dueDate": "2026-07-01"
+    },
+    {
+      "id": "neon-july",
+      "label": "Neon compute",
+      "amountUsd": 19,
+      "dueDate": "2026-07-05"
+    }
+  ],
+  "bridgePipeline": {
+    "targetCount": 20,
+    "identifiedCount": 0,
+    "status": "not_started",
+    "notes": "Warm angels and Speedrun scouts tracked in JOV-1862."
+  },
+  "acceleratorFacts": {
+    "program": "YC",
+    "submissionStatus": "late_submission",
+    "deadlineNote": "Late submission path active; facts must match $400 cash truth.",
+    "cashUsd": 400,
+    "runwayDays": null,
+    "mrrUsd": null,
+    "activeUsers": null,
+    "lastReconciledAt": "2026-06-27"
+  },
+  "dailyDecisions": [
+    {
+      "id": "cash-truth",
+      "label": "Reconcile bank balance, burn, and runway",
+      "status": "pending",
+      "owner": "cfo",
+      "linearIssueId": "JOV-1859",
+      "requiresHumanApproval": true
+    },
+    {
+      "id": "spend-freeze",
+      "label": "Freeze nonessential spend and label vendor actions",
+      "status": "in_progress",
+      "owner": "cfo",
+      "linearIssueId": "JOV-1860",
+      "requiresHumanApproval": true
+    },
+    {
+      "id": "daily-runway-report",
+      "label": "Emit daily runway report (no-agent cron)",
+      "status": "pending",
+      "owner": "no_agent",
+      "linearIssueId": "JOV-1861",
+      "requiresHumanApproval": false
+    },
+    {
+      "id": "bridge-pipeline",
+      "label": "Open bridge micro-process for warm investors",
+      "status": "pending",
+      "owner": "chief",
+      "linearIssueId": "JOV-1862",
+      "requiresHumanApproval": true
+    },
+    {
+      "id": "accelerator-facts",
+      "label": "Reconcile YC/accelerator facts against cash truth",
+      "status": "done",
+      "owner": "chief",
+      "linearIssueId": "JOV-1863",
+      "requiresHumanApproval": true
+    }
+  ]
+}
