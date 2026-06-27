@@ -283,14 +283,16 @@ function SellOutProof({
         <p className='text-xs font-semibold tracking-[-0.02em] text-white dark:text-white'>
           {proof.drawerTitle}
         </p>
-        <p className='mt-1 text-2xs text-white/44'>{proof.drawerSubtitle}</p>
+        <p className='mt-1 text-2xs text-tertiary-token'>
+          {proof.drawerSubtitle}
+        </p>
         <div className='mt-2.5 divide-y divide-white/6'>
           {proof.drawerRows.map(row => (
             <div
               key={row.id}
               className='grid grid-cols-[2.45rem_minmax(0,1fr)_auto] items-center gap-2 py-2.25'
             >
-              <span className='text-2xs font-medium leading-[1.15] tracking-[-0.01em] text-white/52'>
+              <span className='text-2xs font-medium leading-[1.15] tracking-[-0.01em] text-secondary-token'>
                 {row.month}
                 <span className='block text-sm font-semibold tracking-[-0.04em] text-white dark:text-white'>
                   {row.day}
@@ -300,11 +302,11 @@ function SellOutProof({
                 <span className='block truncate text-xs font-semibold text-white dark:text-white'>
                   {row.venue}
                 </span>
-                <span className='block truncate text-2xs text-white/44'>
+                <span className='block truncate text-2xs text-tertiary-token'>
                   {row.location}
                 </span>
               </span>
-              <span className='text-2xs font-medium text-white/64'>
+              <span className='text-2xs font-medium text-secondary-token'>
                 {row.ctaLabel}
               </span>
             </div>
@@ -324,7 +326,7 @@ function GetPaidProof({
     <div className='grid gap-2 sm:grid-cols-[0.9fr_1.1fr]'>
       <div className='flex flex-col justify-between rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:pt-3.5'>
         <div>
-          <p className='text-2xs font-medium tracking-[-0.01em] text-white/48'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
             {proof.drawerTitle}
           </p>
           <p className='mt-1 text-app font-semibold tracking-[-0.03em] text-white dark:text-white'>
@@ -333,7 +335,7 @@ function GetPaidProof({
         </div>
 
         <div className='mt-3 space-y-1.5'>
-          <p className='text-2xs font-medium tracking-[-0.01em] text-white/48'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
             {proof.chooseAmountLabel}
           </p>
           <div className='grid gap-1.5'>
@@ -353,7 +355,9 @@ function GetPaidProof({
                 <span
                   className={cn(
                     'text-3xs font-medium',
-                    row.featured ? 'text-black/62' : 'text-white/52'
+                    row.featured
+                      ? 'text-secondary-token'
+                      : 'text-tertiary-token'
                   )}
                 >
                   {row.currency}
@@ -389,7 +393,7 @@ function ShareProof({
   return (
     <div className='flex justify-center sm:pt-2'>
       <div className='relative ml-auto flex w-full max-w-[15.5rem] flex-col items-center rounded-[1.2rem] bg-(--color-badge-text) px-4 py-4.5 text-center text-black dark:text-white shadow-[0_16px_32px_rgba(0,0,0,0.14)]'>
-        <p className='text-2xs font-semibold tracking-[0.02em] text-black/72'>
+        <p className='text-2xs font-semibold tracking-[0.02em] text-secondary-token'>
           {proof.title}
         </p>
 
@@ -410,7 +414,7 @@ function ShareProof({
         <p className='mt-3.5 font-mono text-2xs font-semibold tracking-[-0.02em] text-black dark:text-white'>
           {proof.url}
         </p>
-        <p className='mt-2 text-2xs font-medium text-black/56'>
+        <p className='mt-2 text-2xs font-medium text-tertiary-token'>
           {proof.subtitle}
         </p>
       </div>
