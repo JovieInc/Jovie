@@ -301,7 +301,7 @@ function TaskReleasePanelStatus({
     <EntitySidebarShell
       isOpen
       width={344}
-      ariaLabel='Release details'
+      ariaLabel='Release Details'
       title='Release'
       onClose={onClose}
       scrollStrategy='shell'
@@ -505,7 +505,7 @@ function TaskMetaMenuNumber({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <TaskMetaTrigger ariaLabel='Open task controls'>
+        <TaskMetaTrigger ariaLabel='Open Task Controls'>
           <span className='inline-flex items-center gap-1 text-2xs font-semibold text-tertiary-token'>
             <span className='shrink-0'>J-{task.taskNumber}</span>
             <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -708,7 +708,7 @@ function TaskDocumentPanel({
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task status'>
+                  <TaskMetaTrigger ariaLabel='Change Task Status'>
                     <TaskStageInline task={task} withChevron />
                   </TaskMetaTrigger>
                 </DropdownMenuTrigger>
@@ -736,7 +736,7 @@ function TaskDocumentPanel({
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task priority'>
+                  <TaskMetaTrigger ariaLabel='Change Task Priority'>
                     <TaskPriorityInline priority={task.priority} withChevron />
                   </TaskMetaTrigger>
                 </DropdownMenuTrigger>
@@ -764,7 +764,7 @@ function TaskDocumentPanel({
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task assignee'>
+                  <TaskMetaTrigger ariaLabel='Change Task Assignee'>
                     <TaskAssigneeInline
                       assigneeKind={task.assigneeKind}
                       artistName={artistName}
@@ -970,20 +970,34 @@ function TaskLoadingState() {
         <ShellListRowFrame
           key={row.key}
           interaction='none'
-          className='group/row grid min-h-16 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5'
+          data-testid='task-loading-row'
+          className='group/row flex min-h-16 items-center gap-3 px-3 py-1.5'
         >
-          <div className='skeleton h-4 w-4 rounded-full' />
-          <div className='min-w-0 space-y-2'>
+          <span className='flex shrink-0 items-center'>
+            <div className='skeleton h-5 w-5 rounded-full' aria-hidden='true' />
+          </span>
+
+          <div className='min-w-0 flex-1'>
             <div
-              className='skeleton h-3.5 rounded'
+              className='skeleton h-3.5 max-w-full rounded'
               style={{ width: row.titleWidth }}
+              aria-hidden='true'
             />
+            <div className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
+              <div
+                className='skeleton h-3 rounded'
+                style={{ width: row.metaWidth }}
+                aria-hidden='true'
+              />
+            </div>
+          </div>
+
+          <div className='flex shrink-0 items-center justify-end'>
             <div
-              className='skeleton h-3 rounded'
-              style={{ width: row.metaWidth }}
+              className='skeleton h-5 w-14 rounded-full'
+              aria-hidden='true'
             />
           </div>
-          <div className='skeleton h-5 w-14 rounded-full' />
         </ShellListRowFrame>
       ))}
     </div>
@@ -1960,7 +1974,7 @@ export function TasksPageClient() {
               pills.length > 0
                 ? `Filter Tasks (${pills.length})`
                 : 'Filter Tasks',
-            ariaLabel: 'Filter tasks',
+            ariaLabel: 'Filter Tasks',
             placeholder: 'Search tasks',
             allowedFields: ['title'] as const,
           },
@@ -1973,7 +1987,7 @@ export function TasksPageClient() {
     () => (
       <DashboardHeaderActionGroup>
         <DashboardHeaderActionButton
-          ariaLabel='Create task'
+          ariaLabel='Create Task'
           icon={<Plus className='h-3.5 w-3.5' />}
           label='New Task'
           onClick={() => setHeaderMode('create')}
