@@ -354,13 +354,21 @@ describe('CI public a11y workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const a11yJob = getJobBlock(workflow, 'ci-a11y');
-    const createBranchStep = getStepBlock(
+    const downloadArtifactStep = getStepBlock(
       a11yJob,
-      'Create ephemeral Neon database branch (with retry)'
+      'Download Neon DB connection artifact'
+    );
+    const resolveDbStep = getStepBlock(
+      a11yJob,
+      'Resolve DATABASE_URL from Neon artifact'
     );
     const exportStep = getStepBlock(
       a11yJob,
       'Export DATABASE_URL (ephemeral branch)'
+    );
+    const failClosedStep = getStepBlock(
+      a11yJob,
+      'Fail if Neon DB URL is missing (A11y)'
     );
     const migrateStep = getStepBlock(
       a11yJob,
@@ -368,11 +376,26 @@ describe('CI public a11y workflow', () => {
     );
     const seedStep = getStepBlock(a11yJob, 'Seed public QA fixtures');
 
-    expect(createBranchStep).toContain(
+    expect(workflow).toContain(
+      'needs: [optimize_ci, ci-build-public, ci-path-changes, neon-db]'
+    );
+    expect(downloadArtifactStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(downloadArtifactStep).toContain(
+      'name: neon-db-connection-${{ github.run_id }}'
+    );
+    expect(resolveDbStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(resolveDbStep).toContain(
+      'connection_file: /tmp/neon-db-connection/connection.json'
     );
     expect(exportStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(failClosedStep).toContain(
+      'Refusing to run a11y against staging/production DBs'
     );
     expect(migrateStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
@@ -381,8 +404,9 @@ describe('CI public a11y workflow', () => {
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
     );
 
-    expect(createBranchStep).not.toContain('run_neon');
-    expect(seedStep).not.toContain('run_neon');
     expect(a11yJob).not.toContain('Export DATABASE_URL (main');
+    expect(a11yJob).not.toContain(
+      '- name: Create ephemeral Neon database branch (with retry)'
+    );
   });
 });
