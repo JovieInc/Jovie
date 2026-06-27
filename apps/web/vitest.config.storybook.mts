@@ -36,7 +36,15 @@ export default defineConfig({
       'react/jsx-dev-runtime',
     ],
   },
+  // Browser mode prebundles with a legacy default target; use esnext so modern
+  // syntax in client deps does not fail esbuild transforms.
+  esbuild: {
+    target: 'esnext',
+  },
   optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext',
+    },
     include: [
       // React core
       'react',
@@ -56,7 +64,6 @@ export default defineConfig({
       'motion/react',
       'vaul',
       'react-error-boundary',
-      'react-hook-form',
       // Radix UI primitives
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
@@ -71,7 +78,6 @@ export default defineConfig({
       '@radix-ui/react-switch',
       '@radix-ui/react-tabs',
       '@radix-ui/react-tooltip',
-      '@radix-ui/react-context-menu',
       // Data / state
       '@tanstack/react-query',
       '@tanstack/react-pacer',
@@ -95,27 +101,10 @@ export default defineConfig({
       'nuqs',
       'nuqs/adapters/next/app',
       'recharts',
-      // Auth / analytics
-      '@clerk/nextjs',
+      // Analytics
       '@vercel/analytics/react',
       // AI SDK (used by chat components)
       '@ai-sdk/react',
-      // Form + context menu (pulled in via @jovie/ui barrel exports)
-      'react-hook-form',
-      '@radix-ui/react-context-menu',
-      // Server-side deps (referenced by stories indirectly)
-      '@sentry/nextjs',
-      'isomorphic-dompurify',
-      'drizzle-orm',
-      'drizzle-orm/pg-core',
-      'drizzle-orm/neon-http',
-      'drizzle-zod',
-      'zod',
-      '@upstash/ratelimit',
-      '@upstash/redis',
-      '@neondatabase/serverless',
-      'jose',
-      'stripe',
     ],
   },
 });
