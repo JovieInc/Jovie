@@ -1,4 +1,4 @@
 {
-  "count": 3,
-  "note": "Files in apps/web/components/{atoms,molecules,organisms} that import a server-only specifier (server-only, @clerk/nextjs/server, drizzle-orm, @/lib/db/*, /actions modules, next/headers, next/cache, etc.) or contain 'use server'. Baseline of 3 reflects organism offenders: CreateProfileDialog.tsx, ProfileSwitcher.tsx, release-sidebar/ReleaseSidebar.tsx (all import from /actions). Exclusions: *.stories.tsx, *.test.ts(x), *-action.ts, *.server.ts. Ratchet only goes down — lower this when a PR moves the /actions import to a feature wrapper."
+  "count": 2,
+  "note": "Files in apps/web/components/{atoms,molecules,organisms} that import a server-only specifier (server-only, @clerk/nextjs/server, drizzle-orm, @/lib/db/*, /actions modules, next/headers, next/cache, etc.) or contain 'use server'. Baseline of 2 reflects remaining organism offenders: ProfileSwitcher.tsx, release-sidebar/ReleaseSidebar.tsx (both import from /actions). CreateProfileDialog.tsx was isolated (JOV-3568) — it now calls POST /api/dashboard/profile/create via fetch instead of importing the server action. Exclusions: *.stories.tsx, *.test.ts(x), *-action.ts, *.server.ts. Ratchet only goes down — lower this when a PR moves the /actions import to a feature wrapper or API route."
 }
