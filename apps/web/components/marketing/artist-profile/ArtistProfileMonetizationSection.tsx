@@ -230,7 +230,7 @@ export function ArtistProfileMonetizationSection({
           <section
             ref={scrollerRef}
             data-testid='artist-profile-monetization-scroller'
-            aria-label='Monetization card carousel'
+            aria-label='Monetization Card Carousel'
             className='relative grid grid-cols-1 gap-3 overflow-visible px-5 pb-2 sm:flex sm:gap-4 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] sm:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide [&::-webkit-scrollbar]:hidden'
           >
             <button
@@ -250,12 +250,12 @@ export function ArtistProfileMonetizationSection({
                 }}
                 disabled={activeCardIndex === 0}
                 className={cn(
-                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
+                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
                   activeCardIndex === 0
                     ? 'cursor-not-allowed opacity-35'
-                    : 'hover:bg-white hover:text-black'
+                    : 'hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white'
                 )}
-                aria-label='Scroll monetization left'
+                aria-label='Scroll Monetization Left'
               >
                 <ChevronLeft className='h-4 w-4' />
               </button>
@@ -266,12 +266,12 @@ export function ArtistProfileMonetizationSection({
                 }}
                 disabled={activeCardIndex === cards.length - 1}
                 className={cn(
-                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
+                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
                   activeCardIndex === cards.length - 1
                     ? 'cursor-not-allowed opacity-35'
-                    : 'hover:bg-white hover:text-black'
+                    : 'hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white'
                 )}
-                aria-label='Scroll monetization right'
+                aria-label='Scroll Monetization Right'
               >
                 <ChevronRight className='h-4 w-4' />
               </button>
@@ -412,10 +412,10 @@ function CaptureFanVisual({
   card: ArtistProfileLandingCopy['monetization']['captureCard'];
 }>) {
   return (
-    <div className='w-[14.75rem] rounded-[1.15rem] bg-(--color-bg-input) px-4 py-3.5 text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]'>
+    <div className='w-[14.75rem] rounded-[1.15rem] bg-(--color-bg-input) px-4 py-3.5 text-white dark:text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-sm font-semibold tracking-[-0.03em] text-white'>
+          <p className='text-sm font-semibold tracking-[-0.03em] text-white dark:text-white'>
             {card.fanName}
           </p>
           <div className='mt-1 inline-flex items-center gap-1.5 text-2xs font-medium text-white/72'>
@@ -423,7 +423,7 @@ function CaptureFanVisual({
             {card.fanLocation}
           </div>
         </div>
-        <div className='rounded-full bg-white px-2.5 py-1 text-2xs font-semibold text-black'>
+        <div className='rounded-full bg-white dark:bg-surface-1 px-2.5 py-1 text-2xs font-semibold text-black dark:text-white'>
           {card.fanAmount}
         </div>
       </div>
@@ -445,14 +445,14 @@ function SayThanksVisual({
   card: ArtistProfileLandingCopy['monetization']['thanksCard'];
 }>) {
   return (
-    <div className='w-[15rem] rounded-[1.1rem] bg-(--color-bg-input) p-3.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.16)]'>
+    <div className='w-[15rem] rounded-[1.1rem] bg-(--color-bg-input) p-3.5 text-white dark:text-white shadow-[0_18px_34px_rgba(0,0,0,0.16)]'>
       <div className='flex items-start gap-3'>
-        <span className='mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white'>
+        <span className='mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white dark:text-white'>
           <Mail className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center justify-between gap-3'>
-            <p className='text-xs font-semibold tracking-[-0.02em] text-white'>
+            <p className='text-xs font-semibold tracking-[-0.02em] text-white dark:text-white'>
               {card.appName}
             </p>
             <p className='text-2xs font-medium text-white/72'>now</p>
@@ -460,7 +460,7 @@ function SayThanksVisual({
           <p className='mt-0.5 text-2xs font-medium text-white/72'>
             {card.sender}
           </p>
-          <p className='mt-3 text-app font-semibold leading-[1.28] tracking-[-0.03em] text-white'>
+          <p className='mt-3 text-app font-semibold leading-[1.28] tracking-[-0.03em] text-white dark:text-white'>
             {card.notificationTitle}
           </p>
           <p className='mt-1.5 text-xs leading-[1.45] text-white/74'>
@@ -497,7 +497,7 @@ function ReengageVisual({
           <div
             key={output.id}
             className={cn(
-              'relative rounded-[1rem] bg-(--color-bg-input) px-3.5 py-3.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
+              'relative rounded-[1rem] bg-(--color-bg-input) px-3.5 py-3.5 text-white dark:text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
               getOutputTransformClass(index),
               index > 0 && 'mt-2.5'
             )}
@@ -507,7 +507,7 @@ function ReengageVisual({
                 <Icon className='h-4 w-4' strokeWidth={1.9} />
               </span>
               <div className='min-w-0'>
-                <p className='text-xs font-semibold leading-[1.3] tracking-[-0.02em] text-white'>
+                <p className='text-xs font-semibold leading-[1.3] tracking-[-0.02em] text-white dark:text-white'>
                   {output.title}
                 </p>
                 <p className='mt-1.5 text-2xs leading-[1.45] text-white/72'>
