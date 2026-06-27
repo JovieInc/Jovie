@@ -2952,6 +2952,13 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      - name: Seed public QA fixtures
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4

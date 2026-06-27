@@ -350,6 +350,27 @@ describe('canary health gate workflow', () => {
   });
 });
 
+describe('CI E2E smoke workflow', () => {
+  it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
+    const migrateStep = getStepBlock(
+      smokeJob,
+      'Run migrations (ephemeral Neon)'
+    );
+    const seedStep = getStepBlock(smokeJob, 'Seed public QA fixtures');
+
+    expect(migrateStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(seedStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(smokeJob).not.toContain('Export DATABASE_URL (main');
+  });
+});
+
 describe('CI public a11y workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
