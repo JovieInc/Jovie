@@ -1,6 +1,7 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
   useCallback,
@@ -13,6 +14,8 @@ import {
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -35,6 +38,7 @@ import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useAppFlag } from '@/lib/flags/client';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
@@ -78,8 +82,10 @@ function AuthShellWrapperInner({
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
+  const pathname = usePathname();
   const headerActions = useHeaderActions();
   const isElectron = useIsElectronRuntime();
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -105,18 +111,30 @@ function AuthShellWrapperInner({
     ? 'artist-profile-settings'
     : 'app-shell';
 
+  const showArtistProfileRailToggle =
+    shellChatV1Enabled &&
+    previewEnabled &&
+    !config.isDemoRoute &&
+    (config.isChatRoute || pathname === APP_ROUTES.DASHBOARD);
+
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
     () => (
       <>
+        {showArtistProfileRailToggle ? <ArtistProfileRailToggle /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
         {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),
-    [config.isDemoRoute, config.showChatUsageIndicator, isElectron]
+    [
+      config.isDemoRoute,
+      config.showChatUsageIndicator,
+      isElectron,
+      showArtistProfileRailToggle,
+    ]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.

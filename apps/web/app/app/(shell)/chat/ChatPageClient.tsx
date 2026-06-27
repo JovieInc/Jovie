@@ -32,6 +32,7 @@ import { JovieChat } from '@/components/jovie/JovieChat';
 import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
@@ -487,38 +488,46 @@ export function ChatPageClient({
   }, [conversationId, deleteConversation, router, notifications]);
 
   const headerActions = useMemo(() => {
+    const artistProfileToggle = designV1ChatEntitiesEnabled ? (
+      <ArtistProfileRailToggle />
+    ) : null;
+
     if (!conversationId) {
-      return null;
+      return artistProfileToggle;
     }
 
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <AppIconButton
-            ariaLabel='Thread options'
-            className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
-          >
-            <Ellipsis aria-hidden='true' className='size-4' />
-          </AppIconButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align='end'>
-          <DropdownMenuItem onClick={handleCopyConversationId}>
-            {sessionIdCopied ? (
-              <Check aria-hidden='true' className='size-3.5' />
-            ) : (
-              <Copy aria-hidden='true' className='size-3.5' />
-            )}
-            {sessionIdCopied ? 'Copied!' : 'Copy Session ID'}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleArchive}>
-            <Archive aria-hidden='true' className='size-3.5' />
-            Archive
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className='flex items-center gap-1'>
+        {artistProfileToggle}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <AppIconButton
+              ariaLabel='Thread options'
+              className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
+            >
+              <Ellipsis aria-hidden='true' className='size-4' />
+            </AppIconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            <DropdownMenuItem onClick={handleCopyConversationId}>
+              {sessionIdCopied ? (
+                <Check aria-hidden='true' className='size-3.5' />
+              ) : (
+                <Copy aria-hidden='true' className='size-3.5' />
+              )}
+              {sessionIdCopied ? 'Copied!' : 'Copy Session ID'}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleArchive}>
+              <Archive aria-hidden='true' className='size-3.5' />
+              Archive
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     );
   }, [
     conversationId,
+    designV1ChatEntitiesEnabled,
     sessionIdCopied,
     handleCopyConversationId,
     handleArchive,
