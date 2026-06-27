@@ -8,7 +8,12 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
+import { libraryAssetApprovalStatuses } from '@/lib/db/schema/library';
 import { determineReleasePhase } from '@/lib/discography/release-phase';
+import {
+  isLibraryReleaseApprovedForPublic,
+  type LibraryApprovalStatus,
+} from '@/lib/library/approval-status';
 
 type ReleaseDateInput = Date | string | null | undefined;
 
@@ -19,6 +24,7 @@ export interface PublicReleaseEligibilityInput {
   readonly status?: string | null;
   readonly deletedAt?: Date | string | null;
   readonly hasProviderLinks?: boolean;
+  readonly approvalStatus?: LibraryApprovalStatus | null;
 }
 
 export function hasPublicReleaseArtwork(
@@ -35,6 +41,13 @@ export function isPublicReleaseEligible(
   if (!release) return false;
   if (release.deletedAt) return false;
   if (release.status === 'draft') return false;
+  const approvalStatus = release.approvalStatus;
+  if (
+    approvalStatus !== undefined &&
+    !isLibraryReleaseApprovedForPublic(approvalStatus)
+  ) {
+    return false;
+  }
   if (!hasPublicReleaseArtwork(release.artworkUrl)) return false;
   if (options.requireProviderLinks && release.hasProviderLinks !== true) {
     return false;
@@ -67,6 +80,13 @@ export function publicReleaseEligibilitySqlPredicate(
       WHERE ${providerLinks.releaseId} = ${discogReleases.id}
         AND ${providerLinks.ownerType} = 'release'
         AND NULLIF(BTRIM(${providerLinks.url}), '') IS NOT NULL
+    )`,
+    drizzleSql`EXISTS (
+      SELECT 1
+      FROM ${libraryAssetApprovalStatuses}
+      WHERE ${libraryAssetApprovalStatuses.assetId} = ${discogReleases.id}::text
+        AND ${libraryAssetApprovalStatuses.creatorProfileId} = ${discogReleases.creatorProfileId}
+        AND ${libraryAssetApprovalStatuses.approvalStatus} = 'approved'
     )`
   );
 }

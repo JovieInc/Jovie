@@ -435,6 +435,13 @@
       "when": 1781300000000,
       "tag": "0061_user_profile_claims_unique_profile_role",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1781400000000,
+      "tag": "0062_backfill_public_release_approvals",
+      "breakpoints": true
     }
   ]
 }
