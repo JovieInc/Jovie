@@ -107,12 +107,14 @@ jobs:
       - name: Post Promptfoo viewer comment (deterministic)
         if: github.event_name == 'pull_request' && steps.deterministic.outcome == 'success'
         uses: promptfoo/promptfoo-action@v1
+        continue-on-error: true
         with:
           github-token: ${{ github.token }}
-          config: apps/web/promptfooconfig.yaml
+          config: promptfooconfig.yaml
           prompts: |
-            apps/web/prompts/**/*.md
+            prompts/**/*.md
           working-directory: apps/web
+          promptfoo-version: '0.121.12'
           force-run: 'true'
           no-cache: 'true'
           no-share: 'true'
