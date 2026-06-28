@@ -1,5 +1,7 @@
 'use client';
 
+import './ScrollToBottom.css';
+
 import { ArrowDown } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 
