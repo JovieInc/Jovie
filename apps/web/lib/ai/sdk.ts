@@ -1,6 +1,16 @@
 import * as ai from 'ai';
 import { wrapAISDK } from 'braintrust';
 
+import {
+  guardModelOutput,
+  guardStructuredValue,
+  isLeakGuardEnabled,
+  type LeakGuardContext,
+  wrapStreamObjectResult,
+  wrapStreamTextOptions,
+  wrapStreamTextResult,
+} from '@/lib/eval/leak-guard';
+
 // wrapAISDK returns a Proxy. Defer the wrap and per-key access to call time
 // so partial vi.mock('ai') in unit tests doesn't fault on sibling exports
 // the test never invokes.
@@ -10,16 +20,86 @@ function getWrapped(): typeof ai {
   return cachedWrapped;
 }
 
-export const generateText: typeof ai.generateText = (...args) =>
-  getWrapped().generateText(...args);
+function leakGuardContext(
+  source: LeakGuardContext['source']
+): LeakGuardContext {
+  return { source };
+}
 
-export const streamText: typeof ai.streamText = (...args) =>
-  getWrapped().streamText(...args);
+function guardGenerateTextResult<
+  RESULT extends {
+    readonly text: string;
+  },
+>(result: RESULT, context: LeakGuardContext): RESULT {
+  const guarded = guardModelOutput(result.text, context);
+  if (!guarded.leaked) {
+    return result;
+  }
 
-export const generateObject: typeof ai.generateObject = (...args) =>
-  getWrapped().generateObject(...args);
+  return Object.create(result, {
+    text: { value: guarded.text },
+  }) as RESULT;
+}
 
-export const streamObject: typeof ai.streamObject = (...args) =>
-  getWrapped().streamObject(...args);
+function guardGenerateObjectResult<
+  RESULT extends {
+    readonly object: unknown;
+  },
+>(result: RESULT, context: LeakGuardContext): RESULT {
+  const guarded = guardStructuredValue(result.object, context);
+  if (!guarded.leaked) {
+    return result;
+  }
+
+  return Object.create(result, {
+    object: { value: guarded.value },
+  }) as RESULT;
+}
+
+export const generateText: typeof ai.generateText = async (...args) => {
+  const result = await getWrapped().generateText(...args);
+  if (!isLeakGuardEnabled()) {
+    return result;
+  }
+
+  return guardGenerateTextResult(result, leakGuardContext('generateText'));
+};
+
+export const streamText: typeof ai.streamText = ((...args) => {
+  const context = leakGuardContext('streamText');
+  const guardedArgs = isLeakGuardEnabled()
+    ? ([
+        wrapStreamTextOptions(args[0], context),
+        ...args.slice(1),
+      ] as typeof args)
+    : args;
+  const result = getWrapped().streamText(...guardedArgs);
+
+  if (!isLeakGuardEnabled()) {
+    return result;
+  }
+
+  return wrapStreamTextResult(result, context);
+}) as typeof ai.streamText;
+
+export const generateObject: typeof ai.generateObject = async (...args) => {
+  const result = await getWrapped().generateObject(...args);
+  if (!isLeakGuardEnabled()) {
+    return result;
+  }
+
+  return guardGenerateObjectResult(result, leakGuardContext('generateObject'));
+};
+
+export const streamObject: typeof ai.streamObject = (...args) => {
+  const context = leakGuardContext('streamObject');
+  const result = getWrapped().streamObject(...args);
+
+  if (!isLeakGuardEnabled()) {
+    return result;
+  }
+
+  return wrapStreamObjectResult(result, context);
+};
 
 export type * from 'ai';
