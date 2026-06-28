@@ -264,6 +264,14 @@ export const ServerEnvSchema = z.object({
   /** Set to `1` to export Agnost traces in local development. */
   JOVIE_ENABLE_AGNOST: z.enum(['0', '1']).optional(),
 
+  // Langfuse LLM tracing + prompt registry delivery (Langfuse Cloud)
+  LANGFUSE_SECRET_KEY: z.string().optional(),
+  LANGFUSE_PUBLIC_KEY: z.string().optional(),
+  /** Defaults to https://cloud.langfuse.com when unset. */
+  LANGFUSE_BASE_URL: z.string().url().optional(),
+  /** Set to `1` to export Langfuse traces in local development. */
+  JOVIE_ENABLE_LANGFUSE: z.enum(['0', '1']).optional(),
+
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
 
@@ -486,6 +494,10 @@ export const ENV_KEYS = [
   'JOVIE_ENABLE_LOCAL_SENTRY',
   'AGNOST_ORG_ID',
   'JOVIE_ENABLE_AGNOST',
+  'LANGFUSE_SECRET_KEY',
+  'LANGFUSE_PUBLIC_KEY',
+  'LANGFUSE_BASE_URL',
+  'JOVIE_ENABLE_LANGFUSE',
   'AGENT_OS_WORKFLOWS_ENABLED',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',

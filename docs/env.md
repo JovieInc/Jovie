@@ -178,6 +178,29 @@ The client ID for Spotify API.
 
 The client secret for Spotify API.
 
+## Langfuse LLM Tracing (Langfuse Cloud)
+
+Server-side chat-turn tracing via the Langfuse SDK. Disabled in CI, test, and
+local dev unless explicitly opted in.
+
+### `LANGFUSE_SECRET_KEY`
+
+Langfuse project secret key (server-only). Get from Langfuse Cloud → Project
+Settings → API Keys.
+
+### `LANGFUSE_PUBLIC_KEY`
+
+Langfuse project public key (server-only ingestion).
+
+### `LANGFUSE_BASE_URL`
+
+Optional Langfuse API host. Defaults to `https://cloud.langfuse.com`.
+
+### `JOVIE_ENABLE_LANGFUSE`
+
+Set to `1` to export Langfuse traces during local development. Production and
+preview enable export automatically when both Langfuse keys are configured.
+
 ## Feature Flags
 
 ### `NEXT_PUBLIC_FEATURE_TIPS`
