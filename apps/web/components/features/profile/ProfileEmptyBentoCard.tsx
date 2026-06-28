@@ -1,7 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export type ProfileEmptyBentoAccent = 'alerts' | 'music' | 'events';
@@ -52,7 +53,7 @@ function CardShell({
   children,
 }: Readonly<{
   href?: string;
-  onClick?: (event: React.MouseEvent<HTMLElement>) => void;
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
   ariaLabel?: string;
   className: string;
   style: CSSProperties;
@@ -76,16 +77,17 @@ function CardShell({
 
   if (onClick) {
     return (
-      <button
+      <Button
         type='button'
+        variant='ghost'
         onClick={onClick}
         aria-label={ariaLabel}
-        className={className}
+        className={cn('h-auto rounded-(--profile-inner-radius) p-0', className)}
         style={style}
         data-testid={dataTestId}
       >
         {children}
-      </button>
+      </Button>
     );
   }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Bell, CheckCircle2, Music2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -266,13 +267,14 @@ function ProfileMusicEmptyState({
 }>) {
   const action =
     renderMode === 'preview' ? (
-      <button
+      <Button
         type='button'
-        className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-5 text-app font-semibold tracking-tight text-black dark:bg-white dark:text-black'
+        variant='primary'
+        className='h-11 w-full rounded-full'
         disabled
       >
-        Turn on alerts
-      </button>
+        Turn On Alerts
+      </Button>
     ) : (
       <ArtistNotificationsCTA
         artist={artist}

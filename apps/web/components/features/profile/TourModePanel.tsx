@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Ticket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
@@ -188,13 +189,14 @@ function TourDatesContent({
   if (allDates.length === 0) {
     const action =
       renderMode === 'preview' ? (
-        <button
+        <Button
           type='button'
-          className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-5 text-app font-semibold tracking-tight text-black dark:bg-white dark:text-black'
+          variant='primary'
+          className='h-11 w-full rounded-full'
           disabled
         >
           Event Alerts
-        </button>
+        </Button>
       ) : (
         <ArtistNotificationsCTA
           artist={artist}
