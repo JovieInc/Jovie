@@ -234,4 +234,12 @@ final class AppState {
   var billingURL: URL {
     continueOnWebURL.appending(path: "settings/billing")
   }
+
+  var editProfileURL: URL {
+    continueOnWebURL.appending(path: "settings/artist-profile")
+  }
+
+  var connectionsURL: URL {
+    continueOnWebURL.appending(path: "settings/connectors")
+  }
 }

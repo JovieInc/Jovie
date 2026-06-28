@@ -81,6 +81,31 @@ final class JovieUITests: XCTestCase {
     }
 
     attachScreenshot(named: "settings", app: app)
+    for linkTitle in ["Edit Profile", "Billing", "Connected Accounts", "Support", "Privacy", "Terms"] {
+      XCTAssertTrue(
+        app.buttons[linkTitle].waitForExistence(timeout: 2),
+        "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+    XCTAssertTrue(
+      app.buttons["Upgrade"].waitForExistence(timeout: 2),
+      "Settings upgrade CTA did not appear for the preview free plan.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Current plan"].waitForExistence(timeout: 2),
+      "Settings plan summary did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Free"].waitForExistence(timeout: 2),
+      "Settings plan label did not appear.\n\(app.debugDescription)"
+    )
+    for valueTitle in ["Version", "Build"] {
+      XCTAssertTrue(
+        app.staticTexts[valueTitle].waitForExistence(timeout: 2),
+        "Settings value row \(valueTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+
     app.buttons["Log Out"].tap()
 
     XCTAssertTrue(

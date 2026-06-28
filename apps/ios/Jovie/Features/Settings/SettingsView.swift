@@ -15,7 +15,9 @@ struct AppBuildInfo: Equatable {
 struct SettingsView: View {
   let profile: AppShellProfile
   let buildInfo: AppBuildInfo
+  let editProfileURL: URL
   let billingURL: URL
+  let connectionsURL: URL
   var onClose: (() -> Void)?
   let onLogout: @MainActor () async -> Void
 
@@ -27,6 +29,8 @@ struct SettingsView: View {
       VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
         header
         accountSection
+        planSection
+        connectionsSection
         linksSection
         buildSection
         logoutButton
@@ -61,28 +65,81 @@ struct SettingsView: View {
     VStack(alignment: .leading, spacing: JovieSpacing.medium) {
       SettingsSectionTitle("Account")
 
-      HStack(spacing: JovieSpacing.medium) {
-        DashboardAvatarView(
-          name: profile.displayName,
-          avatarURL: profile.avatarURL
-        )
-        .frame(width: 34, height: 34)
+      VStack(spacing: 0) {
+        HStack(spacing: JovieSpacing.medium) {
+          DashboardAvatarView(
+            name: profile.displayName,
+            avatarURL: profile.avatarURL
+          )
+          .frame(width: 34, height: 34)
 
-        VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
-          Text(profile.displayName)
-            .font(JovieFont.body(size: 15, weight: .semibold))
-            .foregroundStyle(JovieColor.textPrimary)
-            .lineLimit(1)
+          VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+            Text(profile.displayName)
+              .font(JovieFont.body(size: 15, weight: .semibold))
+              .foregroundStyle(JovieColor.textPrimary)
+              .lineLimit(1)
 
-          Text(profile.secondaryText)
-            .font(JovieFont.body(size: 13))
-            .foregroundStyle(JovieColor.textTertiary)
-            .lineLimit(1)
+            Text(profile.secondaryText)
+              .font(JovieFont.body(size: 13))
+              .foregroundStyle(JovieColor.textTertiary)
+              .lineLimit(1)
+          }
+
+          Spacer(minLength: 0)
         }
+        .padding(JovieSpacing.medium)
 
-        Spacer(minLength: 0)
+        SettingsDivider()
+
+        SettingsLinkRow(title: "Edit Profile", systemImage: "person.crop.circle") {
+          openURL(editProfileURL)
+        }
       }
-      .padding(JovieSpacing.medium)
+      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+    }
+  }
+
+  private var planSection: some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+      SettingsSectionTitle("Plan")
+
+      VStack(spacing: JovieSpacing.medium) {
+        VStack(spacing: 0) {
+          SettingsValueRow(title: "Current plan", value: profile.planLabel)
+
+          SettingsDivider()
+
+          SettingsLinkRow(title: "Billing", systemImage: "creditcard") {
+            openURL(billingURL)
+          }
+        }
+        .padding(.vertical, JovieSpacing.xSmall)
+        .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+
+        if profile.showsUpgradeCTA {
+          Button {
+            openURL(billingURL)
+          } label: {
+            Label("Upgrade", systemImage: "sparkles")
+              .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(JoviePillButtonStyle(filled: true))
+          .accessibilityIdentifier("settings-upgrade-button")
+        }
+      }
+    }
+  }
+
+  private var connectionsSection: some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+      SettingsSectionTitle("Connections")
+
+      VStack(spacing: 0) {
+        SettingsLinkRow(title: "Connected Accounts", systemImage: "link") {
+          openURL(connectionsURL)
+        }
+      }
+      .padding(.vertical, JovieSpacing.xSmall)
       .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
   }
@@ -94,12 +151,6 @@ struct SettingsView: View {
       VStack(spacing: 0) {
         SettingsLinkRow(title: "Support", systemImage: "questionmark.circle") {
           openURL(URL(string: "https://jov.ie/support")!)
-        }
-
-        SettingsDivider()
-
-        SettingsLinkRow(title: "Billing", systemImage: "creditcard") {
-          openURL(billingURL)
         }
 
         SettingsDivider()

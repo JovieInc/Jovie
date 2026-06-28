@@ -131,6 +131,8 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: true,
       chatEnabled: true,
+      plan: 'free',
+      isPro: false,
     });
     expect(hoisted.isProfileCompleteMock).toHaveBeenCalledWith({
       username: 'djshadow',
@@ -139,6 +141,32 @@ describe('GET /api/mobile/v1/me', () => {
       isPublic: true,
       onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
     });
+  });
+
+  it('returns pro plan metadata for paid users', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: {
+        userStatus: 'active',
+        isPro: true,
+      },
+      profile: {
+        id: 'profile_123',
+        username: 'djshadow',
+        usernameNormalized: 'djshadow',
+        displayName: 'DJ Shadow',
+        avatarUrl: null,
+        isPublic: true,
+        onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    });
+
+    const { GET } = await routeModulePromise;
+    const response = await GET(makeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.plan).toBe('pro');
+    expect(data.isPro).toBe(true);
   });
 
   it('reports chatEnabled from the mobile chat runtime switch', async () => {
@@ -187,6 +215,8 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
+      plan: 'free',
+      isPro: false,
     });
   });
 
@@ -213,6 +243,8 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
+      plan: 'free',
+      isPro: false,
     });
   });
 
@@ -248,6 +280,8 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
+      plan: 'free',
+      isPro: false,
     });
   });
 

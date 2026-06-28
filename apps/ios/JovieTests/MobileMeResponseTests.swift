@@ -14,7 +14,9 @@ struct MobileMeResponseTests {
         "avatarUrl": null,
         "appleWalletProfilePassAvailable": true,
         "chatEnabled": true,
-        "continueOnWebUrl": "https://jov.ie/app"
+        "continueOnWebUrl": "https://jov.ie/app",
+        "plan": "free",
+        "isPro": false
       }
       """.data(using: .utf8)!
 
@@ -24,6 +26,8 @@ struct MobileMeResponseTests {
     #expect(response.publicProfileURL == "https://jov.ie/tim")
     #expect(response.appleWalletProfilePassAvailable == true)
     #expect(response.chatEnabled == true)
+    #expect(response.plan == "free")
+    #expect(response.isPro == false)
   }
 
   @Test func decodesNeedsOnboardingResponse() throws {
@@ -37,7 +41,9 @@ struct MobileMeResponseTests {
         "avatarUrl": null,
         "appleWalletProfilePassAvailable": false,
         "chatEnabled": false,
-        "continueOnWebUrl": "https://jov.ie/app"
+        "continueOnWebUrl": "https://jov.ie/app",
+        "plan": "free",
+        "isPro": false
       }
       """.data(using: .utf8)!
 

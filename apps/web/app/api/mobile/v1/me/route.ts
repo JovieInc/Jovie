@@ -20,6 +20,14 @@ export interface MobileMeResponse {
   continueOnWebUrl: string;
   appleWalletProfilePassAvailable: boolean;
   chatEnabled: boolean;
+  plan: 'free' | 'trial' | 'pro' | 'max';
+  isPro: boolean;
+}
+
+function resolveMobilePlan(
+  isPro: boolean | null | undefined
+): MobileMeResponse['plan'] {
+  return isPro ? 'pro' : 'free';
 }
 
 function buildNeedsOnboardingResponse(): NextResponse {
@@ -33,6 +41,8 @@ function buildNeedsOnboardingResponse(): NextResponse {
     continueOnWebUrl: getAppUrl(),
     appleWalletProfilePassAvailable: false,
     chatEnabled: false,
+    plan: 'free',
+    isPro: false,
   };
 
   return NextResponse.json(payload, {
@@ -107,6 +117,7 @@ export async function GET(request: Request) {
         onboardingCompletedAt: profile.onboardingCompletedAt,
       });
     const chatEnabled = await isMobileChatEnabled(userId);
+    const isPro = session.user.isPro ?? false;
     const payload: MobileMeResponse = {
       state: 'ready',
       displayName: profile.displayName,
@@ -117,6 +128,8 @@ export async function GET(request: Request) {
       continueOnWebUrl: getAppUrl(),
       appleWalletProfilePassAvailable,
       chatEnabled,
+      plan: resolveMobilePlan(isPro),
+      isPro,
     };
 
     return NextResponse.json(payload, {
