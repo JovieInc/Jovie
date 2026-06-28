@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.57] - 2026-06-27
+
+> The desktop app recovers from renderer crashes instead of leaving you on a permanent black screen.
+
+### Fixed
+
+- **Desktop renderer crash recovery**: when the embedded web view crashes or runs out of memory, Jovie now reloads it automatically. If crashes repeat, the app shows the load-failure page with a Retry button instead of a blank black window.
+
 ## [26.6.56] - 2026-06-26
 
 > Admins can now turn product features on and off per environment (dev, staging, prod) from a new Features panel, and changes take effect without a redeploy.
