@@ -4,6 +4,8 @@
 
 import { expect } from 'vitest';
 
+import { runDeterministicScorers } from '@/lib/eval/scorers';
+
 import type { GoldenCase } from './cases';
 
 export function assertMustSay(
@@ -97,9 +99,20 @@ export function assertGoldenCaseQuality(
   response: string,
   golden: GoldenCase
 ): void {
-  assertMustSay(response, golden.mustSay, golden.name);
-  assertMustNotSay(response, golden.mustNotSay, golden.name);
-  assertHarmfulBlacklist(response, golden.harmfulBlacklist, golden.name);
-  assertVoiceCompliance(response, golden.voiceException ?? false, golden.name);
-  assertPromptInjectionGuards(response, golden.name);
+  const scored = runDeterministicScorers({
+    caseName: golden.name,
+    userPrompt: golden.userPrompt,
+    assistantResponse: response,
+    mustSay: golden.mustSay,
+    mustNotSay: golden.mustNotSay,
+    harmfulBlacklist: golden.harmfulBlacklist,
+    voiceException: golden.voiceException ?? false,
+    mustNotLeakPrompt: true,
+  });
+
+  for (const result of scored.results) {
+    if (result.verdict === 'fail') {
+      throw new Error(result.reason);
+    }
+  }
 }
