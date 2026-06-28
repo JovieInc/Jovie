@@ -77,6 +77,10 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
+    case .uiTestingAudience:
+      route = .ready
+      dashboardState = .loaded(.previewReady)
+      isOffline = false
     case .uiTestingQRUnavailable:
       route = .ready
       dashboardState = .loaded(.previewReadyWithoutQR)

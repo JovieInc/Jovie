@@ -274,6 +274,65 @@ final class JovieUITests: XCTestCase {
     }
   }
 
+  func testAudienceHighlightsLaunchShowsHeroAndStatTiles() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-audience",
+      expectedElementDescription: "\"Profile views\""
+    ) {
+      $0.staticTexts["Profile views"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Audience"].exists)
+    XCTAssertTrue(app.staticTexts["1,284"].exists)
+    XCTAssertTrue(app.staticTexts["+18% vs last week"].exists)
+    XCTAssertTrue(app.staticTexts["Unique fans"].exists)
+    XCTAssertTrue(app.staticTexts["Subscribed fans"].exists)
+    XCTAssertTrue(app.staticTexts["Link clicks"].exists)
+    XCTAssertTrue(app.staticTexts["Listen clicks"].exists)
+    XCTAssertTrue(app.buttons["Ask Jovie about your audience"].exists)
+  }
+
+  func testAudienceDrawerSurfaceOpensHighlights() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+    let audienceSurface = app.buttons["Audience"]
+    XCTAssertTrue(
+      audienceSurface.waitForExistence(timeout: 3),
+      "Audience drawer surface did not appear.\n\(app.debugDescription)"
+    )
+
+    audienceSurface.tap()
+    XCTAssertTrue(
+      app.staticTexts["Profile views"].waitForExistence(timeout: 3),
+      "Audience drawer surface did not open highlights.\n\(app.debugDescription)"
+    )
+  }
+
+  func testAudienceAskJovieCTAOpensScopedChat() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-audience",
+      expectedElementDescription: "\"Ask Jovie about your audience\""
+    ) {
+      $0.buttons["Ask Jovie about your audience"]
+    }
+
+    app.buttons["Ask Jovie about your audience"].tap()
+
+    let chatInput = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(chatInput, timeout: 3),
+      "Audience CTA did not open chat.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      chatInput.value as? String,
+      "Ask Jovie about my audience trends and who is engaging most.",
+      "Audience CTA did not scope chat to the audience prompt.\n\(app.debugDescription)"
+    )
+  }
+
   func testShellDrawerAndSettingsNavigation() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]

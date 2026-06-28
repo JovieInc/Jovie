@@ -44,6 +44,11 @@
 		A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */; };
 		A0J0V36330000000000000002 /* AppShellLeftDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */; };
 		A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */; };
+		A0J0V36380000000000000002 /* AudienceHighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000001 /* AudienceHighlightsView.swift */; };
+		A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */; };
+		A0J0V36380000000000000006 /* AudienceHighlightsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */; };
+		A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */; };
+		A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */; };
 		A0J0V25490000000000000002 /* ChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000001 /* ChatCache.swift */; };
 		A0J0V25490000000000000004 /* ChatRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000003 /* ChatRepository.swift */; };
@@ -148,6 +153,11 @@
 		A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellIntentNavigationTests.swift; sourceTree = "<group>"; };
 		A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellLeftDrawer.swift; sourceTree = "<group>"; };
 		A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellDrawerThreadsFilterTests.swift; sourceTree = "<group>"; };
+		A0J0V36380000000000000001 /* AudienceHighlightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudienceHighlightsView.swift; sourceTree = "<group>"; };
+		A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAudienceHighlightsResponse.swift; sourceTree = "<group>"; };
+		A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudienceHighlightsRepository.swift; sourceTree = "<group>"; };
+		A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudienceHighlightsRepositoryTests.swift; sourceTree = "<group>"; };
+		A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAudienceHighlightsResponseTests.swift; sourceTree = "<group>"; };
 		F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsEscapeTrapGuardTests.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000001 /* ChatCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatCache.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000003 /* ChatRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRepository.swift; sourceTree = "<group>"; };
@@ -237,9 +247,19 @@
 			path = JovieUITests;
 			sourceTree = "<group>";
 		};
+		A0J0V36380000000000000007 /* Audience */ = {
+			isa = PBXGroup;
+			children = (
+				A0J0V36380000000000000001 /* AudienceHighlightsView.swift */,
+			);
+			name = Audience;
+			path = Audience;
+			sourceTree = "<group>";
+		};
 		38A521B77CFB8C49A552F2BF /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				A0J0V36380000000000000007 /* Audience */,
 				44CFD0078FC64A56A527EB88 /* AppShell */,
 				D38B16D4420C99A6D206BF5B /* Auth */,
 				A0J0V25490000000000000010 /* Chat */,
@@ -273,6 +293,8 @@
 				A0J0V26350000000000000003 /* MobileAuthFinalizationTests.swift */,
 				A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */,
 				A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */,
+				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
+				A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */,
 				5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */,
 				F4562819B40056163650929C /* JovieAppIntentsTests.swift */,
 			);
@@ -349,6 +371,7 @@
 		83A70DCC42A2C4A23FF9A69D /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */,
 				9924B177AFB753A4C23A4098 /* APIClient.swift */,
 				A0J0V25490000000000000001 /* ChatCache.swift */,
 				A0J0V25490000000000000003 /* ChatRepository.swift */,
@@ -359,6 +382,7 @@
 				A0J0V36070000000000000001 /* MobileChatContentParser.swift */,
 				A0J0V25490000000000000007 /* MobileChatModels.swift */,
 				3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */,
+				A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */,
 				A0B10F00000000000000000B /* Observability */,
 				44B3D151E21A49C2876932A8 /* NativeSessionTokenStore.swift */,
 				A0J0V26350000000000000001 /* MobileAuthFinalization.swift */,
@@ -619,6 +643,8 @@
 				A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */,
 				A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */,
 				A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */,
+				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
+				A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */,
 				E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */,
 				71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */,
 				F232904F618A4671B805D0BC /* JovieAppIntentsTests.swift in Sources */,
@@ -643,6 +669,7 @@
 				A0B10F00000000000000000A /* SentryObservabilityProvider.swift in Sources */,
 				A0B10F000000000000000030 /* ObservabilityReportBuilder.swift in Sources */,
 				A0B10F000000000000000032 /* MetricKitReporter.swift in Sources */,
+				A0J0V36380000000000000006 /* AudienceHighlightsRepository.swift in Sources */,
 				E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */,
 				A0J0V25490000000000000002 /* ChatCache.swift in Sources */,
 				A0J0V25490000000000000004 /* ChatRepository.swift in Sources */,
@@ -653,6 +680,7 @@
 				A0J0V25490000000000000008 /* MobileChatModels.swift in Sources */,
 				A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */,
 				52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */,
+				A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */,
 				DA0F3A9E1C4B4B149B7D4C21 /* NativeSessionTokenStore.swift in Sources */,
 				A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */,
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
@@ -663,6 +691,7 @@
 				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
+				A0J0V36380000000000000002 /* AudienceHighlightsView.swift in Sources */,
 				BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */,
 				F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */,
 				F178AB3E908746C78645E4EE /* SettingsView.swift in Sources */,
