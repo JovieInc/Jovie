@@ -52,32 +52,34 @@ struct AppShellLeftDrawer: View {
     )
   }
 
-  var body: some View {
-    GeometryReader { proxy in
-      let openOffset = drawerWidth + proxy.safeAreaInsets.leading
-      let progress = isPresented
-        ? max(0, min(1, 1 + (dragOffset / openOffset)))
-        : max(0, min(1, dragOffset / openOffset))
+  private var isVisible: Bool {
+    isPresented || dragOffset != 0
+  }
 
-      ZStack(alignment: .leading) {
-        if isPresented || dragOffset != 0 {
+  var body: some View {
+    if isVisible {
+      GeometryReader { proxy in
+        let openOffset = drawerWidth + proxy.safeAreaInsets.leading
+        let progress = isPresented
+          ? max(0, min(1, 1 + (dragOffset / openOffset)))
+          : max(0, min(1, dragOffset / openOffset))
+
+        ZStack(alignment: .leading) {
           Color.black
             .opacity(0.42 * progress)
             .ignoresSafeArea()
             .onTapGesture { closeDrawer() }
             .accessibilityHidden(true)
-        }
 
-        drawerPanel(openOffset: openOffset)
-          .offset(x: drawerOffset(openOffset: openOffset))
-          .gesture(drawerDragGesture(openOffset: openOffset))
+          drawerPanel(openOffset: openOffset)
+            .offset(x: drawerOffset(openOffset: openOffset))
+            .gesture(drawerDragGesture(openOffset: openOffset))
+        }
+        .animation(animation, value: isPresented)
+        .animation(animation, value: dragOffset)
       }
-      .animation(animation, value: isPresented)
-      .animation(animation, value: dragOffset)
+      .accessibilityIdentifier("shell-drawer")
     }
-    .allowsHitTesting(isPresented || dragOffset != 0)
-    .accessibilityElement(children: isPresented ? .contain : .ignore)
-    .accessibilityIdentifier("shell-drawer")
   }
 
   @ViewBuilder

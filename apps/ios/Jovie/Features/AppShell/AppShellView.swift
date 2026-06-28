@@ -78,7 +78,6 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
   @State private var intentStore = IntentNavigationStore.shared
-  @State private var edgeDragOffset: CGFloat = 0
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   init(
@@ -274,15 +273,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
 
   private var edgeSwipeToOpenDrawer: some Gesture {
     DragGesture(minimumDistance: 12, coordinateSpace: .global)
-      .onChanged { value in
-        guard !isShowingDrawer, !reduceMotion else { return }
-        guard value.startLocation.x < 28, value.translation.width > 0 else { return }
-        edgeDragOffset = value.translation.width
-      }
       .onEnded { value in
         guard !isShowingDrawer, !reduceMotion else { return }
-        defer { edgeDragOffset = 0 }
-
         guard value.startLocation.x < 28 else { return }
         if value.translation.width > 72 || value.predictedEndTranslation.width > 120 {
           openDrawer()
