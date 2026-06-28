@@ -92,9 +92,9 @@
   --system-b-app-content-surface: var(--app-shell-content-surface);
   --system-b-accent-cyan: var(--geist-cyan-solid);
   --system-b-entity-chip-release-accent: var(--color-accent);
-  --system-b-entity-chip-artist-accent: var(--color-info);
-  --system-b-entity-chip-track-accent: var(--color-accent-pink);
-  --system-b-entity-chip-event-accent: var(--color-success);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
+  --system-b-entity-chip-track-accent: var(--color-accent-blue);
+  --system-b-entity-chip-event-accent: var(--color-accent-orange);
   --system-b-entity-chip-on-light-text: var(--color-text-primary-token);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
@@ -4622,6 +4622,41 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   background: var(--system-b-bg-surface-1);
 }
 
+.system-b-entity-mention-span {
+  display: inline;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--jovie-entity-accent) 28%, transparent);
+  color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 72%,
+    var(--color-text-primary-token) 28%
+  );
+  text-decoration: none;
+  transition:
+    border-color var(--system-b-duration-fast) var(--system-b-ease),
+    color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-entity-chip-trigger:hover) .system-b-entity-mention-span,
+:where(.system-b-entity-chip-trigger:focus-visible)
+  .system-b-entity-mention-span {
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 52%,
+    transparent
+  );
+  color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 82%,
+    var(--color-text-primary-token) 18%
+  );
+}
+
+.system-b-assistant-skill-mention {
+  color: var(--color-text-secondary-token);
+  font-weight: var(--font-weight-medium);
+}
+
 .system-b-entity-chip {
   display: inline-flex;
   align-items: center;
@@ -5104,7 +5139,11 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-entity-chip-popover-eyebrow) {
-  color: var(--color-text-tertiary-token);
+  color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent, var(--color-text-tertiary-token)) 68%,
+    var(--color-text-tertiary-token) 32%
+  );
   font-family: var(--font-caption);
   font-size: var(--text-2xs);
 }

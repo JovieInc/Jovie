@@ -5,10 +5,12 @@ import { describe, expect, it } from 'vitest';
 const webRoot = path.resolve(__dirname, '../../..');
 
 const guardedFiles = [
+  'components/jovie/components/AssistantMessageText.tsx',
   'components/jovie/components/ChatGenerationArtifactSurface.tsx',
   'components/jovie/components/ChatPitchCard.tsx',
   'components/jovie/components/EntityChip.tsx',
   'components/jovie/components/EntityChipPopover.tsx',
+  'components/jovie/components/EntityMentionSpan.tsx',
   'components/jovie/components/EntityPreviewPane.tsx',
   'components/jovie/components/SkillChip.tsx',
   'components/shell/DspAvatarStack.tsx',
@@ -75,6 +77,19 @@ describe('entity rich chip System B style guard', () => {
     expect(transcriptDotInnerCss).toContain(
       'background: var(--jovie-entity-accent);'
     );
+  });
+
+  it('keeps assistant entity mention spans on named System B primitives', () => {
+    const source = readFileSync(
+      path.join(webRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    const mentionCss = source.match(
+      /\.system-b-entity-mention-span\s*\{[\s\S]*?\n\}/
+    )?.[0];
+
+    expect(mentionCss).toContain('var(--jovie-entity-accent)');
+    expect(mentionCss).not.toContain('border-radius: var(--radius-full)');
   });
 
   it('keeps entity chip popover internals on named System B primitives', () => {
