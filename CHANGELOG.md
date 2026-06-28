@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.60] - 2026-06-28
+
+> Catalog collaborator signal matching resolves external mentions to discography releases with confidence scoring.
+
+### Added
+
+- **Catalog collaborator signal matching (JOV-2206)**: adds `lib/catalog` collaborator entity resolver with alias normalization, provider ID matching, and confidence scoring; founder-demo fixture coverage for Cosmic Gate → The Deep End; and `POST /api/catalog/collaborators/match` for confidence-scored release matches.
+
 ## [26.6.59] - 2026-06-28
 
 > Merge-queue Lighthouse and mobile-overflow CI lanes reuse shared Neon fixtures reliably.
