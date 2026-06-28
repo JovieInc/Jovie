@@ -96,7 +96,7 @@ pool when many PRs run at once.
 
 | Control | Location | Behavior |
 |---------|----------|----------|
-| **Four-slot endpoint pool** | `.github/workflows/ci.yml` job `concurrency.group: neon-endpoint-pool-{0..3}` | Cross-PR queue; `cancel-in-progress: false` so bursts wait instead of racing the cap |
+| **Four-slot branch-creation pool** | `.github/workflows/ci.yml` `neon-create-branch-with-retry` jobs only | Cross-PR queue on branch creation; artifact consumers (Lighthouse/A11y/Mobile Overflow) stay outside the pool so matrix siblings are not cancelled |
 | **Shared `neon-db` branch** | `neon-db` job + artifact consumers | One ephemeral branch per workflow run for public Lighthouse/A11y/Mobile Overflow |
 | **2h branch TTL** | `neon-create-branch-with-retry` `expires_in_hours: 2` on `neon-db` | Safety net if cleanup misses a branch |
 | **PR-close prefix cleanup** | `neon-ephemeral-branch-cleanup.yml` | Deletes `<sanitized-ref>-*` branches when a PR closes |

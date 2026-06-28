@@ -499,27 +499,39 @@ describe('CI mobile overflow workflow', () => {
 });
 
 describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
-  const neonPoolJobs = [
+  const neonBranchCreateJobs = [
     'neon-db',
-    'ci-mobile-overflow',
-    'ci-lighthouse-pr',
     'ci-lighthouse-dashboard-pr',
     'ci-lighthouse-onboarding-pr',
     'ci-lighthouse-admin-pr',
     'ci-lighthouse-chat-pr',
-    'ci-a11y',
     'ci-e2e-smoke',
     'ci-admin-smoke',
   ] as const;
 
-  it('caps cross-PR Neon endpoint consumers with a four-slot queue', () => {
+  const neonArtifactConsumerJobs = [
+    'ci-lighthouse-pr',
+    'ci-a11y',
+    'ci-mobile-overflow',
+  ] as const;
+
+  it('caps cross-PR Neon branch creation with a four-slot queue', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    for (const jobKey of neonPoolJobs) {
+    for (const jobKey of neonBranchCreateJobs) {
       const job = getJobBlock(workflow, jobKey);
       expect(job).toContain('concurrency:');
       expect(job).toContain('group: neon-endpoint-pool-');
       expect(job).toContain('cancel-in-progress: false');
+    }
+  });
+
+  it('keeps artifact consumers out of the branch-creation pool', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    for (const jobKey of neonArtifactConsumerJobs) {
+      const job = getJobBlock(workflow, jobKey);
+      expect(job).not.toContain('group: neon-endpoint-pool-');
     }
   });
 
