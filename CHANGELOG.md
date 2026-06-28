@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.59] - 2026-06-28
+
+> Merge-queue Lighthouse and mobile-overflow CI lanes reuse shared Neon fixtures reliably.
+
+### Fixed
+
+- **CI throughput (JOV-3606)**: public Lighthouse shard-0 and mobile overflow guards stop injecting stale main DB credentials into ephemeral Neon branches, rebalance the mobile-viewport Playwright spec across LHCI shards, and keep deterministic Promptfoo skill-registry coverage in sync with `analyzePackaging`.
+
 ## [26.6.58] - 2026-06-28
 
 > Release detail panel metadata rows are easier to scan: compact copy buttons, readable titles, and labeled copyright lines.
