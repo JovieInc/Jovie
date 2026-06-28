@@ -80,6 +80,7 @@ jobs:
             echo "::warning::GRAPHITE_TOKEN is not configured; Graphite CI Optimizations will not scan PRs."
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - id: graphite
         if: steps.graphite-token.outputs.configured == 'true'
@@ -884,7 +885,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-biome, ci-guardrails, ci-structural-contract]
+    needs: [ci-path-changes, ci-typecheck, ci-biome, ci-guardrails, ci-structural-contract]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -895,7 +896,7 @@ jobs:
   ci-pr-ready:
     name: PR Ready
     # PR gate: fast checks + unit tests + build + Lighthouse (+ risk-triggered smoke/preview).
-    needs: [ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -1022,7 +1023,7 @@ jobs:
   ci-integration-ready:
     name: Integration Fast
     # Lightweight gate for integration/* PRs (agent batch lanes). Full CI runs on train PRs to main.
-    needs: [ci-risk-classifier, ci-fast]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -1121,7 +1122,7 @@ jobs:
 
   ci-layout-guard:
     name: Layout Guard (informational)
-    needs: [ci-build-public]
+    needs: [ci-path-changes, ci-build-public]
     # Fully informational — never blocks PRs or merge queue.
     # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
     # Skipped on push-to-main (merge queue already validated).
@@ -3278,7 +3279,7 @@ jobs:
     name: Full E2E (Preview)
     environment: Preview – jovie
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
+    needs: [ci-path-changes, ci-fast, ci-build, neon-db, ci-e2e-migrate]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
