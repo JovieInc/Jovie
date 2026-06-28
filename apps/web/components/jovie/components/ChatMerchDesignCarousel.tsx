@@ -111,17 +111,19 @@ export function ChatMerchDesignCarousel({
         {count > 1 ? (
           <div className='flex items-center justify-center gap-1.5'>
             {designs.map((design, index) => (
-              <button
+              <Button
                 key={design.id}
                 type='button'
+                variant='ghost'
                 aria-label={`Go to design ${index + 1}`}
                 aria-current={index === active}
                 onClick={() => setActive(index)}
                 className={cn(
-                  'h-1.5 rounded-full transition-[width,background-color] duration-subtle',
+                  'h-1.5 min-w-0 p-0 before:content-none',
+                  'rounded-full transition-[width,background-color] duration-subtle',
                   index === active
-                    ? 'w-5 bg-primary-token'
-                    : 'w-1.5 bg-surface-2'
+                    ? 'w-5 bg-primary-token hover:bg-primary-token'
+                    : 'w-1.5 bg-surface-2 hover:bg-surface-2'
                 )}
               />
             ))}
@@ -141,18 +143,18 @@ function CarouselArrow({
 }) {
   const Icon = side === 'left' ? ChevronLeft : ChevronRight;
   return (
-    <button
+    <Button
       type='button'
+      variant='frosted'
+      size='icon'
       aria-label={side === 'left' ? 'Previous design' : 'Next design'}
       onClick={onClick}
       className={cn(
-        'absolute top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-subtle bg-surface-1/90 text-primary-token backdrop-blur',
-        'transition-colors duration-subtle hover:bg-surface-2',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+        'absolute top-1/2 h-8 w-8 -translate-y-1/2',
         side === 'left' ? 'left-2' : 'right-2'
       )}
     >
       <Icon className='h-4 w-4' strokeWidth={2.25} />
-    </button>
+    </Button>
   );
 }
