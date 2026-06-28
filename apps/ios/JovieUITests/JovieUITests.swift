@@ -274,26 +274,34 @@ final class JovieUITests: XCTestCase {
     }
   }
 
-  func testShellMenuAndSettingsNavigationAreFullScreen() {
+  func testShellDrawerAndSettingsNavigation() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]
     }
 
-    app.buttons["More"].tap()
+    app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
-      app.staticTexts["Jovie"].waitForExistence(timeout: 3),
-      "Shell navigation did not reveal the menu.\n\(app.debugDescription)"
+      app.otherElements["shell-drawer"].waitForExistence(timeout: 3),
+      "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
       app.staticTexts["Start a conversation to see recent conversations here."].exists,
-      "Shell menu did not show the empty recent conversations state.\n\(app.debugDescription)"
+      "Shell drawer did not show the empty recent conversations state.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.buttons["New chat"].exists)
+    XCTAssertTrue(app.buttons["Settings"].exists)
+
+    app.buttons["Close navigation drawer"].tap()
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Closing the drawer did not restore the profile surface.\n\(app.debugDescription)"
     )
 
-    app.buttons["Close Menu"].tap()
-    app.buttons["Open Settings"].tap()
+    app.buttons["Open navigation drawer"].tap()
+    app.buttons["Settings"].tap()
     XCTAssertTrue(
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
-      "Shell navigation did not open settings.\n\(app.debugDescription)"
+      "Shell navigation did not open settings from the drawer.\n\(app.debugDescription)"
     )
   }
 
