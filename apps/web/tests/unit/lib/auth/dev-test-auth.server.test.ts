@@ -121,6 +121,21 @@ describe('dev-test-auth.server', () => {
     });
   });
 
+  it('enables loopback automation for production-built CI test servers', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VERCEL_ENV', '');
+    const { getDevTestAuthAvailability } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    expect(getDevTestAuthAvailability('127.0.0.1')).toEqual({
+      enabled: true,
+      trustedHost: true,
+      reason: null,
+    });
+  });
+
   it('rejects preview deployments even when the bypass env is enabled', async () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     vi.stubEnv('NODE_ENV', 'production');
