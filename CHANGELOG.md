@@ -7,10 +7,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.6.58] - 2026-06-28
 
-> Release detail panel metadata rows are easier to scan: compact copy buttons, readable titles, and labeled copyright lines.
+> Tasks workspace rows read calmer: overdue pills stop screaming red, the All tab stays visible, and list rows stop repeating title/due/assignee you already see in the detail pane. Release detail panel metadata rows are easier to scan: compact copy buttons, readable titles, and labeled copyright lines.
 
 ### Fixed
 
+- **Tasks workspace UI polish (JOV-3652)**: stale overdue due chips downgrade from urgent red to muted metadata; the All assignee subview tab no longer clips under the toolbar; selected list rows hide duplicate title and due chips when the document pane is open; assignee chips hide on Mine/Jovie subviews where every row shares the same assignee.
 - **Release detail panel UI (JOV-3654)**: shrinks UPC/ISRC copy buttons to match metadata row density, exposes the full release title on hover when clamped, and labels phonogram/composition copyright rows as P-line/C-line instead of bare ℗/© symbols.
 
 ## [26.6.57] - 2026-06-27

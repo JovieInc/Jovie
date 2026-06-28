@@ -54,6 +54,25 @@ describe('DueChip', () => {
     ).not.toContain('amber-300');
   });
 
+  it('tints danger only for recently overdue tasks', () => {
+    const { container: recent } = render(
+      <DueChip dueIso='2026-04-20T12:00:00Z' now={NOW} />
+    );
+    expect((recent.firstElementChild as HTMLElement).className).toContain(
+      'red-300'
+    );
+
+    const { container: stale } = render(
+      <DueChip dueIso='2026-03-01T12:00:00Z' now={NOW} />
+    );
+    expect((stale.firstElementChild as HTMLElement).className).not.toContain(
+      'red-300'
+    );
+    expect((stale.firstElementChild as HTMLElement).className).toContain(
+      'quaternary-token'
+    );
+  });
+
   it('returns null on a non-finite due date', () => {
     const { container } = render(<DueChip dueIso='not-a-date' now={NOW} />);
     expect(container.firstChild).toBeNull();

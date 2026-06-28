@@ -1072,6 +1072,7 @@ function MobileTaskSection({
   artistName,
   onOpenTask,
   onOpenRelease,
+  showAssignee,
 }: Readonly<{
   title: string;
   tasks: ReadonlyArray<TaskView>;
@@ -1079,6 +1080,7 @@ function MobileTaskSection({
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
   onOpenRelease: (task: TaskView) => void;
+  showAssignee: boolean;
 }>) {
   if (tasks.length === 0) {
     return null;
@@ -1099,6 +1101,7 @@ function MobileTaskSection({
             onOpenTask={onOpenTask}
             onOpenRelease={onOpenRelease}
             isSelected={task.id === selectedTaskId}
+            showAssignee={showAssignee}
           />
         ))}
       </div>
@@ -1112,12 +1115,14 @@ function MobileTaskListItem({
   onOpenTask,
   onOpenRelease,
   isSelected,
+  showAssignee,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
   onOpenRelease: (task: TaskView) => void;
   isSelected: boolean;
+  showAssignee: boolean;
 }>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const priority = getTaskPriorityVisual(task.priority);
@@ -1159,7 +1164,9 @@ function MobileTaskListItem({
             />
             <span>{priority.label}</span>
           </span>
-          <span className='truncate'>{assignee.label}</span>
+          {showAssignee ? (
+            <span className='truncate'>{assignee.label}</span>
+          ) : null}
         </span>
         {task.releaseTitle ? (
           <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-3xs text-tertiary-token'>
@@ -2002,27 +2009,40 @@ export function TasksPageClient() {
 
   useRegisterHeaderActions(headerActions);
 
+  const showAssigneeInListRows = assigneeFilter === 'all';
+  const suppressSelectedRowDetailDuplicates =
+    showTaskDocumentPane && Boolean(selectedTask);
+
   const renderTaskCell = useCallback(
-    (info: { row: { original: TaskView } }) => (
-      <TaskListRow
-        task={info.row.original}
-        onOpenRelease={openReleaseSidebar}
-        artistName={artistName}
-        isSelected={info.row.original.id === effectiveSelectedTaskId}
-        actionSlot={
-          <TaskRowActionMenu
-            items={getTaskContextMenuItems(info.row.original)}
-            selected={info.row.original.id === effectiveSelectedTaskId}
-            visibility='hover'
-          />
-        }
-      />
-    ),
+    (info: { row: { original: TaskView } }) => {
+      const isRowSelected = info.row.original.id === effectiveSelectedTaskId;
+
+      return (
+        <TaskListRow
+          task={info.row.original}
+          onOpenRelease={openReleaseSidebar}
+          artistName={artistName}
+          isSelected={isRowSelected}
+          showAssignee={showAssigneeInListRows}
+          hideTitle={suppressSelectedRowDetailDuplicates && isRowSelected}
+          hideDue={suppressSelectedRowDetailDuplicates && isRowSelected}
+          actionSlot={
+            <TaskRowActionMenu
+              items={getTaskContextMenuItems(info.row.original)}
+              selected={isRowSelected}
+              visibility='hover'
+            />
+          }
+        />
+      );
+    },
     [
       artistName,
       effectiveSelectedTaskId,
       getTaskContextMenuItems,
       openReleaseSidebar,
+      showAssigneeInListRows,
+      suppressSelectedRowDetailDuplicates,
     ]
   );
 
@@ -2086,6 +2106,7 @@ export function TasksPageClient() {
         isLoading={isActiveBoardLoading}
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
+        showAssigneeChip={assigneeFilter === 'all'}
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
         onMoveTask={handleMoveTask}
@@ -2140,6 +2161,7 @@ export function TasksPageClient() {
           artistName={artistName}
           onOpenTask={openTaskDocument}
           onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
         />
         <MobileTaskSection
           title='Closed'
@@ -2148,6 +2170,7 @@ export function TasksPageClient() {
           artistName={artistName}
           onOpenTask={openTaskDocument}
           onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
         />
       </>
     );
@@ -2160,6 +2183,7 @@ export function TasksPageClient() {
         artistName={artistName}
         onOpenTask={openTaskDocument}
         onOpenRelease={openReleaseSidebar}
+        showAssignee={assigneeFilter === 'all'}
       />
     );
   }
