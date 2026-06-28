@@ -7,11 +7,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-> Connector enrichment turns synced Gmail and Calendar objects into graph facts and calendar suggestions.
+> Connector enrichment turns synced Gmail and Calendar objects into graph facts and calendar suggestions; assistant chat replies surface entity mentions as subdued accent spans that reveal detail cards on hover.
 
 ### Added
 
 - **Connector enrichment pipelines (JOV-3114)**: adds `lib/connectors/enrichment/` with per-provider gmail/calendar pipelines that emit `context_facts`, memory graph observations, and `suggested_actions`; extends `context_fact_kind` for entity mentions; refactors `extractAndPropose` to sync Gmail `external_objects` then run the enrichment runner. Apple Photos deferred until JOV-2919.
+- **Chat progressive disclosure entity accents (JOV-3116)**: assistant responses parse `@kind:id[label]` wire tokens into per-type System B accent spans (release violet, artist purple, track blue, event orange) with hairline underlines instead of pills; hover/tap/focus opens the existing entity detail card with accent-tinted eyebrow copy. User bubbles keep rich input chips unchanged.
 
 ## [26.6.60] - 2026-06-28
 
