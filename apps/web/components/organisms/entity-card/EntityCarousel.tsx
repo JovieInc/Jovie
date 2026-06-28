@@ -119,7 +119,10 @@ export function EntityCarousel({
               treatment={isFeatured ? 'big' : 'compact'}
               surface={surface}
               priority={isFeatured}
-              className='w-full'
+              // h-full so cards fill the stretched row (the <li>s stretch to the
+              // tallest card via default items-stretch); without it shorter
+              // compact cards top-align and leave a dead gap below.
+              className='h-full w-full'
               onClick={
                 onCardClick ? () => onCardClick(index, model) : undefined
               }
