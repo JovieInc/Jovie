@@ -435,40 +435,16 @@ private struct ChatComposerPreview: View {
   let isOffline: Bool
 
   var body: some View {
-    let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-
-    HStack(spacing: JovieSpacing.medium) {
-      TextField(isOffline ? "Ask Jovie (offline)" : "Ask Jovie", text: $draft)
-        .textInputAutocapitalization(.sentences)
-        .disableAutocorrection(false)
-        .font(JovieFont.body(size: 16))
-        .foregroundStyle(JovieColor.textPrimary)
-        .frame(height: 52)
-
-      Button {
-        draft = ""
-      } label: {
-        Image(systemName: "arrow.up")
-          .font(.system(size: 16, weight: .bold))
-          .foregroundStyle(trimmedDraft.isEmpty ? JovieColor.textTertiary : JovieColor.backgroundBase)
-          .frame(width: 36, height: 36)
-          .background(
-            trimmedDraft.isEmpty ? JovieColor.surface2 : Color.white,
-            in: Circle()
-          )
+    ChatComposerBar(
+      draft: $draft,
+      placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
+      isSending: false,
+      isPlusEnabled: true,
+      onSend: { draft = "" },
+      onSelectWorkflow: { action in
+        draft = action.prompt
       }
-      .buttonStyle(.plain)
-      .disabled(trimmedDraft.isEmpty)
-      .accessibilityLabel("Send")
-    }
-    .padding(.horizontal, JovieSpacing.large)
-    .frame(height: 64)
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
-        .stroke(JovieColor.borderDefault, lineWidth: 1)
-    }
-    .accessibilityIdentifier("chat-composer")
+    )
   }
 }
 
