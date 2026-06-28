@@ -9491,6 +9491,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   position: absolute;
   left: 50%;
   display: flex;
+  min-width: var(--space-2);
   width: var(--space-2);
   height: var(--space-2);
   align-items: center;
@@ -9505,10 +9506,15 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   padding: 0;
   transform: translate(-50%, -50%);
   cursor: pointer;
+  box-shadow: none;
   transition:
     transform var(--duration-fast) var(--ease-subtle),
     background-color var(--duration-fast) var(--ease-subtle),
     box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-chat-thread-nav-marker::before) {
+  content: none;
 }
 
 :where(.system-b-chat-thread-nav-marker.is-hovered),

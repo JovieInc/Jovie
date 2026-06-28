@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
 import { type RefObject, useCallback, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -79,9 +80,11 @@ export function ChatThreadNavigationRail({
         {turns.map(turn => {
           const isHovered = hoveredTurnId === turn.id;
           return (
-            <button
+            <Button
               key={`${turn.id}:${turn.messageIndex}`}
               type='button'
+              variant='ghost'
+              size='icon'
               className={cn(
                 'system-b-chat-thread-nav-marker',
                 isHovered && 'is-hovered'
@@ -106,7 +109,7 @@ export function ChatThreadNavigationRail({
                   </span>
                 </span>
               ) : null}
-            </button>
+            </Button>
           );
         })}
       </nav>
