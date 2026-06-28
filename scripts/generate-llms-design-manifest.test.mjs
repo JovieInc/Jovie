@@ -7,8 +7,10 @@ import {
   REPO_ROOT,
   buildLlmsDesignManifest,
   categorizeTokens,
+  filterContractTokens,
   filterDesignEslintRules,
   generateLlmsDesignManifest,
+  isContractToken,
   parseCanonicalSurfaces,
   parseCssCustomProperties,
   parseEnabledJovieRules,
@@ -27,6 +29,17 @@ test('stripReducedMotionOverrides removes reduced-motion media blocks', () => {
   const stripped = stripReducedMotionOverrides(css);
   assert.match(stripped, /--ds-motion-subtle-duration:\s*150ms/);
   assert.doesNotMatch(stripped, /--ds-motion-subtle-duration:\s*0ms/);
+});
+
+test('filterContractTokens excludes DSP brand tokens', () => {
+  const tokens = new Map([
+    ['--ds-public-content-max', '1298px'],
+    ['--color-brand-audiomack', 'oklch(74% 0.17 65)'],
+    ['--color-text-primary-token', 'var(--linear-text-primary)'],
+  ]);
+  const filtered = filterContractTokens(tokens);
+  assert.equal(filtered.size, 2);
+  assert.equal(isContractToken('--color-brand-audiomack'), false);
 });
 
 test('parseCssCustomProperties keeps first canonical token values', () => {

@@ -59,6 +59,70 @@ const DESIGN_RULE_ALLOWLIST = new Set([
 const DESIGN_RULE_KEYWORDS =
   /\b(design|focus|motion|casing|theme|color|icon|label|ring|token|tailwind|contrast|ui)\b/i;
 
+/** Prefixes included in the AI contract manifest (full registry stays in CSS). */
+const CONTRACT_TOKEN_PREFIXES = [
+  'ds-',
+  'app-shell-',
+  'system-b-',
+  'public-shell-',
+  'public-content-',
+  'profile-shell-',
+  'profile-card-',
+  'profile-inner-',
+  'profile-drawer-',
+  'profile-action-',
+  'profile-notification-',
+  'profile-bottom-nav-',
+  'page-pad',
+  'section-gap',
+  'card-pad',
+  'content-max',
+  'radius-',
+  'text-',
+  'font-',
+  'space-',
+  'shadow-',
+  'theme-',
+  'duration-',
+  'ease-',
+  'color-text-',
+  'color-bg-',
+  'color-border-',
+  'color-btn-',
+  'color-accent',
+  'color-success',
+  'color-error',
+  'color-warning',
+  'color-info',
+  'color-interactive-',
+  'linear-app-',
+  'linear-header-',
+  'linear-btn-',
+  'linear-bg-',
+];
+
+const CONTRACT_TOKEN_BLOCKLIST_PREFIXES = ['color-brand-', 'color-accent-'];
+
+export function isContractToken(name) {
+  const bare = name.startsWith('--') ? name.slice(2) : name;
+  if (CONTRACT_TOKEN_BLOCKLIST_PREFIXES.some(prefix => bare.startsWith(prefix))) {
+    return false;
+  }
+  return CONTRACT_TOKEN_PREFIXES.some(
+    prefix => bare === prefix || bare.startsWith(prefix)
+  );
+}
+
+export function filterContractTokens(tokens) {
+  const filtered = new Map();
+  for (const [name, value] of tokens) {
+    if (isContractToken(name)) {
+      filtered.set(name, value);
+    }
+  }
+  return filtered;
+}
+
 const TOKEN_CATEGORY_ORDER = [
   ['ds-', 'DS Foundation'],
   ['color-', 'Semantic Colors'],
@@ -361,7 +425,8 @@ export function buildLlmsDesignManifest({
   canonicalSurfacesSource = readText(CANONICAL_SURFACES),
   uiComponents = listUiAtomComponents(path.join(repoRoot, 'packages/ui/atoms')),
 } = {}) {
-  const tokens = parseCssCustomProperties(designSystemCss);
+  const allTokens = parseCssCustomProperties(designSystemCss);
+  const tokens = filterContractTokens(allTokens);
   const categories = categorizeTokens(tokens);
   const enabledRules = parseEnabledJovieRules(eslintConfig);
   const designRules = filterDesignEslintRules(
@@ -407,7 +472,9 @@ export function buildLlmsDesignManifest({
     '- `border-subtle`, `border-default`, `border-strong`',
     '- `focus-ring-themed` or `focus-visible:*` on interactive elements',
     '',
-    `## Design Tokens (${tokens.size} CSS custom properties)`,
+    `## Design Tokens (${tokens.size} contract tokens; ${allTokens.size} total in CSS)`,
+    '',
+    'Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.',
     '',
     formatTokenSection(categories).trimEnd(),
     '',
