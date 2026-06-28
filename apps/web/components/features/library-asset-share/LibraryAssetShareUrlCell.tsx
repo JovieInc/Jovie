@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { type MouseEvent, useCallback, useState } from 'react';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
@@ -46,8 +47,10 @@ export function LibraryAssetShareUrlCell({
       <span className='system-b-library-meta-text min-w-0 flex-1 truncate font-mono text-2xs text-tertiary-token'>
         {displayUrl}
       </span>
-      <button
+      <Button
         type='button'
+        variant='outline'
+        size='icon'
         onClick={event => {
           handleCopy(event).catch(() => {});
         }}
@@ -57,7 +60,7 @@ export function LibraryAssetShareUrlCell({
         }
         data-testid={`library-share-url-copy-${asset.id}`}
         className={cn(
-          'system-b-library-action inline-flex h-6 w-6 shrink-0 items-center justify-center border border-subtle',
+          'system-b-library-action h-6 w-6 shrink-0 border border-subtle',
           !shareUrl && 'opacity-40'
         )}
       >
@@ -66,7 +69,7 @@ export function LibraryAssetShareUrlCell({
         ) : (
           <Copy className='h-3 w-3' strokeWidth={2.25} />
         )}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -1,71 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
-import { getSessionContext } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { isLibraryAssetVisibility } from '@/lib/library/asset-share';
 import {
+  parseLibraryAssetShareRequest,
+  resolveLibraryAssetShareActor,
+} from '@/lib/library/asset-share/route-helpers.server';
+import {
+  libraryAssetShareMutationSchema,
+  libraryAssetShareVisibilitySchema,
+} from '@/lib/library/asset-share/schemas';
+import {
   ensureLibraryAssetShareSettings,
   getLibraryAssetShareForAsset,
-  loadArtistHandleForProfile,
   updateLibraryAssetShareVisibility,
 } from '@/lib/library/asset-share.server';
 
 export const runtime = 'nodejs';
-
-const updateSchema = z.object({
-  profileId: z.string().uuid(),
-  assetId: z.string().min(1),
-  itemKind: z.enum(['release', 'merch', 'image', 'video', 'audio']),
-  title: z.string().min(1),
-  smartLinkPath: z.string().optional(),
-  visibility: z.enum(['public', 'private']),
-});
-
-const ensureSchema = z.object({
-  profileId: z.string().uuid(),
-  assetId: z.string().min(1),
-  itemKind: z.enum(['release', 'merch', 'image', 'video', 'audio']),
-  title: z.string().min(1),
-  smartLinkPath: z.string().optional(),
-});
 
 export async function PATCH(request: NextRequest) {
   const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
 
   try {
-    const parsed = updateSchema.safeParse(await request.json());
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid request', details: parsed.error.format() },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    const parsed = await parseLibraryAssetShareRequest(
+      request,
+      libraryAssetShareVisibilitySchema
+    );
+    if (!parsed.ok) return parsed.response;
 
     const { profileId, assetId, itemKind, title, smartLinkPath, visibility } =
       parsed.data;
-    const { profile } = await getSessionContext({
-      clerkUserId,
-      requireUser: true,
-      requireProfile: false,
-    });
-
-    if (!profile || profile.id !== profileId) {
-      return NextResponse.json(
-        { error: 'Creator profile not found' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const artistHandle = await loadArtistHandleForProfile(profileId);
-    if (!artistHandle) {
-      return NextResponse.json(
-        { error: 'Artist handle not found' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    const actor = await resolveLibraryAssetShareActor(clerkUserId, profileId);
+    if (!actor.ok) return actor.response;
 
     const share = await updateLibraryAssetShareVisibility({
       creatorProfileId: profileId,
@@ -74,7 +42,7 @@ export async function PATCH(request: NextRequest) {
       title,
       smartLinkPath,
       visibility,
-      artistHandle,
+      artistHandle: actor.artistHandle,
     });
 
     return NextResponse.json(
@@ -101,42 +69,22 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   try {
-    const parsed = ensureSchema.safeParse(await request.json());
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid request', details: parsed.error.format() },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    const parsed = await parseLibraryAssetShareRequest(
+      request,
+      libraryAssetShareMutationSchema
+    );
+    if (!parsed.ok) return parsed.response;
 
     const { profileId, assetId, itemKind, title, smartLinkPath } = parsed.data;
-    const { profile } = await getSessionContext({
-      clerkUserId,
-      requireUser: true,
-      requireProfile: false,
-    });
-
-    if (!profile || profile.id !== profileId) {
-      return NextResponse.json(
-        { error: 'Creator profile not found' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const artistHandle = await loadArtistHandleForProfile(profileId);
-    if (!artistHandle) {
-      return NextResponse.json(
-        { error: 'Artist handle not found' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    const actor = await resolveLibraryAssetShareActor(clerkUserId, profileId);
+    if (!actor.ok) return actor.response;
 
     const share = await ensureLibraryAssetShareSettings({
       creatorProfileId: profileId,
       assetId,
       itemKind,
       title,
-      artistHandle,
+      artistHandle: actor.artistHandle,
       smartLinkPath,
     });
 
@@ -170,31 +118,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { profile } = await getSessionContext({
-      clerkUserId,
-      requireUser: true,
-      requireProfile: false,
-    });
-
-    if (!profile || profile.id !== profileId) {
-      return NextResponse.json(
-        { error: 'Creator profile not found' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const artistHandle = await loadArtistHandleForProfile(profileId);
-    if (!artistHandle) {
-      return NextResponse.json(
-        { error: 'Artist handle not found' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    const actor = await resolveLibraryAssetShareActor(clerkUserId, profileId);
+    if (!actor.ok) return actor.response;
 
     const share = await getLibraryAssetShareForAsset({
       creatorProfileId: profileId,
       assetId,
-      artistHandle,
+      artistHandle: actor.artistHandle,
     });
 
     if (!share) {

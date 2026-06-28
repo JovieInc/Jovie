@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
@@ -208,17 +209,19 @@ export function LibraryAssetSharePanel({
       />
 
       {visibility === 'private' ? (
-        <button
+        <Button
           type='button'
+          variant='outline'
+          size='sm'
           onClick={() => {
             handleRevoke().catch(() => {});
           }}
           disabled={disabled || isEnsuring || isRevoking || !profileId}
           data-testid={`library-asset-share-revoke-${asset.id}`}
-          className='system-b-library-action system-b-library-action--standard inline-flex h-8 items-center border border-subtle px-2.5 text-2xs text-secondary-token'
+          className='system-b-library-action system-b-library-action--standard h-8 px-2.5 text-2xs text-secondary-token'
         >
           {isRevoking ? 'Revoking...' : 'Revoke private link'}
-        </button>
+        </Button>
       ) : null}
     </div>
   );
