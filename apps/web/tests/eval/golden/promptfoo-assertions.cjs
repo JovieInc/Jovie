@@ -13,7 +13,7 @@ register({
 
 const {
   runDeterministicScorers,
-} = require('../../../../lib/eval/scorers/deterministic.ts');
+} = require('../../../lib/eval/scorers/core.ts');
 
 function parseOutput(output) {
   if (output && typeof output === 'object') {
