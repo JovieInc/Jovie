@@ -1,8 +1,10 @@
 'use client';
 
+import { Ticket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -188,7 +190,7 @@ function TourDatesContent({
       renderMode === 'preview' ? (
         <button
           type='button'
-          className='inline-flex h-11 items-center rounded-full bg-white px-5 text-app font-semibold tracking-tight text-black dark:bg-white dark:text-black'
+          className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-5 text-app font-semibold tracking-tight text-black dark:bg-white dark:text-black'
           disabled
         >
           Event Alerts
@@ -206,14 +208,15 @@ function TourDatesContent({
       );
 
     return (
-      <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
-        <p className='text-base font-semibold tracking-[-0.018em] dark:text-white'>
-          No Events
-        </p>
-        <p className='mt-2 max-w-[25ch] text-xs leading-5 text-white/52'>
-          Get alerted when shows are announced.
-        </p>
-        <div className='mt-5'>{action}</div>
+      <div className='px-4 pb-4' data-testid='profile-primary-tab-events-empty'>
+        <ProfileEmptyBentoCard
+          accent='events'
+          icon={Ticket}
+          title='No Events'
+          body='Get alerted when shows are announced.'
+          layout='compact'
+          action={action}
+        />
       </div>
     );
   }

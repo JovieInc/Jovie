@@ -1,7 +1,7 @@
 'use client';
 
 import { Bell } from 'lucide-react';
-import { useMemo } from 'react';
+import { type MouseEvent, useMemo } from 'react';
 import {
   type EntityCardModel,
   merchToEntityCard,
@@ -10,6 +10,7 @@ import {
 } from '@/components/organisms/entity-card';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
@@ -23,7 +24,6 @@ import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
 import type { PublicRelease } from './releases/types';
@@ -68,93 +68,60 @@ function getUpcomingTourDates(
     );
 }
 
+function HomeAlertsSwitch() {
+  return (
+    <span
+      className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/18 bg-white/18 p-1 shadow-sm transition-colors duration-subtle group-hover:bg-white/24'
+      aria-hidden='true'
+      data-testid='profile-home-alerts-switch'
+    >
+      <span className='block h-6 w-6 rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)] dark:bg-white' />
+    </span>
+  );
+}
+
 function HomeAlertsCard({
   artist,
   onAlertsClick,
   renderMode,
-  variant,
+  prominent,
   sourceContext,
 }: Readonly<{
   artist: Artist;
   onAlertsClick?: (context: NotificationSourceContext) => void;
   renderMode: ProfileRenderMode;
-  variant: 'row' | 'bento';
+  prominent: boolean;
   sourceContext: NotificationSourceContext;
 }>) {
   const title = 'Alerts';
   const description = `${artist.name}: music, shows, merch.`;
   const isInteractive = renderMode === 'interactive';
   const subscribeHref = `/${artist.handle}?mode=subscribe`;
-  const sharedProps = {
-    className:
-      variant === 'bento'
-        ? 'group flex min-h-16 w-full min-w-0 items-center gap-3 rounded-(--profile-inner-radius) border border-white/10 bg-white/5 px-3.5 py-3 text-left text-white dark:text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90'
-        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 text-left text-white dark:text-white shadow-card backdrop-blur-2xl transition-colors duration-subtle hover:bg-white/10 active:opacity-90',
-    'data-testid':
-      variant === 'bento'
-        ? 'profile-home-alerts-fallback-card'
-        : 'profile-home-alerts-row',
-  } as const;
   const ariaLabel = `Turn on alerts for ${artist.name}`;
-  const content = (
-    <>
-      <Bell
-        className={cn(
-          'shrink-0 text-white/84',
-          variant === 'bento' ? 'h-5 w-5' : 'h-4 w-4'
-        )}
-        aria-hidden='true'
-      />
-      <span className='min-w-0 flex-1'>
-        <span
-          className={
-            variant === 'bento'
-              ? 'block text-app font-semibold leading-tight [overflow-wrap:anywhere]'
-              : 'block text-xs font-semibold leading-4 [overflow-wrap:anywhere]'
-          }
-        >
-          {title}
-        </span>
-        <span
-          className={
-            variant === 'bento'
-              ? 'mt-0.5 block max-w-64 text-2xs leading-4 text-white/55 [overflow-wrap:anywhere]'
-              : 'mt-0.5 block text-2xs leading-3.5 text-white/50 [overflow-wrap:anywhere]'
-          }
-        >
-          {description}
-        </span>
-      </span>
-      <span
-        className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/12 bg-white/15 p-1 shadow-sm transition-colors duration-subtle group-hover:bg-white/20'
-        aria-hidden='true'
-        data-testid='profile-home-alerts-switch'
-      >
-        <span className='block h-6 w-6 rounded-full bg-white dark:bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
-      </span>
-    </>
+  const handleClick = isInteractive
+    ? (event: MouseEvent<HTMLElement>) => {
+        if (!onAlertsClick) {
+          return;
+        }
+        event.preventDefault();
+        onAlertsClick(sourceContext);
+      }
+    : undefined;
+
+  return (
+    <ProfileEmptyBentoCard
+      accent='alerts'
+      icon={Bell}
+      title={title}
+      body={description}
+      layout={prominent ? 'prominent' : 'inline'}
+      trailing={<HomeAlertsSwitch />}
+      href={isInteractive ? subscribeHref : undefined}
+      onClick={handleClick}
+      ariaLabel={ariaLabel}
+      dataTestId='profile-home-alerts-fallback-card'
+    />
   );
-
-  if (isInteractive) {
-    return (
-      <a
-        href={subscribeHref}
-        onClick={event => {
-          if (!onAlertsClick) {
-            return;
-          }
-          event.preventDefault();
-          onAlertsClick(sourceContext);
-        }}
-        aria-label={ariaLabel}
-        {...sharedProps}
-      >
-        {content}
-      </a>
-    );
-  }
-
-  return <div {...sharedProps}>{content}</div>;
 }
 
 export function ProfileHomeRail({
@@ -290,12 +257,14 @@ export function ProfileHomeRail({
     upcomingTourDates,
   ]);
 
+  const isLowContentHome = carouselItems.length === 0;
+
   const alertsCard = isSubscribed ? null : (
     <HomeAlertsCard
       artist={artist}
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
-      variant='bento'
+      prominent={isLowContentHome}
       sourceContext={{
         artistId: artist.id,
         profileId: artist.id,

@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CheckCircle2 } from 'lucide-react';
+import { Bell, CheckCircle2, Music2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
@@ -11,6 +11,7 @@ import type {
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
+import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
@@ -254,38 +255,46 @@ function SubscribePanel({
   );
 }
 
-function ProfileEmptyState({
+function ProfileMusicEmptyState({
   artist,
-  title,
-  body,
-  triggerLabel,
   sourceContext,
+  renderMode,
 }: Readonly<{
   artist: Artist;
-  title: string;
-  body: string;
-  triggerLabel: string;
   sourceContext: NotificationSourceContext;
+  renderMode: ProfileRenderMode;
 }>) {
+  const action =
+    renderMode === 'preview' ? (
+      <button
+        type='button'
+        className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-5 text-app font-semibold tracking-tight text-black dark:bg-white dark:text-black'
+        disabled
+      >
+        Turn on alerts
+      </button>
+    ) : (
+      <ArtistNotificationsCTA
+        artist={artist}
+        variant='button'
+        presentation='overlay'
+        hideListenFallback
+        source={sourceContext.ctaLocation}
+        sourceContext={sourceContext}
+        triggerLabel='Turn on alerts'
+      />
+    );
+
   return (
-    <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
-      <p className='text-base font-semibold tracking-[-0.018em] text-white dark:text-white'>
-        {title}
-      </p>
-      <p className='mt-2 max-w-[25ch] text-xs leading-5 text-white/52'>
-        {body}
-      </p>
-      <div className='mt-5'>
-        <ArtistNotificationsCTA
-          artist={artist}
-          variant='button'
-          presentation='overlay'
-          hideListenFallback
-          source={sourceContext.ctaLocation}
-          sourceContext={sourceContext}
-          triggerLabel={triggerLabel}
-        />
-      </div>
+    <div className='px-4 pb-4' data-testid='profile-primary-tab-music-empty'>
+      <ProfileEmptyBentoCard
+        accent='music'
+        icon={Music2}
+        title='No Music'
+        body='Get a note when the first release lands.'
+        layout='compact'
+        action={action}
+      />
     </div>
   );
 }
@@ -535,11 +544,9 @@ export function ProfilePrimaryTabPanel({
             Music
           </h2>
         </div>
-        <ProfileEmptyState
+        <ProfileMusicEmptyState
           artist={artist}
-          title='No Music'
-          body='Get a note when the first release lands.'
-          triggerLabel='Turn on alerts'
+          renderMode={renderMode}
           sourceContext={musicEmptySourceContext}
         />
       </div>

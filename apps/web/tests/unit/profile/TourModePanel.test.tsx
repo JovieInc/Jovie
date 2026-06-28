@@ -145,15 +145,18 @@ describe('TourModePanel', () => {
     );
   });
 
-  // JOV-3555: the "No Events" heading must be the primary readable line, not a
-  // low-contrast token. The profile drawer is an always-dark surface, so the
-  // high-contrast white is applied via the lint-compliant `dark:text-white`
-  // pairing. Regression guard against the near-invisible heading.
-  it('renders the No Events heading with primary (dark:text-white) contrast', () => {
+  it('renders the events empty state as a full-color gradient bento card', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
+
+    expect(
+      screen.getByTestId('profile-primary-tab-events-empty')
+    ).toBeInTheDocument();
     const heading = screen.getByText('No Events');
     expect(heading).toHaveClass('dark:text-white');
     expect(heading.className).not.toMatch(/text-\(--color-text-tooltip\)/);
+    const bentoCard = screen.getByTestId('profile-primary-tab-events-empty')
+      .firstChild as HTMLElement;
+    expect(bentoCard.style.background).toContain('var(--color-accent-blue)');
   });
 
   it('renders the styled all-shows list when no geolocation is available', () => {
