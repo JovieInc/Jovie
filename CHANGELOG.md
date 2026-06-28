@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.58] - 2026-06-28
+
+> Tasks workspace rows read calmer: overdue pills stop screaming red, the All tab stays visible, and list rows stop repeating title/due/assignee you already see in the detail pane.
+
+### Fixed
+
+- **Tasks workspace UI polish (JOV-3652)**: stale overdue due chips downgrade from urgent red to muted metadata; the All assignee subview tab no longer clips under the toolbar; selected list rows hide duplicate title and due chips when the document pane is open; assignee chips hide on Mine/Jovie subviews where every row shares the same assignee.
+
 ## [26.6.57] - 2026-06-27
 
 > The desktop app recovers from renderer crashes instead of leaving you on a permanent black screen.
