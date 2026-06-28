@@ -2,14 +2,19 @@ name: Neon Scheduled Branch Cleanup
 
 on:
   schedule:
-    # Run every 4 hours to catch orphaned branches
-    - cron: '0 */4 * * *'
+    # JOV-2497: run every 30 minutes so orphaned CI branches release endpoint slots
+    # between bulk rebase/drain bursts (PR-close cleanup alone is too slow).
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       cleanup_threshold:
         description: 'Cleanup threshold (number of branches to trigger cleanup)'
         required: false
         default: '5'
+      minimum_branch_age_minutes:
+        description: 'Minimum branch age before scheduled cleanup may delete it'
+        required: false
+        default: '45'
 
 permissions:
   contents: read
@@ -31,8 +36,8 @@ jobs:
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
           protected_branches: 'main,development,preview,br-main,br-production'
-          # Lower threshold for scheduled runs - be more aggressive
           cleanup_threshold: ${{ github.event.inputs.cleanup_threshold || '5' }}
+          minimum_branch_age_minutes: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }}
 
       - name: Report cleanup summary
         if: always()
@@ -41,4 +46,5 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- Scheduled cleanup completed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Threshold: ${{ github.event.inputs.cleanup_threshold || '5' }} branches" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Minimum branch age: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }} minutes" >> "$GITHUB_STEP_SUMMARY"
           echo "- Run at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"
