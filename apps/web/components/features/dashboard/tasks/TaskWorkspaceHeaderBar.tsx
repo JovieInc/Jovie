@@ -192,7 +192,7 @@ export function TaskWorkspaceHeaderBar({
         start={toolbarStart}
         end={toolbarEnd}
         className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
-        startClassName={mode === 'create' ? 'overflow-visible' : undefined}
+        startClassName='overflow-visible'
         endClassName='gap-0.5'
       />
     </div>
@@ -229,9 +229,9 @@ export function TaskSubviewTabs({
       value={activeSubview}
       onValueChange={onSubviewChange}
       ariaLabel='Task subviews'
-      overflowMode='scroll'
+      overflowMode='collapse'
       variant='segment'
-      className={cn('pl-0', className)}
+      className={cn('pl-1.5', className)}
       triggerClassName='gap-1.5 px-2 text-xs'
       options={subviews.map(subview => ({
         value: subview.id,
