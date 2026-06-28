@@ -463,6 +463,13 @@
       "when": 1782700000000,
       "tag": "0065_connector_enrichment_context_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1782800000000,
+      "tag": "0066_library_asset_share_settings",
+      "breakpoints": true
     }
   ]
 }
