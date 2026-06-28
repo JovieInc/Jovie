@@ -176,6 +176,7 @@ apps/desktop/src/*
 !apps/desktop/src/desktop-permissions.ts
 !apps/desktop/src/desktop-security-reporting.ts
 !apps/desktop/src/window-state.ts
+!apps/desktop/src/renderer-recovery.ts
 apps/extension/
 .agents/
 
