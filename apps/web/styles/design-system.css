@@ -9448,6 +9448,124 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   color: var(--color-text-primary-token);
 }
 
+:where(.system-b-chat-thread-nav-hover-zone) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 8;
+  width: var(--space-8);
+  pointer-events: auto;
+}
+
+:where(.system-b-chat-thread-nav-gutter) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+}
+
+:where(.system-b-chat-thread-navigation-rail) {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-1-5);
+  bottom: calc(var(--space-5) + var(--space-16));
+  z-index: 9;
+  width: var(--space-3);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-subtle);
+}
+
+:where(
+    .system-b-chat-thread-nav-hover-zone:hover
+      .system-b-chat-thread-navigation-rail
+  ),
+:where(.system-b-chat-thread-navigation-rail:focus-within) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+:where(.system-b-chat-thread-nav-marker) {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  min-width: var(--space-2);
+  width: var(--space-2);
+  height: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: color-mix(
+    in oklab,
+    var(--color-text-tertiary-token) 55%,
+    transparent
+  );
+  padding: 0;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  box-shadow: none;
+  transition:
+    transform var(--duration-fast) var(--ease-subtle),
+    background-color var(--duration-fast) var(--ease-subtle),
+    box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+:where(.system-b-chat-thread-nav-marker::before) {
+  content: none;
+}
+
+:where(.system-b-chat-thread-nav-marker.is-hovered),
+:where(.system-b-chat-thread-nav-marker:focus-visible) {
+  width: var(--space-2-5);
+  height: var(--space-2-5);
+  background: var(--system-b-accent-cyan);
+  box-shadow: 0 0 0 3px
+    color-mix(in oklab, var(--system-b-accent-cyan) 18%, transparent);
+}
+
+:where(.system-b-chat-thread-nav-marker:focus-visible) {
+  outline: none;
+}
+
+:where(.system-b-chat-thread-nav-preview) {
+  position: absolute;
+  right: calc(100% + var(--space-3));
+  top: 50%;
+  z-index: 1;
+  display: flex;
+  width: max-content;
+  max-width: 15rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--surface-1) 96%, transparent);
+  padding: var(--space-2-5) var(--space-3);
+  text-align: left;
+  transform: translateY(-50%);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px -18px
+    color-mix(in oklab, var(--system-b-accent-cyan) 28%, black 72%);
+  pointer-events: none;
+}
+
+:where(.system-b-chat-thread-nav-preview-label) {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+:where(.system-b-chat-thread-nav-preview-text) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
 /* ============================================
    SYSTEM B LAUNCH PAGE
    ============================================ */

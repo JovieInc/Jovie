@@ -10,10 +10,10 @@ import {
   useState,
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
+import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
@@ -608,6 +608,15 @@ export function JovieChat({
             in the scroll viewport; active threads float it over the transcript with
             a scroll-behind fade so the last message never hard-stops at the input.
           */}
+          {showThreadView ? (
+            <ChatThreadNavigationRail
+              messages={messages}
+              scrollContainerRef={scrollContainerRef}
+              shouldVirtualizeMessages={shouldVirtualizeMessages}
+              virtualizer={virtualizer}
+            />
+          ) : null}
+
           {showBottomComposer ? (
             <>
               <div
