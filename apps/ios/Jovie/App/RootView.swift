@@ -198,8 +198,12 @@ private struct AppContentView: View {
           billingURL: appState.billingURL,
           chatEnabled: false,
           recentConversations: chatRepository?.conversations ?? [],
+          activeConversationID: chatRepository?.activeConversationID,
           onSelectConversation: { conversationID in
             Task { await chatRepository?.openConversation(conversationID) }
+          },
+          onStartNewChat: {
+            chatRepository?.startNewConversation()
           },
           onLogout: onLogout
         ) {
@@ -225,8 +229,12 @@ private struct AppContentView: View {
           billingURL: appState.billingURL,
           chatEnabled: appState.loadedDashboardResponse != nil,
           recentConversations: chatRepository?.conversations ?? [],
+          activeConversationID: chatRepository?.activeConversationID,
           onSelectConversation: { conversationID in
             Task { await chatRepository?.openConversation(conversationID) }
+          },
+          onStartNewChat: {
+            chatRepository?.startNewConversation()
           },
           onLogout: onLogout
         ) {
