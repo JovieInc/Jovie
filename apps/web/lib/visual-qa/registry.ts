@@ -96,6 +96,22 @@ export const VISUAL_QA_SURFACES = [
     },
   }),
   defineSurface({
+    id: 'opportunity-inbox-home',
+    title: 'Home — opportunity inbox',
+    description:
+      'Authenticated home inbox feed for open suggested_actions with System B card grammar.',
+    parityLedgerGroup: 'Shell',
+    canonicalSurfaceId: 'dashboard-releases',
+    baseline: {
+      route: '/app',
+      waitFor: '[data-testid="opportunity-inbox-page"]',
+      viewport: 'desktop',
+      captureTarget: 'page',
+      fullPage: false,
+      reducedMotion: true,
+    },
+  }),
+  defineSurface({
     id: 'settings-root-hierarchy',
     title: 'Settings — root hierarchy',
     description:
