@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import type { OnlineScoringInput, OnlineScoringResult, ScorerResult } from './core';
+import type {
+  OnlineScoringInput,
+  OnlineScoringResult,
+  ScorerResult,
+} from './core';
 import { runAllScorers } from './core';
 
 export const EVAL_REVIEW_LABEL = 'needs:eval-review' as const;
@@ -11,7 +15,9 @@ export function resetOnlineScorerState(): void {
 }
 
 const readSampleRate = () => {
-  const parsed = Number.parseFloat(process.env.JOVIE_ONLINE_SCORER_SAMPLE_RATE ?? '');
+  const parsed = Number.parseFloat(
+    process.env.JOVIE_ONLINE_SCORER_SAMPLE_RATE ?? ''
+  );
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 1
     ? parsed
     : DEFAULT_SAMPLE_RATE;
@@ -25,7 +31,8 @@ export function shouldSampleProdTrace(
   },
   options: { readonly sampleRate?: number } = {}
 ): boolean {
-  if ((input.durationMs ?? 0) >= 15_000 || (input.tokenCount ?? 0) >= 4_000) return true;
+  if ((input.durationMs ?? 0) >= 15_000 || (input.tokenCount ?? 0) >= 4_000)
+    return true;
   const sampleRate = options.sampleRate ?? readSampleRate();
   const digest = createHash('sha256')
     .update(`jovie-online-scorer-v1:${input.traceId}`)
@@ -37,7 +44,10 @@ export function shouldSampleProdTrace(
 const partitionSoftFailures = (
   traceId: string,
   results: readonly ScorerResult[]
-): { readonly forRecording: ScorerResult[]; readonly forReview: ScorerResult[] } => {
+): {
+  readonly forRecording: ScorerResult[];
+  readonly forReview: ScorerResult[];
+} => {
   const forRecording: ScorerResult[] = [];
   const forReview: ScorerResult[] = [];
   for (const item of results) {
