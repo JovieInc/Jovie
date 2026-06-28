@@ -498,6 +498,79 @@ describe('CI mobile overflow workflow', () => {
   });
 });
 
+describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
+  const neonPoolJobs = [
+    'neon-db',
+    'ci-mobile-overflow',
+    'ci-lighthouse-pr',
+    'ci-lighthouse-dashboard-pr',
+    'ci-lighthouse-onboarding-pr',
+    'ci-lighthouse-admin-pr',
+    'ci-lighthouse-chat-pr',
+    'ci-a11y',
+    'ci-e2e-smoke',
+    'ci-admin-smoke',
+  ] as const;
+
+  it('caps cross-PR Neon endpoint consumers with a four-slot queue', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    for (const jobKey of neonPoolJobs) {
+      const job = getJobBlock(workflow, jobKey);
+      expect(job).toContain('concurrency:');
+      expect(job).toContain('group: neon-endpoint-pool-');
+      expect(job).toContain('cancel-in-progress: false');
+    }
+  });
+
+  it('shortens shared neon-db branch TTL to release endpoint slots faster', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const neonDbJob = getJobBlock(workflow, 'neon-db');
+    const createBranchStep = getStepBlock(
+      neonDbJob,
+      'Create or reuse Neon branch (with retry)'
+    );
+
+    expect(createBranchStep).toContain("expires_in_hours: '2'");
+  });
+});
+
+describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
+  it('deletes prefixed CI branches when a PR closes', () => {
+    const cleanupWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
+      'utf8'
+    );
+
+    expect(cleanupWorkflow).toContain('List and delete matching Neon branches');
+    expect(cleanupWorkflow).toContain('startswith($base + "-")');
+  });
+
+  it('runs scheduled branch cleanup every 30 minutes', () => {
+    const scheduledWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/neon-scheduled-cleanup.yml'),
+      'utf8'
+    );
+
+    expect(scheduledWorkflow).toContain("cron: '*/30 * * * *'");
+    expect(scheduledWorkflow).toContain(
+      "minimum_branch_age_minutes: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }}"
+    );
+  });
+
+  it('recognizes lighthouse and smoke ephemeral branch name patterns', () => {
+    const cleanupAction = readFileSync(
+      resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),
+      'utf8'
+    );
+
+    expect(cleanupAction).toContain(
+      'dashboard|onboarding|admin|chat)-lighthouse-'
+    );
+    expect(cleanupAction).toContain('admin-smoke-[0-9]+-[0-9]+');
+  });
+});
+
 describe('CI public a11y workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');

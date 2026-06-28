@@ -77,29 +77,30 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         run: |
           BASE_NAME="${{ steps.sanitize.outputs.name }}"
-          echo "Looking for Neon branches matching pattern: $BASE_NAME-"
+          echo "Looking for Neon branches matching pattern: ${BASE_NAME}-*"
 
-          # List all branches and find those matching the sanitized base name + run_id suffix pattern
           BRANCHES_JSON=$(pnpm dlx neonctl branches list \
             --project-id "$NEON_PROJECT_ID" \
             --output json 2>/dev/null || echo "[]")
 
-          # Find branches that start with the sanitized name followed by a hyphen (indicating run suffix)
-          # These are ephemeral branches created by CI: <sanitized>-<run_id>-<attempt>
           MATCHING_BRANCHES=$(echo "$BRANCHES_JSON" | jq -r --arg base "$BASE_NAME" '
-            .[] | select(.name | startswith($base + "-")) | .name
+            (if type == "array" then . else (.branches // []) end)
+            | .[]
+            | select(.name | startswith($base + "-"))
+            | .name
           ')
 
-          if [ -z "$MATCHING_BRANCHES" ]; then
+          EXACT_MATCH=$(echo "$BRANCHES_JSON" | jq -r --arg name "$BASE_NAME" '
+            (if type == "array" then . else (.branches // []) end)
+            | .[]
+            | select(.name == $name)
+            | .name
+          ')
+
+          if [ -z "$MATCHING_BRANCHES" ] && [ -z "$EXACT_MATCH" ]; then
             echo "No matching Neon branches found for '$BASE_NAME'"
             exit 0
           fi
-
-          # Also check for exact match (in case naming changed)
-          EXACT_MATCH=$(echo "$BRANCHES_JSON" | jq -r --arg name "$BASE_NAME" '
-            .[] | select(.name == $name) | .name
-          ')
-
           DELETED_COUNT=0
           for branch in $MATCHING_BRANCHES; do
             echo "Deleting Neon branch: $branch"
