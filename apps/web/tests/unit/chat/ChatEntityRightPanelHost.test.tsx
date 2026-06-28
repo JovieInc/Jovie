@@ -198,6 +198,36 @@ function UpsertTourDateContext() {
   return null;
 }
 
+function UpsertTemplatePlaceholderContexts() {
+  const { upsertContexts } = useChatEntityPanel();
+  useEffect(() => {
+    upsertContexts([
+      {
+        kind: 'release',
+        id: 'release-1',
+        label: '<title>',
+        source: 'message',
+        focusKey: 'message-1:release-1',
+      },
+      {
+        kind: 'artist',
+        id: 'artist-1',
+        label: '<name>',
+        source: 'message',
+        focusKey: 'message-1:artist-1',
+      },
+      {
+        kind: 'track',
+        id: 'track-1',
+        label: '<title>',
+        source: 'message',
+        focusKey: 'message-1:track-1',
+      },
+    ]);
+  }, [upsertContexts]);
+  return null;
+}
+
 function DismissContextHarness() {
   const { contextTargets, dismissContext, upsertContext } =
     useChatEntityPanel();
@@ -476,6 +506,36 @@ describe('ChatEntityRightPanelHost', () => {
     expect(
       screen.getByRole('button', { name: 'Dismiss Release Context' })
     ).toBeInTheDocument();
+  });
+
+  it('never renders raw template placeholder tokens on context cards', async () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({ data: null, isLoading: false });
+
+    render(
+      <ChatEntityPanelProvider>
+        <UpsertTemplatePlaceholderContexts />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    });
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    render(registeredPanel as React.ReactElement);
+
+    expect(screen.getByText('Release')).toBeInTheDocument();
+    expect(screen.getByText('Artist')).toBeInTheDocument();
+    expect(screen.getByText('Track')).toBeInTheDocument();
+    expect(screen.queryByText('<title>')).toBeNull();
+    expect(screen.queryByText('<name>')).toBeNull();
   });
 
   it('renders tour-date context cards with the shared EntityCard compact treatment', async () => {
