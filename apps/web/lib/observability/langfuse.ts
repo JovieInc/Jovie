@@ -1,9 +1,10 @@
 import type { ChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
-import { publicEnv } from '@/lib/env-public';
-import { env } from '@/lib/env-server';
 
 /**
  * Langfuse LLM tracing — async batched export to Langfuse Cloud.
+ *
+ * Reads `process.env` directly (not `env-server`) so this module stays loadable
+ * from promptfoo eval harnesses that import `executeChatTurn`.
  *
  * @see https://langfuse.com/docs/sdk/typescript
  */
@@ -15,18 +16,29 @@ const LANGFUSE_REQUEST_TIMEOUT_MS = 10_000;
 let langfuseClientPromise: Promise<import('langfuse').Langfuse | null> | null =
   null;
 
+function readProcessEnv(key: string): string | undefined {
+  const value = process.env[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 export function shouldEnableLangfuse(): boolean {
-  if (env.CI === 'true') return false;
-  if (env.NODE_ENV === 'test' || publicEnv.NEXT_PUBLIC_E2E_MODE === '1') {
+  if (readProcessEnv('CI') === 'true') return false;
+  if (
+    readProcessEnv('NODE_ENV') === 'test' ||
+    readProcessEnv('NEXT_PUBLIC_E2E_MODE') === '1'
+  ) {
     return false;
   }
 
-  if (!env.LANGFUSE_SECRET_KEY || !env.LANGFUSE_PUBLIC_KEY) {
+  if (
+    !readProcessEnv('LANGFUSE_SECRET_KEY') ||
+    !readProcessEnv('LANGFUSE_PUBLIC_KEY')
+  ) {
     return false;
   }
 
-  if (env.NODE_ENV === 'development') {
-    return env.JOVIE_ENABLE_LANGFUSE === '1';
+  if (readProcessEnv('NODE_ENV') === 'development') {
+    return readProcessEnv('JOVIE_ENABLE_LANGFUSE') === '1';
   }
 
   return true;
@@ -42,14 +54,16 @@ async function loadLangfuseClient(): Promise<
       try {
         const { Langfuse } = await import('langfuse');
         return new Langfuse({
-          secretKey: env.LANGFUSE_SECRET_KEY,
-          publicKey: env.LANGFUSE_PUBLIC_KEY,
-          baseUrl: env.LANGFUSE_BASE_URL ?? DEFAULT_LANGFUSE_BASE_URL,
+          secretKey: readProcessEnv('LANGFUSE_SECRET_KEY'),
+          publicKey: readProcessEnv('LANGFUSE_PUBLIC_KEY'),
+          baseUrl:
+            readProcessEnv('LANGFUSE_BASE_URL') ?? DEFAULT_LANGFUSE_BASE_URL,
           flushAt: 15,
           flushInterval: 10_000,
           requestTimeout: LANGFUSE_REQUEST_TIMEOUT_MS,
-          environment: env.VERCEL_ENV ?? env.NODE_ENV,
-          release: env.NEXT_PUBLIC_BUILD_SHA || undefined,
+          environment:
+            readProcessEnv('VERCEL_ENV') ?? readProcessEnv('NODE_ENV'),
+          release: readProcessEnv('NEXT_PUBLIC_BUILD_SHA'),
         });
       } catch (error) {
         console.warn('[langfuse] Client init failed:', error);
