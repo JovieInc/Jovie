@@ -266,6 +266,7 @@ export function DrawerHero({
         <div className='flex-1 min-w-0 pt-1'>
           <div className='flex items-start gap-2'>
             <h2
+              title={title}
               className={cn(
                 'flex-1 min-w-0 text-base font-semibold text-primary-token leading-tight',
                 resolvedTitleLineClamp &&

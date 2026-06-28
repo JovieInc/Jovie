@@ -41,7 +41,6 @@ import {
   newThreadNavItem,
   primaryNavigation,
   releasesNavItem,
-  settingsNavItem,
   touringNavItem,
   userSettingsNavigation,
 } from './config';
@@ -60,12 +59,6 @@ const searchNavItem: NavItem = {
 type DashboardNavSection = {
   readonly key: string;
   readonly label?: string;
-  readonly items: NavItem[];
-};
-
-type MoreNavSection = {
-  readonly key: 'more';
-  readonly label: string;
   readonly items: NavItem[];
 };
 
@@ -233,14 +226,10 @@ export function DashboardNav(_: DashboardNavProps) {
   // In the chat shell the artist row itself shows the display name, so keep the
   // section label generic to avoid duplicate "Tim White" buttons in the sidebar.
   const artistSettingsLabel =
-    shellChatV1Enabled && !isInSettings ? 'Artist' : artistName || 'Artist';
-  const moreLabel = 'More';
+    shellChatV1Enabled || isInSettings ? 'Artist' : artistName || 'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
-  const { moreSection, navSections } = useMemo<{
-    readonly moreSection: MoreNavSection | null;
-    readonly navSections: DashboardNavSection[];
-  }>(() => {
+  const navSections = useMemo<readonly DashboardNavSection[]>(() => {
     const decorateItem = (item: NavItem): NavItem => {
       if (item.id === 'tasks') {
         return {
@@ -273,51 +262,40 @@ export function DashboardNav(_: DashboardNavProps) {
     const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
 
     if (shellChatV1Enabled) {
-      return {
-        moreSection: {
-          key: 'more',
-          label: moreLabel,
-          items: [settingsNavItem].map(decorateItem),
+      return [
+        {
+          key: 'top',
+          items: [
+            decorateItem(newThreadNavItem),
+            searchNavItem,
+            decorateItem(releasesNavItem),
+          ],
         },
-        navSections: [
-          {
-            key: 'top',
-            items: [
-              decorateItem(newThreadNavItem),
-              searchNavItem,
-              decorateItem(releasesNavItem),
-            ],
-          },
-          {
-            key: 'artist',
-            label: artistSettingsLabel,
-            items: [
-              decorateItem(artistProfileNavItem),
-              decorateItem(touringNavItem),
-              ...(audienceItem ? [decorateItem(audienceItem)] : []),
-              ...(tasksItem ? [decorateItem(tasksItem)] : []),
-            ],
-          },
-        ],
-      };
+        {
+          key: 'artist',
+          label: artistSettingsLabel,
+          items: [
+            decorateItem(artistProfileNavItem),
+            decorateItem(touringNavItem),
+            ...(audienceItem ? [decorateItem(audienceItem)] : []),
+            ...(tasksItem ? [decorateItem(tasksItem)] : []),
+          ],
+        },
+      ];
     }
 
-    return {
-      moreSection: null,
-      navSections: [
-        {
-          key: 'primary',
-          items: primaryNavigation.map(decorateItem),
-        },
-      ],
-    };
+    return [
+      {
+        key: 'primary',
+        items: primaryNavigation.map(decorateItem),
+      },
+    ];
   }, [
     canAccessTasksWorkspace,
     isPlanGateLoading,
     artistName,
     artistSettingsLabel,
     isInSettings,
-    moreLabel,
     shellChatV1Enabled,
     taskStats,
     tasksSeenAt,
@@ -581,7 +559,7 @@ export function DashboardNav(_: DashboardNavProps) {
         {isInSettings ? (
           <>
             <SidebarCollapsibleGroup
-              label='General'
+              label='Account'
               defaultOpen
               storageKey='settings.general'
             >
@@ -628,9 +606,6 @@ export function DashboardNav(_: DashboardNavProps) {
                 normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
               }
               onThreadContextMenu={onThreadContextMenu}
-              onNewThread={() => {
-                router.push(APP_ROUTES.CHAT);
-              }}
               state={
                 conversationsError
                   ? 'error'
@@ -642,18 +617,6 @@ export function DashboardNav(_: DashboardNavProps) {
               tight
               collapsed={false}
             />
-          </div>
-        ) : null}
-
-        {moreSection ? (
-          <div data-nav-section={moreSection.key} className='mt-3'>
-            <SidebarCollapsibleGroup
-              label={moreSection.label}
-              defaultOpen={false}
-              storageKey={moreSection.key}
-            >
-              {renderSection(moreSection.items)}
-            </SidebarCollapsibleGroup>
           </div>
         ) : null}
 
@@ -670,7 +633,7 @@ export function DashboardNav(_: DashboardNavProps) {
                   className='space-y-2'
                   data-admin-section={section.label}
                 >
-                  <p className='px-2.5 pb-0.5 text-2xs font-semibold tracking-tight text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
+                  <p className='px-2.5 pb-0.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>
                   {renderSection(section.items)}

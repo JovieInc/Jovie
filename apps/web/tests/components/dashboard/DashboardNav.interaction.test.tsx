@@ -201,7 +201,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByLabelText('Command palette search')).toBeInTheDocument();
   });
 
-  it('groups the Design V1 shell into top nav, artist group, and More sections', () => {
+  it('groups the Design V1 shell into top nav and artist sections without duplicate Settings', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
@@ -220,7 +220,8 @@ describe('DashboardNav interactions', () => {
     expect(screen.queryByRole('button', { name: 'Work' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Catalog' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Growth' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Artist' })).toHaveAttribute(
@@ -243,9 +244,7 @@ describe('DashboardNav interactions', () => {
       'href',
       APP_ROUTES.AUDIENCE
     );
-    expect(
-      container.querySelector('[data-nav-section="more"]')
-    ).toBeInTheDocument();
+    expect(container.querySelector('[data-nav-section="more"]')).toBeNull();
   });
 
   it('renders recent chats in the Design V1 sidebar as App Router links', () => {
@@ -315,9 +314,7 @@ describe('DashboardNav interactions', () => {
     });
 
     expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
-    expect(
-      screen.getByRole('button', { name: 'New Chat' })
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
   });
 
   it('navigates to chat and opens the profile rail from artist name off chat routes', async () => {

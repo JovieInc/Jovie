@@ -229,7 +229,7 @@ describe('DashboardNav', () => {
     });
   });
 
-  it('renders the grouped top nav, artist group, and More section', () => {
+  it('renders the grouped top nav and artist group without a duplicate Settings row', () => {
     const { getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
@@ -252,10 +252,8 @@ describe('DashboardNav', () => {
       'aria-expanded',
       'true'
     );
-    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
+    expect(queryByRole('button', { name: 'More' })).toBeNull();
+    expect(queryByRole('link', { name: 'Settings' })).toBeNull();
     expect(queryByRole('button', { name: 'Work' })).toBeNull();
     expect(queryByRole('button', { name: 'Catalog' })).toBeNull();
     expect(queryByRole('button', { name: 'Growth' })).toBeNull();
@@ -278,7 +276,7 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('defaults More and Admin groups collapsed', () => {
+  it('defaults the Admin group collapsed', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
@@ -292,34 +290,9 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
     expect(getByRole('button', { name: 'Admin' })).toHaveAttribute(
       'aria-expanded',
       'false'
-    );
-  });
-
-  it('remembers an expanded More group', () => {
-    localStorage.setItem('jovie:sidebar-section:more', 'open');
-
-    const { getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
-    });
-
-    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
     );
   });
 
@@ -346,7 +319,7 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('renders settings groups with the selected artist name', () => {
+  it('renders settings groups with canonical Account and Artist labels', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.SETTINGS_ACCOUNT);
 
     const { getAllByText, getByRole, queryByText } = renderDashboardNav({
@@ -361,8 +334,8 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getAllByText('General').length).toBeGreaterThan(0);
-    expect(getAllByText('Tim White').length).toBeGreaterThan(0);
+    expect(getAllByText('Account').length).toBeGreaterThan(0);
+    expect(getAllByText('Artist').length).toBeGreaterThan(0);
     expect(
       getByRole('link', { name: 'Audience & Tracking' }).getAttribute('href')
     ).toBe(APP_ROUTES.SETTINGS_AUDIENCE);

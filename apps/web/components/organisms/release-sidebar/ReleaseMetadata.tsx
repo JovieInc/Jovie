@@ -110,15 +110,19 @@ function formatCopyrightLine(line: string, symbol: '℗' | '©'): string {
 }
 
 function CopyrightLabel({
+  lineLabel,
   symbol,
   description,
 }: {
+  readonly lineLabel: string;
   readonly symbol: '℗' | '©';
   readonly description: string;
 }) {
   return (
     <span className='inline-flex items-center gap-1'>
-      <span>{symbol}</span>
+      <span>
+        {lineLabel} <span aria-hidden='true'>{symbol}</span>
+      </span>
       <SimpleTooltip content={description} side='top'>
         <span className='inline-flex items-center'>
           <Info
@@ -126,7 +130,9 @@ function CopyrightLabel({
             aria-hidden='true'
             className='text-muted-foreground'
           />
-          <span className='sr-only'>{description}</span>
+          <span className='sr-only'>
+            {lineLabel} ({symbol}): {description}
+          </span>
         </span>
       </SimpleTooltip>
     </span>
@@ -316,6 +322,7 @@ export function ReleaseMetadata({
               valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
+                  lineLabel='P-line'
                   symbol='℗'
                   description='Sound recording copyright (phonogram rights)'
                 />
@@ -349,6 +356,7 @@ export function ReleaseMetadata({
               valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
+                  lineLabel='C-line'
                   symbol='©'
                   description='Composition copyright (musical work)'
                 />

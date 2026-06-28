@@ -98,6 +98,20 @@ describe('buildContentSecurityPolicy', () => {
     expect(frameSrc).toContain('https://clerk.staging.jov.ie');
   });
 
+  it('includes Google Analytics domains in script-src and connect-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(scriptSrc).toContain('https://www.googletagmanager.com');
+    expect(connectSrc).toContain('https://www.google-analytics.com');
+    expect(connectSrc).toContain('https://analytics.google.com');
+    expect(connectSrc).toContain('https://*.google-analytics.com');
+  });
+
   it('includes vercel analytics inline script hash in script-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
