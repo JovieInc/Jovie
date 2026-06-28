@@ -451,8 +451,8 @@ describe('CI public a11y workflow', () => {
     );
     const seedStep = getStepBlock(a11yJob, 'Seed public QA fixtures');
 
-    expect(workflow).toContain(
-      'needs: [optimize_ci, ci-build-public, ci-path-changes, neon-db]'
+    expect(a11yJob).toContain(
+      'needs: [ci-build-public, ci-path-changes, neon-db]'
     );
     expect(downloadArtifactStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
