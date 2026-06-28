@@ -141,7 +141,9 @@ final class AppState {
         detail: "state=\(cachedSnapshot.state.rawValue)"
       )
     } else {
-      route = .launching
+      // Paint the interactive shell immediately with a loading skeleton instead
+      // of holding first-run users on SplashView for the full /me round-trip.
+      route = .ready
       dashboardState = .loading
       isOffline = false
       MobileAuthDiagnostics.record("mobile_me_loading")
@@ -209,7 +211,9 @@ final class AppState {
       dashboardState = .loaded(response)
     case .needsOnboarding:
       route = .needsOnboarding
-      dashboardState = .idle
+      // Keep the resolved profile payload so continueOnWebURL and cache paint
+      // stay instant — .idle forced a generic fallback URL and extra reload work.
+      dashboardState = .loaded(response)
     }
   }
 
