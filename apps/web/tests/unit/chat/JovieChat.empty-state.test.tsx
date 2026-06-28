@@ -178,6 +178,9 @@ describe('JovieChat empty state', () => {
     expect(queryByText("Hey, I'm Jovie.")).toBeNull();
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
+    const emptyViewport = getByTestId('chat-empty-state-viewport');
+    expect(emptyViewport.className).toContain('flex-1');
+    expect(emptyViewport.className).toContain('justify-center');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
     expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();

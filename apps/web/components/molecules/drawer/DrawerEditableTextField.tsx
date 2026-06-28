@@ -282,7 +282,7 @@ export const DrawerEditableTextField = React.memo(
                   handleCopyClick();
                 }}
                 aria-label={copyLabel ?? `Copy ${label}`}
-                className='h-6 w-6 text-tertiary-token'
+                className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
               >
                 {isSuccess ? (
                   <Check className='h-3.5 w-3.5 text-success' />
@@ -318,7 +318,7 @@ export const DrawerEditableTextField = React.memo(
                         action.onClick?.();
                       }}
                       aria-label={action.ariaLabel}
-                      className='h-6 w-6 text-tertiary-token'
+                      className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
                     >
                       {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
                     </DrawerInlineIconButton>
