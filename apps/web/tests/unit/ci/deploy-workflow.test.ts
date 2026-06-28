@@ -558,3 +558,52 @@ describe('CI public a11y workflow', () => {
     );
   });
 });
+
+describe('CI PR neon migrate workflow', () => {
+  it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const migrateJob = getJobBlock(workflow, 'ci-pr-neon-migrate');
+    const downloadArtifactStep = getStepBlock(
+      migrateJob,
+      'Download Neon DB connection artifact'
+    );
+    const resolveDbStep = getStepBlock(
+      migrateJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const exportStep = getStepBlock(
+      migrateJob,
+      'Export DATABASE_URL (ephemeral branch)'
+    );
+    const failClosedStep = getStepBlock(
+      migrateJob,
+      'Fail if Neon DB URL is missing (PR migrate)'
+    );
+    const verifyDbStep = getStepBlock(
+      migrateJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
+    const migrateStep = getStepBlock(
+      migrateJob,
+      'Run migrations (ephemeral Neon)'
+    );
+
+    expect(downloadArtifactStep).toContain(
+      'name: neon-db-connection-${{ github.run_id }}'
+    );
+    expect(resolveDbStep).toContain(
+      'connection_file: /tmp/neon-db-connection/connection.json'
+    );
+    expect(resolveDbStep).toContain('candidate_json_key: db_url');
+    expect(resolveDbStep).not.toContain('credential_source_url');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
+    expect(failClosedStep).toContain(
+      'Refusing to run PR migrate against staging/production DBs'
+    );
+    expect(exportStep).toContain(
+      'steps.resolve-pr-neon-db-url.outputs.database_url'
+    );
+    expect(migrateStep).toContain('drizzle:migrate:ci');
+    expect(migrateJob).not.toContain('credential_source_url');
+  });
+});

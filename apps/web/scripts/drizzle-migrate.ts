@@ -160,12 +160,23 @@ function isRetryableConnectionError(error: unknown) {
     combinedMessage.includes('password authentication failed') ||
     combinedMessage.includes('requested endpoint could not be found') ||
     combinedMessage.includes("you don't have access to it") ||
+    combinedMessage.includes('concurrently active endpoints') ||
     combinedMessage.includes('connection terminated unexpectedly') ||
     combinedMessage.includes('connection closed') ||
     combinedMessage.includes('server closed the connection unexpectedly') ||
     combinedMessage.includes('timed out waiting for database connection') ||
     combinedMessage.includes('fetch failed')
   );
+}
+
+function getConnectionRetryDelayMs(error: unknown, attempt: number) {
+  const combinedMessage = flattenErrorMessages(error).join(' ').toLowerCase();
+  if (combinedMessage.includes('concurrently active endpoints')) {
+    // Neon endpoint limits clear slowly; back off harder than auth/bootstrap retries.
+    return Math.min(CI_CONNECT_RETRY_DELAY_MS * 2 ** (attempt - 1), 30_000);
+  }
+
+  return CI_CONNECT_RETRY_DELAY_MS;
 }
 
 async function connectClientWithRetryableBootstrap(pool: Pool) {
@@ -256,10 +267,11 @@ async function connectWithRetry(databaseUrl: string) {
         throw error;
       }
 
+      const retryDelayMs = getConnectionRetryDelayMs(error, attempt);
       log.warning(
-        `Database connection attempt ${attempt}/${maxAttempts} failed with a transient Neon endpoint error. Retrying in ${CI_CONNECT_RETRY_DELAY_MS / 1000}s...`
+        `Database connection attempt ${attempt}/${maxAttempts} failed with a transient Neon endpoint error. Retrying in ${retryDelayMs / 1000}s...`
       );
-      await sleep(CI_CONNECT_RETRY_DELAY_MS);
+      await sleep(retryDelayMs);
     }
   }
 
@@ -535,4 +547,8 @@ if (require.main === module) {
   });
 }
 
-export { runMigrations };
+export {
+  getConnectionRetryDelayMs,
+  isRetryableConnectionError,
+  runMigrations,
+};

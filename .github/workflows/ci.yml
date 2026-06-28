@@ -2227,17 +2227,29 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-pr-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Fail if Neon DB URL is missing (PR migrate)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run PR migrate against staging/production DBs."
+            exit 1
+          fi
+
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Verify Neon DB connectivity (fail-fast)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/e2e/verify-neon-db-connectivity.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
