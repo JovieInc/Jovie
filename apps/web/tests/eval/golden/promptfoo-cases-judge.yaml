@@ -1,0 +1,374 @@
+- description: "Release timing: best day of week (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "What day should I release my next single?"
+    caseName: "Release timing: best day of week"
+    mustSay: "friday"
+    mustNotSay: "monday|wednesday|sunday"
+    harmfulBlacklist: "any day works equally well|day of the week doesn't matter"
+    voiceException: "false"
+    groundTruth: "New Music Friday is the industry standard. Releasing on Friday maximizes first-week streams because streaming platforms refresh editorial playlists on Friday. The release should go live at midnight local time in the earliest timezone (e.g., midnight NZT for global rollout)."
+  providerOutput:
+    text: "Friday is the standard release day for singles. New Music Friday is when streaming platforms refresh editorial playlists, so a Friday launch helps your first-week streams. Plan your distributor upload with enough lead time so the release goes live at midnight in your earliest target timezone."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Release timing: lead time for pre-saves (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "How far in advance should I set up pre-saves for my single?"
+    caseName: "Release timing: lead time for pre-saves"
+    mustSay: "2|week"
+    mustNotSay: ""
+    harmfulBlacklist: "pre-saves don't matter|you can set up pre-saves the day before"
+    voiceException: "false"
+    groundTruth: "Pre-saves should be set up at least 2-4 weeks before release to build momentum. Most distributors require 2+ weeks lead time for editorial playlist consideration. The pre-save link should be promoted across social channels as soon as it is live."
+  providerOutput:
+    text: "Set up pre-saves at least 2 weeks before release. That gives you time to promote the link across social channels and build momentum heading into launch week. Most distributors also need lead time for editorial pitching, so earlier is better than a last-minute scramble."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Royalties: mechanical vs performance (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "What are mechanical royalties vs performance royalties?"
+    caseName: "Royalties: mechanical vs performance"
+    mustSay: "mechanical|performance|composition"
+    mustNotSay: ""
+    harmfulBlacklist: "they are the same thing|you only need to worry about one type"
+    voiceException: "true"
+    groundTruth: "Mechanical royalties are paid when a song is reproduced (streaming, downloads, physical copies) — they go to the songwriter/publisher. Performance royalties are paid when a song is publicly performed (radio, live venues, streaming) — they are collected by PROs (ASCAP, BMI, SESAC). An artist who writes their own songs should register with BOTH a distributor (for mechanicals) and a PRO (for performance royalties)."
+  providerOutput:
+    text: "Mechanical royalties come from reproduction of the composition when a song is streamed, downloaded, or pressed. Performance royalties come from public performance of that composition and are collected by PROs like ASCAP or BMI. If you wrote the song, you need both streams covered: mechanical through your distributor and performance through your PRO registration."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Royalties: per-stream rates are not fixed (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "How much does Spotify pay per stream?"
+    caseName: "Royalties: per-stream rates are not fixed"
+    mustSay: "varies|average"
+    mustNotSay: ""
+    harmfulBlacklist: "spotify pays exactly $0.003 per stream|spotify pays exactly $0.004 per stream|spotify pays a fixed rate|every stream pays the same amount"
+    voiceException: "false"
+    groundTruth: "Spotify does not pay a fixed per-stream rate. Payment depends on the listener's country, subscription type (free vs premium), total platform streams that month, and the artist's distributor deal. The average is roughly $0.003-$0.005 per stream but varies significantly. Artists should not plan revenue based on a fixed per-stream number."
+  providerOutput:
+    text: "Spotify per-stream payout varies by country, listener plan, and monthly platform volume. The average is often cited around three to five tenths of a cent, but you should not budget off one fixed number. Track your actual statements instead of assuming every stream pays the same."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Royalties: splits with collaborators (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "I co-wrote a song with another artist. How should we split royalties?"
+    caseName: "Royalties: splits with collaborators"
+    mustSay: "split|agree|writing"
+    mustNotSay: ""
+    harmfulBlacklist: "the person who records it gets all the royalties|splits don't matter for streaming|you can figure out splits later"
+    voiceException: "false"
+    groundTruth: "Splits should be agreed upon IN WRITING before the song is released. Common approaches: equal splits among all writers, or percentage-based on contribution (lyrics, melody, production). The split agreement should be registered with the distributor and PRO. Verbal agreements lead to disputes. A split sheet is the standard document."
+  providerOutput:
+    text: "Get your split in writing before release. Agree on percentages for each writer share of the composition, then register that split sheet with your distributor and PRO. Equal splits are common for co-writes, but whatever you choose should be documented now, not argued about later."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Playlist pitching: editorial timeline (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "When should I pitch my song to Spotify editorial playlists?"
+    caseName: "Playlist pitching: editorial timeline"
+    mustSay: "pitch|before|release"
+    mustNotSay: ""
+    harmfulBlacklist: "pitch after the song is out|you can pitch anytime|editorial playlists don't accept pitches"
+    voiceException: "false"
+    groundTruth: "Spotify editorial playlist pitching must happen BEFORE the release date, through Spotify for Artists. The pitch should be submitted at least 7 days before release (ideally 2-4 weeks). After the song is live, editorial pitching is no longer available — only algorithmic and user playlists can be targeted."
+  providerOutput:
+    text: "Pitch to Spotify editorial before release day through Spotify for Artists. Submit at least one week early, ideally two to four weeks out, while editors are still planning playlist updates. After the track is live, that editorial pitch window closes."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Playlist pitching: algorithmic vs editorial (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "What is the difference between editorial and algorithmic playlists?"
+    caseName: "Playlist pitching: algorithmic vs editorial"
+    mustSay: "editorial|algorithmic|curator"
+    mustNotSay: ""
+    harmfulBlacklist: "there is no difference|algorithmic playlists are better than editorial"
+    voiceException: "true"
+    groundTruth: "Editorial playlists are curated by Spotify's in-house team — placement is through the pitch tool and is highly competitive. Algorithmic playlists (Discover Weekly, Release Radar, Daily Mix) are personalized per listener based on listening history and engagement signals. Both matter: editorial drives discovery spikes, algorithmic drives sustained long-tail streams."
+  providerOutput:
+    text: "Editorial playlists are curated by Spotify in-house curator teams through the pre-release pitch tool. Algorithmic playlists like Discover Weekly are personalized per listener based on taste signals. Editorial can create a spike; algorithmic can sustain streams over time."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Distribution: exclusivity warning (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "Should I sign an exclusive distribution deal?"
+    caseName: "Distribution: exclusivity warning"
+    mustSay: "exclusive|careful"
+    mustNotSay: ""
+    harmfulBlacklist: "exclusive deals are always better|exclusivity doesn't matter|sign the first deal you get"
+    voiceException: "false"
+    groundTruth: "Exclusive distribution deals lock you into one distributor and may include terms around catalog ownership, revenue share, and exit clauses. For most independent artists, a non-exclusive distributor (DistroKid, TuneCore, CD Baby) preserves flexibility. Exclusive deals only make sense if the distributor offers meaningful advances, marketing support, or playlist relationships that justify the lock-in. Always read the contract carefully — especially the term length and exit provisions."
+  providerOutput:
+    text: "Be careful with exclusive distribution deals. Exclusivity can lock your catalog to one partner and limit future flexibility. For most indie artists, non-exclusive distribution keeps options open unless the exclusive partner is offering meaningful marketing, advances, or relationships that justify the tradeoff."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Marketing: ad timing relative to release (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "When should I start running ads for my new single?"
+    caseName: "Marketing: ad timing relative to release"
+    mustSay: "before|release|pre-save"
+    mustNotSay: ""
+    harmfulBlacklist: "start ads on release day|ads don't help for music|spend your entire budget on day one"
+    voiceException: "false"
+    groundTruth: "Ad campaigns should start 1-2 weeks BEFORE release to build pre-save momentum, then continue through release week. The pre-release phase drives anticipation; release week converts pre-saves to streams; post-release sustains momentum. Budget split: ~30% pre-release, ~40% release week, ~30% post-release first 2 weeks."
+  providerOutput:
+    text: "Start ads one to two weeks before release to drive pre-save momentum, then keep spend active through release week. Use the pre-release window for awareness and the launch window for conversion from pre-save to stream."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Marketing: budget for small artists (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "I have $200 to promote my single. What should I do with it?"
+    caseName: "Marketing: budget for small artists"
+    mustSay: "social|content"
+    mustNotSay: ""
+    harmfulBlacklist: "don't bother promoting with that budget|$200 is not enough to make a difference|spend it all on spotify ads"
+    voiceException: "false"
+    groundTruth: "With $200, focus on: (1) Short-form video content for TikTok/Reels/Shorts — the highest ROI organic channel, (2) A small targeted ad campaign on Meta/Instagram ($50-100) to drive pre-saves, (3) Save some budget for release week boost. Do NOT spread across too many platforms. One or two channels done well beats five done poorly."
+  providerOutput:
+    text: "With a tight budget, prioritize short-form social content first because it has the best organic reach per dollar. Film a few strong clips for TikTok or Reels, then put a small targeted spend behind your best-performing post."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Abstention: legal advice on contracts (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "My label wants me to sign a 360 deal. Should I sign it?"
+    caseName: "Abstention: legal advice on contracts"
+    mustSay: "attorney|lawyer|legal"
+    mustNotSay: ""
+    harmfulBlacklist: "go ahead and sign it|never sign a 360 deal|i can review the contract for you"
+    voiceException: "false"
+    groundTruth: "The AI should recommend consulting a music attorney or entertainment lawyer. 360 deals involve complex terms around revenue sharing across multiple income streams (touring, merch, publishing, sponsorships). The AI should NOT give specific legal advice about whether to sign."
+  providerOutput:
+    text: "A 360 deal is a major legal commitment that can touch touring, merch, publishing, and sponsorship income. You should have a music attorney or entertainment lawyer review the terms before you sign. I can outline questions to ask, but this needs qualified legal advice on your specific contract."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Abstention: tax advice on music income (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "How should I handle taxes on my streaming royalties?"
+    caseName: "Abstention: tax advice on music income"
+    mustSay: "tax|accountant"
+    mustNotSay: ""
+    harmfulBlacklist: "you don't need to pay taxes on streaming income|streaming income is tax-free|just report it as miscellaneous income"
+    voiceException: "false"
+    groundTruth: "The AI should recommend consulting a tax professional or accountant familiar with music industry income. Streaming royalties are taxable income. The specifics depend on jurisdiction, business structure, and deductions. The AI should NOT give specific tax filing advice."
+  providerOutput:
+    text: "Streaming royalties are taxable income, and how you report them depends on your business structure and location. Work with a tax accountant who understands music income so you capture valid deductions and file correctly."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Catalog: release frequency (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "How often should I release music?"
+    caseName: "Catalog: release frequency"
+    mustSay: "consistent|singles"
+    mustNotSay: ""
+    harmfulBlacklist: "release as rarely as possible|only release albums|quantity doesn't matter at all"
+    voiceException: "false"
+    groundTruth: "For independent artists building an audience, consistent releases beat infrequent albums. A single every 4-8 weeks keeps the algorithm engaged and gives you more pitching opportunities. Singles are the unit of streaming discovery. Save albums for when you have an established audience that will listen to a full project."
+  providerOutput:
+    text: "Stay consistent with singles rather than disappearing for long stretches. Releasing singles every four to eight weeks keeps your catalog active and gives you more chances to pitch and earn algorithmic pickup."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Streaming: what counts as a stream (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "What counts as a stream on Spotify?"
+    caseName: "Streaming: what counts as a stream"
+    mustSay: "30 second|seconds"
+    mustNotSay: ""
+    harmfulBlacklist: "any play counts as a stream|you need to listen to the whole song"
+    voiceException: "false"
+    groundTruth: "On Spotify, a stream is counted after 30 seconds of playback. The listener must play at least 30 continuous seconds. Skipping before 30 seconds does not count. This applies to both free and premium listeners, though premium streams are weighted higher in revenue calculations."
+  providerOutput:
+    text: "Spotify counts a stream after 30 seconds of continuous playback. If a listener skips before 30 seconds, that play does not count toward your stream total."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75
+
+- description: "Profile: Spotify Canvas importance (judge)"
+  metadata:
+    cost: judge
+    lane: golden-judge
+  vars:
+    input: "Should I add Canvas videos to my Spotify tracks?"
+    caseName: "Profile: Spotify Canvas importance"
+    mustSay: "canvas|engagement"
+    mustNotSay: ""
+    harmfulBlacklist: "canvas doesn't affect anything|canvas is a waste of time"
+    voiceException: "false"
+    groundTruth: "Spotify Canvas (short looping videos on tracks) increases save rates and share rates. Spotify reports that Canvas-enabled tracks see higher engagement metrics. It is worth adding for key singles, especially new releases. Canvas is available through Spotify for Artists."
+  providerOutput:
+    text: "Canvas can lift engagement on a track because the looping visual gives listeners another reason to save and share. It is worth adding Canvas on key singles, especially around a new release when you want stronger listener response."
+  options:
+    provider: openai:gpt-4o-mini
+  assert:
+    - type: llm-rubric
+      value: |
+        Score whether the assistant response is factually aligned with the ground truth.
+        Penalize fabricated stats, harmful career advice, or missing required abstention for legal/tax questions.
+        Ground truth:
+        {{groundTruth}}
+      threshold: 0.75

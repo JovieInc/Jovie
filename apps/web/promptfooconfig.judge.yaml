@@ -1,0 +1,26 @@
+description: Jovie CI eval gate — golden judge lane (LLM rubric, budget-capped)
+
+prompts:
+  - file://prompts/system/jovie-chat.md
+  - "{{input}}"
+
+providers:
+  - id: echo
+    label: golden-mock
+  - id: openai:gpt-4o-mini
+    label: judge-grader
+
+defaultTest:
+  options:
+    provider: golden-mock
+
+tests: file://tests/eval/golden/promptfoo-cases-judge.yaml
+
+evaluateOptions:
+  maxConcurrency: 1
+  cache: false
+  showProgressBar: false
+
+commandLineOptions:
+  noCache: true
+  noShare: true
