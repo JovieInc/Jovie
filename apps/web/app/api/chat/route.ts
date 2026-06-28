@@ -107,7 +107,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
-import { scheduleOnlineScoring } from '@/lib/eval/scorers';
+import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { checkGatesForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';

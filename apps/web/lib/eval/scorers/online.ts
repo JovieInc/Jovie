@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
-
-import { failureModeLabel } from '@/lib/eval/failure-modes';
-
+import type {
+  OnlineScoringInput,
+  OnlineScoringResult,
+  ScorerResult,
+} from './core';
 import { runAllScorers } from './core';
-import type { OnlineScoringInput, OnlineScoringResult, ScorerResult } from './core';
 
 export const EVAL_REVIEW_LABEL = 'needs:eval-review' as const;
 const DEFAULT_SAMPLE_RATE = 0.05;
@@ -14,14 +15,20 @@ export function resetOnlineScorerState(): void {
 }
 
 function readSampleRate(): number {
-  const parsed = Number.parseFloat(process.env.JOVIE_ONLINE_SCORER_SAMPLE_RATE ?? '');
+  const parsed = Number.parseFloat(
+    process.env.JOVIE_ONLINE_SCORER_SAMPLE_RATE ?? ''
+  );
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 1
     ? parsed
     : DEFAULT_SAMPLE_RATE;
 }
 
 export function shouldSampleProdTrace(
-  input: { readonly traceId: string; readonly durationMs?: number; readonly tokenCount?: number },
+  input: {
+    readonly traceId: string;
+    readonly durationMs?: number;
+    readonly tokenCount?: number;
+  },
   options: { readonly sampleRate?: number } = {}
 ): boolean {
   if ((input.durationMs ?? 0) >= 15_000 || (input.tokenCount ?? 0) >= 4_000) {
@@ -38,7 +45,10 @@ export function shouldSampleProdTrace(
 function partitionSoftFailures(
   traceId: string,
   results: readonly ScorerResult[]
-): { readonly forRecording: readonly ScorerResult[]; readonly forReview: readonly ScorerResult[] } {
+): {
+  readonly forRecording: readonly ScorerResult[];
+  readonly forReview: readonly ScorerResult[];
+} {
   const forRecording: ScorerResult[] = [];
   const forReview: ScorerResult[] = [];
 
@@ -69,14 +79,6 @@ function partitionSoftFailures(
   return { forRecording, forReview };
 }
 
-export function buildEvalReviewIssueTitle(input: {
-  readonly traceId: string;
-  readonly failureModes: readonly OnlineScoringResult['failureModes'][number][];
-}): string {
-  const modes = input.failureModes.map(failureModeLabel).join(', ');
-  return `Eval review: ${input.traceId} (${modes || 'flagged'})`;
-}
-
 export function enqueueEvalReview(input: {
   readonly traceId: string;
   readonly caseName: string;
@@ -90,7 +92,10 @@ export function enqueueEvalReview(input: {
   };
 }
 
-async function recordScoresInLangfuse(traceId: string, results: readonly ScorerResult[]): Promise<void> {
+async function recordScoresInLangfuse(
+  traceId: string,
+  results: readonly ScorerResult[]
+): Promise<void> {
   if (
     process.env.CI === 'true' ||
     process.env.NODE_ENV === 'test' ||
@@ -115,7 +120,9 @@ async function recordScoresInLangfuse(traceId: string, results: readonly ScorerR
         name: result.criterion,
         value: result.score,
         comment: result.reason,
-        dataType: result.criterion.startsWith('rubric-') ? 'NUMERIC' : 'BOOLEAN',
+        dataType: result.criterion.startsWith('rubric-')
+          ? 'NUMERIC'
+          : 'BOOLEAN',
       });
     }
     await client.flushAsync();
@@ -131,7 +138,9 @@ async function recordScoresInLangfuse(traceId: string, results: readonly ScorerR
   }
 }
 
-export async function runOnlineScoring(input: OnlineScoringInput): Promise<OnlineScoringResult> {
+export async function runOnlineScoring(
+  input: OnlineScoringInput
+): Promise<OnlineScoringResult> {
   if (!shouldSampleProdTrace(input)) {
     return {
       sampled: false,
