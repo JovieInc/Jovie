@@ -435,6 +435,69 @@ describe('CI public lighthouse workflow', () => {
   });
 });
 
+describe('CI mobile overflow workflow', () => {
+  it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const mobileOverflowJob = getJobBlock(workflow, 'ci-mobile-overflow');
+    const downloadArtifactStep = getStepBlock(
+      mobileOverflowJob,
+      'Download Neon DB connection artifact'
+    );
+    const resolveDbStep = getStepBlock(
+      mobileOverflowJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const exportStep = getStepBlock(
+      mobileOverflowJob,
+      'Export DATABASE_URL (ephemeral branch)'
+    );
+    const failClosedStep = getStepBlock(
+      mobileOverflowJob,
+      'Fail if Neon DB URL is missing (Mobile Overflow)'
+    );
+    const verifyDbStep = getStepBlock(
+      mobileOverflowJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
+    const migrateStep = getStepBlock(
+      mobileOverflowJob,
+      'Run migrations (ephemeral Neon)'
+    );
+    const seedStep = getStepBlock(
+      mobileOverflowJob,
+      'Seed mobile overflow fixtures'
+    );
+    const waitStep = getStepBlock(
+      mobileOverflowJob,
+      'Wait for shared Neon seed (mobile overflow width > 320)'
+    );
+
+    expect(downloadArtifactStep).toContain(
+      'name: neon-db-connection-${{ github.run_id }}'
+    );
+    expect(resolveDbStep).toContain(
+      'connection_file: /tmp/neon-db-connection/connection.json'
+    );
+    expect(resolveDbStep).not.toContain('credential_source_url');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
+    expect(failClosedStep).toContain(
+      'Refusing to run mobile overflow against staging/production DBs'
+    );
+    expect(migrateStep).toContain('matrix.width == 320');
+    expect(seedStep).toContain('matrix.width == 320');
+    expect(waitStep).toContain('matrix.width != 320');
+    expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
+    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(exportStep).toContain(
+      'steps.resolve-mobile-overflow-neon-db-url.outputs.database_url'
+    );
+    expect(mobileOverflowJob).not.toContain('Export DATABASE_URL (main');
+    expect(mobileOverflowJob).not.toContain(
+      '- name: Create ephemeral Neon database branch (with retry)'
+    );
+  });
+});
+
 describe('CI public a11y workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
