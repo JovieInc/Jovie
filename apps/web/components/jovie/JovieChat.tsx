@@ -562,12 +562,16 @@ export function JovieChat({
             ref={scrollContainerRef}
             className={cn(
               'absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5',
+              !showThreadView && 'flex flex-col',
               showBottomComposer &&
                 CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME
             )}
           >
             {!showThreadView ? (
-              <div className='relative min-h-full'>
+              <div
+                className='flex flex-1 flex-col items-center justify-center'
+                data-testid='chat-empty-state-viewport'
+              >
                 <ChatEmptyStateComposerRegion>
                   {composerSurface}
                   {inlineChatError ? (
