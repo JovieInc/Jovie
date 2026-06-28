@@ -521,8 +521,19 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
     for (const jobKey of neonBranchCreateJobs) {
       const job = getJobBlock(workflow, jobKey);
       expect(job).toContain('concurrency:');
-      expect(job).toContain('group: neon-endpoint-pool-');
+      expect(job).toContain('group: neon-endpoint-pool-${{ github.job }}-');
       expect(job).toContain('cancel-in-progress: false');
+    }
+  });
+
+  it('scopes branch-creation pool per job so siblings in one workflow are not cancelled', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const poolGroups =
+      workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ?? [];
+
+    expect(poolGroups.length).toBeGreaterThan(0);
+    for (const group of poolGroups) {
+      expect(group).toContain('${{ github.job }}');
     }
   });
 
