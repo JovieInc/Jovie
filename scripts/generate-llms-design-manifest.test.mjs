@@ -2,9 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 import {
-  REPO_ROOT,
   buildLlmsDesignManifest,
   categorizeTokens,
   filterContractTokens,
@@ -14,10 +12,9 @@ import {
   parseCanonicalSurfaces,
   parseCssCustomProperties,
   parseEnabledJovieRules,
+  REPO_ROOT,
   stripReducedMotionOverrides,
 } from './generate-llms-design-manifest.mjs';
-
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('stripReducedMotionOverrides removes reduced-motion media blocks', () => {
   const css = `
@@ -44,7 +41,7 @@ test('filterContractTokens excludes DSP brand tokens', () => {
 
 test('parseCssCustomProperties keeps first canonical token values', () => {
   const css = readFileSync(
-    path.join(repoRoot, 'apps/web/styles/design-system.css'),
+    path.join(REPO_ROOT, 'apps/web/styles/design-system.css'),
     'utf8'
   );
   const tokens = parseCssCustomProperties(css);
@@ -68,7 +65,7 @@ test('categorizeTokens groups ds and color prefixes', () => {
 
 test('parseCanonicalSurfaces reads all canonical surface ids', () => {
   const source = readFileSync(
-    path.join(repoRoot, 'apps/web/lib/canonical-surfaces.ts'),
+    path.join(REPO_ROOT, 'apps/web/lib/canonical-surfaces.ts'),
     'utf8'
   );
   const surfaces = parseCanonicalSurfaces(source);
@@ -79,13 +76,13 @@ test('parseCanonicalSurfaces reads all canonical surface ids', () => {
 
 test('filterDesignEslintRules includes design guardrails', () => {
   const eslintConfig = readFileSync(
-    path.join(repoRoot, 'apps/web/eslint.config.js'),
+    path.join(REPO_ROOT, 'apps/web/eslint.config.js'),
     'utf8'
   );
   const enabled = parseEnabledJovieRules(eslintConfig);
   const designRules = filterDesignEslintRules(
     enabled,
-    path.join(repoRoot, 'apps/web/eslint-rules')
+    path.join(REPO_ROOT, 'apps/web/eslint-rules')
   );
   const ids = designRules.map(rule => rule.id);
   assert.ok(ids.includes('no-raw-motion-values'));
@@ -94,7 +91,7 @@ test('filterDesignEslintRules includes design guardrails', () => {
 });
 
 test('buildLlmsDesignManifest includes required llms.txt sections', () => {
-  const manifest = buildLlmsDesignManifest({ repoRoot });
+  const manifest = buildLlmsDesignManifest({ repoRoot: REPO_ROOT });
   assert.match(manifest, /^# Jovie Design System — AI Agent Contract/m);
   assert.match(manifest, /## Design Tokens/);
   assert.match(manifest, /## Shared UI Components/);
@@ -104,11 +101,11 @@ test('buildLlmsDesignManifest includes required llms.txt sections', () => {
 });
 
 test('generateLlmsDesignManifest --check detects drift', () => {
-  const outPath = path.join(repoRoot, 'docs/llms-design-manifest.txt');
+  const outPath = path.join(REPO_ROOT, 'docs/llms-design-manifest.txt');
   const { changed } = generateLlmsDesignManifest({
     outPath,
     write: false,
-    repoRoot,
+    repoRoot: REPO_ROOT,
   });
   assert.equal(changed, false);
 });

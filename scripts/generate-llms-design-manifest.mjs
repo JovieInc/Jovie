@@ -12,12 +12,7 @@
  *   node scripts/generate-llms-design-manifest.mjs [--check] [--out <path>]
  */
 
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -105,7 +100,9 @@ const CONTRACT_TOKEN_BLOCKLIST_PREFIXES = ['color-brand-', 'color-accent-'];
 
 export function isContractToken(name) {
   const bare = name.startsWith('--') ? name.slice(2) : name;
-  if (CONTRACT_TOKEN_BLOCKLIST_PREFIXES.some(prefix => bare.startsWith(prefix))) {
+  if (
+    CONTRACT_TOKEN_BLOCKLIST_PREFIXES.some(prefix => bare.startsWith(prefix))
+  ) {
     return false;
   }
   return CONTRACT_TOKEN_PREFIXES.some(
@@ -318,7 +315,11 @@ export function extractRuleDescription(ruleId, rulesDir = ESLINT_RULES_DIR) {
   const paragraph = [];
   for (const line of lines) {
     if (line.startsWith('@')) break;
-    if (line.startsWith('Rules:') || line.startsWith('Bad:') || line.startsWith('Good:')) {
+    if (
+      line.startsWith('Rules:') ||
+      line.startsWith('Bad:') ||
+      line.startsWith('Good:')
+    ) {
       break;
     }
     paragraph.push(line);
@@ -329,7 +330,8 @@ export function extractRuleDescription(ruleId, rulesDir = ESLINT_RULES_DIR) {
     return null;
   }
 
-  const firstSentence = full.match(/^[\s\S]*?[.!?](?:\s|$)/)?.[0]?.trim() ?? full;
+  const firstSentence =
+    full.match(/^[\s\S]*?[.!?](?:\s|$)/)?.[0]?.trim() ?? full;
   return firstSentence.length > 220
     ? `${firstSentence.slice(0, 217).trimEnd()}...`
     : firstSentence;
@@ -345,7 +347,10 @@ export function parseEnabledJovieRules(eslintConfigSource) {
   return rules;
 }
 
-export function filterDesignEslintRules(enabledRules, rulesDir = ESLINT_RULES_DIR) {
+export function filterDesignEslintRules(
+  enabledRules,
+  rulesDir = ESLINT_RULES_DIR
+) {
   return enabledRules
     .map(rule => {
       const description = extractRuleDescription(rule.id, rulesDir);
@@ -388,7 +393,10 @@ export function parseCanonicalSurfaces(source) {
   }
 
   const surfaces = [];
-  const chunks = source.slice(start).split(/\{\s*\n\s*id:\s*'/).slice(1);
+  const chunks = source
+    .slice(start)
+    .split(/\{\s*\n\s*id:\s*'/)
+    .slice(1);
 
   for (const chunk of chunks) {
     const id = chunk.match(/^([^']+)'/)?.[1];
@@ -446,7 +454,7 @@ export function buildLlmsDesignManifest({
     '- **Visual spec:** `DESIGN.md` (read before any UI edit)',
     '- **Token registry:** `apps/web/styles/design-system.css`',
     '- **Token docs:** `docs/DESIGN_TOKENS.md`',
-    '- **Shared primitives:** `packages/ui/atoms/*` via `import { ... } from \'@jovie/ui\'`',
+    "- **Shared primitives:** `packages/ui/atoms/*` via `import { ... } from '@jovie/ui'`",
     '- **Canonical surfaces:** `apps/web/lib/canonical-surfaces.ts`',
     '- **Tailwind mapping:** `apps/web/tailwind.config.js`',
     '',
@@ -512,9 +520,7 @@ export function buildLlmsDesignManifest({
 
   for (const rule of designRules) {
     const summary = rule.description ?? 'Enforced custom ESLint rule.';
-    lines.push(
-      `- **\`@jovie/${rule.id}\`** (${rule.severity}) — ${summary}`
-    );
+    lines.push(`- **\`@jovie/${rule.id}\`** (${rule.severity}) — ${summary}`);
   }
 
   if (restrictedImports.length > 0) {
