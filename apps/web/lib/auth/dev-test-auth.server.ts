@@ -23,6 +23,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   DEVELOPMENT_ONLY_ERROR,
   isExplicitDevelopmentEnvironment,
+  isLocalDevelopmentAutomationHostname,
 } from '@/lib/security/development-only';
 import {
   DEFAULT_TEST_AVATAR_URL,
@@ -158,6 +159,20 @@ export function getDevTestAuthAvailability(
   hostname: string | null
 ): DevTestAuthAvailability {
   if (!isExplicitDevelopmentEnvironment()) {
+    const loopbackAutomationEnabled =
+      isTestAuthBypassEnabled() &&
+      isLocalDevelopmentAutomationHostname(hostname) &&
+      process.env.VERCEL_ENV !== 'production' &&
+      process.env.VERCEL_ENV !== 'preview';
+
+    if (loopbackAutomationEnabled) {
+      return {
+        enabled: true,
+        trustedHost: true,
+        reason: null,
+      };
+    }
+
     return {
       enabled: false,
       trustedHost: false,
