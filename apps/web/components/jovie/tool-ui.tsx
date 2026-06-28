@@ -28,6 +28,10 @@ import {
   isChatMerchGenerationResult,
   isChatMerchSelectionResult,
 } from './components/ChatMerchCard';
+import {
+  ChatMerchDesignCarousel,
+  isChatMerchDesignCarouselResult,
+} from './components/ChatMerchDesignCarousel';
 import { ChatPitchCard } from './components/ChatPitchCard';
 import type {
   ChatInsightsToolResult,
@@ -457,6 +461,9 @@ function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
 }
 
 function renderMerchGenerationArtifact(event: PersistedToolEvent): ReactNode {
+  if (isChatMerchDesignCarouselResult(event.output)) {
+    return <ChatMerchDesignCarousel result={event.output} />;
+  }
   if (!isChatMerchGenerationResult(event.output)) {
     return null;
   }
