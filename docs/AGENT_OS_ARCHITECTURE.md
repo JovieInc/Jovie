@@ -98,6 +98,10 @@ Do not install Trigger in this wave. Revisit it only if WDK fails one of these p
 - Retry/resume/step behavior cannot be tested reliably in CI.
 - Jovie needs a self-hosted durable worker outside Vercel's execution model.
 
+## Related ADRs
+
+- [`docs/MEMORY_ADR.md`](./MEMORY_ADR.md) (JOV-2705) — product memory workflows use a separate durable runtime from internal AgentOS WDK. Customer memory loops must not import `workflows/agent-os-dry-run.ts`; WDK remains internal operator orchestration only.
+
 ## Linear Dedupe
 
 Duplicates linked during this ADR:
