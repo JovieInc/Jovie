@@ -5300,6 +5300,8 @@ function evaluateSkillArtifactContract(vars: EvalVars) {
   const skillArtifacts = Object.entries(SKILL_REGISTRY)
     .map(([skillId, skill]) => {
       const isTool = skill.kind === 'tool';
+      const isChatSurfaceTool =
+        isTool && (skill.metadata.surface ?? 'chat') === 'chat';
       const promptContent = isTool ? '' : registryPathContent(skill.promptPath);
       const requiredPromptGuardrails = toStringArray(promptGuardrails[skillId]);
       const missingPromptGuardrails = requiredPromptGuardrails.filter(
