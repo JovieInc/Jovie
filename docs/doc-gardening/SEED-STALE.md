@@ -1,0 +1,13 @@
+# Doc-gardening seed (intentionally stale)
+
+Sandbox file for the recurring doc-gardening agent. **Not canon.** CI ignores this path; the gardening agent should detect drift and open a fix-up PR.
+
+## Stale claim
+
+The repo has **12** topic-scoped agent rule files under `.claude/rules/`.
+
+<!-- doc-freshness:scoped-rules-count:12 -->
+
+## Remediation
+
+When the gardening agent runs, it should update the claim and freshness marker to match the current `.claude/rules/*.md` count.

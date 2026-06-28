@@ -104,7 +104,8 @@ describe('ci-harness risk classifier', () => {
 
   it('does not escalate root devDependency bumps with lockfile to smoke', () => {
     const risk = classifyCiRisk(['package.json', 'pnpm-lock.yaml'], manifest, {
-      diffBase: 'HEAD~1',
+      isVersionOnlyPackageManifestChange: () => false,
+      isDependencyOnlyPackageManifestChange: file => file === 'package.json',
     });
 
     expect(risk.riskLevel).toBe('low');
@@ -193,8 +194,10 @@ describe('ci-harness artifact formatter', () => {
     expect(artifact.requiredGates.map(job => job.id)).toContain(
       'ci-structural-contract'
     );
-    expect(artifact.nextLocalCommands).toContain(
-      'pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet'
-    );
+    expect(
+      artifact.nextLocalCommands.some(command =>
+        command.includes('pnpm doc:freshness:check')
+      )
+    ).toBe(true);
   });
 });

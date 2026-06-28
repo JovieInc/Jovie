@@ -483,6 +483,7 @@ jobs:
           pnpm --filter=@jovie/web run lint:no-native-dialogs
           pnpm --filter=@jovie/web run lint:seo
           pnpm --filter=@jovie/web run lint:contrast-ratchet
+          pnpm doc:freshness:check
       - name: Validate flaky quarantine ledger
         run: node .github/scripts/quarantine-ledger.mjs validate
       - name: Validate reliability detector registry
@@ -500,7 +501,7 @@ jobs:
             echo "Next local command:"
             echo
             echo '```bash'
-            echo "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm test:reliability-detectors"
+            echo "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
