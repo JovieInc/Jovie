@@ -46,11 +46,11 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Start a new conversation',
+  description: 'Start a new chat',
 };
 
 export const newThreadNavItem: NavItem = {
-  name: 'New Conversation',
+  name: 'New Chat',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,

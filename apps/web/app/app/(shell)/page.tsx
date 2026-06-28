@@ -5,7 +5,7 @@ import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState } from '@/lib/queries/server';
 import { DeferredChatPageClient } from './chat/DeferredChatPageClient';
 
-const DASHBOARD_DESCRIPTION = 'Start a new conversation with Jovie AI';
+const DASHBOARD_DESCRIPTION = 'Start a new chat with Jovie AI';
 const DASHBOARD_TITLE = 'Home';
 
 export function generateMetadata(): Metadata {

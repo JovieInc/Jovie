@@ -118,7 +118,7 @@ describe('dashboard metadata generation', () => {
       params: Promise.resolve({ id: 'conversation-123' }),
     });
 
-    expect(metadata.title).toBe('Conversation');
+    expect(metadata.title).toBe('Chat');
   });
 
   it('keeps chat thread metadata queries outside the page module', () => {
