@@ -12,7 +12,8 @@ Jovie uses a unified toast notification system that provides consistent user fee
 
 - Send cross-channel notifications through `lib/notifications/service.ts` to avoid duplicating provider logic.
 - Email delivery is handled by Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO_EMAIL`). Defaults are `notifications@jov.ie` for system sender/reply-to; founder-personal mail uses `tim@jov.ie`.
-- SMS delivery is handled by the outbound connector (`providers/sms/outbound-sms.ts` → `twilio-sender.ts`), gated by `OUTBOUND_SMS_ENABLED` and the global STOP suppression ledger (`notification_contacts.smsStatus`). Per-artist consent and unsubscribe are enforced upstream by the subscribe flow and release scheduler. Unit economics: `docs/plans/sms-unit-economics.md`.
+- SMS delivery is handled by the outbound connector (`providers/sms/outbound-sms.ts` → `twilio-sender.ts`), gated by `OUTBOUND_SMS_ENABLED` and the global STOP suppression ledger (`notification_contacts.smsStatus`). Per-artist consent and unsubscribe are enforced upstream by the subscribe flow and release scheduler.
+- **SMS unit economics (JOV-3626 spike):** US outbound ≈ **$0.008/segment** fully loaded (Twilio 10DLC + delivery log). Release bodies cap near 2 segments. Re-evaluate pricing when fleet exceeds **5,000 segments/day** or any artist exceeds **500 SMS subs** with >2 alerts/month. Flip `OUTBOUND_SMS_ENABLED=true` in Doppler only after A2P 10DLC verification.
 - Preferences are resolved from creator profile settings (`settings.marketing_emails` + `marketingOptOut`) and channel toggles under `settings.notifications.channels`.
 - Provide a stable `id`/`dedupKey` so `dismissNotification` can stop the same message from fanning out across channels (e.g., when a user dismisses an in-app toast).
 - Example:
