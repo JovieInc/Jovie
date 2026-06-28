@@ -1,4 +1,3 @@
-import { gateway } from '@ai-sdk/gateway';
 import {
   convertToModelMessages,
   type LanguageModel,
@@ -7,7 +6,7 @@ import {
   type ToolSet,
   type UIMessage,
 } from 'ai';
-import { streamText } from '@/lib/ai/sdk';
+import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';

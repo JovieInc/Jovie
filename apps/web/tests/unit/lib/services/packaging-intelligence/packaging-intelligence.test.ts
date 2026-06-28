@@ -3,18 +3,21 @@ import { PACKAGING_INTELLIGENCE_MODEL } from '@/lib/constants/ai-models';
 
 const {
   mockGenerateObject,
-  mockGateway,
+  mockGatewayModel,
   mockServerFetch,
   mockFetchVideoCaptions,
 } = vi.hoisted(() => ({
   mockGenerateObject: vi.fn(),
-  mockGateway: vi.fn((model: string) => model),
+  mockGatewayModel: vi.fn((model: string) => model),
   mockServerFetch: vi.fn(),
   mockFetchVideoCaptions: vi.fn(),
 }));
 
 vi.mock('ai', () => ({ generateObject: mockGenerateObject }));
-vi.mock('@ai-sdk/gateway', () => ({ gateway: mockGateway }));
+vi.mock('@ai-sdk/gateway', () => ({
+  createGateway: vi.fn(() => mockGatewayModel),
+  gateway: vi.fn(),
+}));
 vi.mock('@/lib/http/server-fetch', () => ({ serverFetch: mockServerFetch }));
 vi.mock(
   '@/lib/services/packaging-intelligence/transcript',
@@ -147,7 +150,7 @@ describe('packaging intelligence', () => {
       identity: { userId: 'user_1', sessionId: 'session_1' },
     });
 
-    expect(mockGateway).toHaveBeenCalledWith(PACKAGING_INTELLIGENCE_MODEL);
+    expect(mockGatewayModel).toHaveBeenCalledWith(PACKAGING_INTELLIGENCE_MODEL);
     expect(mockGenerateObject).toHaveBeenCalledWith(
       expect.objectContaining({
         experimental_telemetry: expect.objectContaining({

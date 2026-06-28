@@ -7123,8 +7123,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
   const generatedTitle = sanitizeConversationTitle('"Neon Reef Launch Plan"');
   const sourceFacts = {
     importsUserFacingRouteDependencies: textIncludesAll(routeSource, [
-      "import { gateway } from '@ai-sdk/gateway'",
-      "import { generateText } from '@/lib/ai/sdk'",
+      "import { gateway, generateText } from '@/lib/ai/sdk'",
       "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
     ]),
     usesTitleModelConstant:
