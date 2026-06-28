@@ -352,6 +352,12 @@ export const ServerEnvSchema = z.object({
    */
   NATIVE_SMS_ENABLED: z.string().optional(),
   /**
+   * Master gate for outbound SMS provider POSTs (release alerts + webhook
+   * auto-replies). When 'false' (or unset), sends short-circuit before
+   * Twilio. Inbound STOP/HELP still process regardless (TCPA mandate).
+   */
+  OUTBOUND_SMS_ENABLED: z.string().optional(),
+  /**
    * Demo override that bypasses the existing SMS Pro-gating in
    * subscribeToNotificationsDomain when set to 'true'. Off by default;
    * intended for the YC demo window only. See autoplan decision row #32 / F7.
@@ -530,6 +536,7 @@ export const ENV_KEYS = [
   'TWILIO_MESSAGING_SERVICE_SID',
   'TWILIO_FROM_NUMBER',
   'NATIVE_SMS_ENABLED',
+  'OUTBOUND_SMS_ENABLED',
   'SMS_DEMO_BYPASS_PRO_GATE',
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',

@@ -47,8 +47,8 @@ vi.mock('@/lib/notifications/sms-suppression', () => ({
   suppressPhoneForStop: vi.fn(),
 }));
 
-vi.mock('@/lib/notifications/providers/sms/twilio-sender', () => ({
-  sendTwilioSms: vi.fn(),
+vi.mock('@/lib/notifications/providers/sms/outbound-sms', () => ({
+  sendOutboundSms: vi.fn(),
 }));
 
 vi.mock('@/lib/notifications/quota', () => ({
@@ -65,7 +65,7 @@ import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
-import { sendTwilioSms } from '@/lib/notifications/providers/sms/twilio-sender';
+import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms';
 import { checkQuota } from '@/lib/notifications/quota';
 import { checkReputation } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
@@ -134,7 +134,7 @@ describe('Notification Service', () => {
     });
 
     // Default SMS provider: success
-    vi.mocked(sendTwilioSms).mockResolvedValue({
+    vi.mocked(sendOutboundSms).mockResolvedValue({
       success: true,
       providerMessageId: 'SM_test',
       status: 'queued',
@@ -415,7 +415,7 @@ describe('Notification Service', () => {
       const result = await sendNotification(smsMessage, smsTarget);
 
       expect(result.delivered).toContain('sms');
-      expect(sendTwilioSms).toHaveBeenCalledWith({
+      expect(sendOutboundSms).toHaveBeenCalledWith({
         to: '+15551112222',
         body: smsMessage.text,
       });
@@ -435,7 +435,7 @@ describe('Notification Service', () => {
       expect(result.delivered).toHaveLength(0);
       expect(result.skipped).toHaveLength(1);
       expect(result.skipped[0].detail).toContain('No phone');
-      expect(sendTwilioSms).not.toHaveBeenCalled();
+      expect(sendOutboundSms).not.toHaveBeenCalled();
     });
 
     it('skips and logs SMS when phone is globally suppressed', async () => {
@@ -449,7 +449,7 @@ describe('Notification Service', () => {
       expect(result.delivered).toHaveLength(0);
       expect(result.skipped[0].detail).toContain('SMS suppressed');
       expect(result.skipped[0].detail).toContain('stopped');
-      expect(sendTwilioSms).not.toHaveBeenCalled();
+      expect(sendOutboundSms).not.toHaveBeenCalled();
       expect(logDelivery).toHaveBeenCalledWith(
         expect.objectContaining({
           channel: 'sms',
@@ -460,7 +460,7 @@ describe('Notification Service', () => {
     });
 
     it('reports an error result when the provider fails', async () => {
-      vi.mocked(sendTwilioSms).mockResolvedValue({
+      vi.mocked(sendOutboundSms).mockResolvedValue({
         success: false,
         error: 'Recipient unsubscribed',
         errorCode: '21610',
@@ -484,7 +484,7 @@ describe('Notification Service', () => {
     });
 
     it('records suppression when Twilio returns 21610 (recipient unsubscribed)', async () => {
-      vi.mocked(sendTwilioSms).mockResolvedValue({
+      vi.mocked(sendOutboundSms).mockResolvedValue({
         success: false,
         error: 'Attempt to send to unsubscribed recipient',
         errorCode: '21610',
@@ -502,7 +502,7 @@ describe('Notification Service', () => {
     });
 
     it('does NOT call suppressPhoneForStop for non-21610 failures', async () => {
-      vi.mocked(sendTwilioSms).mockResolvedValue({
+      vi.mocked(sendOutboundSms).mockResolvedValue({
         success: false,
         error: 'queue full',
         errorCode: '30007',
@@ -516,7 +516,7 @@ describe('Notification Service', () => {
     });
 
     it('does NOT throw if suppression bookkeeping fails', async () => {
-      vi.mocked(sendTwilioSms).mockResolvedValue({
+      vi.mocked(sendOutboundSms).mockResolvedValue({
         success: false,
         error: 'unsubscribed',
         errorCode: '21610',
@@ -544,7 +544,7 @@ describe('Notification Service', () => {
 
       expect(result.delivered).toHaveLength(0);
       expect(result.skipped[0].detail).toContain('disabled');
-      expect(sendTwilioSms).not.toHaveBeenCalled();
+      expect(sendOutboundSms).not.toHaveBeenCalled();
     });
   });
 
