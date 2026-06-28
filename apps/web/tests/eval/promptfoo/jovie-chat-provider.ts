@@ -5183,6 +5183,13 @@ function registryPathContent(path: string | undefined): string {
   return readFileSync(resolve(REPO_ROOT, path), 'utf8');
 }
 
+function requiresChatToolArtifactCoverage(skill: {
+  readonly kind: string;
+  readonly metadata: { readonly surface?: string | null };
+}): boolean {
+  return skill.kind === 'tool' && (skill.metadata.surface ?? 'chat') === 'chat';
+}
+
 function evaluateSkillRegistryInventory(vars: EvalVars) {
   const coverage = toObject(vars.coverage);
   const expectedSkillIds = Array.isArray(coverage.expectedSkillIds)
@@ -5310,11 +5317,18 @@ function evaluateSkillArtifactContract(vars: EvalVars) {
         minimumPromptChars,
         requiredPromptGuardrails,
         missingPromptGuardrails,
-        toolSchemaCovered: isTool && ALL_EVAL_TOOL_NAME_SET.has(skillId),
+        toolSchemaCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          ALL_EVAL_TOOL_NAME_SET.has(skillId),
         toolResultShapeCovered:
-          isTool && Object.hasOwn(TOOL_RESULT_REQUIRED_KEYS, skillId),
-        toolAvailabilityCovered: isTool && PAID_TOOL_NAME_SET.has(skillId),
-        toolRenderCovered: isTool && TOOL_UI_REGISTRY_NAME_SET.has(skillId),
+          !requiresChatToolArtifactCoverage(skill) ||
+          Object.hasOwn(TOOL_RESULT_REQUIRED_KEYS, skillId),
+        toolAvailabilityCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          PAID_TOOL_NAME_SET.has(skillId),
+        toolRenderCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          TOOL_UI_REGISTRY_NAME_SET.has(skillId),
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));

@@ -1592,6 +1592,7 @@ tests:
       skillRegistryCase: registry-inventory
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
     assert:
@@ -1609,6 +1610,7 @@ tests:
       skillArtifactCase: artifact-inventory
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
         minimumPromptChars: 300
@@ -1633,6 +1635,7 @@ tests:
       skillCatalogCase: catalog-sync-shape
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
     assert:
@@ -1671,6 +1674,7 @@ tests:
       skillPromptCase: release-pitch-retouch-prompts
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
     assert:
