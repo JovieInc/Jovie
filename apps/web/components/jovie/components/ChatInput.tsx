@@ -13,6 +13,10 @@ import {
   useState,
 } from 'react';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
+import {
+  insertLargeTextAtCaret,
+  shouldChunkLargePaste,
+} from '@/lib/chat/large-text-paste';
 import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
 import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
 import { cn } from '@/lib/utils';
@@ -567,6 +571,37 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       []
     );
 
+    const handlePaste = useCallback(
+      (event: React.ClipboardEvent) => {
+        const hasFileItems = Array.from(event.clipboardData.items).some(
+          item => item.kind === 'file'
+        );
+        if (hasFileItems) {
+          onPaste?.(event);
+          return;
+        }
+
+        const pastedText = event.clipboardData.getData('text/plain');
+        if (!shouldChunkLargePaste(pastedText.length)) {
+          onPaste?.(event);
+          return;
+        }
+
+        const textarea = internalTextareaRef.current;
+        if (!textarea) return;
+
+        event.preventDefault();
+        insertLargeTextAtCaret({
+          textarea,
+          pastedText,
+          currentValue: value,
+          onValueChange: handleChange,
+          maxLength: MAX_MESSAGE_LENGTH + 100,
+        });
+      },
+      [handleChange, onPaste, value]
+    );
+
     // Resolve the surface mode from textarea + picker state. Shell + Chat V1
     // keeps empty focus calm so the composer doesn't reflow just because the
     // textarea received focus.
@@ -743,7 +778,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       value={value}
                       onChange={handleChange}
                       handleKeyDown={handleKeyDown}
-                      onPaste={onPaste}
+                      onPaste={handlePaste}
                       placeholder={placeholder}
                       isAtMaxHeight={isAtMaxHeight}
                       measuredHeight={measuredHeight}
@@ -825,7 +860,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   value={value}
                   onChange={handleChange}
                   handleKeyDown={handleKeyDown}
-                  onPaste={onPaste}
+                  onPaste={handlePaste}
                   placeholder={placeholder}
                   isAtMaxHeight={isAtMaxHeight}
                   measuredHeight={measuredHeight}
