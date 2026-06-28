@@ -4,7 +4,6 @@ import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { getLibraryItemKind } from '@/app/app/(shell)/library/library-data';
 import { CopyLinkInput } from '@/components/features/dashboard/atoms/CopyLinkInput';
 import { DrawerAsyncToggle } from '@/components/molecules/drawer';
 import {
@@ -13,6 +12,10 @@ import {
   type LibraryAssetShareViewModel,
   type LibraryAssetVisibility,
 } from '@/lib/library/asset-share';
+import {
+  buildLibraryAssetShareRequestBody,
+  requestLibraryAssetShareMutation,
+} from '@/lib/library/asset-share/client-mutations';
 import { cn } from '@/lib/utils';
 
 export function LibraryAssetSharePanel({
@@ -44,44 +47,33 @@ export function LibraryAssetSharePanel({
     setShare(initialShare ?? null);
   }, [initialShare]);
 
+  const applyShare = useCallback(
+    (nextShare: LibraryAssetShareViewModel) => {
+      setShare(nextShare);
+      onShareChange(asset.id, nextShare);
+    },
+    [asset.id, onShareChange]
+  );
+
   const ensureShare = useCallback(async () => {
     if (!profileId || !artistHandle) return null;
 
     setIsEnsuring(true);
     try {
-      const response = await fetch('/api/library/asset-share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId,
-          assetId: asset.id,
-          itemKind: getLibraryItemKind(asset),
-          title: asset.title,
-          smartLinkPath: asset.smartLinkPath,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Share ensure failed');
-      }
-
-      const body = (await response.json()) as {
-        readonly share?: LibraryAssetShareViewModel;
-      };
-      if (!body.share) {
-        throw new Error('Share ensure missing payload');
-      }
-
-      setShare(body.share);
-      onShareChange(asset.id, body.share);
-      return body.share;
+      const nextShare = await requestLibraryAssetShareMutation(
+        '/api/library/asset-share',
+        'POST',
+        buildLibraryAssetShareRequestBody(asset, profileId)
+      );
+      applyShare(nextShare);
+      return nextShare;
     } catch {
       toast.error('Unable to load share link right now');
       return null;
     } finally {
       setIsEnsuring(false);
     }
-  }, [artistHandle, asset, onShareChange, profileId]);
+  }, [applyShare, artistHandle, asset, profileId]);
 
   useEffect(() => {
     if (!profileId || !artistHandle || share || isEnsuring || hasEnsureFailed) {
@@ -111,34 +103,14 @@ export function LibraryAssetSharePanel({
       const visibility: LibraryAssetVisibility = isPublic
         ? 'public'
         : 'private';
-      const response = await fetch('/api/library/asset-share', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId,
-          assetId: asset.id,
-          itemKind: getLibraryItemKind(asset),
-          title: asset.title,
-          smartLinkPath: asset.smartLinkPath,
-          visibility,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Visibility update failed');
-      }
-
-      const body = (await response.json()) as {
-        readonly share?: LibraryAssetShareViewModel;
-      };
-      if (!body.share) {
-        throw new Error('Visibility update missing payload');
-      }
-
-      setShare(body.share);
-      onShareChange(asset.id, body.share);
+      const nextShare = await requestLibraryAssetShareMutation(
+        '/api/library/asset-share',
+        'PATCH',
+        buildLibraryAssetShareRequestBody(asset, profileId, { visibility })
+      );
+      applyShare(nextShare);
     },
-    [artistHandle, asset, onShareChange, profileId]
+    [applyShare, artistHandle, asset, profileId]
   );
 
   const handleRevoke = useCallback(async () => {
@@ -146,38 +118,19 @@ export function LibraryAssetSharePanel({
 
     setIsRevoking(true);
     try {
-      const response = await fetch('/api/library/asset-share/revoke', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId,
-          assetId: asset.id,
-          itemKind: getLibraryItemKind(asset),
-          title: asset.title,
-          smartLinkPath: asset.smartLinkPath,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Revoke failed');
-      }
-
-      const body = (await response.json()) as {
-        readonly share?: LibraryAssetShareViewModel;
-      };
-      if (!body.share) {
-        throw new Error('Revoke missing payload');
-      }
-
-      setShare(body.share);
-      onShareChange(asset.id, body.share);
+      const nextShare = await requestLibraryAssetShareMutation(
+        '/api/library/asset-share/revoke',
+        'POST',
+        buildLibraryAssetShareRequestBody(asset, profileId)
+      );
+      applyShare(nextShare);
       toast.success('Private link revoked and regenerated');
     } catch {
       toast.error('Unable to revoke private link right now');
     } finally {
       setIsRevoking(false);
     }
-  }, [artistHandle, asset, onShareChange, profileId]);
+  }, [applyShare, artistHandle, asset, profileId]);
 
   const visibility = share?.visibility ?? DEFAULT_LIBRARY_ASSET_VISIBILITY;
   const shareUrl = share?.shareUrl ?? '';
