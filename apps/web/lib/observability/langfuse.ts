@@ -1,5 +1,3 @@
-import 'server-only';
-
 import type { ChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
