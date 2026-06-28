@@ -26,10 +26,10 @@
   --public-shell-bg: var(--color-bg-base);
   --public-shell-text: var(--color-text-primary-token);
   --public-shell-border: var(--color-border-default);
-  --public-shell-content-max: var(--linear-content-max);
-  /* TODO(DS_FOUNDATION_V1 Wave 1): migrate consumers to --ds-public-content-max (1298px) and remove these legacy variants */
-  --public-content-max-landing: 1280px;
-  --public-content-max-page: 1200px;
+  --public-shell-content-max: var(--ds-public-content-max);
+  /* Legacy variant names — alias to canonical 1298px until Wave 4 consumer sweep */
+  --public-content-max-landing: var(--ds-public-content-max);
+  --public-content-max-page: var(--ds-public-content-max);
   /* TODO(DS_FOUNDATION_V1 Wave 4): consider deprecating once consumers migrate to --ds-prose-max */
   --public-content-max-prose: var(--ds-prose-max);
   --app-shell-content-max-wide: 84rem;
