@@ -42,9 +42,9 @@ function slugifyShareSegment(value: string): string {
   const normalized = value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .join('-');
   return normalized || 'asset';
 }
 
