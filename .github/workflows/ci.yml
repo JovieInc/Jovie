@@ -1759,29 +1759,22 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed.
-        # Non-DB PRs skip branch creation; resolve-neon-database-url falls back to DATABASE_URL_MAIN.
+      - name: Download Neon DB connection artifact
+        # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
         if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: onboarding-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
+      - name: Resolve DATABASE_URL from Neon artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -1883,22 +1876,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-lighthouse-admin-pr:
     name: Lighthouse (admin PR)
-    # Do NOT depend on neon-db — it only runs on push / testing-labeled / drizzle PRs,
-    # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
-    # its own ephemeral branch below and does not reuse the shared neon-db branch.
-    needs: [ci-fast, ci-path-changes, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true') }}
+    # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
+    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1919,29 +1901,32 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: admin-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
+      - name: Resolve DATABASE_URL from Neon artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-admin-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-admin-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2031,15 +2016,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-lighthouse-chat-pr:
     name: Lighthouse (chat PR)
     # Informational baseline run — first PR establishes the budget; once
@@ -2068,29 +2044,32 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: chat-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
+      - name: Resolve DATABASE_URL from Neon artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-chat-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-chat-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2179,15 +2158,6 @@ jobs:
           path: apps/web/.lighthouseci/chat-pr/
           if-no-files-found: ignore
           retention-days: 3
-
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
@@ -2927,8 +2897,8 @@ jobs:
     # Gated: runs with 'testing' label or deterministic high-risk classification.
     # Full E2E runs on merge to main anyway.
     # Dependabot PRs cannot access NEON_API_KEY or other Preview-environment secrets.
-    needs: [ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true')) }}
+    needs: [ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -2952,9 +2922,29 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
+      - name: Download Neon DB connection artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
+
+      - name: Resolve DATABASE_URL from Neon artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
+        id: resolve-e2e-smoke-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
+
+      - name: Export DATABASE_URL (shared ephemeral branch)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
+        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -2963,9 +2953,9 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           protected_branches: main,development,preview,br-main,br-production
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        id: resolve-e2e-smoke-neon-db-url
+      - name: Resolve DATABASE_URL (fallback Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
+        id: resolve-e2e-smoke-fallback-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
           candidate_url: ${{ steps.neon-branch.outputs.db_url }}
@@ -2973,9 +2963,9 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+      - name: Export DATABASE_URL (fallback ephemeral branch)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
+        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-fallback-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3086,7 +3076,7 @@ jobs:
           retention-days: 3
 
       - name: Cleanup ephemeral Neon branch
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success' && steps.neon-branch.outputs.branch_id != ''
         continue-on-error: true
         run: |
           curl -sS -X DELETE \
