@@ -3,6 +3,7 @@ import SwiftUI
 enum AppShellTab: Equatable, Hashable {
   case chat
   case profile
+  case audience
 
   var accessibilityID: String {
     switch self {
@@ -10,6 +11,8 @@ enum AppShellTab: Equatable, Hashable {
       return "shell-tab-chat"
     case .profile:
       return "shell-tab-profile"
+    case .audience:
+      return "shell-tab-audience"
     }
   }
 
@@ -19,6 +22,8 @@ enum AppShellTab: Equatable, Hashable {
       return "Chat"
     case .profile:
       return "Profile"
+    case .audience:
+      return "Audience"
     }
   }
 
@@ -28,6 +33,17 @@ enum AppShellTab: Equatable, Hashable {
       return "sparkles"
     case .profile:
       return "qrcode.viewfinder"
+    case .audience:
+      return "person.3"
+    }
+  }
+
+  var isBottomBarDestination: Bool {
+    switch self {
+    case .chat, .profile:
+      return true
+    case .audience:
+      return false
     }
   }
 }
@@ -58,18 +74,20 @@ struct AppShellProfile: Equatable {
   }
 }
 
-struct AppShellView<ProfileContent: View, ChatContent: View>: View {
+struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: View>: View {
   let profile: AppShellProfile
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
   let billingURL: URL
   let chatEnabled: Bool
+  let audienceEnabled: Bool
   let recentConversations: [MobileConversationSummary]
   let activeConversationID: String?
   let onSelectConversation: (String) -> Void
   let onStartNewChat: () -> Void
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
+  @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
   let chatContent: (Binding<String>) -> ChatContent
 
   @State private var selectedTab: AppShellTab
@@ -87,12 +105,14 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     opensSettingsOnLaunch: Bool = false,
     billingURL: URL,
     chatEnabled: Bool = false,
+    audienceEnabled: Bool = true,
     recentConversations: [MobileConversationSummary] = [],
     activeConversationID: String? = nil,
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onStartNewChat: @escaping () -> Void = {},
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
+    @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
     @ViewBuilder chatContent: @escaping (Binding<String>) -> ChatContent
   ) {
     self.profile = profile
@@ -100,14 +120,18 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
     self.billingURL = billingURL
     self.chatEnabled = chatEnabled
+    self.audienceEnabled = audienceEnabled
     self.recentConversations = recentConversations
     self.activeConversationID = activeConversationID
     self.onSelectConversation = onSelectConversation
     self.onStartNewChat = onStartNewChat
     self.onLogout = onLogout
     self.profileContent = profileContent()
+    self.audienceContent = audienceContent
     self.chatContent = chatContent
-    _selectedTab = State(initialValue: chatEnabled ? initialTab : .profile)
+    _selectedTab = State(
+      initialValue: Self.resolvedInitialTab(initialTab: initialTab, chatEnabled: chatEnabled)
+    )
   }
 
   var body: some View {
@@ -149,6 +173,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
           profile: profile,
           isOffline: isOffline,
           chatEnabled: chatEnabled,
+          audienceEnabled: audienceEnabled,
           selectedTab: selectedTab,
           recentConversations: recentConversations,
           activeConversationID: activeConversationID,
@@ -217,6 +242,24 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     selectTab(.chat)
   }
 
+  private func openAudienceChat(prompt: String) {
+    guard chatEnabled else { return }
+    chatDraft = prompt
+    selectTab(.chat)
+  }
+
+  private static func resolvedInitialTab(
+    initialTab: AppShellTab,
+    chatEnabled: Bool
+  ) -> AppShellTab {
+    switch initialTab {
+    case .chat:
+      return chatEnabled ? .chat : .profile
+    case .audience, .profile:
+      return initialTab
+    }
+  }
+
   private func openDrawer() {
     guard !isShowingDrawer else { return }
     isShowingDrawer = true
@@ -237,6 +280,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
       }
     case .profile:
       profileContent
+    case .audience:
+      audienceContent(openAudienceChat)
     }
   }
 
@@ -244,9 +289,27 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   // Profile from the leading edge, so the motion matches the swipe.
   private var pageTransition: AnyTransition {
     .asymmetric(
-      insertion: .move(edge: selectedTab == .chat ? .trailing : .leading),
-      removal: .move(edge: selectedTab == .chat ? .leading : .trailing)
+      insertion: .move(edge: pageInsertionEdge),
+      removal: .move(edge: pageRemovalEdge)
     )
+  }
+
+  private var pageInsertionEdge: Edge {
+    switch selectedTab {
+    case .chat:
+      return .trailing
+    case .profile, .audience:
+      return .leading
+    }
+  }
+
+  private var pageRemovalEdge: Edge {
+    switch selectedTab {
+    case .chat:
+      return .leading
+    case .profile, .audience:
+      return .trailing
+    }
   }
 
   private var pageSwipe: some Gesture {

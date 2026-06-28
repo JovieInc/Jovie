@@ -25,6 +25,7 @@ struct AppShellLeftDrawer: View {
   let profile: AppShellProfile
   let isOffline: Bool
   let chatEnabled: Bool
+  let audienceEnabled: Bool
   let selectedTab: AppShellTab
   let recentConversations: [MobileConversationSummary]
   let activeConversationID: String?
@@ -109,6 +110,7 @@ struct AppShellLeftDrawer: View {
 
           DrawerSurfaceSwitcher(
             chatEnabled: chatEnabled,
+            audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
             onSelectTab: { tab in
               onSelectTab(tab)
@@ -247,11 +249,19 @@ private struct DrawerAccountHeader: View {
 
 private struct DrawerSurfaceSwitcher: View {
   let chatEnabled: Bool
+  let audienceEnabled: Bool
   let selectedTab: AppShellTab
   let onSelectTab: (AppShellTab) -> Void
 
   private var surfaces: [AppShellTab] {
-    chatEnabled ? [.profile, .chat] : [.profile]
+    var tabs: [AppShellTab] = [.profile]
+    if audienceEnabled {
+      tabs.append(.audience)
+    }
+    if chatEnabled {
+      tabs.append(.chat)
+    }
+    return tabs
   }
 
   var body: some View {
