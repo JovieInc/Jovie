@@ -191,7 +191,7 @@ private struct AppContentView: View {
         .transition(.opacity)
       case .needsOnboarding:
         AppShellView(
-          profile: AppShellProfile(response: nil),
+          profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: false,
           initialTab: .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
@@ -277,8 +277,8 @@ private struct AppContentView: View {
           clerkUserID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
         )
-        await repository.bootstrap()
         chatRepository = repository
+        Task { await repository.bootstrap() }
       }
     }
   }
