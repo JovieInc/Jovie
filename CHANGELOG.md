@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.58] - 2026-06-28
+
+> Release detail panel metadata rows are easier to scan: compact copy buttons, readable titles, and labeled copyright lines.
+
+### Fixed
+
+- **Release detail panel UI (JOV-3654)**: shrinks UPC/ISRC copy buttons to match metadata row density, exposes the full release title on hover when clamped, and labels phonogram/composition copyright rows as P-line/C-line instead of bare ℗/© symbols.
+
 ## [26.6.57] - 2026-06-27
 
 > The desktop app recovers from renderer crashes instead of leaving you on a permanent black screen.
