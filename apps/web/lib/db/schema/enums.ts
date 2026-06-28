@@ -808,3 +808,8 @@ export const libraryAssetApprovalStatusEnum = pgEnum(
   'library_asset_approval_status',
   ['draft', 'needs_review', 'approved', 'archived']
 );
+
+export const libraryAssetVisibilityEnum = pgEnum('library_asset_visibility', [
+  'public',
+  'private',
+]);
