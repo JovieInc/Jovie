@@ -391,6 +391,10 @@ describe('CI public lighthouse workflow', () => {
       lighthouseJob,
       'Fail if Neon DB URL is missing (Lighthouse)'
     );
+    const verifyDbStep = getStepBlock(
+      lighthouseJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
     const migrateStep = getStepBlock(
       lighthouseJob,
       'Run migrations (ephemeral Neon)'
@@ -407,6 +411,8 @@ describe('CI public lighthouse workflow', () => {
     expect(resolveDbStep).toContain(
       'connection_file: /tmp/neon-db-connection/connection.json'
     );
+    expect(resolveDbStep).not.toContain('credential_source_url');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
     expect(failClosedStep).toContain(
       'Refusing to run public Lighthouse against staging/production DBs'
     );
@@ -421,6 +427,10 @@ describe('CI public lighthouse workflow', () => {
     expect(lighthouseJob).not.toContain('Export DATABASE_URL (main');
     expect(lighthouseJob).not.toContain(
       '- name: Create ephemeral Neon database branch (with retry)'
+    );
+    expect(lighthouseJob).toContain('matrix.shard }}" = "1"');
+    expect(lighthouseJob).toContain(
+      'tests/e2e/profile-mobile-viewport-stability.spec.ts'
     );
   });
 });
