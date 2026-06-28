@@ -49,6 +49,7 @@ export const APP_ROUTES = {
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
+  JOVIE_WORK: '/app/jovie-work',
   LYRICS: '/app/lyrics',
   PRESENCE: '/app/presence',
 

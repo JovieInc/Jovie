@@ -8,6 +8,7 @@
  * @see /api/dashboard/audience/members
  * @see /api/dashboard/audience/subscribers
  * @see /api/dashboard/activity/recent
+ * @see /api/dashboard/jovie-work/recent
  */
 
 // Activity schemas
@@ -34,6 +35,11 @@ export {
   subscriberSortValues,
   subscribersQuerySchema,
 } from './audience';
+// Jovie work feed schemas
+export {
+  type RecentJovieWorkQueryParams,
+  recentJovieWorkQuerySchema,
+} from './jovie-work';
 // Profile schemas
 export {
   type CreatorType,
