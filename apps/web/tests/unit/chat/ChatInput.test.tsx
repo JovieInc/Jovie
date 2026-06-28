@@ -6,6 +6,7 @@ import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
+import * as largeTextPaste from '@/lib/chat/large-text-paste';
 import { fastRender } from '@/tests/utils/fast-render';
 
 function withProviders(ui: ReactNode) {
@@ -748,6 +749,37 @@ describe('ChatInput', () => {
     });
 
     await waitFor(() => expect(sendButton).toBeEnabled());
+  });
+
+  it('routes very large text pastes through the chunked insert helper', () => {
+    const insertSpy = vi.spyOn(largeTextPaste, 'insertLargeTextAtCaret');
+    const onChange = vi.fn();
+    const largePaste = 'z'.repeat(5000);
+
+    fastRender(
+      withProviders(
+        <ChatInput {...baseProps} value='hello' onChange={onChange} />
+      )
+    );
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    }) as HTMLTextAreaElement;
+    textarea.setSelectionRange(5, 5);
+
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) => (type === 'text/plain' ? largePaste : ''),
+      },
+    });
+
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+    expect(insertSpy.mock.calls[0]?.[0]).toMatchObject({
+      pastedText: largePaste,
+      currentValue: 'hello',
+    });
+    insertSpy.mockRestore();
   });
 
   it('shows the stop action while streaming even when the draft is empty', async () => {

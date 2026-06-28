@@ -8,6 +8,11 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
+import {
+  clearComposerDraft,
+  readComposerDraft,
+  saveComposerDraft,
+} from '@/lib/chat/composer-draft-store';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
@@ -230,7 +235,10 @@ export function useJovieChat({
   const lastAssistantPartsSignatureRef = useRef<string | null>(null);
   const sdkMessagesRef = useRef<UIMessage[]>([]);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() =>
+    readComposerDraft(conversationId ?? null)
+  );
+  const inputDraftRef = useRef(input);
   const chipTray = useChipTray();
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -708,6 +716,17 @@ export function useJovieChat({
     }
   }, [input, chatError]);
 
+  useEffect(() => {
+    inputDraftRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
+    const handle = globalThis.setTimeout(() => {
+      saveComposerDraft(activeConversationId, input);
+    }, 250);
+    return () => globalThis.clearTimeout(handle);
+  }, [activeConversationId, input]);
+
   // Sync activeConversationId when parent prop changes
   useEffect(() => {
     const nextConversationId = conversationId ?? null;
@@ -721,6 +740,9 @@ export function useJovieChat({
         return;
       }
     }
+
+    saveComposerDraft(activeConversationId, inputDraftRef.current);
+    setInput(readComposerDraft(nextConversationId));
 
     setActiveConversationId(nextConversationId);
     activeClientTurnIdRef.current = null;
@@ -751,6 +773,7 @@ export function useJovieChat({
         ],
         now: Date.now(),
       });
+      clearComposerDraft(activeConversationId);
       setInput('');
       command.execute(commandCtx);
       return true;
@@ -823,6 +846,7 @@ export function useJovieChat({
 
       try {
         const result = sendMessage(payload, sendOptions);
+        clearComposerDraft(activeConversationId);
         setInput('');
         void Promise.resolve(result).catch(error_ => {
           handleChatFailure(toError(error_), 'send', clientTurnId);
