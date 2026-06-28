@@ -100,7 +100,10 @@ export function ChatThreadNavigationRail({
               aria-label={`Jump to turn ${turn.turnNumber}: ${turn.preview}`}
             >
               {isHovered ? (
-                <span className='system-b-chat-thread-nav-preview'>
+                <span
+                  className='system-b-chat-thread-nav-preview'
+                  aria-hidden='true'
+                >
                   <span className='system-b-chat-thread-nav-preview-label'>
                     Turn {turn.turnNumber}
                   </span>

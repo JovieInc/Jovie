@@ -124,6 +124,25 @@ describe('ChatThreadNavigationRail', () => {
     expect(screen.getAllByRole('button')).toHaveLength(7);
   });
 
+  it('exposes accessible names on icon-only turn markers', () => {
+    render(
+      <ChatThreadNavigationRail
+        messages={buildLongThread()}
+        scrollContainerRef={{ current: null }}
+        shouldVirtualizeMessages
+        virtualizer={{ scrollToIndex: vi.fn() } as never}
+      />
+    );
+
+    const markers = screen.getAllByRole('button');
+    expect(markers).toHaveLength(7);
+    for (const marker of markers) {
+      expect(marker).toHaveAttribute('aria-label');
+      expect(marker.getAttribute('aria-label')).toMatch(/^Jump to turn \d+:/);
+      expect(marker.textContent?.trim()).toBe('');
+    }
+  });
+
   it('jumps to the selected turn through the virtualizer', async () => {
     const user = userEvent.setup();
     const scrollToIndex = vi.fn();
