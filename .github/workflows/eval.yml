@@ -52,9 +52,20 @@ jobs:
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/promptfoo
-          key: ${{ runner.os }}-promptfoo-${{ hashFiles('apps/web/promptfooconfig.yaml', 'apps/web/promptfooconfig.judge.yaml', 'apps/web/tests/eval/golden/promptfoo-cases-deterministic.yaml', 'apps/web/tests/eval/golden/promptfoo-cases-judge.yaml') }}
+          key: ${{ runner.os }}-promptfoo-${{ hashFiles('apps/web/promptfooconfig.yaml', 'apps/web/promptfooconfig.judge.yaml', 'apps/web/tests/eval/golden/promptfoo-cases-generator.ts') }}
           restore-keys: |
             ${{ runner.os }}-promptfoo-
+
+      - name: Detect judge lane prerequisites
+        id: judge_gate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Validate Promptfoo config
         working-directory: apps/web
@@ -68,7 +79,6 @@ jobs:
           mkdir -p .promptfoo/output
           pnpm exec promptfoo eval \
             -c promptfooconfig.yaml \
-            --filter-metadata cost=deterministic \
             --no-cache \
             --no-share \
             --no-table \
@@ -77,7 +87,7 @@ jobs:
 
       - name: Run judge lane (budget-capped)
         id: judge
-        if: ${{ env.BUDGET_CAP_USD != '0' && secrets.OPENAI_API_KEY != '' }}
+        if: ${{ env.BUDGET_CAP_USD != '0' && steps.judge_gate.outputs.has_key == 'true' }}
         working-directory: apps/web
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -111,7 +121,7 @@ jobs:
 
       - name: Record judge skip reason
         id: judge_skip
-        if: ${{ always() && (env.BUDGET_CAP_USD == '0' || secrets.OPENAI_API_KEY == '') }}
+        if: ${{ always() && (env.BUDGET_CAP_USD == '0' || steps.judge_gate.outputs.has_key != 'true') }}
         run: |
           if [[ "${{ env.BUDGET_CAP_USD }}" == "0" ]]; then
             echo "reason=BUDGET_CAP_USD is 0 — judge lane skipped (deterministic only)" >> "$GITHUB_OUTPUT"

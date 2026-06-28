@@ -14,7 +14,10 @@ defaultTest:
   options:
     provider: golden-mock
 
-tests: file://tests/eval/golden/promptfoo-cases-judge.yaml
+tests:
+  - path: file://tests/eval/golden/promptfoo-cases-generator.ts
+    config:
+      lane: judge
 
 evaluateOptions:
   maxConcurrency: 1

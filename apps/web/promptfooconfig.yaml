@@ -15,7 +15,10 @@ defaultTest:
     - type: javascript
       value: file://tests/eval/golden/promptfoo-assertions.cjs:assertGoldenDeterministic
 
-tests: file://tests/eval/golden/promptfoo-cases-deterministic.yaml
+tests:
+  - path: file://tests/eval/golden/promptfoo-cases-generator.ts
+    config:
+      lane: deterministic
 
 evaluateOptions:
   maxConcurrency: 2
