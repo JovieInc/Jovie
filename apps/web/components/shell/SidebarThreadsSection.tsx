@@ -324,7 +324,7 @@ export function SidebarThreadsSection({
   return (
     <div className='space-y-1.5'>
       <div className='flex items-center justify-between border-t border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] px-2.5 pb-0.5 pt-2'>
-        <span className='text-3xs font-semibold uppercase tracking-[0.08em] text-quaternary-token'>
+        <span className='text-xs font-caption tracking-normal text-sidebar-muted/90'>
           Chats
         </span>
         {unreadCount > 0 && (
