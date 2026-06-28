@@ -1,6 +1,9 @@
+import 'server-only';
+import { createGateway, gateway as defaultGateway } from '@ai-sdk/gateway';
 import * as ai from 'ai';
 import { wrapAISDK } from 'braintrust';
 
+import { env } from '@/lib/env-server';
 import {
   guardModelOutput,
   guardStructuredValue,
@@ -103,3 +106,39 @@ export const streamObject: typeof ai.streamObject = (...args) => {
 };
 
 export type * from 'ai';
+
+type GatewayModelSelector = typeof defaultGateway;
+
+let cachedGateway: GatewayModelSelector | null = null;
+
+function resolveHeliconeGatewayHeaders(): Record<string, string> | undefined {
+  const heliconeApiKey = env.HELICONE_API_KEY?.trim();
+  if (!heliconeApiKey) {
+    return undefined;
+  }
+
+  return {
+    'Helicone-Auth': `Bearer ${heliconeApiKey}`,
+  };
+}
+
+function getGatewayProvider(): GatewayModelSelector {
+  if (!cachedGateway) {
+    const heliconeBaseUrl = env.HELICONE_GATEWAY_BASE_URL?.trim();
+    const apiKey = env.AI_GATEWAY_API_KEY?.trim();
+
+    cachedGateway = heliconeBaseUrl
+      ? createGateway({
+          apiKey,
+          baseURL: heliconeBaseUrl,
+          headers: resolveHeliconeGatewayHeaders(),
+        })
+      : createGateway(apiKey ? { apiKey } : undefined);
+  }
+
+  return cachedGateway;
+}
+
+/** Env-gated Vercel AI Gateway selector (optionally routed through Helicone proxy). */
+export const gateway: GatewayModelSelector = ((...args) =>
+  getGatewayProvider()(...args)) as GatewayModelSelector;

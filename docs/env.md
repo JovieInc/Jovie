@@ -65,6 +65,28 @@ Optional internal TestFlight install URL used by authenticated iOS download
 surfaces. Leave unset to keep iOS visible but not directly installable from web
 UI.
 
+## AI Gateway
+
+### `AI_GATEWAY_API_KEY`
+
+Server-side API key for Vercel AI Gateway chat completions. Required in
+production and preview for onboarding/chat flows.
+
+### `HELICONE_GATEWAY_BASE_URL`
+
+Optional override for the Vercel AI Gateway base URL. Set this to your Helicone
+proxy endpoint (for example, a Cloudflare Worker deployed in front of
+`https://vercel.helicone.ai/v1/ai`) to enable cost tracking, rate limiting, and
+request observability without changing model call sites.
+
+When unset, Jovie talks to Vercel AI Gateway directly.
+
+### `HELICONE_API_KEY`
+
+Helicone API key sent as the `Helicone-Auth` header when
+`HELICONE_GATEWAY_BASE_URL` is configured. Required for Helicone logging when
+the proxy is enabled.
+
 ## Feature Flags (Statsig)
 
 ### `STATSIG_SERVER_SECRET`

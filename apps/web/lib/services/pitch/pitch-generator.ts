@@ -8,9 +8,8 @@
  * generateObject + Zod schema + AI Gateway.
  */
 
-import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
-import { generateObject } from '@/lib/ai/sdk';
+import { gateway, generateObject } from '@/lib/ai/sdk';
 import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
 import { PITCH_MODEL } from '@/lib/constants/ai-models';
 import {

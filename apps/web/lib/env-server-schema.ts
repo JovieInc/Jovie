@@ -234,6 +234,10 @@ export const ServerEnvSchema = z.object({
 
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
+  /** Optional Helicone proxy base URL (e.g. Cloudflare Worker) for cost/rate observability. */
+  HELICONE_GATEWAY_BASE_URL: z.string().url().optional(),
+  /** Helicone API key sent as `Helicone-Auth` when routing through the proxy. */
+  HELICONE_API_KEY: z.string().optional(),
   // Hermes HUD events ingest authentication
   HERMES_HUD_API_KEY: z.string().optional(),
   HUD_AGENT_RUNS_FIXTURES: z
@@ -471,6 +475,8 @@ export const ENV_KEYS = [
   'VERCEL_PRODUCTION_DEPLOY_HOOK',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'HELICONE_GATEWAY_BASE_URL',
+  'HELICONE_API_KEY',
   'HERMES_HUD_API_KEY',
   'HUD_AGENT_RUNS_FIXTURES',
   'OPENAI_API_KEY',
