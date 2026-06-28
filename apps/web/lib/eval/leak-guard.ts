@@ -137,6 +137,15 @@ export function guardModelOutput(
   text: string,
   context?: LeakGuardContext
 ): LeakGuardResult {
+  if (typeof text !== 'string') {
+    return {
+      text: '' as string,
+      leaked: false,
+      action: 'none',
+      matchedMarkers: [],
+    };
+  }
+
   const trimmed = text.trim();
   if (!trimmed) {
     return { text, leaked: false, action: 'none', matchedMarkers: [] };
@@ -264,9 +273,13 @@ function guardTextPromise(
   textPromise: PromiseLike<string>,
   context: LeakGuardContext
 ): Promise<string> {
-  return Promise.resolve(textPromise).then(
-    text => guardModelOutput(text, context).text
-  );
+  return Promise.resolve(textPromise).then(text => {
+    if (typeof text !== 'string') {
+      return text;
+    }
+
+    return guardModelOutput(text, context).text;
+  });
 }
 
 function createGuardedTextStream(
@@ -403,11 +416,26 @@ type StreamObjectGuardableResult = {
   readonly textStream: AsyncIterableStream<string>;
 };
 
+function hasStreamTextGuardSurface(
+  result: Partial<StreamTextGuardableResult>
+): result is StreamTextGuardableResult {
+  return (
+    result.text !== undefined &&
+    result.textStream !== undefined &&
+    result.fullStream !== undefined &&
+    typeof result.toUIMessageStream === 'function'
+  );
+}
+
 export function wrapStreamTextResult<TResult>(
   streamResult: TResult,
   context: LeakGuardContext
 ): TResult {
-  const result = streamResult as TResult & StreamTextGuardableResult;
+  const result = streamResult as TResult & Partial<StreamTextGuardableResult>;
+  if (!hasStreamTextGuardSurface(result)) {
+    return streamResult;
+  }
+
   const guardedText = guardTextPromise(result.text, context);
   const guardedTextStream = createGuardedTextStream(result.textStream, context);
   const guardedFullStream = createGuardedDeltaStream(
@@ -427,11 +455,21 @@ export function wrapStreamTextResult<TResult>(
   }) as TResult;
 }
 
+function hasStreamObjectGuardSurface(
+  result: Partial<StreamObjectGuardableResult>
+): result is StreamObjectGuardableResult {
+  return result.object !== undefined && result.textStream !== undefined;
+}
+
 export function wrapStreamObjectResult<TResult>(
   streamResult: TResult,
   context: LeakGuardContext
 ): TResult {
-  const result = streamResult as TResult & StreamObjectGuardableResult;
+  const result = streamResult as TResult & Partial<StreamObjectGuardableResult>;
+  if (!hasStreamObjectGuardSurface(result)) {
+    return streamResult;
+  }
+
   const guardedObject = Promise.resolve(result.object).then(async object => {
     const guarded = guardStructuredValue(object, context);
     return guarded.value;
