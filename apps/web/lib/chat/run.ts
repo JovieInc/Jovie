@@ -21,6 +21,7 @@ import {
   sanitizeAssistantResponse,
 } from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
+import { resolveChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import {
   isChatToolStepCapExhausted,
@@ -31,9 +32,9 @@ import type {
   ChatTelemetry,
   ReleaseContext,
 } from '@/lib/chat/types';
-
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
+import { startChatTurnLangfuseTrace } from '@/lib/observability/langfuse';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
 
@@ -288,6 +289,20 @@ export async function executeChatTurn(
     disclosureProbeText.length > 0 &&
     isPromptDisclosureRequest(disclosureProbeText);
 
+  const promptRegistry = resolveChatPromptRegistryEntry(mode);
+  const langfuseTrace = await startChatTurnLangfuseTrace({
+    requestId,
+    conversationId: resolvedConversationId,
+    userId,
+    userPlan,
+    mode,
+    selectedModel,
+    toolNames,
+    promptRegistry,
+    messageCount: uiMessages.length,
+    blockedForDisclosure,
+  });
+
   const rawStreamResult = streamText({
     model: blockedForDisclosure
       ? (createStaticTextLanguageModel(
@@ -324,9 +339,11 @@ export async function executeChatTurn(
       },
     }),
     onFinish: async ({ steps, text }) => {
+      let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {
         const sanitized = sanitizeAssistantResponse(text);
         if (sanitized.leaked) {
+          promptLeakBlocked = true;
           telemetry?.setTags?.({
             chat_prompt_leak_blocked: 'true',
           });
@@ -361,6 +378,12 @@ export async function executeChatTurn(
         }
       }
 
+      langfuseTrace.endSuccess({
+        text: typeof text === 'string' ? text : undefined,
+        stepCount: steps.length,
+        leaked: promptLeakBlocked,
+      });
+
       if (
         blockedForDisclosure ||
         !isChatToolStepCapExhausted(steps, toolStepLimit)
@@ -390,6 +413,8 @@ export async function executeChatTurn(
     },
     onError: async ({ error }) => {
       if (isClientDisconnect(error, signal)) return;
+
+      langfuseTrace.endError(error);
 
       telemetry?.captureException?.(error, {
         tags: { feature: 'ai-chat', errorType: 'streaming' },
