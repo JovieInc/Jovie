@@ -7943,8 +7943,10 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-chat-message-content-shell) {
   width: 100%;
+  min-width: 0;
   max-width: var(--system-b-chat-message-content-max);
   margin-inline: auto;
+  overflow-x: clip;
 }
 
 @media (min-width: 640px) {
@@ -8858,6 +8860,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   line-height: inherit;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 :where(.system-b-chat-markdown p) {
@@ -8956,6 +8960,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-chat-markdown pre) {
   margin-block: 1rem;
+  max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-2xl);
