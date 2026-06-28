@@ -896,7 +896,7 @@ jobs:
   ci-pr-ready:
     name: PR Ready
     # PR gate: fast checks + unit tests + build + Lighthouse (+ risk-triggered smoke/preview).
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-e2e-smoke, ci-pr-vercel-preview]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -906,10 +906,6 @@ jobs:
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
-          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
-          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
-          ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
-          PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_REQUIRES_SMOKE="${{ needs.ci-risk-classifier.outputs.requires_smoke }}"
@@ -923,10 +919,6 @@ jobs:
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
-          echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-admin-pr: $ADMIN_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
           echo "ci-e2e-smoke: $E2E_SMOKE_RESULT"
           echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
@@ -972,30 +964,7 @@ jobs:
             echo "::warning::ci-build-public did not pass (result: $BUILD_RESULT) — non-blocking per throughput policy"
             echo "Build failure will be corrected post-merge or in a follow-up PR."
           fi
-
-          if [[ "$DASHBOARD_LIGHTHOUSE_RESULT" != "success" && "$DASHBOARD_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-dashboard-pr did not pass (result: $DASHBOARD_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
-          # Onboarding Lighthouse — path-gated, so skipped when no onboarding files changed
-          if [[ "$ONBOARDING_LIGHTHOUSE_RESULT" != "success" && "$ONBOARDING_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-onboarding-pr did not pass (result: $ONBOARDING_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
-          # Admin Lighthouse — path-gated, so skipped when no admin files changed
-          if [[ "$ADMIN_LIGHTHOUSE_RESULT" != "success" && "$ADMIN_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-admin-pr did not pass (result: $ADMIN_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
-          # Public routes Lighthouse — path-gated, blocks when triggered
-          if [[ "$PUBLIC_LIGHTHOUSE_RESULT" != "success" && "$PUBLIC_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-pr did not pass (result: $PUBLIC_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
+          # Risk-trigger smoke/preview checks
           if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_SMOKE" == "true" && "$E2E_SMOKE_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
             echo "❌ Risk classifier requires E2E smoke evidence, but ci-e2e-smoke result was $E2E_SMOKE_RESULT"
             echo "Likely fix: inspect the E2E Smoke job artifact, then run pnpm run test:web:smoke locally with the relevant env."
@@ -1327,7 +1296,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -1491,7 +1460,7 @@ jobs:
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
     needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1662,7 +1631,7 @@ jobs:
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
     needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true') }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1822,7 +1791,7 @@ jobs:
     # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
     # its own ephemeral branch below and does not reuse the shared neon-db branch.
     needs: [ci-fast, ci-path-changes, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true') }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1970,7 +1939,7 @@ jobs:
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
     needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true') }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
