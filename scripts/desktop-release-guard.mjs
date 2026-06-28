@@ -21,6 +21,13 @@ function isDesktopReleaseImpactingFile(file) {
     return false;
   }
 
+  // package.json version is synced from VERSION at build time (sync-version.mjs);
+  // version-check.mjs enforces consistency. Metadata-only bumps are not shipped
+  // desktop code changes and must not require a DMG release trigger.
+  if (file === 'apps/desktop/package.json') {
+    return false;
+  }
+
   return !/^apps\/desktop\/scripts\/(?:.+\.test\.(mjs|ts|js)|smoke-.+\.mjs)$/.test(
     file
   );
