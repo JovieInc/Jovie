@@ -1,9 +1,5 @@
 import { createHash } from 'node:crypto';
-import type {
-  OnlineScoringInput,
-  OnlineScoringResult,
-  ScorerResult,
-} from './core';
+import type { OnlineScoringInput, OnlineScoringResult, ScorerResult } from './core';
 import { runAllScorers } from './core';
 
 export const EVAL_REVIEW_LABEL = 'needs:eval-review' as const;
@@ -14,14 +10,12 @@ export function resetOnlineScorerState(): void {
   softFailureCounts.clear();
 }
 
-function readSampleRate(): number {
-  const parsed = Number.parseFloat(
-    process.env.JOVIE_ONLINE_SCORER_SAMPLE_RATE ?? ''
-  );
+const readSampleRate = () => {
+  const parsed = Number.parseFloat(process.env.JOVIE_ONLINE_SCORER_SAMPLE_RATE ?? '');
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 1
     ? parsed
     : DEFAULT_SAMPLE_RATE;
-}
+};
 
 export function shouldSampleProdTrace(
   input: {
@@ -31,9 +25,7 @@ export function shouldSampleProdTrace(
   },
   options: { readonly sampleRate?: number } = {}
 ): boolean {
-  if ((input.durationMs ?? 0) >= 15_000 || (input.tokenCount ?? 0) >= 4_000) {
-    return true;
-  }
+  if ((input.durationMs ?? 0) >= 15_000 || (input.tokenCount ?? 0) >= 4_000) return true;
   const sampleRate = options.sampleRate ?? readSampleRate();
   const digest = createHash('sha256')
     .update(`jovie-online-scorer-v1:${input.traceId}`)
@@ -42,42 +34,35 @@ export function shouldSampleProdTrace(
   return Number.parseInt(digest, 16) / 0xffffffff < sampleRate;
 }
 
-function partitionSoftFailures(
+const partitionSoftFailures = (
   traceId: string,
   results: readonly ScorerResult[]
-): {
-  readonly forRecording: readonly ScorerResult[];
-  readonly forReview: readonly ScorerResult[];
-} {
+): { readonly forRecording: ScorerResult[]; readonly forReview: ScorerResult[] } => {
   const forRecording: ScorerResult[] = [];
   const forReview: ScorerResult[] = [];
-
-  for (const result of results) {
-    if (result.verdict !== 'soft-fail') {
-      forRecording.push(result);
-      if (result.flagged) forReview.push(result);
+  for (const item of results) {
+    if (item.verdict !== 'soft-fail') {
+      forRecording.push(item);
+      if (item.flagged) forReview.push(item);
       continue;
     }
-
-    const key = `${traceId}:${result.criterion}`;
+    const key = `${traceId}:${item.criterion}`;
     const count = (softFailureCounts.get(key) ?? 0) + 1;
     softFailureCounts.set(key, count);
-    forRecording.push(result);
-
+    forRecording.push(item);
     if (count >= 2) {
       const escalated: ScorerResult = {
-        ...result,
+        ...item,
         verdict: 'fail',
         flagged: true,
-        reason: `${result.reason} (recurred ${count}x)`,
+        reason: `${item.reason} (recurred ${count}x)`,
       };
       forRecording.push(escalated);
       forReview.push(escalated);
     }
   }
-
   return { forRecording, forReview };
-}
+};
 
 export function enqueueEvalReview(input: {
   readonly traceId: string;
@@ -85,11 +70,8 @@ export function enqueueEvalReview(input: {
   readonly userPrompt: string;
   readonly assistantResponse: string;
   readonly failureModes: readonly OnlineScoringResult['failureModes'][number][];
-}): { readonly enqueued: boolean; readonly label: typeof EVAL_REVIEW_LABEL } {
-  return {
-    enqueued: input.failureModes.length > 0,
-    label: EVAL_REVIEW_LABEL,
-  };
+}) {
+  return { enqueued: input.failureModes.length > 0, label: EVAL_REVIEW_LABEL };
 }
 
 async function recordScoresInLangfuse(
@@ -104,7 +86,6 @@ async function recordScoresInLangfuse(
   ) {
     return;
   }
-
   try {
     const { Langfuse } = await import('langfuse');
     const client = new Langfuse({
@@ -114,15 +95,13 @@ async function recordScoresInLangfuse(
       flushAt: 1,
       flushInterval: 1_000,
     });
-    for (const result of results) {
+    for (const item of results) {
       client.score({
         traceId,
-        name: result.criterion,
-        value: result.score,
-        comment: result.reason,
-        dataType: result.criterion.startsWith('rubric-')
-          ? 'NUMERIC'
-          : 'BOOLEAN',
+        name: item.criterion,
+        value: item.score,
+        comment: item.reason,
+        dataType: item.criterion.startsWith('rubric-') ? 'NUMERIC' : 'BOOLEAN',
       });
     }
     await client.flushAsync();
@@ -150,7 +129,6 @@ export async function runOnlineScoring(
       reviewEnqueued: false,
     };
   }
-
   const scored = runAllScorers(input);
   const partitioned = partitionSoftFailures(input.traceId, scored.all);
   const flagged = partitioned.forReview.length > 0;
@@ -164,9 +142,7 @@ export async function runOnlineScoring(
         failureModes,
       })
     : { enqueued: false, label: EVAL_REVIEW_LABEL };
-
   void recordScoresInLangfuse(input.traceId, partitioned.forRecording);
-
   return {
     sampled: true,
     results: partitioned.forRecording,
