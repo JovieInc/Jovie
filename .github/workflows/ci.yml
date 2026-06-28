@@ -49,7 +49,7 @@ env:
   # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
   # sibling matrix jobs cancel each other within the same workflow run.
   # Pool groups include github.job so branch-creator siblings in one workflow (neon-db,
-  # admin/onboarding Lighthouse, E2E smoke) do not queue-cancel each other on the same slot.
+  # dashboard Lighthouse, E2E smoke fallback, admin smoke) do not queue-cancel each other.
 
 jobs:
   # ── CI Optimizer + Centralized path-change detection (merged) ──────────
@@ -1755,9 +1755,6 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    concurrency:
-      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -1900,9 +1897,6 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    concurrency:
-      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -2046,9 +2040,6 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    concurrency:
-      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

@@ -502,15 +502,15 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   const neonBranchCreateJobs = [
     'neon-db',
     'ci-lighthouse-dashboard-pr',
-    'ci-lighthouse-onboarding-pr',
-    'ci-lighthouse-admin-pr',
-    'ci-lighthouse-chat-pr',
     'ci-e2e-smoke',
     'ci-admin-smoke',
   ] as const;
 
   const neonArtifactConsumerJobs = [
     'ci-lighthouse-pr',
+    'ci-lighthouse-onboarding-pr',
+    'ci-lighthouse-admin-pr',
+    'ci-lighthouse-chat-pr',
     'ci-a11y',
     'ci-mobile-overflow',
   ] as const;
