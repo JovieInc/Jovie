@@ -33,6 +33,7 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import { decideRendererRecovery } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
 
@@ -50,6 +51,11 @@ const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
+// A crashed/killed renderer is reloaded up to this many times before the shell
+// gives up and shows the visible load-failure page (Retry) instead of leaving
+// the window black. Reset to 0 on every successful load so only crash *loops*
+// hit the cap.
+const MAX_RENDERER_CRASH_RELOADS = 2;
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
@@ -883,6 +889,39 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       showDesktopLoadFailure(win);
     }
   );
+
+  // Renderer crash recovery. Electron leaves a crashed/killed renderer as a
+  // blank black window with no recovery, which strands the user. Reload the
+  // view on a crash, capped to avoid a crash loop, then fall back to the
+  // visible load-failure page (Retry) instead of black.
+  let rendererCrashReloadCount = 0;
+  win.webContents.on('did-finish-load', () => {
+    rendererCrashReloadCount = 0;
+  });
+  win.webContents.on('render-process-gone', (_event, details) => {
+    const action = decideRendererRecovery({
+      reason: details.reason,
+      reloadCount: rendererCrashReloadCount,
+      maxReloads: MAX_RENDERER_CRASH_RELOADS,
+    });
+    console.error('[Jovie Desktop] Renderer process gone', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+      action,
+    });
+    if (win.isDestroyed() || action === 'ignore') return;
+    if (action === 'reload') {
+      rendererCrashReloadCount += 1;
+      win.webContents.reload();
+      return;
+    }
+    showDesktopLoadFailure(win);
+  });
+  win.webContents.on('unresponsive', () => {
+    console.warn('[Jovie Desktop] Renderer unresponsive', {
+      url: win.webContents.getURL().split('?')[0],
+    });
+  });
 
   win.webContents.session.setPermissionRequestHandler(
     (webContents, permission, callback, details) => {
