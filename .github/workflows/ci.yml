@@ -1410,14 +1410,15 @@ jobs:
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
+        # Use only the ephemeral branch credentials from the neon-db artifact.
+        # Injecting DATABASE_URL_MAIN passwords onto an ephemeral host causes
+        # password-auth retry storms during shard-0 migrate/seed and LHCI.
         id: resolve-lighthouse-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL (ephemeral branch)
         run: echo "DATABASE_URL=${{ steps.resolve-lighthouse-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
@@ -1428,6 +1429,11 @@ jobs:
             echo "No Neon ephemeral DATABASE_URL available. Refusing to run public Lighthouse against staging/production DBs."
             exit 1
           fi
+
+      - name: Verify Neon DB connectivity (fail-fast)
+        run: pnpm --filter=@jovie/web exec tsx tests/e2e/verify-neon-db-connectivity.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Run migrations (ephemeral Neon)
         # Shard 0 owns migrate/seed so matrix siblings reuse one Neon branch.
@@ -1522,7 +1528,14 @@ jobs:
 
           pnpm run test:lighthouse:public:launch
 
-          if [ "${{ matrix.shard }}" = "0" ]; then
+          # Pin the extra mobile-viewport-stability Playwright spec to the lighter
+          # LHCI shard (shard 1 collects 9 URLs vs shard 0's 10). Both shards run
+          # in parallel and the merge gate waits on max(shard0, shard1); piling the
+          # ~1.5m spec onto the already-heavier shard 0 made it the gate long pole
+          # on every public-route gtmq batch. Running it on the lighter shard
+          # rebalances the only-2-way fan-out and lowers wall-clock with identical
+          # coverage.
+          if [ "${{ matrix.shard }}" = "1" ]; then
             mkdir -p tests/.auth
             echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
             pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
