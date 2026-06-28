@@ -3,6 +3,8 @@ import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 /** Connector v1 tables introduced in migration 0048 (JOV-2229). */
 export const CONNECTOR_SCHEMA_TABLES = [
   'connector_accounts',
+  'context_facts',
+  'external_objects',
   'suggested_actions',
   'workflow_runs',
 ] as const;

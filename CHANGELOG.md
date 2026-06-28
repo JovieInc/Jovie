@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [Unreleased]
+
+> Connector enrichment turns synced Gmail and Calendar objects into graph facts and calendar suggestions.
+
+### Added
+
+- **Connector enrichment pipelines (JOV-3114)**: adds `lib/connectors/enrichment/` with per-provider gmail/calendar pipelines that emit `context_facts`, memory graph observations, and `suggested_actions`; extends `context_fact_kind` for entity mentions; refactors `extractAndPropose` to sync Gmail `external_objects` then run the enrichment runner. Apple Photos deferred until JOV-2919.
+
 ## [26.6.60] - 2026-06-28
 
 > Catalog collaborator signal matching resolves external mentions to discography releases with confidence scoring.
