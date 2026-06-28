@@ -41,12 +41,16 @@ struct AppShellProfile: Equatable {
   let username: String?
   let publicProfileURL: String?
   let avatarURL: URL?
+  let plan: String
+  let isPro: Bool
 
   init(response: MobileMeResponse?) {
     displayName = response?.displayName ?? response?.username ?? "Jovie"
     username = response?.username
     publicProfileURL = response?.publicProfileURL
     avatarURL = response?.avatarURL.flatMap(URL.init(string:))
+    plan = response?.plan ?? "free"
+    isPro = response?.isPro ?? false
   }
 
   var secondaryText: String {
@@ -56,6 +60,23 @@ struct AppShellProfile: Equatable {
 
     return publicProfileURL ?? "Profile setup pending"
   }
+
+  var planLabel: String {
+    switch plan.lowercased() {
+    case "max":
+      return "Max"
+    case "pro":
+      return "Pro"
+    case "trial":
+      return "Trial"
+    default:
+      return "Free"
+    }
+  }
+
+  var showsUpgradeCTA: Bool {
+    !isPro && plan.lowercased() != "max"
+  }
 }
 
 struct AppShellView<ProfileContent: View, ChatContent: View>: View {
@@ -63,6 +84,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
   let billingURL: URL
+  let editProfileURL: URL
+  let connectionsURL: URL
   let chatEnabled: Bool
   let recentConversations: [MobileConversationSummary]
   let onSelectConversation: (String) -> Void
@@ -83,6 +106,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     initialTab: AppShellTab = .profile,
     opensSettingsOnLaunch: Bool = false,
     billingURL: URL,
+    editProfileURL: URL,
+    connectionsURL: URL,
     chatEnabled: Bool = false,
     recentConversations: [MobileConversationSummary] = [],
     onSelectConversation: @escaping (String) -> Void = { _ in },
@@ -94,6 +119,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
     self.billingURL = billingURL
+    self.editProfileURL = editProfileURL
+    self.connectionsURL = connectionsURL
     self.chatEnabled = chatEnabled
     self.recentConversations = recentConversations
     self.onSelectConversation = onSelectConversation
@@ -128,7 +155,9 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
           SettingsView(
             profile: profile,
             buildInfo: .current(),
+            editProfileURL: editProfileURL,
             billingURL: billingURL,
+            connectionsURL: connectionsURL,
             onClose: { navigationPath.removeLast() },
             onLogout: onLogout
           )

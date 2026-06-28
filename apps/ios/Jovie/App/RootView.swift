@@ -196,6 +196,8 @@ private struct AppContentView: View {
           initialTab: .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
+          editProfileURL: appState.editProfileURL,
+          connectionsURL: appState.connectionsURL,
           chatEnabled: false,
           recentConversations: chatRepository?.conversations ?? [],
           onSelectConversation: { conversationID in
@@ -223,6 +225,8 @@ private struct AppContentView: View {
           initialTab: appState.launchMode.opensChatOnLaunch ? .chat : .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
+          editProfileURL: appState.editProfileURL,
+          connectionsURL: appState.connectionsURL,
           chatEnabled: appState.loadedDashboardResponse?.chatEnabled ?? false,
           recentConversations: chatRepository?.conversations ?? [],
           onSelectConversation: { conversationID in

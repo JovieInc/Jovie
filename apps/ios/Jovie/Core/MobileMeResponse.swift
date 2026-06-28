@@ -15,6 +15,8 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
   let appleWalletProfilePassAvailable: Bool
   let chatEnabled: Bool
   let continueOnWebURL: String
+  let plan: String
+  let isPro: Bool
 
   enum CodingKeys: String, CodingKey {
     case state
@@ -26,6 +28,8 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     case appleWalletProfilePassAvailable
     case chatEnabled
     case continueOnWebURL = "continueOnWebUrl"
+    case plan
+    case isPro
   }
 
   static let previewReady = MobileMeResponse(
@@ -37,7 +41,23 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     avatarURL: nil,
     appleWalletProfilePassAvailable: false,
     chatEnabled: true,
-    continueOnWebURL: "https://jov.ie/app"
+    continueOnWebURL: "https://jov.ie/app",
+    plan: "free",
+    isPro: false
+  )
+
+  static let previewReadyWithoutQR = MobileMeResponse(
+    state: .ready,
+    displayName: "Tim White",
+    username: "tim",
+    publicProfileURL: "https://jov.ie/tim",
+    qrPayload: nil,
+    avatarURL: nil,
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: true,
+    continueOnWebURL: "https://jov.ie/app",
+    plan: "free",
+    isPro: false
   )
 
   static let previewNeedsOnboarding = MobileMeResponse(
@@ -49,6 +69,8 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     avatarURL: nil,
     appleWalletProfilePassAvailable: false,
     chatEnabled: false,
-    continueOnWebURL: "https://jov.ie/app"
+    continueOnWebURL: "https://jov.ie/app",
+    plan: "free",
+    isPro: false
   )
 }
