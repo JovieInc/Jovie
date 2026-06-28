@@ -419,11 +419,10 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     'utf8'
   );
 
-  assert.match(rootLayout, /import Script from 'next\/script';/);
-  assert.match(
-    rootLayout,
-    /<Script src='\/electron-runtime-init\.js' strategy='beforeInteractive' \/>/
-  );
+  // Loaded as a plain synchronous <script> in <head> (not next/script) so it
+  // runs before React hydration. next/script + nonce drift caused local E2E
+  // console errors, so the runtime marker is injected this way intentionally.
+  assert.match(rootLayout, /<script src='\/electron-runtime-init\.js' \/>/);
   assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
