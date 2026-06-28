@@ -49,7 +49,7 @@ export function LibraryAssetShareUrlCell({
       <button
         type='button'
         onClick={event => {
-          void handleCopy(event);
+          handleCopy(event).catch(() => {});
         }}
         disabled={!shareUrl}
         aria-label={

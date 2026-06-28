@@ -43,7 +43,8 @@ function slugifyShareSegment(value: string): string {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
   return normalized || 'asset';
 }
 
@@ -54,7 +55,7 @@ export function deriveLibraryAssetShareSlug(input: {
   readonly smartLinkPath?: string;
 }): string {
   if (input.itemKind === 'release' && input.smartLinkPath) {
-    const slug = input.smartLinkPath.split('/').filter(Boolean).at(-1);
+    const slug = input.smartLinkPath.split('/').findLast(Boolean);
     if (slug) return slugifyShareSegment(slug);
   }
 

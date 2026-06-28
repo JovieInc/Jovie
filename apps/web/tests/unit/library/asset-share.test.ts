@@ -6,6 +6,7 @@ import {
   isLibraryAssetVisibility,
   toLibraryAssetShareViewModel,
 } from '@/lib/library/asset-share';
+import { generateLibraryAssetShareToken } from '@/lib/library/asset-share/token';
 
 describe('library asset share helpers', () => {
   it('derives release slugs from smart link paths', () => {
@@ -67,6 +68,13 @@ describe('library asset share helpers', () => {
     expect(isLibraryAssetVisibility('public')).toBe(true);
     expect(isLibraryAssetVisibility('private')).toBe(true);
     expect(isLibraryAssetVisibility('hidden')).toBe(false);
+  });
+
+  it('generates fixed-length alphanumeric share tokens', () => {
+    const token = generateLibraryAssetShareToken();
+
+    expect(token).toHaveLength(24);
+    expect(token).toMatch(/^[a-f0-9]{24}$/);
   });
 
   it('maps share rows into view models', () => {

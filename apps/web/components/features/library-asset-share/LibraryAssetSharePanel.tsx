@@ -37,6 +37,7 @@ export function LibraryAssetSharePanel({
   );
   const [isEnsuring, setIsEnsuring] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [hasEnsureFailed, setHasEnsureFailed] = useState(false);
 
   useEffect(() => {
     setShare(initialShare ?? null);
@@ -82,9 +83,23 @@ export function LibraryAssetSharePanel({
   }, [artistHandle, asset, onShareChange, profileId]);
 
   useEffect(() => {
-    if (!profileId || !artistHandle || share || isEnsuring) return;
-    void ensureShare();
-  }, [artistHandle, ensureShare, isEnsuring, profileId, share]);
+    if (!profileId || !artistHandle || share || isEnsuring || hasEnsureFailed) {
+      return;
+    }
+
+    ensureShare().then(result => {
+      if (!result) {
+        setHasEnsureFailed(true);
+      }
+    });
+  }, [
+    artistHandle,
+    ensureShare,
+    hasEnsureFailed,
+    isEnsuring,
+    profileId,
+    share,
+  ]);
 
   const handleVisibilityToggle = useCallback(
     async (isPublic: boolean) => {
@@ -196,7 +211,7 @@ export function LibraryAssetSharePanel({
         <button
           type='button'
           onClick={() => {
-            void handleRevoke();
+            handleRevoke().catch(() => {});
           }}
           disabled={disabled || isEnsuring || isRevoking || !profileId}
           data-testid={`library-asset-share-revoke-${asset.id}`}
