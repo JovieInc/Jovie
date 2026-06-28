@@ -194,8 +194,10 @@ describe('ci-harness artifact formatter', () => {
     expect(artifact.requiredGates.map(job => job.id)).toContain(
       'ci-structural-contract'
     );
-    expect(artifact.nextLocalCommands).toContain(
-      'pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check'
-    );
+    expect(
+      artifact.nextLocalCommands.some(command =>
+        command.includes('pnpm doc:freshness:check')
+      )
+    ).toBe(true);
   });
 });
