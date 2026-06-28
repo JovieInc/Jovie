@@ -1,4 +1,4 @@
 {
-  "count": 3058,
-  "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count. Corrected 3057→3061 on 2026-06-23: #11689 set the baseline 4 below the true post-sweep count and was admin-merged past its own red ratchet, leaving main RED and failing every PR's Unit Tests. Drive back down via JOV-3466 (tokenize the 4 stragglers). 3061→3059 on 2026-06-23 (JOV-3484): TaskListRow dropped grid-cols-[…] + leading-[17px] arbitrary values when converging to a flex layout. 3059→3058 on 2026-06-27 (JOV-3490): TaskLoadingState dropped grid-cols-[…] when matching TaskListRow flex layout."
+  "count": 3027,
+  "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count. 3058→3027 on 2026-06-28 (#11312): locked in post-stack drift reduction after #11219–#11228, #11302, and #11689 landed on main. Prior: 3057→3061 on 2026-06-23 (#11689 baseline correction via #11756). 3061→3059 (JOV-3484): TaskListRow flex layout. 3059→3058 (JOV-3490): TaskLoadingState flex layout."
 }
