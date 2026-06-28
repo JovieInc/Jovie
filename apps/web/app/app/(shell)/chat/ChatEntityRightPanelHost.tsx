@@ -43,6 +43,7 @@ import {
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { resolveChatRailContextLabel } from '@/lib/chat/context-label';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
 import { useContactsQuery } from '@/lib/queries/useContactsQuery';
@@ -151,8 +152,7 @@ function ChatProfileContextCard({
   const title =
     profile?.displayName?.trim() ||
     profile?.username?.trim() ||
-    target.label ||
-    'Profile';
+    resolveChatRailContextLabel('profile', target.label);
   const completion =
     typeof profile?.completionPercentage === 'number'
       ? Math.round(profile.completionPercentage)
@@ -267,7 +267,7 @@ function ChatEntityContextCard({
   onOpenProfilePreview?: () => void;
   profileSpotifyArtistId?: string | null;
 }>) {
-  const title = target.label?.trim() || contextKindLabel(target.kind);
+  const title = resolveChatRailContextLabel(target.kind, target.label);
   const opensProfilePreview =
     target.kind === 'artist' &&
     Boolean(profileSpotifyArtistId) &&
@@ -410,7 +410,8 @@ function ChatReleaseContextCard({
     profileId,
     target.id
   );
-  const title = release?.title ?? target.label?.trim() ?? 'Release';
+  const title =
+    release?.title ?? resolveChatRailContextLabel('release', target.label);
   const model = chatReleaseContextToEntityCard(
     release
       ? {
@@ -451,7 +452,8 @@ function ChatTourDateContextCard({
   const { data, isLoading } = useEventsQuery(profileId);
   const event: EventRecord | null =
     (data ?? []).find(entry => entry.id === target.id) ?? null;
-  const title = event?.title ?? target.label?.trim() ?? 'Tour date';
+  const title =
+    event?.title ?? resolveChatRailContextLabel('tour-date', target.label);
   const model = chatTourDateContextToEntityCard(
     event
       ? {
