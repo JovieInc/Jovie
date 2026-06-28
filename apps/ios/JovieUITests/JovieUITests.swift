@@ -200,6 +200,51 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testChatComposerWorkflowSheetShowsWorkflowGrid() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let plusButton = app.buttons["Open workflow sheet"]
+    XCTAssertTrue(
+      waitForHittable(plusButton, timeout: 3),
+      "Chat composer plus button did not become hittable.\n\(app.debugDescription)"
+    )
+
+    plusButton.tap()
+
+    XCTAssertTrue(
+      app.buttons["Make merch"].waitForExistence(timeout: 3),
+      "Workflow sheet did not appear.\n\(app.debugDescription)"
+    )
+    for title in [
+      "Make merch",
+      "Smart link",
+      "Camera",
+      "Photo/file",
+      "Release campaign",
+      "Lyric video",
+    ] {
+      XCTAssertTrue(
+        app.buttons[title].waitForExistence(timeout: 2),
+        "Workflow action \(title) did not appear.\n\(app.debugDescription)"
+      )
+    }
+
+    app.buttons["Make merch"].tap()
+
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(input, timeout: 3),
+      "Chat composer input did not become hittable after workflow selection.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      input.value as? String,
+      "Make merch for my latest release.",
+      "Workflow selection did not prefill the composer draft.\n\(app.debugDescription)"
+    )
+  }
+
   func testChatComposerPreservesDraftAcrossShellNavigation() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
