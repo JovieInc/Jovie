@@ -547,8 +547,4 @@ if (require.main === module) {
   });
 }
 
-export {
-  getConnectionRetryDelayMs,
-  isRetryableConnectionError,
-  runMigrations,
-};
+export { getConnectionRetryDelayMs, isRetryableConnectionError, runMigrations };
