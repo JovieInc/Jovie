@@ -78,6 +78,37 @@ export function isLocalDevelopmentAutomationRequest(
   return isLocalDevelopmentAutomationHostname(hostname);
 }
 
+function isLoopbackE2eAutomationHost(
+  hostname: string | null,
+  headerReader: HeaderReader
+): boolean {
+  return (
+    isLocalDevelopmentAutomationRequest(headerReader) ||
+    (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
+      isLocalDevelopmentAutomationHostname(hostname))
+  );
+}
+
+/**
+ * Loopback-only escape hatch for production-built CI servers (mobile overflow,
+ * screenshot capture). Keeps debug routes blocked on public hosts.
+ */
+export function shouldBypassProductionBlockedDebugPath(
+  pathname: string,
+  hostname: string | null,
+  headerReader: HeaderReader
+): boolean {
+  if (!isLoopbackE2eAutomationHost(hostname, headerReader)) {
+    return false;
+  }
+
+  if (pathname.startsWith('/api/dev/test-auth/')) {
+    return true;
+  }
+
+  return pathname === '/exp/shell-v1' || pathname.startsWith('/exp/shell-v1/');
+}
+
 export function developmentOnlyForbiddenResponse(
   init?: ResponseInit
 ): NextResponse {

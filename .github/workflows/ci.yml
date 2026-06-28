@@ -1215,54 +1215,10 @@ jobs:
       - name: Run static mobile overflow guard
         run: pnpm --filter=@jovie/web run mobile-overflow:guard
 
-      - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed (saves 3 Neon branches
-        # per PR run — one per matrix shard — on UI-only PRs that just need a read-only DB).
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: mobile-overflow-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
-
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: resolve-mobile-overflow-neon-db-url
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
-      - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-mobile-overflow-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
-
-      - name: Export DATABASE_URL (main — non-DB PR)
-        # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true'
+      - name: Export DATABASE_URL (stable main read-only)
+        # Mobile overflow is a read-only layout guard; use the stable main DB instead
+        # of per-shard ephemeral Neon branches (avoids credential drift on lockfile-only PRs).
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
-
-      - name: Run migrations (ephemeral Neon)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
-          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
-          ALLOW_PROD_MIGRATIONS: 'true'
-
-      - name: Seed mobile overflow fixtures
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
 
       - name: Cache Playwright Browsers
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -1341,6 +1297,7 @@ jobs:
           CI: true
           E2E_SKIP_WEB_SERVER: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -1364,15 +1321,6 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
-
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-lighthouse-pr:
     name: Lighthouse (public routes PR)
