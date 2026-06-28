@@ -52,7 +52,7 @@ describe('OpportunityInboxCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Review pitch/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Mark suggestion helpful' })
+      screen.getByRole('button', { name: 'Mark Suggestion Helpful' })
     );
 
     expect(onApprove).toHaveBeenCalledWith('card-1');
