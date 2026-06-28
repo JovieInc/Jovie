@@ -113,7 +113,9 @@
   --system-b-chat-action-card-min-height-compact: 132px;
   --system-b-chat-action-card-icon-size: 28px;
   --system-b-chat-action-card-primary-height: 32px;
-  --system-b-chat-message-content-max: 45rem;
+  --system-b-chat-message-content-max: 66ch;
+  --system-b-chat-body-size: 1rem;
+  --system-b-chat-body-line-height: 1.5;
   --system-b-chat-composer-max-width: 45rem;
   --system-b-chat-composer-thread-scroll-padding: 9rem;
   --system-b-chat-composer-scroll-fade-height: 7rem;
@@ -7939,6 +7941,19 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   margin-inline: auto;
 }
 
+:where(.system-b-chat-message-content-shell) {
+  width: 100%;
+  max-width: var(--system-b-chat-message-content-max);
+  margin-inline: auto;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --system-b-chat-body-size: 1.0625rem;
+    --system-b-chat-body-line-height: 1.6;
+  }
+}
+
 :where(.system-b-chat-composer-dock) {
   position: absolute;
   z-index: 10;
@@ -8675,8 +8690,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-chat-user-text) {
-  font-size: var(--text-app);
-  line-height: var(--space-5);
+  font-size: var(--system-b-chat-body-size);
+  line-height: var(--system-b-chat-body-line-height);
 }
 
 :where(.system-b-chat-assistant-frame) {
@@ -8692,8 +8707,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   max-width: var(--system-b-chat-message-max-width);
   flex-direction: column;
   gap: var(--space-2);
-  font-size: var(--text-mid);
-  line-height: calc(var(--space-6) + var(--space-1));
+  font-size: var(--system-b-chat-body-size);
+  line-height: var(--system-b-chat-body-line-height);
 }
 
 :where(.system-b-chat-loading-head) {
@@ -8833,14 +8848,157 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-chat-message-reply) {
   color: var(--color-text-primary-token);
-  font-size: var(--text-mid);
-  line-height: calc(var(--space-6) + var(--space-1));
+  font-size: var(--system-b-chat-body-size);
+  line-height: var(--system-b-chat-body-line-height);
 }
 
-@media (min-width: 640px) {
-  :where(.system-b-chat-message-reply) {
-    font-size: calc(var(--text-mid) + var(--space-0-5));
-  }
+:where(.system-b-chat-markdown) {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(.system-b-chat-markdown p) {
+  margin-bottom: 0.75em;
+}
+
+:where(.system-b-chat-markdown p:last-child) {
+  margin-bottom: 0;
+}
+
+:where(.system-b-chat-markdown ul),
+:where(.system-b-chat-markdown ol) {
+  margin-block: 1em;
+  padding-left: 1.25rem;
+}
+
+:where(.system-b-chat-markdown ul) {
+  list-style-type: disc;
+}
+
+:where(.system-b-chat-markdown ol) {
+  list-style-type: decimal;
+}
+
+:where(.system-b-chat-markdown li) {
+  padding-left: 0.125rem;
+  color: var(--color-text-secondary-token);
+}
+
+:where(.system-b-chat-markdown li + li) {
+  margin-top: 0.5rem;
+}
+
+:where(.system-b-chat-markdown strong) {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-chat-markdown del) {
+  color: var(--color-text-tertiary-token);
+  opacity: 0.8;
+}
+
+:where(.system-b-chat-markdown em) {
+  font-style: italic;
+}
+
+:where(.system-b-chat-markdown h1) {
+  margin-top: 1.5rem;
+  margin-bottom: 0.625rem;
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.03em;
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-chat-markdown h2) {
+  margin-top: 1.25rem;
+  margin-bottom: 0.625rem;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.025em;
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-chat-markdown h3) {
+  margin-top: 1rem;
+  margin-bottom: 0.375rem;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-chat-markdown h4) {
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+  font-size: var(--text-app);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary-token);
+}
+
+:where(.system-b-chat-markdown code) {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-2);
+  padding: 0.125rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-chat-markdown pre) {
+  margin-block: 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background: color-mix(in oklab, var(--color-bg-surface-2) 85%, transparent);
+  padding: 1rem;
+  box-shadow: inset 0 1px 0
+    color-mix(in oklab, var(--color-text-primary-token) 4%, transparent);
+}
+
+:where(.system-b-chat-markdown pre code) {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.75rem;
+  line-height: 1.5rem;
+}
+
+:where(.system-b-chat-markdown a) {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary-token);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-subtle);
+  text-underline-offset: 0.25rem;
+}
+
+:where(.system-b-chat-markdown a:hover) {
+  text-decoration-color: var(--color-border-default);
+}
+
+:where(.system-b-chat-markdown hr) {
+  margin-block: 1.25rem;
+  border-color: var(--color-border-subtle);
+}
+
+:where(.system-b-chat-markdown blockquote) {
+  margin-block: 1rem;
+  border-left: 2px solid
+    color-mix(in oklab, var(--color-accent) 30%, transparent);
+  border-radius: 0 var(--radius-2xl) var(--radius-2xl) 0;
+  background: color-mix(in oklab, var(--color-bg-surface-2) 50%, transparent);
+  padding: 0.125rem 0.75rem 0.125rem 1rem;
+  color: var(--color-text-secondary-token);
+  font-style: italic;
 }
 
 :where(.system-b-chat-copy-row) {

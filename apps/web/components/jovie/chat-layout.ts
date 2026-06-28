@@ -1,5 +1,9 @@
-/** Shared chat content width — composer and transcript share one column. */
+/** Shared composer column width — input dock and empty-state shell. */
 export const CHAT_CONTENT_SHELL_CLASSNAME = 'system-b-chat-content-shell';
+
+/** Transcript read column — capped for comfortable line length. */
+export const CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME =
+  'system-b-chat-message-content-shell';
 
 /** Thread composer dock — overlays the scroll viewport at the bottom. */
 export const CHAT_COMPOSER_DOCK_CLASSNAME = 'system-b-chat-composer-dock';
