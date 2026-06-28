@@ -110,6 +110,24 @@ export function getLibraryAspectRatioClass(ratio: LibraryAspectRatio): string {
   }
 }
 
+/**
+ * Compact drawer-hero sizing for the narrow right rail.
+ *
+ * Caps width for square/landscape art and caps HEIGHT for portrait art so a
+ * tall 9:16 canvas does not blow the rail out vertically. Returns the wrapper
+ * class plus the aspect class; the aspect class keeps the media's true ratio
+ * while the cap that does not match the long axis is effectively inert.
+ */
+export function getLibraryDrawerHeroClass(ratio: LibraryAspectRatio): string {
+  const aspectClass = getLibraryAspectRatioClass(ratio);
+  // Portrait: bound by height so width derives down from the cap.
+  if (ratio === '9:16') {
+    return `${aspectClass} mx-auto h-full max-h-72 w-auto`;
+  }
+  // Square / landscape: bound by width.
+  return `${aspectClass} mx-auto w-full max-w-56`;
+}
+
 function normalizeHttpUrl(value: string | null | undefined): string | null {
   const trimmed = value?.trim() ?? '';
   if (!/^https?:\/\//i.test(trimmed)) return null;

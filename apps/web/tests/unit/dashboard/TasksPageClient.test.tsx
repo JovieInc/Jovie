@@ -626,7 +626,7 @@ function getLatestTableProps() {
 
 function openDesktopTaskSearch() {
   fireEvent.click(screen.getByRole('button', { name: /filter tasks/i }));
-  return screen.getByRole('combobox', { name: 'Filter tasks' });
+  return screen.getByRole('combobox', { name: 'Filter Tasks' });
 }
 
 function enableDesignV1Tasks() {
@@ -965,6 +965,13 @@ describe('TasksPageClient', () => {
     expect(
       screen.queryByText('Your Task List Is Empty')
     ).not.toBeInTheDocument();
+
+    const loadingRows = screen.getAllByTestId('task-loading-row');
+    expect(loadingRows.length).toBeGreaterThan(0);
+    for (const row of loadingRows) {
+      expect(row.className).toContain('flex');
+      expect(row.className).not.toContain('grid-cols-');
+    }
   });
 
   it('renders the shared retry state when the task query fails', () => {
@@ -1264,7 +1271,7 @@ describe('TasksPageClient', () => {
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create task',
+        name: 'Create Task',
       })
     ).toBeInTheDocument();
   }, 10000);
@@ -1273,13 +1280,13 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      screen.queryByRole('combobox', { name: 'Filter tasks' })
+      screen.queryByRole('combobox', { name: 'Filter Tasks' })
     ).not.toBeInTheDocument();
 
     openDesktopTaskSearch();
 
     expect(
-      screen.getByRole('combobox', { name: 'Filter tasks' })
+      screen.getByRole('combobox', { name: 'Filter Tasks' })
     ).toBeInTheDocument();
   });
 
@@ -1336,7 +1343,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create task',
+        name: 'Create Task',
       })
     );
 
@@ -1519,7 +1526,7 @@ describe('TasksPageClient', () => {
 
     expect(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create task',
+        name: 'Create Task',
       })
     ).toBeInTheDocument();
   });
@@ -1531,7 +1538,7 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByText('2 total tasks')).toBeInTheDocument();
     expect(
-      screen.queryByRole('combobox', { name: 'Filter tasks' })
+      screen.queryByRole('combobox', { name: 'Filter Tasks' })
     ).not.toBeInTheDocument();
 
     const firstMobileRow = screen.getAllByTestId('mobile-task-row')[0]!;

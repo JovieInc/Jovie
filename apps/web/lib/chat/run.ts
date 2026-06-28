@@ -1,6 +1,7 @@
 import { gateway } from '@ai-sdk/gateway';
 import {
   convertToModelMessages,
+  type LanguageModel,
   type ModelMessage,
   stepCountIs,
   type ToolSet,
@@ -13,6 +14,13 @@ import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { extractLastUserText } from '@/lib/chat/message-text';
+import {
+  createStaticTextLanguageModel,
+  detectSystemPromptLeak,
+  isPromptDisclosureRequest,
+  PROMPT_DISCLOSURE_REFUSAL,
+  sanitizeAssistantResponse,
+} from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import {
@@ -275,22 +283,34 @@ export async function executeChatTurn(
     planLimits.booleans.aiCanUseTools
   );
 
-  const streamResult = streamText({
-    model: gateway(selectedModel),
+  const disclosureProbeText =
+    lastUserText ?? extractLastUserText(uiMessages) ?? '';
+  const blockedForDisclosure =
+    disclosureProbeText.length > 0 &&
+    isPromptDisclosureRequest(disclosureProbeText);
+
+  const rawStreamResult = streamText({
+    model: blockedForDisclosure
+      ? (createStaticTextLanguageModel(
+          PROMPT_DISCLOSURE_REFUSAL
+        ) as unknown as LanguageModel)
+      : gateway(selectedModel),
     system: systemPrompt,
     messages: modelMessages,
-    tools,
-    stopWhen: stepCountIs(toolStepLimit),
-    prepareStep: ({ steps, stepNumber }) => {
-      const restrictedTools = resolveImportBioRestrictedTools(
-        steps,
-        stepNumber
-      );
-      if (restrictedTools) {
-        return { activeTools: restrictedTools };
-      }
-      return {};
-    },
+    tools: blockedForDisclosure ? undefined : tools,
+    stopWhen: blockedForDisclosure ? undefined : stepCountIs(toolStepLimit),
+    prepareStep: blockedForDisclosure
+      ? undefined
+      : ({ steps, stepNumber }) => {
+          const restrictedTools = resolveImportBioRestrictedTools(
+            steps,
+            stepNumber
+          );
+          if (restrictedTools) {
+            return { activeTools: restrictedTools };
+          }
+          return {};
+        },
     abortSignal: signal,
     experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
@@ -304,8 +324,48 @@ export async function executeChatTurn(
         chatToolStepLimit: toolStepLimit,
       },
     }),
-    onFinish: ({ steps }) => {
-      if (!isChatToolStepCapExhausted(steps, toolStepLimit)) {
+    onFinish: async ({ steps, text }) => {
+      if (!blockedForDisclosure && typeof text === 'string') {
+        const sanitized = sanitizeAssistantResponse(text);
+        if (sanitized.leaked) {
+          telemetry?.setTags?.({
+            chat_prompt_leak_blocked: 'true',
+          });
+          telemetry?.addBreadcrumb?.({
+            category: 'ai-chat',
+            message: 'chat_prompt_leak_blocked',
+            level: 'warning',
+            data: {
+              requestId,
+              conversationId: resolvedConversationId,
+              profileId: resolvedProfileId,
+              plan: userPlan,
+              mode,
+            },
+          });
+          await telemetry?.captureException?.(
+            new Error('Assistant response matched system-prompt leak markers'),
+            {
+              tags: { feature: 'ai-chat', errorType: 'prompt_leak_blocked' },
+              extra: {
+                requestId,
+                conversationId: resolvedConversationId,
+                profileId: resolvedProfileId,
+                leakedChars: text.length,
+              },
+            }
+          );
+        } else if (text.length > 0 && detectSystemPromptLeak(text)) {
+          telemetry?.setTags?.({
+            chat_prompt_leak_detected: 'true',
+          });
+        }
+      }
+
+      if (
+        blockedForDisclosure ||
+        !isChatToolStepCapExhausted(steps, toolStepLimit)
+      ) {
         return;
       }
 
@@ -346,6 +406,10 @@ export async function executeChatTurn(
     },
   });
 
+  const streamResult = blockedForDisclosure
+    ? rawStreamResult
+    : wrapStreamResultWithLeakGuard(rawStreamResult);
+
   return {
     streamResult,
     selectedModel,
@@ -353,4 +417,22 @@ export async function executeChatTurn(
     toolNames,
     modelMessages,
   };
+}
+
+function wrapStreamResultWithLeakGuard<T extends ReturnType<typeof streamText>>(
+  streamResult: T
+): T {
+  if (!streamResult?.text) {
+    return streamResult;
+  }
+
+  const sanitizedTextPromise = streamResult.text.then(
+    text => sanitizeAssistantResponse(text).text
+  );
+
+  return Object.create(streamResult, {
+    text: {
+      value: sanitizedTextPromise,
+    },
+  }) as T;
 }

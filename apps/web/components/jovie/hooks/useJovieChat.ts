@@ -560,7 +560,7 @@ export function useJovieChat({
     const errorMessage =
       existingConversationError instanceof Error
         ? existingConversationError.message
-        : 'Conversation failed to load';
+        : 'Chat failed to load';
     const failureKey = `${activeConversationId}:${errorMessage}`;
     if (lastConversationLoadFailureRef.current === failureKey) return;
     lastConversationLoadFailureRef.current = failureKey;
