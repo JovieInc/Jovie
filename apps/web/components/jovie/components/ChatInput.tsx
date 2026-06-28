@@ -570,7 +570,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Resolve the surface mode from textarea + picker state. Shell + Chat V1
     // keeps empty focus calm so the composer doesn't reflow just because the
     // textarea received focus.
-    const hasText = Boolean(value.trim()) || hasPendingFiles;
+    // Attachment chips render above the composer in ChatComposerSurface;
+    // only typed draft text should expand the inline field geometry.
+    const hasText = Boolean(value.trim());
     const isExpanded = plusMenuOpen || isListening || hasText || isFocused;
     let surfaceMode: SurfaceMode = 'empty';
     if (picker.state.status === 'entity') surfaceMode = 'entity';
@@ -582,10 +584,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       picker.state.status === 'root' &&
       value.trim().startsWith('/') &&
       !hasChips;
-    const useHeroPill =
-      isHero &&
-      !hasPendingFiles &&
-      (!hasInlineContent || hasOnlyRootSlashQuery);
+    const useHeroPill = isHero && (!hasInlineContent || hasOnlyRootSlashQuery);
     const geometry = geometryFor(surfaceMode, isStacked, variant, useHeroPill);
     const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
@@ -768,7 +767,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       onSend={handleSendClick}
                       onStop={onStop}
                       setIsFocused={setIsFocused}
-                      hasPendingFiles={hasPendingFiles}
                       chips={chips}
                       onRemoveChipAt={onRemoveChipAt}
                       isPickerOpen={isPickerOpen}
@@ -851,7 +849,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onSend={handleSendClick}
                   onStop={onStop}
                   setIsFocused={setIsFocused}
-                  hasPendingFiles={hasPendingFiles}
                   chips={chips}
                   onRemoveChipAt={onRemoveChipAt}
                   hasBorderTop={
@@ -926,7 +923,6 @@ interface InputRowProps {
   readonly onSend: () => void;
   readonly onStop?: () => void;
   readonly setIsFocused: (focused: boolean) => void;
-  readonly hasPendingFiles: boolean;
   readonly chips?: readonly import('../hooks/useChipTray').TrayChip[];
   readonly onRemoveChipAt?: (index: number) => void;
   /** Add hairline divider above the input (when picker sits above it). */
@@ -975,7 +971,6 @@ function InputRow({
   onSend,
   onStop,
   setIsFocused,
-  hasPendingFiles = false,
   chips,
   onRemoveChipAt,
   hasBorderTop = false,
@@ -991,8 +986,7 @@ function InputRow({
     isRootPickerOpen &&
     value.trim().startsWith('/') &&
     (chips?.length ?? 0) === 0;
-  const useHeroPill =
-    isHero && !hasPendingFiles && (!hasInlineContent || hasOnlyRootSlashQuery);
+  const useHeroPill = isHero && (!hasInlineContent || hasOnlyRootSlashQuery);
 
   return (
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
@@ -1004,12 +998,7 @@ function InputRow({
           'relative',
           useHeroPill
             ? 'flex min-h-13 items-center gap-1.5 px-3 py-1.5 sm:min-h-14 sm:px-3'
-            : [
-                'grid gap-2',
-                isHero
-                  ? 'min-h-22 grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
-                  : 'min-h-14 grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
-              ]
+            : 'grid content-start gap-2 grid-rows-[auto_36px] px-3 py-1.5'
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
@@ -1032,8 +1021,8 @@ function InputRow({
             useHeroPill
               ? 'min-h-8 flex-1 items-center px-1.5 pt-0'
               : isHero
-                ? 'min-h-7 px-2 pt-0.5'
-                : 'min-h-6 px-1.5 pt-0'
+                ? 'px-2 pt-0.5'
+                : 'px-1.5 pt-0'
           )}
         >
           {chips && chips.length > 0 && onRemoveChipAt ? (
@@ -1049,7 +1038,7 @@ function InputRow({
             animate={reducedMotion ? undefined : { height: measuredHeight }}
             transition={reducedMotion ? undefined : SPRING_HEIGHT}
             className={cn(
-              'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token',
+              'min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent placeholder:text-quaternary-token',
               isHero
                 ? 'min-h-7 px-2 py-0.5 text-[15px] font-book leading-6 text-primary-token sm:text-[16px]'
                 : 'min-h-6 px-1.5 py-[1px] text-[15px] leading-6 text-primary-token',
