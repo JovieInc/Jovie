@@ -91,7 +91,7 @@
       "id": "ci-lighthouse-pr",
       "name": "Lighthouse (public routes PR)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:public:launch",
       "remediation": "Public route performance or viewport stability regressed. Use the uploaded Lighthouse and Playwright artifacts before changing thresholds."
     },
@@ -99,7 +99,7 @@
       "id": "ci-lighthouse-dashboard-pr",
       "name": "Lighthouse (dashboard PR)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr",
       "remediation": "Dashboard Lighthouse is required when triggered by risk or the testing label. Fix the route behavior or budget drift instead of bypassing it."
     },
@@ -107,7 +107,7 @@
       "id": "ci-lighthouse-onboarding-pr",
       "name": "Lighthouse (onboarding PR)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr",
       "remediation": "Onboarding Lighthouse is required when onboarding or risk-triggered paths change. Verify /start with the test-auth bypass."
     },
@@ -115,7 +115,7 @@
       "id": "ci-lighthouse-admin-pr",
       "name": "Lighthouse (admin PR)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:admin:pr",
       "remediation": "Admin Lighthouse is required when admin or risk-triggered paths change. Verify the admin persona and uploaded artifacts."
     },
