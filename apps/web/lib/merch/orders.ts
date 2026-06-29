@@ -248,7 +248,8 @@ export async function createMerchCheckoutSession(
   });
   const printfulExternalId = `jovie_merch_${crypto.randomUUID()}`;
   const releaseWorkflowRunId = await resolveReleaseWorkflowRunIdForMerchCard(
-    row.card.id
+    row.card.id,
+    row.card.creatorProfileId
   );
 
   const [order] = await db

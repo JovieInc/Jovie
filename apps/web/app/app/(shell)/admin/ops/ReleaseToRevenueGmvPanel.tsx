@@ -1,31 +1,15 @@
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { formatUsd } from '@/lib/admin/format';
-import { getDesignPartnerReleaseGmvSnapshot } from '@/lib/release-to-revenue/gmv-attribution';
+import { getAllTenantsReleaseGmvSnapshot } from '@/lib/release-to-revenue/gmv-attribution';
 
 function formatGmvFromCents(gmvCents: number): string {
   return formatUsd(gmvCents / 100);
 }
 
 export async function ReleaseToRevenueGmvPanel() {
-  const snapshot = await getDesignPartnerReleaseGmvSnapshot();
-
-  if (!snapshot) {
-    return (
-      <ContentSurfaceCard
-        surface='details'
-        className='space-y-2 p-3'
-        data-testid='release-to-revenue-gmv-panel'
-      >
-        <p className='text-app font-medium text-primary-token'>
-          Release-to-Revenue GMV
-        </p>
-        <p className='text-app text-secondary-token'>
-          Design partner is not configured in this environment.
-        </p>
-      </ContentSurfaceCard>
-    );
-  }
+  const snapshot = await getAllTenantsReleaseGmvSnapshot();
+  const creatorLabel = snapshot.tenantCount === 1 ? 'creator' : 'creators';
 
   return (
     <ContentSurfaceCard
@@ -38,7 +22,8 @@ export async function ReleaseToRevenueGmvPanel() {
           Release-to-Revenue GMV
         </p>
         <p className='text-app text-secondary-token'>
-          Store GMV per autopilot release for @{snapshot.creatorUsername}
+          Store GMV per autopilot release across{' '}
+          {snapshot.tenantCount.toLocaleString('en-US')} {creatorLabel}
         </p>
       </div>
 
@@ -54,7 +39,7 @@ export async function ReleaseToRevenueGmvPanel() {
               data-testid={`release-gmv-row-${release.workflowRunId}`}
             >
               <ContentMetricRow
-                label={`${release.releaseTitle} (${release.orderCount.toLocaleString('en-US')} orders)`}
+                label={`${release.creatorUsername ? `@${release.creatorUsername}` : 'Unknown creator'} · ${release.releaseTitle} (${release.orderCount.toLocaleString('en-US')} orders)`}
                 value={formatGmvFromCents(release.gmvCents)}
               />
             </div>
