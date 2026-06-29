@@ -164,6 +164,18 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testTalkFABAppearsOnChatTab() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    XCTAssertTrue(
+      app.buttons["shell-talk-fab"].waitForExistence(timeout: 3),
+      "Talk FAB did not appear on the chat tab.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "talk-fab", app: app)
+  }
+
   func testOfflineChatLaunchShowsCachedHistoryIntro() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-chat-offline",
