@@ -40,8 +40,8 @@ jobs:
     timeout-minutes: 10
     permissions: {}
     env:
-      PROJECT_NAME: ${{ inputs.project_name || 'Design V1 Rollout / Flag Hardening' }}
-      READY_LABEL: ${{ inputs.ready_label || 'automated' }}
+      PROJECT_NAME: ${{ inputs.project_name || vars.LINEAR_PROJECT_NAME || 'Design V1 Rollout / Flag Hardening' }}
+      READY_LABEL: ${{ inputs.ready_label || vars.LINEAR_READY_LABEL || 'automated' }}
       MAX_DISPATCH: ${{ inputs.max_dispatch || '2' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       MAX_OPEN_AGENT_PRS: '5'
@@ -52,6 +52,18 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Validate configuration
+        run: |
+          if [[ -z "$PROJECT_NAME" ]]; then
+            echo "::error::PROJECT_NAME is not set. Configure it via the workflow_dispatch input 'project_name' or the repo variable 'LINEAR_PROJECT_NAME'."
+            exit 1
+          fi
+          if [[ -z "$READY_LABEL" ]]; then
+            echo "::error::READY_LABEL is not set. Configure it via the workflow_dispatch input 'ready_label' or the repo variable 'LINEAR_READY_LABEL'."
+            exit 1
+          fi
+          echo "Dispatching Linear issues from project '$PROJECT_NAME' with label '$READY_LABEL'"
 
       - name: Find capacity and dispatch candidates
         env:
