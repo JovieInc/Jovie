@@ -60,6 +60,18 @@ enum LaunchMode: Equatable {
     self == .uiTestingVenueMode
   }
 
+  // Chat is the permanent home for live sessions. UI-testing modes that assert
+  // Profile-tab content (QR code, Copy URL) keep .profile as their default so
+  // existing test assertions don't have to navigate first.
+  var defaultInitialTab: AppShellTab {
+    switch self {
+    case .uiTestingReady, .uiTestingSettings, .uiTestingQRUnavailable:
+      return .profile
+    default:
+      return .chat
+    }
+  }
+
   var recoversProfileErrorOnRetry: Bool {
     self == .uiTestingProfileError
   }

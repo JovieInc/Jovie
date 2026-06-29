@@ -44,6 +44,7 @@
 		A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */; };
 		A0J0V36330000000000000002 /* AppShellLeftDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */; };
 		A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */; };
+		A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12170000000000000003 /* AppShellChatFirstTests.swift */; };
 		A0J0V36380000000000000002 /* AudienceHighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000001 /* AudienceHighlightsView.swift */; };
 		A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */; };
 		A0J0V36380000000000000006 /* AudienceHighlightsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */; };
@@ -155,6 +156,7 @@
 		A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellIntentNavigationTests.swift; sourceTree = "<group>"; };
 		A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellLeftDrawer.swift; sourceTree = "<group>"; };
 		A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellDrawerThreadsFilterTests.swift; sourceTree = "<group>"; };
+		A0GH12170000000000000003 /* AppShellChatFirstTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellChatFirstTests.swift; sourceTree = "<group>"; };
 		A0J0V36380000000000000001 /* AudienceHighlightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudienceHighlightsView.swift; sourceTree = "<group>"; };
 		A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAudienceHighlightsResponse.swift; sourceTree = "<group>"; };
 		A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudienceHighlightsRepository.swift; sourceTree = "<group>"; };
@@ -298,6 +300,7 @@
 				A0J0V26350000000000000003 /* MobileAuthFinalizationTests.swift */,
 				A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */,
 				A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */,
+				A0GH12170000000000000003 /* AppShellChatFirstTests.swift */,
 				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
 				A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */,
 				5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */,
@@ -650,6 +653,7 @@
 				A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */,
 				A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */,
 				A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */,
+				A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */,
 				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
 				A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */,
 				E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */,

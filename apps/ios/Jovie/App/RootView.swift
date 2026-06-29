@@ -243,6 +243,7 @@ private struct AppContentView: View {
           onStartNewChat: {
             chatRepository?.startNewConversation()
           },
+          onTalk: {},
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
@@ -266,7 +267,7 @@ private struct AppContentView: View {
           isOffline: appState.isOffline,
           initialTab: appState.launchMode.opensAudienceOnLaunch
             ? .audience
-            : (appState.launchMode.opensChatOnLaunch ? .chat : .profile),
+            : (appState.launchMode.opensChatOnLaunch ? .chat : appState.launchMode.defaultInitialTab),
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
           chatEnabled: appState.loadedDashboardResponse != nil,
@@ -279,6 +280,7 @@ private struct AppContentView: View {
           onStartNewChat: {
             chatRepository?.startNewConversation()
           },
+          onTalk: {},
           onLogout: onLogout
         ) {
           DashboardView(
