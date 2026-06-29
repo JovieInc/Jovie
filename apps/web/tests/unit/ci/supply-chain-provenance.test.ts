@@ -99,12 +99,11 @@ describe('supply chain provenance guardrails', () => {
     expect(buildStep).toContain('vercel build');
     expect(packageStep).toContain('tar -czf /tmp/vercel-build-output.tar.gz');
     expect(packageStep).toContain('.vercel/output');
-    // Assert the action is pinned to a full 40-char commit SHA (supply-chain
-    // intent: SHA, not a mutable tag), without hardcoding which SHA — so
-    // dependabot pin bumps don't redden this guardrail. The optional trailing
-    // `# vX.Y.Z` pin comment is allowed.
+    // Assert the action is pinned to a full 40-char commit SHA (the security
+    // property this guardrail protects) without hardcoding a specific SHA, so
+    // dependabot pin bumps don't deterministically redden the merge gate (#12425).
     expect(attestStep).toMatch(
-      /^\s*uses: actions\/attest-build-provenance@[0-9a-f]{40}(?:\s+#.*)?$/m
+      /^\s*uses: actions\/attest-build-provenance@[0-9a-f]{40}(?:\s+#.*)?\s*$/m
     );
     expect(attestStep).toContain(
       'subject-path: /tmp/vercel-build-output.tar.gz'
