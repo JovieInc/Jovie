@@ -21,6 +21,14 @@ struct AppShellChatFirstTests {
     #expect(LaunchMode.uiTestingQRUnavailable.defaultInitialTab == .profile)
   }
 
+  @Test func uiTestingAuthCallbackKeepsProfileDefault() {
+    #expect(LaunchMode.uiTestingAuthCallback.defaultInitialTab == .profile)
+  }
+
+  @Test func uiTestingVenueModeKeepsProfileDefault() {
+    #expect(LaunchMode.uiTestingVenueMode.defaultInitialTab == .profile)
+  }
+
   // Chat-only launch modes also yield .chat as their default.
   @Test func uiTestingChatYieldsChatDefault() {
     #expect(LaunchMode.uiTestingChat.defaultInitialTab == .chat)
