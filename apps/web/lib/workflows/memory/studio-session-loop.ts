@@ -18,7 +18,7 @@ import {
   type StudioSessionResult,
 } from '@/lib/agents/agent-harness';
 import { captureError } from '@/lib/error-tracking';
-import { isEnabled } from '@/lib/feature-flags';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { logger } from '@/lib/utils/logger';
 
 export interface RunStudioSessionMemoryLoopInput extends StudioSessionInput {
@@ -39,7 +39,7 @@ export async function runStudioSessionMemoryLoop(
   input: RunStudioSessionMemoryLoopInput
 ): Promise<RunStudioSessionMemoryLoopResult> {
   const flagName = 'MEMORY_STUDIO_SESSION_V0' as const;
-  const gated = !isEnabled(flagName) && !input.force;
+  const gated = !isCodeFlagEnabled(flagName) && !input.force;
 
   if (gated) {
     logger.warn('[memory-loop] studio-session v0 gated off (default)', {

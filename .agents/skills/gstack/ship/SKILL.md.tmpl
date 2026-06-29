@@ -360,6 +360,15 @@ For each classified comment:
 
 ## Step 4: Version bump (auto-decide)
 
+> **JOVIE OVERRIDE — version stamping is MAIN-ONLY.** This repo bumps the version
+> fan-out (`VERSION`, `version.json`, root + workspace `package.json` versions, dated
+> `CHANGELOG.md` headings) only on the main/release path via `pnpm version:stamp`, never
+> on feature branches. `/ship` runs from a feature branch (Step 1), so **SKIP this entire
+> Step 4** — do not edit `VERSION`, `version.json`, or any `package.json` version field.
+> CI (`scripts/version-fanout-guard.mjs`) will fail the PR if you do. Put release notes
+> under the `## [Unreleased]` CHANGELOG section instead (see the CHANGELOG step below).
+> See `.claude/rules/release.md` → "Version Stamping (main-only)".
+
 **Idempotency check:** Before bumping, compare VERSION against the base branch.
 
 ```bash

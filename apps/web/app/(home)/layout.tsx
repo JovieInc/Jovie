@@ -1,9 +1,8 @@
 import './home.css';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
-import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
 import { HomeScrollWatcher } from '@/components/homepage/HomeScrollWatcher';
+import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export const revalidate = false;
 
@@ -23,13 +22,16 @@ export default function HomeLayout({
       <MarketingHeader
         logoSize='sm'
         logoVariant='icon'
-        showHomepageCenterNav={FEATURE_FLAGS.SHOW_HOMEPAGE_CENTER_NAV}
+        showHomepageCenterNav={false}
         variant='homepage'
       />
       <main id='main-content' className='flex min-h-svh flex-1 flex-col'>
         {children}
       </main>
-      <HomeLegalFooter className='system-b-mounted-home-footer' />
+      <MarketingFooter
+        variant='minimal'
+        className='system-b-mounted-home-footer'
+      />
     </div>
   );
 }

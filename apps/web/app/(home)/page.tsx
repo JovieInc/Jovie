@@ -20,7 +20,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 // Below-the-fold sections are dynamic-loaded so their `motion/react`
@@ -457,7 +457,7 @@ export default async function HomePage() {
       </section>
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
         <HomeTrustSection
-          label='Used by artists and teams with releases distributed through'
+          label='Used By Artists And Teams With Releases Distributed Through'
           presentation='inline-strip'
         />
       </div>
