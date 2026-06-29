@@ -749,6 +749,13 @@ export const contextFactKindEnum = pgEnum('context_fact_kind', [
   'social_engagement',
   'playlist_placement',
   'other',
+  // Connector enrichment (JOV-3114) — also created in migration 0048 for greenfield DBs
+  'event_signal',
+  'tour_date_known',
+  'person_mentioned',
+  'song_mentioned',
+  'location_mentioned',
+  'studio_location',
 ]);
 
 export const suggestedActionStatusEnum = pgEnum('suggested_action_status', [
@@ -801,3 +808,8 @@ export const libraryAssetApprovalStatusEnum = pgEnum(
   'library_asset_approval_status',
   ['draft', 'needs_review', 'approved', 'archived']
 );
+
+export const libraryAssetVisibilityEnum = pgEnum('library_asset_visibility', [
+  'public',
+  'private',
+]);

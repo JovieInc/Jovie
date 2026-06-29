@@ -52,6 +52,15 @@ vi.mock('@/lib/stripe/client', () => ({
   },
 }));
 
+vi.mock('@/lib/stripe/connect-errors', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/stripe/connect-errors')>();
+  return {
+    ...actual,
+    isStripeConnectPlatformProfileBlocked: vi.fn(() => false),
+  };
+});
+
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'id',
@@ -82,6 +91,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+const connectErrors = await import('@/lib/stripe/connect-errors');
 const { POST } = await import('./route');
 
 const PROFILE = {
@@ -93,6 +103,10 @@ const PROFILE = {
 describe('POST /api/stripe-connect/onboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectErrors.clearStripeConnectPlatformProfileBlock();
+    vi.mocked(
+      connectErrors.isStripeConnectPlatformProfileBlocked
+    ).mockReturnValue(false);
     hoisted.requireAuth.mockResolvedValue({ userId: 'clerk_user_123' });
     hoisted.getAppFlagValue.mockResolvedValue(true);
     hoisted.getUserByClerkId.mockResolvedValue({
@@ -104,6 +118,26 @@ describe('POST /api/stripe-connect/onboard', () => {
     hoisted.stripeAccountLinksCreate.mockResolvedValue({
       url: 'https://connect.stripe.com/setup',
     });
+  });
+
+  it('returns 503 without calling Stripe when the platform guard is active', async () => {
+    vi.mocked(
+      connectErrors.isStripeConnectPlatformProfileBlocked
+    ).mockReturnValue(true);
+
+    const res = await POST();
+    const body = await res.json();
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Retry-After')).toBe('30');
+    expect(body).toEqual({
+      error: 'Payout setup is temporarily unavailable. Please try again later.',
+      code: 'platform_profile_incomplete',
+    });
+    expect(hoisted.captureWarning).toHaveBeenCalledTimes(1);
+    expect(hoisted.captureError).not.toHaveBeenCalled();
+    expect(hoisted.stripeAccountsCreate).not.toHaveBeenCalled();
+    expect(hoisted.stripeAccountLinksCreate).not.toHaveBeenCalled();
   });
 
   it('returns 503 with a safe message when Stripe platform profile is incomplete', async () => {

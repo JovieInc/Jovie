@@ -52,7 +52,7 @@ import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import {
   isExplicitDevelopmentEnvironment,
   isLocalDevelopmentAutomationHostname,
-  isLocalDevelopmentAutomationRequest,
+  shouldBypassProductionBlockedDebugPath,
 } from '@/lib/security/development-only';
 import {
   createFastNotFoundResponse,
@@ -114,13 +114,10 @@ function isElectronAppShellNavigation(
 }
 
 function shouldAllowProductScreenshotCaptureRoutes(req: NextRequest): boolean {
-  if (isLocalDevelopmentAutomationRequest(req.headers)) {
-    return true;
-  }
-
-  return (
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
-    isLocalDevelopmentAutomationHostname(req.nextUrl.hostname)
+  return shouldBypassProductionBlockedDebugPath(
+    req.nextUrl.pathname,
+    req.nextUrl.hostname,
+    req.headers
   );
 }
 
@@ -273,6 +270,11 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Block debug/test/dev surfaces outside explicit development environments.
     if (
       !isExplicitDevelopmentEnvironment() &&
+      !shouldBypassProductionBlockedDebugPath(
+        pathname,
+        hostname,
+        req.headers
+      ) &&
       isProductionBlockedDebugPath(pathname, {
         allowProductScreenshotCaptureRoutes:
           shouldAllowProductScreenshotCaptureRoutes(req),

@@ -8,6 +8,7 @@ import {
   getBaseServerConfig,
   isNonProductionServerNoise,
 } from '@/lib/sentry/config';
+import { isTransientInfraHttpTransaction } from '@/lib/sentry/non-actionable-issues';
 
 const baseConfig = getBaseServerConfig();
 
@@ -31,6 +32,11 @@ Sentry.init({
   tracesSampler: (samplingContext: SamplingContext) => {
     const name = samplingContext.name ?? '';
     if (HEALTH_ENDPOINT_PATTERN.test(name)) {
+      return 0;
+    }
+    // Upstash Redis pipeline latency blips during cold starts are transient infra
+    // noise (JOV-3666) — exclude from performance traces to avoid ai_detected_http alerts.
+    if (isTransientInfraHttpTransaction(name)) {
       return 0;
     }
     return baseConfig.tracesSampleRate;

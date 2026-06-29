@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.6.56",
+  "version": "26.6.61",
   "private": true,
   "config": {
     "commitizen": {
@@ -160,6 +160,9 @@
     "ci:merge-queue:verify": "node scripts/ci-merge-queue-check.mjs verify",
     "ci:typecheck-gate-guard": "node scripts/ci-typecheck-gate-guard.mjs",
     "ci:harness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__",
+    "doc:freshness:check": "node scripts/doc-freshness-lint.mjs",
+    "doc:freshness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs",
+    "doc:gardening:run": "node scripts/doc-gardening-agent.mjs",
     "qa:swarm:list": "node scripts/qa-swarm/cli.mjs list",
     "qa:swarm:propose": "node scripts/qa-swarm/cli.mjs propose",
     "qa:swarm:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/qa-swarm.test.mjs",
@@ -183,7 +186,9 @@
     "video:footer:generate": "doppler run --project jovie-web --config dev -- tsx scripts/generate-footer-cta-video.ts",
     "hermes:worker": "pnpm --filter @jovie/web run hermes:worker",
     "hermes:codex-shipper": "tsx scripts/hermes/jobs/codex-issue-shipper.ts",
-    "ds:offscale": "node scripts/ds-offscale-report.mjs"
+    "ds:offscale": "node scripts/ds-offscale-report.mjs",
+    "ds:llms-manifest": "node scripts/generate-llms-design-manifest.mjs",
+    "ds:llms-manifest:check": "node scripts/generate-llms-design-manifest.mjs --check"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

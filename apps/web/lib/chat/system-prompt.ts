@@ -1,3 +1,4 @@
+import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
 import { formatAmount } from '@/lib/utils/format-number';
 
 interface ArtistContext {
@@ -105,7 +106,7 @@ export function buildSystemPrompt(
   }
 ): string {
   return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
-
+${buildPromptSecuritySection()}
 ## About This Artist
 - **Name:** ${context.displayName} (@${context.username})
 - **Bio:** ${context.bio ?? 'Not set'}

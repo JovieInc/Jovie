@@ -116,6 +116,33 @@ struct APIClientTests {
     #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
+  @Test func fetchesAudienceHighlightsWithBearerToken() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/audience/highlights")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      let data = try JSONEncoder().encode(MobileAudienceHighlightsResponse.preview)
+      return (response, data)
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    let response = try await client.fetchAudienceHighlights()
+
+    #expect(response.heroValue == 1284)
+    #expect(response.statTiles.count == 4)
+  }
+
   @Test func fetchesAppleWalletPassWithFreshTokenAfterUnauthorized() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
     let passData = Data([0x50, 0x4B, 0x03, 0x04])

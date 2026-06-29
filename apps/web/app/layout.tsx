@@ -11,9 +11,15 @@ import './globals.css';
 import '@/components/organisms/HeaderNav.css';
 import '@/components/site/MarketingFooter.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
+import { GoogleAnalytics } from '@/components/providers/GoogleAnalytics';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
+import {
+  buildGoogleConsentInitScript,
+  isValidGaMeasurementId,
+  shouldMountGoogleAnalytics,
+} from '@/lib/tracking/google-consent-mode';
 
 const inter = localFont({
   src: '../public/fonts/Inter-Latin.woff2',
@@ -177,6 +183,13 @@ export default async function RootLayout({
       devEnv,
       isE2EClientRuntime,
     });
+  const gaMeasurementId = publicEnv.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+  const shouldMountGa = shouldMountGoogleAnalytics({
+    measurementId: gaMeasurementId,
+    isTest: process.env.NODE_ENV === 'test',
+    isE2E: isE2EClientRuntime,
+    isDemoRecording,
+  });
 
   let devToolbar: React.ReactNode = null;
   let FlagBadgeProvider: React.ComponentType<{
@@ -210,6 +223,7 @@ export default async function RootLayout({
       {auth}
       {devToolbar}
       {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
+      <GoogleAnalytics />
       <InstantlyPixel />
     </>
   );
@@ -237,6 +251,15 @@ export default async function RootLayout({
         <script src='/electron-runtime-init.js' />
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
         <script src='/theme-init.js' />
+        {shouldMountGa && isValidGaMeasurementId(gaMeasurementId) ? (
+          <script
+            id='ga-consent-init'
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: script body is generated from a validated GA measurement ID.
+            dangerouslySetInnerHTML={{
+              __html: buildGoogleConsentInitScript(gaMeasurementId),
+            }}
+          />
+        ) : null}
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (

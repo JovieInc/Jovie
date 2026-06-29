@@ -16,7 +16,12 @@ export default async function StartLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const forceBypassClerk = env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureEnv();
+  // Anonymous onboarding never needs a live Clerk bootstrap on loopback E2E/dev
+  // hosts — loading FAPI JS from localhost causes CORS console errors and jank.
+  const forceBypassClerk =
+    !isSecureEnv() &&
+    (env.PUBLIC_NOAUTH_SMOKE === '1' ||
+      process.env.NEXT_PUBLIC_E2E_MODE === '1');
   const initialFlags = await getAppFlagsSnapshot({
     flagNames: resolveStartRouteFlagNames(),
   });

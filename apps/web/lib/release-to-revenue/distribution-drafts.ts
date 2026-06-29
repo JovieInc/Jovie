@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, eq, isNotNull, like } from 'drizzle-orm';
+import { recordWorkflowRunOutcome } from '@/lib/connectors/workflows/outcome-attribution';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { merchGenerationBatches } from '@/lib/db/schema/merch';
@@ -265,6 +266,17 @@ async function persistStepOutputs(input: {
         : {}),
     })
     .where(eq(workflowRuns.id, input.runId));
+
+  if (input.nextRunStatus === 'completed') {
+    try {
+      await recordWorkflowRunOutcome(input.runId);
+    } catch (err) {
+      logger.error(
+        '[release-to-revenue] failed to record workflow run outcome',
+        { runId: input.runId, err }
+      );
+    }
+  }
 }
 
 export function dispatchDistributionDraft(

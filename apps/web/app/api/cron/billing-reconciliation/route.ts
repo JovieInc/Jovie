@@ -83,9 +83,21 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
 
   logger.info('[billing-reconciliation] Completed:', result);
 
-  if (stats.mismatches > 0 || stats.errors > 0) {
+  const unfixedMismatches = stats.mismatches - stats.fixed;
+  if (stats.fixed > 0) {
+    logger.info('[billing-reconciliation] Auto-fixed billing mismatches', {
+      fixed: stats.fixed,
+      mismatches: stats.mismatches,
+      orphanedSubscriptions: stats.orphanedSubscriptions,
+    });
+  }
+
+  // Only alert on actionable failures. Successfully repaired mismatches are
+  // expected self-healing behavior and should not page Sentry.
+  if (stats.errors > 0 || unfixedMismatches > 0) {
     await captureWarning('Billing reconciliation found issues', undefined, {
       stats,
+      unfixedMismatches,
       errors: errors.slice(0, 5),
     });
   }

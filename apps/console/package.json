@@ -1,6 +1,6 @@
 {
   "name": "@jovie/console",
-  "version": "26.6.56",
+  "version": "26.6.61",
   "private": true,
   "sideEffects": false,
   "engines": {

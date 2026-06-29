@@ -15,7 +15,7 @@
 #    no-cost success status so CI does not burn tokens or fail inconclusively
 # 5. If the PR diff is unavailable, skips the LLM call and reports a deterministic
 #    no-cost success status so scope-judge never stays pending
-# 6. Reports pass/fail/skip as a commit status (used as required check for auto-approve)
+# 6. Reports pass/fail/skip as a commit status (advisory — not on PR Ready / merge gate)
 #
 # SAFETY:
 # - Read-only: does not modify code, only reports status

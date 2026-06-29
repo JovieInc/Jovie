@@ -6,6 +6,7 @@ import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
+import * as largeTextPaste from '@/lib/chat/large-text-paste';
 import { fastRender } from '@/tests/utils/fast-render';
 
 function withProviders(ui: ReactNode) {
@@ -380,28 +381,24 @@ describe('ChatInput', () => {
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.style.borderRadius).toBe('24px');
 
-    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-22'
-    );
-    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'grid'
-    );
+    const inputRow = surface.firstElementChild?.firstElementChild;
+    expect(inputRow?.className).toContain('grid');
+    expect(inputRow?.className).toContain('content-start');
+    expect(inputRow?.className).not.toContain('min-h-22');
   });
 
-  it('renders the grid layout (not pill) for hero variant when pending images are present', () => {
+  it('keeps hero pill geometry when only external attachments are present', () => {
     const pendingFiles = [
       {
         id: 'p1',
-        name: 'preview.png',
+        name: 'track.wav',
         size: 1024,
-        mediaType: 'image/png',
-        kind: 'image',
+        mediaType: 'audio/wav',
+        kind: 'audio',
         progress: 100,
         speed: 0,
         status: 'ready',
-        kindLabel: 'PNG · image',
-        previewUrl: 'blob:mock',
-        dataUrl: 'data:image/png;base64,AAAA',
+        kindLabel: 'WAV · audio',
       } as const,
     ];
     fastRender(
@@ -418,13 +415,46 @@ describe('ChatInput', () => {
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.style.borderRadius).toBe('24px'); // expanded hero geometry with attachments
+    expect(surface.style.borderRadius).toBe('999px');
+    expect(surface).not.toHaveAttribute('data-expanded');
+
+    const inputRow = surface.firstElementChild?.firstElementChild;
+    expect(inputRow?.className).toContain('min-h-13');
+    expect(inputRow?.className).not.toContain('grid');
+  });
+
+  it('does not inflate the textarea row when typing with a ready audio attachment', () => {
+    const pendingFiles = [
+      {
+        id: 'a1',
+        name: 'demo.wav',
+        size: 2048,
+        mediaType: 'audio/wav',
+        kind: 'audio',
+        progress: 100,
+        speed: 0,
+        status: 'ready',
+        kindLabel: 'WAV · audio',
+      } as const,
+    ];
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value='transcribe this clip'
+          onFileAttach={vi.fn()}
+          pendingFiles={pendingFiles}
+          onRemoveFile={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
-    const container = inlineField.parentElement;
-    expect(container?.className).toContain('min-h-22');
-    expect(container?.className).toContain('grid');
-    expect(container?.className).not.toContain('min-h-13');
+    const inputRow = inlineField.parentElement;
+    expect(inputRow?.className).toContain('content-start');
+    expect(inputRow?.className).not.toContain('min-h-22');
+    expect(inlineField.className).not.toContain('min-h-7');
   });
 
   it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
@@ -719,6 +749,37 @@ describe('ChatInput', () => {
     });
 
     await waitFor(() => expect(sendButton).toBeEnabled());
+  });
+
+  it('routes very large text pastes through the chunked insert helper', () => {
+    const insertSpy = vi.spyOn(largeTextPaste, 'insertLargeTextAtCaret');
+    const onChange = vi.fn();
+    const largePaste = 'z'.repeat(5000);
+
+    fastRender(
+      withProviders(
+        <ChatInput {...baseProps} value='hello' onChange={onChange} />
+      )
+    );
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    }) as HTMLTextAreaElement;
+    textarea.setSelectionRange(5, 5);
+
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) => (type === 'text/plain' ? largePaste : ''),
+      },
+    });
+
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+    expect(insertSpy.mock.calls[0]?.[0]).toMatchObject({
+      pastedText: largePaste,
+      currentValue: 'hello',
+    });
+    insertSpy.mockRestore();
   });
 
   it('shows the stop action while streaming even when the draft is empty', async () => {

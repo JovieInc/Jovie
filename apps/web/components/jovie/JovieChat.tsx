@@ -10,10 +10,10 @@ import {
   useState,
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
+import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
@@ -562,12 +562,16 @@ export function JovieChat({
             ref={scrollContainerRef}
             className={cn(
               'absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5',
+              !showThreadView && 'flex flex-col',
               showBottomComposer &&
                 CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME
             )}
           >
             {!showThreadView ? (
-              <div className='relative min-h-full'>
+              <div
+                className='flex flex-1 flex-col items-center justify-center'
+                data-testid='chat-empty-state-viewport'
+              >
                 <ChatEmptyStateComposerRegion>
                   {composerSurface}
                   {inlineChatError ? (
@@ -604,6 +608,15 @@ export function JovieChat({
             in the scroll viewport; active threads float it over the transcript with
             a scroll-behind fade so the last message never hard-stops at the input.
           */}
+          {showThreadView ? (
+            <ChatThreadNavigationRail
+              messages={messages}
+              scrollContainerRef={scrollContainerRef}
+              shouldVirtualizeMessages={shouldVirtualizeMessages}
+              virtualizer={virtualizer}
+            />
+          ) : null}
+
           {showBottomComposer ? (
             <>
               <div

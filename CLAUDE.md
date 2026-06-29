@@ -1,188 +1,115 @@
 # Jovie — Agent Operating Manual
 
-Controller file for AI agents working in this repo. `AGENTS.md` is a symlink to this file. Read the scoped rule for the topic you're touching before you edit.
+Controller map for AI agents. `AGENTS.md` symlinks here. Read the scoped rule for your topic before editing. Detail lives in `.claude/rules/*` and `docs/`.
 
 ## Operating Principles
 
-- Make the smallest correct change.
-- Inspect existing patterns before creating new ones.
-- Prefer server-side code, typed contracts, and existing package boundaries.
-- Don't invent commands, env vars, routes, tables, services, or design tokens.
-- Don't hide failing checks. Report exact failures and the likely cause.
-- Ask before destructive operations: data deletion, irreversible migrations without CI guard, credential changes, dependency replacement, or production-impacting scripts. **Do not** require human approval for merge/review solely because a change touches auth or payments — strict CI and Migration Guard own that.
-- **Decisions are systems, not events** (when quantifiable). For decisions whose cost or benefit is measurable, format as **Ship now / Re-evaluate when / Then** with the trigger tied to revenue/cost/perf unit economics (per-unit cost OR build cost = CI minutes × runner $/min + agent minutes × $/hr-of-intelligence). For taste, identity, security, or "this is just wrong" decisions, tag `EVENT:` and skip the trigger — some decisions are permanent. Reject phrasing like "premature", "later", "future work" without a Linear ID. See `.claude/rules/code-style.md` → "Conditional decisions" (added 2026-05-18) and `~/.claude/projects/.../memory/feedback_conditional_decisions.md`. Enforcement hook: `.claude/hooks/conditional-decision-lint.sh` (warn-mode through 2026-06-01, then error).
+- Smallest correct change; inspect existing patterns first.
+- Server-side code, typed contracts, existing package boundaries.
+- Don't invent commands, env vars, routes, tables, services, or tokens.
+- Report exact check failures — don't hide them.
+- Ask before destructive ops (data deletion, irreversible migrations without CI guard, credential changes, prod scripts). Auth/payment edits do **not** need human merge approval — CI + Migration Guard own that.
+- **Decisions are systems, not events** when quantifiable: **Ship now / Re-evaluate when / Then** with unit-economics triggers; tag `EVENT:` for taste/identity/security permanence. No "later"/"future work" without a Linear ID → [`.claude/rules/code-style.md`](.claude/rules/code-style.md).
 
-The four canon principles (Ship Fast, Run Experiments, Document Everything, MRR Is King) are in [`docs/company/operating-principles.md`](docs/company/operating-principles.md). They supersede [`docs/company/core-values.md`](docs/company/core-values.md) when in conflict.
+Canon principles: [`docs/company/operating-principles.md`](docs/company/operating-principles.md) (supersede [`docs/company/core-values.md`](docs/company/core-values.md)).
 
 ## Agent Role Boundary
 
-Orchestrated sessions must set `JOVIE_AGENT_PROFILE` before editing:
-
-- `default` / Chief of Staff: prioritize, dispatch, verify, update HUD/Linear. Do not code.
-- `cfo-milan-v2`: cost, runway, usage, spend routing. Do not code.
-- `founder-os`: GTM, fundraising, applications, company facts. Do not code.
-- `code-orchestrator`: plan, decompose, review, and create manifests. Do not implement.
-- `coder`: implement assigned HUD/delegation manifests only.
-- `no_agent`: deterministic scripts, HUD refresh, cron checks, usage ledger, GBrain sync.
-
-If a non-coding profile discovers work that needs product/CI changes, create or update a HUD/delegation manifest with KPI, owner, profile, runtime, cost route, GBrain queries, gstack skills, expected output, and verification. Then dispatch a `coder` profile. Do not check out teammate branches, edit code, commit, push, merge, deploy, or repair CI directly from Chief/default/code-orchestrator sessions.
+Set `JOVIE_AGENT_PROFILE` before editing. Non-coding profiles (`default`, Chief, `cfo-milan-v2`, `founder-os`, `code-orchestrator`) dispatch and verify — never code/commit/push/merge/repair CI. `coder` implements assigned manifests. `no_agent` runs deterministic scripts only. Full contract: [`.claude/rules/linear.md`](.claude/rules/linear.md).
 
 ## Instruction Architecture
 
-- `AGENTS.md` is the canonical cross-agent contract and is intentionally a symlink to this file. Do not replace it with a standalone file.
-- Keep host-specific wrappers thin. `CODEX.md`, Claude settings, Copilot/Gemini-style wrappers, and future agent entrypoints should point back to this contract and scoped rules instead of copying policy.
-- Put stable, shared instructions in this file or `.claude/rules/*`; put task-specific workflow in skills; put deterministic enforcement in hooks/settings/scripts when available.
-- Generated skill outputs are derived artifacts. Edit gstack `.tmpl` source files and generator code, then regenerate; do not hand-edit generated `SKILL.md` files except to unblock a generator repair.
-- Keep skill files progressively disclosed: short trigger/inputs/workflow/output in the leaf skill, detailed reference material in linked files, repeatable logic in scripts.
-- Prefer stable static prefixes and variable task context later in prompts. This improves prompt-cache reuse and reduces repeated token burn.
-- Use separate agent sessions or subagents for large side investigations, broad review, or research-heavy work when the host supports delegation and the task would otherwise lose context.
+- `AGENTS.md` → symlink to this file. Host wrappers (`CODEX.md`, Copilot, etc.) point here — never duplicate policy.
+- Stable rules → this file or `.claude/rules/*`; workflows → skills; enforcement → hooks/scripts.
+- Generated skills: edit `.tmpl` sources, regenerate — don't hand-edit `SKILL.md`.
+- Prefer static prefixes + variable task context later (cache-friendly). Delegate large investigations to subagents.
 
-## Tool Versions (Verify Before Any Command)
+## Tool Versions
 
 ```bash
 node --version   # MUST be 22.x (22.13+)
 pnpm --version   # MUST be 9.15.4
 ```
 
-If wrong: `nvm use 22 && corepack prepare pnpm@9.15.4 --activate`. Always run from the repo root. Never `cd` into packages. Use `pnpm` (not npm/yarn) and `pnpm turbo` (not `npx turbo`).
+Wrong versions: `nvm use 22 && corepack prepare pnpm@9.15.4 --activate`. Repo root only; `pnpm` + `pnpm turbo` (not npm/yarn/npx). Secret-bound commands via Doppler wrappers. Setup: [`.claude/rules/environment.md`](.claude/rules/environment.md).
 
-Secret-bound commands MUST be prefixed with Doppler — prefer the wrapped scripts (`pnpm run dev:web:fast`, `pnpm run test:web`, etc.). Run `./scripts/setup.sh` on every fresh worktree. Full setup: [`.claude/rules/environment.md`](.claude/rules/environment.md).
+## Hard Invariants (Hook-Enforced)
 
-## Hard Invariants (Enforced by Hooks)
+Details and remediation live in scoped rules — hooks block violations.
 
-These rules will block your changes if violated.
-
-- **Migration files are immutable** → [`.claude/rules/db.md`](.claude/rules/db.md)
-- **Single DB driver: `import { db } from '@/lib/db'`** → [`.claude/rules/db.md`](.claude/rules/db.md)
-- **One Clerk instance per env, `/__clerk` proxy via `fetch()`** → [`.claude/rules/auth.md`](.claude/rules/auth.md)
-- **No direct `middleware.ts` creation** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **No `biome-ignore` comments** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **No emoji in UI — use icons** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **No native browser dialogs (`alert`/`confirm`/`prompt`)** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **No decorative hover motion (translate/scale/lift)** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **Subtraction principle: remove before adding** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **Marketing/blog/legal pages must be fully static** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **Global UI singletons render once (root layout only)** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **CSP domains stay in sync with provider registry** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **Public/webhook coordination must be durable (no in-memory state)** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **Server-side external HTTP must be bounded (timeout + retry wrapper)** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **Persistence-critical helpers must fail closed (throw on failure)** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **Outbound email personalization must fail safe (generic fallback)** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **Entitlements: single source of truth (`getCurrentUserEntitlements()`)** → [`.claude/rules/security.md`](.claude/rules/security.md)
-- **Performance must not replace route UIs (same design, faster)** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **iOS: no raw `AsyncImage`, no CoreImage in views, no main-thread blocking, cache-first loads** → [`.claude/rules/ios.md`](.claude/rules/ios.md)
-- **Founder/featured-creator identity must be canonical (Tim White Spotify ID `4u`)** → [`.claude/rules/ui.md`](.claude/rules/ui.md)
-- **Bot review comments (CodeRabbit, Greptile) block merge** → [`.claude/rules/release.md`](.claude/rules/release.md)
-- **Conventional commits required** → [`.claude/rules/release.md`](.claude/rules/release.md)
-- **Plan before executing complex tasks (3+ steps, schema changes, refactors)** → [`.claude/rules/code-style.md`](.claude/rules/code-style.md)
-- **Verify before marking done (typecheck + relevant tests)** → [`.claude/rules/testing.md`](.claude/rules/testing.md)
+| Topic | Rule file |
+|-------|-----------|
+| Migrations, DB driver | [`.claude/rules/db.md`](.claude/rules/db.md) |
+| Clerk proxy, E2E auth | [`.claude/rules/auth.md`](.claude/rules/auth.md) |
+| UI, design system, marketing static | [`.claude/rules/ui.md`](.claude/rules/ui.md) |
+| CSP, webhooks, secrets, entitlements | [`.claude/rules/security.md`](.claude/rules/security.md) |
+| PR/ship/deploy, bot reviews | [`.claude/rules/release.md`](.claude/rules/release.md) |
+| iOS native guardrails | [`.claude/rules/ios.md`](.claude/rules/ios.md) |
+| TypeScript, boundaries, prior-art gate | [`.claude/rules/code-style.md`](.claude/rules/code-style.md) |
+| Tests, verify-before-done | [`.claude/rules/testing.md`](.claude/rules/testing.md) |
 
 ## Repo Workflow
 
-**How code reaches `main` is canonical in [`docs/PR_FLOW.md`](docs/PR_FLOW.md)** — small PRs to `main`, risk-tiered CI (heavy scans run post-merge/nightly, never on the PR path), per-PR auto-merge that tolerates transient/zombie checks, and a screenshot-gated 👍 as the only human (taste) step. Read it before changing CI triggers, the merge queue, or how you stack PRs.
+**PR/CI/merge flow is canonical in [`docs/PR_FLOW.md`](docs/PR_FLOW.md).** Before changing CI or merge behavior, read it.
 
-1. Read the relevant files before editing.
-2. State the plan for multi-file or risky changes (use plan mode for 3+ steps, schema, or refactors).
-3. Mark the Linear issue `In Progress` BEFORE editing files (see [`.claude/rules/linear.md`](.claude/rules/linear.md)). `Done` is automated on merge; `In Review` is automated for orchestrator-dispatched PRs but must be set manually for ad-hoc PRs.
-4. Edit only files needed for the task.
-5. Open a draft PR on the first push so CI runs early.
-6. Run the narrowest verification (typecheck, lint, focused tests) before claiming done.
-7. Summarize changed files, checks run, and remaining risks in the PR description.
+1. Read relevant files → plan risky/multi-file work.
+2. Mark Linear `In Progress` before edits ([`.claude/rules/linear.md`](.claude/rules/linear.md)).
+3. Edit only task files → draft PR on first push.
+4. Run narrowest verification → summarize changes, checks, risks in PR.
 
-## Linear (Gating, Ownership)
-
-- Skip any issue labeled `human-review-required` or whose description contains "This issue requires human review".
-- Mark issues `In Progress` before editing. `Done` is automated on merge. `In Review` is automated for orchestrator-dispatched PRs; set it manually only for ad-hoc PRs.
-- File a Linear issue for any actionable follow-up, including optional/candidate work. Final answers, PR bodies, plans, and reviews must not mention "did not do X", "consider later", "deferred", "future work", or "follow-up PR" unless they include the created Linear issue ID. Do not rely on `// TODO`, `TODOS.md`, PR bullets, or chat memory.
-
-Full contract: [`.claude/rules/linear.md`](.claude/rules/linear.md).
+Skip issues labeled `human-review-required` or containing "This issue requires human review". File Linear issues for all follow-ups — no orphan "deferred" bullets.
 
 ## Files To Treat Carefully
 
-- `proxy.ts` middleware and route guards
-- `drizzle/migrations/` (immutable on base branch)
-- `apps/web/app/api/stripe/`, `/api/billing/` (money)
-- `app/(onboarding)`, profile claim flow (trust)
-- `apps/web/lib/entitlements/` (entitlement registry + server resolver)
-- `apps/web/constants/platforms/cdn-domains.ts` (CSP source of truth)
-- Design tokens (`tailwind.config.ts`, `DESIGN.md`) and `packages/ui/atoms/`
-- Generated files, schema files, analytics/event schemas
-- Marketing pages (must remain fully static)
+`proxy.ts`, `drizzle/migrations/`, `apps/web/app/api/stripe|billing/`, onboarding/claim flows, `apps/web/lib/entitlements/`, `cdn-domains.ts`, design tokens, generated/schema files, marketing pages (fully static).
 
-## Verification (Before Claiming Done)
+## Verification
 
-Run the narrowest relevant checks:
+- Typecheck: `pnpm --filter @jovie/web run typecheck -- --pretty false`
+- Lint: `pnpm biome check --write <paths>`
+- Tests: `pnpm --filter web exec vitest run <file>`
+- Build when routing/config/cross-package changes
+- **Layout shift audit (mandatory for UI):** no state transition may shift layout — reserve space, update tests. See [`.claude/rules/ui.md`](.claude/rules/ui.md), `DESIGN.md`, `docs/TESTING_GUIDELINES.md`.
 
-- Typecheck for TypeScript/API changes: `pnpm --filter @jovie/web run typecheck -- --pretty false`
-- Lint/format for edited packages: `pnpm biome check --write apps/web`
-- Unit/integration tests for changed logic: `pnpm --filter web exec vitest run <file>`
-- Build for routing/config/cross-package changes
-- **Layout shift audit (mandatory):** Before any UI edit, enumerate all visual states of the component/surface and verify (via inspection, manual dev run, Playwright bounding boxes, or visual regression) that **no state transition causes layout shift**. Reserve space with min-height or stable wrappers for conditional content. Update relevant tests. This is non-negotiable (see `.claude/rules/ui.md` → "Layout Shift Prevention", `DESIGN.md` → "Layout Shift Prevention", `docs/TESTING_GUIDELINES.md`, and `apps/web/tests/TESTING.md`).
-
-If checks are unavailable or fail for unrelated reasons, say so clearly. Paste passing output as evidence in the PR description.
-
-The `post-task-validate.sh` hook runs at task completion and blocks if typecheck, Biome lint, server boundaries, or affected tests fail.
+`post-task-validate.sh` blocks on typecheck, Biome, boundaries, or affected test failures.
 
 ## Scoped Rules
 
-Read the file for the topic you're touching. More-local instructions override this file for their scope.
-
 | File | Topic |
 |---|---|
-| [`.claude/rules/environment.md`](.claude/rules/environment.md) | Local + cloud setup, Doppler, DB isolation, Turbo, worktrees, troubleshooting |
-| [`.claude/rules/auth.md`](.claude/rules/auth.md) | Clerk proxy architecture, E2E auth bypass, browse auth |
-| [`.claude/rules/db.md`](.claude/rules/db.md) | Single driver, immutable migrations, transaction policy |
-| [`.claude/rules/ui.md`](.claude/rules/ui.md) | Design system, component hierarchy, surfaces, taste rules, marketing |
-| [`.claude/rules/security.md`](.claude/rules/security.md) | CSP, webhooks, secrets, email, fail-closed persistence, entitlements |
-| [`.claude/rules/release.md`](.claude/rules/release.md) | PR discipline, ship, deploy, branch strategy, bot reviews |
-| [`.claude/rules/ci-branching.md`](.claude/rules/ci-branching.md) | Agent integration branches, train PRs, CI throughput for parallel work |
-| [`.claude/rules/testing.md`](.claude/rules/testing.md) | E2E patterns, test perf, coverage, verify-before-done |
-| [`.claude/rules/infra.md`](.claude/rules/infra.md) | Cron, API budgets, forbidden infra, cost disclosure, API runtime |
-| [`.claude/rules/ios.md`](.claude/rules/ios.md) | Native SwiftUI app: cache-first loads, off-main rendering, image caching, layout shift, guardrail lint, company-wide portability |
-| [`.claude/rules/code-style.md`](.claude/rules/code-style.md) | TypeScript, React, server/client boundaries, canonical imports, ESLint, hooks |
-| [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership contract |
-| [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Vendored toolkit, skill routing |
-| [`.claude/rules/swarm.md`](.claude/rules/swarm.md) | Ruflo-coordinated parallel swarms (pre-created worktrees, claims, ship recipe) |
-| [`.claude/rules/hermes-air.md`](.claude/rules/hermes-air.md) | Always-on Hermes node (MacBook Air): voice/Telegram intake, ops crons, Linear-as-bus contract |
+| [`.claude/rules/environment.md`](.claude/rules/environment.md) | Setup, Doppler, DB isolation, Turbo, worktrees |
+| [`.claude/rules/auth.md`](.claude/rules/auth.md) | Clerk proxy, E2E auth |
+| [`.claude/rules/db.md`](.claude/rules/db.md) | Driver, migrations, transactions |
+| [`.claude/rules/ui.md`](.claude/rules/ui.md) | Design system, surfaces, taste |
+| [`.claude/rules/security.md`](.claude/rules/security.md) | CSP, webhooks, secrets, entitlements |
+| [`.claude/rules/release.md`](.claude/rules/release.md) | PR discipline, ship, deploy |
+| [`.claude/rules/ci-branching.md`](.claude/rules/ci-branching.md) | Integration branches, train PRs |
+| [`.claude/rules/testing.md`](.claude/rules/testing.md) | E2E, coverage, verify-before-done |
+| [`.claude/rules/infra.md`](.claude/rules/infra.md) | Cron, API budgets, cost disclosure |
+| [`.claude/rules/ios.md`](.claude/rules/ios.md) | SwiftUI guardrails, cache-first loads |
+| [`.claude/rules/code-style.md`](.claude/rules/code-style.md) | TypeScript, React, prior-art gate |
+| [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership |
+| [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Skill routing, vendored toolkit |
+| [`.claude/rules/swarm.md`](.claude/rules/swarm.md) | Parallel swarms, worktrees |
+| [`.claude/rules/hermes-air.md`](.claude/rules/hermes-air.md) | Hermes node, voice/Telegram intake |
 
-## Skill routing
+## Skill Routing
 
-When the user's request matches an available skill, ALWAYS invoke it using the Skill tool as your FIRST action. Full routing table (which skill handles which intent) lives in [`.claude/rules/gstack.md`](.claude/rules/gstack.md).
+Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md`](.claude/rules/gstack.md). Web browsing: `/browse` only (never `mcp__claude-in-chrome__*`). Key flows: `/ship`, `/review`, `/qa`, `/investigate`, `/autoplan`, `/perf-loop`.
 
-Skill hygiene rules:
-- Do not duplicate the gstack routing table inside leaf skills.
-- Do not add broad policy, telemetry, voice, or release rules to a leaf skill unless that rule is unique to the skill.
-- If a skill workflow requires repeated shell logic, add or reuse a script instead of embedding long command prose in every skill.
-- When changing skill templates or generators, run the focused gstack checks from `.agents/skills/gstack/CLAUDE.md`.
+## Documentation Map
 
-## gstack
+| Doc | Use when |
+|-----|----------|
+| `DESIGN.md` | Any UI decision |
+| `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
+| `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |
+| `docs/company/operating-principles.md` | Product prioritization canon |
+| `docs/company/PRICING-PHILOSOPHY.md` | Pricing decisions |
+| `LESSONS.md` | Post-mortems from human corrections |
+| `apps/web/tests/TESTING.md` | Deep test reference |
+| `CODEX.md` | Codex bootstrap wrapper |
 
-Use /browse from gstack for all web browsing. Never use mcp__claude-in-chrome__* tools.
-Available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review,
-/design-consultation, /design-shotgun, /design-html, /review, /ship, /land-and-deploy,
-/canary, /benchmark, /browse, /open-gstack-browser, /qa, /qa-only, /design-review,
-/setup-browser-cookies, /setup-deploy, /setup-gbrain, /sync-gbrain, /retro, /investigate, /document-release,
-/codex, /cso, /autoplan, /perf-loop, /pair-agent, /careful, /freeze, /guard, /unfreeze, /gstack-upgrade, /learn.
+Indexes (`docs/API_ROUTE_MAP.md`, `docs/CRON_REGISTRY.md`, `docs/WEBHOOK_MAP.md`, …) are system-of-record — navigate via this map.
 
-## Coding Tasks
-
-When spawning Claude Code sessions for coding work, tell the session to use gstack skills.
-
-Examples:
-- Security audit: "Load gstack. Run /cso"
-- Code review: "Load gstack. Run /review"
-- QA test a URL: "Load gstack. Run /qa https://..."
-- Build a feature end-to-end: "Load gstack. Run /autoplan, implement the plan, then run /ship"
-- Plan before building: "Load gstack. Run /office-hours then /autoplan. Save the plan, don't implement."
-
-## Quick Pointers
-
-- `AGENTS.md` is a symlink to this file — do not replace it with a standalone file.
-- `DESIGN.md` is the visual source of truth (read before any UI decision).
-- `docs/PR_FLOW.md` is the canonical PR/CI/merge flow (how to ship, CI tiers, the taste gate).
-- `CODEX.md` is the Codex bootstrap wrapper.
-- `apps/web/tests/TESTING.md` is the deep test reference.
-- `LESSONS.md` collects post-mortems from human corrections.
-- `docs/` holds reference indexes (schema map, API map, cron registry, etc.).
-- `docs/company/operating-principles.md` is the four-principle canon (Ship Fast, Experiments, Document, MRR Is King).
-- `docs/company/PRICING-PHILOSOPHY.md` is the canon for how pricing decisions are made; `docs/company/PRICING-STRATEGY.md` is the current snapshot; `docs/company/pricing-trends-summary.md` is the Stripe data behind the philosophy.
+<!-- doc-freshness:scoped-rules-count:16 -->

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage } from '@/components/jovie/components/ChatMessage';
@@ -66,6 +66,13 @@ vi.mock('next/dynamic', () => ({
 
 vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
   ChatMarkdown: ({ content }: { content: string }) => <div>{content}</div>,
+}));
+
+const copyMarkdownToClipboardMock = vi.fn().mockResolvedValue(true);
+
+vi.mock('@/lib/chat/copy-markdown', () => ({
+  copyMarkdownToClipboard: (...args: unknown[]) =>
+    copyMarkdownToClipboardMock(...args),
 }));
 
 describe('ChatMessage', () => {
@@ -167,6 +174,21 @@ describe('ChatMessage', () => {
     expect(loading.querySelector('.system-b-chat-loading-avatar')).toBeTruthy();
     expect(loading.querySelector('.system-b-chat-loading-label')).toBeTruthy();
     expect(loading.querySelector('.system-b-chat-loading-line')).toBeTruthy();
+  });
+
+  it('copies assistant markdown through the rich clipboard helper', () => {
+    copyMarkdownToClipboardMock.mockClear();
+    const messageProps = {
+      id: 'assistant-copy-rich',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: '**Bold** answer' }],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy message' }));
+
+    expect(copyMarkdownToClipboardMock).toHaveBeenCalledWith('**Bold** answer');
   });
 
   it('keeps assistant reply and copy action on named System B primitives', () => {

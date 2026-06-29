@@ -161,6 +161,7 @@ export {
   insertExternalObjectSchema,
   insertSuggestedActionSchema,
   insertWebhookDeliverySchema,
+  insertWorkflowRunOutcomeSchema,
   insertWorkflowRunSchema,
   type NewAgentRun,
   type NewConnectorAccount,
@@ -170,6 +171,7 @@ export {
   type NewSuggestedAction,
   type NewWebhookDelivery,
   type NewWorkflowRun,
+  type NewWorkflowRunOutcome,
   type SuggestedAction,
   selectAgentRunSchema,
   selectConnectorAccountSchema,
@@ -178,11 +180,14 @@ export {
   selectExternalObjectSchema,
   selectSuggestedActionSchema,
   selectWebhookDeliverySchema,
+  selectWorkflowRunOutcomeSchema,
   selectWorkflowRunSchema,
   suggestedActions,
   type WebhookDelivery,
   type WorkflowRun,
+  type WorkflowRunOutcome,
   webhookDeliveries,
+  workflowRunOutcomes,
   workflowRuns,
 } from './connectors';
 // Content (Providers, Releases, Recordings, Tracks)
@@ -365,6 +370,7 @@ export {
   leadSourcePlatformEnum,
   leadStatusEnum,
   libraryAssetApprovalStatusEnum,
+  libraryAssetVisibilityEnum,
   linkTypeEnum,
   merchCardStatusEnum,
   merchDesignLaneEnum,
@@ -535,6 +541,15 @@ export {
   type NewLibraryAssetApprovalStatusRow,
   selectLibraryAssetApprovalStatusSchema,
 } from './library';
+// Library Asset Share (per-asset public/private URLs)
+export {
+  insertLibraryAssetShareSettingsSchema,
+  type LibraryAssetShareSettingsRow,
+  type LibraryAssetVisibilityValue,
+  libraryAssetShareSettings,
+  type NewLibraryAssetShareSettingsRow,
+  selectLibraryAssetShareSettingsSchema,
+} from './library-asset-share';
 // Library Share Drops (press kit / label review portals)
 export {
   insertLibraryShareDropItemSchema,

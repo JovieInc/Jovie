@@ -116,4 +116,8 @@ export const publicEnv = {
   get NEXT_PUBLIC_INSTANTLY_PIXEL_ID() {
     return process.env.NEXT_PUBLIC_INSTANTLY_PIXEL_ID || undefined;
   },
+  // Google Analytics 4 measurement ID (gtag.js)
+  get NEXT_PUBLIC_GA_MEASUREMENT_ID() {
+    return process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || undefined;
+  },
 } as const;

@@ -27,6 +27,10 @@ private actor MutableAPIClient: APIClientProtocol {
     Data()
   }
 
+  func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse {
+    .preview
+  }
+
   func updateMode(_ mode: Mode) {
     self.mode = mode
   }

@@ -146,7 +146,7 @@ export function toSidebarThread(
   return {
     id: conversation.id,
     href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
-    title: conversation.title?.trim() || 'Untitled conversation',
+    title: conversation.title?.trim() || 'Untitled chat',
     status: getSidebarThreadStatus(latestTurnStatus),
     updatedAt: conversation.updatedAt,
     unread,
@@ -268,11 +268,11 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         )}
       </Tooltip>
       {onThreadContextMenu ? (
-        <Tooltip label='Conversation Actions' side='right'>
+        <Tooltip label='Chat Actions' side='right'>
           <button
             type='button'
             onClick={e => onThreadContextMenu(e, thread)}
-            aria-label={`Conversation Actions for ${thread.title}`}
+            aria-label={`Chat Actions for ${thread.title}`}
             className={cn(
               'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
               'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
@@ -324,8 +324,8 @@ export function SidebarThreadsSection({
   return (
     <div className='space-y-1.5'>
       <div className='flex items-center justify-between border-t border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] px-2.5 pb-0.5 pt-2'>
-        <span className='text-3xs font-semibold uppercase tracking-[0.08em] text-quaternary-token'>
-          Conversations
+        <span className='text-xs font-caption tracking-normal text-sidebar-muted/90'>
+          Chats
         </span>
         {unreadCount > 0 && (
           <span className='inline-flex items-center gap-1 text-2xs font-medium text-quaternary-token'>
@@ -366,7 +366,7 @@ export function SidebarThreadsSection({
               <button
                 type='button'
                 onClick={onRetry}
-                aria-label='Retry Conversations'
+                aria-label='Retry Chats'
                 className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token'
               >
                 <RefreshCw
@@ -396,7 +396,7 @@ export function SidebarThreadsSection({
               strokeWidth={2.25}
             />
             <span className='min-w-0 truncate justify-self-start'>
-              New Conversation
+              New Chat
             </span>
           </button>
         ) : null}
@@ -435,7 +435,7 @@ export function SidebarThreadsSection({
               strokeWidth={2.25}
             />
             <span className='min-w-0 truncate justify-self-start'>
-              All Conversations
+              All Chats
             </span>
           </Link>
         ) : null}

@@ -70,9 +70,7 @@ describe('DashboardHeader', () => {
   it('prefers the breadcrumb suffix for the mobile title when present', () => {
     const { container } = render(
       <DashboardHeader
-        breadcrumbs={[
-          { label: 'New Conversation', href: '/app/chat/conv-123' },
-        ]}
+        breadcrumbs={[{ label: 'New Chat', href: '/app/chat/conv-123' }]}
         breadcrumbSuffix={<span>Release planning thread</span>}
       />
     );
@@ -83,7 +81,7 @@ describe('DashboardHeader', () => {
     expect(
       within(mobileHeader!).getByText('Release planning thread')
     ).toBeInTheDocument();
-    expect(within(mobileHeader!).queryByText('New Conversation')).toBeNull();
+    expect(within(mobileHeader!).queryByText('New Chat')).toBeNull();
   });
 
   it('collapses the breadcrumb when the search surface takes over', () => {
