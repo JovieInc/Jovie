@@ -15,6 +15,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -555,3 +556,57 @@ export type WorkflowRun = typeof workflowRuns.$inferSelect;
 export type NewWorkflowRun = typeof workflowRuns.$inferInsert;
 export const insertWorkflowRunSchema = createInsertSchema(workflowRuns);
 export const selectWorkflowRunSchema = createSelectSchema(workflowRuns);
+
+// ---------------------------------------------------------------------------
+// workflow_run_outcomes
+// ---------------------------------------------------------------------------
+
+/**
+ * Revenue outcome snapshot written when a workflow_run reaches `completed`.
+ * One row per run — joins GMV, smartlink clicks, DSP clicks, and captured fans
+ * inside the attribution window so automations can be rolled up to artist lift.
+ */
+export const workflowRunOutcomes = pgTable(
+  'workflow_run_outcomes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workflowRunId: uuid('workflow_run_id')
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Release or catalog asset tied to the automation, when known. */
+    releaseId: text('release_id'),
+    /** Originating suggested_action for connector automations. */
+    suggestedActionId: uuid('suggested_action_id').references(
+      () => suggestedActions.id,
+      { onDelete: 'set null' }
+    ),
+    gmvDeltaCents: integer('gmv_delta_cents').notNull().default(0),
+    clickDelta: integer('click_delta').notNull().default(0),
+    dspClickDelta: integer('dsp_click_delta').notNull().default(0),
+    newFansDelta: integer('new_fans_delta').notNull().default(0),
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  t => [
+    uniqueIndex('workflow_run_outcomes_workflow_run_id_uniq').on(
+      t.workflowRunId
+    ),
+    index('workflow_run_outcomes_user_id_window_end_idx').on(
+      t.userId,
+      t.windowEnd
+    ),
+  ]
+);
+
+export type WorkflowRunOutcome = typeof workflowRunOutcomes.$inferSelect;
+export type NewWorkflowRunOutcome = typeof workflowRunOutcomes.$inferInsert;
+export const insertWorkflowRunOutcomeSchema =
+  createInsertSchema(workflowRunOutcomes);
+export const selectWorkflowRunOutcomeSchema =
+  createSelectSchema(workflowRunOutcomes);

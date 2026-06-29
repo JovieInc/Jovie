@@ -262,6 +262,10 @@ To fix a violation:
 
 ## Color System
 
+> **Canonical source:** Token values in the tables below are mirrored from
+> `apps/web/styles/design-system.css` (the single source of truth). When tokens
+> change in CSS, update these tables in the same PR — do not invent values here.
+
 ### Theme Generation
 
 Three input variables generate the entire palette:
@@ -297,10 +301,10 @@ Three input variables generate the entire palette:
 
 | Token | Value | Hex | Usage |
 |-------|-------|-----|-------|
-| `--color-bg-base` | `#08090a` | — | Sidebar, page background |
-| `--color-bg-surface-0` | `#0f1011` | — | Primary app surface |
-| `--color-bg-surface-1` | `#17171a` | — | Cards, panels |
-| `--color-bg-surface-2` | `#23252a` | — | Inputs, elevated |
+| `--color-bg-base` | `#06070a` | — | Sidebar, page background (carbon palette) |
+| `--color-bg-surface-0` | `#0a0b0e` | — | Primary app surface (carbon palette) |
+| `--color-bg-surface-1` | `#101216` | — | Cards, panels (carbon palette) |
+| `--color-bg-surface-2` | `#161a20` | — | Inputs, elevated (carbon palette) |
 | `--color-bg-surface-3` | `#2a2c32` | — | Modals, tooltips |
 | Text primary | `lch(100% 0 282)` | `#ffffff` | Headings |
 | Text secondary | `lch(90.65% 1.35 282)` | `#E3E4E6` | Body, labels (bright!) |
@@ -416,9 +420,9 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | Prose | 680px | Long-form text |
 | Pricing grid | 1024px | Pricing layout (intentional narrow) |
 
-**Rule:** All marketing sections use the canonical width (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+**Rule:** All marketing sections use the canonical width (`var(--ds-public-content-max)` / `max-w-public-content`). Full-bleed sections explicitly break out. No more mixed widths.
 
-These are surface-side aliases of `--ds-public-content-max` and `--ds-prose-max` (DS_FOUNDATION_V1).
+Legacy aliases (`--linear-content-max`, `--public-content-max-page`, `--public-content-max-landing`) all resolve to `--ds-public-content-max` (1298px). Prose uses `--ds-prose-max` (680px).
 
 ---
 
@@ -786,7 +790,7 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 
 | File | Responsibility |
 |------|----------------|
-| `apps/web/styles/design-system.css` | Canonical app/product token source |
+| `apps/web/styles/design-system.css` | **Canonical token source** — all width, surface, and color values in this doc mirror CSS here |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |
@@ -820,7 +824,8 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 | 2026-04-22 | Homepage migrated from System A to System B | Chat-intake is product, not marketing. Satoshi-editorial typography on a utility entrypoint was a category error. Lovable, v0, Bolt, and ChatGPT all use one system across homepage and product. System A scope shrinks to editorial surfaces (blog, pricing, changelog, support, legal). Full System A retirement deferred 3 months pending shipping data. |
 | 2026-04-22 | Homepage hero typography: Inter 40→48→56px, weight 680 (Linear bold / `font-bold` token) | Replaces Satoshi 800 marketing display. Product-powerful without tipping into marketing-shout. Letter-spacing -2.5% at display sizes. `--font-weight-bold` resolves to 680 (verified at runtime); the plan's initial "try 590 first, 680 if too muted" landed on 680. |
 | 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | Supersedes the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stay Inter. Driven by Frame.io-inspired hero composition where Inter at 80px reads narrow; Satoshi at 600/-0.045em matches Frame.io's FrameGothic computed style spec (verified by getComputedStyle). |
-| 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). Everything boxed at 1200px now. |
+| 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). **Superseded 2026-06-28** by DS_FOUNDATION_V1 1298px. |
+| 2026-06-28 | Canonical 1298px public/marketing width (DS_FOUNDATION_V1) | One width in code + docs. `--ds-public-content-max` is canonical; legacy 1200/1280 aliases resolve to 1298px. Linear.app container parity. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |

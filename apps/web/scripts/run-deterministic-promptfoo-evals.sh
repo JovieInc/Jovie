@@ -21,6 +21,11 @@ export PROMPTFOO_DISABLE_TELEMETRY=1
 export PROMPTFOO_DISABLE_UPDATE=1
 export PROMPTFOO_NO_TESTCASE_ASSERT_WARNING=1
 
+# Register the server-only shim before Promptfoo loads jovie-chat-provider.ts.
+# lib/ai/sdk.ts imports `server-only`; without preload, validate/eval fail in CI.
+PRELOAD_SHIM="$(cd "$(dirname "$0")/../tests/eval/promptfoo" && pwd)/server-only-preload.mjs"
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import file://${PRELOAD_SHIM}"
+
 unset \
   AI_GATEWAY_API_KEY \
   OPENAI_API_KEY \

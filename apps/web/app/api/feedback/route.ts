@@ -19,6 +19,8 @@ const payloadSchema = z.object({
   message: z.string().trim().min(5).max(2000),
   source: z.string().trim().min(1).max(80).default('dashboard'),
   pathname: z.string().trim().max(512).nullable().optional(),
+  suggestedActionId: z.string().uuid().optional(),
+  rating: z.enum(['positive', 'negative']).optional(),
 });
 
 export const runtime = 'nodejs';
@@ -78,6 +80,10 @@ export async function POST(request: Request) {
         pathname,
         userAgent: request.headers.get('user-agent'),
         timestampIso: new Date().toISOString(),
+        ...(parsed.data.suggestedActionId
+          ? { suggestedActionId: parsed.data.suggestedActionId }
+          : {}),
+        ...(parsed.data.rating ? { rating: parsed.data.rating } : {}),
       },
     });
 

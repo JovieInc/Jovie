@@ -133,19 +133,91 @@ test.describe('Auth signup onboarding canary', () => {
     await assertAuthShellReady(page, 'sign-in');
   });
 
-  test('start /start renders onboarding chat', async ({ page }) => {
+  test('start /start initializes the onboarding interview', async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(90_000);
     await allowAnalyticsPassthrough(page);
 
-    const { status, ok } = await goAndWait(
-      page,
-      AUTH_SIGNUP_ONBOARDING_SPEC_ROUTES.start
+    // Deterministic (no-LLM) signals that the interview actually initialized.
+    // The original canary only asserted the `onboarding-chat` container was in
+    // the DOM, so the production break — interview never starts / composer never
+    // becomes usable — slipped through. These assertions are the gated lane's
+    // "CI fails if the interview does not initialize" contract.
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    // Uncaught JS exceptions are always app errors. console.error is noisier:
+    // browser CSP-policy violation reports are surfaced as console errors but
+    // are orthogonal to whether the interview initializes, so they are captured
+    // (for the failure packet) but excluded from the gating subset below.
+    const isBenignConsoleNoise = (text: string) =>
+      /content security policy|violates the following|was preloaded using link preload/i.test(
+        text
+      );
+    page.on('pageerror', err =>
+      consoleErrors.push(`pageerror: ${err.message}`)
     );
-
-    expect(ok, `/start returned ${status}`).toBe(true);
-    await expect(page.getByTestId('onboarding-chat')).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    page.on('console', msg => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
+    page.on('requestfailed', req => {
+      const url = req.url();
+      // Only critical requests: the chat API, app JS, and the document itself.
+      if (/\/api\/chat|\/_next\/static\/.+\.js|\/start/.test(url)) {
+        failedRequests.push(`${req.method()} ${url}`);
+      }
+    });
+
+    // Attach the captured signals on every run so the failure-packet reporter
+    // can surface them even when an assertion below fails first.
+    const attachSignals = async () => {
+      await testInfo.attach('journey-console-errors', {
+        body: JSON.stringify(consoleErrors),
+        contentType: 'application/json',
+      });
+      await testInfo.attach('journey-failed-requests', {
+        body: JSON.stringify(failedRequests),
+        contentType: 'application/json',
+      });
+    };
+
+    try {
+      const { status, ok } = await goAndWait(
+        page,
+        AUTH_SIGNUP_ONBOARDING_SPEC_ROUTES.start
+      );
+      expect(ok, `/start returned ${status}`).toBe(true);
+
+      // Container present...
+      await expect(page.getByTestId('onboarding-chat')).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+
+      // ...AND the interview initialized: the starter intro/suggestions render.
+      await expect(
+        page.getByTestId('onboarding-empty-intro'),
+        'onboarding interview never initialized its starter prompt'
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+      // ...AND the visitor can actually answer: the composer input is enabled.
+      const composer = page.getByRole('textbox', {
+        name: /chat message input/i,
+      });
+      await expect(
+        composer,
+        'onboarding composer never became editable (stuck loading)'
+      ).toBeEditable({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+      // No silent breakage behind a rendered shell. Gate on real app errors;
+      // browser CSP-policy reports are captured (packet) but not gated.
+      const gatingErrors = consoleErrors.filter(e => !isBenignConsoleNoise(e));
+      expect(gatingErrors, 'uncaught app errors on /start').toHaveLength(0);
+      expect(failedRequests, 'critical requests failed on /start').toHaveLength(
+        0
+      );
+    } finally {
+      await attachSignals();
+    }
   });
 
   test('onboarding chat POST reaches Turnstile gate', async ({ page }) => {

@@ -3,6 +3,7 @@ import {
   DEFAULT_LIBRARY_APPROVAL_STATUS,
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
+import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { hashLibraryWaveformSeed } from './library-waveform-peaks';
 
@@ -78,6 +79,7 @@ export interface LibraryReleaseAsset {
   readonly updatedAt?: string;
   readonly aspectRatio?: LibraryAspectRatio;
   readonly mediaOrientation?: LibraryMediaOrientation;
+  readonly share?: LibraryAssetShareViewModel | null;
 }
 
 export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {

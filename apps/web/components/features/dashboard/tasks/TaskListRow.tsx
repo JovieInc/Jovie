@@ -22,6 +22,12 @@ interface TaskListRowProps {
   readonly onOpenRelease: (task: TaskView) => void;
   readonly actionSlot?: ReactNode;
   readonly isSelected?: boolean;
+  /** Hide when the assignee subview already scopes the list. */
+  readonly showAssignee?: boolean;
+  /** Hide when the detail pane already shows the task title. */
+  readonly hideTitle?: boolean;
+  /** Hide when the detail pane already shows the due state. */
+  readonly hideDue?: boolean;
 }
 
 function TaskStageGlyph({ task }: Readonly<{ task: TaskView }>) {
@@ -145,6 +151,9 @@ export const TaskListRow = memo(function TaskListRow({
   onOpenRelease,
   actionSlot,
   isSelected = false,
+  showAssignee = true,
+  hideTitle = false,
+  hideDue = false,
 }: Readonly<TaskListRowProps>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const isDone = task.status === 'done';
@@ -173,24 +182,29 @@ export const TaskListRow = memo(function TaskListRow({
       </span>
 
       <div className='min-w-0 flex-1'>
-        <div className='flex min-w-0 items-center gap-1.5'>
-          <p
-            className={cn(
-              'min-w-0 truncate text-app font-semibold leading-tight text-primary-token',
-              isDone && 'text-secondary-token',
-              isCancelled && 'text-tertiary-token'
-            )}
-          >
-            {task.title}
-          </p>
-          {agentWorking ? <TaskAgentWorkingGlyph /> : null}
-        </div>
+        {hideTitle ? null : (
+          <div className='flex min-w-0 items-center gap-1.5'>
+            <p
+              className={cn(
+                'min-w-0 truncate text-app font-semibold leading-tight text-primary-token',
+                isDone && 'text-secondary-token',
+                isCancelled && 'text-tertiary-token'
+              )}
+            >
+              {task.title}
+            </p>
+            {agentWorking ? <TaskAgentWorkingGlyph /> : null}
+          </div>
+        )}
 
         <div
           data-testid={`task-list-row-meta-${task.id}`}
-          className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-3xs leading-none text-secondary-token'
+          className={cn(
+            'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-3xs leading-none text-secondary-token',
+            !hideTitle && 'mt-0.5'
+          )}
         >
-          {task.dueAt ? (
+          {task.dueAt && !hideDue ? (
             <DueChip dueIso={task.dueAt.toISOString()} muted={isMuted} />
           ) : null}
           <span className='shrink-0 truncate text-tertiary-token'>
@@ -207,9 +221,11 @@ export const TaskListRow = memo(function TaskListRow({
           <div className='min-w-0 max-w-full overflow-hidden text-left'>
             <TaskPriorityInline task={task} />
           </div>
-          <div className='min-w-0 max-w-full overflow-hidden text-left'>
-            <TaskAssigneeInline task={task} artistName={artistName} />
-          </div>
+          {showAssignee ? (
+            <div className='min-w-0 max-w-full overflow-hidden text-left'>
+              <TaskAssigneeInline task={task} artistName={artistName} />
+            </div>
+          ) : null}
           {task.releaseTitle ? (
             <button
               type='button'

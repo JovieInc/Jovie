@@ -29,7 +29,7 @@ import {
   HOMEPAGE_V2_POWER_TILES,
 } from '@/data/homepageV2Copy';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export { HomepageV2FinalCta, HomepageV2Pricing } from './HomepageV2Ctas';
 

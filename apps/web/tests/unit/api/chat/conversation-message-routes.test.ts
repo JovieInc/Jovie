@@ -93,6 +93,7 @@ vi.mock('drizzle-orm', () => ({
 }));
 
 vi.mock('@ai-sdk/gateway', () => ({
+  createGateway: vi.fn(() => vi.fn()),
   gateway: vi.fn(),
 }));
 

@@ -13,7 +13,7 @@ describe('getChatMarkdownStreamdownConfig', () => {
     expect(config.mode).toBe('streaming');
     expect(config.isAnimating).toBe(true);
     expect(config.caret).toBe('block');
-    expect(config.className).toContain('text-[15px]');
+    expect(config.className).toContain('system-b-chat-markdown');
     expect(config.className).toContain('custom-class');
   });
 

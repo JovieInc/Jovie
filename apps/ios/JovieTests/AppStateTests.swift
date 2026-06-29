@@ -169,6 +169,70 @@ struct AppStateTests {
     await appState.handleSignedInUserChange("user_123")
 
     #expect(appState.route == .needsOnboarding)
+    guard case let .loaded(response) = appState.dashboardState else {
+      Issue.record("Needs-onboarding profile must stay loaded for continue URL.")
+      return
+    }
+    #expect(response.state == .needsOnboarding)
+    #expect(appState.continueOnWebURL.absoluteString == "https://jov.ie/app")
+  }
+
+  @Test func coldProfileLoadShowsInteractiveShellBeforeNetworkReturns() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      ),
+      loadDelay: .milliseconds(300)
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    async let change: Void = appState.handleSignedInUserChange("user_123")
+
+    try await Task.sleep(for: .milliseconds(20))
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loading)
+
+    await change
+
+    #expect(appState.dashboardState == .loaded(.previewReady))
+  }
+
+  @Test func cachedNeedsOnboardingSnapshotPreservesContinueOnWebURL() async throws {
+    let onboarding = MobileMeResponse(
+      state: .needsOnboarding,
+      displayName: nil,
+      username: nil,
+      publicProfileURL: nil,
+      qrPayload: nil,
+      avatarURL: nil,
+      appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
+      continueOnWebURL: "https://jov.ie/onboarding/start"
+    )
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: onboarding, isStale: false)
+      ),
+      cached: onboarding
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didLoadClerk = true
+
+    await appState.handleSignedInUserChange("user_123")
+
+    #expect(appState.route == .needsOnboarding)
+    #expect(appState.continueOnWebURL.absoluteString == "https://jov.ie/onboarding/start")
   }
 
   @Test func signOutResetsRouteAndClearsActiveUserCache() async throws {

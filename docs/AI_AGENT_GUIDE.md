@@ -4,6 +4,16 @@ Quick-reference for AI agents working in the Jovie codebase. For hard guardrails
 
 ---
 
+## 0. Design System Contract (llms.txt)
+
+Before editing UI, read the auto-generated design contract:
+
+- **[`docs/llms-design-manifest.txt`](llms-design-manifest.txt)** — llms.txt-style token + component manifest sourced from `apps/web/styles/design-system.css`, `@jovie/ui` primitives, canonical surfaces, and design ESLint guardrails.
+- **Regenerate after token/rule changes:** `pnpm ds:llms-manifest` (CI check: `pnpm ds:llms-manifest:check`)
+- **Human specs:** [`DESIGN.md`](../DESIGN.md), [`docs/DESIGN_TOKENS.md`](DESIGN_TOKENS.md)
+
+---
+
 ## 1. API Route Inventory
 
 All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless noted.

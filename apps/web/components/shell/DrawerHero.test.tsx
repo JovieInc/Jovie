@@ -8,6 +8,25 @@ describe('DrawerHero', () => {
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
   });
 
+  it('exposes the full title on hover when line clamping is enabled', () => {
+    render(
+      <DrawerHero
+        title='A Very Long Release Title That Should Still Be Discoverable'
+        stableLayout
+        titleLineClamp={2}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'A Very Long Release Title That Should Still Be Discoverable',
+      })
+    ).toHaveAttribute(
+      'title',
+      'A Very Long Release Title That Should Still Be Discoverable'
+    );
+  });
+
   it('renders subtitle when provided', () => {
     render(<DrawerHero title='Lost in the Light' subtitle='Bahamas' />);
     expect(screen.getByText('Bahamas')).toBeInTheDocument();

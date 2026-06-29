@@ -1,8 +1,9 @@
 import SwiftUI
 
-enum AppShellTab: Equatable {
+enum AppShellTab: Equatable, Hashable {
   case chat
   case profile
+  case audience
 
   var accessibilityID: String {
     switch self {
@@ -10,6 +11,8 @@ enum AppShellTab: Equatable {
       return "shell-tab-chat"
     case .profile:
       return "shell-tab-profile"
+    case .audience:
+      return "shell-tab-audience"
     }
   }
 
@@ -19,6 +22,8 @@ enum AppShellTab: Equatable {
       return "Chat"
     case .profile:
       return "Profile"
+    case .audience:
+      return "Audience"
     }
   }
 
@@ -28,6 +33,17 @@ enum AppShellTab: Equatable {
       return "sparkles"
     case .profile:
       return "qrcode.viewfinder"
+    case .audience:
+      return "person.3"
+    }
+  }
+
+  var isBottomBarDestination: Bool {
+    switch self {
+    case .chat, .profile:
+      return true
+    case .audience:
+      return false
     }
   }
 }
@@ -58,24 +74,29 @@ struct AppShellProfile: Equatable {
   }
 }
 
-struct AppShellView<ProfileContent: View, ChatContent: View>: View {
+struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: View>: View {
   let profile: AppShellProfile
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
   let billingURL: URL
   let chatEnabled: Bool
+  let audienceEnabled: Bool
   let recentConversations: [MobileConversationSummary]
+  let activeConversationID: String?
   let onSelectConversation: (String) -> Void
+  let onStartNewChat: () -> Void
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
+  @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
   let chatContent: (Binding<String>) -> ChatContent
 
   @State private var selectedTab: AppShellTab
   @State private var navigationPath: [AppShellRoute] = []
-  @State private var isShowingMenu = false
+  @State private var isShowingDrawer = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
   @State private var intentStore = IntentNavigationStore.shared
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   init(
     profile: AppShellProfile,
@@ -84,10 +105,14 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     opensSettingsOnLaunch: Bool = false,
     billingURL: URL,
     chatEnabled: Bool = false,
+    audienceEnabled: Bool = true,
     recentConversations: [MobileConversationSummary] = [],
+    activeConversationID: String? = nil,
     onSelectConversation: @escaping (String) -> Void = { _ in },
+    onStartNewChat: @escaping () -> Void = {},
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
+    @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
     @ViewBuilder chatContent: @escaping (Binding<String>) -> ChatContent
   ) {
     self.profile = profile
@@ -95,12 +120,18 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
     self.billingURL = billingURL
     self.chatEnabled = chatEnabled
+    self.audienceEnabled = audienceEnabled
     self.recentConversations = recentConversations
+    self.activeConversationID = activeConversationID
     self.onSelectConversation = onSelectConversation
+    self.onStartNewChat = onStartNewChat
     self.onLogout = onLogout
     self.profileContent = profileContent()
+    self.audienceContent = audienceContent
     self.chatContent = chatContent
-    _selectedTab = State(initialValue: chatEnabled ? initialTab : .profile)
+    _selectedTab = State(
+      initialValue: Self.resolvedInitialTab(initialTab: initialTab, chatEnabled: chatEnabled)
+    )
   }
 
   var body: some View {
@@ -121,6 +152,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
         bottomBar
       }
       .simultaneousGesture(pageSwipe)
+      .simultaneousGesture(edgeSwipeToOpenDrawer)
       .navigationBarHidden(true)
       .navigationDestination(for: AppShellRoute.self) { route in
         switch route {
@@ -135,26 +167,29 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
           .navigationBarBackButtonHidden()
         }
       }
+      .overlay {
+        AppShellLeftDrawer(
+          isPresented: $isShowingDrawer,
+          profile: profile,
+          isOffline: isOffline,
+          chatEnabled: chatEnabled,
+          audienceEnabled: audienceEnabled,
+          selectedTab: selectedTab,
+          recentConversations: recentConversations,
+          activeConversationID: activeConversationID,
+          onSelectTab: selectTab,
+          onStartNewChat: startNewChat,
+          onSelectConversation: { conversationID in
+            onSelectConversation(conversationID)
+            selectTab(.chat)
+          },
+          onOpenSettings: {
+            navigationPath.append(.settings)
+          }
+        )
+      }
     }
     .background(JovieColor.backgroundBase)
-    .fullScreenCover(isPresented: $isShowingMenu) {
-      AppNavigationMenu(
-        profile: profile,
-        isOffline: isOffline,
-        chatEnabled: chatEnabled,
-        recentConversations: recentConversations,
-        onSelectConversation: { conversationID in
-          onSelectConversation(conversationID)
-          selectedTab = .chat
-          isShowingMenu = false
-        },
-        onOpenSettings: {
-          isShowingMenu = false
-          navigationPath.append(.settings)
-        },
-        onClose: { isShowingMenu = false }
-      )
-    }
     .task(id: opensSettingsOnLaunch) {
       guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
       didOpenLaunchSettings = true
@@ -195,6 +230,41 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     }
   }
 
+  private func selectTab(_ tab: AppShellTab) {
+    withAnimation(.easeInOut(duration: 0.25)) {
+      selectedTab = tab
+    }
+  }
+
+  private func startNewChat() {
+    onStartNewChat()
+    chatDraft = ""
+    selectTab(.chat)
+  }
+
+  private func openAudienceChat(prompt: String) {
+    guard chatEnabled else { return }
+    chatDraft = prompt
+    selectTab(.chat)
+  }
+
+  private static func resolvedInitialTab(
+    initialTab: AppShellTab,
+    chatEnabled: Bool
+  ) -> AppShellTab {
+    switch initialTab {
+    case .chat:
+      return chatEnabled ? .chat : .profile
+    case .audience, .profile:
+      return initialTab
+    }
+  }
+
+  private func openDrawer() {
+    guard !isShowingDrawer else { return }
+    isShowingDrawer = true
+  }
+
   // Horizontally paged primary screens. The floating bottom bar drives the same
   // `selectedTab` selection so taps and the horizontal swipe gesture stay in sync,
   // and each screen keeps its own vertical scrolling (the swipe is recognized
@@ -210,6 +280,8 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
       }
     case .profile:
       profileContent
+    case .audience:
+      audienceContent(openAudienceChat)
     }
   }
 
@@ -217,18 +289,39 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
   // Profile from the leading edge, so the motion matches the swipe.
   private var pageTransition: AnyTransition {
     .asymmetric(
-      insertion: .move(edge: selectedTab == .chat ? .trailing : .leading),
-      removal: .move(edge: selectedTab == .chat ? .leading : .trailing)
+      insertion: .move(edge: pageInsertionEdge),
+      removal: .move(edge: pageRemovalEdge)
     )
+  }
+
+  private var pageInsertionEdge: Edge {
+    switch selectedTab {
+    case .chat:
+      return .trailing
+    case .profile, .audience:
+      return .leading
+    }
+  }
+
+  private var pageRemovalEdge: Edge {
+    switch selectedTab {
+    case .chat:
+      return .leading
+    case .profile, .audience:
+      return .trailing
+    }
   }
 
   private var pageSwipe: some Gesture {
     DragGesture(minimumDistance: 24)
       .onEnded { value in
+        guard !isShowingDrawer else { return }
+
         let horizontal = value.translation.width
         guard chatEnabled,
               abs(horizontal) > 60,
-              abs(horizontal) > abs(value.translation.height) * 1.5
+              abs(horizontal) > abs(value.translation.height) * 1.5,
+              value.startLocation.x >= 28 || horizontal < 0
         else { return }
 
         withAnimation(.easeInOut(duration: 0.28)) {
@@ -241,8 +334,30 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
       }
   }
 
+  private var edgeSwipeToOpenDrawer: some Gesture {
+    DragGesture(minimumDistance: 12, coordinateSpace: .global)
+      .onEnded { value in
+        guard !isShowingDrawer, !reduceMotion else { return }
+        guard value.startLocation.x < 28 else { return }
+        if value.translation.width > 72 || value.predictedEndTranslation.width > 120 {
+          openDrawer()
+        }
+      }
+  }
+
   private var shellToolbar: some View {
-    HStack(alignment: .firstTextBaseline, spacing: JovieSpacing.medium) {
+    HStack(alignment: .center, spacing: JovieSpacing.medium) {
+      Button(action: openDrawer) {
+        DashboardAvatarView(
+          name: profile.displayName,
+          avatarURL: profile.avatarURL
+        )
+        .frame(width: 32, height: 32)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Open navigation drawer")
+      .accessibilityIdentifier("shell-drawer-open")
+
       VStack(alignment: .leading, spacing: 2) {
         Text(selectedTab.title)
           .font(JovieFont.display(size: 22))
@@ -271,8 +386,7 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     .background(JovieColor.backgroundBase.opacity(0.96))
   }
 
-  // Floating, icon-only bottom bar: primary destinations live in one capsule, with
-  // an overflow "More" control in its own adjacent capsule (drawer trigger).
+  // Floating, icon-only bottom bar: primary destinations live in one capsule.
   private var bottomBar: some View {
     HStack(spacing: JovieSpacing.small) {
       HStack(spacing: 4) {
@@ -283,10 +397,6 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
       }
       .padding(6)
       .modifier(BottomBarSurface())
-
-      moreButton
-        .padding(6)
-        .modifier(BottomBarSurface())
     }
     .padding(.bottom, JovieSpacing.medium)
   }
@@ -314,21 +424,6 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     .accessibilityIdentifier(tab.accessibilityID)
   }
-
-  private var moreButton: some View {
-    Button {
-      isShowingMenu = true
-    } label: {
-      Image(systemName: "ellipsis")
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundStyle(JovieColor.textSecondary)
-        .frame(width: 48, height: 40)
-        .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel("More")
-    .accessibilityIdentifier("shell-more")
-  }
 }
 
 private struct BottomBarSurface: ViewModifier {
@@ -350,149 +445,5 @@ private struct BottomBarSurface: ViewModifier {
           }
       }
     }
-  }
-}
-
-private struct AppNavigationMenu: View {
-  let profile: AppShellProfile
-  let isOffline: Bool
-  let chatEnabled: Bool
-  let recentConversations: [MobileConversationSummary]
-  let onSelectConversation: (String) -> Void
-  let onOpenSettings: () -> Void
-  let onClose: () -> Void
-
-  var body: some View {
-    ZStack {
-      JovieColor.backgroundBase.ignoresSafeArea()
-
-      VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
-        HStack {
-          Text("Jovie")
-            .font(JovieFont.display(size: 30))
-            .foregroundStyle(JovieColor.textPrimary)
-
-          Spacer()
-
-          Button(action: onClose) {
-            Image(systemName: "xmark")
-          }
-          .buttonStyle(JovieIconButtonStyle())
-          .accessibilityLabel("Close Menu")
-        }
-
-        MenuAccountView(profile: profile, isOffline: isOffline)
-
-        VStack(spacing: JovieSpacing.small) {
-          MenuRow(
-            title: "Settings",
-            systemImage: "gearshape",
-            isSelected: false,
-            action: onOpenSettings
-          )
-        }
-
-        if chatEnabled {
-          VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-            Text("Recent")
-              .font(JovieFont.body(size: 13, weight: .semibold))
-              .foregroundStyle(JovieColor.textTertiary)
-
-            if recentConversations.isEmpty {
-              Text("Start a conversation to see recent conversations here.")
-                .font(JovieFont.body(size: 15))
-                .foregroundStyle(JovieColor.textTertiary)
-                .fixedSize(horizontal: false, vertical: true)
-            } else {
-              VStack(spacing: JovieSpacing.small) {
-                ForEach(recentConversations.prefix(5)) { conversation in
-                  Button {
-                    onSelectConversation(conversation.id)
-                  } label: {
-                    HStack {
-                      Text(conversation.title ?? "New Conversation")
-                        .font(JovieFont.body(size: 15))
-                        .foregroundStyle(JovieColor.textPrimary)
-                        .lineLimit(1)
-                      Spacer()
-                    }
-                    .padding(.vertical, JovieSpacing.small)
-                  }
-                  .buttonStyle(.plain)
-                }
-              }
-            }
-          }
-          .padding(.top, JovieSpacing.medium)
-        }
-
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, JovieSpacing.xLarge)
-      .padding(.top, JovieSpacing.xxLarge)
-      .padding(.bottom, JovieSpacing.xLarge)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-    .accessibilityIdentifier("shell-menu")
-  }
-}
-
-private struct MenuAccountView: View {
-  let profile: AppShellProfile
-  let isOffline: Bool
-
-  var body: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      DashboardAvatarView(
-        name: profile.displayName,
-        avatarURL: profile.avatarURL
-      )
-      .frame(width: 36, height: 36)
-
-      VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
-        Text(profile.displayName)
-          .font(JovieFont.body(size: 15, weight: .semibold))
-          .foregroundStyle(JovieColor.textPrimary)
-          .lineLimit(1)
-
-        Text(isOffline ? "Offline" : profile.secondaryText)
-          .font(JovieFont.body(size: 13, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .lineLimit(1)
-      }
-
-      Spacer(minLength: 0)
-    }
-  }
-}
-
-private struct MenuRow: View {
-  let title: String
-  let systemImage: String
-  let isSelected: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: JovieSpacing.medium) {
-        Image(systemName: systemImage)
-          .frame(width: 22)
-
-        Text(title)
-          .lineLimit(1)
-
-        Spacer(minLength: 0)
-      }
-      .font(JovieFont.body(size: 18, weight: .semibold))
-      .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
-      .padding(.vertical, 13)
-      .padding(.horizontal, JovieSpacing.medium)
-      .background(
-        isSelected ? JovieColor.surface1 : Color.clear,
-        in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
-      )
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(title)
   }
 }

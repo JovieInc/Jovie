@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.61] - 2026-06-28
+
+> Outbound SMS provider integration ships behind `OUTBOUND_SMS_ENABLED`. Release alerts and webhook auto-replies (STOP/HELP) now route through a single Twilio connector.
+
+### Added
+
+- **[notifications] Outbound SMS connector (JOV-3626)**: `providers/sms/outbound-sms.ts` gates live Twilio POSTs behind `OUTBOUND_SMS_ENABLED`; `sendNotification()` SMS channel and inbound webhook auto-replies both use it; unit-economics spike documented in `NOTIFICATION_GUIDELINES.md`.
+
+## [Unreleased]
+
+> Connector enrichment turns synced Gmail and Calendar objects into graph facts and calendar suggestions; assistant chat replies surface entity mentions as subdued accent spans that reveal detail cards on hover.
+
+### Added
+
+- **Production Journey Auditor**: a layered net for the signup → AI onboarding interview. Deepens the existing canary so it verifies the interview actually initializes (starter prompt visible, composer usable) instead of only checking the chat container is present; adds a nightly real-turn detector, a production smoke command (`qa:journey:smoke`) with a compact redacted failure packet, a product-promise registry, and a report-only exploratory journey scout (`qa:journey:scout`). [internal] Captures a currently-broken anonymous onboarding turn (500 on send) with a clear diagnosis — root cause tracked in JOV-3693.
+- **Connector enrichment pipelines (JOV-3114)**: adds `lib/connectors/enrichment/` with per-provider gmail/calendar pipelines that emit `context_facts`, memory graph observations, and `suggested_actions`; extends `context_fact_kind` for entity mentions; refactors `extractAndPropose` to sync Gmail `external_objects` then run the enrichment runner. Apple Photos deferred until JOV-2919.
+- **Chat progressive disclosure entity accents (JOV-3116)**: assistant responses parse `@kind:id[label]` wire tokens into per-type System B accent spans (release violet, artist purple, track blue, event orange) with hairline underlines instead of pills; hover/tap/focus opens the existing entity detail card with accent-tinted eyebrow copy. User bubbles keep rich input chips unchanged.
+
+### Changed
+
+- **Homepage collapsed to hero + minimal footer**: the below-the-fold story stack (product statement, trust strip, go-live steps, workspace, artist-profiles carousel, Friday rhythm, bento/loop/stat sections, pricing, FAQ) and the final CTA are flagged off via the existing static marketing flags (`SHOW_HOMEPAGE_UNLOCKED_SECTIONS`, `SHOW_HOMEPAGE_V2_FINAL_CTA`). The header keeps the logo and sign-in but drops the center nav (its anchors pointed at the now-hidden sections), and the homepage footer renders the minimal variant. Fully reversible by flipping the flags back on. Pages stay fully static (`revalidate = false`).
+
+## [26.6.60] - 2026-06-28
+
+> Catalog collaborator signal matching resolves external mentions to discography releases with confidence scoring.
+
+### Added
+
+- **Catalog collaborator signal matching (JOV-2206)**: adds `lib/catalog` collaborator entity resolver with alias normalization, provider ID matching, and confidence scoring; founder-demo fixture coverage for Cosmic Gate → The Deep End; and `POST /api/catalog/collaborators/match` for confidence-scored release matches.
+
+## [26.6.59] - 2026-06-28
+
+> Merge-queue Lighthouse and mobile-overflow CI lanes reuse shared Neon fixtures reliably.
+
+### Fixed
+
+- **CI throughput (JOV-3606)**: public Lighthouse shard-0 and mobile overflow guards stop injecting stale main DB credentials into ephemeral Neon branches, rebalance the mobile-viewport Playwright spec across LHCI shards, and keep deterministic Promptfoo skill-registry coverage in sync with `analyzePackaging`.
+
+## [26.6.58] - 2026-06-28
+
+> Tasks workspace rows read calmer: overdue pills stop screaming red, the All tab stays visible, and list rows stop repeating title/due/assignee you already see in the detail pane. Release detail panel metadata rows are easier to scan: compact copy buttons, readable titles, and labeled copyright lines.
+
+### Fixed
+
+- **Tasks workspace UI polish (JOV-3652)**: stale overdue due chips downgrade from urgent red to muted metadata; the All assignee subview tab no longer clips under the toolbar; selected list rows hide duplicate title and due chips when the document pane is open; assignee chips hide on Mine/Jovie subviews where every row shares the same assignee.
+- **Release detail panel UI (JOV-3654)**: shrinks UPC/ISRC copy buttons to match metadata row density, exposes the full release title on hover when clamped, and labels phonogram/composition copyright rows as P-line/C-line instead of bare ℗/© symbols.
+
+## [26.6.57] - 2026-06-27
+
+> The desktop app recovers from renderer crashes instead of leaving you on a permanent black screen.
+
+### Fixed
+
+- **Desktop renderer crash recovery**: when the embedded web view crashes or runs out of memory, Jovie now reloads it automatically. If crashes repeat, the app shows the load-failure page with a Retry button instead of a blank black window.
+
 ## [26.6.56] - 2026-06-26
 
 > Admins can now turn product features on and off per environment (dev, staging, prod) from a new Features panel, and changes take effect without a redeploy.

@@ -1,7 +1,6 @@
 import 'server-only';
 
-import { gateway } from '@ai-sdk/gateway';
-import { generateObject } from '@/lib/ai/sdk';
+import { gateway, generateObject } from '@/lib/ai/sdk';
 import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
 import { PACKAGING_INTELLIGENCE_MODEL } from '@/lib/constants/ai-models';
 import { type PackagingLlmOutput, packagingLlmOutputSchema } from './types';

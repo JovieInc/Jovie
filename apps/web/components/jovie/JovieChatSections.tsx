@@ -7,6 +7,7 @@ import {
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
   CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
   CHAT_CONTENT_SHELL_CLASSNAME,
+  CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME,
 } from './chat-layout';
 import {
   ChatConversationComposerSkeleton,
@@ -193,7 +194,7 @@ export function ChatThreadMessages({
       {shouldVirtualizeMessages ? (
         <div
           ref={totalSizeRef}
-          className={`${CHAT_CONTENT_SHELL_CLASSNAME} flex min-h-full flex-col`}
+          className={`${CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME} flex min-h-full flex-col`}
           style={{
             position: 'relative',
             height: virtualizedMessageViewportHeight,
@@ -237,7 +238,7 @@ export function ChatThreadMessages({
       ) : (
         <div
           ref={totalSizeRef}
-          className={`${CHAT_CONTENT_SHELL_CLASSNAME} flex min-h-full flex-col`}
+          className={`${CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME} flex min-h-full flex-col`}
           style={{
             paddingBottom: messageViewportPaddingBottom,
           }}

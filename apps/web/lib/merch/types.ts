@@ -83,6 +83,80 @@ export interface MerchSelectionResult {
   readonly publishBlockedReasons?: readonly string[];
 }
 
+// ---------------------------------------------------------------------------
+// Two-phase guided merch flow contracts
+//
+// Phase A (design): the chat shows a carousel of product-agnostic design
+// concepts rendered from the parametric archetype library. Phase B (product):
+// the chosen design is composited onto a curated product+color set by the
+// own-generator mockup engine. Chat-facing fields stay snake_case to match
+// MerchGenerationOptionView and the ChatMerch* components.
+// ---------------------------------------------------------------------------
+
+/** Slot values filled into a design archetype. Lyric is sourced from the
+ * artist's own catalog (discog_recordings/tracks.lyrics) or typed manually. */
+export interface MerchDesignSlots {
+  readonly artist_name: string;
+  readonly short_text?: string;
+  readonly lyric?: string;
+  readonly year?: string;
+  readonly location?: string;
+  readonly tracklist?: readonly string[];
+}
+
+/** One design concept in the Phase-A carousel (product-agnostic).
+ * Mirrors ThreadImageCard's discriminated union: while the image model runs the
+ * design is `generating` with no preview; `preview_url` is present once `ready`. */
+export interface MerchDesignPreview {
+  readonly id: string;
+  readonly option_number: number;
+  readonly design_name: string;
+  /** Which roster model produced it — stamped for feedback scoring. */
+  readonly model_key?: string;
+  readonly concept: string;
+  readonly status: 'generating' | 'ready';
+  /** Transparent (alpha) print-art preview. Present only when status is `ready`. */
+  readonly preview_url?: string;
+  readonly slots: MerchDesignSlots;
+}
+
+export interface MerchDesignCarouselResult {
+  readonly success: true;
+  readonly generationId: string;
+  readonly prompt?: string;
+  readonly nextStep?: string;
+  readonly designs: readonly MerchDesignPreview[];
+}
+
+/** One product in the Phase-B set: the chosen design composited onto a
+ * curated product in a pop color, with the instant own-generator mockup. */
+export interface MerchProductApplication {
+  readonly id: string;
+  readonly product_type: string;
+  readonly product_name: string;
+  readonly color_name: string;
+  readonly color_hex: string;
+  /** Printful variant id for the shown color, so the order matches the mockup. */
+  readonly color_variant_id: number;
+  /** Plain-language reason this color/product makes the print pop. */
+  readonly pop_reason: string;
+  /** Instant own-generator mockup (always present — synchronous render). */
+  readonly mockup_url: string;
+  readonly price_recommendation: MerchGenerationOptionView['price_recommendation'];
+  readonly sellability?: {
+    readonly sellable: boolean;
+    readonly reasons: readonly string[];
+  };
+}
+
+export interface MerchProductSetResult {
+  readonly success: true;
+  readonly designId: string;
+  readonly design_name: string;
+  readonly nextStep?: string;
+  readonly products: readonly MerchProductApplication[];
+}
+
 export interface PublicMerchCard {
   readonly id: string;
   readonly artistId: string;

@@ -53,6 +53,51 @@ describe('POST /api/webhooks/sentry', () => {
     vi.resetModules();
   });
 
+  it('skips autofix for transient Degraded HTTP Operation on POST /pipeline', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '3666',
+          title: 'Degraded HTTP Operation',
+          culprit: 'POST /pipeline',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'transient-infra-http',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      '[Sentry Webhook] Skipping autofix for transient infra HTTP issue',
+      expect.objectContaining({
+        issueId: '3666',
+        title: 'Degraded HTTP Operation',
+        culprit: 'POST /pipeline',
+      })
+    );
+  });
+
   it('returns deduplicated response when a recent dispatch exists', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: false,

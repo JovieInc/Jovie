@@ -100,7 +100,8 @@ Do not install Trigger in this wave. Revisit it only if WDK fails one of these p
 
 ## Related ADRs
 
-- [`docs/MEMORY_ADR.md`](./MEMORY_ADR.md) (JOV-2705) — product memory workflows use a separate durable runtime from internal AgentOS WDK. Customer memory loops must not import `workflows/agent-os-dry-run.ts`; WDK remains internal operator orchestration only.
+- [`docs/MEMORY_CORE_ARCHITECTURE.md`](./MEMORY_CORE_ARCHITECTURE.md) (JOV-2705) — product memory stack: Trigger.dev + Agents SDK + Memory Core; WDK stays internal-only.
+- [`docs/MEMORY_ADR.md`](./MEMORY_ADR.md) (JOV-2705) — import-boundary guardrails; customer memory loops must not import `workflows/agent-os-dry-run.ts`.
 
 ## Linear Dedupe
 

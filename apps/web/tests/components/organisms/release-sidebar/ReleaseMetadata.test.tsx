@@ -186,8 +186,8 @@ describe('ReleaseMetadata copyright labels', () => {
       })
     );
 
-    expect(screen.getByText('℗')).toBeInTheDocument();
-    expect(screen.getByText('©')).toBeInTheDocument();
+    expect(screen.getByText('P-line')).toBeInTheDocument();
+    expect(screen.getByText('C-line')).toBeInTheDocument();
     expect(screen.getByText('℗ 2020 To Mine Limited')).toBeInTheDocument();
     expect(screen.getByText('© 2020 To Mine Limited')).toBeInTheDocument();
   });
@@ -200,8 +200,8 @@ describe('ReleaseMetadata copyright labels', () => {
       })
     );
 
-    expect(screen.queryByText('℗')).not.toBeInTheDocument();
-    expect(screen.getByText('©')).toBeInTheDocument();
+    expect(screen.queryByText('P-line')).not.toBeInTheDocument();
+    expect(screen.getByText('C-line')).toBeInTheDocument();
     expect(screen.getByText('© 2020 To Mine Limited')).toBeInTheDocument();
   });
 

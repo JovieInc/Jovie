@@ -4,6 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = join(process.cwd(), '../..');
 const MEMORY_ADR_PATH = join(REPO_ROOT, 'docs/MEMORY_ADR.md');
+const MEMORY_CORE_ARCH_PATH = join(
+  REPO_ROOT,
+  'docs/MEMORY_CORE_ARCHITECTURE.md'
+);
 const WEB_ROOT = join(REPO_ROOT, 'apps/web');
 
 const REQUIRED_ADR_SECTIONS = [
@@ -12,6 +16,15 @@ const REQUIRED_ADR_SECTIONS = [
   '## Context',
   '## Current file map',
   '## Forbidden couplings',
+] as const;
+
+const REQUIRED_MEMORY_CORE_SECTIONS = [
+  '## Decision',
+  '## Why WDK stays in AgentOS',
+  '## Product workflow boundaries',
+  '## v0 shipped target',
+  '## Technology decision table',
+  '## Linear triage',
 ] as const;
 
 const PRODUCT_MEMORY_PATHS = [
@@ -94,13 +107,40 @@ describe('MEMORY ADR contract (JOV-2705)', () => {
     }
   });
 
+  it('keeps docs/MEMORY_CORE_ARCHITECTURE.md present with required sections', () => {
+    expect(existsSync(MEMORY_CORE_ARCH_PATH)).toBe(true);
+
+    const arch = readFileSync(MEMORY_CORE_ARCH_PATH, 'utf8');
+    expect(arch).toContain('Issue: JOV-2705');
+    expect(arch).toContain('Trigger.dev');
+    expect(arch).toContain('OpenAI Agents SDK');
+    expect(arch).toContain('studio-session-loop.ts');
+    expect(arch).toContain('Graphiti');
+    expect(arch).toContain('Honcho');
+
+    for (const section of REQUIRED_MEMORY_CORE_SECTIONS) {
+      expect(arch, `missing ${section}`).toContain(section);
+    }
+  });
+
   it('links AgentOS architecture without collapsing the runtime split', () => {
     const agentOsAdrPath = join(REPO_ROOT, 'docs/AGENT_OS_ARCHITECTURE.md');
     expect(existsSync(agentOsAdrPath)).toBe(true);
 
     const agentOsAdr = readFileSync(agentOsAdrPath, 'utf8');
+    expect(agentOsAdr).toContain('MEMORY_CORE_ARCHITECTURE.md');
     expect(agentOsAdr).toContain('MEMORY_ADR.md');
     expect(agentOsAdr).toContain('JOV-2705');
+  });
+
+  it('documents the product-memory split in AUTOMATION_AUDIT.md', () => {
+    const automationAuditPath = join(REPO_ROOT, 'docs/AUTOMATION_AUDIT.md');
+    expect(existsSync(automationAuditPath)).toBe(true);
+
+    const audit = readFileSync(automationAuditPath, 'utf8');
+    expect(audit).toContain('JOV-2705');
+    expect(audit).toContain('MEMORY_CORE_ARCHITECTURE.md');
+    expect(audit).toContain('Trigger.dev');
   });
 
   it('blocks product memory modules from importing AgentOS WDK workflow code', () => {
