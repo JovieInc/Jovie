@@ -406,6 +406,12 @@ describe('LibrarySurface', () => {
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
+    // Approval editor is a bare, accessible select (no stacked label / nested
+    // card) — labeled only by its aria-label now that the section heading owns
+    // the visible title (issue #12317).
+    expect(
+      screen.getByRole('combobox', { name: 'Approval Status' })
+    ).toBeInTheDocument();
     const drawer = within(screen.getByTestId('library-asset-drawer'));
     expect(
       drawer.getAllByRole('button', {

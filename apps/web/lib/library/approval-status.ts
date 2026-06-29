@@ -32,7 +32,9 @@ export function libraryApprovalStatusClasses(
   status: LibraryApprovalStatus
 ): string {
   if (status === 'approved') {
-    return 'border-success/20 bg-success/10 text-success';
+    // Distinct from release "Released" (green/success) so the two badges never
+    // share a color — System B accent spectrum (issue #12317).
+    return 'border-accent-purple/20 bg-accent-purple/10 text-accent-purple';
   }
   if (status === 'needs_review') {
     return 'border-warning/20 bg-warning/10 text-warning';
@@ -46,7 +48,7 @@ export function libraryApprovalStatusClasses(
 export function libraryApprovalStatusDotClasses(
   status: LibraryApprovalStatus
 ): string {
-  if (status === 'approved') return 'bg-success';
+  if (status === 'approved') return 'bg-accent-purple';
   if (status === 'needs_review') return 'bg-warning';
   if (status === 'archived') return 'bg-tertiary-token';
   return 'bg-secondary-token';

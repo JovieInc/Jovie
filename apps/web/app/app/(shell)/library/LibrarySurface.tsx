@@ -46,6 +46,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -79,6 +80,7 @@ import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import type { ProviderKey } from '@/lib/discography/types';
 import {
   formatLibraryApprovalStatus,
   LIBRARY_APPROVAL_STATUSES,
@@ -1628,10 +1630,10 @@ function PreviewActionButton({
       aria-pressed={isPreviewPlaying}
       tabIndex={disabledTabIndex}
       className={cn(
-        'system-b-library-action inline-flex items-center justify-center gap-1.5 border border-subtle',
+        'system-b-library-action inline-flex items-center justify-center gap-1.5',
         compact
           ? 'system-b-library-action--icon'
-          : 'system-b-library-action--standard',
+          : 'system-b-library-action--standard border border-subtle',
         LIBRARY_BUTTON_FOCUS_CLASS
       )}
     >
@@ -1709,7 +1711,6 @@ function ApprovalStatusEditor({
   ) => void;
 }) {
   const [saving, setSaving] = useState(false);
-  const selectId = useId();
 
   async function handleChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextStatus = event.target.value;
@@ -1749,34 +1750,29 @@ function ApprovalStatusEditor({
     }
   }
 
+  // The "Approval" DrawerSection already labels this control, so the select
+  // stands on its own (no stacked label, no nested card) — click-to-edit with
+  // an a11y label (issue #12317).
   return (
-    <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
-      <label
-        htmlFor={selectId}
-        className='system-b-library-drawer-panel-heading mb-2 block font-semibold text-primary-token'
-      >
-        Approval Status
-      </label>
-      <select
-        id={selectId}
-        value={asset.approvalStatus}
-        onChange={event => {
-          void handleChange(event);
-        }}
-        disabled={disabled || saving || !profileId}
-        data-testid={`library-approval-status-select-${asset.id}`}
-        className={cn(
-          'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
-          LIBRARY_BUTTON_FOCUS_CLASS
-        )}
-      >
-        {LIBRARY_APPROVAL_STATUSES.map(status => (
-          <option key={status} value={status}>
-            {formatLibraryApprovalStatus(status)}
-          </option>
-        ))}
-      </select>
-    </div>
+    <select
+      aria-label='Approval Status'
+      value={asset.approvalStatus}
+      onChange={event => {
+        void handleChange(event);
+      }}
+      disabled={disabled || saving || !profileId}
+      data-testid={`library-approval-status-select-${asset.id}`}
+      className={cn(
+        'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
+        LIBRARY_BUTTON_FOCUS_CLASS
+      )}
+    >
+      {LIBRARY_APPROVAL_STATUSES.map(status => (
+        <option key={status} value={status}>
+          {formatLibraryApprovalStatus(status)}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -1851,7 +1847,7 @@ function AssetDrawer({
         {...closedInteractiveProps}
         aria-label={`Open ${current.title}`}
         className={cn(
-          'system-b-library-icon-button system-b-library-icon-button--bordered grid h-7 w-7 place-items-center',
+          'system-b-library-icon-button grid h-7 w-7 place-items-center',
           LIBRARY_ICON_FOCUS_CLASS
         )}
       >
@@ -2110,7 +2106,10 @@ function AssetDrawer({
                               LIBRARY_CARD_FOCUS_CLASS
                             )}
                           >
-                            <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
+                            <ProviderIcon
+                              provider={provider.key as ProviderKey}
+                              className='h-3.5 w-3.5'
+                            />
                             <span className='min-w-0 flex-1 truncate'>
                               {provider.label}
                             </span>

@@ -4,6 +4,7 @@ import {
   isLibraryApprovalStatus,
   isLibraryReleaseApprovedForPublic,
   libraryApprovalStatusClasses,
+  libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 
 describe('library approval status helpers', () => {
@@ -20,9 +21,18 @@ describe('library approval status helpers', () => {
   });
 
   it('maps approval statuses to semantic classes', () => {
-    expect(libraryApprovalStatusClasses('approved')).toContain('text-success');
     expect(libraryApprovalStatusClasses('needs_review')).toContain(
       'text-warning'
+    );
+  });
+
+  it('gives Approved its own accent, never the green that Released uses', () => {
+    const approved = libraryApprovalStatusClasses('approved');
+    // Released (release status) is green/success; Approved must not collide.
+    expect(approved).not.toContain('text-success');
+    expect(approved).toContain('text-accent-purple');
+    expect(libraryApprovalStatusDotClasses('approved')).toBe(
+      'bg-accent-purple'
     );
   });
 
