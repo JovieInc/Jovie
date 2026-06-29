@@ -301,7 +301,7 @@ function TaskReleasePanelStatus({
     <EntitySidebarShell
       isOpen
       width={344}
-      ariaLabel='Release details'
+      ariaLabel='Release Details'
       title='Release'
       onClose={onClose}
       scrollStrategy='shell'
@@ -505,7 +505,7 @@ function TaskMetaMenuNumber({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <TaskMetaTrigger ariaLabel='Open task controls'>
+        <TaskMetaTrigger ariaLabel='Open Task Controls'>
           <span className='inline-flex items-center gap-1 text-2xs font-semibold text-tertiary-token'>
             <span className='shrink-0'>J-{task.taskNumber}</span>
             <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -708,7 +708,7 @@ function TaskDocumentPanel({
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task status'>
+                  <TaskMetaTrigger ariaLabel='Change Task Status'>
                     <TaskStageInline task={task} withChevron />
                   </TaskMetaTrigger>
                 </DropdownMenuTrigger>
@@ -736,7 +736,7 @@ function TaskDocumentPanel({
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task priority'>
+                  <TaskMetaTrigger ariaLabel='Change Task Priority'>
                     <TaskPriorityInline priority={task.priority} withChevron />
                   </TaskMetaTrigger>
                 </DropdownMenuTrigger>
@@ -764,7 +764,7 @@ function TaskDocumentPanel({
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task assignee'>
+                  <TaskMetaTrigger ariaLabel='Change Task Assignee'>
                     <TaskAssigneeInline
                       assigneeKind={task.assigneeKind}
                       artistName={artistName}
@@ -970,20 +970,34 @@ function TaskLoadingState() {
         <ShellListRowFrame
           key={row.key}
           interaction='none'
-          className='group/row grid min-h-16 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5'
+          data-testid='task-loading-row'
+          className='group/row flex min-h-16 items-center gap-3 px-3 py-1.5'
         >
-          <div className='skeleton h-4 w-4 rounded-full' />
-          <div className='min-w-0 space-y-2'>
+          <span className='flex shrink-0 items-center'>
+            <div className='skeleton h-5 w-5 rounded-full' aria-hidden='true' />
+          </span>
+
+          <div className='min-w-0 flex-1'>
             <div
-              className='skeleton h-3.5 rounded'
+              className='skeleton h-3.5 max-w-full rounded'
               style={{ width: row.titleWidth }}
+              aria-hidden='true'
             />
+            <div className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
+              <div
+                className='skeleton h-3 rounded'
+                style={{ width: row.metaWidth }}
+                aria-hidden='true'
+              />
+            </div>
+          </div>
+
+          <div className='flex shrink-0 items-center justify-end'>
             <div
-              className='skeleton h-3 rounded'
-              style={{ width: row.metaWidth }}
+              className='skeleton h-5 w-14 rounded-full'
+              aria-hidden='true'
             />
           </div>
-          <div className='skeleton h-5 w-14 rounded-full' />
         </ShellListRowFrame>
       ))}
     </div>
@@ -1058,6 +1072,7 @@ function MobileTaskSection({
   artistName,
   onOpenTask,
   onOpenRelease,
+  showAssignee,
 }: Readonly<{
   title: string;
   tasks: ReadonlyArray<TaskView>;
@@ -1065,6 +1080,7 @@ function MobileTaskSection({
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
   onOpenRelease: (task: TaskView) => void;
+  showAssignee: boolean;
 }>) {
   if (tasks.length === 0) {
     return null;
@@ -1085,6 +1101,7 @@ function MobileTaskSection({
             onOpenTask={onOpenTask}
             onOpenRelease={onOpenRelease}
             isSelected={task.id === selectedTaskId}
+            showAssignee={showAssignee}
           />
         ))}
       </div>
@@ -1098,12 +1115,14 @@ function MobileTaskListItem({
   onOpenTask,
   onOpenRelease,
   isSelected,
+  showAssignee,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
   onOpenRelease: (task: TaskView) => void;
   isSelected: boolean;
+  showAssignee: boolean;
 }>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const priority = getTaskPriorityVisual(task.priority);
@@ -1145,7 +1164,9 @@ function MobileTaskListItem({
             />
             <span>{priority.label}</span>
           </span>
-          <span className='truncate'>{assignee.label}</span>
+          {showAssignee ? (
+            <span className='truncate'>{assignee.label}</span>
+          ) : null}
         </span>
         {task.releaseTitle ? (
           <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-3xs text-tertiary-token'>
@@ -1960,7 +1981,7 @@ export function TasksPageClient() {
               pills.length > 0
                 ? `Filter Tasks (${pills.length})`
                 : 'Filter Tasks',
-            ariaLabel: 'Filter tasks',
+            ariaLabel: 'Filter Tasks',
             placeholder: 'Search tasks',
             allowedFields: ['title'] as const,
           },
@@ -1973,7 +1994,7 @@ export function TasksPageClient() {
     () => (
       <DashboardHeaderActionGroup>
         <DashboardHeaderActionButton
-          ariaLabel='Create task'
+          ariaLabel='Create Task'
           icon={<Plus className='h-3.5 w-3.5' />}
           label='New Task'
           onClick={() => setHeaderMode('create')}
@@ -1988,27 +2009,40 @@ export function TasksPageClient() {
 
   useRegisterHeaderActions(headerActions);
 
+  const showAssigneeInListRows = assigneeFilter === 'all';
+  const suppressSelectedRowDetailDuplicates =
+    showTaskDocumentPane && Boolean(selectedTask);
+
   const renderTaskCell = useCallback(
-    (info: { row: { original: TaskView } }) => (
-      <TaskListRow
-        task={info.row.original}
-        onOpenRelease={openReleaseSidebar}
-        artistName={artistName}
-        isSelected={info.row.original.id === effectiveSelectedTaskId}
-        actionSlot={
-          <TaskRowActionMenu
-            items={getTaskContextMenuItems(info.row.original)}
-            selected={info.row.original.id === effectiveSelectedTaskId}
-            visibility='hover'
-          />
-        }
-      />
-    ),
+    (info: { row: { original: TaskView } }) => {
+      const isRowSelected = info.row.original.id === effectiveSelectedTaskId;
+
+      return (
+        <TaskListRow
+          task={info.row.original}
+          onOpenRelease={openReleaseSidebar}
+          artistName={artistName}
+          isSelected={isRowSelected}
+          showAssignee={showAssigneeInListRows}
+          hideTitle={suppressSelectedRowDetailDuplicates && isRowSelected}
+          hideDue={suppressSelectedRowDetailDuplicates && isRowSelected}
+          actionSlot={
+            <TaskRowActionMenu
+              items={getTaskContextMenuItems(info.row.original)}
+              selected={isRowSelected}
+              visibility='hover'
+            />
+          }
+        />
+      );
+    },
     [
       artistName,
       effectiveSelectedTaskId,
       getTaskContextMenuItems,
       openReleaseSidebar,
+      showAssigneeInListRows,
+      suppressSelectedRowDetailDuplicates,
     ]
   );
 
@@ -2072,6 +2106,7 @@ export function TasksPageClient() {
         isLoading={isActiveBoardLoading}
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
+        showAssigneeChip={assigneeFilter === 'all'}
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
         onMoveTask={handleMoveTask}
@@ -2126,6 +2161,7 @@ export function TasksPageClient() {
           artistName={artistName}
           onOpenTask={openTaskDocument}
           onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
         />
         <MobileTaskSection
           title='Closed'
@@ -2134,6 +2170,7 @@ export function TasksPageClient() {
           artistName={artistName}
           onOpenTask={openTaskDocument}
           onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
         />
       </>
     );
@@ -2146,6 +2183,7 @@ export function TasksPageClient() {
         artistName={artistName}
         onOpenTask={openTaskDocument}
         onOpenRelease={openReleaseSidebar}
+        showAssignee={assigneeFilter === 'all'}
       />
     );
   }

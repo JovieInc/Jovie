@@ -22,6 +22,11 @@ import {
   detectAlbumArtGenerationIntent,
 } from '@/lib/chat/album-art-capability';
 import { KNOWLEDGE_TOPICS } from '@/lib/chat/knowledge/topics';
+import {
+  isPromptDisclosureRequest,
+  PROMPT_DISCLOSURE_REFUSAL,
+  PROMPT_LEAK_CANARY,
+} from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import {
   canUseLightModel,
@@ -140,6 +145,7 @@ type EvalTarget =
   | 'release-task-classifier-contract'
   | 'onboarding-state-contract'
   | 'onboarding-tool-sequence-contract'
+  | 'prompt-disclosure-contract'
   | 'prompt-context-contract'
   | 'skill-artifact-contract'
   | 'skill-catalog-sync-contract'
@@ -602,6 +608,7 @@ const REQUIRED_PLAYLIST_GENERATION_CASES = [
 const REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES = ['prompt-rules'] as const;
 const REQUIRED_RELEASE_TASK_CLASSIFIER_CASES = ['prompt-and-coercion'] as const;
 const REQUIRED_CHAT_TITLE_CASES = ['prompt-and-fallback'] as const;
+const REQUIRED_PROMPT_DISCLOSURE_CASES = ['blocked-before-dispatch'] as const;
 let serverOnlyEvalShimRegistered = false;
 const AI_TOOL_PROMPT_TOOL_NAMES = [
   'generateAlbumArt',
@@ -762,6 +769,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'release-task-classifier-contract' ||
     value === 'onboarding-state-contract' ||
     value === 'onboarding-tool-sequence-contract' ||
+    value === 'prompt-disclosure-contract' ||
     value === 'prompt-context-contract' ||
     value === 'skill-artifact-contract' ||
     value === 'skill-catalog-sync-contract' ||
@@ -5175,6 +5183,13 @@ function registryPathContent(path: string | undefined): string {
   return readFileSync(resolve(REPO_ROOT, path), 'utf8');
 }
 
+function requiresChatToolArtifactCoverage(skill: {
+  readonly kind: string;
+  readonly metadata: { readonly surface?: string | null };
+}): boolean {
+  return skill.kind === 'tool' && (skill.metadata.surface ?? 'chat') === 'chat';
+}
+
 function evaluateSkillRegistryInventory(vars: EvalVars) {
   const coverage = toObject(vars.coverage);
   const expectedSkillIds = Array.isArray(coverage.expectedSkillIds)
@@ -5302,11 +5317,18 @@ function evaluateSkillArtifactContract(vars: EvalVars) {
         minimumPromptChars,
         requiredPromptGuardrails,
         missingPromptGuardrails,
-        toolSchemaCovered: isTool && ALL_EVAL_TOOL_NAME_SET.has(skillId),
+        toolSchemaCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          ALL_EVAL_TOOL_NAME_SET.has(skillId),
         toolResultShapeCovered:
-          isTool && Object.hasOwn(TOOL_RESULT_REQUIRED_KEYS, skillId),
-        toolAvailabilityCovered: isTool && PAID_TOOL_NAME_SET.has(skillId),
-        toolRenderCovered: isTool && TOOL_UI_REGISTRY_NAME_SET.has(skillId),
+          !requiresChatToolArtifactCoverage(skill) ||
+          Object.hasOwn(TOOL_RESULT_REQUIRED_KEYS, skillId),
+        toolAvailabilityCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          PAID_TOOL_NAME_SET.has(skillId),
+        toolRenderCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          TOOL_UI_REGISTRY_NAME_SET.has(skillId),
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -7044,6 +7066,50 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
   };
 }
 
+function evaluatePromptDisclosureContract(prompt: string, vars: EvalVars) {
+  const disclosureCase =
+    typeof vars.promptDisclosureCase === 'string'
+      ? vars.promptDisclosureCase
+      : 'blocked-before-dispatch';
+  const userText = prompt.trim();
+  const blocked = isPromptDisclosureRequest(userText);
+  const artistContext = buildTestArtistContext(
+    toObject(vars.artistOverrides) as Parameters<
+      typeof buildTestArtistContext
+    >[0]
+  );
+  const plan = toPlanId(vars.plan);
+  const planLimits = getEntitlements(plan);
+  const systemPrompt = buildSystemPrompt(artistContext, [], {
+    aiCanUseTools: planLimits.booleans.aiCanUseTools,
+    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    insightsEnabled: plan !== 'free',
+  });
+
+  return {
+    target: 'prompt-disclosure-contract',
+    adapter: 'prompt-disclosure-contract',
+    productionEntrypoint: 'apps/web/lib/chat/run.ts:executeChatTurn',
+    costTier: 'deterministic',
+    text: blocked ? PROMPT_DISCLOSURE_REFUSAL : '',
+    disclosureCase,
+    userText,
+    blocked,
+    modelDispatchPrevented: blocked,
+    refusalModelId: blocked ? 'prompt-disclosure-refusal' : null,
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    hasSecuritySection: systemPrompt.includes('## Security (CRITICAL)'),
+    hasCanary: systemPrompt.includes(PROMPT_LEAK_CANARY),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function evaluateChatTitleContract(vars: EvalVars) {
   const titleCase =
     typeof vars.chatTitleCase === 'string'
@@ -7071,8 +7137,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
   const generatedTitle = sanitizeConversationTitle('"Neon Reef Launch Plan"');
   const sourceFacts = {
     importsUserFacingRouteDependencies: textIncludesAll(routeSource, [
-      "import { gateway } from '@ai-sdk/gateway'",
-      "import { generateText } from '@/lib/ai/sdk'",
+      "import { gateway, generateText } from '@/lib/ai/sdk'",
       "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
     ]),
     usesTitleModelConstant:
@@ -8173,6 +8238,7 @@ type EvalCaseSummary = {
   readonly albumArtProviderCase: string | null;
   readonly aiToolPromptCase: string | null;
   readonly chatTitleCase: string | null;
+  readonly promptDisclosureCase: string | null;
   readonly insightPromptCase: string | null;
   readonly interviewSummaryCase: string | null;
   readonly playlistGenerationCase: string | null;
@@ -8281,6 +8347,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     albumArtProviderCase: scalarValue(block, 'albumArtProviderCase'),
     aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
     chatTitleCase: scalarValue(block, 'chatTitleCase'),
+    promptDisclosureCase: scalarValue(block, 'promptDisclosureCase'),
     insightPromptCase: scalarValue(block, 'insightPromptCase'),
     interviewSummaryCase: scalarValue(block, 'interviewSummaryCase'),
     playlistGenerationCase: scalarValue(block, 'playlistGenerationCase'),
@@ -8535,6 +8602,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .filter(
         (chatTitleCase): chatTitleCase is string =>
           typeof chatTitleCase === 'string'
+      )
+  );
+  const promptDisclosureCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'prompt-disclosure-contract')
+      .map(testCase => testCase.promptDisclosureCase)
+      .filter(
+        (promptDisclosureCase): promptDisclosureCase is string =>
+          typeof promptDisclosureCase === 'string'
       )
   );
   const insightPromptCaseNames = uniqueSorted(
@@ -8834,6 +8910,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       REQUIRED_CHAT_TITLE_CASES,
       chatTitleCaseNames
     ),
+    requiredPromptDisclosureCaseNames: [...REQUIRED_PROMPT_DISCLOSURE_CASES],
+    promptDisclosureCaseNames,
+    missingPromptDisclosureCaseNames: missingNames(
+      REQUIRED_PROMPT_DISCLOSURE_CASES,
+      promptDisclosureCaseNames
+    ),
     requiredInsightPromptCaseNames: [...REQUIRED_INSIGHT_PROMPT_CASES],
     insightPromptCaseNames,
     missingInsightPromptCaseNames: missingNames(
@@ -9096,6 +9178,11 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'prompt-context-contract') {
       const payload = evaluateSystemPromptContract(prompt, vars);
+      return jsonProviderResponse(payload, startedAt);
+    }
+
+    if (target === 'prompt-disclosure-contract') {
+      const payload = evaluatePromptDisclosureContract(prompt, vars);
       return jsonProviderResponse(payload, startedAt);
     }
 

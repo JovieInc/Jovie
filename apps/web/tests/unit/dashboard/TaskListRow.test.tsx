@@ -126,6 +126,41 @@ describe('TaskListRow', () => {
     ).toBeNull();
   });
 
+  it('hides the assignee chip when the assignee subview already scopes the list', () => {
+    const { queryByText } = fastRender(
+      <TaskListRow
+        task={mockTask}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+        showAssignee={false}
+      />
+    );
+
+    expect(queryByText('You')).not.toBeInTheDocument();
+  });
+
+  it('hides the title and due chip when the detail pane already shows them', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-25T12:00:00.000Z'));
+
+    const { queryByText } = fastRender(
+      <TaskListRow
+        task={{
+          ...mockTask,
+          dueAt: new Date('2026-04-20T12:00:00.000Z'),
+        }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+        isSelected
+        hideTitle
+        hideDue
+      />
+    );
+
+    expect(queryByText(mockTask.title)).not.toBeInTheDocument();
+    expect(queryByText(/due/i)).not.toBeInTheDocument();
+  });
+
   it('shows the agent-working glyph only for live Jovie in-progress work', () => {
     const working = fastRender(
       <TaskListRow

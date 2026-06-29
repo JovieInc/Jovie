@@ -737,13 +737,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-bento-pairs-section {
-  /* Light band on the dark homepage shell — scope light reading tokens so
-     text-*-token utilities meet WCAG on #f5f5f7 regardless of page theme. */
+  /* Light band on the dark homepage shell — scopes tokens so black marketing
+     copy and white cards keep WCAG contrast when html.dark is active. */
+  color-scheme: light;
   --color-bg-base: #f5f5f7;
-  --color-text-primary-token: lch(9.894% 0 282);
-  --color-text-secondary-token: lch(19.788% 1.25 282);
-  --color-text-tertiary-token: lch(34% 1.25 282);
+  --color-text-primary-token: #000;
+  --color-text-secondary-token: rgb(0 0 0 / 0.58);
+  --color-text-tertiary-token: rgb(0 0 0 / 0.45);
   background: var(--color-bg-base);
+  color: #000;
 }
 
 .homepage-outcome-section {

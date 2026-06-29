@@ -39,8 +39,13 @@ vi.mock('ai', async () => {
   };
 });
 
+const mockGatewayModel = vi.hoisted(() =>
+  vi.fn((modelId: string) => ({ __model: modelId }))
+);
+
 vi.mock('@ai-sdk/gateway', () => ({
-  gateway: vi.fn((modelId: string) => ({ __model: modelId })),
+  createGateway: vi.fn(() => mockGatewayModel),
+  gateway: vi.fn(),
 }));
 
 function buildEvalTools() {

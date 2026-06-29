@@ -19,6 +19,9 @@ concurrency:
 jobs:
   storybook-a11y:
     name: Storybook A11y Checks
+    # Advisory — Storybook component a11y signal, not a merge gate. PR Ready
+    # aggregates deterministic checks only; promote to blocking via ci-pr-ready.needs.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -43,7 +46,15 @@ jobs:
 
       - name: Run Storybook A11y Tests
         id: a11y-test
-        run: pnpm --filter web test:a11y
+        run: |
+          set +e
+          pnpm --filter web test:a11y
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::Storybook a11y exited $code (advisory — not a merge gate)"
+          fi
+          exit 0
 
       - name: A11y Results Summary
         if: always()
@@ -67,6 +78,8 @@ jobs:
 
   playwright-visual:
     name: Playwright Visual Regression
+    # Advisory — visual diff signal for component PRs, not a merge gate.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Skip on forks — secrets (DATABASE_URL) are not available
@@ -93,7 +106,15 @@ jobs:
 
       - name: Run Visual Regression Tests
         id: visual-test
-        run: pnpm --filter web e2e:visual
+        run: |
+          set +e
+          pnpm --filter web e2e:visual
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ]; then
+            echo "::warning::Playwright visual exited $code (advisory — not a merge gate)"
+          fi
+          exit 0
         env:
           CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

@@ -23,9 +23,7 @@ describe('EntityThreadGlyph', () => {
         <EntityThreadGlyph threadTitle='t' onOpen={onOpen} />
       </div>
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Open Running Conversation' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open Running Chat' }));
     expect(onOpen).toHaveBeenCalledOnce();
     expect(onParentClick).not.toHaveBeenCalled();
   });

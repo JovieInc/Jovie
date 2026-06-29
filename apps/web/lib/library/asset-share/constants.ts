@@ -1,0 +1,2 @@
+export const LIBRARY_ASSET_PRIVATE_ROUTE_PREFIX = '/p';
+export const LIBRARY_ASSET_PUBLIC_ROUTE_PREFIX = '/a';

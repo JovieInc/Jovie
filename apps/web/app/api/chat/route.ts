@@ -56,6 +56,7 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { extractLastUserText } from '@/lib/chat/message-text';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -101,12 +102,12 @@ import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
-
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
+import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { checkGatesForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
@@ -2752,9 +2753,11 @@ export async function POST(req: Request) {
       onFinish: async ({ responseMessage, isAborted }) => {
         if (!reservedTurn || streamFailurePersisted) return;
 
-        const assistantText = extractUIMessageText(
-          responseMessage.parts as Array<{ type: string; text?: string }>
-        );
+        const assistantText = sanitizeAssistantResponse(
+          extractUIMessageText(
+            responseMessage.parts as Array<{ type: string; text?: string }>
+          )
+        ).text;
         const toolCalls = preparePersistedToolEventsForTurnFinish({
           parts: responseMessage.parts,
           isAborted,
@@ -2777,6 +2780,16 @@ export async function POST(req: Request) {
               }
             : {}),
         });
+
+        if (!isAborted && assistantText.trim().length > 0) {
+          scheduleOnlineScoring({
+            traceId: requestId,
+            caseName: `prod:${requestId}`,
+            userPrompt: userText,
+            assistantResponse: assistantText,
+            plan: userPlan,
+          });
+        }
       },
       onError: () => {
         return 'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.';

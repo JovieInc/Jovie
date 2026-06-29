@@ -78,4 +78,16 @@ describe('start route layout', () => {
       { forceBypassClerk: false, skipCoreProviders: true },
     ]);
   });
+
+  it('bypasses Clerk for local Playwright E2E runs', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', '');
+    const { default: StartLayout } = await import('./layout');
+
+    render(await StartLayout({ children: <div data-testid='child' /> }));
+
+    expect(mocks.providerProps).toEqual([
+      { forceBypassClerk: true, skipCoreProviders: true },
+    ]);
+  });
 });

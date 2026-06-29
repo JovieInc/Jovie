@@ -21,6 +21,7 @@ import { db } from '@/lib/db';
 import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { recordWorkflowRunOutcome } from './outcome-attribution';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,15 @@ export async function markWorkflowCompleted(
         eq(workflowRuns.status, 'running')
       )
     );
+
+  try {
+    await recordWorkflowRunOutcome(workflowRunId);
+  } catch (err) {
+    logger.error(
+      '[execute-approved-action] failed to record workflow run outcome',
+      { workflowRunId, err }
+    );
+  }
 }
 
 export async function markWorkflowFailed(

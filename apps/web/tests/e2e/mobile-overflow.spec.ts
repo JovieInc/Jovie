@@ -137,7 +137,12 @@ const AUTHENTICATED_ROUTES = [
   {
     id: 'app-home',
     path: APP_ROUTES.DASHBOARD,
-    readySelectors: ['main', 'textarea', '[contenteditable="true"]'],
+    readySelectors: [
+      'main',
+      '[data-testid="opportunity-inbox-page"]',
+      '[data-testid="opportunity-inbox-feed"]',
+      '[data-testid="opportunity-inbox-empty-state"]',
+    ],
   },
   {
     id: 'app-chat',

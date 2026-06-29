@@ -3,6 +3,7 @@ import {
   AUTH_SIGNUP_ONBOARDING_ROUTES,
   AUTH_SURFACE_MIN_BODY_CHARS,
   bodyContainsAuthShellReady,
+  bodyContainsInitializedInterview,
   bodyContainsOnboardingChat,
   buildOnboardingChatProbePayload,
   buildReport,
@@ -10,6 +11,7 @@ import {
   formatAuthSignupOnboardingReportSummary,
   hasAuthSurfaceError,
   hasGoldenPathSurfaceError,
+  isKnownOnboardingFallback,
 } from './auth-signup-onboarding';
 
 afterEach(() => {
@@ -63,6 +65,64 @@ describe('bodyContainsOnboardingChat', () => {
     expect(
       bodyContainsOnboardingChat('<div data-testid="onboarding-chat"></div>')
     ).toBe(true);
+  });
+});
+
+describe('bodyContainsInitializedInterview', () => {
+  it('requires an init marker beyond the bare chat container', () => {
+    // The exact render that slipped past the original canary: container present,
+    // interview never initialized.
+    expect(
+      bodyContainsInitializedInterview('<div data-testid="onboarding-chat">')
+    ).toBe(false);
+  });
+
+  it('passes when the starter intro initialized', () => {
+    expect(
+      bodyContainsInitializedInterview(
+        '<div data-testid="onboarding-chat"><div data-testid="onboarding-empty-intro"></div></div>'
+      )
+    ).toBe(true);
+  });
+
+  it('passes when the composer initialized', () => {
+    expect(
+      bodyContainsInitializedInterview(
+        '<div data-testid="onboarding-chat"><div data-testid="onboarding-centered-composer"></div></div>'
+      )
+    ).toBe(true);
+  });
+
+  it('fails when the chat container is absent', () => {
+    expect(
+      bodyContainsInitializedInterview(
+        '<div data-testid="onboarding-empty-intro"></div>'
+      )
+    ).toBe(false);
+  });
+});
+
+describe('isKnownOnboardingFallback', () => {
+  it('matches the streaming onError fallback', () => {
+    expect(
+      isKnownOnboardingFallback(
+        'Jovie hit a temporary issue while processing your message. Please retry.'
+      )
+    ).toBe(true);
+  });
+
+  it('matches the still-connecting fallback', () => {
+    expect(
+      isKnownOnboardingFallback(
+        'Jovie is still connecting. Try again in a moment.'
+      )
+    ).toBe(true);
+  });
+
+  it('rejects arbitrary text so a broken error page cannot pass', () => {
+    expect(
+      isKnownOnboardingFallback('Application error: a client exception')
+    ).toBe(false);
   });
 });
 

@@ -52,6 +52,7 @@ interface TaskBoardProps {
   readonly isLoading: boolean;
   readonly artistName?: string | null;
   readonly selectedTaskId: string | null;
+  readonly showAssigneeChip?: boolean;
   readonly onOpenTask: (task: TaskView) => void;
   readonly onCreateTask: () => void;
   readonly onMoveTask: (input: MoveTaskInput) => void;
@@ -112,6 +113,7 @@ export function TaskBoard({
   isLoading,
   artistName,
   selectedTaskId,
+  showAssigneeChip = true,
   onOpenTask,
   onCreateTask,
   onMoveTask,
@@ -181,6 +183,7 @@ export function TaskBoard({
             column={column}
             artistName={artistName}
             selectedTaskId={selectedTaskId}
+            showAssigneeChip={showAssigneeChip}
             onOpenTask={onOpenTask}
             onCreateTask={onCreateTask}
             getTaskContextMenuItems={getTaskContextMenuItems}
@@ -193,6 +196,7 @@ export function TaskBoard({
             task={activeTask}
             artistName={artistName}
             selected={false}
+            showAssigneeChip={showAssigneeChip}
             draggingOverlay
           />
         ) : null}
@@ -205,6 +209,7 @@ function TaskBoardColumn({
   column,
   artistName,
   selectedTaskId,
+  showAssigneeChip,
   onOpenTask,
   onCreateTask,
   getTaskContextMenuItems,
@@ -212,6 +217,7 @@ function TaskBoardColumn({
   column: TaskBoardColumnResult;
   artistName?: string | null;
   selectedTaskId: string | null;
+  showAssigneeChip: boolean;
   onOpenTask: (task: TaskView) => void;
   onCreateTask: () => void;
   getTaskContextMenuItems: (task: TaskView) => ContextMenuItemType[];
@@ -277,6 +283,7 @@ function TaskBoardColumn({
                 task={task}
                 artistName={artistName}
                 selected={task.id === selectedTaskId}
+                showAssigneeChip={showAssigneeChip}
                 onOpenTask={onOpenTask}
                 getTaskContextMenuItems={getTaskContextMenuItems}
               />
@@ -297,12 +304,14 @@ function SortableTaskBoardCard({
   task,
   artistName,
   selected,
+  showAssigneeChip,
   onOpenTask,
   getTaskContextMenuItems,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   selected: boolean;
+  showAssigneeChip: boolean;
   onOpenTask: (task: TaskView) => void;
   getTaskContextMenuItems: (task: TaskView) => ContextMenuItemType[];
 }>) {
@@ -342,6 +351,7 @@ function SortableTaskBoardCard({
           task={task}
           artistName={artistName}
           selected={selected}
+          showAssigneeChip={showAssigneeChip}
         />
       </button>
       <div className='absolute right-2 top-2'>
@@ -359,11 +369,13 @@ const TaskBoardCard = memo(function TaskBoardCard({
   task,
   artistName,
   selected,
+  showAssigneeChip = true,
   draggingOverlay = false,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   selected: boolean;
+  showAssigneeChip?: boolean;
   draggingOverlay?: boolean;
 }>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
@@ -433,10 +445,12 @@ const TaskBoardCard = memo(function TaskBoardCard({
           />
           <span>{priority.label}</span>
         </span>
-        <span className='inline-flex min-w-0 items-center gap-1.5 rounded-full border border-subtle px-1.5 py-0.5 text-tertiary-token'>
-          <UserAvatar name={assignee.avatarName} size='xs' />
-          <span className='truncate'>{assignee.label}</span>
-        </span>
+        {showAssigneeChip ? (
+          <span className='inline-flex min-w-0 items-center gap-1.5 rounded-full border border-subtle px-1.5 py-0.5 text-tertiary-token'>
+            <UserAvatar name={assignee.avatarName} size='xs' />
+            <span className='truncate'>{assignee.label}</span>
+          </span>
+        ) : null}
         {agentLabel ? (
           <span
             className={cn(

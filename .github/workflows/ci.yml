@@ -44,17 +44,37 @@ env:
   # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
   # or leave as "ubuntu-latest" for default 2-core runners.
   FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+  # JOV-2497: four-slot cross-PR pool caps Neon branch *creation* (one endpoint per branch).
+  # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
+  # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
+  # sibling matrix jobs cancel each other within the same workflow run.
+  # Pool groups include github.job so branch-creator siblings in one workflow (neon-db,
+  # dashboard Lighthouse, E2E smoke fallback, admin smoke) do not queue-cancel each other.
 
 jobs:
-  # Graphite CI Optimizer: lets Graphite skip redundant CI on PRs it will
-  # re-validate in the merge queue. Fail-open — missing token or action error
-  # leaves skip='false', so CI runs normally and nothing is silently skipped.
-  optimize_ci:
-    name: Optimize CI (Graphite)
+  # ── CI Optimizer + Centralized path-change detection (merged) ──────────
+  # Merged optimize_ci + ci-path-changes into one job to eliminate the serial
+  # dependency chain that added ~5 min to every CI run. Graphite CI Optimizer
+  # runs first (fail-open), then path detection.
+  ci-path-changes:
+    name: Path Changes
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     outputs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
+      run_build: ${{ steps.detect.outputs.run_build }}
+      run_test: ${{ steps.detect.outputs.run_test }}
+      run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
+      run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
+      run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
+      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse }}
+      run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse }}
+      run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals }}
+      run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set }}
+      run_e2e: ${{ steps.detect.outputs.run_e2e }}
+      run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
+      run_neon: ${{ steps.detect.outputs.run_neon }}
+      has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
     steps:
       - id: graphite-token
         name: Check Graphite token configuration
@@ -75,35 +95,20 @@ jobs:
         with:
           graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
 
+      - name: Skip CI (Graphite optimizer)
+        if: steps.graphite.outputs.skip == 'true'
+        run: |
+          echo "Graphite CI optimizer requested skip — CI will be skipped."
+          for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_drizzle run_neon has_code_changes; do
+            echo "$t=false" >> "$GITHUB_OUTPUT"
+          done
 
-  # ── Centralized path-change detection ──────────────────────────────────
-  # Runs once, outputs change flags for all job types.
-  # Downstream jobs read outputs instead of fetching git history independently.
-  ci-path-changes:
-    needs: [optimize_ci]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
-    name: Path Changes
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      run_build: ${{ steps.detect.outputs.run_build }}
-      run_test: ${{ steps.detect.outputs.run_test }}
-      run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
-      run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
-      run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
-      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse }}
-      run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse }}
-      run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals }}
-      run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set }}
-      run_e2e: ${{ steps.detect.outputs.run_e2e }}
-      run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
-      run_neon: ${{ steps.detect.outputs.run_neon }}
-      has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
-    steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: steps.graphite.outputs.skip != 'true'
         with:
           fetch-depth: 0
       - name: Detect path changes for all job types
+        if: steps.graphite.outputs.skip != 'true'
         id: detect
         shell: bash
         run: |
@@ -267,9 +272,9 @@ jobs:
           fi
 
   ci-risk-classifier:
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
     name: CI Risk Classifier
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -357,8 +362,8 @@ jobs:
           retention-days: 7
 
   ci-env-example-guard:
-    needs: [optimize_ci]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
+    needs: [ci-path-changes]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
     runs-on: ubuntu-latest
@@ -390,8 +395,8 @@ jobs:
           echo "✅ .env.example looks safe (no obvious secrets)."
 
   ci-secret-scan:
-    needs: [optimize_ci]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
+    needs: [ci-path-changes]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
     runs-on: ubuntu-latest
@@ -424,10 +429,10 @@ jobs:
   ci-guardrails:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { fetch-depth: 0 }
@@ -450,9 +455,10 @@ jobs:
         run: node scripts/next-proxy-guard.mjs
 
   ci-structural-contract:
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
+    # Path-gated: only runs when CI harness/.github files change or on push/dispatch.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
     name: Structural Contract
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -483,6 +489,7 @@ jobs:
           pnpm --filter=@jovie/web run lint:no-native-dialogs
           pnpm --filter=@jovie/web run lint:seo
           pnpm --filter=@jovie/web run lint:contrast-ratchet
+          pnpm doc:freshness:check
       - name: Validate flaky quarantine ledger
         run: node .github/scripts/quarantine-ledger.mjs validate
       - name: Validate reliability detector registry
@@ -500,17 +507,17 @@ jobs:
             echo "Next local command:"
             echo
             echo '```bash'
-            echo "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm test:reliability-detectors"
+            echo "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
   ci-biome:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { fetch-depth: 2 }
@@ -540,59 +547,6 @@ jobs:
           else
             pnpm biome ci --reporter=github .
           fi
-
-  ci-promptfoo-evals:
-    name: Promptfoo Evals (deterministic)
-    needs: [optimize_ci, ci-path-changes]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true') }}
-    env:
-      JOVIE_RUN_LIVE_EVALS: '0'
-      JOVIE_RUN_LIVE_HTTP_EVALS: '0'
-      JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
-      JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
-      PROMPTFOO_DISABLE_TELEMETRY: '1'
-      PROMPTFOO_DISABLE_UPDATE: '1'
-      PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with: { fetch-depth: 1 }
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Validate Promptfoo config
-        run: pnpm --filter @jovie/web run evals:validate
-      - name: Run deterministic Promptfoo evals
-        run: pnpm run evals
-
-  ci-golden-eval-set:
-    name: Golden Eval Set (deterministic)
-    needs: [optimize_ci, ci-path-changes]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true') }}
-    env:
-      JOVIE_RUN_LIVE_EVALS: '0'
-      JOVIE_RUN_LIVE_HTTP_EVALS: '0'
-      JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
-      JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with: { fetch-depth: 1 }
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Run golden eval-set CI gate
-        run: pnpm run evals:golden
-
-  ci-eslint:
-    name: ESLint Server Boundaries
-    # Check server/client boundary violations
-    needs: [optimize_ci, ci-path-changes]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with: { fetch-depth: 2 }
-      - uses: ./.github/actions/setup-node-pnpm
       - name: Run ESLint server boundary checks
         shell: bash
         run: |
@@ -618,11 +572,52 @@ jobs:
             pnpm --filter=@jovie/web run lint:server-boundaries
           fi
 
+  ci-promptfoo-evals:
+    name: Promptfoo Evals (deterministic)
+    needs: [ci-path-changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true') }}
+    env:
+      JOVIE_RUN_LIVE_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
+      PROMPTFOO_DISABLE_TELEMETRY: '1'
+      PROMPTFOO_DISABLE_UPDATE: '1'
+      PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Validate Promptfoo config
+        run: pnpm --filter @jovie/web run evals:validate
+      - name: Run deterministic Promptfoo evals
+        run: pnpm run evals
+
+  ci-golden-eval-set:
+    name: Golden Eval Set (deterministic)
+    needs: [ci-path-changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true') }}
+    env:
+      JOVIE_RUN_LIVE_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
+      JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run golden eval-set CI gate
+        run: pnpm run evals:golden
+
   ci-knip:
     name: Knip (dead code)
     # Detect unused files, dependencies, and exports
-    needs: [optimize_ci, ci-path-changes]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
+    needs: [ci-path-changes]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -636,10 +631,10 @@ jobs:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -667,13 +662,16 @@ jobs:
 
   neon-db:
     name: Neon DB
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     # Run for push to main, testing-labeled full CI, or PRs touching DB-relevant paths.
     # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
     # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true'))) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     outputs:
       branch_name: ${{ steps.sanitize-branch.outputs.name }}
     steps:
@@ -744,6 +742,7 @@ jobs:
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '2'
       - name: Finalize Neon DB URLs
         id: finalize-urls
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -793,9 +792,9 @@ jobs:
 
   drizzle-migration-guard:
     name: Migration Guard
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -832,9 +831,9 @@ jobs:
 
   ci-drizzle-check:
     name: Drizzle Check
-    needs: [optimize_ci, neon-db, ci-path-changes]
+    needs: [neon-db, ci-path-changes]
     # Drizzle check runs on push to main or PRs with testing label
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -894,10 +893,10 @@ jobs:
         run: pnpm --filter=@jovie/web run drizzle:check
 
   ci-fast:
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [optimize_ci, ci-typecheck, ci-biome, ci-eslint, ci-guardrails, ci-structural-contract]
+    needs: [ci-path-changes, ci-typecheck, ci-biome, ci-guardrails, ci-structural-contract]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -908,8 +907,8 @@ jobs:
   ci-pr-ready:
     name: PR Ready
     # PR gate: fast checks + unit tests + build + Lighthouse (+ risk-triggered smoke/preview).
-    needs: [optimize_ci, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) }}
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -978,11 +977,11 @@ jobs:
             exit 1
           fi
 
-          # Build must succeed. Only skipped for fork PRs (no secrets).
+          # Build is non-blocking (throughput philosophy): corrections are cheap, waiting is expensive.
+          # Build correctness is also validated by Vercel preview deploy + post-merge push CI.
           if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
-            echo "❌ ci-build-public did not pass (result: $BUILD_RESULT)"
-            echo "Likely fix: run pnpm run build:web and inspect the first Next.js build error."
-            exit 1
+            echo "::warning::ci-build-public did not pass (result: $BUILD_RESULT) — non-blocking per throughput policy"
+            echo "Build failure will be corrected post-merge or in a follow-up PR."
           fi
 
           if [[ "$DASHBOARD_LIGHTHOUSE_RESULT" != "success" && "$DASHBOARD_LIGHTHOUSE_RESULT" != "skipped" ]]; then
@@ -1035,8 +1034,8 @@ jobs:
   ci-integration-ready:
     name: Integration Fast
     # Lightweight gate for integration/* PRs (agent batch lanes). Full CI runs on train PRs to main.
-    needs: [optimize_ci, ci-risk-classifier, ci-fast]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/')) }}
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -1058,13 +1057,13 @@ jobs:
 
   ci-build-public:
     name: Build (public routes)
-    needs: [optimize_ci, ci-path-changes, ci-risk-classifier]
+    needs: [ci-path-changes, ci-risk-classifier]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
     # On PRs to main: always runs (non-fork) for build validation. Part of the merge gate.
     # Merge queue intentionally skips build (already validated on the PR).
     # On main push: always runs for full coverage.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -1134,11 +1133,11 @@ jobs:
 
   ci-layout-guard:
     name: Layout Guard (informational)
-    needs: [optimize_ci, ci-build-public]
+    needs: [ci-path-changes, ci-build-public]
     # Fully informational — never blocks PRs or merge queue.
     # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
     # Skipped on push-to-main (merge queue already validated).
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && needs.ci-build-public.outputs.has_artifact == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && needs.ci-build-public.outputs.has_artifact == 'true') }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1209,8 +1208,8 @@ jobs:
 
   ci-mobile-overflow:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') }}
+    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -1227,41 +1226,43 @@ jobs:
       - name: Run static mobile overflow guard
         run: pnpm --filter=@jovie/web run mobile-overflow:guard
 
-      - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed (saves 3 Neon branches
-        # per PR run — one per matrix shard — on UI-only PRs that just need a read-only DB).
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        # Reuse the shared ephemeral branch from neon-db instead of DATABASE_URL_MAIN.
+        # Screenshot/UI-only PRs still need seeded profile fixtures for Playwright.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: mobile-overflow-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+      - name: Resolve DATABASE_URL from Neon artifact
+        # Use only the ephemeral branch credentials from the neon-db artifact.
+        # Injecting DATABASE_URL_MAIN passwords onto an ephemeral host causes
+        # password-auth retry storms during migrate/seed and SSR profile reads.
         id: resolve-mobile-overflow-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-mobile-overflow-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
-      - name: Export DATABASE_URL (main — non-DB PR)
-        # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true'
-        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+      - name: Fail if Neon DB URL is missing (Mobile Overflow)
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run mobile overflow against staging/production DBs."
+            exit 1
+          fi
+
+      - name: Verify Neon DB connectivity (fail-fast)
+        run: pnpm --filter=@jovie/web exec tsx tests/e2e/verify-neon-db-connectivity.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Run migrations (ephemeral Neon)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        # 320px matrix shard owns migrate/seed so 390/430 siblings reuse one Neon branch.
+        if: matrix.width == 320
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1270,11 +1271,28 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed mobile overflow fixtures
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: matrix.width == 320
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+
+      - name: Wait for shared Neon seed (mobile overflow width > 320)
+        if: matrix.width != 320
+        run: |
+          echo "Waiting for 320px shard migrate/seed on shared Neon branch..."
+          for attempt in $(seq 1 60); do
+            if pnpm --filter=@jovie/web exec tsx tests/wait-for-public-qa-seed.ts; then
+              echo "Shared Neon seed ready"
+              exit 0
+            fi
+            echo "Attempt ${attempt}/60: seed markers not ready yet"
+            sleep 5
+          done
+          echo "Timed out waiting for 320px shard seed on shared Neon branch"
+          exit 1
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Cache Playwright Browsers
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -1353,6 +1371,7 @@ jobs:
           CI: true
           E2E_SKIP_WEB_SERVER: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -1377,21 +1396,12 @@ jobs:
             apps/web/test-results/
           retention-days: 3
 
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-lighthouse-pr:
     name: Lighthouse (public routes PR)
-    needs: [optimize_ci, ci-build-public, ci-path-changes, neon-db]
+    needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -1413,42 +1423,43 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed (saves Neon compute).
-        # Non-DB PRs skip branch creation and fall back to DATABASE_URL_MAIN for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        # Reuse the shared ephemeral branch from neon-db instead of DATABASE_URL_MAIN.
+        # Screenshot/UI-only PRs still need seeded profile fixtures for shard-0 Playwright.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: public-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: resolve-neon-db-url
+      - name: Resolve DATABASE_URL from Neon artifact
+        # Use only the ephemeral branch credentials from the neon-db artifact.
+        # Injecting DATABASE_URL_MAIN passwords onto an ephemeral host causes
+        # password-auth retry storms during shard-0 migrate/seed and LHCI.
+        id: resolve-lighthouse-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: echo "DATABASE_URL=${{ steps.resolve-lighthouse-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
-      - name: Export DATABASE_URL (main — non-DB PR)
-        # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true'
-        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+      - name: Fail if Neon DB URL is missing (Lighthouse)
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run public Lighthouse against staging/production DBs."
+            exit 1
+          fi
+
+      - name: Verify Neon DB connectivity (fail-fast)
+        run: pnpm --filter=@jovie/web exec tsx tests/e2e/verify-neon-db-connectivity.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Run migrations (ephemeral Neon)
         # Shard 0 owns migrate/seed so matrix siblings reuse one Neon branch.
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard == 0
+        if: matrix.shard == 0
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1457,14 +1468,14 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard == 0
+        if: matrix.shard == 0
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
 
       - name: Wait for shared Neon seed (lighthouse shard > 0)
-        if: needs.ci-path-changes.outputs.run_neon == 'true' && matrix.shard != 0
+        if: matrix.shard != 0
         run: |
           echo "Waiting for shard 0 migrate/seed on shared Neon branch..."
           for attempt in $(seq 1 60); do
@@ -1539,7 +1550,14 @@ jobs:
 
           pnpm run test:lighthouse:public:launch
 
-          if [ "${{ matrix.shard }}" = "0" ]; then
+          # Pin the extra mobile-viewport-stability Playwright spec to the lighter
+          # LHCI shard (shard 1 collects 9 URLs vs shard 0's 10). Both shards run
+          # in parallel and the merge gate waits on max(shard0, shard1); piling the
+          # ~1.5m spec onto the already-heavier shard 0 made it the gate long pole
+          # on every public-route gtmq batch. Running it on the lighter shard
+          # rebalances the only-2-way fan-out and lowers wall-clock with identical
+          # coverage.
+          if [ "${{ matrix.shard }}" = "1" ]; then
             mkdir -p tests/.auth
             echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
             pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
@@ -1559,10 +1577,13 @@ jobs:
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -1730,8 +1751,8 @@ jobs:
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true') }}
+    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1752,29 +1773,22 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed.
-        # Non-DB PRs skip branch creation; resolve-neon-database-url falls back to DATABASE_URL_MAIN.
+      - name: Download Neon DB connection artifact
+        # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
         if: needs.ci-path-changes.outputs.run_neon == 'true'
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: onboarding-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
+      - name: Resolve DATABASE_URL from Neon artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -1876,22 +1890,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-lighthouse-admin-pr:
     name: Lighthouse (admin PR)
-    # Do NOT depend on neon-db — it only runs on push / testing-labeled / drizzle PRs,
-    # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
-    # its own ephemeral branch below and does not reuse the shared neon-db branch.
-    needs: [optimize_ci, ci-fast, ci-path-changes, ci-build-public]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true') }}
+    # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
+    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1912,29 +1915,32 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: admin-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
+      - name: Resolve DATABASE_URL from Neon artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-admin-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-admin-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2024,22 +2030,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-lighthouse-chat-pr:
     name: Lighthouse (chat PR)
     # Informational baseline run — first PR establishes the budget; once
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true') }}
+    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true') }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -2061,29 +2058,32 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: chat-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
+      - name: Resolve DATABASE_URL from Neon artifact
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-chat-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-chat-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2173,20 +2173,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
-    needs: [optimize_ci, neon-db, ci-path-changes]
+    needs: [neon-db, ci-path-changes]
     # Only run when drizzle/schema paths changed — skip entirely otherwise to save runners
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
@@ -2220,17 +2211,29 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-pr-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Fail if Neon DB URL is missing (PR migrate)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run PR migrate against staging/production DBs."
+            exit 1
+          fi
+
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Verify Neon DB connectivity (fail-fast)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/e2e/verify-neon-db-connectivity.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2531,10 +2534,10 @@ jobs:
 
   ci-build:
     name: Build
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Skipped in merge queue: no merge-queue jobs depend on the full build.
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     outputs:
@@ -2643,17 +2646,17 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
-    needs: [optimize_ci, ci-path-changes]
+    needs: [ci-path-changes]
     # Runs on PRs to main, main pushes, and manual dispatch. Merge queue skips (PR-validated).
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']
+        shard: ['1/5', '2/5', '3/5', '4/5', '5/5']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -2690,8 +2693,8 @@ jobs:
           TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: |
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
-          export NODE_OPTIONS="--max-old-space-size=2048"
-          VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
+          export NODE_OPTIONS="--max-old-space-size=3072"
+          VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"
           # Retry budget comes from apps/web/tests/quarantine.json
           RETRY_FLAG="--retry=${{ steps.quarantine.outputs.unit_default_retries }}"
           # Use shard-specific output file so Codecov Test Analytics receives all 10 shards
@@ -2741,8 +2744,8 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    needs: [optimize_ci, ci-build-public, ci-path-changes, neon-db]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true') }}
+    needs: [ci-build-public, ci-path-changes, neon-db]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -2908,10 +2911,13 @@ jobs:
     # Gated: runs with 'testing' label or deterministic high-risk classification.
     # Full E2E runs on merge to main anyway.
     # Dependabot PRs cannot access NEON_API_KEY or other Preview-environment secrets.
-    needs: [optimize_ci, ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true')) }}
+    needs: [ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -2933,9 +2939,29 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
+      - name: Download Neon DB connection artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
+
+      - name: Resolve DATABASE_URL from Neon artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
+        id: resolve-e2e-smoke-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
+
+      - name: Export DATABASE_URL (shared ephemeral branch)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
+        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -2944,9 +2970,9 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           protected_branches: main,development,preview,br-main,br-production
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        id: resolve-e2e-smoke-neon-db-url
+      - name: Resolve DATABASE_URL (fallback Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
+        id: resolve-e2e-smoke-fallback-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
           candidate_url: ${{ steps.neon-branch.outputs.db_url }}
@@ -2954,9 +2980,9 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+      - name: Export DATABASE_URL (fallback ephemeral branch)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
+        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-fallback-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3067,7 +3093,7 @@ jobs:
           retention-days: 3
 
       - name: Cleanup ephemeral Neon branch
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success' && steps.neon-branch.outputs.branch_id != ''
         continue-on-error: true
         run: |
           curl -sS -X DELETE \
@@ -3080,10 +3106,13 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label (admin tests need auth credentials).
     # Removed push-to-main trigger — merge queue validates PRs before merge.
-    needs: [optimize_ci, ci-fast, ci-path-changes, neon-db]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    needs: [ci-fast, ci-path-changes, neon-db]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -3216,8 +3245,8 @@ jobs:
   ci-e2e-migrate:
     name: E2E DB Migrate
     environment: Preview – jovie
-    needs: [optimize_ci, ci-fast, ci-build, neon-db, ci-path-changes]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
+    needs: [ci-fast, ci-build, neon-db, ci-path-changes]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -3296,8 +3325,8 @@ jobs:
     name: Full E2E (Preview)
     environment: Preview – jovie
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
-    needs: [optimize_ci, ci-fast, ci-build, neon-db, ci-e2e-migrate]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')))) }}
+    needs: [ci-path-changes, ci-fast, ci-build, neon-db, ci-e2e-migrate]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -3558,8 +3587,8 @@ jobs:
     name: Preview Deploy (PR)
     # Preview deploys are the default QA surface for internal PRs.
     # Keep this independent from the main deploy gate so review happens before merge.
-    needs: [optimize_ci, ci-fast, ci-path-changes, ci-risk-classifier]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-risk-classifier.outputs.requires_preview == 'true' || contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) }}
+    needs: [ci-fast, ci-path-changes, ci-risk-classifier]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-risk-classifier.outputs.requires_preview == 'true' || contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -3646,13 +3675,13 @@ jobs:
 
   ci-summary:
     name: PR Summary
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && github.event_name == 'pull_request') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request') }}
     permissions:
       actions: read
       pull-requests: write
       contents: read
     needs:
-      - optimize_ci
+      - ci-path-changes
       - ci-env-example-guard
       - ci-secret-scan
       - ci-guardrails
@@ -3963,8 +3992,8 @@ jobs:
   # This remains available for opt-in PR validation but does not block production deploys.
   ci-smoke-required:
     name: Extended Smoke (Preview)
-    needs: [optimize_ci, ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
-    if: ${{ needs.optimize_ci.outputs.skip == 'false' && (always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20

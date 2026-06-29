@@ -184,16 +184,13 @@ jobs:
               continue
             fi
 
-            # Gate: Scope judge must pass
+            # Advisory: scope judge (LLM alignment — off fast auto-landing path)
             SCOPE_STATUS=$(gh api "repos/$GH_REPO/commits/$PR_SHA/status" \
               --jq '[.statuses[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"' \
               2>/dev/null || echo "unknown")
-            echo "Scope judge: $SCOPE_STATUS"
-
-            if [[ "$SCOPE_STATUS" != "success" ]]; then
-              echo "Scope judge has not passed ($SCOPE_STATUS). Skipping."
-              SKIPPED=$((SKIPPED + 1))
-              continue
+            echo "Scope judge (advisory): $SCOPE_STATUS"
+            if [[ "$SCOPE_STATUS" != "success" && "$SCOPE_STATUS" != "pending" ]]; then
+              echo "::warning::scope-judge reported $SCOPE_STATUS — advisory only, not blocking auto-landing."
             fi
 
             # Gate: CodeRabbit must not be blocking

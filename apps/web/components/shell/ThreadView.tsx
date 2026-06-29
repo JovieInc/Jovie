@@ -17,7 +17,7 @@ export interface ThreadViewProps {
   readonly thread: ThreadViewData;
   /** Rendered turns / cards (typically `<ThreadTurn>`s and `<Thread*Card>`s). */
   readonly children: ReactNode;
-  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this conversation..." />`. */
+  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this chat..." />`. */
   readonly composer?: ReactNode;
   /** Submit handler forwarded to the default ThreadComposer. */
   readonly onComposerSubmit?: (text: string) => void;
@@ -60,7 +60,7 @@ export function ThreadView({
   children,
   composer,
   onComposerSubmit,
-  composerPlaceholder = 'Reply to this conversation...',
+  composerPlaceholder = 'Reply to this chat...',
 }: ThreadViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);

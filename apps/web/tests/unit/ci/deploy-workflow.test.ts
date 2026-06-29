@@ -372,9 +372,29 @@ describe('CI E2E smoke workflow', () => {
 });
 
 describe('CI public lighthouse workflow', () => {
-  it('seeds QA fixtures only on shard 0 to avoid matrix Neon races', () => {
+  it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
+    const downloadArtifactStep = getStepBlock(
+      lighthouseJob,
+      'Download Neon DB connection artifact'
+    );
+    const resolveDbStep = getStepBlock(
+      lighthouseJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const exportStep = getStepBlock(
+      lighthouseJob,
+      'Export DATABASE_URL (ephemeral branch)'
+    );
+    const failClosedStep = getStepBlock(
+      lighthouseJob,
+      'Fail if Neon DB URL is missing (Lighthouse)'
+    );
+    const verifyDbStep = getStepBlock(
+      lighthouseJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
     const migrateStep = getStepBlock(
       lighthouseJob,
       'Run migrations (ephemeral Neon)'
@@ -385,11 +405,192 @@ describe('CI public lighthouse workflow', () => {
       'Wait for shared Neon seed (lighthouse shard > 0)'
     );
 
+    expect(downloadArtifactStep).toContain(
+      'name: neon-db-connection-${{ github.run_id }}'
+    );
+    expect(resolveDbStep).toContain(
+      'connection_file: /tmp/neon-db-connection/connection.json'
+    );
+    expect(resolveDbStep).not.toContain('credential_source_url');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
+    expect(failClosedStep).toContain(
+      'Refusing to run public Lighthouse against staging/production DBs'
+    );
     expect(migrateStep).toContain('matrix.shard == 0');
     expect(seedStep).toContain('matrix.shard == 0');
     expect(waitStep).toContain('matrix.shard != 0');
     expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
     expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(exportStep).toContain(
+      'steps.resolve-lighthouse-neon-db-url.outputs.database_url'
+    );
+    expect(lighthouseJob).not.toContain('Export DATABASE_URL (main');
+    expect(lighthouseJob).not.toContain(
+      '- name: Create ephemeral Neon database branch (with retry)'
+    );
+    expect(lighthouseJob).toContain('matrix.shard }}" = "1"');
+    expect(lighthouseJob).toContain(
+      'tests/e2e/profile-mobile-viewport-stability.spec.ts'
+    );
+  });
+});
+
+describe('CI mobile overflow workflow', () => {
+  it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const mobileOverflowJob = getJobBlock(workflow, 'ci-mobile-overflow');
+    const downloadArtifactStep = getStepBlock(
+      mobileOverflowJob,
+      'Download Neon DB connection artifact'
+    );
+    const resolveDbStep = getStepBlock(
+      mobileOverflowJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const exportStep = getStepBlock(
+      mobileOverflowJob,
+      'Export DATABASE_URL (ephemeral branch)'
+    );
+    const failClosedStep = getStepBlock(
+      mobileOverflowJob,
+      'Fail if Neon DB URL is missing (Mobile Overflow)'
+    );
+    const verifyDbStep = getStepBlock(
+      mobileOverflowJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
+    const migrateStep = getStepBlock(
+      mobileOverflowJob,
+      'Run migrations (ephemeral Neon)'
+    );
+    const seedStep = getStepBlock(
+      mobileOverflowJob,
+      'Seed mobile overflow fixtures'
+    );
+    const waitStep = getStepBlock(
+      mobileOverflowJob,
+      'Wait for shared Neon seed (mobile overflow width > 320)'
+    );
+
+    expect(downloadArtifactStep).toContain(
+      'name: neon-db-connection-${{ github.run_id }}'
+    );
+    expect(resolveDbStep).toContain(
+      'connection_file: /tmp/neon-db-connection/connection.json'
+    );
+    expect(resolveDbStep).not.toContain('credential_source_url');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
+    expect(failClosedStep).toContain(
+      'Refusing to run mobile overflow against staging/production DBs'
+    );
+    expect(migrateStep).toContain('matrix.width == 320');
+    expect(seedStep).toContain('matrix.width == 320');
+    expect(waitStep).toContain('matrix.width != 320');
+    expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
+    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(exportStep).toContain(
+      'steps.resolve-mobile-overflow-neon-db-url.outputs.database_url'
+    );
+    expect(mobileOverflowJob).not.toContain('Export DATABASE_URL (main');
+    expect(mobileOverflowJob).not.toContain(
+      '- name: Create ephemeral Neon database branch (with retry)'
+    );
+  });
+});
+
+describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
+  const neonBranchCreateJobs = [
+    'neon-db',
+    'ci-lighthouse-dashboard-pr',
+    'ci-e2e-smoke',
+    'ci-admin-smoke',
+  ] as const;
+
+  const neonArtifactConsumerJobs = [
+    'ci-lighthouse-pr',
+    'ci-lighthouse-onboarding-pr',
+    'ci-lighthouse-admin-pr',
+    'ci-lighthouse-chat-pr',
+    'ci-a11y',
+    'ci-mobile-overflow',
+  ] as const;
+
+  it('caps cross-PR Neon branch creation with a four-slot queue', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    for (const jobKey of neonBranchCreateJobs) {
+      const job = getJobBlock(workflow, jobKey);
+      expect(job).toContain('concurrency:');
+      expect(job).toContain('group: neon-endpoint-pool-${{ github.job }}-');
+      expect(job).toContain('cancel-in-progress: false');
+    }
+  });
+
+  it('scopes branch-creation pool per job so siblings in one workflow are not cancelled', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const poolGroups =
+      workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ?? [];
+
+    expect(poolGroups.length).toBeGreaterThan(0);
+    for (const group of poolGroups) {
+      expect(group).toContain('${{ github.job }}');
+    }
+  });
+
+  it('keeps artifact consumers out of the branch-creation pool', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    for (const jobKey of neonArtifactConsumerJobs) {
+      const job = getJobBlock(workflow, jobKey);
+      expect(job).not.toContain('group: neon-endpoint-pool-');
+    }
+  });
+
+  it('shortens shared neon-db branch TTL to release endpoint slots faster', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const neonDbJob = getJobBlock(workflow, 'neon-db');
+    const createBranchStep = getStepBlock(
+      neonDbJob,
+      'Create or reuse Neon branch (with retry)'
+    );
+
+    expect(createBranchStep).toContain("expires_in_hours: '2'");
+  });
+});
+
+describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
+  it('deletes prefixed CI branches when a PR closes', () => {
+    const cleanupWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
+      'utf8'
+    );
+
+    expect(cleanupWorkflow).toContain('List and delete matching Neon branches');
+    expect(cleanupWorkflow).toContain('startswith($base + "-")');
+  });
+
+  it('runs scheduled branch cleanup every 30 minutes', () => {
+    const scheduledWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/neon-scheduled-cleanup.yml'),
+      'utf8'
+    );
+
+    expect(scheduledWorkflow).toContain("cron: '*/30 * * * *'");
+    expect(scheduledWorkflow).toContain(
+      "minimum_branch_age_minutes: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }}"
+    );
+  });
+
+  it('recognizes lighthouse and smoke ephemeral branch name patterns', () => {
+    const cleanupAction = readFileSync(
+      resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),
+      'utf8'
+    );
+
+    expect(cleanupAction).toContain(
+      'dashboard|onboarding|admin|chat)-lighthouse-'
+    );
+    expect(cleanupAction).toContain('admin-smoke-[0-9]+-[0-9]+');
   });
 });
 
@@ -419,8 +620,8 @@ describe('CI public a11y workflow', () => {
     );
     const seedStep = getStepBlock(a11yJob, 'Seed public QA fixtures');
 
-    expect(workflow).toContain(
-      'needs: [optimize_ci, ci-build-public, ci-path-changes, neon-db]'
+    expect(a11yJob).toContain(
+      'needs: [ci-build-public, ci-path-changes, neon-db]'
     );
     expect(downloadArtifactStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
@@ -451,5 +652,54 @@ describe('CI public a11y workflow', () => {
     expect(a11yJob).not.toContain(
       '- name: Create ephemeral Neon database branch (with retry)'
     );
+  });
+});
+
+describe('CI PR neon migrate workflow', () => {
+  it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const migrateJob = getJobBlock(workflow, 'ci-pr-neon-migrate');
+    const downloadArtifactStep = getStepBlock(
+      migrateJob,
+      'Download Neon DB connection artifact'
+    );
+    const resolveDbStep = getStepBlock(
+      migrateJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const exportStep = getStepBlock(
+      migrateJob,
+      'Export DATABASE_URL (ephemeral branch)'
+    );
+    const failClosedStep = getStepBlock(
+      migrateJob,
+      'Fail if Neon DB URL is missing (PR migrate)'
+    );
+    const verifyDbStep = getStepBlock(
+      migrateJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
+    const migrateStep = getStepBlock(
+      migrateJob,
+      'Run migrations (ephemeral Neon)'
+    );
+
+    expect(downloadArtifactStep).toContain(
+      'name: neon-db-connection-${{ github.run_id }}'
+    );
+    expect(resolveDbStep).toContain(
+      'connection_file: /tmp/neon-db-connection/connection.json'
+    );
+    expect(resolveDbStep).toContain('candidate_json_key: db_url');
+    expect(resolveDbStep).not.toContain('credential_source_url');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
+    expect(failClosedStep).toContain(
+      'Refusing to run PR migrate against staging/production DBs'
+    );
+    expect(exportStep).toContain(
+      'steps.resolve-pr-neon-db-url.outputs.database_url'
+    );
+    expect(migrateStep).toContain('drizzle:migrate:ci');
+    expect(migrateJob).not.toContain('credential_source_url');
   });
 });

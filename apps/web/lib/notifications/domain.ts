@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
@@ -54,6 +54,10 @@ import {
   type NotificationSubscribeDomainResponse,
 } from '@/lib/notifications/response';
 import { sendNotification } from '@/lib/notifications/service';
+import {
+  type ConsentSnapshot,
+  getCurrentConsentSnapshot,
+} from '@/lib/notifications/sms-consent';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   normalizeSubscriptionEmail,
@@ -439,7 +443,9 @@ function buildUpsertConfig(
   shouldVerifyEmail: boolean,
   emailOtp: EmailOtpResult | null,
   ipAddress: string | null,
-  source: string | undefined
+  source: string | undefined,
+  smsConsentSnapshot: ConsentSnapshot | null,
+  smsConsentAt: Date
 ) {
   const target =
     channel === 'email'
@@ -462,10 +468,19 @@ function buildUpsertConfig(
       }
     : {};
 
+  const smsConsentFields =
+    channel === 'sms' && smsConsentSnapshot
+      ? {
+          smsConsentAt: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentAt}, ${smsConsentAt})`,
+          smsConsentTextHash: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentTextHash}, ${smsConsentSnapshot.textHash})`,
+          smsConsentVersion: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentVersion}, ${smsConsentSnapshot.version})`,
+        }
+      : {};
+
   const set =
     channel === 'email'
       ? { ...emailVerifyFields, ipAddress, source }
-      : { ipAddress, source };
+      : { ipAddress, source, ...smsConsentFields };
 
   return { target, set };
 }
@@ -528,6 +543,8 @@ function buildSubscriptionValues(params: {
   defaultPreferences: FanNotificationPreferences;
   shouldVerifyEmail: boolean;
   emailOtp: EmailOtpResult | null;
+  smsConsentSnapshot: ConsentSnapshot | null;
+  smsConsentAt: Date;
 }) {
   const {
     artist_id,
@@ -541,7 +558,10 @@ function buildSubscriptionValues(params: {
     defaultPreferences,
     shouldVerifyEmail,
     emailOtp,
+    smsConsentSnapshot,
+    smsConsentAt,
   } = params;
+
   return {
     creatorProfileId: artist_id,
     channel,
@@ -553,6 +573,13 @@ function buildSubscriptionValues(params: {
     source,
     preferences: defaultPreferences,
     confirmedAt: channel === 'sms' || shouldVerifyEmail ? null : new Date(),
+    ...(smsConsentSnapshot
+      ? {
+          smsConsentAt,
+          smsConsentTextHash: smsConsentSnapshot.textHash,
+          smsConsentVersion: smsConsentSnapshot.version,
+        }
+      : {}),
     emailOtpHash: emailOtp?.otpHash,
     emailOtpExpiresAt: emailOtp?.otpExpiresAt,
     emailOtpLastSentAt: emailOtp ? new Date() : null,
@@ -718,13 +745,18 @@ export const subscribeToNotificationsDomain = async (
       artist_id
     );
     const emailOtp = shouldVerifyEmail ? createEmailOtp() : null;
+    const smsConsentSnapshot =
+      channel === 'sms' ? getCurrentConsentSnapshot() : null;
+    const smsConsentAt = new Date();
 
     const upsertConfig = buildUpsertConfig(
       channel,
       shouldVerifyEmail,
       emailOtp,
       ipAddress,
-      source
+      source,
+      smsConsentSnapshot,
+      smsConsentAt
     );
 
     await db
@@ -742,6 +774,8 @@ export const subscribeToNotificationsDomain = async (
           defaultPreferences,
           shouldVerifyEmail,
           emailOtp,
+          smsConsentSnapshot,
+          smsConsentAt,
         })
       )
       .onConflictDoUpdate(upsertConfig);

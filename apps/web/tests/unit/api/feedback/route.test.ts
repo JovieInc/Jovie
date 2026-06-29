@@ -92,6 +92,36 @@ describe('POST /api/feedback', () => {
     });
   });
 
+  it('persists opportunity inbox rating metadata in feedback context', async () => {
+    const { POST } = await import('@/app/api/feedback/route');
+
+    const response = await POST(
+      new Request('http://localhost/api/feedback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Helpful suggestion',
+          source: 'opportunity-inbox',
+          pathname: '/app',
+          suggestedActionId: '11111111-1111-4111-8111-111111111111',
+          rating: 'positive',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreateFeedbackItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'opportunity-inbox',
+        context: expect.objectContaining({
+          pathname: '/app',
+          suggestedActionId: '11111111-1111-4111-8111-111111111111',
+          rating: 'positive',
+        }),
+      })
+    );
+  });
+
   it('returns non-200 when persistence fails', async () => {
     mockCreateFeedbackItem.mockRejectedValue(new Error('insert failed'));
 

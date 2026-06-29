@@ -78,6 +78,10 @@ export function ReleaseCatalogCarousel({
       items={items}
       surface='pearl'
       dataTestId={dataTestId}
+      // Edge-to-edge: cancel the surface's --page-pad with a negative margin,
+      // then re-inset the track so the first card aligns with the padded
+      // content above while later cards scroll off the true surface edge.
+      className='-mx-[var(--page-pad)] scroll-px-[var(--page-pad)] px-[var(--page-pad)]'
       onCardImpression={handleCardImpression}
       onCardClick={handleCardClick}
     />

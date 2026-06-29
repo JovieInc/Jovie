@@ -3,13 +3,14 @@
 import { SimpleTooltip, Skeleton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
+import { copyMarkdownToClipboard } from '@/lib/chat/copy-markdown';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
-import { ChatMarkdown } from './ChatMarkdown';
+import { AssistantMessageText } from './AssistantMessageText';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
 
@@ -62,8 +63,37 @@ export const ChatMessage = memo(function ChatMessage({
   renderTools = true,
 }: ChatMessageProps) {
   const isUser = role === 'user';
-  const { copy, isSuccess } = useClipboard();
+  const { copy, isSuccess: fallbackCopySuccess } = useClipboard();
+  const [markdownCopied, setMarkdownCopied] = useState(false);
+  const markdownCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const messageText = getMessageText(parts);
+  const isCopySuccess = markdownCopied || fallbackCopySuccess;
+
+  useEffect(() => {
+    return () => {
+      if (markdownCopyTimeoutRef.current) {
+        clearTimeout(markdownCopyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyMessage = () => {
+    void copyMarkdownToClipboard(messageText).then(success => {
+      if (success) {
+        setMarkdownCopied(true);
+        if (markdownCopyTimeoutRef.current) {
+          clearTimeout(markdownCopyTimeoutRef.current);
+        }
+        markdownCopyTimeoutRef.current = setTimeout(() => {
+          setMarkdownCopied(false);
+        }, 2000);
+        return;
+      }
+      void copy(messageText);
+    });
+  };
   const shouldReduceMotion = useReducedMotion();
   const toolEvents = getRenderableToolEvents(parts);
   const fileParts = parts.filter(
@@ -137,7 +167,7 @@ export const ChatMessage = memo(function ChatMessage({
               className='system-b-chat-loading-indicator'
               role='status'
               aria-live='polite'
-              aria-label='Jovie is thinking'
+              aria-label='Jovie Is Thinking'
             >
               {/* Assistant thinking shimmer — ChatMessageSkeleton-style reserved space */}
               <div className='system-b-chat-loading-head'>
@@ -169,7 +199,7 @@ export const ChatMessage = memo(function ChatMessage({
                   data-testid='chat-message-reply'
                   className='system-b-chat-message-reply'
                 >
-                  <ChatMarkdown
+                  <AssistantMessageText
                     content={messageText}
                     isStreaming={Boolean(isStreaming)}
                   />
@@ -189,16 +219,18 @@ export const ChatMessage = memo(function ChatMessage({
 
           {!isThinking && !isStreaming && messageText ? (
             <div className='system-b-chat-copy-row'>
-              <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
+              <SimpleTooltip
+                content={isCopySuccess ? 'Copied!' : 'Copy response'}
+              >
                 <button
                   type='button'
-                  onClick={() => copy(messageText)}
+                  onClick={handleCopyMessage}
                   className='system-b-chat-copy-button'
                   aria-label={
-                    isSuccess ? 'Copied to clipboard' : 'Copy message'
+                    isCopySuccess ? 'Copied to clipboard' : 'Copy message'
                   }
                 >
-                  {isSuccess ? (
+                  {isCopySuccess ? (
                     <Check className='system-b-chat-copy-icon' />
                   ) : (
                     <Copy className='system-b-chat-copy-icon' />

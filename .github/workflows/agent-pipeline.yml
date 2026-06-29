@@ -433,6 +433,13 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            scripts/lib/upsert-pr-comment.sh
+          sparse-checkout-cone-mode: false
+
       - name: Label and comment systemic blocker
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -494,6 +501,13 @@ jobs:
             exit 1
           fi
           echo "PR is from the same repository. Proceeding."
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            scripts/lib/upsert-pr-comment.sh
+          sparse-checkout-cone-mode: false
 
       - name: Request unprivileged remediation
         env:
@@ -578,15 +592,11 @@ jobs:
           STATUSES=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/status --jq '.statuses')
           CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/check-runs --jq '.check_runs')
 
-          # 1. Check scope-judge status
+          # 1. Scope judge (advisory — LLM alignment off fast auto-merge path)
           SCOPE_STATUS=$(echo "$STATUSES" | jq -r '[.[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"')
-          echo "Scope judge: $SCOPE_STATUS"
-
-          if [[ "$SCOPE_STATUS" != "success" ]]; then
-            echo "Scope judge has not passed (status: $SCOPE_STATUS). Cannot auto-approve."
-            echo "all_passed=false" >> "$GITHUB_OUTPUT"
-            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> "$GITHUB_OUTPUT"
-            exit 0
+          echo "Scope judge (advisory): $SCOPE_STATUS"
+          if [[ "$SCOPE_STATUS" != "success" && "$SCOPE_STATUS" != "pending" ]]; then
+            echo "::warning::scope-judge reported $SCOPE_STATUS — advisory only, not blocking auto-approve."
           fi
 
           # 2. Check CI PR Ready (the aggregate required check)

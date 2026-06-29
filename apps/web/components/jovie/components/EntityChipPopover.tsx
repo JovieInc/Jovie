@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
 import {
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
@@ -19,6 +20,7 @@ import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { useAppFlag } from '@/lib/flags/client';
 import { getInitials } from '@/lib/utils/initials';
+import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
 const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
@@ -177,6 +179,12 @@ export function EntityChipPopover({
         sideOffset={6}
         align='start'
         testId='entity-chip-popover-content'
+        data-entity-kind={kind}
+        style={
+          {
+            '--jovie-entity-accent': `var(${ENTITY_KIND_ACCENT_VAR[kind]})`,
+          } as CSSProperties
+        }
         onPointerEnter={() => {
           // Keep the popover open while the cursor is over its content.
           clearTimers();

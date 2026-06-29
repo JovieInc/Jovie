@@ -24,9 +24,9 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
     });
 
-    expect(
-      getByRole('link', { name: 'New Conversation' }).getAttribute('href')
-    ).toBe(APP_ROUTES.CHAT);
+    expect(getByRole('link', { name: 'New Chat' }).getAttribute('href')).toBe(
+      APP_ROUTES.CHAT
+    );
     expect(getByRole('button', { name: 'Search' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
       buildLibraryViewRoute('releases')
@@ -115,9 +115,7 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      getByRole('link', { name: 'New Conversation' }).getAttribute(
-        'aria-current'
-      )
+      getByRole('link', { name: 'New Chat' }).getAttribute('aria-current')
     ).toBeNull();
   });
 
@@ -129,7 +127,7 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Conversation' });
+    const newThreadLink = getByRole('link', { name: 'New Chat' });
     expect(newThreadLink.className).toContain('text-sidebar-muted/80');
     expect(newThreadLink.className).not.toContain(
       'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
@@ -142,7 +140,7 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getAllByRole('link', { name: 'New Conversation' })).toHaveLength(1);
+    expect(getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
   });
 
   it('opens the global command palette from Search instead of navigating', () => {
@@ -221,7 +219,7 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Conversation' });
+    const newThreadLink = getByRole('link', { name: 'New Chat' });
     expect(newThreadLink.className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
@@ -231,13 +229,13 @@ describe('DashboardNav', () => {
     });
   });
 
-  it('renders the grouped top nav, artist group, and More section', () => {
+  it('renders the grouped top nav and artist group without a duplicate Settings row', () => {
     const { getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(getByRole('link', { name: 'New Conversation' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT
     );
@@ -254,10 +252,8 @@ describe('DashboardNav', () => {
       'aria-expanded',
       'true'
     );
-    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
+    expect(queryByRole('button', { name: 'More' })).toBeNull();
+    expect(queryByRole('link', { name: 'Settings' })).toBeNull();
     expect(queryByRole('button', { name: 'Work' })).toBeNull();
     expect(queryByRole('button', { name: 'Catalog' })).toBeNull();
     expect(queryByRole('button', { name: 'Growth' })).toBeNull();
@@ -280,7 +276,7 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('defaults More and Admin groups collapsed', () => {
+  it('defaults the Admin group collapsed', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
@@ -294,34 +290,9 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
     expect(getByRole('button', { name: 'Admin' })).toHaveAttribute(
       'aria-expanded',
       'false'
-    );
-  });
-
-  it('remembers an expanded More group', () => {
-    localStorage.setItem('jovie:sidebar-section:more', 'open');
-
-    const { getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
-    });
-
-    expect(getByRole('button', { name: 'More' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
     );
   });
 
@@ -348,7 +319,7 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('renders settings groups with the selected artist name', () => {
+  it('renders settings groups with canonical Account and Artist labels', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.SETTINGS_ACCOUNT);
 
     const { getAllByText, getByRole, queryByText } = renderDashboardNav({
@@ -363,8 +334,8 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getAllByText('General').length).toBeGreaterThan(0);
-    expect(getAllByText('Tim White').length).toBeGreaterThan(0);
+    expect(getAllByText('Account').length).toBeGreaterThan(0);
+    expect(getAllByText('Artist').length).toBeGreaterThan(0);
     expect(
       getByRole('link', { name: 'Audience & Tracking' }).getAttribute('href')
     ).toBe(APP_ROUTES.SETTINGS_AUDIENCE);
