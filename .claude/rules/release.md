@@ -16,8 +16,9 @@ The gstack skill pipeline handles verification. The standard agent workflow:
 
 1. `/qa` — Systematic QA testing (skip if already run manually)
 2. `/review` — Pre-landing code review (skip if already run manually)
-3. `/ship` — Tests, review, version bump, PR creation/update
+3. `/ship` — Tests, review, PR creation/update (no feature-branch version bump)
 4. `/land-and-deploy` — Merge, CI wait, deploy verification
+5. Main/release path — run `pnpm version:stamp` to stamp the merged release fan-out, then `pnpm version:check`
 
 `/ship` runs typecheck, lint, and tests as part of its pre-flight checks. There is no separate `/verify` step.
 
@@ -136,7 +137,7 @@ When in doubt, skip auto-merge and request review.
 1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately.
 2. **Iterate** — push frequently, let CI catch issues, fix and push again.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
-4. `/ship` handles: tests, review, version bump, CHANGELOG, commit, push, PR creation/update.
+4. `/ship` handles: tests, review, CHANGELOG `[Unreleased]` notes, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) — see "Version Stamping (main-only)" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
 6. **Add to the Graphite merge queue** after the PR is marked ready. Apply the `merge-queue` label and Graphite enqueues and merges the PR when CI is green:
    ```bash
@@ -246,9 +247,36 @@ BOT REVIEWS
 - Deploy trigger: automatic on push to `main`
 - Health check: https://jov.ie/api/health (returns `{"status":"ok"}`)
 
+## Version Stamping (main-only)
+
+**Version stamping is main-only. Feature branches and their PRs MUST NOT bump the version fan-out.** This prevents recurring merge conflicts where concurrent PRs all edit the same version lines.
+
+**Protected version fan-out files (do NOT bump on feature branches):**
+
+- `VERSION`
+- `version.json`
+- the `version` field of root + workspace `package.json` files (`apps/*`, `packages/*`)
+- dated release headings in `CHANGELOG.md` (e.g. `## [26.6.61] - 2026-06-28`)
+
+**What feature branches MAY do:**
+
+- Add release notes under the `## [Unreleased]` section of `CHANGELOG.md`.
+- Edit `package.json` for dependency/script changes — only the `version` field is protected.
+
+**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out. It auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
+
+**Stamping on main:** After merge to `main` (or from the release workflow), run:
+
+```bash
+pnpm version:stamp        # bump CalVer, write fan-out, promote [Unreleased] → dated heading
+pnpm version:check        # validate consistency
+```
+
+`scripts/version-stamp.mjs` computes the next `YY.M.PATCH` (increment PATCH within the month, reset to 0 on month rollover), writes all fan-out files, and re-opens a fresh empty `## [Unreleased]` section. Use `--dry-run` to preview or `--set <version>` to stamp an explicit version.
+
 ## Changelog
 
-**Do not manually edit `CHANGELOG.md` during development.** The `/ship` workflow generates changelog entries automatically from the diff and commit history.
+**During development, only add notes under the `## [Unreleased]` section of `CHANGELOG.md`.** The `/ship` workflow appends `[Unreleased]` entries automatically from the diff and commit history. The dated release heading is stamped on the main/release path by `pnpm version:stamp` — never add a dated `## [X.Y.Z] - DATE` heading on a feature branch.
 
 `CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
 
