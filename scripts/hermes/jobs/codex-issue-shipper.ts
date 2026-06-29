@@ -2,9 +2,12 @@
 /**
  * Codex Issue Shipper — Hermes-Air
  *
- * Watches open GitHub issues labeled `codex` and `codex-approved`, claims one
+ * Watches all open GitHub issues (not just codex-labeled), claims one
  * eligible issue, writes dispatch context to gbrain, then starts a
  * coder-profile agent to ship it.
+ *
+ * Issues labeled `no-auto` or already claimed/blocked are excluded.
+ * All other open issues are dispatchable.
  *
  * The empty-queue path is intentionally cheap: GitHub scan, log, exit. No
  * gbrain query, model call, subagent, or CodeRabbit work happens unless an
@@ -40,6 +43,7 @@ import {
   HUMAN_REVIEW_LABEL,
   labelNames,
   loadShipperConfig,
+  NO_AUTO_LABEL,
   type ShipperConfig,
 } from '../lib/codex-issue-shipper';
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
@@ -274,8 +278,6 @@ function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
       config.repo,
       '--state',
       'open',
-      '--label',
-      'codex',
       '--limit',
       String(config.issueFetchLimit),
       '--json',
@@ -358,6 +360,12 @@ function ensureControlLabels(config: ShipperConfig): void {
     CODEX_TRUSTED_LABEL,
     '0e8a16',
     'Maintainer approval for the local codex issue shipper to run an agent'
+  );
+  ensureLabel(
+    config,
+    NO_AUTO_LABEL,
+    'e99695',
+    'Opt out of automated issue shipping — agent will skip this issue'
   );
 }
 
@@ -883,6 +891,9 @@ async function main(): Promise<void> {
           const skippedHuman = issues.filter(issue =>
             labelNames(issue).includes(HUMAN_REVIEW_LABEL)
           ).length;
+          const skippedNoAuto = issues.filter(issue =>
+            labelNames(issue).includes(NO_AUTO_LABEL)
+          ).length;
           const capacity = systemCapacity(config);
           const batch = plans.slice(0, capacity.allowedAgents);
 
@@ -892,6 +903,7 @@ async function main(): Promise<void> {
             issueCount: issues.length,
             dispatchableCount: plans.length,
             skippedHuman,
+            skippedNoAuto,
             batchCount: batch.length,
             maxIssuesPerRun: config.maxIssuesPerRun,
             maxParallelAgents: config.maxParallelAgents,
