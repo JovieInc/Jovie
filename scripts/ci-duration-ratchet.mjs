@@ -23,6 +23,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  buildDurationRatchetUpdate,
   checkRatchet,
   formatDuration,
   validateDurationRatchet,
@@ -146,8 +147,16 @@ function runUpdate(args) {
 
   const baseline = loadBaseline();
   const currentP95 = baseline.slo.p95GateSeconds;
+  const sampleSize = rawSampleSize
+    ? Number(rawSampleSize)
+    : baseline.sampleSize;
 
-  if (!force && newP95 > currentP95) {
+  const result = buildDurationRatchetUpdate(baseline, newP95, {
+    force,
+    sampleSize,
+  });
+
+  if (!result.ok) {
     console.error(
       `[ci-duration-ratchet] ✗ Refusing to raise p95 from ${currentP95}s to ${newP95}s.`
     );
@@ -158,18 +167,7 @@ function runUpdate(args) {
     return;
   }
 
-  const sampleSize = rawSampleSize
-    ? Number(rawSampleSize)
-    : baseline.sampleSize;
-
-  const updated = {
-    ...baseline,
-    updatedAt: new Date().toISOString(),
-    sampleSize: sampleSize || 0,
-    slo: { ...baseline.slo, p95GateSeconds: newP95 },
-  };
-
-  writeFileSync(baselinePath(), `${JSON.stringify(updated, null, 2)}\n`);
+  writeFileSync(baselinePath(), `${JSON.stringify(result.updated, null, 2)}\n`);
   console.log(
     `[ci-duration-ratchet] ✓ Baseline updated: ${currentP95}s → ${newP95}s (${formatDuration(newP95)})`
   );
