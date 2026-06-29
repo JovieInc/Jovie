@@ -106,10 +106,11 @@ async function main() {
     } catch (error) {
       if (attempt === MAX_ATTEMPTS) throw error;
       console.error(
-        `Public Lighthouse attempt ${attempt}/${MAX_ATTEMPTS} failed; retrying once. Cause: ${
+        `Public Lighthouse attempt ${attempt}/${MAX_ATTEMPTS} failed; retrying after Chrome cooldown. Cause: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
+      await new Promise(resolve => setTimeout(resolve, 5_000));
     }
   }
 }
