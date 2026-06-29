@@ -107,6 +107,7 @@ Planned implementations:
 
 ## References
 
+- [`docs/MEMORY_CORE_ARCHITECTURE.md`](./MEMORY_CORE_ARCHITECTURE.md) — canonical product memory stack decision (JOV-2705)
 - [`docs/AGENT_OS_ARCHITECTURE.md`](./AGENT_OS_ARCHITECTURE.md) — internal control plane
 - [`apps/web/lib/db/schema/memory.ts`](../apps/web/lib/db/schema/memory.ts) — product memory schema
 - [`apps/web/tests/unit/memory/memory-adr-contract.test.ts`](../apps/web/tests/unit/memory/memory-adr-contract.test.ts) — import-boundary guardrail

@@ -264,6 +264,14 @@ export const ServerEnvSchema = z.object({
   /** Set to `1` to export Agnost traces in local development. */
   JOVIE_ENABLE_AGNOST: z.enum(['0', '1']).optional(),
 
+  // Langfuse LLM tracing + prompt registry delivery (Langfuse Cloud)
+  LANGFUSE_SECRET_KEY: z.string().optional(),
+  LANGFUSE_PUBLIC_KEY: z.string().optional(),
+  /** Defaults to https://cloud.langfuse.com when unset. */
+  LANGFUSE_BASE_URL: z.string().url().optional(),
+  /** Set to `1` to export Langfuse traces in local development. */
+  JOVIE_ENABLE_LANGFUSE: z.enum(['0', '1']).optional(),
+
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
 
@@ -343,6 +351,12 @@ export const ServerEnvSchema = z.object({
    * regardless of this flag (TCPA mandate).
    */
   NATIVE_SMS_ENABLED: z.string().optional(),
+  /**
+   * Master gate for outbound SMS provider POSTs (release alerts + webhook
+   * auto-replies). When 'false' (or unset), sends short-circuit before
+   * Twilio. Inbound STOP/HELP still process regardless (TCPA mandate).
+   */
+  OUTBOUND_SMS_ENABLED: z.string().optional(),
   /**
    * Demo override that bypasses the existing SMS Pro-gating in
    * subscribeToNotificationsDomain when set to 'true'. Off by default;
@@ -486,6 +500,10 @@ export const ENV_KEYS = [
   'JOVIE_ENABLE_LOCAL_SENTRY',
   'AGNOST_ORG_ID',
   'JOVIE_ENABLE_AGNOST',
+  'LANGFUSE_SECRET_KEY',
+  'LANGFUSE_PUBLIC_KEY',
+  'LANGFUSE_BASE_URL',
+  'JOVIE_ENABLE_LANGFUSE',
   'AGENT_OS_WORKFLOWS_ENABLED',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',
@@ -518,6 +536,7 @@ export const ENV_KEYS = [
   'TWILIO_MESSAGING_SERVICE_SID',
   'TWILIO_FROM_NUMBER',
   'NATIVE_SMS_ENABLED',
+  'OUTBOUND_SMS_ENABLED',
   'SMS_DEMO_BYPASS_PRO_GATE',
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',

@@ -370,6 +370,7 @@ export {
   leadSourcePlatformEnum,
   leadStatusEnum,
   libraryAssetApprovalStatusEnum,
+  libraryAssetVisibilityEnum,
   linkTypeEnum,
   merchCardStatusEnum,
   merchDesignLaneEnum,
@@ -540,6 +541,15 @@ export {
   type NewLibraryAssetApprovalStatusRow,
   selectLibraryAssetApprovalStatusSchema,
 } from './library';
+// Library Asset Share (per-asset public/private URLs)
+export {
+  insertLibraryAssetShareSettingsSchema,
+  type LibraryAssetShareSettingsRow,
+  type LibraryAssetVisibilityValue,
+  libraryAssetShareSettings,
+  type NewLibraryAssetShareSettingsRow,
+  selectLibraryAssetShareSettingsSchema,
+} from './library-asset-share';
 // Library Share Drops (press kit / label review portals)
 export {
   insertLibraryShareDropItemSchema,

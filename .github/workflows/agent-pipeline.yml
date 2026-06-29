@@ -433,6 +433,13 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            scripts/lib/upsert-pr-comment.sh
+          sparse-checkout-cone-mode: false
+
       - name: Label and comment systemic blocker
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -494,6 +501,13 @@ jobs:
             exit 1
           fi
           echo "PR is from the same repository. Proceeding."
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            scripts/lib/upsert-pr-comment.sh
+          sparse-checkout-cone-mode: false
 
       - name: Request unprivileged remediation
         env:

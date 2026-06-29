@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.6.59",
+  "version": "26.6.61",
   "private": true,
   "config": {
     "commitizen": {
@@ -186,7 +186,9 @@
     "video:footer:generate": "doppler run --project jovie-web --config dev -- tsx scripts/generate-footer-cta-video.ts",
     "hermes:worker": "pnpm --filter @jovie/web run hermes:worker",
     "hermes:codex-shipper": "tsx scripts/hermes/jobs/codex-issue-shipper.ts",
-    "ds:offscale": "node scripts/ds-offscale-report.mjs"
+    "ds:offscale": "node scripts/ds-offscale-report.mjs",
+    "ds:llms-manifest": "node scripts/generate-llms-design-manifest.mjs",
+    "ds:llms-manifest:check": "node scripts/generate-llms-design-manifest.mjs --check"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
-import { ChatMarkdown } from './ChatMarkdown';
+import { AssistantMessageText } from './AssistantMessageText';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
 
@@ -199,7 +199,7 @@ export const ChatMessage = memo(function ChatMessage({
                   data-testid='chat-message-reply'
                   className='system-b-chat-message-reply'
                 >
-                  <ChatMarkdown
+                  <AssistantMessageText
                     content={messageText}
                     isStreaming={Boolean(isStreaming)}
                   />

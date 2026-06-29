@@ -9,11 +9,20 @@ import {
   getBaseServerConfig,
   isNonProductionServerNoise,
 } from '@/lib/sentry/config';
+import { isTransientInfraHttpTransaction } from '@/lib/sentry/non-actionable-issues';
 
 const baseConfig = getBaseServerConfig();
 
 Sentry.init({
   ...baseConfig,
+
+  tracesSampler: samplingContext => {
+    const name = samplingContext.name ?? '';
+    if (isTransientInfraHttpTransaction(name)) {
+      return 0;
+    }
+    return baseConfig.tracesSampleRate;
+  },
 
   beforeSend: createBeforeSendHook(event => {
     if (isNonProductionServerNoise(event)) {

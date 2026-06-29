@@ -40,12 +40,16 @@ struct MobileChatView: View {
         ChatComposerView(
           draft: $draft,
           isSending: repository.isSending,
-          isOffline: repository.isOffline
-        ) {
-          let text = draft
-          draft = ""
-          Task { await repository.send(text: text) }
-        }
+          isOffline: repository.isOffline,
+          onSend: {
+            let text = draft
+            draft = ""
+            Task { await repository.send(text: text) }
+          },
+          onSelectWorkflow: { action in
+            draft = action.prompt
+          }
+        )
         .padding(.horizontal, JovieSpacing.large)
         .padding(.bottom, JovieSpacing.medium)
       }
@@ -180,43 +184,16 @@ private struct ChatComposerView: View {
   let isSending: Bool
   let isOffline: Bool
   let onSend: () -> Void
+  let onSelectWorkflow: (ComposerWorkflowAction) -> Void
 
   var body: some View {
-    let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-
-    HStack(spacing: JovieSpacing.medium) {
-      TextField(isOffline ? "Ask Jovie (offline)" : "Ask Jovie", text: $draft)
-        .textInputAutocapitalization(.sentences)
-        .disableAutocorrection(false)
-        .font(JovieFont.body(size: 16))
-        .foregroundStyle(JovieColor.textPrimary)
-        .frame(height: 52)
-
-      Button(action: onSend) {
-        Image(systemName: isSending ? "ellipsis" : "arrow.up")
-          .font(.system(size: 16, weight: .bold))
-          .foregroundStyle(
-            trimmedDraft.isEmpty || isSending
-              ? JovieColor.textTertiary
-              : JovieColor.backgroundBase
-          )
-          .frame(width: 36, height: 36)
-          .background(
-            trimmedDraft.isEmpty || isSending ? JovieColor.surface2 : Color.white,
-            in: Circle()
-          )
-      }
-      .buttonStyle(.plain)
-      .disabled(trimmedDraft.isEmpty || isSending)
-      .accessibilityLabel("Send")
-    }
-    .padding(.horizontal, JovieSpacing.large)
-    .frame(height: 64)
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
-        .stroke(JovieColor.borderDefault, lineWidth: 1)
-    }
-    .accessibilityIdentifier("chat-composer")
+    ChatComposerBar(
+      draft: $draft,
+      placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
+      isSending: isSending,
+      isPlusEnabled: !isSending,
+      onSend: onSend,
+      onSelectWorkflow: onSelectWorkflow
+    )
   }
 }
