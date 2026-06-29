@@ -174,7 +174,7 @@
     "prepare": "husky",
     "next:proxy-guard": "pnpm --filter=@jovie/web run next:proxy-guard",
     "typecheck:web:fast": "pnpm --filter @jovie/web run typecheck -- --pretty false",
-    "pre-push": "biome check . && pnpm --filter=@jovie/web run pre-push",
+    "pre-push": "bash scripts/hooks/biome-pre-push.sh && pnpm --filter=@jovie/web run pre-push",
     "pre-push:gate": "bash scripts/hooks/pre-push-gate.sh lint",
     "pre-push:gate:test": "bash scripts/hooks/pre-push-gate.sh test",
     "pre-push:gate:format": "bash scripts/hooks/pre-push-gate.sh format",

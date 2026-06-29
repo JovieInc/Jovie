@@ -36,7 +36,7 @@
     "typecheck": "node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
     "typecheck:tests": "node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.test.json --noEmit --incremental",
     "next:proxy-guard": "node scripts/next-proxy-guard.mjs",
-    "pre-push": "pnpm run next:proxy-guard && pnpm run tailwind:check && pnpm run typecheck && pnpm run lint",
+    "pre-push": "pnpm run next:proxy-guard && pnpm run tailwind:check && pnpm run typecheck",
     "ship": "pnpm run migration:guard && pnpm run migration:validate && pnpm run drizzle:migrate && pnpm run drizzle:check && pnpm run typecheck && pnpm run lint && pnpm run test",
     "ship:pr": "tsx scripts/ship-pr.ts",
     "check": "pnpm run validate && pnpm run build && pnpm run test",
