@@ -1,5 +1,5 @@
 import { Container } from '@/components/site/Container';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { cn } from '@/lib/utils';
 import { HomeHeroCTA } from './HomeHeroCTA';
 import { HomeHeroPhoneComposition } from './HomeHeroPhoneComposition';

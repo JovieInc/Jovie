@@ -179,48 +179,12 @@ describe('feature flag registry integrity', () => {
     expect(readRepoFile('docs/env.md')).toContain('STATSIG_SERVER_SECRET');
   });
 
-  it('limits legacy feature-flags imports to static marketing and compatibility files', () => {
+  it('forbids legacy feature-flags imports outside lib/flags', () => {
     const sourceFiles = collectSourceFiles(WEB_ROOT);
-    const legacyImportRegex =
-      /from ['"]@\/lib\/feature-flags\/(?:client|server|shared)['"]/;
-    const allowedFiles = new Set([
-      path.join('app', '(home)', 'page.tsx'),
-      path.join('components', 'features', 'home', 'SeeItInActionSafe.tsx'),
-      path.join(
-        'components',
-        'features',
-        'home',
-        'HomeAdaptiveProfileStory.tsx'
-      ),
-      path.join('components', 'features', 'home', 'HomePageNarrative.tsx'),
-      path.join(
-        'components',
-        'marketing',
-        'homepage-v2',
-        'HomepageV2Route.tsx'
-      ),
-      path.join(
-        'components',
-        'features',
-        'dashboard',
-        'organisms',
-        'release-provider-matrix',
-        'ReleaseProviderMatrix.tsx'
-      ),
-      path.join('app', 'api', 'chat', 'route.ts'),
-      path.join('app', 'api', 'chat', 'album-art', 'shared.ts'),
-      path.join('lib', 'feature-flags', 'client.tsx'),
-      path.join('lib', 'feature-flags', 'server.ts'),
-      path.join('lib', 'feature-flags', 'shared.ts'),
-    ]);
+    const legacyImportRegex = /from ['"]@\/lib\/feature-flags(?:\/|['"])/;
 
     const violations = sourceFiles
       .filter(sourceFile => {
-        const relativePath = path.relative(WEB_ROOT, sourceFile);
-        if (allowedFiles.has(relativePath)) {
-          return false;
-        }
-
         const source = readFileSync(sourceFile, 'utf8');
         return legacyImportRegex.test(source);
       })

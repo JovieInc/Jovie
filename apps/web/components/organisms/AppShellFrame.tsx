@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
-import { isEnabled } from '@/lib/feature-flags';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
 export type AppShellFrameVariant = 'legacy' | 'shellChatV1';
@@ -77,7 +77,7 @@ export const AppShellFrame = memo(function AppShellFrame({
               : 'lg:border-l lg:border-subtle'
           )}
         >
-          {isEnabled('CANVAS_GRAIN') && <CanvasGrain />}
+          {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
           {header}
           <div
             className={cn(
