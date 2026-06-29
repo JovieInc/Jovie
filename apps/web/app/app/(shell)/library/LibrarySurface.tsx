@@ -89,6 +89,10 @@ import {
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import {
+  releaseStatusClasses,
+  releaseStatusDotClasses,
+} from '@/lib/library/release-status';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
@@ -287,24 +291,6 @@ function formatReleaseStatus(status: LibraryReleaseAsset['status']): string {
 
 function formatLibraryStatus(asset: LibraryReleaseAsset): string {
   return asset.itemStatusLabel ?? formatReleaseStatus(asset.status);
-}
-
-function releaseStatusClasses(status: LibraryReleaseAsset['status']): string {
-  if (status === 'released') {
-    return 'border-success/20 bg-success/10 text-success';
-  }
-  if (status === 'scheduled') {
-    return 'border-info/20 bg-info/10 text-info';
-  }
-  return 'border-subtle bg-surface-1 text-tertiary-token';
-}
-
-function releaseStatusDotClasses(
-  status: LibraryReleaseAsset['status']
-): string {
-  if (status === 'released') return 'bg-success';
-  if (status === 'scheduled') return 'bg-info';
-  return 'bg-tertiary-token';
 }
 
 function assetMatchesFilters(
@@ -970,7 +956,12 @@ function LibraryRail({
                 key={key}
                 active={filters.providers.has(key)}
                 count={counts.providers.get(key) ?? 0}
-                icon={Music2}
+                leadingIcon={
+                  <ProviderIcon
+                    provider={key as ProviderKey}
+                    className='h-3 w-3'
+                  />
+                }
                 label={providerLabels.get(key) ?? capitalizeFirst(key)}
                 onClick={() =>
                   onFilters({
@@ -1037,6 +1028,7 @@ function FilterRow({
   active,
   onClick,
   icon: Icon,
+  leadingIcon,
   dotClassName,
 }: {
   readonly label: string;
@@ -1044,6 +1036,7 @@ function FilterRow({
   readonly active: boolean;
   readonly onClick: () => void;
   readonly icon?: LucideIcon;
+  readonly leadingIcon?: ReactNode;
   readonly dotClassName?: string;
 }) {
   return (
@@ -1055,7 +1048,11 @@ function FilterRow({
         active && 'system-b-library-filter-row--active'
       )}
     >
-      {Icon ? (
+      {leadingIcon ? (
+        <span className='grid h-3 w-3 shrink-0 place-items-center'>
+          {leadingIcon}
+        </span>
+      ) : Icon ? (
         <Icon className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : (
         <span
@@ -1753,26 +1750,32 @@ function ApprovalStatusEditor({
   // The "Approval" DrawerSection already labels this control, so the select
   // stands on its own (no stacked label, no nested card) — click-to-edit with
   // an a11y label (issue #12317).
+  const selectId = useId();
   return (
-    <select
-      aria-label='Approval Status'
-      value={asset.approvalStatus}
-      onChange={event => {
-        void handleChange(event);
-      }}
-      disabled={disabled || saving || !profileId}
-      data-testid={`library-approval-status-select-${asset.id}`}
-      className={cn(
-        'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
-        LIBRARY_BUTTON_FOCUS_CLASS
-      )}
-    >
-      {LIBRARY_APPROVAL_STATUSES.map(status => (
-        <option key={status} value={status}>
-          {formatLibraryApprovalStatus(status)}
-        </option>
-      ))}
-    </select>
+    <div>
+      <label htmlFor={selectId} className='sr-only'>
+        Approval Status
+      </label>
+      <select
+        id={selectId}
+        value={asset.approvalStatus}
+        onChange={event => {
+          void handleChange(event);
+        }}
+        disabled={disabled || saving || !profileId}
+        data-testid={`library-approval-status-select-${asset.id}`}
+        className={cn(
+          'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
+          LIBRARY_BUTTON_FOCUS_CLASS
+        )}
+      >
+        {LIBRARY_APPROVAL_STATUSES.map(status => (
+          <option key={status} value={status}>
+            {formatLibraryApprovalStatus(status)}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
