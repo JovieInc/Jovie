@@ -1,13 +1,15 @@
 /**
- * CI Duration Ratchet — core library.
+ * CI Duration Ratchet — compatibility library.
  *
- * Computes p95 wall-clock of recent PR merge-gate CI runs and checks whether
- * the measured value exceeds the committed baseline + margin.
- *
- * The ratchet lockfile lives at .github/ci-harness/duration-ratchet.json.
- * It is updated by scripts/ci-duration-ratchet.mjs (the CLI) and by the
- * nightly .github/workflows/ci-duration-ratchet.yml workflow when p95 improves.
+ * The duration ratchet keeps its schema v1 lockfile and public exports, while
+ * delegating generic comparison/update concerns to scripts/lib/ratchet-core.mjs.
  */
+
+import {
+  buildRatchetUpdate,
+  compareRatchet,
+  RATCHET_DIRECTIONS,
+} from './ratchet-core.mjs';
 
 export const RATCHET_SCHEMA_VERSION = 1;
 
@@ -35,6 +37,32 @@ export function formatDuration(seconds) {
   return `${m}m ${s}s`;
 }
 
+export function durationRatchetToCore(baseline) {
+  return {
+    schemaVersion: 1,
+    dimension: 'ci-duration',
+    direction: RATCHET_DIRECTIONS.LOCK_DOWN,
+    baseline: baseline.slo.p95GateSeconds,
+    sampleSize: baseline.sampleSize ?? 0,
+    updatedAt: baseline.updatedAt,
+    policy: {
+      marginFraction: baseline.slo.marginFraction,
+      improveEpsilon: baseline.slo.improveEpsilon ?? 0,
+      minSampleSize: baseline.slo.minSampleSize ?? 0,
+      waiver: baseline.waiver ?? null,
+    },
+  };
+}
+
+export function coreRatchetToDuration(coreRatchet, currentBaseline) {
+  return {
+    ...currentBaseline,
+    updatedAt: coreRatchet.updatedAt,
+    sampleSize: coreRatchet.sampleSize ?? currentBaseline.sampleSize ?? 0,
+    slo: { ...currentBaseline.slo, p95GateSeconds: coreRatchet.baseline },
+  };
+}
+
 /**
  * Check whether a measured p95 exceeds the ratchet ceiling.
  *
@@ -44,17 +72,41 @@ export function formatDuration(seconds) {
  *             ceilingSeconds: number, headroomSeconds: number, marginFraction: number }}
  */
 export function checkRatchet(measuredP95Seconds, baseline) {
-  const baselineP95 = baseline.slo.p95GateSeconds;
-  const margin = baseline.slo.marginFraction;
-  const ceiling = baselineP95 * (1 + margin);
-  const headroom = ceiling - measuredP95Seconds;
-  return {
-    ok: measuredP95Seconds <= ceiling,
+  const result = compareRatchet(
     measuredP95Seconds,
-    baselineP95Seconds: baselineP95,
-    ceilingSeconds: ceiling,
-    headroomSeconds: headroom,
-    marginFraction: margin,
+    durationRatchetToCore(baseline)
+  );
+  return {
+    ok: result.ok,
+    status: result.status,
+    measuredP95Seconds: result.measured,
+    baselineP95Seconds: result.baseline,
+    ceilingSeconds: result.threshold,
+    headroomSeconds: result.headroom,
+    marginFraction: result.marginFraction,
+    improvedBy: result.improvedBy,
+    proposeNewBaseline: result.proposeNewBaseline,
+    reason: result.reason,
+  };
+}
+
+export function buildDurationRatchetUpdate(
+  baseline,
+  measuredP95Seconds,
+  options = {}
+) {
+  const result = buildRatchetUpdate(
+    durationRatchetToCore(baseline),
+    { value: measuredP95Seconds, sampleSize: options.sampleSize },
+    options
+  );
+
+  if (!result.ok) return result;
+
+  return {
+    ok: true,
+    errors: [],
+    updated: coreRatchetToDuration(result.updated, baseline),
   };
 }
 
@@ -100,6 +152,13 @@ export function validateDurationRatchet(baseline) {
     ) {
       errors.push('slo.marginFraction must be a non-negative number');
     }
+  }
+
+  if (
+    baseline.sampleSize !== undefined &&
+    !Number.isInteger(baseline.sampleSize)
+  ) {
+    errors.push('sampleSize must be an integer when present');
   }
 
   return { ok: errors.length === 0, errors };
