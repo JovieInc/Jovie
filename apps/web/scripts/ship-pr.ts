@@ -168,45 +168,49 @@ function buildPrBody(opts: {
   const rollback = opts.rollback ?? 'Revert PR.';
   const sourceRunId = opts.sourceRunId ?? 'unknown';
 
-  const artifact = JSON.stringify({
-    id: `pr-${sourceRunId}`,
-    source: 'github',
-    sourceRunId,
-    kind: 'code_review',
-    status: 'done',
-    title: 'Agent PR',
-    summary: 'Automated agent PR — evidence recorded during agent run.',
-    modelRoute: 'deterministic',
-    allowedActions: ['open_pr', 'ready_pr'],
-    forbiddenActions: ['merge', 'deploy'],
-    humanApprovalRequired: false,
-    humanGate: { required: false, status: 'not_required' },
-    verificationGates: [
-      {
-        name: 'gstack.qa.exhaustive',
-        required: true,
-        status: 'passed',
-        summary: 'QA evidence recorded during agent run.',
-        checkedAt: new Date().toISOString(),
-      },
-      {
-        name: 'gstack.review',
-        required: true,
-        status: 'passed',
-        summary: 'Code review evidence recorded during agent run.',
-        checkedAt: new Date().toISOString(),
-      },
-      {
-        name: 'gstack.ship',
-        required: true,
-        status: 'passed',
-        summary: 'Ship readiness evidence recorded during agent run.',
-        checkedAt: new Date().toISOString(),
-      },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }, null, 2);
+  const artifact = JSON.stringify(
+    {
+      id: `pr-${sourceRunId}`,
+      source: 'github',
+      sourceRunId,
+      kind: 'code_review',
+      status: 'done',
+      title: 'Agent PR',
+      summary: 'Automated agent PR — evidence recorded during agent run.',
+      modelRoute: 'deterministic',
+      allowedActions: ['open_pr', 'ready_pr'],
+      forbiddenActions: ['merge', 'deploy'],
+      humanApprovalRequired: false,
+      humanGate: { required: false, status: 'not_required' },
+      verificationGates: [
+        {
+          name: 'gstack.qa.exhaustive',
+          required: true,
+          status: 'passed',
+          summary: 'QA evidence recorded during agent run.',
+          checkedAt: new Date().toISOString(),
+        },
+        {
+          name: 'gstack.review',
+          required: true,
+          status: 'passed',
+          summary: 'Code review evidence recorded during agent run.',
+          checkedAt: new Date().toISOString(),
+        },
+        {
+          name: 'gstack.ship',
+          required: true,
+          status: 'passed',
+          summary: 'Ship readiness evidence recorded during agent run.',
+          checkedAt: new Date().toISOString(),
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    null,
+    2
+  );
 
   return `## Goal\n\n${goal}\n\n## KPI (if applicable)\n\n${kpi}\n\n## Rollback plan\n\n${rollback}\n\n<!-- agent-run-artifact\n${artifact}\n-->`;
 }
