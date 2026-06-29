@@ -452,6 +452,16 @@ This project has evolved through several migrations:
 - **Required Checks** - Typecheck, lint, fast tests
 - **Auto-Merge** - Enabled for Dependabot and approved PRs
 
+### PR Freshness / Conflict Handling
+
+Use the hardened PR conflict handler in dry-run mode before touching stale PRs:
+
+```bash
+node scripts/pr-conflict-handler.mjs --dry-run --max-concurrent 2
+```
+
+It classifies open PRs as `DIRTY`, `BEHIND`, `BLOCKED`, `UNSTABLE`, or `MERGEABLE`, orders safe work by base-branch dependency and diff size, respects in-flight CI, and caps CI-heavy re-triggers for the Neon pool. See [docs/pr-conflict-handler.md](docs/pr-conflict-handler.md) for apply-mode guardrails.
+
 ## Support
 
 - **Documentation** - Check [/docs](/docs) directory
