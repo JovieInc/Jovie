@@ -23,6 +23,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Connector enrichment pipelines (JOV-3114)**: adds `lib/connectors/enrichment/` with per-provider gmail/calendar pipelines that emit `context_facts`, memory graph observations, and `suggested_actions`; extends `context_fact_kind` for entity mentions; refactors `extractAndPropose` to sync Gmail `external_objects` then run the enrichment runner. Apple Photos deferred until JOV-2919.
 - **Chat progressive disclosure entity accents (JOV-3116)**: assistant responses parse `@kind:id[label]` wire tokens into per-type System B accent spans (release violet, artist purple, track blue, event orange) with hairline underlines instead of pills; hover/tap/focus opens the existing entity detail card with accent-tinted eyebrow copy. User bubbles keep rich input chips unchanged.
 
+### Fixed
+
+- **Library share links no longer error on re-open**: opening a release that already has share settings — or two tabs opening it at once — previously returned a 500. The "ensure share settings exist" path is now idempotent under a concurrent first-open race via an `ON CONFLICT DO NOTHING` insert plus re-read (GitHub #12407).
+
 ### Changed
 
 - **Homepage collapsed to hero + minimal footer**: the below-the-fold story stack (product statement, trust strip, go-live steps, workspace, artist-profiles carousel, Friday rhythm, bento/loop/stat sections, pricing, FAQ) and the final CTA are flagged off via the existing static marketing flags (`SHOW_HOMEPAGE_UNLOCKED_SECTIONS`, `SHOW_HOMEPAGE_V2_FINAL_CTA`). The header keeps the logo and sign-in but drops the center nav (its anchors pointed at the now-hidden sections), and the homepage footer renders the minimal variant. Fully reversible by flipping the flags back on. Pages stay fully static (`revalidate = false`).
