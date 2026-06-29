@@ -31,6 +31,9 @@ export function formatLibraryApprovalStatus(
 export function libraryApprovalStatusClasses(
   status: LibraryApprovalStatus
 ): string {
+  // Approval lives on a different axis than release status, so its accent must
+  // not collide with the green `released` pill. Use the System B purple accent
+  // (defined in design-system.css) instead of `success`/green. See #12317.
   if (status === 'approved') {
     // Distinct from release "Released" (green/success) so the two badges never
     // share a color — System B accent spectrum (issue #12317).
