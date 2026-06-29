@@ -1,0 +1,268 @@
+import 'server-only';
+
+/**
+ * Phase-A merch design generation.
+ *
+ * Generates N illustrated, transparent (alpha) print graphics for the artist via
+ * the multi-model graphic engine, persists each as a merchDesignOption bound to
+ * the default product (so the existing selectMerchDesign machinery can turn one
+ * into a card), and returns the carousel result the chat renders.
+ *
+ * Product/color application onto a real Printful blank (the truthful mockup) is
+ * Phase B — selecting a design routes through the existing selectMerchDesign.
+ *
+ * @see @/lib/merch/graphic-engine — the alpha graphic generator
+ * @see @/lib/merch/service — selectMerchDesign (Phase B entry)
+ */
+
+import { randomUUID } from 'node:crypto';
+import { put } from '@vercel/blob';
+import { eq } from 'drizzle-orm';
+import { uploadBufferToBlob } from '@/app/api/images/upload/lib/blob-upload';
+import { db } from '@/lib/db';
+import {
+  type MerchArtistBrief,
+  merchDesignOptions,
+  merchGenerationBatches,
+} from '@/lib/db/schema/merch';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env-server';
+import { logger } from '@/lib/utils/logger';
+import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
+import { generatePrintGraphic } from './graphic-engine';
+import {
+  buildMerchPricingSnapshot,
+  calculateRecommendedSalePriceCents,
+  MERCH_DEFAULT_MARGIN_PRESET,
+  MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
+} from './pricing';
+import type { MerchDesignCarouselResult, MerchDesignPreview } from './types';
+
+const DEFAULT_DESIGN_COUNT = 3;
+
+/** Distinct art directions so the carousel reads as real variety, not 3 of the same. */
+const STYLE_DIRECTIONS: readonly { label: string; style: string }[] = [
+  {
+    label: 'Vintage',
+    style:
+      'vintage distressed band-merch screen print, heavy wash and grain, retro limited palette, gnarly hand-drawn display lettering',
+  },
+  {
+    label: 'Bold',
+    style:
+      'bold modern illustrated graphic, clean heavy linework, confident type lockup, high contrast',
+  },
+  {
+    label: 'Mono',
+    style:
+      'minimal one-color line illustration, refined editorial type, lots of negative space, premium capsule feel',
+  },
+];
+
+async function uploadAlphaPng(path: string, buffer: Buffer): Promise<string> {
+  if (!env.BLOB_READ_WRITE_TOKEN) {
+    if (env.NODE_ENV === 'production') {
+      throw new TypeError('Blob storage not configured');
+    }
+    return `https://blob.vercel-storage.com/${path}`;
+  }
+  const url = await uploadBufferToBlob(put, path, buffer, 'image/png');
+  if (!url.startsWith('https://')) {
+    throw new TypeError('Invalid blob URL returned from storage');
+  }
+  return url;
+}
+
+async function artistName(profileId: string): Promise<string> {
+  const [profile] = await db
+    .select({
+      displayName: creatorProfiles.displayName,
+      username: creatorProfiles.username,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+  if (!profile) throw new Error('Creator profile not found');
+  return profile.displayName?.trim() || profile.username;
+}
+
+function minimalBrief(name: string, prompt: string): MerchArtistBrief {
+  return {
+    artist_myth: `${name} merch.`,
+    fan_identity:
+      'Fans want a wearable graphic that looks designed, not generic.',
+    visual_language: ['illustrated graphic', 'band-merch energy'],
+    forbidden_cliches: ['fake tour dates', 'generic centered logo'],
+    campaign_context: `Artist request: ${prompt}`,
+    best_merch_hypothesis: 'A strong illustrated graphic on a premium blank.',
+    commercial_angle: 'Wearable artist graphic.',
+    risk_level: 'safe',
+  };
+}
+
+function buildImagePrompt(
+  name: string,
+  userPrompt: string,
+  style: string
+): string {
+  return [
+    `${style}.`,
+    `Concept: ${userPrompt}.`,
+    `Feature the artist name "${name}" as bold band-merch lettering.`,
+    'Centered composition, print-ready artwork, no garment, no mockup.',
+  ].join(' ');
+}
+
+function defaultPricing() {
+  return buildMerchPricingSnapshot({
+    retailPriceCents: calculateRecommendedSalePriceCents(
+      MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
+      MERCH_DEFAULT_MARGIN_PRESET,
+      { printfulCostSource: 'jovie_default', printfulCostUpdatedAt: null }
+    ),
+    printfulProductCostCents: MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
+    printfulCostSource: 'jovie_default',
+    printfulCostUpdatedAt: null,
+  });
+}
+
+/**
+ * Generate the Phase-A design carousel. Designs are generated in parallel and
+ * returned `ready`; the per-card generating shimmer activates once generation is
+ * streamed (follow-up). Failures drop that design rather than failing the batch.
+ */
+export async function generateMerchDesigns(params: {
+  readonly profileId: string;
+  readonly clerkUserId: string;
+  readonly prompt: string;
+  readonly count?: number;
+  readonly conversationId?: string | null;
+  readonly turnId?: string | null;
+}): Promise<MerchDesignCarouselResult> {
+  const name = await artistName(params.profileId);
+  const generationId = randomUUID();
+  const count = Math.min(Math.max(params.count ?? DEFAULT_DESIGN_COUNT, 1), 4);
+  const pricing = defaultPricing();
+
+  await db.insert(merchGenerationBatches).values({
+    id: generationId,
+    creatorProfileId: params.profileId,
+    createdByClerkUserId: params.clerkUserId,
+    chatConversationId: params.conversationId ?? null,
+    chatTurnId: params.turnId ?? null,
+    prompt: params.prompt,
+    command: 'generate_merch_designs',
+    artistBrief: minimalBrief(name, params.prompt),
+    status: 'generating',
+  });
+
+  const directions = STYLE_DIRECTIONS.slice(0, count);
+  const grossMargin =
+    pricing.retailPriceCents -
+    pricing.estimatedPrintfulProductCostCents -
+    pricing.stripeFeeEstimateCents -
+    pricing.refundReserveCents;
+
+  const designs = await Promise.all(
+    directions.map(
+      async (direction, index): Promise<MerchDesignPreview | null> => {
+        const optionId = randomUUID();
+        try {
+          const graphic = await generatePrintGraphic({
+            prompt: buildImagePrompt(name, params.prompt, direction.style),
+          });
+          const previewUrl = await uploadAlphaPng(
+            `merch/generated/${params.profileId}/${generationId}/${optionId}.png`,
+            graphic.image
+          );
+          const designName = `${name} ${direction.label}`;
+          const concept = `${direction.label} direction: ${params.prompt}`;
+
+          await db.insert(merchDesignOptions).values({
+            id: optionId,
+            generationBatchId: generationId,
+            creatorProfileId: params.profileId,
+            optionNumber: index + 1,
+            status: 'candidate',
+            designLane: 'fashion_graphic_item',
+            designName,
+            productType: MERCH_DEFAULT_PRINTFUL_PRODUCT.productType,
+            printfulProductName: MERCH_DEFAULT_PRINTFUL_PRODUCT.productName,
+            printfulCatalogProductId:
+              MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
+            printfulCatalogVariantIds: Object.values(
+              MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
+            ),
+            variantMap: MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap,
+            colorway: MERCH_DEFAULT_PRINTFUL_PRODUCT.colorway,
+            availableSizes: MERCH_DEFAULT_PRINTFUL_PRODUCT.sizes,
+            placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
+            technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
+            retailPriceCents: pricing.retailPriceCents,
+            estimatedPrintfulProductCostCents:
+              pricing.estimatedPrintfulProductCostCents,
+            estimatedShippingCostCents: pricing.estimatedShippingCostCents,
+            estimatedGrossMarginCents: grossMargin,
+            artistShareCents: pricing.artistPayoutPerUnitEstimateCents,
+            jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
+            pricing,
+            concept,
+            whyItFits: 'Illustrated graphic generated for this artist.',
+            mockupUrls: [previewUrl],
+            printFileUrls: [previewUrl],
+            productionWarnings: [],
+            qualityReview: {
+              copyrightRisk: 'low',
+              typography: 'generated',
+              printFeasible: true,
+            },
+            learning: {
+              styleLane: 'fashion_graphic_item',
+              typographyStyle: direction.label,
+              graphicDensity: 'medium',
+              garmentColor: MERCH_DEFAULT_PRINTFUL_PRODUCT.colorway,
+              motifs: [direction.label],
+              selectedOverOptionIds: [],
+              rejectedAttributes: [],
+            },
+          });
+
+          return {
+            id: optionId,
+            option_number: index + 1,
+            design_name: designName,
+            model_key: graphic.modelKey,
+            concept,
+            status: 'ready',
+            preview_url: previewUrl,
+            slots: { artist_name: name },
+          };
+        } catch (error) {
+          logger.warn('[merch-designs] generation failed for one design', {
+            optionId,
+            err: error instanceof Error ? error.message : String(error),
+          });
+          return null;
+        }
+      }
+    )
+  );
+
+  const ready = designs.filter((d): d is MerchDesignPreview => d !== null);
+
+  await db
+    .update(merchGenerationBatches)
+    .set({
+      status: ready.length > 0 ? 'ready' : 'failed',
+      completedAt: new Date(),
+    })
+    .where(eq(merchGenerationBatches.id, generationId));
+
+  return {
+    success: true,
+    generationId,
+    prompt: params.prompt,
+    nextStep: 'Pick one and I’ll put it on products.',
+    designs: ready,
+  };
+}
