@@ -3,6 +3,7 @@ import {
   checkRatchet,
   computeElapsedSeconds,
   computeP95,
+  computePercentile,
   formatDuration,
   RATCHET_SCHEMA_VERSION,
   validateDurationRatchet,
@@ -39,6 +40,41 @@ describe('computeP95', () => {
     const input = [300, 100, 200];
     computeP95(input);
     expect(input).toEqual([300, 100, 200]);
+  });
+});
+
+describe('computePercentile', () => {
+  it('returns 0 for empty or invalid input', () => {
+    expect(computePercentile([], 50)).toBe(0);
+    expect(computePercentile([10, 20], 0)).toBe(0);
+    expect(computePercentile([10, 20], Number.NaN)).toBe(0);
+  });
+
+  it('computes p50/p75/p95 (nearest-rank) for a 5-element array', () => {
+    const xs = [10, 20, 30, 40, 50];
+    // p50: ceil(0.50*5)-1 = 3-1 = 2 → 30
+    expect(computePercentile(xs, 50)).toBe(30);
+    // p75: ceil(0.75*5)-1 = 4-1 = 3 → 40
+    expect(computePercentile(xs, 75)).toBe(40);
+    // p95: ceil(0.95*5)-1 = 5-1 = 4 → 50
+    expect(computePercentile(xs, 95)).toBe(50);
+  });
+
+  it('handles unsorted input without mutating it', () => {
+    const xs = [50, 10, 40, 20, 30];
+    expect(computePercentile(xs, 50)).toBe(30);
+    expect(xs).toEqual([50, 10, 40, 20, 30]);
+  });
+
+  it('clamps p > 100 to the max value', () => {
+    expect(computePercentile([1, 2, 3], 150)).toBe(3);
+  });
+
+  it('computeP95 is computePercentile(., 95)', () => {
+    const xs = Array.from({ length: 37 }, (_, i) => i * 7 + 3);
+    expect(computeP95(xs)).toBe(computePercentile(xs, 95));
+    expect(computeP95([])).toBe(computePercentile([], 95));
+    expect(computeP95([42])).toBe(computePercentile([42], 95));
   });
 });
 

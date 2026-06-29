@@ -12,15 +12,27 @@
 export const RATCHET_SCHEMA_VERSION = 1;
 
 /**
- * Compute the p95 of an array of numbers.
- * Uses the nearest-rank method (ceiling of 0.95 × n, 1-indexed).
+ * Compute the p-th percentile of an array of numbers.
+ * Uses the nearest-rank method (ceiling of (p/100) × n, 1-indexed).
+ * `p` is a percentile in (0, 100]; values above 100 clamp to 100.
+ * Returns 0 for empty/invalid input. Does not mutate the input.
+ */
+export function computePercentile(durations, p) {
+  if (!Array.isArray(durations) || durations.length === 0) return 0;
+  if (!Number.isFinite(p) || p <= 0) return 0;
+  const pct = Math.min(100, p) / 100;
+  const sorted = [...durations].sort((a, b) => a - b);
+  const index = Math.ceil(pct * sorted.length) - 1;
+  return sorted[Math.max(0, index)];
+}
+
+/**
+ * Compute the p95 of an array of numbers (nearest-rank). Kept as a named
+ * helper for the ratchet; equivalent to computePercentile(durations, 95).
  * Returns 0 for empty arrays.
  */
 export function computeP95(durations) {
-  if (!Array.isArray(durations) || durations.length === 0) return 0;
-  const sorted = [...durations].sort((a, b) => a - b);
-  const index = Math.ceil(0.95 * sorted.length) - 1;
-  return sorted[Math.max(0, index)];
+  return computePercentile(durations, 95);
 }
 
 /**
