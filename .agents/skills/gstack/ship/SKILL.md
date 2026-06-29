@@ -1732,6 +1732,15 @@ already knows. A good test: would this insight save time in a future session? If
 
 ## Step 4: Version bump (auto-decide)
 
+> **JOVIE OVERRIDE — version stamping is MAIN-ONLY.** This repo bumps the version
+> fan-out (`VERSION`, `version.json`, root + workspace `package.json` versions, dated
+> `CHANGELOG.md` headings) only on the main/release path via `pnpm version:stamp`, never
+> on feature branches. `/ship` runs from a feature branch (Step 1), so **SKIP this entire
+> Step 4** — do not edit `VERSION`, `version.json`, or any `package.json` version field.
+> CI (`scripts/version-fanout-guard.mjs`) will fail the PR if you do. Put release notes
+> under the `## [Unreleased]` CHANGELOG section instead (see the CHANGELOG step below).
+> See `.claude/rules/release.md` → "Version Stamping (main-only)".
+
 **Idempotency check:** Before bumping, compare VERSION against the base branch.
 
 ```bash
@@ -1763,7 +1772,9 @@ If output shows `ALREADY_BUMPED`, VERSION was already bumped on this branch (pri
 
 ## CHANGELOG (auto-generate)
 
-1. Read `CHANGELOG.md` header to know the format.
+**Jovie main-only version stamping override:** On feature branches, do NOT add a dated release heading and do NOT bump any version fan-out file. Write notes under the existing `## [Unreleased]` section only. The main/release path runs `pnpm version:stamp` after merge to promote `[Unreleased]` to a dated release.
+
+1. Read `CHANGELOG.md` header and locate the `## [Unreleased]` section.
 
 2. **First, enumerate every commit on the branch:**
    ```bash
@@ -1784,19 +1795,18 @@ If output shows `ALREADY_BUMPED`, VERSION was already bumped on this branch (pri
    - Infrastructure / tooling / tests
    - Refactoring
 
-5. **Write the CHANGELOG entry** covering ALL groups:
-   - If existing CHANGELOG entries on the branch already cover some commits, replace them with one unified entry for the new version
+5. **Write or update the `[Unreleased]` entry** covering ALL groups:
+   - If existing `[Unreleased]` entries on the branch already cover some commits, replace them with one unified `[Unreleased]` entry
    - Categorize changes into applicable sections:
      - `### Added` — new features
      - `### Changed` — changes to existing functionality
      - `### Fixed` — bug fixes
      - `### Removed` — removed features
    - Write concise, descriptive bullet points
-   - Insert after the file header (line 5), dated today
-   - Format: `## [X.Y.Z.W] - YYYY-MM-DD`
+   - Keep the heading exactly `## [Unreleased]` — do NOT add `## [X.Y.Z] - YYYY-MM-DD` on a feature branch
    - **Voice:** Lead with what the user can now **do** that they couldn't before. Use plain language, not implementation details. Never mention TODOS.md, internal tracking, or contributor-facing details.
 
-6. **Cross-check:** Compare your CHANGELOG entry against the commit list from step 2.
+6. **Cross-check:** Compare your `[Unreleased]` entry against the commit list from step 2.
    Every commit must map to at least one bullet point. If any commit is unrepresented,
    add it now. If the branch has N commits spanning K themes, the CHANGELOG must
    reflect all K themes.
