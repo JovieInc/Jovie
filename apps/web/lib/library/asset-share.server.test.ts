@@ -1,58 +1,90 @@
-/**
- * asset-share.server.test.ts
- *
- * Regression coverage for ensureLibraryAssetShareSettings idempotency
- * (GitHub #12407): re-opening a release with existing share settings, and a
- * concurrent first-open race, must both return the existing row instead of
- * 500ing on the (creator_profile_id, asset_id) unique constraint.
- *
- * All DB calls are mocked — no real Postgres connection required.
- */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-// ---------------------------------------------------------------------------
-// Mocks — db.select() pulls from selectResults, db.insert() from insertResults
-// ---------------------------------------------------------------------------
-
-const selectResults: unknown[][] = [];
-const insertResults: unknown[][] = [];
+// All DB calls are mocked — no real Postgres connection required.
+const selectRows: Array<unknown[]> = [];
+const insertResult = { value: [] as unknown[] };
 const insertSpy = vi.fn();
-const onConflictSpy = vi.fn();
 
-function makeSelectChain(): Record<string, (...a: unknown[]) => unknown> {
-  const chain: Record<string, (...a: unknown[]) => unknown> = {};
-  for (const m of ['from', 'where']) chain[m] = () => chain;
-  chain['limit'] = () => Promise.resolve(selectResults.shift() ?? []);
+// Rows the UPDATE can "match", keyed by assetId. The update mock honors the
+// assetId captured from the WHERE clause so a regression that filters by the
+// wrong assetId returns zero rows (and the function throws).
+const updatableRowsByAssetId = new Map<string, unknown>();
+const eqValues: unknown[] = [];
+
+function makeSelectChain() {
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    // ensure() awaits `.limit(1)` for the read; pop the next queued result set.
+    limit: () => Promise.resolve(selectRows.shift() ?? []),
+  };
   return chain;
 }
 
-function makeInsertChain(): Record<string, (...a: unknown[]) => unknown> {
-  const chain: Record<string, (...a: unknown[]) => unknown> = {};
-  chain['values'] = () => chain;
-  chain['onConflictDoNothing'] = (...a: unknown[]) => {
-    onConflictSpy(...a);
-    return chain;
+function makeInsertChain() {
+  const chain = {
+    values: (...args: unknown[]) => {
+      insertSpy(...args);
+      return chain;
+    },
+    onConflictDoNothing: () => chain,
+    returning: () => Promise.resolve(insertResult.value),
   };
-  chain['returning'] = () => Promise.resolve(insertResults.shift() ?? []);
+  return chain;
+}
+
+function makeUpdateChain() {
+  const chain = {
+    set: () => chain,
+    where: () => chain,
+    returning: () => {
+      // The most-recent `eq(assetId, …)` value is the last string pushed by the
+      // captured `eq` (creatorProfileId is also a string, so use whichever maps
+      // to a known row).
+      const matched = eqValues
+        .filter((v): v is string => typeof v === 'string')
+        .map(v => updatableRowsByAssetId.get(v))
+        .find(Boolean);
+      return Promise.resolve(matched ? [matched] : []);
+    },
+  };
   return chain;
 }
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: () => makeSelectChain(),
-    insert: (...args: unknown[]) => {
-      insertSpy(...args);
-      return makeInsertChain();
-    },
+    insert: () => makeInsertChain(),
+    update: () => makeUpdateChain(),
   },
 }));
 
-import { ensureLibraryAssetShareSettings } from './asset-share.server';
+// Capture the values passed to `eq(column, value)` so the update mock can model
+// the WHERE filter, while keeping every other drizzle-orm export real.
+vi.mock('drizzle-orm', async importActual => {
+  const actual = await importActual<typeof import('drizzle-orm')>();
+  return {
+    ...actual,
+    eq: (column: unknown, value: unknown) => {
+      eqValues.push(value);
+      return actual.eq(column as never, value as never);
+    },
+  };
+});
 
-const INPUT = {
+vi.mock('@/lib/library/asset-share/token', () => ({
+  generateLibraryAssetShareToken: () => 'fixed-token-000000000000',
+}));
+
+import {
+  ensureLibraryAssetShareSettings,
+  revokeLibraryAssetShareToken,
+  updateLibraryAssetShareVisibility,
+} from './asset-share.server';
+
+const baseInput = {
   creatorProfileId: 'creator-1',
-  assetId: 'release-1',
+  assetId: 'release-abc',
   itemKind: 'release' as const,
   title: 'Performance Budget Release',
   artistHandle: 'tim',
@@ -62,12 +94,12 @@ const INPUT = {
 function shareRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'row-1',
-    creatorProfileId: INPUT.creatorProfileId,
-    assetId: INPUT.assetId,
+    creatorProfileId: 'creator-1',
+    assetId: 'release-abc',
     itemKind: 'release',
     visibility: 'private',
     shareSlug: 'performance-budget-release',
-    accessToken: 'token-existing',
+    accessToken: 'existing-token',
     tokenRevokedAt: null,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
@@ -75,72 +107,132 @@ function shareRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-beforeEach(() => {
-  selectResults.length = 0;
-  insertResults.length = 0;
-  insertSpy.mockClear();
-  onConflictSpy.mockClear();
-});
-
-afterEach(() => {
-  vi.clearAllMocks();
-});
-
 describe('ensureLibraryAssetShareSettings idempotency', () => {
-  it('returns the existing row on re-open without inserting', async () => {
-    selectResults.push([shareRow()]); // first select finds it
+  beforeEach(() => {
+    selectRows.length = 0;
+    insertResult.value = [];
+    insertSpy.mockClear();
+    updatableRowsByAssetId.clear();
+    eqValues.length = 0;
+  });
 
-    const view = await ensureLibraryAssetShareSettings(INPUT);
+  it('returns the existing row matched by assetId without inserting', async () => {
+    selectRows.push([shareRow()]); // findExistingShareRow → byAsset hit
 
-    expect(view.assetId).toBe('release-1');
-    expect(view.shareUrl).toContain('token-existing');
+    const result = await ensureLibraryAssetShareSettings(baseInput);
+
+    expect(result.accessToken).toBe('existing-token');
+    expect(result.shareSlug).toBe('performance-budget-release');
     expect(insertSpy).not.toHaveBeenCalled();
   });
 
-  it('returns the winner on a concurrent first-open race instead of throwing', async () => {
-    selectResults.push([]); // first select: not found yet
-    insertResults.push([]); // insert suppressed by onConflictDoNothing
-    selectResults.push([shareRow({ accessToken: 'token-race-winner' })]); // re-read
+  it('returns the slug-matched row when assetId differs but slug collides (the re-open 500 path)', async () => {
+    selectRows.push([]); // byAsset miss
+    selectRows.push([shareRow({ assetId: 'release-OLD' })]); // bySlug hit
 
-    const view = await ensureLibraryAssetShareSettings(INPUT);
+    const result = await ensureLibraryAssetShareSettings(baseInput);
 
-    expect(insertSpy).toHaveBeenCalledOnce();
-    expect(view.shareUrl).toContain('token-race-winner');
+    expect(result.accessToken).toBe('existing-token');
+    // The resolved view model carries the STORED row's assetId, not the input —
+    // this is the identity the update/revoke paths now filter on.
+    expect(result.assetId).toBe('release-OLD');
+    expect(insertSpy).not.toHaveBeenCalled();
   });
 
-  it('creates a new row on genuine first open', async () => {
-    selectResults.push([]); // not found
-    insertResults.push([shareRow({ accessToken: 'token-fresh' })]); // insert wins
-
-    const view = await ensureLibraryAssetShareSettings(INPUT);
-
-    expect(insertSpy).toHaveBeenCalledOnce();
-    expect(view.shareUrl).toContain('token-fresh');
-  });
-
-  it('guards the insert with the (creator_profile_id, asset_id) conflict target', async () => {
-    selectResults.push([]); // not found
-    insertResults.push([shareRow()]); // insert wins
-
-    await ensureLibraryAssetShareSettings(INPUT);
-
-    expect(onConflictSpy).toHaveBeenCalledOnce();
-    const [{ target }] = onConflictSpy.mock.calls[0] as [
-      { target: { name: string }[] },
+  it('inserts when no row exists', async () => {
+    selectRows.push([]); // byAsset miss
+    selectRows.push([]); // bySlug miss
+    insertResult.value = [
+      shareRow({ accessToken: 'fixed-token-000000000000' }),
     ];
-    expect(target.map(col => col.name)).toEqual([
-      'creator_profile_id',
-      'asset_id',
-    ]);
+
+    const result = await ensureLibraryAssetShareSettings(baseInput);
+
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+    expect(result.accessToken).toBe('fixed-token-000000000000');
   });
 
-  it('throws when the row cannot be created or re-read', async () => {
-    selectResults.push([]); // not found
-    insertResults.push([]); // insert suppressed
-    selectResults.push([]); // re-read still empty (true failure)
+  it('re-reads the winning row when the insert hits ON CONFLICT (race)', async () => {
+    selectRows.push([]); // initial byAsset miss
+    selectRows.push([]); // initial bySlug miss
+    insertResult.value = []; // onConflictDoNothing → no row returned
+    selectRows.push([shareRow({ accessToken: 'race-winner-token' })]); // re-read byAsset hit
 
-    await expect(ensureLibraryAssetShareSettings(INPUT)).rejects.toThrow(
-      'Failed to create library asset share settings'
+    const result = await ensureLibraryAssetShareSettings(baseInput);
+
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+    expect(result.accessToken).toBe('race-winner-token');
+  });
+
+  it('throws if the row is still missing after a conflict (genuine failure)', async () => {
+    selectRows.push([]); // initial byAsset miss
+    selectRows.push([]); // initial bySlug miss
+    insertResult.value = []; // conflict, no row
+    selectRows.push([]); // re-read byAsset miss
+    selectRows.push([]); // re-read bySlug miss
+
+    await expect(ensureLibraryAssetShareSettings(baseInput)).rejects.toThrow(
+      'Failed to ensure library asset share settings'
     );
+  });
+});
+
+describe('updateLibraryAssetShareVisibility with a slug-collided assetId', () => {
+  beforeEach(() => {
+    selectRows.length = 0;
+    insertResult.value = [];
+    insertSpy.mockClear();
+    updatableRowsByAssetId.clear();
+    eqValues.length = 0;
+  });
+
+  it('updates the resolved row (release-OLD), not the requested assetId', async () => {
+    // ensure() resolves the existing row by slug (stored assetId differs).
+    selectRows.push([]); // byAsset miss
+    selectRows.push([shareRow({ assetId: 'release-OLD' })]); // bySlug hit
+
+    // Only the resolved row is updatable; filtering by input.assetId would miss.
+    updatableRowsByAssetId.set(
+      'release-OLD',
+      shareRow({ assetId: 'release-OLD', visibility: 'public' })
+    );
+
+    const result = await updateLibraryAssetShareVisibility({
+      creatorProfileId: 'creator-1',
+      assetId: 'release-abc',
+      visibility: 'public',
+      artistHandle: 'tim',
+      itemKind: 'release',
+      title: 'Performance Budget Release',
+      smartLinkPath: '/tim/performance-budget-release',
+    });
+
+    expect(result.visibility).toBe('public');
+    expect(result.assetId).toBe('release-OLD');
+  });
+
+  it('revokeLibraryAssetShareToken targets the resolved row, not the requested assetId', async () => {
+    selectRows.push([]); // byAsset miss
+    selectRows.push([shareRow({ assetId: 'release-OLD' })]); // bySlug hit
+
+    updatableRowsByAssetId.set(
+      'release-OLD',
+      shareRow({
+        assetId: 'release-OLD',
+        accessToken: 'fixed-token-000000000000',
+      })
+    );
+
+    const result = await revokeLibraryAssetShareToken({
+      creatorProfileId: 'creator-1',
+      assetId: 'release-abc',
+      artistHandle: 'tim',
+      itemKind: 'release',
+      title: 'Performance Budget Release',
+      smartLinkPath: '/tim/performance-budget-release',
+    });
+
+    expect(result.assetId).toBe('release-OLD');
+    expect(result.accessToken).toBe('fixed-token-000000000000');
   });
 });

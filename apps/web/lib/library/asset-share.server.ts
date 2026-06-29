@@ -77,31 +77,59 @@ export async function getLibraryAssetShareMapForProfile(
   );
 }
 
-async function selectLibraryAssetShareRow(
-  creatorProfileId: string,
-  assetId: string
-): Promise<typeof libraryAssetShareSettings.$inferSelect | undefined> {
-  const [row] = await db
+/**
+ * Find a share row that already occupies one of this asset's unique slots.
+ * Prefers the (creator, assetId) match; falls back to (creator, shareSlug)
+ * because release slugs derive from the smart-link path, not the assetId — two
+ * opens (or an unstable assetId across sessions) can collide on the slug index.
+ */
+async function findExistingShareRow(input: {
+  readonly creatorProfileId: string;
+  readonly assetId: string;
+  readonly shareSlug: string;
+}): Promise<typeof libraryAssetShareSettings.$inferSelect | null> {
+  const [byAsset] = await db
     .select()
     .from(libraryAssetShareSettings)
     .where(
       and(
-        eq(libraryAssetShareSettings.creatorProfileId, creatorProfileId),
-        eq(libraryAssetShareSettings.assetId, assetId)
+        eq(libraryAssetShareSettings.creatorProfileId, input.creatorProfileId),
+        eq(libraryAssetShareSettings.assetId, input.assetId)
       )
     )
     .limit(1);
 
-  return row;
+  if (byAsset) return byAsset;
+
+  const [bySlug] = await db
+    .select()
+    .from(libraryAssetShareSettings)
+    .where(
+      and(
+        eq(libraryAssetShareSettings.creatorProfileId, input.creatorProfileId),
+        eq(libraryAssetShareSettings.shareSlug, input.shareSlug)
+      )
+    )
+    .limit(1);
+
+  return bySlug ?? null;
 }
 
 export async function ensureLibraryAssetShareSettings(
   input: LibraryAssetShareEnsureInput
 ): Promise<LibraryAssetShareViewModel> {
-  const existing = await selectLibraryAssetShareRow(
-    input.creatorProfileId,
-    input.assetId
-  );
+  const shareSlug = deriveLibraryAssetShareSlug({
+    assetId: input.assetId,
+    itemKind: input.itemKind,
+    title: input.title,
+    smartLinkPath: input.smartLinkPath,
+  });
+
+  const existing = await findExistingShareRow({
+    creatorProfileId: input.creatorProfileId,
+    assetId: input.assetId,
+    shareSlug,
+  });
 
   if (existing) {
     return rowToViewModel(
@@ -112,17 +140,9 @@ export async function ensureLibraryAssetShareSettings(
     );
   }
 
-  const shareSlug = deriveLibraryAssetShareSlug({
-    assetId: input.assetId,
-    itemKind: input.itemKind,
-    title: input.title,
-    smartLinkPath: input.smartLinkPath,
-  });
-
-  // onConflictDoNothing makes the ensure idempotent under a concurrent
-  // first-open race: if another request inserted the row between our select
-  // and insert, the unique (creator_profile_id, asset_id) index suppresses the
-  // duplicate instead of throwing, and we re-read the winning row below.
+  // ON CONFLICT DO NOTHING covers both unique indexes (creator+asset and
+  // creator+slug) so a concurrent first-open race or a slug collision returns
+  // the pre-existing row instead of throwing a 500.
   const [created] = await db
     .insert(libraryAssetShareSettings)
     .values({
@@ -133,24 +153,31 @@ export async function ensureLibraryAssetShareSettings(
       shareSlug,
       accessToken: generateLibraryAssetShareToken(),
     })
-    .onConflictDoNothing({
-      target: [
-        libraryAssetShareSettings.creatorProfileId,
-        libraryAssetShareSettings.assetId,
-      ],
-    })
+    .onConflictDoNothing()
     .returning();
 
-  const row =
-    created ??
-    (await selectLibraryAssetShareRow(input.creatorProfileId, input.assetId));
+  if (created) {
+    return rowToViewModel(
+      created,
+      input.artistHandle,
+      input.smartLinkPath,
+      input.itemKind
+    );
+  }
 
-  if (!row) {
-    throw new Error('Failed to create library asset share settings');
+  // Insert hit a unique constraint — re-read the row that won the race.
+  const settled = await findExistingShareRow({
+    creatorProfileId: input.creatorProfileId,
+    assetId: input.assetId,
+    shareSlug,
+  });
+
+  if (!settled) {
+    throw new Error('Failed to ensure library asset share settings');
   }
 
   return rowToViewModel(
-    row,
+    settled,
     input.artistHandle,
     input.smartLinkPath,
     input.itemKind
@@ -166,7 +193,10 @@ export async function updateLibraryAssetShareVisibility(input: {
   readonly title: string;
   readonly smartLinkPath?: string;
 }): Promise<LibraryAssetShareViewModel> {
-  await ensureLibraryAssetShareSettings({
+  // ensure() may resolve a pre-existing row whose stored assetId differs from
+  // input.assetId (slug collision / unstable assetId), so filter the update by
+  // the resolved row's assetId rather than the caller-supplied one.
+  const ensured = await ensureLibraryAssetShareSettings({
     creatorProfileId: input.creatorProfileId,
     assetId: input.assetId,
     itemKind: input.itemKind,
@@ -184,7 +214,7 @@ export async function updateLibraryAssetShareVisibility(input: {
     .where(
       and(
         eq(libraryAssetShareSettings.creatorProfileId, input.creatorProfileId),
-        eq(libraryAssetShareSettings.assetId, input.assetId)
+        eq(libraryAssetShareSettings.assetId, ensured.assetId)
       )
     )
     .returning();
@@ -209,7 +239,10 @@ export async function revokeLibraryAssetShareToken(input: {
   readonly title: string;
   readonly smartLinkPath?: string;
 }): Promise<LibraryAssetShareViewModel> {
-  await ensureLibraryAssetShareSettings({
+  // Filter the update by the resolved row's assetId (see note in
+  // updateLibraryAssetShareVisibility) so a slug-collided / unstable assetId
+  // still revokes the existing token instead of matching zero rows.
+  const ensured = await ensureLibraryAssetShareSettings({
     creatorProfileId: input.creatorProfileId,
     assetId: input.assetId,
     itemKind: input.itemKind,
@@ -228,7 +261,7 @@ export async function revokeLibraryAssetShareToken(input: {
     .where(
       and(
         eq(libraryAssetShareSettings.creatorProfileId, input.creatorProfileId),
-        eq(libraryAssetShareSettings.assetId, input.assetId)
+        eq(libraryAssetShareSettings.assetId, ensured.assetId)
       )
     )
     .returning();
