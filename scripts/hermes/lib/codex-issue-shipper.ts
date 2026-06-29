@@ -3,6 +3,7 @@ export const CODEX_TRUSTED_LABEL = 'codex-approved';
 export const CODEX_CLAIM_LABEL = 'codex-in-progress';
 export const CODEX_BLOCKED_LABEL = 'codex-blocked';
 export const HUMAN_REVIEW_LABEL = 'human-review-required';
+export const NO_AUTO_LABEL = 'no-auto';
 
 export interface GithubIssueLabel {
   readonly name: string;
@@ -136,15 +137,15 @@ export function loadShipperConfig(
     repoRoot,
     maxIssuesPerRun: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN,
-      3
+      5
     ),
     maxParallelAgents: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS,
-      3
+      15
     ),
     minFreeMemoryMb: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB,
-      4096
+      256
     ),
     maxLoadPerCpu: parsePositiveFloat(
       env.HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU,
@@ -156,7 +157,7 @@ export function loadShipperConfig(
     ),
     issueFetchLimit: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_ISSUE_FETCH_LIMIT,
-      25
+      100
     ),
     integrationThreshold: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD,
@@ -215,9 +216,8 @@ export function eligibleCodexIssues(
 ): ReadonlyArray<GithubIssue> {
   return issues.filter(
     issue =>
-      isTrustedCodexIssue(issue) &&
-      !isHumanReviewRequired(issue) &&
-      !isAlreadyClaimedOrBlocked(issue)
+      !isAlreadyClaimedOrBlocked(issue) &&
+      !labelNames(issue).includes(NO_AUTO_LABEL)
   );
 }
 
@@ -435,7 +435,7 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
     : `Base this feature branch from \`${input.baseBranch}\` and create the PR against \`${input.baseBranch}\`.`;
 
   return [
-    `Load gstack. You are a Jovie coder agent executing a GitHub issue labeled \`${CODEX_SOURCE_LABEL}\` and \`${CODEX_TRUSTED_LABEL}\` end to end.`,
+    `Load gstack. You are a Jovie coder agent executing a GitHub issue end to end.`,
     '',
     `Working directory: ${input.repoRoot}`,
     `GitHub issue: #${input.issue.number} ${issueTitle}`,
