@@ -65,7 +65,7 @@ enum LaunchMode: Equatable {
   // existing test assertions don't have to navigate first.
   var defaultInitialTab: AppShellTab {
     switch self {
-    case .uiTestingReady, .uiTestingSettings, .uiTestingQRUnavailable:
+    case .uiTestingReady, .uiTestingSettings, .uiTestingQRUnavailable, .uiTestingAuthCallback:
       return .profile
     default:
       return .chat
