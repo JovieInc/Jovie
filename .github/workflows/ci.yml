@@ -44,6 +44,12 @@ env:
   # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
   # or leave as "ubuntu-latest" for default 2-core runners.
   FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+  # JOV-2497: four-slot cross-PR pool caps Neon branch *creation* (one endpoint per branch).
+  # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
+  # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
+  # sibling matrix jobs cancel each other within the same workflow run.
+  # Pool groups include github.job so branch-creator siblings in one workflow (neon-db,
+  # dashboard Lighthouse, E2E smoke fallback, admin smoke) do not queue-cancel each other.
 
 jobs:
   # ── CI Optimizer + Centralized path-change detection (merged) ──────────
@@ -663,6 +669,9 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     outputs:
       branch_name: ${{ steps.sanitize-branch.outputs.name }}
     steps:
@@ -733,6 +742,7 @@ jobs:
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '2'
       - name: Finalize Neon DB URLs
         id: finalize-urls
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -896,8 +906,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # PR gate: fast checks + unit tests + build + Lighthouse (+ risk-triggered smoke/preview).
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr, ci-e2e-smoke, ci-pr-vercel-preview]
+    # PR gate: fast checks + unit tests + build (+ risk-triggered smoke/preview).
+    # Heavy DB-touching jobs (Lighthouse, A11y, E2E Smoke) run on push to main,
+    # workflow_dispatch, or PRs with the 'testing' label — not on every PR — to limit Neon compute.
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-public, ci-pr-vercel-preview]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -907,29 +919,19 @@ jobs:
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
-          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
-          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
-          ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
-          PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_REQUIRES_SMOKE="${{ needs.ci-risk-classifier.outputs.requires_smoke }}"
           RISK_REQUIRES_PREVIEW="${{ needs.ci-risk-classifier.outputs.requires_preview }}"
           RISK_BLOCKS_UNATTENDED="${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
-          E2E_SMOKE_RESULT="${{ needs.ci-e2e-smoke.result }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
           EVENT_NAME="${{ github.event_name }}"
           IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
-          echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-admin-pr: $ADMIN_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
-          echo "ci-e2e-smoke: $E2E_SMOKE_RESULT"
           echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
 
           {
@@ -941,7 +943,6 @@ jobs:
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
             echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
-            echo "| E2E Smoke | $E2E_SMOKE_RESULT | \`pnpm run test:web:smoke\` |"
             echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
@@ -974,38 +975,6 @@ jobs:
             echo "Build failure will be corrected post-merge or in a follow-up PR."
           fi
 
-          if [[ "$DASHBOARD_LIGHTHOUSE_RESULT" != "success" && "$DASHBOARD_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-dashboard-pr did not pass (result: $DASHBOARD_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
-          # Onboarding Lighthouse — path-gated, so skipped when no onboarding files changed
-          if [[ "$ONBOARDING_LIGHTHOUSE_RESULT" != "success" && "$ONBOARDING_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-onboarding-pr did not pass (result: $ONBOARDING_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
-          # Admin Lighthouse — path-gated, so skipped when no admin files changed
-          if [[ "$ADMIN_LIGHTHOUSE_RESULT" != "success" && "$ADMIN_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-admin-pr did not pass (result: $ADMIN_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
-          # Public routes Lighthouse — path-gated, blocks when triggered
-          if [[ "$PUBLIC_LIGHTHOUSE_RESULT" != "success" && "$PUBLIC_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-pr did not pass (result: $PUBLIC_LIGHTHOUSE_RESULT)"
-            exit 1
-          fi
-
-          if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_SMOKE" == "true" && "$E2E_SMOKE_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
-            echo "❌ Risk classifier requires E2E smoke evidence, but ci-e2e-smoke result was $E2E_SMOKE_RESULT"
-            echo "Likely fix: inspect the E2E Smoke job artifact, then run pnpm run test:web:smoke locally with the relevant env."
-            exit 1
-          fi
-          if [[ "$EVENT_NAME" == "pull_request" && "$IS_DEPENDABOT" == "true" && "$E2E_SMOKE_RESULT" == "skipped" ]]; then
-            echo "Dependabot PR: E2E smoke intentionally skipped — treating as waived."
-          fi
-
           if [[ "$EVENT_NAME" == "pull_request" && "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
             echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
             echo "Likely fix: inspect the Preview Deploy logs, then run pnpm run build:web locally."
@@ -1019,7 +988,7 @@ jobs:
             echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
           fi
 
-          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build, lighthouse"
+          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build"
 
   ci-integration-ready:
     name: Integration Fast
@@ -1391,7 +1360,8 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
+    # Runs on push to main (post-merge validation), workflow_dispatch, or PRs with 'testing' label.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing'))) && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -1568,9 +1538,12 @@ jobs:
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
     needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -1739,7 +1712,7 @@ jobs:
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
     needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1881,7 +1854,7 @@ jobs:
     name: Lighthouse (admin PR)
     # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
     needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped')) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -2023,7 +1996,7 @@ jobs:
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
     needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -2731,8 +2704,9 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
+    # Runs on push to main, workflow_dispatch, or PRs with 'testing' label to limit Neon compute.
     needs: [ci-build-public, ci-path-changes, neon-db]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing'))) && needs.ci-build-public.outputs.has_artifact == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -2899,9 +2873,12 @@ jobs:
     # Full E2E runs on merge to main anyway.
     # Dependabot PRs cannot access NEON_API_KEY or other Preview-environment secrets.
     needs: [ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped')) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_')) && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -3094,6 +3071,9 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

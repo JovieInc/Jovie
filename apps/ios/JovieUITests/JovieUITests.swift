@@ -200,6 +200,51 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testChatComposerWorkflowSheetShowsWorkflowGrid() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let plusButton = app.buttons["Open workflow sheet"]
+    XCTAssertTrue(
+      waitForHittable(plusButton, timeout: 3),
+      "Chat composer plus button did not become hittable.\n\(app.debugDescription)"
+    )
+
+    plusButton.tap()
+
+    XCTAssertTrue(
+      app.buttons["Make merch"].waitForExistence(timeout: 3),
+      "Workflow sheet did not appear.\n\(app.debugDescription)"
+    )
+    for title in [
+      "Make merch",
+      "Smart link",
+      "Camera",
+      "Photo/file",
+      "Release campaign",
+      "Lyric video",
+    ] {
+      XCTAssertTrue(
+        app.buttons[title].waitForExistence(timeout: 2),
+        "Workflow action \(title) did not appear.\n\(app.debugDescription)"
+      )
+    }
+
+    app.buttons["Make merch"].tap()
+
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(input, timeout: 3),
+      "Chat composer input did not become hittable after workflow selection.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      input.value as? String,
+      "Make merch for my latest release.",
+      "Workflow selection did not prefill the composer draft.\n\(app.debugDescription)"
+    )
+  }
+
   func testChatComposerPreservesDraftAcrossShellNavigation() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
@@ -272,6 +317,65 @@ final class JovieUITests: XCTestCase {
         "Measured transition to Chat did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
       )
     }
+  }
+
+  func testAudienceHighlightsLaunchShowsHeroAndStatTiles() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-audience",
+      expectedElementDescription: "\"Profile views\""
+    ) {
+      $0.staticTexts["Profile views"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Audience"].exists)
+    XCTAssertTrue(app.staticTexts["1,284"].exists)
+    XCTAssertTrue(app.staticTexts["+18% vs last week"].exists)
+    XCTAssertTrue(app.staticTexts["Unique fans"].exists)
+    XCTAssertTrue(app.staticTexts["Subscribed fans"].exists)
+    XCTAssertTrue(app.staticTexts["Link clicks"].exists)
+    XCTAssertTrue(app.staticTexts["Listen clicks"].exists)
+    XCTAssertTrue(app.buttons["Ask Jovie about your audience"].exists)
+  }
+
+  func testAudienceDrawerSurfaceOpensHighlights() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+    let audienceSurface = app.buttons["Audience"]
+    XCTAssertTrue(
+      audienceSurface.waitForExistence(timeout: 3),
+      "Audience drawer surface did not appear.\n\(app.debugDescription)"
+    )
+
+    audienceSurface.tap()
+    XCTAssertTrue(
+      app.staticTexts["Profile views"].waitForExistence(timeout: 3),
+      "Audience drawer surface did not open highlights.\n\(app.debugDescription)"
+    )
+  }
+
+  func testAudienceAskJovieCTAOpensScopedChat() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-audience",
+      expectedElementDescription: "\"Ask Jovie about your audience\""
+    ) {
+      $0.buttons["Ask Jovie about your audience"]
+    }
+
+    app.buttons["Ask Jovie about your audience"].tap()
+
+    let chatInput = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(chatInput, timeout: 3),
+      "Audience CTA did not open chat.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      chatInput.value as? String,
+      "Ask Jovie about my audience trends and who is engaging most.",
+      "Audience CTA did not scope chat to the audience prompt.\n\(app.debugDescription)"
+    )
   }
 
   func testShellDrawerAndSettingsNavigation() {

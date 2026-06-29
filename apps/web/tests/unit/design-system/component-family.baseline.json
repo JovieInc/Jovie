@@ -2,8 +2,8 @@
   "counts": {
     "button": 41,
     "palette": 4,
-    "emptyState": 12,
+    "emptyState": 13,
     "shell": 21
   },
-  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands."
+  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 12→13 on 2026-06-28 (JOV-3386): OpportunityInboxEmptyState is a domain-specific inbox empty surface, not a duplicate of the generic EmptyState family."
 }

@@ -17,6 +17,7 @@ enum LaunchMode: Equatable {
   case uiTestingQRUnavailable
   case uiTestingNeedsOnboarding
   case uiTestingSplash
+  case uiTestingAudience
 
   var usesLiveClerk: Bool {
     switch self {
@@ -33,7 +34,8 @@ enum LaunchMode: Equatable {
          .uiTestingVenueMode,
          .uiTestingQRUnavailable,
          .uiTestingNeedsOnboarding,
-         .uiTestingSplash:
+         .uiTestingSplash,
+         .uiTestingAudience:
       return false
     }
   }
@@ -48,6 +50,10 @@ enum LaunchMode: Equatable {
 
   var opensChatOnLaunch: Bool {
     self == .uiTestingChat || self == .uiTestingChatOffline
+  }
+
+  var opensAudienceOnLaunch: Bool {
+    self == .uiTestingAudience
   }
 
   var opensVenueModeOnLaunch: Bool {
@@ -81,7 +87,8 @@ enum LaunchMode: Equatable {
          .uiTestingVenueMode,
          .uiTestingQRUnavailable,
          .uiTestingNeedsOnboarding,
-         .uiTestingSplash:
+         .uiTestingSplash,
+         .uiTestingAudience:
       return "ie.jov.Jovie"
     }
   }
@@ -143,6 +150,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-splash") {
       return .uiTestingSplash
+    }
+
+    if arguments.contains("-ui-testing-audience") {
+      return .uiTestingAudience
     }
 
     if processInfo.environment["XCTestConfigurationFilePath"] != nil {

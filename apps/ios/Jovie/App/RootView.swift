@@ -172,6 +172,43 @@ private struct AppContentView: View {
   let onAuthError: @MainActor (String?) -> Void
   @State private var chatRepository: ChatRepository?
   @State private var chatDraft = ""
+  @State private var audienceHighlightsState: AudienceHighlightsLoadState
+
+  init(
+    appState: AppState,
+    isAuthAvailable: Bool,
+    isSignInUnavailable: Bool,
+    authErrorMessage: String?,
+    onLogout: @escaping @MainActor () async -> Void,
+    onAuthReturn: @escaping @MainActor (MobileAuthReturn) -> Void,
+    onAuthError: @escaping @MainActor (String?) -> Void
+  ) {
+    self.appState = appState
+    self.isAuthAvailable = isAuthAvailable
+    self.isSignInUnavailable = isSignInUnavailable
+    self.authErrorMessage = authErrorMessage
+    self.onLogout = onLogout
+    self.onAuthReturn = onAuthReturn
+    self.onAuthError = onAuthError
+    _audienceHighlightsState = State(
+      initialValue: Self.previewAudienceHighlightsState(for: appState.launchMode)
+    )
+  }
+
+  private static func previewAudienceHighlightsState(
+    for launchMode: LaunchMode
+  ) -> AudienceHighlightsLoadState {
+    switch launchMode {
+    case .uiTestingAudience,
+         .uiTestingReady,
+         .uiTestingChat,
+         .uiTestingSettings,
+         .uiTestingVenueMode:
+      return .loaded(.preview)
+    default:
+      return .idle
+    }
+  }
 
   var body: some View {
     Group {
@@ -197,6 +234,7 @@ private struct AppContentView: View {
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
           chatEnabled: false,
+          audienceEnabled: false,
           recentConversations: chatRepository?.conversations ?? [],
           activeConversationID: chatRepository?.activeConversationID,
           onSelectConversation: { conversationID in
@@ -208,6 +246,8 @@ private struct AppContentView: View {
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
+        } audienceContent: { _ in
+          EmptyView()
         } chatContent: { draft in
           if let chatRepository {
             MobileChatView(
@@ -224,10 +264,13 @@ private struct AppContentView: View {
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: appState.isOffline,
-          initialTab: appState.launchMode.opensChatOnLaunch ? .chat : .profile,
+          initialTab: appState.launchMode.opensAudienceOnLaunch
+            ? .audience
+            : (appState.launchMode.opensChatOnLaunch ? .chat : .profile),
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
           chatEnabled: appState.loadedDashboardResponse != nil,
+          audienceEnabled: appState.loadedDashboardResponse != nil,
           recentConversations: chatRepository?.conversations ?? [],
           activeConversationID: chatRepository?.activeConversationID,
           onSelectConversation: { conversationID in
@@ -251,6 +294,13 @@ private struct AppContentView: View {
             },
             onRetry: { await appState.retry() }
           )
+        } audienceContent: { askJovie in
+          AudienceHighlightsView(
+            state: audienceHighlightsState,
+            isOffline: appState.isOffline,
+            onRetry: { await reloadAudienceHighlights(for: appState.activeUserID) },
+            onAskJovie: askJovie
+          )
         } chatContent: { draft in
           if let chatRepository {
             MobileChatView(
@@ -269,9 +319,16 @@ private struct AppContentView: View {
     // content paint feels intentional rather than a hard cut. Opacity-only, so
     // no layout shift and no decorative spatial motion.
     .animation(.easeInOut(duration: 0.28), value: appState.route)
+    .task(id: "\(appState.route)-\(appState.launchMode)") {
+      guard appState.route == .ready else { return }
+      await reloadAudienceHighlights(for: appState.activeUserID)
+    }
     .task(id: appState.activeUserID) {
       guard let activeUserID = appState.activeUserID else {
         chatRepository = nil
+        if Self.previewAudienceHighlightsState(for: appState.launchMode) == .idle {
+          audienceHighlightsState = .idle
+        }
         return
       }
 
@@ -288,6 +345,42 @@ private struct AppContentView: View {
         chatRepository = repository
         Task { await repository.bootstrap() }
       }
+
+      await reloadAudienceHighlights(for: activeUserID)
+    }
+  }
+
+  @MainActor
+  private func reloadAudienceHighlights(for userID: String?) async {
+    if appState.launchMode == .uiTestingAudience
+      || appState.launchMode == .uiTestingReady
+      || appState.launchMode == .uiTestingChat
+      || appState.launchMode == .uiTestingSettings
+      || appState.launchMode == .uiTestingVenueMode
+    {
+      audienceHighlightsState = .loaded(.preview)
+      return
+    }
+
+    guard let userID else {
+      audienceHighlightsState = .idle
+      return
+    }
+
+    audienceHighlightsState = .loading
+
+    let repository = AudienceHighlightsRepository(
+      apiClient: APIClient(
+        baseURL: appState.configuration.apiBaseURL,
+        tokenProvider: ClerkTokenProvider()
+      )
+    )
+
+    do {
+      let result = try await repository.load(for: userID)
+      audienceHighlightsState = .loaded(result.response)
+    } catch {
+      audienceHighlightsState = .error("Couldn't load audience highlights.")
     }
   }
 }
@@ -342,40 +435,16 @@ private struct ChatComposerPreview: View {
   let isOffline: Bool
 
   var body: some View {
-    let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-
-    HStack(spacing: JovieSpacing.medium) {
-      TextField(isOffline ? "Ask Jovie (offline)" : "Ask Jovie", text: $draft)
-        .textInputAutocapitalization(.sentences)
-        .disableAutocorrection(false)
-        .font(JovieFont.body(size: 16))
-        .foregroundStyle(JovieColor.textPrimary)
-        .frame(height: 52)
-
-      Button {
-        draft = ""
-      } label: {
-        Image(systemName: "arrow.up")
-          .font(.system(size: 16, weight: .bold))
-          .foregroundStyle(trimmedDraft.isEmpty ? JovieColor.textTertiary : JovieColor.backgroundBase)
-          .frame(width: 36, height: 36)
-          .background(
-            trimmedDraft.isEmpty ? JovieColor.surface2 : Color.white,
-            in: Circle()
-          )
+    ChatComposerBar(
+      draft: $draft,
+      placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
+      isSending: false,
+      isPlusEnabled: true,
+      onSend: { draft = "" },
+      onSelectWorkflow: { action in
+        draft = action.prompt
       }
-      .buttonStyle(.plain)
-      .disabled(trimmedDraft.isEmpty)
-      .accessibilityLabel("Send")
-    }
-    .padding(.horizontal, JovieSpacing.large)
-    .frame(height: 64)
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
-        .stroke(JovieColor.borderDefault, lineWidth: 1)
-    }
-    .accessibilityIdentifier("chat-composer")
+    )
   }
 }
 

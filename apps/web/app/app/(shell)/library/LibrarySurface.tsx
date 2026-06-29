@@ -46,6 +46,8 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
+import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import {
@@ -84,6 +86,7 @@ import {
   libraryApprovalStatusClasses,
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
+import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
@@ -639,6 +642,20 @@ const LIBRARY_TABLE_COLUMNS = [
     size: 86,
     minSize: 72,
     meta: { className: 'hidden md:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'shareUrl',
+    header: 'Share URL',
+    cell: ({ row }) => (
+      <LibraryAssetShareUrlCell
+        asset={row.original}
+        share={row.original.share}
+      />
+    ),
+    size: 220,
+    minSize: 180,
+    enableSorting: false,
+    meta: { className: 'hidden lg:table-cell px-2' },
   }),
   libraryColumnHelper.display({
     id: 'releaseDate',
@@ -1774,7 +1791,9 @@ function AssetDrawer({
   onAudioUploaded,
   getContextMenuItems,
   profileId,
+  artistHandle,
   onApprovalStatusChange,
+  onShareChange,
 }: {
   readonly asset: LibraryReleaseAsset | null;
   readonly open: boolean;
@@ -1786,9 +1805,14 @@ function AssetDrawer({
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
   readonly profileId: string | null;
+  readonly artistHandle: string | null;
   readonly onApprovalStatusChange: (
     assetId: string,
     approvalStatus: LibraryApprovalStatus
+  ) => void;
+  readonly onShareChange: (
+    assetId: string,
+    share: LibraryAssetShareViewModel
   ) => void;
 }) {
   const [stickyAsset, setStickyAsset] = useState<LibraryReleaseAsset | null>(
@@ -1980,7 +2004,18 @@ function AssetDrawer({
                       />
                     </DrawerSection>
 
-                    <DrawerSection surface='card' title='Share'>
+                    <DrawerSection surface='card' title='Share Link'>
+                      <LibraryAssetSharePanel
+                        asset={current}
+                        profileId={profileId}
+                        artistHandle={artistHandle}
+                        disabled={!open}
+                        initialShare={current.share}
+                        onShareChange={onShareChange}
+                      />
+                    </DrawerSection>
+
+                    <DrawerSection surface='card' title='Press Kit Drop'>
                       <LibraryShareDropCreator
                         releaseIds={[current.id]}
                         defaultTitle={`${current.title} press kit`}
@@ -2132,9 +2167,11 @@ function LibraryStatusBar({
 export function LibrarySurface({
   assets,
   profileId = null,
+  artistHandle = null,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
+  readonly artistHandle?: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2144,6 +2181,9 @@ export function LibrarySurface({
   );
   const [approvalStatusOverrides, setApprovalStatusOverrides] = useState<
     Record<string, LibraryApprovalStatus>
+  >({});
+  const [shareOverrides, setShareOverrides] = useState<
+    Record<string, LibraryAssetShareViewModel>
   >({});
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
     parseLibraryViewParam(searchParams.get('view'))
@@ -2177,12 +2217,17 @@ export function LibrarySurface({
         const previewUrl = audioOverrides[asset.id];
         const approvalStatus =
           approvalStatusOverrides[asset.id] ?? asset.approvalStatus;
+        const share = shareOverrides[asset.id] ?? asset.share ?? null;
         const assetKinds: readonly LibraryAssetKind[] =
           previewUrl && !asset.assetKinds.includes('preview')
             ? [...asset.assetKinds, 'preview']
             : asset.assetKinds;
 
-        if (!previewUrl && approvalStatus === asset.approvalStatus) {
+        if (
+          !previewUrl &&
+          approvalStatus === asset.approvalStatus &&
+          share === (asset.share ?? null)
+        ) {
           return asset;
         }
 
@@ -2190,10 +2235,11 @@ export function LibrarySurface({
           ...asset,
           ...(previewUrl ? { previewUrl } : {}),
           approvalStatus,
+          share,
           assetKinds,
         };
       }),
-    [approvalStatusOverrides, assets, audioOverrides]
+    [approvalStatusOverrides, assets, audioOverrides, shareOverrides]
   );
 
   const visibleAssets = useMemo(() => {
@@ -2388,6 +2434,16 @@ export function LibrarySurface({
       setApprovalStatusOverrides(previous => ({
         ...previous,
         [assetId]: approvalStatus,
+      }));
+    },
+    []
+  );
+
+  const handleShareChange = useCallback(
+    (assetId: string, share: LibraryAssetShareViewModel) => {
+      setShareOverrides(previous => ({
+        ...previous,
+        [assetId]: share,
       }));
     },
     []
@@ -2589,7 +2645,9 @@ export function LibrarySurface({
           onAudioUploaded={handleAudioUploaded}
           getContextMenuItems={getContextMenuItems}
           profileId={profileId}
+          artistHandle={artistHandle}
           onApprovalStatusChange={handleApprovalStatusChange}
+          onShareChange={handleShareChange}
         />
       </div>
     </PageShell>

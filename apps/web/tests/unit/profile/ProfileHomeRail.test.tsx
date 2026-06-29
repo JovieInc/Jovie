@@ -79,6 +79,25 @@ describe('ProfileHomeRail', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders a prominent gradient alerts bento when the home rail is empty', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+      />
+    );
+
+    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
+    expect(alertsCard.style.background).toContain('var(--color-accent-purple)');
+    expect(alertsCard.className).toContain('min-h-44');
+  });
+
   it('pins the alerts bento above the carousel and renders no carousel when empty', () => {
     render(
       <ProfileHomeRail
