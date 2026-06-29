@@ -77,19 +77,31 @@ export async function getLibraryAssetShareMapForProfile(
   );
 }
 
-export async function ensureLibraryAssetShareSettings(
-  input: LibraryAssetShareEnsureInput
-): Promise<LibraryAssetShareViewModel> {
-  const [existing] = await db
+async function selectLibraryAssetShareRow(
+  creatorProfileId: string,
+  assetId: string
+): Promise<typeof libraryAssetShareSettings.$inferSelect | undefined> {
+  const [row] = await db
     .select()
     .from(libraryAssetShareSettings)
     .where(
       and(
-        eq(libraryAssetShareSettings.creatorProfileId, input.creatorProfileId),
-        eq(libraryAssetShareSettings.assetId, input.assetId)
+        eq(libraryAssetShareSettings.creatorProfileId, creatorProfileId),
+        eq(libraryAssetShareSettings.assetId, assetId)
       )
     )
     .limit(1);
+
+  return row;
+}
+
+export async function ensureLibraryAssetShareSettings(
+  input: LibraryAssetShareEnsureInput
+): Promise<LibraryAssetShareViewModel> {
+  const existing = await selectLibraryAssetShareRow(
+    input.creatorProfileId,
+    input.assetId
+  );
 
   if (existing) {
     return rowToViewModel(
@@ -107,6 +119,10 @@ export async function ensureLibraryAssetShareSettings(
     smartLinkPath: input.smartLinkPath,
   });
 
+  // onConflictDoNothing makes the ensure idempotent under a concurrent
+  // first-open race: if another request inserted the row between our select
+  // and insert, the unique (creator_profile_id, asset_id) index suppresses the
+  // duplicate instead of throwing, and we re-read the winning row below.
   const [created] = await db
     .insert(libraryAssetShareSettings)
     .values({
@@ -117,14 +133,24 @@ export async function ensureLibraryAssetShareSettings(
       shareSlug,
       accessToken: generateLibraryAssetShareToken(),
     })
+    .onConflictDoNothing({
+      target: [
+        libraryAssetShareSettings.creatorProfileId,
+        libraryAssetShareSettings.assetId,
+      ],
+    })
     .returning();
 
-  if (!created) {
+  const row =
+    created ??
+    (await selectLibraryAssetShareRow(input.creatorProfileId, input.assetId));
+
+  if (!row) {
     throw new Error('Failed to create library asset share settings');
   }
 
   return rowToViewModel(
-    created,
+    row,
     input.artistHandle,
     input.smartLinkPath,
     input.itemKind
