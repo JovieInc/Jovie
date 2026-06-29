@@ -46,7 +46,11 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+<<<<<<< HEAD
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+=======
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+>>>>>>> origin/main
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -80,6 +84,7 @@ import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import type { ProviderKey } from '@/lib/discography/types';
 import {
   formatLibraryApprovalStatus,
   LIBRARY_APPROVAL_STATUSES,
@@ -1629,10 +1634,10 @@ function PreviewActionButton({
       aria-pressed={isPreviewPlaying}
       tabIndex={disabledTabIndex}
       className={cn(
-        'system-b-library-action inline-flex items-center justify-center gap-1.5 border border-subtle',
+        'system-b-library-action inline-flex items-center justify-center gap-1.5',
         compact
           ? 'system-b-library-action--icon'
-          : 'system-b-library-action--standard',
+          : 'system-b-library-action--standard border border-subtle',
         LIBRARY_BUTTON_FOCUS_CLASS
       )}
     >
@@ -1749,16 +1754,28 @@ function ApprovalStatusEditor({
     }
   }
 
+<<<<<<< HEAD
   // Inline control: the enclosing DrawerSection already renders the "Approval"
   // title, so a stacked label + nested panel would duplicate chrome (#12317).
   return (
     <select
+=======
+  // The "Approval" DrawerSection already labels this control, so the select
+  // stands on its own (no stacked label, no nested card) — click-to-edit with
+  // an a11y label (issue #12317).
+  return (
+    <select
+      aria-label='Approval Status'
+>>>>>>> origin/main
       value={asset.approvalStatus}
       onChange={event => {
         void handleChange(event);
       }}
       disabled={disabled || saving || !profileId}
+<<<<<<< HEAD
       aria-label='Approval Status'
+=======
+>>>>>>> origin/main
       data-testid={`library-approval-status-select-${asset.id}`}
       className={cn(
         'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
@@ -2104,9 +2121,15 @@ function AssetDrawer({
                               LIBRARY_CARD_FOCUS_CLASS
                             )}
                           >
+<<<<<<< HEAD
                             <SocialIcon
                               platform={provider.key}
                               className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+=======
+                            <ProviderIcon
+                              provider={provider.key as ProviderKey}
+                              className='h-3.5 w-3.5'
+>>>>>>> origin/main
                             />
                             <span className='min-w-0 flex-1 truncate'>
                               {provider.label}

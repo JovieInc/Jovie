@@ -6592,6 +6592,23 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   padding-inline: 0;
 }
 
+/* Issue #12317 — System B compliance: pill action buttons + borderless
+   circular icon buttons. Overrides the shared --radius-md primitive above. */
+:where(.system-b-library-action),
+:where(.system-b-library-icon-button) {
+  border-radius: var(--radius-full);
+}
+
+/* Compact icon-mode actions read as borderless hover-circles, matching the
+   drawer header icon buttons. */
+:where(.system-b-library-action--icon) {
+  background: transparent;
+}
+
+:where(.system-b-library-action--icon:hover) {
+  background: var(--system-b-bg-surface-1);
+}
+
 :where(.system-b-library-metadata-row) {
   grid-template-columns: 96px minmax(0, 1fr);
 }

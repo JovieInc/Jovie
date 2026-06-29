@@ -26,6 +26,7 @@ describe('library approval status helpers', () => {
     );
   });
 
+<<<<<<< HEAD
   it('keeps the approved accent distinct from the green released pill (#12317)', () => {
     // Bug: "Approved" and "Released" both rendered green. Approved must use a
     // distinct System B accent (purple), never the success/green tokens.
@@ -36,6 +37,16 @@ describe('library approval status helpers', () => {
     const approvedDot = libraryApprovalStatusDotClasses('approved');
     expect(approvedDot).toBe('system-b-library-status-dot--approved');
     expect(approvedDot).not.toContain('success');
+=======
+  it('gives Approved its own accent, never the green that Released uses', () => {
+    const approved = libraryApprovalStatusClasses('approved');
+    // Released (release status) is green/success; Approved must not collide.
+    expect(approved).not.toContain('text-success');
+    expect(approved).toContain('text-accent-purple');
+    expect(libraryApprovalStatusDotClasses('approved')).toBe(
+      'bg-accent-purple'
+    );
+>>>>>>> origin/main
   });
 
   it('only treats approved releases as public-profile eligible', () => {
