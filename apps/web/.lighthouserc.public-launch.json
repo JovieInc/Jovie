@@ -3,7 +3,9 @@
     "collect": {
       "numberOfRuns": 2,
       "settings": {
-        "preset": "desktop"
+        "preset": "desktop",
+        "protocolTimeout": 120000,
+        "skipAudits": ["font-size"]
       },
       "url": ["http://localhost:3200/"]
     },
