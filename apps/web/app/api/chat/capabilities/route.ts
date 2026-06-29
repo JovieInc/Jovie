@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveAlbumArtCapability } from '@/lib/chat/album-art-capability';
+import { resolveRetouchCapability } from '@/lib/chat/retouch-capability';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { isXaiConfigured } from '@/lib/services/album-art/provider-xai';
@@ -36,11 +37,13 @@ export async function GET(req: Request) {
       providerConfigured: isXaiConfigured(),
       entitlements,
     });
+    const retouch = resolveRetouchCapability({ entitlements });
 
     return NextResponse.json(
       {
         tools: {
           albumArt,
+          retouch,
         },
       },
       { status: 200, headers: NO_STORE_HEADERS }
