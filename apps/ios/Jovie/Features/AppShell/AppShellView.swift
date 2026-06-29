@@ -48,6 +48,16 @@ enum AppShellTab: Equatable, Hashable {
   }
 }
 
+// File-level so unit tests can call it without importing SwiftUI.
+func resolveShellInitialTab(_ initialTab: AppShellTab, chatEnabled: Bool) -> AppShellTab {
+  switch initialTab {
+  case .chat:
+    return chatEnabled ? .chat : .profile
+  case .audience, .profile:
+    return initialTab
+  }
+}
+
 private enum AppShellRoute: Hashable {
   case settings
 }
@@ -85,6 +95,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   let activeConversationID: String?
   let onSelectConversation: (String) -> Void
   let onStartNewChat: () -> Void
+  let onTalk: () -> Void
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
   @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
@@ -101,7 +112,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   init(
     profile: AppShellProfile,
     isOffline: Bool,
-    initialTab: AppShellTab = .profile,
+    initialTab: AppShellTab = .chat,
     opensSettingsOnLaunch: Bool = false,
     billingURL: URL,
     chatEnabled: Bool = false,
@@ -110,6 +121,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     activeConversationID: String? = nil,
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onStartNewChat: @escaping () -> Void = {},
+    onTalk: @escaping () -> Void = {},
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
     @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
@@ -125,6 +137,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     self.activeConversationID = activeConversationID
     self.onSelectConversation = onSelectConversation
     self.onStartNewChat = onStartNewChat
+    self.onTalk = onTalk
     self.onLogout = onLogout
     self.profileContent = profileContent()
     self.audienceContent = audienceContent
@@ -248,16 +261,11 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     selectTab(.chat)
   }
 
-  private static func resolvedInitialTab(
+  static func resolvedInitialTab(
     initialTab: AppShellTab,
     chatEnabled: Bool
   ) -> AppShellTab {
-    switch initialTab {
-    case .chat:
-      return chatEnabled ? .chat : .profile
-    case .audience, .profile:
-      return initialTab
-    }
+    resolveShellInitialTab(initialTab, chatEnabled: chatEnabled)
   }
 
   private func openDrawer() {
@@ -386,19 +394,38 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     .background(JovieColor.backgroundBase.opacity(0.96))
   }
 
-  // Floating, icon-only bottom bar: primary destinations live in one capsule.
+  // Floating, icon-only bottom bar: nav capsule centered, Talk FAB trailing.
   private var bottomBar: some View {
-    HStack(spacing: JovieSpacing.small) {
-      HStack(spacing: 4) {
-        navIcon(.profile)
-        if chatEnabled {
-          navIcon(.chat)
-        }
+    HStack(spacing: 4) {
+      navIcon(.profile)
+      if chatEnabled {
+        navIcon(.chat)
       }
-      .padding(6)
-      .modifier(BottomBarSurface())
+    }
+    .padding(6)
+    .modifier(BottomBarSurface())
+    .frame(maxWidth: .infinity)
+    .overlay(alignment: .trailing) {
+      if chatEnabled {
+        talkFAB
+          .padding(.trailing, JovieSpacing.large)
+      }
     }
     .padding(.bottom, JovieSpacing.medium)
+  }
+
+  // Global Talk FAB — voice entry point (wired to voice feature in JOV-10378/2928).
+  private var talkFAB: some View {
+    Button(action: onTalk) {
+      Image(systemName: "mic.fill")
+        .font(.system(size: 20, weight: .semibold))
+        .foregroundStyle(JovieColor.backgroundBase)
+        .frame(width: 52, height: 52)
+        .background(Color.white, in: Circle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Talk to Jovie")
+    .accessibilityIdentifier("shell-talk-fab")
   }
 
   private func navIcon(_ tab: AppShellTab) -> some View {

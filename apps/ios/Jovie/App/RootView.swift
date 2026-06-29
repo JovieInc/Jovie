@@ -243,6 +243,7 @@ private struct AppContentView: View {
           onStartNewChat: {
             chatRepository?.startNewConversation()
           },
+          onTalk: {},
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
@@ -266,7 +267,7 @@ private struct AppContentView: View {
           isOffline: appState.isOffline,
           initialTab: appState.launchMode.opensAudienceOnLaunch
             ? .audience
-            : (appState.launchMode.opensChatOnLaunch ? .chat : .profile),
+            : (appState.launchMode.opensChatOnLaunch ? .chat : appState.launchMode.defaultInitialTab),
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
           chatEnabled: appState.loadedDashboardResponse != nil,
@@ -279,6 +280,7 @@ private struct AppContentView: View {
           onStartNewChat: {
             chatRepository?.startNewConversation()
           },
+          onTalk: {},
           onLogout: onLogout
         ) {
           DashboardView(
@@ -602,6 +604,13 @@ struct UITestingAuthCallbackRoot: View {
   private let statusKey = "ie.jov.Jovie.authCallbackUITestStatus"
   private let handledCountKey = "ie.jov.Jovie.authCallbackUITestHandledCount"
 
+  init(appState: AppState) {
+    self.appState = appState
+    // Seed the verifier before the first onOpenURL from a cold launch via
+    // XCUIApplication.open(_:) — the async .task below is too late on CI.
+    MobileAuthPendingStore.shared.save(codeVerifier: "test_verifier")
+  }
+
   var body: some View {
     RootView(
       appState: appState,
@@ -655,22 +664,19 @@ struct UITestingAuthCallbackRoot: View {
         return
       }
 
-      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) {
+      if let authReturn = await Self.parseAuthReturnWhenReady(
+        url,
+        pendingStore: .shared,
+        codeVerifier: expectedVerifier
+      ) {
         handleAuthReturn(authReturn)
         return
       }
 
       guard MobileAuthReturnParser.isCodeCallback(url) else { return }
 
-      try? await Task.sleep(nanoseconds: 250_000_000)
-
-      guard let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) else {
-        authErrorMessage = "Couldn't finish sign-in. Try again."
-        UserDefaults.standard.set("error", forKey: statusKey)
-        return
-      }
-
-      handleAuthReturn(authReturn)
+      authErrorMessage = "Couldn't finish sign-in. Try again."
+      UserDefaults.standard.set("error", forKey: statusKey)
     }
   }
 
@@ -694,6 +700,25 @@ struct UITestingAuthCallbackRoot: View {
     appState.isOffline = false
     UserDefaults.standard.set(handledStates.count, forKey: handledCountKey)
     UserDefaults.standard.set("ready", forKey: statusKey)
+  }
+
+  @MainActor
+  private static func parseAuthReturnWhenReady(
+    _ url: URL,
+    pendingStore: MobileAuthPendingStore,
+    codeVerifier: String,
+    maxAttempts: Int = 40
+  ) async -> MobileAuthReturn? {
+    for _ in 0..<maxAttempts {
+      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: pendingStore) {
+        return authReturn
+      }
+
+      pendingStore.save(codeVerifier: codeVerifier)
+      try? await Task.sleep(nanoseconds: 50_000_000)
+    }
+
+    return nil
   }
 }
 #endif
