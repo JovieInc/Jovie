@@ -25,6 +25,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- **Library right rail polish (JOV-3679)**: release status badges now use distinct colors — a released drop reads in accent purple instead of the same green as an approved one — buttons and icon buttons are pill-shaped with a clean hover circle, and streaming providers show their real brand icons (Spotify, Apple Music, …) in both the detail drawer and the filter rail. The approval control drops its redundant inline label.
 - **Homepage collapsed to hero + minimal footer**: the below-the-fold story stack (product statement, trust strip, go-live steps, workspace, artist-profiles carousel, Friday rhythm, bento/loop/stat sections, pricing, FAQ) and the final CTA are flagged off via the existing static marketing flags (`SHOW_HOMEPAGE_UNLOCKED_SECTIONS`, `SHOW_HOMEPAGE_V2_FINAL_CTA`). The header keeps the logo and sign-in but drops the center nav (its anchors pointed at the now-hidden sections), and the homepage footer renders the minimal variant. Fully reversible by flipping the flags back on. Pages stay fully static (`revalidate = false`).
 
 ## [26.6.60] - 2026-06-28
