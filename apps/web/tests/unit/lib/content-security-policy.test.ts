@@ -112,6 +112,16 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://*.google-analytics.com');
   });
 
+  it('includes GTM domain in img-src for conversion tracking pixels', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const imgSrc = findDirective(csp, 'img-src');
+
+    expect(imgSrc).toContain('https://www.googletagmanager.com');
+  });
+
   it('includes vercel analytics inline script hash in script-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
