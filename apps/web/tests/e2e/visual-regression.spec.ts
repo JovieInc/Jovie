@@ -23,6 +23,14 @@ import { expect, test } from '@playwright/test';
 // No auth — test public pages as anonymous visitor
 test.use({ storageState: { cookies: [], origins: [] } });
 
+// Honors the `E2E_SKIP_AUTH` contract set by the visual-a11y workflow:
+// lanes that run without auth secrets can't render the Clerk sign-in/sign-up
+// widget, so the auth-page visual tests would otherwise hard-wait 15s × retries
+// each and blow the job's time budget. Skip them where Clerk isn't provisioned;
+// they still run locally and in any lane that has auth secrets.
+const describeAuthVisual =
+  process.env.E2E_SKIP_AUTH === 'true' ? test.describe.skip : test.describe;
+
 async function blockAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/profile/view', r =>
     r.fulfill({ status: 200, body: '{}' })
@@ -100,7 +108,7 @@ test.describe('homepage visual regression', () => {
 // ==========================================================================
 // 2. Auth pages — frequent regressions in light/dark mode visibility
 // ==========================================================================
-test.describe('auth pages visual regression', () => {
+describeAuthVisual('auth pages visual regression', () => {
   test('signin dark mode', async ({ page }) => {
     await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -392,7 +400,7 @@ test.describe('JOV-2081: Viewport matrix — homepage', () => {
   }
 });
 
-test.describe('JOV-2081: Viewport matrix — /sign-up', () => {
+describeAuthVisual('JOV-2081: Viewport matrix — /sign-up', () => {
   for (const viewport of VIEWPORT_MATRIX) {
     test(`sign-up no horizontal scroll at ${viewport.label}px`, async ({
       page,
@@ -475,7 +483,7 @@ test.describe('JOV-2081: Viewport matrix — /sign-up', () => {
   }
 });
 
-test.describe('JOV-2081: Viewport matrix — /sign-in', () => {
+describeAuthVisual('JOV-2081: Viewport matrix — /sign-in', () => {
   for (const viewport of VIEWPORT_MATRIX) {
     test(`sign-in no horizontal scroll at ${viewport.label}px`, async ({
       page,
