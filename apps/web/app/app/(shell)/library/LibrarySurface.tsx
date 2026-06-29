@@ -46,6 +46,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -1709,7 +1710,6 @@ function ApprovalStatusEditor({
   ) => void;
 }) {
   const [saving, setSaving] = useState(false);
-  const selectId = useId();
 
   async function handleChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextStatus = event.target.value;
@@ -1749,34 +1749,28 @@ function ApprovalStatusEditor({
     }
   }
 
+  // Inline control: the enclosing DrawerSection already renders the "Approval"
+  // title, so a stacked label + nested panel would duplicate chrome (#12317).
   return (
-    <div className='system-b-library-drawer-panel mt-4 px-3 py-3'>
-      <label
-        htmlFor={selectId}
-        className='system-b-library-drawer-panel-heading mb-2 block font-semibold text-primary-token'
-      >
-        Approval Status
-      </label>
-      <select
-        id={selectId}
-        value={asset.approvalStatus}
-        onChange={event => {
-          void handleChange(event);
-        }}
-        disabled={disabled || saving || !profileId}
-        data-testid={`library-approval-status-select-${asset.id}`}
-        className={cn(
-          'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
-          LIBRARY_BUTTON_FOCUS_CLASS
-        )}
-      >
-        {LIBRARY_APPROVAL_STATUSES.map(status => (
-          <option key={status} value={status}>
-            {formatLibraryApprovalStatus(status)}
-          </option>
-        ))}
-      </select>
-    </div>
+    <select
+      value={asset.approvalStatus}
+      onChange={event => {
+        void handleChange(event);
+      }}
+      disabled={disabled || saving || !profileId}
+      aria-label='Approval Status'
+      data-testid={`library-approval-status-select-${asset.id}`}
+      className={cn(
+        'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
+        LIBRARY_BUTTON_FOCUS_CLASS
+      )}
+    >
+      {LIBRARY_APPROVAL_STATUSES.map(status => (
+        <option key={status} value={status}>
+          {formatLibraryApprovalStatus(status)}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -1851,7 +1845,7 @@ function AssetDrawer({
         {...closedInteractiveProps}
         aria-label={`Open ${current.title}`}
         className={cn(
-          'system-b-library-icon-button system-b-library-icon-button--bordered grid h-7 w-7 place-items-center',
+          'system-b-library-icon-button grid h-7 w-7 place-items-center',
           LIBRARY_ICON_FOCUS_CLASS
         )}
       >
@@ -2110,7 +2104,10 @@ function AssetDrawer({
                               LIBRARY_CARD_FOCUS_CLASS
                             )}
                           >
-                            <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
+                            <SocialIcon
+                              platform={provider.key}
+                              className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                            />
                             <span className='min-w-0 flex-1 truncate'>
                               {provider.label}
                             </span>

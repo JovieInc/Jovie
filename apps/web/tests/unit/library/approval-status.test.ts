@@ -4,6 +4,7 @@ import {
   isLibraryApprovalStatus,
   isLibraryReleaseApprovedForPublic,
   libraryApprovalStatusClasses,
+  libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 
 describe('library approval status helpers', () => {
@@ -20,10 +21,21 @@ describe('library approval status helpers', () => {
   });
 
   it('maps approval statuses to semantic classes', () => {
-    expect(libraryApprovalStatusClasses('approved')).toContain('text-success');
     expect(libraryApprovalStatusClasses('needs_review')).toContain(
       'text-warning'
     );
+  });
+
+  it('keeps the approved accent distinct from the green released pill (#12317)', () => {
+    // Bug: "Approved" and "Released" both rendered green. Approved must use a
+    // distinct System B accent (purple), never the success/green tokens.
+    const approvedPill = libraryApprovalStatusClasses('approved');
+    expect(approvedPill).toBe('system-b-library-status-pill--approved');
+    expect(approvedPill).not.toContain('success');
+
+    const approvedDot = libraryApprovalStatusDotClasses('approved');
+    expect(approvedDot).toBe('system-b-library-status-dot--approved');
+    expect(approvedDot).not.toContain('success');
   });
 
   it('only treats approved releases as public-profile eligible', () => {

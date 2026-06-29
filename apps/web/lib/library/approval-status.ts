@@ -31,8 +31,11 @@ export function formatLibraryApprovalStatus(
 export function libraryApprovalStatusClasses(
   status: LibraryApprovalStatus
 ): string {
+  // Approval lives on a different axis than release status, so its accent must
+  // not collide with the green `released` pill. Use the System B purple accent
+  // (defined in design-system.css) instead of `success`/green. See #12317.
   if (status === 'approved') {
-    return 'border-success/20 bg-success/10 text-success';
+    return 'system-b-library-status-pill--approved';
   }
   if (status === 'needs_review') {
     return 'border-warning/20 bg-warning/10 text-warning';
@@ -46,7 +49,7 @@ export function libraryApprovalStatusClasses(
 export function libraryApprovalStatusDotClasses(
   status: LibraryApprovalStatus
 ): string {
-  if (status === 'approved') return 'bg-success';
+  if (status === 'approved') return 'system-b-library-status-dot--approved';
   if (status === 'needs_review') return 'bg-warning';
   if (status === 'archived') return 'bg-tertiary-token';
   return 'bg-secondary-token';

@@ -6219,6 +6219,27 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-size: var(--text-2xs);
 }
 
+/* Approval "Approved" accent — System B purple, distinct from the green
+   `released` release-status pill so the two never read as the same color (#12317).
+   Plain class (not :where) so the color trio wins without a Tailwind utility. */
+.system-b-library-status-pill--approved {
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 22%,
+    transparent
+  );
+  background-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 12%,
+    transparent
+  );
+  color: var(--color-accent-purple);
+}
+
+.system-b-library-status-dot--approved {
+  background-color: var(--color-accent-purple);
+}
+
 :where(.system-b-library-count-pill),
 :where(.system-b-library-meta-text),
 :where(.system-b-library-release-meta),
@@ -6541,6 +6562,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-library-action) {
+  border-radius: var(--radius-full);
   background: var(--system-b-bg-surface-1);
   color: var(--color-text-primary-token);
   font-weight: var(--font-weight-medium);
@@ -6633,23 +6655,15 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-weight: var(--font-weight-semibold);
 }
 
+/* Borderless icon buttons; the round hover background reads as a hover-circle. */
 :where(.system-b-library-icon-button) {
+  border-radius: var(--radius-full);
   color: var(--color-text-tertiary-token);
-}
-
-:where(.system-b-library-icon-button--bordered) {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--system-b-bg-surface-1);
 }
 
 :where(.system-b-library-icon-button:hover) {
   background: var(--system-b-bg-surface-1);
   color: var(--color-text-primary-token);
-}
-
-:where(.system-b-library-icon-button--bordered:hover) {
-  border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-2);
 }
 
 :where(.system-b-library-drawer-artwork),
