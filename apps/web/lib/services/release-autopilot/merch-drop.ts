@@ -38,8 +38,15 @@ function releasePromptPrefix(releaseId: string): string {
 }
 
 async function findExistingReleaseMerchDrop(
-  releaseId: string
+  releaseId: string,
+  creatorProfileId: string
 ): Promise<ReleaseAutopilotMerchDropResult | null> {
+  // Owner-scope the lookup so one creator's release never resolves to another
+  // creator's existing merch drop. Fail closed on a missing owner.
+  if (!creatorProfileId) {
+    return null;
+  }
+
   const [batch] = await db
     .select({
       generationId: merchGenerationBatches.id,
@@ -48,6 +55,7 @@ async function findExistingReleaseMerchDrop(
     .from(merchGenerationBatches)
     .where(
       and(
+        eq(merchGenerationBatches.creatorProfileId, creatorProfileId),
         eq(merchGenerationBatches.command, RELEASE_AUTOPILOT_MERCH_COMMAND),
         like(
           merchGenerationBatches.prompt,
@@ -90,7 +98,10 @@ export async function generateReleaseMerchDrop(params: {
   readonly releaseId: string;
   readonly clerkUserId: string;
 }): Promise<ReleaseAutopilotMerchDropResult> {
-  const existing = await findExistingReleaseMerchDrop(params.releaseId);
+  const existing = await findExistingReleaseMerchDrop(
+    params.releaseId,
+    params.profileId
+  );
   if (existing) {
     return existing;
   }

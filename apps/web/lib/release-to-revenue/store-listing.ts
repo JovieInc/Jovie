@@ -37,9 +37,24 @@ export function mergeStoreListingMerchCardIds(
   });
 }
 
+/**
+ * Resolve the merch cards generated for a release, scoped to the owning creator.
+ *
+ * The `creatorProfileId` predicate is the tenant-isolation boundary: without it,
+ * one creator's release run could pick up another creator's merch cards that share
+ * the same `release_id:` prompt prefix (JOV cross-tenant GMV leak). Always pass the
+ * owning creator profile id; an empty id fails closed and returns no cards.
+ */
 export async function findMerchCardIdsForRelease(
-  releaseId: string
+  releaseId: string,
+  creatorProfileId: string
 ): Promise<string[]> {
+  // Fail closed: an empty owner would search across tenants, and an empty
+  // releaseId would match every release-prefixed batch (`release_id:%`).
+  if (!creatorProfileId || !releaseId) {
+    return [];
+  }
+
   const batches = await db
     .select({
       merchCardId: merchGenerationBatches.selectedMerchCardId,
@@ -47,6 +62,7 @@ export async function findMerchCardIdsForRelease(
     .from(merchGenerationBatches)
     .where(
       and(
+        eq(merchGenerationBatches.creatorProfileId, creatorProfileId),
         eq(merchGenerationBatches.command, RELEASE_AUTOPILOT_MERCH_COMMAND),
         like(
           merchGenerationBatches.prompt,
@@ -77,7 +93,14 @@ export async function resolveMerchCardIdsForRun(
     return [];
   }
 
-  return findMerchCardIdsForRelease(stepOutputs.releaseId);
+  // Owner-scope the discovery query to the run's creator. Fail closed when the
+  // owner is missing rather than searching across every tenant's merch cards.
+  const creatorProfileId = stepOutputs.designPartner?.creatorProfileId;
+  if (!creatorProfileId) {
+    return [];
+  }
+
+  return findMerchCardIdsForRelease(stepOutputs.releaseId, creatorProfileId);
 }
 
 export async function linkMerchCardToReleaseRun(input: {

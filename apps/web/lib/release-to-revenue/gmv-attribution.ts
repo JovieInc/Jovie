@@ -4,9 +4,9 @@ import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { type MerchOrder, merchOrders } from '@/lib/db/schema/merch';
-import { resolveDesignPartnerConfig } from './design-partner-config';
 import { resolveMerchCardIdsForRun } from './store-listing';
 import type {
+  AllTenantsReleaseGmvSnapshot,
   DesignPartnerReleaseGmvSnapshot,
   ReleaseGmvPerRunRow,
   ReleaseToRevenueRunStepOutputs,
@@ -52,12 +52,20 @@ export function computeStoreGmvCents(
   return { gmvCents, orderCount };
 }
 
+/**
+ * Fetch paid orders for the given merch cards, scoped to the owning creator.
+ *
+ * The `creatorProfileId` predicate is the tenant-isolation boundary: a merch card
+ * id list that was contaminated upstream (or a foreign id) can never count another
+ * creator's orders toward this creator's GMV. An empty owner id fails closed.
+ */
 export async function getPaidOrdersForMerchCards(
-  merchCardIds: readonly string[]
+  merchCardIds: readonly string[],
+  creatorProfileId: string
 ): Promise<
   Pick<MerchOrder, 'id' | 'merchCardId' | 'subtotalCents' | 'status'>[]
 > {
-  if (merchCardIds.length === 0) {
+  if (merchCardIds.length === 0 || !creatorProfileId) {
     return [];
   }
 
@@ -69,21 +77,33 @@ export async function getPaidOrdersForMerchCards(
       status: merchOrders.status,
     })
     .from(merchOrders)
-    .where(inArray(merchOrders.merchCardId, [...merchCardIds]));
+    .where(
+      and(
+        eq(merchOrders.creatorProfileId, creatorProfileId),
+        inArray(merchOrders.merchCardId, [...merchCardIds])
+      )
+    );
 }
 
 export async function buildReleaseGmvRowForRun(input: {
   readonly workflowRunId: string;
   readonly stepOutputs: ReleaseToRevenueRunStepOutputs;
 }): Promise<ReleaseGmvPerRunRow> {
+  const creatorProfileId =
+    input.stepOutputs.designPartner?.creatorProfileId ?? '';
   const merchCardIds = await resolveMerchCardIdsForRun(input.stepOutputs);
-  const orders = await getPaidOrdersForMerchCards(merchCardIds);
+  const orders = await getPaidOrdersForMerchCards(
+    merchCardIds,
+    creatorProfileId
+  );
   const { gmvCents, orderCount } = computeStoreGmvCents(orders);
 
   return {
     workflowRunId: input.workflowRunId,
     releaseId: input.stepOutputs.releaseId,
     releaseTitle: input.stepOutputs.release.title,
+    creatorProfileId,
+    creatorUsername: input.stepOutputs.designPartner?.creatorUsername ?? '',
     triggeredAt: input.stepOutputs.triggeredAt,
     merchCardIds,
     orderCount,
@@ -91,27 +111,14 @@ export async function buildReleaseGmvRowForRun(input: {
   };
 }
 
-export async function getDesignPartnerReleaseGmvSnapshot(): Promise<DesignPartnerReleaseGmvSnapshot | null> {
-  const designPartner = await resolveDesignPartnerConfig();
-  if (!designPartner) {
-    return null;
-  }
+interface ReleaseRunRow {
+  readonly id: string;
+  readonly stepOutputs: unknown;
+}
 
-  const runs = await db
-    .select({
-      id: workflowRuns.id,
-      stepOutputs: workflowRuns.stepOutputs,
-      createdAt: workflowRuns.createdAt,
-    })
-    .from(workflowRuns)
-    .where(
-      and(
-        eq(workflowRuns.userId, designPartner.userId),
-        eq(workflowRuns.kind, RELEASE_TO_REVENUE_WORKFLOW_KIND)
-      )
-    )
-    .orderBy(drizzleSql`${workflowRuns.createdAt} DESC`);
-
+async function buildReleaseGmvRows(
+  runs: readonly ReleaseRunRow[]
+): Promise<ReleaseGmvPerRunRow[]> {
   const releases: ReleaseGmvPerRunRow[] = [];
   for (const run of runs) {
     const stepOutputs = run.stepOutputs as ReleaseToRevenueRunStepOutputs;
@@ -125,29 +132,108 @@ export async function getDesignPartnerReleaseGmvSnapshot(): Promise<DesignPartne
       })
     );
   }
+  return releases;
+}
 
-  const totalGmvCents = releases.reduce(
-    (sum, release) => sum + release.gmvCents,
-    0
-  );
+function sumGmvCents(releases: readonly ReleaseGmvPerRunRow[]): number {
+  return releases.reduce((sum, release) => sum + release.gmvCents, 0);
+}
+
+/**
+ * Select release-to-revenue runs ordered newest-first. When `ownerUserId` is
+ * provided the result is scoped to that user (ownership-filtered); pass `null`
+ * only for the admin/global all-tenants view.
+ */
+async function selectReleaseRuns(
+  ownerUserId: string | null
+): Promise<ReleaseRunRow[]> {
+  // Only `null` means "all tenants". An empty/blank userId is never a valid
+  // tenant — fail closed instead of falling through to the global query.
+  if (ownerUserId !== null && !ownerUserId) {
+    return [];
+  }
+
+  const predicate =
+    ownerUserId === null
+      ? eq(workflowRuns.kind, RELEASE_TO_REVENUE_WORKFLOW_KIND)
+      : and(
+          eq(workflowRuns.userId, ownerUserId),
+          eq(workflowRuns.kind, RELEASE_TO_REVENUE_WORKFLOW_KIND)
+        );
+
+  return db
+    .select({
+      id: workflowRuns.id,
+      stepOutputs: workflowRuns.stepOutputs,
+    })
+    .from(workflowRuns)
+    .where(predicate)
+    .orderBy(drizzleSql`${workflowRuns.createdAt} DESC`);
+}
+
+/**
+ * Ownership-filtered release GMV snapshot for a single user. Each run's GMV is
+ * additionally scoped to its own creator profile inside {@link buildReleaseGmvRowForRun}.
+ */
+export async function getReleaseGmvSnapshotForUser(input: {
+  readonly userId: string;
+}): Promise<DesignPartnerReleaseGmvSnapshot> {
+  const runs = await selectReleaseRuns(input.userId);
+  const releases = await buildReleaseGmvRows(runs);
 
   return {
-    creatorUsername: designPartner.creatorUsername,
+    creatorUsername: releases[0]?.creatorUsername ?? '',
     generatedAtIso: new Date().toISOString(),
     releases,
-    totalGmvCents,
+    totalGmvCents: sumGmvCents(releases),
+  };
+}
+
+/**
+ * Admin/global release GMV snapshot across every tenant. Each release row is still
+ * owner-scoped at the order level, so no creator's GMV bleeds into another's row.
+ *
+ * SECURITY INVARIANT: this returns cross-tenant revenue and MUST only be called
+ * from an admin-gated surface. Its sole caller is `ReleaseToRevenueGmvPanel`, which
+ * renders under `app/app/(shell)/admin/layout.tsx` — that layout redirects any
+ * request lacking `hasAdminRole` (and middleware already gates `/app/admin`). Do
+ * not call this from a non-admin route/action. Use {@link getReleaseGmvSnapshotForUser}
+ * for any creator-facing surface.
+ */
+export async function getAllTenantsReleaseGmvSnapshot(): Promise<AllTenantsReleaseGmvSnapshot> {
+  const runs = await selectReleaseRuns(null);
+  const releases = await buildReleaseGmvRows(runs);
+  const tenantCount = new Set(
+    releases.map(release => release.creatorProfileId).filter(Boolean)
+  ).size;
+
+  return {
+    generatedAtIso: new Date().toISOString(),
+    releases,
+    totalGmvCents: sumGmvCents(releases),
+    tenantCount,
   };
 }
 
 export async function resolveReleaseWorkflowRunIdForMerchCard(
-  merchCardId: string
+  merchCardId: string,
+  creatorProfileId: string
 ): Promise<string | null> {
+  if (!creatorProfileId) {
+    return null;
+  }
+
+  // Only consider runs owned by the same creator as the merch card. Without this
+  // predicate a buyer's card could resolve to another tenant's release run.
+  const ownerPredicate = drizzleSql`${workflowRuns.stepOutputs}->'designPartner'->>'creatorProfileId' = ${creatorProfileId}`;
+
   const [explicit] = await db
     .select({ id: workflowRuns.id })
     .from(workflowRuns)
     .where(
       and(
         eq(workflowRuns.kind, RELEASE_TO_REVENUE_WORKFLOW_KIND),
+        ownerPredicate,
         drizzleSql`${workflowRuns.stepOutputs}->'storeListing'->'merchCardIds' @> ${JSON.stringify([merchCardId])}::jsonb`
       )
     )
@@ -165,7 +251,12 @@ export async function resolveReleaseWorkflowRunIdForMerchCard(
       createdAt: workflowRuns.createdAt,
     })
     .from(workflowRuns)
-    .where(eq(workflowRuns.kind, RELEASE_TO_REVENUE_WORKFLOW_KIND))
+    .where(
+      and(
+        eq(workflowRuns.kind, RELEASE_TO_REVENUE_WORKFLOW_KIND),
+        ownerPredicate
+      )
+    )
     .orderBy(drizzleSql`${workflowRuns.createdAt} DESC`);
 
   for (const run of runs) {

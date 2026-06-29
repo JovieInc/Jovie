@@ -31,9 +31,12 @@ function buildAbsoluteUrl(path: string): string {
 
 export async function resolveMerchDropLink(input: {
   readonly creatorUsername: string;
+  readonly creatorProfileId: string;
   readonly releaseId: string | null;
 }): Promise<string | null> {
-  if (!input.releaseId) {
+  // Fall back to the creator's merch landing without a DB lookup when we can't
+  // owner-scope the release batch query (no release id, or no owning creator).
+  if (!input.releaseId || !input.creatorProfileId) {
     return buildAbsoluteUrl(`/${input.creatorUsername}/merch`);
   }
 
@@ -44,6 +47,7 @@ export async function resolveMerchDropLink(input: {
     .from(merchGenerationBatches)
     .where(
       and(
+        eq(merchGenerationBatches.creatorProfileId, input.creatorProfileId),
         eq(merchGenerationBatches.command, RELEASE_AUTOPILOT_MERCH_COMMAND),
         like(
           merchGenerationBatches.prompt,
@@ -124,6 +128,7 @@ export async function generateDistributionDraftsForRun(input: {
   const releaseLink = buildAbsoluteUrl(releasePath);
   const merchDropLink = await resolveMerchDropLink({
     creatorUsername: designPartner.creatorUsername,
+    creatorProfileId: designPartner.creatorProfileId,
     releaseId: input.stepOutputs.releaseId,
   });
 

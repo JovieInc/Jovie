@@ -91,6 +91,10 @@ export interface ReleaseGmvPerRunRow {
   readonly workflowRunId: string;
   readonly releaseId: string | null;
   readonly releaseTitle: string;
+  /** Canonical owning-tenant key (from the run's design partner snapshot). */
+  readonly creatorProfileId: string;
+  /** Owning creator's username — display only, not a tenant key. */
+  readonly creatorUsername: string;
   readonly triggeredAt: string;
   readonly merchCardIds: readonly string[];
   readonly orderCount: number;
@@ -98,11 +102,20 @@ export interface ReleaseGmvPerRunRow {
   readonly gmvCents: number;
 }
 
+/** Single-creator (ownership-filtered) release GMV snapshot. */
 export interface DesignPartnerReleaseGmvSnapshot {
   readonly creatorUsername: string;
   readonly generatedAtIso: string;
   readonly releases: readonly ReleaseGmvPerRunRow[];
   readonly totalGmvCents: number;
+}
+
+/** Admin/global release GMV snapshot spanning every tenant's runs. */
+export interface AllTenantsReleaseGmvSnapshot {
+  readonly generatedAtIso: string;
+  readonly releases: readonly ReleaseGmvPerRunRow[];
+  readonly totalGmvCents: number;
+  readonly tenantCount: number;
 }
 
 export interface ManualReleaseTriggerInput {
