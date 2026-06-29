@@ -14,6 +14,7 @@ import {
   saveComposerDraft,
 } from '@/lib/chat/composer-draft-store';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
@@ -357,6 +358,18 @@ export function useJovieChat({
           ...(activeConversationId
             ? { conversationId: activeConversationId }
             : {}),
+        },
+        prepareSendMessagesRequest: ({ messages, body }) => {
+          const staticBody =
+            typeof body === 'object' && body !== null
+              ? (body as Record<string, unknown>)
+              : {};
+          return {
+            body: {
+              ...staticBody,
+              messages: trimMessagesForChatRequest(messages, staticBody),
+            },
+          };
         },
         fetch: async (input, init) => {
           const response = await globalThis.fetch(input, {

@@ -304,6 +304,8 @@ async function uploadImageAttachment(
   id: string,
   updateFile: UploadFileUpdater
 ): Promise<void> {
+  updateFile(id, { status: 'uploading', progress: 0 });
+  let previewUrl: string | undefined;
   try {
     let processedFile = file;
     if (isHeicLikeMimeType(file.type)) {
@@ -317,24 +319,27 @@ async function uploadImageAttachment(
         return;
       }
     }
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Read failed'));
-      reader.readAsDataURL(processedFile);
+
+    previewUrl = URL.createObjectURL(processedFile);
+    const blob = await upload(processedFile.name, processedFile, {
+      access: 'public',
+      handleUploadUrl: '/api/chat/files/upload-token',
     });
-    const previewUrl = URL.createObjectURL(processedFile);
     updateFile(id, {
       status: 'ready',
       progress: 100,
-      dataUrl,
+      blobUrl: blob.url,
       previewUrl,
       mediaType: processedFile.type,
     });
-  } catch {
+  } catch (err) {
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
     updateFile(id, {
       status: 'error',
-      error: `Failed to read ${file.name}.`,
+      error:
+        err instanceof Error ? err.message : `Failed to upload ${file.name}.`,
     });
   }
 }
@@ -679,13 +684,6 @@ export function useChatFileAttachments({
       pendingFiles
         .filter(f => f.status === 'ready')
         .map(f => {
-          if (f.kind === 'image' && f.dataUrl) {
-            return {
-              type: 'file' as const,
-              mediaType: f.mediaType,
-              url: f.dataUrl,
-            };
-          }
           if (f.blobUrl) {
             return {
               type: 'file' as const,
