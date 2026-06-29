@@ -65,6 +65,12 @@ export const queryKeys = {
         'activity-feed',
         ...(profileId === undefined ? [] : [{ profileId, range }]),
       ] as const,
+    jovieWorkFeed: (profileId?: string, range?: string) =>
+      [
+        ...queryKeys.dashboard.all,
+        'jovie-work-feed',
+        ...(profileId === undefined ? [] : [{ profileId, range }]),
+      ] as const,
   },
 
   // Creator profiles (admin)

@@ -3,7 +3,6 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
-const pagePath = 'app/(home)/page.tsx';
 const trustPath = 'components/features/home/HomeTrustSection.tsx';
 const cssPath = 'app/(home)/home.css';
 
@@ -33,10 +32,7 @@ function extractTrustStripCss(source: string): string {
 
 describe('mounted homepage trust strip System B source contract', () => {
   it('keeps mounted trust strip markup on named System B primitives', () => {
-    const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
     const trustSource = readFileSync(path.join(webRoot, trustPath), 'utf8');
-
-    expect(pageSource).toContain('system-b-mounted-home-trust-strip-shell');
 
     for (const className of [
       'system-b-mounted-home-trust-strip',

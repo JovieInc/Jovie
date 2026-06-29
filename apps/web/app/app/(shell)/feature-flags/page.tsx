@@ -5,10 +5,10 @@ import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
-  FEATURE_FLAGS,
-  type FeatureFlag,
-  isEnabled,
-} from '@/lib/feature-flags';
+  CODE_FLAGS,
+  type CodeFlagName,
+  isCodeFlagEnabled,
+} from '@/lib/flags/code-flags';
 import { FeatureFlagsTable } from './FeatureFlagsTable';
 
 export const runtime = 'nodejs';
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export interface FlagRow {
-  readonly name: FeatureFlag;
+  readonly name: CodeFlagName;
   readonly enabled: boolean;
   readonly defaultValue: boolean;
 }
@@ -49,11 +49,11 @@ export default async function FeatureFlagsPage() {
   }
 
   const flags: readonly FlagRow[] = (
-    Object.keys(FEATURE_FLAGS) as FeatureFlag[]
+    Object.keys(CODE_FLAGS) as CodeFlagName[]
   ).map(name => ({
     name,
-    enabled: isEnabled(name),
-    defaultValue: FEATURE_FLAGS[name],
+    enabled: isCodeFlagEnabled(name),
+    defaultValue: CODE_FLAGS[name],
   }));
 
   return (
