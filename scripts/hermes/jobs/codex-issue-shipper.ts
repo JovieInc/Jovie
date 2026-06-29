@@ -52,6 +52,18 @@ import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 
 const JOB = 'codex-issue-shipper';
 
+/**
+ * Sentinel file that, when present, pauses the shipper.
+ * Written by the Shipping Menu Bar ops tool (or `touch ~/.hermes/shipping-paused`).
+ * Removed to resume. Lets an operator halt all autonomous dispatch without
+ * unloading the LaunchAgent or touching env vars.
+ */
+const PAUSE_SENTINEL = join(HERMES_HOME(), 'shipping-paused');
+
+function HERMES_HOME(): string {
+  return process.env.HERMES_HOME ?? join(tmpdir(), '..', 'timwhite', '.hermes');
+}
+
 interface AgentRunResult {
   readonly ok: boolean;
   readonly status: number | null;
@@ -875,6 +887,14 @@ async function dispatchBatch(
 
 async function main(): Promise<void> {
   loadHermesEnv();
+
+  // Pause sentinel: if the operator has touched ~/.hermes/shipping-paused,
+  // skip this run entirely. Cheap — no GitHub scan, no gbrain, no model call.
+  if (existsSync(PAUSE_SENTINEL)) {
+    logJobEvent({ job: JOB, event: 'paused_skip' });
+    return;
+  }
+
   const repoRoot = detectRepoRoot();
   const repo = detectGithubRepo(repoRoot);
   const config = loadShipperConfig(process.env, repoRoot, repo);
