@@ -78,7 +78,7 @@ jobs:
 
       - name: Claude review
         continue-on-error: true
-        uses: anthropics/claude-code-action@9dd8b95a392eb34b6f5fb56cf5a64cb735912d4b # v1
+        uses: anthropics/claude-code-action@a92e7c70a4da9793dc164451d829089dc057a464 # v1
         env:
           GBRAIN_CONNECTION: ${{ secrets.GBRAIN_CONNECTION }}
         with:
