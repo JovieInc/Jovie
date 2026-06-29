@@ -5,19 +5,20 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isEnabled } from '@/lib/feature-flags';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { runStudioSessionMemoryLoop } from '@/lib/workflows/memory/studio-session-loop';
 
 // Mock the flag for tests
-vi.mock('@/lib/feature-flags', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/feature-flags')>();
+vi.mock('@/lib/flags/code-flags', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/flags/code-flags')>();
   return {
     ...actual,
-    isEnabled: vi.fn(),
+    isCodeFlagEnabled: vi.fn(),
   };
 });
 
-const mockIsEnabled = vi.mocked(isEnabled);
+const mockIsCodeFlagEnabled = vi.mocked(isCodeFlagEnabled);
 
 // Mock the harness to avoid real DB inserts (harness does db ops)
 vi.mock('@/lib/agents/agent-harness', async importOriginal => {
@@ -64,7 +65,7 @@ describe('studio-session memory loop (gh-9869 v0)', () => {
   });
 
   it('gates off when MEMORY_STUDIO_SESSION_V0 is disabled', async () => {
-    mockIsEnabled.mockReturnValue(false);
+    mockIsCodeFlagEnabled.mockReturnValue(false);
 
     const result = await runStudioSessionMemoryLoop({
       userId: '00000000-0000-4000-8000-000000000001',
@@ -79,7 +80,7 @@ describe('studio-session memory loop (gh-9869 v0)', () => {
   });
 
   it('executes full loop when flag forced (demo path) and produces evidence with provenance', async () => {
-    mockIsEnabled.mockReturnValue(true); // or force:true bypasses
+    mockIsCodeFlagEnabled.mockReturnValue(true); // or force:true bypasses
 
     const result = await runStudioSessionMemoryLoop({
       userId: '00000000-0000-4000-8000-000000000003',
@@ -113,7 +114,7 @@ describe('studio-session memory loop (gh-9869 v0)', () => {
   });
 
   it('preserves strict user scoping (no cross-user leakage in evidence)', async () => {
-    mockIsEnabled.mockReturnValue(true);
+    mockIsCodeFlagEnabled.mockReturnValue(true);
 
     const userA = '00000000-0000-4000-8000-00000000000a';
     const userB = '00000000-0000-4000-8000-00000000000b';

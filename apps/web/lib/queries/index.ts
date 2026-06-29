@@ -394,6 +394,7 @@ export {
   type CreateInviteResponse,
   useCreateInviteMutation,
 } from './useInviteMutation';
+export { useJovieWorkFeedQuery } from './useJovieWorkFeedQuery';
 // Link verification mutation
 export {
   type LinkVerificationInput,

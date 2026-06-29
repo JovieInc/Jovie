@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import {
-  FEATURE_FLAGS,
-  type FeatureFlag,
-  isEnabled,
-} from '@/lib/feature-flags';
+  CODE_FLAGS,
+  type CodeFlagName,
+  isCodeFlagEnabled,
+} from '@/lib/flags/code-flags';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,9 @@ export async function GET() {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  const names = Object.keys(FEATURE_FLAGS) as FeatureFlag[];
-  const flags = Object.fromEntries(names.map(name => [name, isEnabled(name)]));
+  const names = Object.keys(CODE_FLAGS) as CodeFlagName[];
+  const flags = Object.fromEntries(
+    names.map(name => [name, isCodeFlagEnabled(name)])
+  );
   return NextResponse.json({ flags });
 }

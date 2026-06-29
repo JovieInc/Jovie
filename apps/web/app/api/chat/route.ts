@@ -108,8 +108,7 @@ import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { checkGatesForUser } from '@/lib/flags/server';
+import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -2383,8 +2382,11 @@ export async function POST(req: Request) {
   const toolIntent = normalizeToolIntent(body.toolIntent);
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
+  const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
+    userId,
+  });
   const albumArtCapability = resolveAlbumArtCapability({
-    featureEnabled: FEATURE_FLAGS.ALBUM_ART_GENERATION,
+    featureEnabled: albumArtFeatureEnabled,
     providerConfigured: isXaiConfigured(),
     entitlements: currentUserEntitlements,
   });
@@ -2644,7 +2646,7 @@ export async function POST(req: Request) {
     reservedTurn?.conversationId ?? resolvedConversationId;
 
   try {
-    const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
+    const albumArtEnabled = albumArtFeatureEnabled;
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(
       resolvedProfileId,

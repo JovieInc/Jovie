@@ -45,8 +45,8 @@ vi.mock('@/contexts/TableMetaContext', () => ({
   }),
 }));
 
-vi.mock('@/lib/feature-flags/client', () => ({
-  useCodeFlag: () => false,
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({

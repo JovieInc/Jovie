@@ -1,11 +1,7 @@
 /**
- * Feature flags -- simple env-var-based toggles for shipping features
- * disabled by default. All new features should check isEnabled()
- * before rendering their UI.
+ * Environment-variable code flags for UI and workflow toggles.
  *
- * How it works:
- * - Each flag name -> boolean pair defines the flag and its default value.
- * - Override any flag at runtime via the env var `FEATURE_<FLAG_NAME>`.
+ * Override any flag at runtime via `FEATURE_<FLAG_NAME>`.
  *
  * @example
  * ```shell
@@ -13,7 +9,7 @@
  * ```
  */
 
-export const FEATURE_FLAGS = {
+export const CODE_FLAGS = {
   NEW_RELEASE_PAGE: true,
   CANVAS_GRAIN: true,
   CYAN_FOCUS_GLOW: true,
@@ -22,16 +18,16 @@ export const FEATURE_FLAGS = {
   MEMORY_STUDIO_SESSION_V0: true,
 } as const satisfies Record<string, boolean>;
 
-export type FeatureFlag = keyof typeof FEATURE_FLAGS;
+export type CodeFlagName = keyof typeof CODE_FLAGS;
 
-/** Return whether a feature flag is enabled. */
-export function isEnabled(name: FeatureFlag): boolean {
+/** Return whether an env-driven code flag is enabled. */
+export function isCodeFlagEnabled(name: CodeFlagName): boolean {
   if (typeof process === 'undefined' || !process.env) {
-    return FEATURE_FLAGS[name];
+    return CODE_FLAGS[name];
   }
   const envKey = `FEATURE_${name}`;
   const envVal = process.env[envKey];
   if (envVal === 'true') return true;
   if (envVal === 'false') return false;
-  return FEATURE_FLAGS[name];
+  return CODE_FLAGS[name];
 }

@@ -41,6 +41,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
   '/app/insights':
     'AI insights workspace is reachable from dashboard widgets and direct app links until nav placement is finalised',
+  '/app/jovie-work':
+    'Unified autonomous work feed is reachable from direct app links until nav placement is finalised',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
 };
