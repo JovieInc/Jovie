@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
+import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageArtistProfilesCarouselLazy } from '@/components/homepage/HomepageArtistProfilesCarouselLazy';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
@@ -19,7 +20,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 // Below-the-fold sections are dynamic-loaded so their `motion/react`
@@ -454,6 +455,12 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+      <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
+        <HomeTrustSection
+          label='Used By Artists And Teams With Releases Distributed Through'
+          presentation='inline-strip'
+        />
+      </div>
       <HomepageStoryStack showUnlockedSections={showUnlockedSections} />
     </HomePageShell>
   );

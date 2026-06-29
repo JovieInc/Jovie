@@ -658,8 +658,8 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={true}
         />
       );
-      // When connected but no releases and not importing, shows "No releases yet"
-      expect(screen.getByText('No releases yet')).toBeInTheDocument();
+      // When connected but no releases and not importing, shows connected empty state
+      expect(screen.getByText('No Releases Yet')).toBeInTheDocument();
     });
 
     it('shows releases table when releases exist', () => {
