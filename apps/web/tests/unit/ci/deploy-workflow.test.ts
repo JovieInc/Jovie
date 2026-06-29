@@ -433,6 +433,37 @@ describe('CI public lighthouse workflow', () => {
       'tests/e2e/profile-mobile-viewport-stability.spec.ts'
     );
   });
+
+  it('public launch Lighthouse config includes CI Chrome stability flags', () => {
+    const configPath = resolve(
+      repoRoot,
+      'apps/web/.lighthouserc.public-launch.json'
+    );
+    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      ci: {
+        collect: {
+          puppeteerLaunchOptions?: {
+            args?: string[];
+            protocolTimeout?: number;
+          };
+          settings?: {
+            skipAudits?: string[];
+          };
+        };
+      };
+    };
+
+    const launchOptions = config.ci.collect.puppeteerLaunchOptions;
+    expect(launchOptions?.args).toEqual(
+      expect.arrayContaining([
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+      ])
+    );
+    expect(launchOptions?.protocolTimeout).toBeGreaterThanOrEqual(120_000);
+    expect(config.ci.collect.settings?.skipAudits).toContain('font-size');
+  });
 });
 
 describe('CI mobile overflow workflow', () => {
