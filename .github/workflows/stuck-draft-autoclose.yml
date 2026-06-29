@@ -1,0 +1,45 @@
+name: Stuck Draft Auto-Close
+
+# Closes agent-owned draft PRs that have been idle (>48h since last update)
+# with failing checks. This prevents stale drafts from accumulating and
+# confusing the merge-queue prioritization.
+#
+# Opt out per-PR with any of: needs-human, hold, gated.
+# Human-owned branches are never touched.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours
+  workflow_dispatch:
+
+concurrency:
+  group: stuck-draft-autoclose
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  contents: read
+  checks: read
+
+jobs:
+  autoclose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Run merge-queue drain regression tests
+        run: pip install pytest --quiet && pytest scripts/tests/test_gh_retry.py -v
+
+      - name: Auto-close stuck agent drafts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
+          STUCK_IDLE_HOURS: 48
+        run: bash scripts/stuck-draft-autoclose.sh
