@@ -139,6 +139,30 @@ describe('GET /api/chat/usage', () => {
     expect(body.remaining).toBe(88);
   });
 
+  it('returns pro limits for isPro rows with missing raw plan via entitlements (#11365)', async () => {
+    // Pre-fix route used resolveChatUsagePlan(billing.data?.plan), which maps null →
+    // free (10/day). Paid users with isPro=true but no plan string saw wrong/blank meters.
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      ...makeEntitlements({ plan: 'pro' }),
+      billingPlanMismatch: {
+        rawPlan: null,
+        normalizedPlan: 'pro',
+        reason: 'is_pro_true_with_non_paid_plan',
+      },
+    });
+    hoisted.getStatusMock.mockReturnValue({ remaining: 42, resetTime: 0 });
+
+    const { GET } = await import('@/app/api/chat/usage/route');
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.plan).toBe('pro');
+    expect(body.dailyLimit).toBe(100);
+    expect(body.used).toBe(58);
+    expect(body.remaining).toBe(42);
+  });
+
   it('returns degraded usage when billing is unavailable and no cache', async () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
       makeEntitlements({
