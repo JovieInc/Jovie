@@ -515,8 +515,8 @@ importers:
         specifier: ^20.4.1
         version: 20.4.1(@types/node@22.19.15)
       svix:
-        specifier: ^1.94.0
-        version: 1.94.0
+        specifier: ^1.96.1
+        version: 1.96.1
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -15543,8 +15543,8 @@ packages:
   svix@1.86.0:
     resolution: {integrity: sha512-/HTvXwjLJe1l/MsLXAO1ddCYxElJk4eNR4DzOjDOEmGrPN/3BtBE8perGwMAaJ2sT5T172VkBYzmHcjUfM1JRQ==}
 
-  svix@1.94.0:
-    resolution: {integrity: sha512-FuP5nJez1P/SeK+4zOBI8RrNhtrzMTBSvwuD4yGGsn+Af2yQazid6OwPu3fpZpMifOJxrJua0su/dYB5fe4v9Q==}
+  svix@1.96.1:
+    resolution: {integrity: sha512-l+GyPS6gjL0okiXplLazEY2GbBsv1jZ4UIwtjp553YkDDv635xMKbM5sABpIdiWy1BYxgyV8M6tHeTwY0gyXlQ==}
 
   swr@2.4.1:
     resolution: {integrity: sha512-2CC6CiKQtEwaEeNiqWTAw9PGykW8SR5zZX8MZk6TeAvEAnVS7Visz8WzphqgtQ8v2xz/4Q5K+j+SeMaKXeeQIA==}
@@ -35038,7 +35038,7 @@ snapshots:
       standardwebhooks: 1.0.0
       uuid: 11.1.1
 
-  svix@1.94.0:
+  svix@1.96.1:
     dependencies:
       standardwebhooks: 1.0.0
 
