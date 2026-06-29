@@ -17,7 +17,7 @@ Repo-specific commands live in `.no-mistakes.yaml` and delegate to `scripts/hook
 
 | Step | Command | What it runs |
 | --- | --- | --- |
-| **lint** | `bash scripts/hooks/pre-push-gate.sh lint` | `pnpm run pre-push` (biome + proxy-guard + tailwind + typecheck + lint) |
+| **lint** | `bash scripts/hooks/pre-push-gate.sh lint` | `pnpm run pre-push`: biome check on changed files (full `biome check .` when no base ref), then proxy-guard + tailwind + typecheck. The single scoped biome step covers lint+format; the web `pre-push` no longer re-runs a repo-wide `biome lint .`. |
 | **test** | `bash scripts/hooks/pre-push-gate.sh test` | `pnpm --filter=@jovie/web run test:fast` |
 | **format** | `bash scripts/hooks/pre-push-gate.sh format` | `pnpm biome check --write .` |
 
