@@ -114,6 +114,14 @@ describe('queryKeys', () => {
         { profileId: 'profile-123', range: '7d' },
       ]);
     });
+
+    it('jovieWorkFeed() with params includes params object', () => {
+      expect(queryKeys.dashboard.jovieWorkFeed('profile-123', '30d')).toEqual([
+        'dashboard',
+        'jovie-work-feed',
+        { profileId: 'profile-123', range: '30d' },
+      ]);
+    });
   });
 
   describe('creators', () => {
