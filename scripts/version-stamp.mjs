@@ -21,7 +21,7 @@
  *   node scripts/version-stamp.mjs --set 26.7.0  # stamp an explicit version
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -118,7 +118,9 @@ export function promoteChangelog(changelog, nextVersion, dateISO) {
 
   const firstReleaseIndex = lines.findIndex(line => /^##\s/.test(line));
   const insertAt = firstReleaseIndex === -1 ? lines.length : firstReleaseIndex;
-  const unreleasedIndex = lines.findIndex(line => /^##\s*\[Unreleased\]\s*$/.test(line));
+  const unreleasedIndex = lines.findIndex(line =>
+    /^##\s*\[Unreleased\]\s*$/.test(line)
+  );
 
   if (unreleasedIndex === -1) {
     const nextLines = [...lines];
@@ -140,9 +142,13 @@ export function promoteChangelog(changelog, nextVersion, dateISO) {
     ...lines.slice(unreleasedEnd),
   ];
 
-  const nextFirstReleaseIndex = withoutUnreleased.findIndex(line => /^##\s/.test(line));
+  const nextFirstReleaseIndex = withoutUnreleased.findIndex(line =>
+    /^##\s/.test(line)
+  );
   const nextInsertAt =
-    nextFirstReleaseIndex === -1 ? withoutUnreleased.length : nextFirstReleaseIndex;
+    nextFirstReleaseIndex === -1
+      ? withoutUnreleased.length
+      : nextFirstReleaseIndex;
 
   withoutUnreleased.splice(
     nextInsertAt,
@@ -168,12 +174,7 @@ export function promoteChangelog(changelog, nextVersion, dateISO) {
  * @param {string} input.dateISO
  * @returns {Array<{ path: string, content: string }>}
  */
-export function planStamp({
-  nextVersion,
-  manifests,
-  changelog,
-  dateISO,
-}) {
+export function planStamp({ nextVersion, manifests, changelog, dateISO }) {
   const writes = [];
 
   writes.push({

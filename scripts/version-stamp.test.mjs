@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -30,7 +30,8 @@ test('computeNextVersion resets patch on UTC month rollover', () => {
 });
 
 test('setManifestVersion preserves package manifest formatting and only changes version', () => {
-  const source = '{\n  "name": "@jovie/web",\n  "version": "26.6.61",\n  "private": true\n}\n';
+  const source =
+    '{\n  "name": "@jovie/web",\n  "version": "26.6.61",\n  "private": true\n}\n';
 
   assert.equal(
     setManifestVersion(source, '26.6.62'),
@@ -94,10 +95,22 @@ test('planStamp writes the complete version fan-out for main release path', () =
 
   assert.deepEqual(
     writes.map(write => write.path),
-    ['version.json', 'VERSION', 'package.json', 'apps/web/package.json', 'CHANGELOG.md']
+    [
+      'version.json',
+      'VERSION',
+      'package.json',
+      'apps/web/package.json',
+      'CHANGELOG.md',
+    ]
   );
-  assert.equal(writes.find(write => write.path === 'version.json')?.content, '{\n  "version": "26.6.62"\n}\n');
-  assert.equal(writes.find(write => write.path === 'VERSION')?.content, '26.6.62\n');
+  assert.equal(
+    writes.find(write => write.path === 'version.json')?.content,
+    '{\n  "version": "26.6.62"\n}\n'
+  );
+  assert.equal(
+    writes.find(write => write.path === 'VERSION')?.content,
+    '26.6.62\n'
+  );
   assert.match(
     writes.find(write => write.path === 'package.json')?.content ?? '',
     /"version": "26\.6\.62"/
@@ -114,11 +127,21 @@ test('main release path: real stamp keeps the version fan-out consistent (versio
   // proves the MAIN/release path still updates everything consistently.
   const tmp = mkdtempSync(join(tmpdir(), 'jovie-version-stamp-'));
   try {
-    const filesToCopy = ['VERSION', 'version.json', 'CHANGELOG.md', 'package.json'];
-    const manifestGlobs = readFileSync(join(REPO_ROOT, 'scripts/version-check.mjs'), 'utf-8');
+    const filesToCopy = [
+      'VERSION',
+      'version.json',
+      'CHANGELOG.md',
+      'package.json',
+    ];
+    const manifestGlobs = readFileSync(
+      join(REPO_ROOT, 'scripts/version-check.mjs'),
+      'utf-8'
+    );
     // Mirror version-check's manifest list by copying every workspace package.json
     // that currently carries a version field.
-    cpSync(join(REPO_ROOT, 'scripts'), join(tmp, 'scripts'), { recursive: true });
+    cpSync(join(REPO_ROOT, 'scripts'), join(tmp, 'scripts'), {
+      recursive: true,
+    });
     for (const rel of filesToCopy) {
       cpSync(join(REPO_ROOT, rel), join(tmp, rel));
     }
@@ -135,7 +158,9 @@ test('main release path: real stamp keeps the version fan-out consistent (versio
     }
     void manifestGlobs;
 
-    const current = JSON.parse(readFileSync(join(tmp, 'version.json'), 'utf-8')).version;
+    const current = JSON.parse(
+      readFileSync(join(tmp, 'version.json'), 'utf-8')
+    ).version;
     const [yy, mm] = current.split('.');
     const target = `${yy}.${mm}.999`;
 
@@ -145,7 +170,10 @@ test('main release path: real stamp keeps the version fan-out consistent (versio
     });
 
     // version-check.mjs exits non-zero if the fan-out is inconsistent.
-    execFileSync('node', ['scripts/version-check.mjs'], { cwd: tmp, stdio: 'pipe' });
+    execFileSync('node', ['scripts/version-check.mjs'], {
+      cwd: tmp,
+      stdio: 'pipe',
+    });
 
     assert.equal(readFileSync(join(tmp, 'VERSION'), 'utf-8').trim(), target);
     assert.equal(

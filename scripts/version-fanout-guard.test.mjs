@@ -11,7 +11,12 @@ const versionedManifests = [
   'packages/ui/package.json',
 ];
 
-function evaluate({ branch = 'tim/feature', changedFiles, base = {}, head = {} }) {
+function evaluate({
+  branch = 'tim/feature',
+  changedFiles,
+  base = {},
+  head = {},
+}) {
   return evaluateVersionFanoutGuard({
     branch,
     changedFiles,
@@ -58,11 +63,13 @@ test('fails when a feature branch changes package.json version fields', () => {
     changedFiles: ['package.json', 'apps/web/package.json'],
     base: {
       'package.json': '{"version":"26.6.61","scripts":{"test":"node --test"}}',
-      'apps/web/package.json': '{"version":"26.6.61","dependencies":{"x":"1.0.0"}}',
+      'apps/web/package.json':
+        '{"version":"26.6.61","dependencies":{"x":"1.0.0"}}',
     },
     head: {
       'package.json': '{"version":"26.6.62","scripts":{"test":"node --test"}}',
-      'apps/web/package.json': '{"version":"26.6.62","dependencies":{"x":"1.0.0"}}',
+      'apps/web/package.json':
+        '{"version":"26.6.62","dependencies":{"x":"1.0.0"}}',
     },
   });
 
@@ -75,11 +82,14 @@ test('allows feature branch package.json dependency/script edits when version fi
     changedFiles: ['package.json', 'apps/web/package.json'],
     base: {
       'package.json': '{"version":"26.6.61","scripts":{"test":"node --test"}}',
-      'apps/web/package.json': '{"version":"26.6.61","dependencies":{"x":"1.0.0"}}',
+      'apps/web/package.json':
+        '{"version":"26.6.61","dependencies":{"x":"1.0.0"}}',
     },
     head: {
-      'package.json': '{"version":"26.6.61","scripts":{"test":"node --test scripts/*.test.mjs"}}',
-      'apps/web/package.json': '{"version":"26.6.61","dependencies":{"x":"1.0.1"}}',
+      'package.json':
+        '{"version":"26.6.61","scripts":{"test":"node --test scripts/*.test.mjs"}}',
+      'apps/web/package.json':
+        '{"version":"26.6.61","dependencies":{"x":"1.0.1"}}',
     },
   });
 
@@ -91,10 +101,12 @@ test('allows feature branch CHANGELOG notes under Unreleased', () => {
   const result = evaluate({
     changedFiles: ['CHANGELOG.md'],
     base: {
-      'CHANGELOG.md': '# Changelog\n\n## [26.6.61] - 2026-06-28\n\n### Added\n- Old\n\n## [Unreleased]\n',
+      'CHANGELOG.md':
+        '# Changelog\n\n## [26.6.61] - 2026-06-28\n\n### Added\n- Old\n\n## [Unreleased]\n',
     },
     head: {
-      'CHANGELOG.md': '# Changelog\n\n## [26.6.61] - 2026-06-28\n\n### Added\n- Old\n\n## [Unreleased]\n\n### Added\n- New note\n',
+      'CHANGELOG.md':
+        '# Changelog\n\n## [26.6.61] - 2026-06-28\n\n### Added\n- Old\n\n## [Unreleased]\n\n### Added\n- New note\n',
     },
   });
 
@@ -105,10 +117,12 @@ test('fails when a feature branch adds a dated CHANGELOG release heading', () =>
   const result = evaluate({
     changedFiles: ['CHANGELOG.md'],
     base: {
-      'CHANGELOG.md': '# Changelog\n\n## [26.6.61] - 2026-06-28\n\n## [Unreleased]\n',
+      'CHANGELOG.md':
+        '# Changelog\n\n## [26.6.61] - 2026-06-28\n\n## [Unreleased]\n',
     },
     head: {
-      'CHANGELOG.md': '# Changelog\n\n## [26.6.62] - 2026-06-28\n\n### Changed\n- Stamp\n\n## [26.6.61] - 2026-06-28\n\n## [Unreleased]\n',
+      'CHANGELOG.md':
+        '# Changelog\n\n## [26.6.62] - 2026-06-28\n\n### Changed\n- Stamp\n\n## [26.6.61] - 2026-06-28\n\n## [Unreleased]\n',
     },
   });
 

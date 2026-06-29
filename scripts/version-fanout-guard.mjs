@@ -23,7 +23,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -103,7 +103,12 @@ export function evaluateVersionFanoutGuard({
   const enforced = !isStampAllowedBranch(branch);
 
   if (!enforced) {
-    return { branch: branch ?? '', enforced: false, violations: [], passed: true };
+    return {
+      branch: branch ?? '',
+      enforced: false,
+      violations: [],
+      passed: true,
+    };
   }
 
   const changed = new Set(normalizedFiles);
@@ -293,8 +298,12 @@ function main() {
   console.error(
     'Version stamping is main-only. Revert these changes; the release path stamps them after merge.'
   );
-  console.error('Add release notes under "## [Unreleased]" in CHANGELOG.md instead.');
-  console.error('See .claude/rules/release.md → "Version Stamping (main-only)".');
+  console.error(
+    'Add release notes under "## [Unreleased]" in CHANGELOG.md instead.'
+  );
+  console.error(
+    'See .claude/rules/release.md → "Version Stamping (main-only)".'
+  );
   console.error('Violations:');
   for (const violation of result.violations) {
     console.error(`- ${violation}`);
