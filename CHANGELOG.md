@@ -11,6 +11,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- **Production Journey Auditor**: a layered net for the signup → AI onboarding interview. Deepens the existing canary so it verifies the interview actually initializes (starter prompt visible, composer usable) instead of only checking the chat container is present; adds a nightly real-turn detector, a production smoke command (`qa:journey:smoke`) with a compact redacted failure packet, a product-promise registry, and a report-only exploratory journey scout (`qa:journey:scout`). [internal] Captures a currently-broken anonymous onboarding turn (500 on send) with a clear diagnosis — root cause tracked in JOV-3693.
 - **Connector enrichment pipelines (JOV-3114)**: adds `lib/connectors/enrichment/` with per-provider gmail/calendar pipelines that emit `context_facts`, memory graph observations, and `suggested_actions`; extends `context_fact_kind` for entity mentions; refactors `extractAndPropose` to sync Gmail `external_objects` then run the enrichment runner. Apple Photos deferred until JOV-2919.
 
 ## [26.6.60] - 2026-06-28
