@@ -145,6 +145,9 @@ output/
 # QA swarm runtime artifacts (findings, remediation manifests, Eve queue)
 .context/qa-swarm/
 
+# Journey scout reports + evidence (Production Journey Auditor)
+.context/journey-scout/
+
 # Ruflo MCP local state (sqlite + vector index, never committed)
 .claude-flow/
 .swarm/
