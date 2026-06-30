@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
   isMaliciousProbePath: vi.fn(),
   createProbeDropResponse: vi.fn(),
   buildAuthDegradedHtmlResponse: vi.fn(),
+  buildAuthDegradedJsonResponse: vi.fn(),
+  isBrowserNavigation: vi.fn().mockReturnValue(true),
   resolveClerkKeys: vi.fn(),
   isStagingHost: vi.fn(),
   captureError: vi.fn(),
@@ -58,6 +60,8 @@ vi.mock('@/lib/security/probe-detection', () => ({
 
 vi.mock('@/lib/auth/auth-degraded-fallback', () => ({
   buildAuthDegradedHtmlResponse: mocks.buildAuthDegradedHtmlResponse,
+  buildAuthDegradedJsonResponse: mocks.buildAuthDegradedJsonResponse,
+  isBrowserNavigation: mocks.isBrowserNavigation,
 }));
 
 vi.mock('@/lib/auth/staging-clerk-keys', () => ({
