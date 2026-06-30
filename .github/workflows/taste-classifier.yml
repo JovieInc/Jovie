@@ -45,6 +45,7 @@ jobs:
       - name: Run taste classifier
         id: classify
         env:
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           node scripts/taste-classifier.mjs --pr "$PR_NUMBER" --json > taste-classification.json 2>&1 || true

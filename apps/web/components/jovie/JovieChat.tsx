@@ -145,6 +145,7 @@ export function JovieChat({
         focusKey,
       });
       // ponytail: populate composer for review instead of auto-submitting — identity-safety (#11950)
+      // sending verbatim violates the identity-sacred / never-speak-for-the-artist guardrail
       setInput(result.prompt);
       inputRef.current?.focus();
     },
