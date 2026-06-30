@@ -26,6 +26,31 @@ describe('getChatMarkdownStreamdownConfig', () => {
     );
   });
 
+  it('allows GFM table elements (regression: gh-11948 silent table stripping)', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+
+    const tableElements = ['table', 'thead', 'tbody', 'tr', 'th', 'td'];
+    for (const el of tableElements) {
+      expect(config.allowedElements).toContain(el);
+    }
+  });
+
+  it('allows img elements with safe attributes (regression: gh-11948)', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+
+    expect(config.allowedElements).toContain('img');
+    expect(config.allowedTags?.img).toEqual(
+      expect.arrayContaining(['src', 'alt', 'title'])
+    );
+  });
+
+  it('allows h5 and h6 headings', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+
+    expect(config.allowedElements).toContain('h5');
+    expect(config.allowedElements).toContain('h6');
+  });
+
   it('blocks unsafe protocols from links', () => {
     const config = getChatMarkdownStreamdownConfig(false);
 

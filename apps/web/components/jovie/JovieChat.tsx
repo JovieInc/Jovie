@@ -104,7 +104,7 @@ export function JovieChat({
     totalSizeRef,
     scrollContainerRef,
     bottomSentinelRef,
-  } = useStickToBottom({ messageCount: messages.length });
+  } = useStickToBottom();
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');

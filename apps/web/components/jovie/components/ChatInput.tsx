@@ -1059,6 +1059,7 @@ function InputRow({
   return (
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
       <motion.div
+        data-testid='chat-composer-input-row'
         layout={!reducedMotion}
         ref={containerRef}
         transition={reducedMotion ? undefined : TRANSITION_SURFACE}

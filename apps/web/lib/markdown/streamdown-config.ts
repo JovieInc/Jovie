@@ -52,7 +52,7 @@ const baseStreamdownConfig: Omit<
     a: ['href', 'title'],
     img: ['src', 'alt', 'title'],
     td: ['align'],
-    th: ['align'],
+    th: ['scope', 'align'],
   },
   caret: 'block',
 };

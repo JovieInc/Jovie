@@ -893,7 +893,7 @@ export function OnboardingChat({
   const displayMessages = getDisplayMessages(messages, shouldShowThinking);
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
   const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
-    useStickToBottom({ messageCount: displayMessages.length });
+    useStickToBottom();
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: 'onboarding',
