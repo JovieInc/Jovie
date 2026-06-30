@@ -5,6 +5,8 @@ struct MobileChatView: View {
   @Binding var draft: String
   let webBaseURL: URL
 
+  @State private var isAtBottom = true
+
   var body: some View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
@@ -13,18 +15,56 @@ struct MobileChatView: View {
         if repository.timeline.isEmpty {
           emptyState
         } else {
-          ScrollView {
-            LazyVStack(alignment: .leading, spacing: JovieSpacing.large) {
-              ForEach(repository.timeline) { item in
-                MobileChatMessageRow(item: item, webBaseURL: webBaseURL) {
-                  guard let clientTurnId = item.clientTurnId else { return }
-                  Task { await repository.retry(clientTurnId: clientTurnId) }
+          ScrollViewReader { proxy in
+            ScrollView {
+              LazyVStack(alignment: .leading, spacing: JovieSpacing.large) {
+                ForEach(repository.timeline) { item in
+                  MobileChatMessageRow(item: item, webBaseURL: webBaseURL) {
+                    guard let clientTurnId = item.clientTurnId else { return }
+                    Task { await repository.retry(clientTurnId: clientTurnId) }
+                  }
                 }
               }
+              .padding(.horizontal, JovieSpacing.large)
+              .padding(.top, JovieSpacing.xLarge)
+              .padding(.bottom, JovieSpacing.medium)
+
+              // ponytail: onAppear/onDisappear of this sentinel tracks whether the user is near
+              // the bottom without needing coordinate-space math
+              Color.clear
+                .frame(height: 1)
+                .id("chat-bottom")
+                .onAppear { isAtBottom = true }
+                .onDisappear { isAtBottom = false }
             }
-            .padding(.horizontal, JovieSpacing.large)
-            .padding(.top, JovieSpacing.xLarge)
-            .padding(.bottom, JovieSpacing.medium)
+            .onChange(of: repository.timeline.count) {
+              guard isAtBottom else { return }
+              withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo("chat-bottom", anchor: .bottom)
+              }
+            }
+            .onChange(of: repository.timeline.last?.content) {
+              guard isAtBottom else { return }
+              proxy.scrollTo("chat-bottom", anchor: .bottom)
+            }
+            .overlay(alignment: .bottomTrailing) {
+              if !isAtBottom {
+                Button {
+                  isAtBottom = true
+                  withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo("chat-bottom", anchor: .bottom)
+                  }
+                } label: {
+                  Image(systemName: "arrow.down")
+                }
+                .buttonStyle(JovieIconButtonStyle())
+                .padding(.trailing, JovieSpacing.large)
+                .padding(.bottom, JovieSpacing.medium)
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                .animation(.spring(duration: 0.2), value: isAtBottom)
+                .accessibilityLabel("Scroll to latest message")
+              }
+            }
           }
         }
 
