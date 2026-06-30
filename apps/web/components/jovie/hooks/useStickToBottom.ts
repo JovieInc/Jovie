@@ -70,8 +70,14 @@ export function useStickToBottom({
     });
   }, []);
 
+  // Only re-pin on the initial load (0 → positive), never on per-message appends.
+  // Pinning on every messageCount change forced the viewport back to bottom
+  // whenever a new row was appended even when the user had scrolled up (JOV-11948).
+  const prevMessageCountRef = useRef(0);
   useEffect(() => {
-    if (messageCount > 0) {
+    const prev = prevMessageCountRef.current;
+    prevMessageCountRef.current = messageCount;
+    if (prev === 0 && messageCount > 0) {
       setStuckToBottom(true);
     }
   }, [messageCount, setStuckToBottom]);

@@ -37,4 +37,35 @@ describe('getChatMarkdownStreamdownConfig', () => {
       'https://jov.ie'
     );
   });
+
+  it('allows GFM table elements so comparison tables are not silently stripped', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+    const tableElements = [
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'td',
+      'th',
+    ] as const;
+    for (const el of tableElements) {
+      expect(config.allowedElements, `Expected ${el} to be allowed`).toContain(
+        el
+      );
+    }
+  });
+
+  it('allows img element with safe attributes', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+    expect(config.allowedElements).toContain('img');
+    expect((config.allowedTags as Record<string, string[]>)['img']).toEqual(
+      expect.arrayContaining(['src', 'alt'])
+    );
+  });
+
+  it('allows h5 and h6 headings', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+    expect(config.allowedElements).toContain('h5');
+    expect(config.allowedElements).toContain('h6');
+  });
 });
