@@ -23,6 +23,9 @@ vi.mock('@/lib/db', () => ({
     onConflictDoNothing: vi.fn().mockReturnThis(),
     onConflictDoUpdate: vi.fn().mockReturnThis(),
     returning: vi.fn().mockResolvedValue([{ id: 'sub-1' }]),
+    execute: vi.fn().mockResolvedValue(undefined),
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
   },
 }));
@@ -190,9 +193,6 @@ describe('notifications/domain', () => {
     it('keeps the subscribe success path when audience enrichment fails', async () => {
       const artistId = '123e4567-e89b-12d3-a456-426614174000';
       const { db } = await import('@/lib/db');
-      const { withSystemIngestionSession } = await import(
-        '@/lib/ingestion/session'
-      );
       const { captureError } = await import('@/lib/error-tracking');
 
       vi.mocked(db.limit)
@@ -208,7 +208,7 @@ describe('notifications/domain', () => {
         ])
         .mockResolvedValueOnce([]);
 
-      vi.mocked(withSystemIngestionSession).mockRejectedValueOnce(
+      vi.mocked(db.execute).mockRejectedValueOnce(
         new Error('column "latest_referrer_url" does not exist')
       );
 
