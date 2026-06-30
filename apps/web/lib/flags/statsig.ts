@@ -10,6 +10,7 @@ import {
   type ProfileAlertOptInVariant,
   type StatsigBackedAppFlagName,
   type SubscribeCTAVariant,
+  type TeleprompterShowcaseVariant,
 } from './contracts';
 
 let statsigInitialized = false;
@@ -250,6 +251,20 @@ export async function getSubscribeCTAVariantValue(
     return variant;
   }
   return 'two_step';
+}
+
+export async function getTeleprompterShowcaseVariantValue(
+  userId: string | null
+): Promise<TeleprompterShowcaseVariant> {
+  const config = await getExperiment(
+    userId,
+    LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_SHOWCASE_EXPERIMENT
+  );
+  const variant = config.variant;
+  if (variant === 'interstitial' || variant === 'direct') {
+    return variant;
+  }
+  return 'direct';
 }
 
 export async function shutdownStatsig(): Promise<void> {

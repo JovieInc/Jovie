@@ -90,6 +90,7 @@ import {
   createMerchPreviewTool,
   createMerchSelectTool,
 } from '@/lib/chat/tools/merch-tools';
+import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
 import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
 import {
   type ChatTurnSource,
@@ -1980,6 +1981,7 @@ function buildChatTools(
   albumArtEnabled: boolean,
   canAccessMerchCreation: boolean,
   canAccessAiRetouching: boolean,
+  teleprompterRecordingEnabled: boolean,
   userEntitlements: Awaited<
     ReturnType<
       typeof import('@/lib/entitlements/server').getCurrentUserEntitlements
@@ -2149,6 +2151,13 @@ function buildChatTools(
           }),
           showMerchSales: createMerchSalesTool(resolvedProfileId),
           showArtistPayouts: createMerchPayoutsTool(resolvedProfileId),
+        }
+      : {}),
+    ...(teleprompterRecordingEnabled
+      ? {
+          proposeVideoRecording: createProposeVideoRecordingTool({
+            clerkUserId,
+          }),
         }
       : {}),
   };
@@ -2405,6 +2414,10 @@ export async function POST(req: Request) {
   const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
     userId,
   });
+  const teleprompterRecordingEnabled = await getAppFlagValue(
+    'TELEPROMPTER_RECORDING',
+    { userId }
+  );
   const albumArtCapability = resolveAlbumArtCapability({
     featureEnabled: albumArtFeatureEnabled,
     providerConfigured: isXaiConfigured(),
@@ -2722,6 +2735,7 @@ export async function POST(req: Request) {
             albumArtEnabled,
             planLimits.booleans.canAccessMerchCreation,
             planLimits.booleans.canAccessAiRetouching,
+            teleprompterRecordingEnabled,
             currentUserEntitlements,
             reservedTurn
           ),

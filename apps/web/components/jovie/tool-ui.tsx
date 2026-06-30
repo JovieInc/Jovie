@@ -15,6 +15,7 @@ import {
 import { getToolUiConfig } from '@/lib/chat/tool-ui-registry';
 import { env } from '@/lib/env-client';
 import { addBreadcrumb } from '@/lib/sentry/client-lite';
+import { isVideoRecordingProposalPayload } from '@/lib/teleprompter/types';
 import { cn } from '@/lib/utils';
 import { ChatAlbumArtCard } from './components/ChatAlbumArtCard';
 import { ChatAnalyticsCard } from './components/ChatAnalyticsCard';
@@ -33,6 +34,7 @@ import {
   isChatMerchDesignCarouselResult,
 } from './components/ChatMerchDesignCarousel';
 import { ChatPitchCard } from './components/ChatPitchCard';
+import { ChatVideoRecordingProposalCard } from './components/ChatVideoRecordingProposalCard';
 import type {
   ChatInsightsToolResult,
   MessagePart,
@@ -539,8 +541,26 @@ function renderMerchActionArtifact(
   );
 }
 
+function renderVideoRecordingArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !isVideoRecordingProposalPayload(event.output)) {
+    return null;
+  }
+
+  return (
+    <ChatVideoRecordingProposalCard
+      profileId={profileId}
+      payload={event.output}
+    />
+  );
+}
+
 const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   proposeAvatarUpload: event => renderAvatarUploadArtifact(event),
+  proposeVideoRecording: (event, profileId) =>
+    renderVideoRecordingArtifact(event, profileId),
   proposeProfileEdit: (event, profileId) =>
     renderProfileEditArtifact(event, profileId),
   proposeSocialLink: (event, profileId) =>

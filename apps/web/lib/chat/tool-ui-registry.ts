@@ -323,6 +323,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Checkout ready',
     errorTitle: "Couldn't prepare checkout",
   },
+  proposeVideoRecording: {
+    label: 'Video recording',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Preparing your recording…',
+    successTitle: 'Ready to record',
+    errorTitle: "Couldn't prepare your recording",
+  },
 } as const satisfies Record<string, ToolUiConfig>;
 
 function startCaseFromCamelCase(value: string): string {

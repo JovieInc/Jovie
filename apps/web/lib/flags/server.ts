@@ -11,6 +11,7 @@ import {
   type ProfileAlertOptInVariant,
   type StatsigFeatureFlagsBootstrap,
   type SubscribeCTAVariant,
+  type TeleprompterShowcaseVariant,
 } from './contracts';
 import {
   APP_FLAG_OVERRIDES_COOKIE,
@@ -22,6 +23,7 @@ import {
   APP_FLAG_REGISTRY,
   PROFILE_ALERT_OPTIN_VARIANT_FLAG,
   SUBSCRIBE_CTA_VARIANT_FLAG,
+  TELEPROMPTER_SHOWCASE_VARIANT_FLAG,
 } from './registry';
 
 const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
@@ -159,6 +161,16 @@ export async function getProfileAlertOptInVariant(
   return PROFILE_ALERT_OPTIN_VARIANT_FLAG.run({
     identify: {
       userId: stableId,
+    },
+  });
+}
+
+export async function getTeleprompterShowcaseVariant(
+  userId: string | null
+): Promise<TeleprompterShowcaseVariant> {
+  return TELEPROMPTER_SHOWCASE_VARIANT_FLAG.run({
+    identify: {
+      userId,
     },
   });
 }
