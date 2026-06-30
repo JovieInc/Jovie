@@ -66,13 +66,13 @@ export async function cleanupFanCaptureTestData(params: {
   }
 }
 
-export async function assertConfirmedEmailSubscription(params: {
+export async function assertEmailCaptureComplete(params: {
   readonly creatorProfileId: string;
   readonly email: string;
 }): Promise<void> {
   const sql = getSql();
   const normalizedEmail = params.email.trim().toLowerCase();
-  const rows = await sql`
+  const [subscription] = await sql`
     SELECT confirmed_at
     FROM notification_subscriptions
     WHERE creator_profile_id = ${params.creatorProfileId}
@@ -80,32 +80,21 @@ export async function assertConfirmedEmailSubscription(params: {
       AND lower(email) = ${normalizedEmail}
     LIMIT 1
   `;
-
-  if (!rows[0]?.confirmed_at) {
-    throw new Error(
-      `Expected confirmed email subscription for ${normalizedEmail} on profile ${params.creatorProfileId}`
-    );
-  }
-}
-
-export async function assertAudienceMemberForEmail(params: {
-  readonly creatorProfileId: string;
-  readonly email: string;
-}): Promise<void> {
-  const sql = getSql();
-  const normalizedEmail = params.email.trim().toLowerCase();
-  const rows = await sql`
-    SELECT id, has_active_alerts
+  const [audience] = await sql`
+    SELECT id
     FROM audience_members
     WHERE creator_profile_id = ${params.creatorProfileId}
       AND lower(email) = ${normalizedEmail}
     LIMIT 1
   `;
 
-  if (!rows[0]?.id) {
+  if (!subscription?.confirmed_at) {
     throw new Error(
-      `Expected audience_members row for ${normalizedEmail} on profile ${params.creatorProfileId}`
+      `Expected confirmed email subscription for ${normalizedEmail}`
     );
+  }
+  if (!audience?.id) {
+    throw new Error(`Expected audience_members row for ${normalizedEmail}`);
   }
 }
 
@@ -115,7 +104,7 @@ export async function assertSmsSubscriptionRow(params: {
 }): Promise<void> {
   const sql = getSql();
   const rows = await sql`
-    SELECT id, phone
+    SELECT id
     FROM notification_subscriptions
     WHERE creator_profile_id = ${params.creatorProfileId}
       AND channel = 'sms'
@@ -124,8 +113,6 @@ export async function assertSmsSubscriptionRow(params: {
   `;
 
   if (!rows[0]?.id) {
-    throw new Error(
-      `Expected SMS notification_subscriptions row for ${params.phone} on profile ${params.creatorProfileId}`
-    );
+    throw new Error(`Expected SMS subscription row for ${params.phone}`);
   }
 }

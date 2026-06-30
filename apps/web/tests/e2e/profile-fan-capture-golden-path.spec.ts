@@ -2,8 +2,7 @@ import { createHash } from 'node:crypto';
 import { type Page, type Route } from '@playwright/test';
 import { FAN_CAPTURE_E2E_OTP_CODE } from '@/lib/e2e/runtime';
 import {
-  assertAudienceMemberForEmail,
-  assertConfirmedEmailSubscription,
+  assertEmailCaptureComplete,
   assertSmsSubscriptionRow,
   cleanupFanCaptureTestData,
   getCreatorProfileIdByUsername,
@@ -17,18 +16,7 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
-/**
- * Fan capture golden path (JOV-3343 / #11369)
- *
- * End-to-end guardrail for public-profile email + SMS capture. Uses real
- * notification APIs (no subscribe/verify mocks) and verifies durable rows in
- * notification_subscriptions + audience_members.
- *
- * Email OTP is deterministic in CI/local E2E (424242) — same contract as
- * Clerk +clerk_test verification.
- *
- * @smoke @critical @fan-capture
- */
+/** Fan capture golden path (#11369): public-profile email + SMS, real APIs, DB rows. @smoke @critical */
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.describe.configure({ mode: 'serial' });
@@ -42,6 +30,11 @@ const VISIBLE_EMAIL_STEP_SELECTOR =
   '[data-testid="profile-mobile-notifications-step-email"]:visible';
 const VISIBLE_EMAIL_INPUT_SELECTOR =
   '[data-testid="mobile-email-input"]:visible';
+
+const EMAIL_VIEWPORTS = [
+  { label: 'mobile', width: 375, height: 812 },
+  { label: 'desktop', width: 1280, height: 800 },
+] as const;
 
 function buildTestEmail(runId: string): string {
   return `fan-capture+${runId}@test.jov.ie`;
@@ -208,6 +201,44 @@ async function skipNameAndBirthday(page: Page) {
   ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 }
 
+async function runEmailGoldenPath(
+  page: Page,
+  viewport: { readonly width: number; readonly height: number },
+  label: string
+) {
+  const runId = `${Date.now().toString(36)}-${label}`;
+  const testEmail = buildTestEmail(runId);
+  const creatorProfileId = await getCreatorProfileIdByUsername(
+    TEST_PROFILES.DUALIPA
+  );
+
+  if (!creatorProfileId) {
+    test.skip(true, `${TEST_PROFILES.DUALIPA} profile not seeded`);
+    return;
+  }
+
+  await cleanupFanCaptureTestData({ creatorProfileId, email: testEmail });
+
+  try {
+    await setupProfileSubscribePage(page, viewport);
+    await submitEmailStep(page, testEmail, { waitForSubscribe: true });
+    await enterOtpCode(page, FAN_CAPTURE_E2E_OTP_CODE);
+
+    await page.waitForResponse(
+      response =>
+        response.url().includes('/api/notifications/verify-email-otp') &&
+        response.request().method() === 'POST' &&
+        response.status() < 400,
+      { timeout: SMOKE_TIMEOUTS.VISIBILITY }
+    );
+
+    await skipNameAndBirthday(page);
+    await assertEmailCaptureComplete({ creatorProfileId, email: testEmail });
+  } finally {
+    await cleanupFanCaptureTestData({ creatorProfileId, email: testEmail });
+  }
+}
+
 test.describe('Fan capture golden path @smoke @critical', () => {
   test.setTimeout(240_000);
 
@@ -227,102 +258,11 @@ test.describe('Fan capture golden path @smoke @critical', () => {
     }
   });
 
-  test('mobile: email subscribe → OTP → audience row', async ({ page }) => {
-    const runId = `${Date.now().toString(36)}-mobile`;
-    const testEmail = buildTestEmail(runId);
-    const creatorProfileId = await getCreatorProfileIdByUsername(
-      TEST_PROFILES.DUALIPA
-    );
-
-    if (!creatorProfileId) {
-      test.skip(true, `${TEST_PROFILES.DUALIPA} profile not seeded`);
-      return;
-    }
-
-    await cleanupFanCaptureTestData({
-      creatorProfileId,
-      email: testEmail,
+  for (const { label, width, height } of EMAIL_VIEWPORTS) {
+    test(`${label}: email subscribe → OTP → audience row`, async ({ page }) => {
+      await runEmailGoldenPath(page, { width, height }, label);
     });
-
-    try {
-      await setupProfileSubscribePage(page, { width: 375, height: 812 });
-      await submitEmailStep(page, testEmail, { waitForSubscribe: true });
-
-      await enterOtpCode(page, FAN_CAPTURE_E2E_OTP_CODE);
-
-      await page.waitForResponse(
-        response =>
-          response.url().includes('/api/notifications/verify-email-otp') &&
-          response.request().method() === 'POST' &&
-          response.status() < 400,
-        { timeout: SMOKE_TIMEOUTS.VISIBILITY }
-      );
-
-      await skipNameAndBirthday(page);
-
-      await assertConfirmedEmailSubscription({
-        creatorProfileId,
-        email: testEmail,
-      });
-      await assertAudienceMemberForEmail({
-        creatorProfileId,
-        email: testEmail,
-      });
-    } finally {
-      await cleanupFanCaptureTestData({
-        creatorProfileId,
-        email: testEmail,
-      });
-    }
-  });
-
-  test('desktop: email subscribe → OTP → audience row', async ({ page }) => {
-    const runId = `${Date.now().toString(36)}-desktop`;
-    const testEmail = buildTestEmail(runId);
-    const creatorProfileId = await getCreatorProfileIdByUsername(
-      TEST_PROFILES.DUALIPA
-    );
-
-    if (!creatorProfileId) {
-      test.skip(true, `${TEST_PROFILES.DUALIPA} profile not seeded`);
-      return;
-    }
-
-    await cleanupFanCaptureTestData({
-      creatorProfileId,
-      email: testEmail,
-    });
-
-    try {
-      await setupProfileSubscribePage(page, { width: 1280, height: 800 });
-      await submitEmailStep(page, testEmail, { waitForSubscribe: true });
-      await enterOtpCode(page, FAN_CAPTURE_E2E_OTP_CODE);
-
-      await page.waitForResponse(
-        response =>
-          response.url().includes('/api/notifications/verify-email-otp') &&
-          response.request().method() === 'POST' &&
-          response.status() < 400,
-        { timeout: SMOKE_TIMEOUTS.VISIBILITY }
-      );
-
-      await skipNameAndBirthday(page);
-
-      await assertConfirmedEmailSubscription({
-        creatorProfileId,
-        email: testEmail,
-      });
-      await assertAudienceMemberForEmail({
-        creatorProfileId,
-        email: testEmail,
-      });
-    } finally {
-      await cleanupFanCaptureTestData({
-        creatorProfileId,
-        email: testEmail,
-      });
-    }
-  });
+  }
 
   test('mobile: SMS subscribe persists notification row', async ({ page }) => {
     const runId = `${Date.now().toString(36)}-sms`;
