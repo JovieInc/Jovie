@@ -67,11 +67,12 @@ export function UsageMenuItem({
 
   return (
     <div className='border-t border-subtle/60' data-testid='usage-menu-item'>
-      <button
+      <Button
         type='button'
+        variant='ghost'
         onClick={toggleExpanded}
         aria-expanded={expanded}
-        className='flex w-full cursor-pointer items-center gap-2 px-2.5 py-2 text-left text-app text-secondary-token transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover'
+        className='h-auto w-full justify-start gap-2 rounded-none px-2.5 py-2 text-left text-app font-normal text-secondary-token hover:text-secondary-token focus-visible:bg-interactive-hover'
       >
         <span className='min-w-0 flex-1'>Usage remaining</span>
         <span className='shrink-0 tabular-nums text-tertiary-token'>
@@ -91,7 +92,7 @@ export function UsageMenuItem({
         ) : (
           <ChevronRight className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
         )}
-      </button>
+      </Button>
 
       {expanded ? (
         <div className='pb-2'>
