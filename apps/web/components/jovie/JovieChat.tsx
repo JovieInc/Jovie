@@ -144,10 +144,11 @@ export function JovieChat({
         source: 'route-hint',
         focusKey,
       });
-      notifyJankSend();
-      void submitMessage(result.prompt);
+      // ponytail: populate composer for review instead of auto-submitting — identity-safety (#11950)
+      setInput(result.prompt);
+      inputRef.current?.focus();
     },
-    [chatEntityPanel, notifyJankSend, submitMessage]
+    [chatEntityPanel, setInput, inputRef]
   );
 
   const {
