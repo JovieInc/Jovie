@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDbExecute = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockGetRedis = vi.hoisted(() => vi.fn());
+const mockPing = vi.hoisted(() => vi.fn());
 const mockEnv = vi.hoisted(() => ({
   DATABASE_URL: 'postgres://test:test@localhost:5432/test',
   VERCEL_AUTOMATION_BYPASS_SECRET: undefined as string | undefined,
@@ -20,6 +22,10 @@ vi.mock('@/lib/db', () => ({
   db: {
     execute: mockDbExecute,
   },
+}));
+
+vi.mock('@/lib/redis', () => ({
+  getRedis: mockGetRedis,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -42,6 +48,8 @@ describe('@critical GET /api/health', () => {
       remaining: 29,
       reset: new Date(Date.now() + 60000),
     });
+    mockPing.mockResolvedValue('PONG');
+    mockGetRedis.mockReturnValue({ ping: mockPing });
   });
 
   it('returns 429 when rate limited', async () => {
@@ -129,5 +137,70 @@ describe('@critical GET /api/health', () => {
       expect.any(Error),
       expect.objectContaining({ service: 'health', route: '/api/health' })
     );
+  });
+
+  // Redis keepalive (JOV-11962): one cheap command per invocation keeps the
+  // free-tier Upstash DB from auto-archiving after ~14 days of inactivity.
+  it('issues exactly one Redis keepalive command per invocation', async () => {
+    mockDbExecute.mockResolvedValue(undefined);
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(new Request('http://localhost/api/health'));
+
+    expect(response.status).toBe(200);
+    expect(mockPing).toHaveBeenCalledTimes(1);
+  });
+
+  it('still pings to keep the DB warm even when the DB check fails', async () => {
+    mockDbExecute.mockRejectedValue(new Error('Connection refused'));
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(new Request('http://localhost/api/health'));
+
+    expect(response.status).toBe(503);
+    expect(mockPing).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays green and fail-soft when the keepalive ping throws', async () => {
+    mockDbExecute.mockResolvedValue(undefined);
+    mockPing.mockRejectedValue(new Error('Upstash archived'));
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(new Request('http://localhost/api/health'));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'ok' });
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      'Redis keepalive ping failed',
+      expect.any(Error),
+      expect.objectContaining({ service: 'redis', route: '/api/health' })
+    );
+  });
+
+  it('stays green when Redis is unconfigured (getRedis returns null)', async () => {
+    mockDbExecute.mockResolvedValue(undefined);
+    mockGetRedis.mockReturnValue(null);
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(new Request('http://localhost/api/health'));
+
+    expect(response.status).toBe(200);
+    expect(mockPing).not.toHaveBeenCalled();
+  });
+
+  it('does not issue a keepalive ping on the rate-limited path', async () => {
+    mockHealthLimiterLimit.mockResolvedValue({
+      success: false,
+      limit: 30,
+      remaining: 0,
+      reset: new Date(Date.now() + 60000),
+      reason: 'Rate limit exceeded',
+    });
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(new Request('http://localhost/api/health'));
+
+    expect(response.status).toBe(429);
+    expect(mockPing).not.toHaveBeenCalled();
   });
 });
