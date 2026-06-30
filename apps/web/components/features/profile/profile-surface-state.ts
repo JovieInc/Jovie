@@ -290,7 +290,8 @@ export function resolveProfileSurfaceState(params: {
     : rawHeroImageUrl;
   const releaseVisibility = getProfileReleaseVisibility(
     latestRelease,
-    profileSettings
+    profileSettings,
+    now
   );
   const latestVisibleRelease =
     releaseVisibility?.show && latestRelease ? latestRelease : null;
