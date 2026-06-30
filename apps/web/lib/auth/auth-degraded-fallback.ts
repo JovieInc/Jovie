@@ -98,6 +98,28 @@ export function buildAuthDegradedHtmlResponse(): Response {
 }
 
 /**
+ * Returns a 503 JSON response for API/fetch callers (no Accept: text/html).
+ * Reuse this alongside buildAuthDegradedHtmlResponse wherever proxy.ts
+ * distinguishes browser navigation from API requests on degraded auth paths.
+ */
+export function buildAuthDegradedJsonResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      error: 'Service temporarily unavailable',
+      message: 'Authentication service is initializing. Please try again.',
+    }),
+    {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': '5',
+        'Cache-Control': 'no-store',
+      },
+    }
+  );
+}
+
+/**
  * Returns true if the request's Accept header indicates a browser navigation
  * (i.e., the caller expects an HTML document).
  *
