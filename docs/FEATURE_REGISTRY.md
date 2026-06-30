@@ -71,6 +71,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Integrations | Spotify OAuth sign-in method | Shipped (internal v1 default-on) | Free+ | Former key: `feature_spotify_oauth` | Available in auth method selector |
 | Billing | Direct upgrade checkout flow | Shipped (internal v1 default-on) | Free+ | Former key: `billing.upgradeDirect` | Billing UX experiment |
 | Conversion | Subscribe CTA variant experiment | In rollout | Flag-gated | `experiment_subscribe_cta_variant` | Variant defaults to `inline` |
+| Creator recording | Teleprompter recording proposals + showcase interstitial | In rollout | Flag-gated | `teleprompter_recording` + `experiment_teleprompter_showcase` | A/B measures interstitial lift into recorder use |
 | Mobile UX | iOS Apple Music destination prioritization | Shipped (internal v1 default-on) | Free+ | Former key: `feature_ios_apple_music_priority` | Listen interface optimization |
 | Marketing Site | Modular homepage sections | Shipped (internal v1 default-on) | Internal v1 default-on flags | `homepage_*` flags | Static flags default visible |
 

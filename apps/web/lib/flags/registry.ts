@@ -7,10 +7,12 @@ import {
   type AppFlagName,
   type ProfileAlertOptInVariant,
   type SubscribeCTAVariant,
+  type TeleprompterShowcaseVariant,
 } from './contracts';
 import {
   getProfileAlertOptInVariantValue,
   getSubscribeCTAVariantValue,
+  getTeleprompterShowcaseVariantValue,
 } from './statsig';
 
 type FlagEntities = {
@@ -60,6 +62,7 @@ export const APP_FLAG_REGISTRY = {
   AI_CONNECTORS_BETA: buildBooleanFlag('AI_CONNECTORS_BETA'),
   MERCH_MVP: buildBooleanFlag('MERCH_MVP'),
   BULK_PRESS_PHOTO_IMPORT: buildBooleanFlag('BULK_PRESS_PHOTO_IMPORT'),
+  TELEPROMPTER_RECORDING: buildBooleanFlag('TELEPROMPTER_RECORDING'),
 } as const satisfies Record<AppFlagName, Flag<boolean>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<
@@ -85,6 +88,20 @@ export const PROFILE_ALERT_OPTIN_VARIANT_FLAG = flag<
   options: ['button', 'toggle'],
   async decide({ entities }) {
     return getProfileAlertOptInVariantValue(entities?.userId ?? null);
+  },
+});
+
+export const TELEPROMPTER_SHOWCASE_VARIANT_FLAG = flag<
+  TeleprompterShowcaseVariant,
+  FlagEntities
+>({
+  key: 'experiment_teleprompter_showcase',
+  defaultValue: 'direct',
+  description:
+    'Teleprompter showcase interstitial A/B — direct recorder vs bento primer',
+  options: ['interstitial', 'direct'],
+  async decide({ entities }) {
+    return getTeleprompterShowcaseVariantValue(entities?.userId ?? null);
   },
 });
 

@@ -22,6 +22,8 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   MERCH_MVP: 'merch_mvp',
   BULK_PRESS_PHOTO_IMPORT: 'bulk_press_photo_import',
   APPLE_WALLET_PROFILE_PASS: 'apple_wallet_profile_pass',
+  TELEPROMPTER_RECORDING: 'teleprompter_recording',
+  TELEPROMPTER_SHOWCASE_EXPERIMENT: 'experiment_teleprompter_showcase',
 } as const;
 
 export type StatsigGateKey =
@@ -29,6 +31,7 @@ export type StatsigGateKey =
 
 export type SubscribeCTAVariant = 'two_step' | 'inline';
 export type ProfileAlertOptInVariant = 'button' | 'toggle';
+export type TeleprompterShowcaseVariant = 'interstitial' | 'direct';
 export interface StatsigFeatureFlagsBootstrap {
   gates: Record<string, boolean>;
 }
@@ -48,6 +51,7 @@ export const APP_FLAG_DEFAULTS = {
   MERCH_MVP: true,
   BULK_PRESS_PHOTO_IMPORT: true,
   APPLE_WALLET_PROFILE_PASS: true,
+  TELEPROMPTER_RECORDING: true,
   // DESIGN_V1 and all its surface aliases are permanently enabled.
   // Statsig gate "design_v1" is also set to 100% rollout.
   // The true default here ensures the new design is on even if Statsig is
@@ -83,6 +87,7 @@ export const APP_FLAG_KEYS = {
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
   BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
   APPLE_WALLET_PROFILE_PASS: LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS,
+  TELEPROMPTER_RECORDING: LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING,
   DESIGN_V1: 'design_v1',
   SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_RELEASES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
@@ -109,6 +114,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   MERCH_MVP: 'code:MERCH_MVP',
   BULK_PRESS_PHOTO_IMPORT: 'code:BULK_PRESS_PHOTO_IMPORT',
   APPLE_WALLET_PROFILE_PASS: 'code:APPLE_WALLET_PROFILE_PASS',
+  TELEPROMPTER_RECORDING: 'code:TELEPROMPTER_RECORDING',
   DESIGN_V1: 'code:DESIGN_V1',
   SHELL_CHAT_V1: 'code:DESIGN_V1',
   DESIGN_V1_RELEASES: 'code:DESIGN_V1',
@@ -131,6 +137,7 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
   BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
   APPLE_WALLET_PROFILE_PASS: LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS,
+  TELEPROMPTER_RECORDING: LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
@@ -155,6 +162,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'DSP bulk press-photo import after platform activation evidence passes',
   APPLE_WALLET_PROFILE_PASS:
     'First-party Apple Wallet profile pass for in-person sharing',
+  TELEPROMPTER_RECORDING:
+    'In-app teleprompter recording proposals and showcase interstitial',
   DESIGN_V1: 'New production design',
   SHELL_CHAT_V1: 'New production design alias for shell and chat',
   DESIGN_V1_RELEASES: 'New production design alias for releases',

@@ -28,6 +28,7 @@ historical console cleanup.
 | `merch_mvp` | `LEGACY_STATSIG_GATE_KEYS.MERCH_MVP` | `true` | Jovie-owned merch generation, public merch cards, checkout, and Printful fulfillment | Compatibility key |
 | `bulk_press_photo_import` | `LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT` | `true` | DSP bulk press-photo import after platform activation evidence passes | Compatibility key |
 | `apple_wallet_profile_pass` | `LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS` | `true` | First-party Apple Wallet generic profile pass generation, update service, and iOS/mobile web add flows | Compatibility key |
+| `teleprompter_recording` | `LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING` | `true` | In-app teleprompter recording proposals + showcase interstitial | Setup |
 | `ai_chat_disabled` | `CHAT_KILL_SWITCH_GATES.DISABLED` | `false` | Emergency kill switch for `/api/chat` | Active |
 | `ai_chat_force_light` | `CHAT_KILL_SWITCH_GATES.FORCE_LIGHT` | `false` | Runtime switch to route `/api/chat` to the lighter model | Active |
 
@@ -37,6 +38,7 @@ historical console cleanup.
 |---|---|---|---|---|
 | `experiment_subscribe_cta_variant` | `LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT` | `'two_step'` | Subscription CTA experiment | Setup |
 | `profile_alert_optin_cta_variant` | `LEGACY_STATSIG_GATE_KEYS.PROFILE_ALERT_OPTIN_EXPERIMENT` | `'button'` | Public profile alert opt-in CTA variant | Setup |
+| `experiment_teleprompter_showcase` | `LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_SHOWCASE_EXPERIMENT` | `'direct'` | Teleprompter showcase interstitial vs direct recorder | Setup |
 
 ## Operational Notes
 
