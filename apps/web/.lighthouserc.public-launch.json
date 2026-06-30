@@ -2,17 +2,10 @@
   "ci": {
     "collect": {
       "numberOfRuns": 2,
-      "puppeteerLaunchOptions": {
-        "args": [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage"
-        ],
-        "protocolTimeout": 180000
-      },
       "settings": {
         "preset": "desktop",
-        "skipAudits": ["font-size"]
+        "skipAudits": ["font-size"],
+        "chromeFlags": "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
       },
       "url": ["http://localhost:3200/"]
     },
