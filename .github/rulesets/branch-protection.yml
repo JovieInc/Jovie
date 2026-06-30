@@ -39,7 +39,8 @@
 #    When agent-remediation pushes a fix, old informational approvals
 #    are dismissed. This keeps the audit trail accurate.
 #
-# 4. Simplified status checks: only PR Ready + Migration Guard
+# 4. Simplified status checks: PR Ready + Migration Guard + Fork PR Gate
+#    + PR Size Guard (the full live required set on ruleset 10512119).
 #    PR Ready aggregates only the fast deterministic lane:
 #    ci-fast (typecheck + lint + server boundaries + guardrails).
 #    Slower checks run post-merge or in nightly/manual lanes, which keeps
@@ -112,6 +113,13 @@ rules:
         # Blocks fork PRs from external contributors until a human
         # collaborator submits an APPROVE review. See design decision #7.
         - context: 'Fork PR Gate'
+
+        # PR Size Guard: Caps PR size (800 lines / 40 files, tunable via repo
+        # vars PR_MAX_LINES / PR_MAX_FILES) to force small, reviewable PRs.
+        # Runs as its own workflow (.github/workflows/pr-size-guard.yml), so
+        # the live context is the bare job name with no "CI /" prefix. Approved
+        # mechanical codemods opt out with the `big-pr` label.
+        - context: 'PR Size Guard'
 
   # ── Merge Queue: Graphite (not GitHub-native) ──────────────────────────
   # The native `merge_queue` rule was retired 2026-06-18 — Graphite owns the
