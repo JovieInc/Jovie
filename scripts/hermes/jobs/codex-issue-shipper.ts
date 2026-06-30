@@ -781,6 +781,38 @@ async function dispatchPlan(
       gbrainSlug: gbrain.captureSlug,
     });
 
+    // SIGTERM or timeout = system interruption, release claim for retry
+    // Exit 137 (SIGKILL) or 143 (SIGTERM) means the agent was externally killed
+    const isSystemKilled =
+      agentResult.status === 143 ||
+      agentResult.status === 137 ||
+      agentResult.error?.includes('timeout') ||
+      agentResult.error?.includes('killed');
+
+    if (isSystemKilled) {
+      releaseClaimForRetry(
+        config,
+        dispatch,
+        [
+          `Agent was interrupted (status=${agentResult.status}) - releasing claim for retry.`,
+          '',
+          agentResult.error ? `Error: \`${agentResult.error}\`` : null,
+          `Log: \`${agentResult.logPath}\``,
+        ]
+          .filter((line): line is string => line !== null)
+          .join('\n')
+      );
+      logJobEvent({
+        job: JOB,
+        event: 'agent_interrupted_release_claim',
+        issue: dispatch.issue.number,
+        status: agentResult.status,
+        error: agentResult.error,
+      });
+      return;
+    }
+
+    // Non-zero exit (but not killed) = genuine failure, mark blocked
     if (!agentResult.ok) {
       markBlocked(
         config,
@@ -802,11 +834,11 @@ async function dispatchPlan(
 
     const pr = findPrForBranch(config, dispatch.branchName);
     if (!pr) {
-      markBlocked(
+      releaseClaimForRetry(
         config,
         dispatch,
         [
-          `Agent exited 0 but no open PR exists for \`${dispatch.branchName}\`.`,
+          `Agent exited 0 but no open PR exists - releasing claim for retry.`,
           '',
           `Log: \`${agentResult.logPath}\``,
           `Prompt: \`${agentResult.promptPath}\``,
@@ -814,7 +846,7 @@ async function dispatchPlan(
       );
       logJobEvent({
         job: JOB,
-        event: 'missing_pr_after_success',
+        event: 'missing_pr_release_claim',
         issue: plan.issue.number,
         branch: dispatch.branchName,
       });
