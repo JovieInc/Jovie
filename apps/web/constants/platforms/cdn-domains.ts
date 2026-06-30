@@ -108,6 +108,8 @@ export const INFRASTRUCTURE_IMAGE_DOMAINS: readonly string[] = [
   '*.googleusercontent.com',
   '*.gravatar.com',
   'images.unsplash.com',
+  // Google Tag Manager (conversion tracking pixels fired as img tags)
+  'www.googletagmanager.com',
   // Utilities
   'api.qrserver.com',
   // Hosting / storage
