@@ -18,6 +18,11 @@ import { resolve } from 'node:path';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
+// Ensure gh CLI has a token (GitHub Actions provides GITHUB_TOKEN automatically)
+if (!process.env.GH_TOKEN && process.env.GITHUB_TOKEN) {
+  process.env.GH_TOKEN = process.env.GITHUB_TOKEN;
+}
+
 // ---------------------------------------------------------------------------
 // Taste signal patterns
 // ---------------------------------------------------------------------------
