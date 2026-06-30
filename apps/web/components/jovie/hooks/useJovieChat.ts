@@ -115,9 +115,20 @@ function inferToolIntentFromPrompt(text: string): string | null {
   const asksForBrief =
     /\bbrief\b/.test(normalized) || /\bdraft\b/.test(normalized);
 
-  return mentionsAlbumArt && asksForGeneration && !asksForBrief
-    ? 'album_art_generation'
-    : null;
+  if (mentionsAlbumArt && asksForGeneration && !asksForBrief) {
+    return 'album_art_generation';
+  }
+
+  const mentionsImage =
+    /\b(photo|image|picture|shot|pic|selfie|portrait|press)\b/.test(normalized);
+  const asksForRetouch =
+    /\b(retouch|touch[\s-]?up|enhance|polish|clean\s+up)\b/.test(normalized);
+
+  if (mentionsImage && asksForRetouch) {
+    return 'image_retouch';
+  }
+
+  return null;
 }
 
 function inferToolIntentFromSkill(id: string): string | null {

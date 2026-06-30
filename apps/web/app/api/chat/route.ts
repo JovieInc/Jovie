@@ -66,6 +66,11 @@ import {
   extractUIMessageText,
   parseChatRequestBody,
 } from '@/lib/chat/request-validation';
+import {
+  buildRetouchUnavailableAssistantMessage,
+  detectRetouchIntent,
+  resolveRetouchCapability,
+} from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
@@ -85,6 +90,7 @@ import {
   createMerchPreviewTool,
   createMerchSelectTool,
 } from '@/lib/chat/tools/merch-tools';
+import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
@@ -1973,6 +1979,12 @@ function buildChatTools(
   canGenerateAlbumArt: boolean,
   albumArtEnabled: boolean,
   canAccessMerchCreation: boolean,
+  canAccessAiRetouching: boolean,
+  userEntitlements: Awaited<
+    ReturnType<
+      typeof import('@/lib/entitlements/server').getCurrentUserEntitlements
+    >
+  >,
   reservedTurn?: {
     readonly conversationId: string;
     readonly turnId: string;
@@ -2003,6 +2015,14 @@ function buildChatTools(
             artistName: artistContext.displayName,
             canGenerateAlbumArt,
             releases,
+          }),
+        }
+      : {}),
+    ...(canAccessAiRetouching
+      ? {
+          retouchImage: createRetouchImageTool({
+            profileId: resolvedProfileId,
+            entitlements: userEntitlements,
           }),
         }
       : {}),
@@ -2390,6 +2410,9 @@ export async function POST(req: Request) {
     providerConfigured: isXaiConfigured(),
     entitlements: currentUserEntitlements,
   });
+  const retouchCapability = resolveRetouchCapability({
+    entitlements: currentUserEntitlements,
+  });
 
   let reservedTurn: {
     conversationId: string;
@@ -2518,6 +2541,38 @@ export async function POST(req: Request) {
         corsHeaders,
         headers: {
           'x-chat-preflight': 'album-art-unavailable',
+          'x-conversation-id': reservation.conversationId,
+          'x-chat-turn-id': reservation.turn.id,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+          requestId,
+        }),
+      });
+    }
+
+    if (
+      retouchCapability.availability !== 'available' &&
+      detectRetouchIntent({ text: userText, toolIntent })
+    ) {
+      const replyText =
+        buildRetouchUnavailableAssistantMessage(retouchCapability);
+      await persistTerminalAssistantMessage({
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        status: 'failed_tool_unavailable',
+        content: replyText,
+        errorCode: retouchCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
+        errorMessage: retouchCapability.reason,
+      });
+
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'retouch-unavailable',
           'x-conversation-id': reservation.conversationId,
           'x-chat-turn-id': reservation.turn.id,
         },
@@ -2666,6 +2721,8 @@ export async function POST(req: Request) {
             albumArtCapability.availability === 'available',
             albumArtEnabled,
             planLimits.booleans.canAccessMerchCreation,
+            planLimits.booleans.canAccessAiRetouching,
+            currentUserEntitlements,
             reservedTurn
           ),
         }

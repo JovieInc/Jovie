@@ -44,6 +44,15 @@ export const TOOL_SCHEMAS = {
     }),
   },
 
+  retouchImage: {
+    description:
+      'Retouch an attached or referenced artist photo using the White Space editorial style.',
+    inputSchema: chatToolSchema({
+      styleId: z.enum(['white-space']).optional(),
+      instructions: z.string().max(500).optional(),
+    }),
+  },
+
   generateReleasePitch: {
     description: `Generate one copy-paste-ready release pitch for a destination. Ask where they want to pitch it before using this tool unless the task or user message clearly maps to: ${PITCH_TARGET_OPTIONS_TEXT}.`,
     inputSchema: chatToolSchema({

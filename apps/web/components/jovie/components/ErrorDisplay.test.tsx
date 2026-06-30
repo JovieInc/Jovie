@@ -31,4 +31,28 @@ describe('ErrorDisplay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry Message' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
+
+  it('renders recoverable tool failures without the message paused headline', () => {
+    fastRender(
+      <ErrorDisplay
+        chatError={{
+          type: 'tool',
+          message: 'Retouch is not provisioned for this account.',
+          errorCode: 'TOOL_UNPROVISIONED',
+          suppressComposerPause: true,
+        }}
+        onRetry={vi.fn()}
+        isLoading={false}
+        isSubmitting={false}
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Action could not finish');
+    expect(alert).not.toHaveTextContent('Message paused');
+    expect(alert).not.toHaveTextContent('Something went wrong');
+    expect(
+      screen.queryByRole('button', { name: 'Retry Message' })
+    ).not.toBeInTheDocument();
+  });
 });

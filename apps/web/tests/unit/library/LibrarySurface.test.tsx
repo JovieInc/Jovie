@@ -237,8 +237,11 @@ describe('LibrarySurface', () => {
       expect(source).not.toMatch(localRecipePattern);
     }
 
-    expect(source).toContain('border-success/20 bg-success/10 text-success');
-    expect(source).toContain('border-info/20 bg-info/10 text-info');
+    // Release/approval badge accents live in their semantic helpers
+    // (lib/library/{release,approval}-status.ts) — guarded for distinctness
+    // in library-system-b-compliance.test.ts and approval-status.test.ts.
+    expect(source).toContain('releaseStatusClasses');
+    expect(source).toContain('libraryApprovalStatusClasses');
     expect(source).toContain('system-b-library-filter-pill-active');
     expect(source).toContain('system-b-library-rail-button--active');
     expect(source).toContain('system-b-library-card--selected');
@@ -376,6 +379,18 @@ describe('LibrarySurface', () => {
         screen.queryByTestId('library-approval-status-release-2')
       ).toBeNull();
     });
+  });
+
+  it('keeps the approval status select labelled after the inline refactor', () => {
+    // The visible label became sr-only (#12317 subtraction); guard a11y wiring.
+    renderLibrary([buildAsset({ approvalStatus: 'draft' })]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    const select = screen.getByTestId(
+      'library-approval-status-select-release-1'
+    );
+    expect(select).toHaveAccessibleName('Approval Status');
   });
 
   it('renders release assets with grid cards and a read-only detail drawer', () => {

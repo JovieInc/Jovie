@@ -123,6 +123,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.supabase.in' },
       { protocol: 'https', hostname: 'vercel.live' },
       { protocol: 'https', hostname: 'vercel.com' },
+      { protocol: 'https', hostname: 'www.googletagmanager.com' }, // GTM conversion tracking pixels
     ],
     formats: ['image/avif', 'image/webp'],
     qualities: [25, 50, 75, 85, 100],

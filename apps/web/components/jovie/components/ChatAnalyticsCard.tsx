@@ -1,7 +1,9 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
+import Link from 'next/link';
 import { InsightCategoryIcon } from '@/components/features/dashboard/insights/InsightCategoryIcon';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 import type { ChatInsightsToolResult } from '../types';
 
@@ -9,10 +11,26 @@ interface ChatAnalyticsCardProps {
   readonly result: ChatInsightsToolResult;
 }
 
+export function formatChatActiveSignalsLabel(
+  displayedCount: number,
+  totalActive: number
+): string {
+  const signalWord = totalActive === 1 ? 'signal' : 'signals';
+
+  if (displayedCount < totalActive) {
+    return `Showing ${displayedCount} of ${totalActive} active ${signalWord}`;
+  }
+
+  return `${totalActive} active ${signalWord}`;
+}
+
 export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
   if (!result.success || result.insights.length === 0) {
     return null;
   }
+
+  const displayedCount = result.insights.length;
+  const hasMoreSignals = displayedCount < result.totalActive;
 
   return (
     <section
@@ -20,19 +38,32 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
       data-testid='chat-analytics-card'
       aria-label={result.title}
     >
-      <div className='flex items-start gap-3'>
-        <div className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
-          <Sparkles className='h-4 w-4' strokeWidth={2.2} />
+      <div className='flex items-start justify-between gap-3'>
+        <div className='flex min-w-0 items-start gap-3'>
+          <div className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
+            <Sparkles className='h-4 w-4' strokeWidth={2.2} />
+          </div>
+          <div className='min-w-0'>
+            <p className='text-sm font-semibold leading-5 text-primary-token'>
+              {result.title}
+            </p>
+            <p
+              className='mt-1 text-xs leading-5 text-tertiary-token'
+              data-testid='chat-analytics-signal-count'
+            >
+              {formatChatActiveSignalsLabel(displayedCount, result.totalActive)}
+            </p>
+          </div>
         </div>
-        <div className='min-w-0'>
-          <p className='text-sm font-semibold leading-5 text-primary-token'>
-            {result.title}
-          </p>
-          <p className='mt-1 text-xs leading-5 text-tertiary-token'>
-            {result.totalActive} active{' '}
-            {result.totalActive === 1 ? 'signal' : 'signals'}
-          </p>
-        </div>
+        {hasMoreSignals ? (
+          <Link
+            href={APP_ROUTES.INSIGHTS}
+            className='inline-flex shrink-0 items-center gap-1 rounded-lg border border-transparent px-1.5 py-1 text-2xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+          >
+            <span>View all</span>
+            <ChevronRight className='h-3 w-3' aria-hidden='true' />
+          </Link>
+        ) : null}
       </div>
 
       <ul

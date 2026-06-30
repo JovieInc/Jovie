@@ -6194,10 +6194,15 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 :where(.system-b-library-filter-section-button),
 :where(.system-b-library-filter-row),
 :where(.system-b-library-kind-pill),
-:where(.system-b-library-action),
-:where(.system-b-library-icon-button),
 :where(.system-b-library-provider-link) {
   border-radius: var(--radius-md);
+}
+
+/* Buttons + icon buttons are pill / hover-circle per System B (DESIGN.md:
+   App buttons, inputs, controls → 9999px). */
+:where(.system-b-library-action),
+:where(.system-b-library-icon-button) {
+  border-radius: var(--radius-full);
 }
 
 :where(.system-b-library-artwork-shell),
@@ -6252,7 +6257,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 :where(.system-b-library-audio-label),
 :where(.system-b-library-drawer-kicker),
 :where(.system-b-library-drawer-artist),
-:where(.system-b-library-drawer-panel-heading),
 :where(.system-b-library-drawer-panel-copy),
 :where(.system-b-library-provider-link),
 :where(.system-b-library-provider-empty) {
@@ -6683,8 +6687,12 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   color: var(--color-text-primary-token);
 }
 
-:where(.system-b-library-drawer-artwork),
-:where(.system-b-library-drawer-panel) {
+:where(.system-b-library-icon-button--bordered:hover) {
+  border-color: var(--color-border-default);
+  background: var(--system-b-bg-surface-2);
+}
+
+:where(.system-b-library-drawer-artwork) {
   border-radius: var(--radius-lg);
 }
 
@@ -6697,11 +6705,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-library-drawer-artist) {
   color: var(--color-text-secondary-token);
-}
-
-:where(.system-b-library-drawer-panel) {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--system-b-bg-surface-0);
 }
 
 :where(.system-b-library-provider-link) {
