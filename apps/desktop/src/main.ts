@@ -11,6 +11,12 @@ import {
   screen,
   shell,
 } from 'electron';
+import {
+  isTrayAppState,
+  MenuBarTray,
+  type TrayAction,
+  type TrayStatePayload,
+} from './tray';
 import { autoUpdater } from 'electron-updater';
 import {
   bindPendingDesktopAuthCompletion,
@@ -89,6 +95,8 @@ const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
+const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
+const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_RUNTIME_LABEL_BY_PLATFORM: Partial<
   Record<NodeJS.Platform, string>
 > = {
@@ -142,6 +150,7 @@ const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
+let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
@@ -1191,6 +1200,21 @@ function buildApplicationMenu(): Menu {
   return Menu.buildFromTemplate(template);
 }
 
+function handleTrayAction(action: TrayAction): void {
+  if (action === 'open-preferences') {
+    openPreferences();
+    return;
+  }
+
+  const win =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+  showWindow(win);
+
+  if (action === 'new-message') {
+    win.webContents.send(TRAY_ACTION_CHANNEL, action);
+  }
+}
+
 function sendToAppWindows(channel: UpdateChannel): void {
   for (const win of BrowserWindow.getAllWindows()) {
     const parsed = parseUrl(win.webContents.getURL());
@@ -1412,6 +1436,12 @@ app.whenReady().then(() => {
 
   registerAuthReturnProtocol();
   refreshApplicationMenu();
+
+  // macOS menu bar extra (NSStatusItem via Electron Tray)
+  if (process.platform === 'darwin') {
+    menuBarTray = new MenuBarTray(handleTrayAction);
+  }
+
   createWindow(
     pendingAuthCompletion
       ? new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL).toString()
@@ -1456,5 +1486,24 @@ ipcMain.handle(
     }
 
     return getDesktopDictationStatus();
+  }
+);
+
+ipcMain.handle(
+  TRAY_SET_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent, payload: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    if (
+      !menuBarTray ||
+      payload === null ||
+      typeof payload !== 'object' ||
+      !isTrayAppState((payload as Record<string, unknown>).state)
+    ) {
+      return { ok: false, reason: 'invalid-payload' };
+    }
+    menuBarTray.setState(payload as TrayStatePayload);
+    return { ok: true };
   }
 );
