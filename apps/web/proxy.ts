@@ -18,6 +18,7 @@ import {
 } from '@/lib/audience/public-profile-block';
 import {
   buildAuthDegradedHtmlResponse,
+  buildAuthDegradedJsonResponse,
   isBrowserNavigation,
 } from '@/lib/auth/auth-degraded-fallback';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
@@ -800,19 +801,7 @@ export default async function middleware(
     if (isBrowserNavigation(req.headers.get('accept'))) {
       return buildAuthDegradedHtmlResponse();
     }
-    return new NextResponse(
-      JSON.stringify({
-        error: 'Service temporarily unavailable',
-        message: 'Authentication service is initializing. Please try again.',
-      }),
-      {
-        status: 503,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': '5',
-        },
-      }
-    );
+    return buildAuthDegradedJsonResponse();
   }
 
   const clerkPathInfo: ClerkBypassPathInfo = pathInfo;
@@ -870,19 +859,7 @@ export default async function middleware(
     if (isBrowserNavigation(req.headers.get('accept'))) {
       return buildAuthDegradedHtmlResponse();
     }
-    return new NextResponse(
-      JSON.stringify({
-        error: 'Service temporarily unavailable',
-        message: 'Authentication service is initializing. Please try again.',
-      }),
-      {
-        status: 503,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': '5',
-        },
-      }
-    );
+    return buildAuthDegradedJsonResponse();
   }
 
   try {
@@ -910,19 +887,7 @@ export default async function middleware(
       if (isBrowserNavigation(req.headers.get('accept'))) {
         return buildAuthDegradedHtmlResponse();
       }
-      return new NextResponse(
-        JSON.stringify({
-          error: 'Service temporarily unavailable',
-          message: 'Authentication service is initializing. Please try again.',
-        }),
-        {
-          status: 503,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': '5',
-          },
-        }
-      );
+      return buildAuthDegradedJsonResponse();
     }
     throw error;
   }

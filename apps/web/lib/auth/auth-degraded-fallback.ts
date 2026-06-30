@@ -82,6 +82,28 @@ const DEGRADED_HTML = `<!DOCTYPE html>
 </html>`;
 
 /**
+ * Returns a 503 JSON response for API/fetch callers (non-browser navigation).
+ * Reuse this whenever proxy.ts needs to surface an auth-degraded state
+ * to a programmatic caller that expects JSON.
+ */
+export function buildAuthDegradedJsonResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      error: 'Service temporarily unavailable',
+      message: 'Authentication service is initializing. Please try again.',
+    }),
+    {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': '5',
+        'Cache-Control': 'no-store',
+      },
+    }
+  );
+}
+
+/**
  * Returns a 503 HTML response for browser navigation (Accept: text/html).
  * Reuse this whenever proxy.ts needs to surface an auth-degraded state
  * to a real browser request.
