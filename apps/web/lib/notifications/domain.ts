@@ -3,14 +3,12 @@ import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
-  audienceMembers,
   type FanNotificationPreferences,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   extractPayloadProps,
   inferChannel,
@@ -33,7 +31,7 @@ import { syncAudienceAlertState } from '@/lib/notifications/audience-alert-state
 import {
   buildEmailOtpExpiry,
   EMAIL_OTP_TTL_MINUTES,
-  generateEmailOtpCode,
+  generateFanCaptureEmailOtpCode,
   hashEmailOtp,
   isValidEmailOtpFormat,
 } from '@/lib/notifications/email-otp';
@@ -192,37 +190,53 @@ async function upsertAudienceMember(
   const fingerprint = createFingerprint(ipAddress, userAgent);
   const now = new Date();
 
-  await withSystemIngestionSession(async tx => {
-    await tx
-      .insert(audienceMembers)
-      .values({
-        creatorProfileId: artist_id,
-        fingerprint,
-        type: 'email',
-        displayName: 'Subscriber',
-        email: normalizedEmail,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        visits: 0,
-        engagementScore: 0,
-        intentLevel: 'low',
-        deviceType: 'unknown',
-        referrerHistory: [],
-        latestActions: [],
-        tags: [],
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [audienceMembers.creatorProfileId, audienceMembers.fingerprint],
-        set: {
-          type: 'email',
-          email: normalizedEmail,
-          lastSeenAt: now,
-          updatedAt: now,
-        },
-      });
-  });
+  // Use core columns only so fan capture works on DB branches that have not yet
+  // picked up optional audience summary migrations (latest_referrer_url, etc.).
+  // Drizzle's insert() always emits the full schema column list and fails when
+  // those optional columns are absent — same class of bug as audience/visit.
+  await db.execute(drizzleSql`
+    INSERT INTO audience_members (
+      creator_profile_id,
+      fingerprint,
+      type,
+      display_name,
+      first_seen_at,
+      last_seen_at,
+      visits,
+      engagement_score,
+      intent_level,
+      device_type,
+      referrer_history,
+      latest_actions,
+      email,
+      tags,
+      created_at,
+      updated_at
+    ) VALUES (
+      ${artist_id},
+      ${fingerprint},
+      'email',
+      'Subscriber',
+      ${now},
+      ${now},
+      0,
+      0,
+      'low',
+      'unknown',
+      '[]'::jsonb,
+      '[]'::jsonb,
+      ${normalizedEmail},
+      '[]'::jsonb,
+      ${now},
+      ${now}
+    )
+    ON CONFLICT (creator_profile_id, fingerprint)
+    DO UPDATE SET
+      type = 'email',
+      email = EXCLUDED.email,
+      last_seen_at = EXCLUDED.last_seen_at,
+      updated_at = EXCLUDED.updated_at
+  `);
 }
 
 async function upsertAudienceMemberBestEffort(
@@ -401,7 +415,7 @@ interface EmailOtpResult {
 }
 
 function createEmailOtp(): EmailOtpResult {
-  const otpCode = generateEmailOtpCode();
+  const otpCode = generateFanCaptureEmailOtpCode();
   return {
     otpCode,
     otpHash: hashEmailOtp(otpCode),
@@ -900,6 +914,21 @@ export const verifyEmailOtpDomain = async (
       emailOtpAttempts: 0,
     })
     .where(eq(notificationSubscriptions.id, subscription.id));
+
+  // Subscribe-time audience upsert is best-effort; ensure a row exists after
+  // confirmation so Pro creators see the fan in audience immediately.
+  const artistResult = await fetchArtistProfile(
+    parsed.data.artist_id,
+    undefined
+  );
+  if (isArtistProfileResult(artistResult) && artistResult.dynamicEnabled) {
+    await upsertAudienceMemberBestEffort(
+      parsed.data.artist_id,
+      normalizedEmail,
+      null,
+      null
+    );
+  }
 
   // JOV-1842: propagate confirmed alert state to audience_members.
   await syncAudienceAlertState(parsed.data.artist_id, {

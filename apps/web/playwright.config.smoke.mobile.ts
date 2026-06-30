@@ -99,6 +99,7 @@ export default defineConfig({
             ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
+            NEXT_PUBLIC_E2E_MODE: '1',
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
             E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
