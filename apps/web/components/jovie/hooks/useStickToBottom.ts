@@ -5,11 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 /** Scroll distance (px) from bottom before considering "scrolled away". */
 export const SCROLL_THRESHOLD = 200;
 
-interface UseStickToBottomOptions {
-  /** Number of messages — resets sticky state when this changes */
-  messageCount: number;
-}
-
 interface UseStickToBottomReturn {
   /** Whether the scroll is currently pinned to the bottom */
   isStuckToBottom: boolean;
@@ -33,10 +28,10 @@ interface UseStickToBottomReturn {
  *
  * Uses IntersectionObserver on a bottom sentinel (no sync layout reads on scroll)
  * and a rAF-batched ResizeObserver to follow content growth during streaming.
+ * Scroll-to-bottom only fires when the sentinel is already in view; appending
+ * a new message while the user is scrolled away does NOT force them back down.
  */
-export function useStickToBottom({
-  messageCount,
-}: UseStickToBottomOptions): UseStickToBottomReturn {
+export function useStickToBottom(): UseStickToBottomReturn {
   const [isStuckToBottom, setIsStuckToBottom] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -69,12 +64,6 @@ export function useStickToBottom({
       container.scrollTop = container.scrollHeight;
     });
   }, []);
-
-  useEffect(() => {
-    if (messageCount > 0) {
-      setStuckToBottom(true);
-    }
-  }, [messageCount, setStuckToBottom]);
 
   const attachSentinelObserver = useCallback(
     (sentinel: HTMLDivElement | null) => {

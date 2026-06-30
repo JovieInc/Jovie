@@ -352,7 +352,7 @@ describe('ChatInput', () => {
     expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 45rem)');
     expect(surface.style.borderRadius).toBe('999px');
 
-    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
+    expect(screen.getByTestId('chat-composer-input-row').className).toContain(
       'min-h-13'
     );
 
@@ -381,10 +381,10 @@ describe('ChatInput', () => {
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.style.borderRadius).toBe('24px');
 
-    const inputRow = surface.firstElementChild?.firstElementChild;
-    expect(inputRow?.className).toContain('grid');
-    expect(inputRow?.className).toContain('content-start');
-    expect(inputRow?.className).not.toContain('min-h-22');
+    const inputRow = screen.getByTestId('chat-composer-input-row');
+    expect(inputRow.className).toContain('grid');
+    expect(inputRow.className).toContain('content-start');
+    expect(inputRow.className).not.toContain('min-h-22');
   });
 
   it('keeps hero pill geometry when only external attachments are present', () => {
@@ -418,9 +418,9 @@ describe('ChatInput', () => {
     expect(surface.style.borderRadius).toBe('999px');
     expect(surface).not.toHaveAttribute('data-expanded');
 
-    const inputRow = surface.firstElementChild?.firstElementChild;
-    expect(inputRow?.className).toContain('min-h-13');
-    expect(inputRow?.className).not.toContain('grid');
+    const inputRow = screen.getByTestId('chat-composer-input-row');
+    expect(inputRow.className).toContain('min-h-13');
+    expect(inputRow.className).not.toContain('grid');
   });
 
   it('does not inflate the textarea row when typing with a ready audio attachment', () => {

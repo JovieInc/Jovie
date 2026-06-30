@@ -217,8 +217,15 @@ export const ChatMessage = memo(function ChatMessage({
             </div>
           ) : null}
 
-          {!isThinking && !isStreaming && messageText ? (
-            <div className='system-b-chat-copy-row'>
+          {!isThinking && messageText ? (
+            /* ponytail: invisible reserves layout space so streaming→done causes no shift */
+            <div
+              className={cn(
+                'system-b-chat-copy-row',
+                isStreaming && 'invisible'
+              )}
+              aria-hidden={isStreaming || undefined}
+            >
               <SimpleTooltip
                 content={isCopySuccess ? 'Copied!' : 'Copy response'}
               >
@@ -229,6 +236,7 @@ export const ChatMessage = memo(function ChatMessage({
                   aria-label={
                     isCopySuccess ? 'Copied to clipboard' : 'Copy message'
                   }
+                  tabIndex={isStreaming ? -1 : undefined}
                 >
                   {isCopySuccess ? (
                     <Check className='system-b-chat-copy-icon' />

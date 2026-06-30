@@ -375,4 +375,40 @@ describe('ChatMessage', () => {
       '/app/library?view=merch'
     );
   });
+
+  // Layout-guard: copy-row must not cause a shift when streaming ends (gh-11948)
+  it('renders the copy-row invisible during streaming to reserve layout space', () => {
+    const messageProps = {
+      id: 'assistant-streaming',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'Streaming response…' }],
+      isStreaming: true,
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    // The copy-row container must exist in the DOM (reserving space)…
+    const copyRow = document.querySelector('.system-b-chat-copy-row');
+    expect(copyRow).toBeTruthy();
+    // …but must be invisible so it doesn't flash during streaming.
+    expect(copyRow?.className).toContain('invisible');
+    // Copy button must not be focusable while invisible.
+    const btn = copyRow?.querySelector('button');
+    expect(btn?.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('shows the copy-row visibly once streaming ends', () => {
+    const messageProps = {
+      id: 'assistant-done',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'Done streaming.' }],
+      isStreaming: false,
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const copyRow = document.querySelector('.system-b-chat-copy-row');
+    expect(copyRow).toBeTruthy();
+    expect(copyRow?.className).not.toContain('invisible');
+  });
 });

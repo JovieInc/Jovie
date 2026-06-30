@@ -765,11 +765,21 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {statusBanner}
                     </div>
                   ) : null}
-                  {showDictationBanner ? (
-                    <div className='system-b-chat-composer-seam border-t'>
-                      {dictationBanner}
+                  {/* ponytail: inline grid trick — no arbitrary Tailwind values, smooth height reserve */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
+                      transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
+                    }}
+                    aria-hidden={!showDictationBanner}
+                  >
+                    <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                      <div className='system-b-chat-composer-seam border-t'>
+                        {dictationBanner}
+                      </div>
                     </div>
-                  ) : null}
+                  </div>
                   <div className='system-b-chat-composer-seam border-t'>
                     <InputRow
                       containerRef={containerRef}
@@ -847,11 +857,21 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 ) : null}
 
-                {showDictationBanner ? (
-                  <div className='system-b-chat-composer-seam border-b'>
-                    {dictationBanner}
+                {/* ponytail: inline grid trick — no arbitrary Tailwind values, smooth height reserve */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
+                    transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
+                  }}
+                  aria-hidden={!showDictationBanner}
+                >
+                  <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                    <div className='system-b-chat-composer-seam border-b'>
+                      {dictationBanner}
+                    </div>
                   </div>
-                ) : null}
+                </div>
 
                 <InputRow
                   containerRef={containerRef}
@@ -1026,6 +1046,7 @@ function InputRow({
   return (
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
       <motion.div
+        data-testid='chat-composer-input-row'
         layout={!reducedMotion}
         ref={containerRef}
         transition={reducedMotion ? undefined : TRANSITION_SURFACE}
