@@ -15,7 +15,7 @@ Creator-facing product memory and internal AgentOS orchestration are **separate 
 | Surface | Durable runner | Cognition harness | Canonical store |
 | --- | --- | --- | --- |
 | Internal AgentOS / Hermes / Ruflo | Vercel Workflow/WDK ([JOV-1922](./AGENT_OS_ARCHITECTURE.md)) | Deterministic artifact builders + bounded agent adapters | `AgentRunArtifact` + admin ops tables |
-| Customer product memory | Trigger.dev behind `WorkflowRunner` (when cross-step durability ships) | OpenAI Agents SDK behind `AgentHarness` | `memory_*` tables via `lib/memory/*` |
+| Customer product memory | Trigger.dev behind `WorkflowRunner` (when cross-step durability ships) | Vercel `eve` behind `AgentHarness` (supersedes the OpenAI Agents SDK target — #12498) | `memory_*` tables via `lib/memory/*` |
 
 **Ship now (v0):** studio-session memory runs inline from `lib/workflows/memory/studio-session-loop.ts` through `AgentHarness`. WDK dry-run proof continues for operator control plane only.
 
@@ -53,7 +53,7 @@ Does not own:
 - Extraction reasoning (delegates to Agent SDK harness)
 - Internal operator dispatch (AgentOS WDK path)
 
-### OpenAI Agents SDK — product cognition harness
+### Vercel `eve` — product cognition harness (supersedes OpenAI Agents SDK target, #12498)
 
 Owns:
 
@@ -62,11 +62,11 @@ Owns:
 
 Does not own:
 
-- Durable job scheduling (Trigger.dev)
+- Durable job scheduling (Trigger.dev — `eve`'s own Vercel-Workflows durability is **not** used for customer-facing durable jobs; see [`docs/MEMORY_ADR.md`](./MEMORY_ADR.md) Addendum)
 - Long-term canonical storage (Memory Core / Neon)
 - Operator gate evidence (AgentOS WDK)
 
-Until Agents SDK migration completes, the existing **AI SDK Gateway** path remains valid for chat and simple structured extraction in non-memory surfaces.
+Founder-directed pivot from the OpenAI Agents SDK target to Vercel's `eve`; the interface (`AgentHarness`) is unchanged, so this is an implementation swap. Until the `eve` harness migration completes — gated on the `ai` v6→v7 bump and an `eve` shake-out per [`docs/spikes/eve-agent-sdk-fit.md`](./spikes/eve-agent-sdk-fit.md) — the existing **AI SDK Gateway** path remains valid for chat and simple structured extraction in non-memory surfaces.
 
 ### Memory Core — canonical memory store
 
@@ -111,7 +111,8 @@ Future production durability wraps the same entrypoint with `TriggerWorkflowRunn
 | **Honcho** | Session/persona memory SaaS | **Deferred** — not canonical; Neon `memory_*` is SoT |
 | **Graphiti / Zep** | External temporal knowledge graphs | **Deferred** — not canonical memory; may inform enrichment patterns only |
 | **Anthropic Managed Agents** | Hosted agent runtime | **Deferred** for product memory — Jovie-owned harness + provenance required |
-| **OpenAI Agents SDK** | Product agent harness behind `AgentHarness` | **Selected** target for extraction/planning; AI SDK Gateway remains interim for chat/simple extraction |
+| **Vercel `eve`** | Product agent harness behind `AgentHarness` (founder-directed, #12498) | **Selected** target for extraction/planning/tool-orchestration; conditional-GO per [`docs/spikes/eve-agent-sdk-fit.md`](./spikes/eve-agent-sdk-fit.md); AI SDK Gateway interim for chat/simple extraction |
+| **OpenAI Agents SDK** | Product agent harness behind `AgentHarness` | **Superseded** by `eve` (#12498); kept for lineage — interface unchanged, implementation swapped |
 
 ### Explicitly deferred as canonical memory
 
