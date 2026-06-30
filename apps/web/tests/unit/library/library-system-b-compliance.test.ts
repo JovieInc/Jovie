@@ -26,11 +26,12 @@ describe('library badge accents (no two semantic badges share one color)', () =>
     );
   });
 
-  it('does not reuse approval "approved" green for "released"', () => {
-    // Before #12317 both were border-success/bg-success/text-success (green).
+  it('does not reuse approval "approved" accent for "released" accent', () => {
+    // #12317: approved uses accent-purple, released uses accent — must differ.
     const approved = textToken(libraryApprovalStatusClasses('approved'));
     const released = textToken(releaseStatusClasses('released'));
-    expect(approved).toBe('text-success');
+    expect(approved).toBe('text-accent-purple');
+    expect(released).toBe('text-accent');
     expect(released).not.toBe(approved);
   });
 
