@@ -446,6 +446,7 @@ Reference docs for common agent lookups:
 | `docs/DB_MIGRATIONS.md` | How do I create/run migrations? What are the invariants? |
 | `docs/TESTING_GUIDELINES.md` | Testing philosophy, patterns, and when to write tests |
 | `docs/DOPPLER_SETUP.md` | How to set up and use Doppler for secrets management |
+| `docs/REVENUE_LIFT_METRICS.md` | How is IRPAA (artist revenue lift) defined, and which table/column emits each metric term? |
 
 ## Pre-commit review (agents)
 
