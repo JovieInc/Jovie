@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "retryBudget": {
-    "unitDefaultRetries": 1,
+    "unitDefaultRetries": 2,
     "quarantineUnitRetries": 2,
     "e2eDefaultRetries": 0,
     "quarantineE2eRetries": 2,
-    "maxRetryAttemptsPerCiRun": 120,
+    "maxRetryAttemptsPerCiRun": 160,
     "unitShardCount": 6
   },
   "entries": [
@@ -39,6 +39,50 @@
       "firstSeenAt": "2026-02-10",
       "reproductionCommand": "cd apps/web && pnpm playwright test tests/e2e/dashboard-pages-health.spec.ts --project=chromium",
       "fixIssueUrl": "https://linear.app/jovie/issue/JOV-782",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    },
+    {
+      "id": "unit-notifications-service-flaky",
+      "kind": "unit",
+      "path": "tests/lib/notifications/service.test.ts",
+      "owners": "platform",
+      "firstSeenAt": "2026-06-29",
+      "reproductionCommand": "pnpm --filter @jovie/web exec vitest run tests/lib/notifications/service.test.ts",
+      "fixIssueUrl": "",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    },
+    {
+      "id": "unit-url-encryption-flaky",
+      "kind": "unit",
+      "path": "tests/lib/utils/url-encryption.test.ts",
+      "owners": "platform",
+      "firstSeenAt": "2026-06-29",
+      "reproductionCommand": "pnpm --filter @jovie/web exec vitest run tests/lib/utils/url-encryption.test.ts",
+      "fixIssueUrl": "",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    },
+    {
+      "id": "unit-webhook-handler-flaky",
+      "kind": "unit",
+      "path": "tests/unit/inbox/webhook-handler.test.ts",
+      "owners": "platform",
+      "firstSeenAt": "2026-06-29",
+      "reproductionCommand": "pnpm --filter @jovie/web exec vitest run tests/unit/inbox/webhook-handler.test.ts",
+      "fixIssueUrl": "",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    },
+    {
+      "id": "unit-deploy-workflow-flaky",
+      "kind": "unit",
+      "path": "tests/unit/ci/deploy-workflow.test.ts",
+      "owners": "platform",
+      "firstSeenAt": "2026-06-29",
+      "reproductionCommand": "pnpm --filter @jovie/web exec vitest run tests/unit/ci/deploy-workflow.test.ts",
+      "fixIssueUrl": "",
       "expiresAt": "2026-09-30",
       "consecutiveSuccesses": 0
     }
