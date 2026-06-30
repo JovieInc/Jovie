@@ -217,26 +217,36 @@ export const ChatMessage = memo(function ChatMessage({
             </div>
           ) : null}
 
-          {!isThinking && !isStreaming && messageText ? (
-            <div className='system-b-chat-copy-row'>
-              <SimpleTooltip
-                content={isCopySuccess ? 'Copied!' : 'Copy response'}
-              >
-                <button
-                  type='button'
-                  onClick={handleCopyMessage}
-                  className='system-b-chat-copy-button'
-                  aria-label={
-                    isCopySuccess ? 'Copied to clipboard' : 'Copy message'
-                  }
+          {/* Copy row is always rendered when there is content to reserve its
+              height and prevent a layout shift when streaming ends (JOV-11948).
+              The button is hidden via aria-hidden + pointer-events while
+              streaming; CSS opacity:0 already hides it visually on non-hover. */}
+          {!isThinking && messageText ? (
+            <div
+              className='system-b-chat-copy-row'
+              aria-hidden={isStreaming ? true : undefined}
+              style={isStreaming ? { pointerEvents: 'none' } : undefined}
+            >
+              {!isStreaming ? (
+                <SimpleTooltip
+                  content={isCopySuccess ? 'Copied!' : 'Copy response'}
                 >
-                  {isCopySuccess ? (
-                    <Check className='system-b-chat-copy-icon' />
-                  ) : (
-                    <Copy className='system-b-chat-copy-icon' />
-                  )}
-                </button>
-              </SimpleTooltip>
+                  <button
+                    type='button'
+                    onClick={handleCopyMessage}
+                    className='system-b-chat-copy-button'
+                    aria-label={
+                      isCopySuccess ? 'Copied to clipboard' : 'Copy message'
+                    }
+                  >
+                    {isCopySuccess ? (
+                      <Check className='system-b-chat-copy-icon' />
+                    ) : (
+                      <Copy className='system-b-chat-copy-icon' />
+                    )}
+                  </button>
+                </SimpleTooltip>
+              ) : null}
             </div>
           ) : null}
         </div>

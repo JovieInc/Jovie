@@ -770,9 +770,23 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {statusBanner}
                     </div>
                   ) : null}
-                  {showDictationBanner ? (
-                    <div className='system-b-chat-composer-seam border-t'>
-                      {dictationBanner}
+                  {/* Grid accordion reserves height while animating dictation
+                      banner in/out — avoids the ~64px jump (JOV-11948). */}
+                  {isDictationSupported ? (
+                    <div
+                      className={cn(
+                        'grid transition-[grid-template-rows] duration-subtle ease-in-out',
+                        showDictationBanner
+                          ? 'grid-rows-[1fr]'
+                          : 'grid-rows-[0fr]'
+                      )}
+                      aria-hidden={!showDictationBanner}
+                    >
+                      <div className='overflow-hidden'>
+                        <div className='system-b-chat-composer-seam border-t'>
+                          {dictationBanner}
+                        </div>
+                      </div>
                     </div>
                   ) : null}
                   <div className='system-b-chat-composer-seam border-t'>
@@ -852,9 +866,23 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 ) : null}
 
-                {showDictationBanner ? (
-                  <div className='system-b-chat-composer-seam border-b'>
-                    {dictationBanner}
+                {/* Grid accordion reserves height while animating dictation
+                    banner in/out — avoids the ~64px jump (JOV-11948). */}
+                {isDictationSupported ? (
+                  <div
+                    className={cn(
+                      'grid transition-[grid-template-rows] duration-subtle ease-in-out',
+                      showDictationBanner
+                        ? 'grid-rows-[1fr]'
+                        : 'grid-rows-[0fr]'
+                    )}
+                    aria-hidden={!showDictationBanner}
+                  >
+                    <div className='overflow-hidden'>
+                      <div className='system-b-chat-composer-seam border-b'>
+                        {dictationBanner}
+                      </div>
+                    </div>
                   </div>
                 ) : null}
 
