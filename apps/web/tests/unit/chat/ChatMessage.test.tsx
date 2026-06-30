@@ -375,4 +375,21 @@ describe('ChatMessage', () => {
       '/app/library?view=merch'
     );
   });
+
+  it('reserves copy-row height in DOM while streaming to prevent layout shift (JOV-11948)', () => {
+    const streamingProps = {
+      id: 'streaming-msg',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'Streaming…' }],
+      isStreaming: true,
+    };
+    const { container } = fastRender(<ChatMessage {...streamingProps} />);
+
+    // The copy-row div must exist in the DOM while streaming so its CSS-defined
+    // height is reserved and the layout does not shift when streaming ends.
+    const copyRow = container.querySelector('.system-b-chat-copy-row');
+    expect(copyRow).not.toBeNull();
+    // Copy button must NOT be rendered while streaming (no interactive element).
+    expect(screen.queryByRole('button', { name: /copy/i })).toBeNull();
+  });
 });

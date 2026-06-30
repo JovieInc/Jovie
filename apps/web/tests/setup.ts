@@ -85,6 +85,7 @@ export { setupBrowserGlobals } from './setup-browser';
 // Integration tests should import './setup-db' explicitly
 // Unit tests skip this entirely
 export { setupDatabase } from './setup-db';
+
 // Component mocks are intentionally not imported here.
 // The old re-export forced `tests/setup-mocks.ts` to execute for every suite,
 // which leaked partial mocks into unrelated tests and broke coverage runs.
