@@ -5,7 +5,6 @@ import { Button, CommonDropdown } from '@jovie/ui';
 import {
   CreditCard,
   FileText,
-  Gauge,
   HelpCircle,
   Keyboard,
   LogOut,
@@ -29,6 +28,7 @@ import { useFeedbackMutation } from '@/lib/queries';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
+import { UsageMenuItem } from './UsageMenuItem';
 import { useUserButton } from './useUserButton';
 
 const DashboardFeedbackModal = dynamic(
@@ -61,7 +61,7 @@ interface BuildDropdownItemsParams {
     hasAccess: boolean;
     installUrl: string | null;
   };
-  handleUsageStats: () => void;
+  usageStatsUrl: string;
   handleManageBilling: () => void;
   handleUpgrade: () => void;
   upgradeLabel: string;
@@ -92,7 +92,7 @@ function buildDropdownItems({
   handleProfile,
   handleSettings,
   iosAlphaAccess,
-  handleUsageStats,
+  usageStatsUrl,
   handleManageBilling,
   handleUpgrade,
   upgradeLabel,
@@ -154,6 +154,18 @@ function buildDropdownItems({
       onClick: handleSettings,
       shortcut: 'G S',
     },
+    {
+      type: 'custom',
+      id: 'usage-menu',
+      render: () => (
+        <UsageMenuItem
+          usageStatsUrl={usageStatsUrl}
+          onUpgrade={handleUpgrade}
+          upgradeLabel={upgradeLabel}
+          isUpgradeLoading={loading.upgrade}
+        />
+      ),
+    },
   ];
 
   if (iosAlphaAccess.hasAccess) {
@@ -169,14 +181,6 @@ function buildDropdownItems({
       },
     });
   }
-
-  items.push({
-    type: 'action',
-    id: 'usage-stats',
-    label: 'Usage Stats',
-    icon: Gauge,
-    onClick: handleUsageStats,
-  });
 
   if (!isElectronRuntime) {
     items.push({
@@ -388,7 +392,6 @@ export function UserButton({
     handleManageBilling,
     handleProfile,
     handleSettings,
-    handleUsageStats,
     handleSignOut,
     handleUpgrade,
     loading,
@@ -488,7 +491,7 @@ export function UserButton({
     handleProfile,
     handleSettings,
     iosAlphaAccess,
-    handleUsageStats,
+    usageStatsUrl: APP_ROUTES.SETTINGS_USAGE,
     handleManageBilling,
     handleUpgrade,
     upgradeLabel: menuActions.upgradeLabel,
