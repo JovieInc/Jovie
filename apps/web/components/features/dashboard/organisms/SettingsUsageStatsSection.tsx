@@ -9,9 +9,9 @@ import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatUsageState } from '@/lib/chat-usage/copy';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
+import { formatResetAt, getMonthlyUsage } from '@/lib/chat-usage/metrics';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
-import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { cn } from '@/lib/utils';
 
 const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-86';
@@ -38,19 +38,6 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-function formatResetAt(value: string | null | undefined): string {
-  if (!value) return 'Reset timing unavailable';
-  const resetAt = new Date(value);
-  if (Number.isNaN(resetAt.getTime())) return 'Reset timing unavailable';
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(resetAt);
-}
-
 function getStatusToneClasses(state: ChatUsageState): string {
   if (state === 'healthy') {
     return 'border-success/25 bg-success/10 text-success';
@@ -73,23 +60,6 @@ function getProgressToneClasses(state: ChatUsageState): string {
   }
 
   return 'bg-error/10 [&::-moz-progress-bar]:bg-error [&::-webkit-progress-bar]:bg-error/10 [&::-webkit-progress-value]:bg-error';
-}
-
-function getMonthlyUsage(data: ChatUsageData): {
-  readonly limit: number;
-  readonly used: number;
-  readonly remaining: number;
-  readonly resetAt: string | null | undefined;
-} {
-  const limit = data.monthlyLimit ?? data.dailyLimit * 30;
-  const used = data.monthlyUsed ?? data.used;
-
-  return {
-    limit,
-    used,
-    remaining: data.monthlyRemaining ?? Math.max(0, limit - used),
-    resetAt: data.monthlyResetAt,
-  };
 }
 
 interface UsageMeterRowProps {
