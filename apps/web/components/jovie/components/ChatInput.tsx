@@ -19,6 +19,7 @@ import {
 } from '@/lib/chat/large-text-paste';
 import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
 import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
+import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
 import { CHAT_COMPOSER_MAX_WIDTH } from '../chat-layout';
@@ -304,6 +305,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Picker queries scope to this profile's catalog when present; absent
     // profileId yields an empty release set (artist search is global).
     const pickerProfileId = profileId ?? '';
+    const { record: recordRecentEntity } = useEntityRecents(pickerProfileId);
     const { items: pickerItems, sections: _sections } = useSlashItems(
       picker.state,
       pickerProfileId
@@ -439,6 +441,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const handleSelectEntity = useCallback(
       (entity: import('@/lib/commands/entities').EntityRef) => {
+        // Remember every tagged entity so it ranks first next time (own graph).
+        recordRecentEntity(entity);
         if (onAddEntity) {
           stripSlashQuery();
           onAddEntity({
@@ -462,6 +466,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [
         handlePickerClose,
         onAddEntity,
+        recordRecentEntity,
         replaceSlashQueryWithToken,
         stripSlashQuery,
       ]

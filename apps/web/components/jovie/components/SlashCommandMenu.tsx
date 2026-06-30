@@ -38,11 +38,13 @@ import type { EntityRef } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
+import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   artistResultToEntityRef,
   type ReleaseLikeRow,
+  rankRecentsFirst,
   releaseRowMatches,
   releaseRowToEntityRef,
 } from './entity-mappers';
@@ -164,25 +166,50 @@ export function useSlashItems(
     enabled: Boolean(profileId) && isRoot,
   });
 
+  // Own-graph tier: recently-referenced entities, synced instantly across
+  // picker instances. Ranked above the per-kind source results so the menu
+  // opens populated with the creator's world even before Spotify responds.
+  const { recents } = useEntityRecents(profileId);
+
   return useMemo<UseSlashItemsResult>(() => {
     if (state.status === 'closed') {
       return { items: [], sections: [], isLoading: false };
     }
 
     const lowerQuery = query.toLowerCase();
-    const filteredReleases: EntityRef[] = (releaseData ?? [])
-      .filter(r => releaseRowMatches(r as ReleaseLikeRow, lowerQuery))
-      .slice(0, isEntity ? 8 : 4)
-      .map(r => releaseRowToEntityRef(r as ReleaseLikeRow));
+    const limit = isEntity ? 8 : 4;
 
-    const filteredEvents: EntityRef[] = (eventData ?? [])
-      .filter(e => eventRowMatches(e, lowerQuery))
-      .slice(0, isEntity ? 8 : 4)
-      .map(eventToEntityRef);
+    const releaseRecents = recents.filter(r => r.kind === 'release');
+    const filteredReleases: EntityRef[] = rankRecentsFirst(
+      releaseRecents,
+      (releaseData ?? [])
+        .filter(r => releaseRowMatches(r as ReleaseLikeRow, lowerQuery))
+        .slice(0, limit + releaseRecents.length)
+        .map(r => releaseRowToEntityRef(r as ReleaseLikeRow)),
+      query,
+      limit
+    );
 
-    const artistEntities: EntityRef[] = artistSearch.results
-      .slice(0, isEntity ? 8 : 4)
-      .map(artistResultToEntityRef);
+    const eventRecents = recents.filter(r => r.kind === 'event');
+    const filteredEvents: EntityRef[] = rankRecentsFirst(
+      eventRecents,
+      (eventData ?? [])
+        .filter(e => eventRowMatches(e, lowerQuery))
+        .slice(0, limit + eventRecents.length)
+        .map(eventToEntityRef),
+      query,
+      limit
+    );
+
+    const artistRecents = recents.filter(r => r.kind === 'artist');
+    const artistEntities: EntityRef[] = rankRecentsFirst(
+      artistRecents,
+      artistSearch.results
+        .slice(0, limit + artistRecents.length)
+        .map(artistResultToEntityRef),
+      query,
+      limit
+    );
 
     if (state.status === 'entity') {
       let items: EntityRef[];
@@ -268,6 +295,7 @@ export function useSlashItems(
     state,
     query,
     isEntity,
+    recents,
     releaseData,
     releaseLoading,
     eventData,
