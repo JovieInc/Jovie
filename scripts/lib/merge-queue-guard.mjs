@@ -32,6 +32,7 @@ export const ALLOWED_REQUIRED_CHECK_CONTEXTS = Object.freeze([
   'CI / PR Ready',
   'CI / Migration Guard',
   'Fork PR Gate',
+  'PR Size Guard',
   'PR Ready',
   'Migration Guard',
 ]);

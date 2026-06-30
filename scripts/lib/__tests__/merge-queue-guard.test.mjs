@@ -211,6 +211,7 @@ describe('aggregate required checks', () => {
       'CI / PR Ready',
       'CI / Migration Guard',
       'Fork PR Gate',
+      'PR Size Guard',
     ]);
   });
 
