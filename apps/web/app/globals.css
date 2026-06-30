@@ -2057,10 +2057,10 @@ body {
   }
   /* Interactive controls — tactile press via transform only (no transition:all) */
   :where(
-    button:not(:disabled):not([data-static="true"]),
-    [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
-    summary
-  ) {
+      button:not(:disabled):not([data-static="true"]),
+      [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
+      summary
+    ) {
     transition: transform var(--duration-subtle) var(--ease-subtle);
   }
   @media (prefers-reduced-motion: no-preference) {
