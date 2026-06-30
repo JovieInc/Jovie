@@ -1450,7 +1450,6 @@ app.whenReady().then(() => {
       : APP_ENTRY_URL
   );
   pendingLegacyAuthReturnRoute = null;
-
   scheduleDesktopAutoUpdate();
 
   app.on('activate', () => {
