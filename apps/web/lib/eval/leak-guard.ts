@@ -30,7 +30,7 @@ const INSTRUCTION_ECHO_PATTERNS: readonly RegExp[] = [
 ];
 
 const FENCED_PROMPT_PATTERN =
-  /```[\w-]*\n[\s\S]*?(?:You are Jovie|## Voice \(CRITICAL\)|jv-prompt-canary|## Music Industry Knowledge|## Security \(CRITICAL)[\s\S]*?```/gi;
+  /```[\w-]*\n[\s\S]*?(?:You are Jovie|## Voice \(CRITICAL\)|jv-prompt-canary|## Music Industry Knowledge|## Security \(CRITICAL\)|ONBOARDING_SYSTEM_PROMPT)[\s\S]*?```/gi;
 
 const REDACTED_SPAN = '[REDACTED]';
 
@@ -282,6 +282,17 @@ function guardTextPromise(
   });
 }
 
+/**
+ * Wrap an async generator in a ReadableStream for AI SDK v6 compatibility.
+ * ReadableStream.from was added in ES2023; types lag behind runtime.
+ */
+function generatorToReadableStream<T>(
+  generator: () => AsyncGenerator<T>
+): AsyncIterableStream<T> {
+  // @ts-expect-error ReadableStream.from exists at runtime (Node 22+) but types lag
+  return ReadableStream.from(generator()) as unknown as AsyncIterableStream<T>;
+}
+
 function createGuardedTextStream(
   stream: AsyncIterableStream<string>,
   context: LeakGuardContext
@@ -314,7 +325,7 @@ function createGuardedTextStream(
     }
   }
 
-  return generator() as unknown as AsyncIterableStream<string>;
+  return generatorToReadableStream(() => generator());
 }
 
 type TextDeltaChunk = {
@@ -366,7 +377,7 @@ function createGuardedDeltaStream<T>(
     }
   }
 
-  return generator() as unknown as AsyncIterableStream<T>;
+  return generatorToReadableStream(() => generator());
 }
 
 type StreamTextOptions = {
