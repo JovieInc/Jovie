@@ -770,17 +770,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {statusBanner}
                     </div>
                   ) : null}
-                  {/* ponytail: inline grid trick — no arbitrary Tailwind values, smooth height reserve */}
+                  {/* Grid accordion reserves height while animating dictation
+                      banner in/out — avoids the ~64px jump (JOV-11948). */}
                   {isDictationSupported ? (
                     <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
-                        transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
-                      }}
+                      className={cn(
+                        'grid transition-[grid-template-rows] duration-subtle ease-in-out',
+                        showDictationBanner
+                          ? 'grid-rows-[1fr]'
+                          : 'grid-rows-[0fr]'
+                      )}
                       aria-hidden={!showDictationBanner}
                     >
-                      <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                      <div className='overflow-hidden'>
                         <div className='system-b-chat-composer-seam border-t'>
                           {dictationBanner}
                         </div>
@@ -864,17 +866,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 ) : null}
 
-                {/* ponytail: inline grid trick — no arbitrary Tailwind values, smooth height reserve */}
+                {/* Grid accordion reserves height while animating dictation
+                    banner in/out — avoids the ~64px jump (JOV-11948). */}
                 {isDictationSupported ? (
                   <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
-                      transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
-                    }}
+                    className={cn(
+                      'grid transition-[grid-template-rows] duration-subtle ease-in-out',
+                      showDictationBanner
+                        ? 'grid-rows-[1fr]'
+                        : 'grid-rows-[0fr]'
+                    )}
                     aria-hidden={!showDictationBanner}
                   >
-                    <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                    <div className='overflow-hidden'>
                       <div className='system-b-chat-composer-seam border-b'>
                         {dictationBanner}
                       </div>

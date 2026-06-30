@@ -376,39 +376,20 @@ describe('ChatMessage', () => {
     );
   });
 
-  // Layout-guard: copy-row must not cause a shift when streaming ends (gh-11948)
-  it('renders the copy-row invisible during streaming to reserve layout space', () => {
-    const messageProps = {
-      id: 'assistant-streaming',
+  it('reserves copy-row height in DOM while streaming to prevent layout shift (JOV-11948)', () => {
+    const streamingProps = {
+      id: 'streaming-msg',
       role: 'assistant' as const,
-      parts: [{ type: 'text' as const, text: 'Streaming response…' }],
+      parts: [{ type: 'text' as const, text: 'Streaming…' }],
       isStreaming: true,
     };
+    const { container } = fastRender(<ChatMessage {...streamingProps} />);
 
-    fastRender(<ChatMessage {...messageProps} />);
-
-    // The copy-row container must exist in the DOM (reserving space)…
-    const copyRow = document.querySelector('.system-b-chat-copy-row');
-    expect(copyRow).toBeTruthy();
-    // …but must be invisible so it doesn't flash during streaming.
-    expect(copyRow?.className).toContain('invisible');
-    // Copy button must not be focusable while invisible.
-    const btn = copyRow?.querySelector('button');
-    expect(btn?.getAttribute('tabindex')).toBe('-1');
-  });
-
-  it('shows the copy-row visibly once streaming ends', () => {
-    const messageProps = {
-      id: 'assistant-done',
-      role: 'assistant' as const,
-      parts: [{ type: 'text' as const, text: 'Done streaming.' }],
-      isStreaming: false,
-    };
-
-    fastRender(<ChatMessage {...messageProps} />);
-
-    const copyRow = document.querySelector('.system-b-chat-copy-row');
-    expect(copyRow).toBeTruthy();
-    expect(copyRow?.className).not.toContain('invisible');
+    // The copy-row div must exist in the DOM while streaming so its CSS-defined
+    // height is reserved and the layout does not shift when streaming ends.
+    const copyRow = container.querySelector('.system-b-chat-copy-row');
+    expect(copyRow).not.toBeNull();
+    // Copy button must NOT be rendered while streaming (no interactive element).
+    expect(screen.queryByRole('button', { name: /copy/i })).toBeNull();
   });
 });

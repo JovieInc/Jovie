@@ -217,34 +217,36 @@ export const ChatMessage = memo(function ChatMessage({
             </div>
           ) : null}
 
+          {/* Copy row is always rendered when there is content to reserve its
+              height and prevent a layout shift when streaming ends (JOV-11948).
+              The button is hidden via aria-hidden + pointer-events while
+              streaming; CSS opacity:0 already hides it visually on non-hover. */}
           {!isThinking && messageText ? (
-            /* ponytail: invisible reserves layout space so streaming→done causes no shift */
             <div
-              className={cn(
-                'system-b-chat-copy-row',
-                isStreaming && 'invisible'
-              )}
-              aria-hidden={isStreaming || undefined}
+              className='system-b-chat-copy-row'
+              aria-hidden={isStreaming ? true : undefined}
+              style={isStreaming ? { pointerEvents: 'none' } : undefined}
             >
-              <SimpleTooltip
-                content={isCopySuccess ? 'Copied!' : 'Copy response'}
-              >
-                <button
-                  type='button'
-                  onClick={handleCopyMessage}
-                  className='system-b-chat-copy-button'
-                  aria-label={
-                    isCopySuccess ? 'Copied to clipboard' : 'Copy message'
-                  }
-                  tabIndex={isStreaming ? -1 : undefined}
+              {!isStreaming ? (
+                <SimpleTooltip
+                  content={isCopySuccess ? 'Copied!' : 'Copy response'}
                 >
-                  {isCopySuccess ? (
-                    <Check className='system-b-chat-copy-icon' />
-                  ) : (
-                    <Copy className='system-b-chat-copy-icon' />
-                  )}
-                </button>
-              </SimpleTooltip>
+                  <button
+                    type='button'
+                    onClick={handleCopyMessage}
+                    className='system-b-chat-copy-button'
+                    aria-label={
+                      isCopySuccess ? 'Copied to clipboard' : 'Copy message'
+                    }
+                  >
+                    {isCopySuccess ? (
+                      <Check className='system-b-chat-copy-icon' />
+                    ) : (
+                      <Copy className='system-b-chat-copy-icon' />
+                    )}
+                  </button>
+                </SimpleTooltip>
+              ) : null}
             </div>
           ) : null}
         </div>
