@@ -8,6 +8,14 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/app',
 }));
 
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
+}));
+
+vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
+  ProfileContactSidebar: () => null,
+}));
+
 vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
   useOpportunityInboxMutations: () => ({
     approveMutation: {
@@ -29,6 +37,18 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
 }));
 
 describe('OpportunityInboxPageClient', () => {
+  it('registers a non-null right panel for the artist-profile rail', async () => {
+    const { useRegisterRightPanel } = await import(
+      '@/hooks/useRegisterRightPanel'
+    );
+    render(
+      <OpportunityInboxPageClient inbox={{ cards: [], emptyActionCards: [] }} />
+    );
+    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenCalledWith(
+      expect.anything()
+    );
+  });
+
   it('renders the inbox feed when cards are present', () => {
     render(
       <OpportunityInboxPageClient

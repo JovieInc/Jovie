@@ -1,11 +1,37 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
 import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxMutations';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
+
+const ProfileContactSidebar = dynamic(
+  () =>
+    import('@/features/dashboard/organisms/profile-contact-sidebar').then(
+      mod => ({ default: mod.ProfileContactSidebar })
+    ),
+  { ssr: false }
+);
+
+// Registers the artist-profile right rail for the dashboard home route so the
+// ArtistProfileRailToggle in the shell header can animate it open/closed.
+function HomeRightPanelHost() {
+  const panel = useMemo(
+    () => (
+      <ErrorBoundary fallback={null}>
+        <ProfileContactSidebar />
+      </ErrorBoundary>
+    ),
+    []
+  );
+  useRegisterRightPanel(panel);
+  return null;
+}
 
 export interface OpportunityInboxPageClientProps {
   readonly inbox: OpportunityInboxData;
@@ -72,6 +98,7 @@ export function OpportunityInboxPageClient({
       className='system-b-opportunity-inbox-page'
       data-testid='opportunity-inbox-page'
     >
+      <HomeRightPanelHost />
       <header className='system-b-opportunity-inbox-page-header'>
         {/* ui-casing-allow: design-locked inbox copy */}
         <h1 className='system-b-opportunity-inbox-page-title'>
