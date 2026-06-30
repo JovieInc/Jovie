@@ -31,7 +31,9 @@ interface UseStickToBottomReturn {
  * Scroll-to-bottom only fires when the sentinel is already in view; appending
  * a new message while the user is scrolled away does NOT force them back down.
  */
-export function useStickToBottom(): UseStickToBottomReturn {
+export function useStickToBottom(
+  messageCount?: number
+): UseStickToBottomReturn {
   const [isStuckToBottom, setIsStuckToBottom] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -69,6 +71,7 @@ export function useStickToBottom(): UseStickToBottomReturn {
   // whenever a new row was appended even when the user had scrolled up (JOV-11948).
   const prevMessageCountRef = useRef(0);
   useEffect(() => {
+    if (messageCount === undefined) return;
     const prev = prevMessageCountRef.current;
     prevMessageCountRef.current = messageCount;
     if (prev === 0 && messageCount > 0) {
