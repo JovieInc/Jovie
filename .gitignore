@@ -180,6 +180,10 @@ apps/desktop/src/*
 !apps/desktop/src/desktop-security-reporting.ts
 !apps/desktop/src/window-state.ts
 !apps/desktop/src/renderer-recovery.ts
+!apps/desktop/src/menu-bar-tray.ts
+!apps/desktop/scripts/
+apps/desktop/scripts/*
+!apps/desktop/scripts/menu-bar-tray.test.mjs
 apps/extension/
 .agents/
 

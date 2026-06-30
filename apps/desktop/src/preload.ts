@@ -11,6 +11,7 @@ const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
+const SET_TRAY_STATE_CHANNEL = 'set-tray-state';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -147,5 +148,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** Probe desktop dictation support without exposing node/native APIs. */
     getDictationStatus: () => {
       return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
+    },
+
+    /**
+     * Update the macOS menu bar tray state. No-op on Windows/Linux where no
+     * tray is created. State must be one of: idle | active | unread | error.
+     */
+    setTrayState: (state: string) => {
+      return ipcRenderer.invoke(SET_TRAY_STATE_CHANNEL, state) as Promise<{
+        ok: boolean;
+        reason?: string;
+      }>;
     },
 });

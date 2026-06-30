@@ -448,3 +448,43 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   );
   assert.doesNotMatch(titlebarSource, /w-\[72px\]/);
 });
+
+test('macOS menu bar tray module exports state guard and factory', async () => {
+  const traySource = await readFile(join(desktopRoot, 'src/menu-bar-tray.ts'), 'utf8');
+
+  assert.match(traySource, /export type TrayState = 'idle' \| 'active' \| 'unread' \| 'error'/);
+  assert.match(traySource, /export function isValidTrayState\(value: unknown\): value is TrayState/);
+  assert.match(traySource, /export function createMenuBarTray\(/);
+  assert.match(traySource, /tray\.setToolTip\(/);
+  assert.match(traySource, /tray\.setContextMenu\(/);
+  assert.match(traySource, /tray\.on\('click', onOpen\)/);
+  assert.match(traySource, /app\.dock\.setBadge\(/);
+  assert.match(traySource, /idle: ''/);
+  assert.match(traySource, /unread: '●'/);
+  assert.doesNotMatch(traySource, /console\.log/);
+  assert.doesNotMatch(traySource, /console\.error/);
+});
+
+test('macOS menu bar tray is wired into main process on darwin only', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  assert.match(mainSource, /import \{[\s\S]*?createMenuBarTray[\s\S]*?\} from '\.\/menu-bar-tray'/);
+  assert.match(mainSource, /import \{[\s\S]*?isValidTrayState[\s\S]*?\} from '\.\/menu-bar-tray'/);
+  assert.match(mainSource, /const SET_TRAY_STATE_CHANNEL = 'set-tray-state'/);
+  assert.match(mainSource, /let menuBarTray: MenuBarTray \| null = null/);
+  assert.match(mainSource, /process\.platform === 'darwin'/);
+  assert.match(mainSource, /createMenuBarTray\(\{/);
+  assert.match(mainSource, /menuBarTray = createMenuBarTray\(/);
+  assert.match(mainSource, /ipcMain\.handle\(\s*SET_TRAY_STATE_CHANNEL,/);
+  assert.match(mainSource, /isValidTrayState\(state\)/);
+  assert.match(mainSource, /menuBarTray\?\.setState\(/);
+  assert.doesNotMatch(mainSource, /createMenuBarTray\(\).*(?!darwin)/);
+});
+
+test('macOS menu bar tray is exposed in the preload bridge', async () => {
+  const preloadSource = await readFile(join(desktopRoot, 'src/preload.ts'), 'utf8');
+
+  assert.match(preloadSource, /const SET_TRAY_STATE_CHANNEL = 'set-tray-state'/);
+  assert.match(preloadSource, /setTrayState:/);
+  assert.match(preloadSource, /ipcRenderer\.invoke\(SET_TRAY_STATE_CHANNEL, state\)/);
+});

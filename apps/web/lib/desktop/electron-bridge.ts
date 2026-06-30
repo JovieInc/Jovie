@@ -54,6 +54,13 @@ export interface ElectronAPI {
    * whether Electron has explicitly allowed the trusted Web Speech fallback.
    */
   readonly getDictationStatus?: () => Promise<DesktopDictationStatus>;
+  /**
+   * Update the macOS menu bar tray state. No-op on non-macOS where no tray
+   * is present. Valid states: 'idle' | 'active' | 'unread' | 'error'.
+   */
+  readonly setTrayState?: (
+    state: string
+  ) => Promise<{ ok: boolean; reason?: string }>;
 }
 
 export interface DesktopAuthCompletion {
@@ -538,6 +545,27 @@ export function useDesktopDictationStatus(): DesktopDictationStatus {
   }, []);
 
   return status;
+}
+
+/** Valid tray states — mirrors TrayState in apps/desktop/src/menu-bar-tray.ts. */
+export type DesktopTrayState = 'idle' | 'active' | 'unread' | 'error';
+
+/**
+ * Push a tray state update to the Electron main process. Safe no-op when
+ * running in a browser, on non-macOS, or with a stale binary that lacks the
+ * bridge method.
+ */
+export async function setDesktopTrayState(
+  state: DesktopTrayState
+): Promise<void> {
+  const api = getRawElectronAPI();
+  if (!api) return;
+  if (typeof api.setTrayState !== 'function') return;
+  try {
+    await api.setTrayState(state);
+  } catch {
+    // Non-fatal: tray unavailable on this platform or binary
+  }
 }
 
 // Exported for tests only — do not call directly from product code.

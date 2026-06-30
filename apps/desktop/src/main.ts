@@ -11,6 +11,12 @@ import {
   screen,
   shell,
 } from 'electron';
+import {
+  createMenuBarTray,
+  isValidTrayState,
+  type MenuBarTray,
+  type TrayState,
+} from './menu-bar-tray';
 import { autoUpdater } from 'electron-updater';
 import {
   bindPendingDesktopAuthCompletion,
@@ -89,6 +95,7 @@ const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
+const SET_TRAY_STATE_CHANNEL = 'set-tray-state';
 const DESKTOP_RUNTIME_LABEL_BY_PLATFORM: Partial<
   Record<NodeJS.Platform, string>
 > = {
@@ -142,6 +149,7 @@ const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
+let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
@@ -1420,6 +1428,22 @@ app.whenReady().then(() => {
       : APP_ENTRY_URL
   );
   pendingLegacyAuthReturnRoute = null;
+
+  if (process.platform === 'darwin') {
+    const appIconPath = getAppIconPath();
+    if (appIconPath) {
+      menuBarTray = createMenuBarTray({
+        appName: app.name,
+        iconPath: appIconPath,
+        onOpen: () => {
+          const win =
+            mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+          showWindow(win);
+        },
+      });
+    }
+  }
+
   scheduleDesktopAutoUpdate();
 
   app.on('activate', () => {
@@ -1441,6 +1465,20 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+ipcMain.handle(
+  SET_TRAY_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent, state: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    if (!isValidTrayState(state)) {
+      return { ok: false, reason: 'invalid-state' };
+    }
+    menuBarTray?.setState(state as TrayState);
+    return { ok: true };
+  }
+);
 
 ipcMain.handle(
   DICTATION_STATUS_CHANNEL,
