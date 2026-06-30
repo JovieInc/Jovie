@@ -107,6 +107,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Album art ready',
     errorTitle: "Couldn't create your album art",
   },
+  retouchImage: {
+    label: 'Retouch',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Retouching your photo…',
+    successTitle: 'Photo retouched',
+    errorTitle: "Couldn't retouch your photo",
+  },
   createMerch: {
     label: 'Merch',
     uiHint: 'artifact',

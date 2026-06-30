@@ -474,6 +474,7 @@ const MERCH_TOOL_NAMES = [
 
 const INSIGHT_TOOL_NAMES = ['showTopInsights'] as const;
 const ALBUM_ART_TOOL_NAMES = ['generateAlbumArt'] as const;
+const RETOUCH_TOOL_NAMES = ['retouchImage'] as const;
 const PROFILE_RELEASE_TOOL_NAMES = [
   'createRelease',
   'generateReleasePitch',
@@ -496,6 +497,7 @@ const PAID_TOOL_NAMES = [
   ...INSIGHT_TOOL_NAMES,
   ...ALWAYS_PAID_TOOL_NAMES,
   ...ALBUM_ART_TOOL_NAMES,
+  ...RETOUCH_TOOL_NAMES,
   ...PROFILE_RELEASE_TOOL_NAMES,
   ...MERCH_TOOL_NAMES,
 ] as const;
@@ -3717,6 +3719,10 @@ function resolveToolAvailabilityFlags(plan: PlanId, vars: EvalVars) {
       vars.canAccessMerchCreation,
       Boolean(planLimits.booleans.canAccessMerchCreation)
     ),
+    canAccessAiRetouching: toBoolean(
+      vars.canAccessAiRetouching,
+      Boolean(planLimits.booleans.canAccessAiRetouching)
+    ),
   };
 }
 
@@ -3738,6 +3744,9 @@ function getToolNamesForTurn(
   }
   if (flags.albumArtEnabled && flags.canGenerateAlbumArt) {
     toolNames.push(...ALBUM_ART_TOOL_NAMES);
+  }
+  if (flags.canAccessAiRetouching) {
+    toolNames.push(...RETOUCH_TOOL_NAMES);
   }
   if (flags.resolvedProfileIdPresent) {
     toolNames.push(...PROFILE_RELEASE_TOOL_NAMES);

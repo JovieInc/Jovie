@@ -2410,6 +2410,20 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolRenderFailureNoSuccess
 
+  - description: Tool rendering failed retouch falls back to alert status
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a failed retouch tool result."
+      target: tool-render-contract
+      toolName: retouchImage
+      renderCase: failed
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderFailureNoSuccess
+
   - description: Tool rendering approval request does not claim completion
     metadata:
       cost: deterministic
