@@ -309,7 +309,7 @@ describe('ChatEntityRightPanelHost', () => {
     });
   });
 
-  it('keeps the profile sidebar mounted when preview is closed for cinematic close', () => {
+  it('renders null when preview is closed and no entity target is active', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
 
@@ -320,7 +320,7 @@ describe('ChatEntityRightPanelHost', () => {
     );
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
-    expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).toBeNull();
   });
 
   it('registers the profile sidebar when preview is open', () => {
@@ -861,6 +861,21 @@ describe('ChatEntityRightPanelHost', () => {
       .querySelector('.system-b-chat-entity-panel-eyebrow');
     expect(eyebrow).not.toBeNull();
     expect(eyebrow?.textContent).toBe('Tour date');
+  });
+
+  it('registers null when enablePreviewPanel is true but preview is closed and no entity target', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    render(
+      <ChatEntityPanelProvider>
+        <ChatEntityRightPanelHost
+          enablePreviewPanel
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+    expect(mockUseRegisterRightPanel).toHaveBeenLastCalledWith(null);
   });
 
   it('keeps the right rail empty when flag is off (no panel for contact target)', () => {
