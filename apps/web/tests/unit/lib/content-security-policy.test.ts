@@ -71,6 +71,17 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://vercel.com');
   });
 
+  it('includes Vercel Blob storage in connect-src for client uploads', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(connectSrc).toContain('https://*.blob.vercel-storage.com');
+    expect(connectSrc).toContain('https://*.public.blob.vercel-storage.com');
+  });
+
   it('includes Sentry regional ingest wildcard in connect-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',

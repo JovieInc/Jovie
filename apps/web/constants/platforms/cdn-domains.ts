@@ -93,6 +93,9 @@ export const INFRASTRUCTURE_MEDIA_DOMAINS: readonly string[] = [
 export const INFRASTRUCTURE_CONNECT_DOMAINS: readonly string[] = [
   // Vercel dashboard/API (chat surface deployment status, toolbar)
   'vercel.com',
+  // Vercel Blob client uploads + direct browser fetches
+  '*.blob.vercel-storage.com',
+  '*.public.blob.vercel-storage.com',
 ];
 
 /**
