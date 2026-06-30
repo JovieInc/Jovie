@@ -109,11 +109,11 @@ export const TOOL_UI_REGISTRY = {
   },
   retouchImage: {
     label: 'Retouch',
-    uiHint: 'artifact',
-    renderer: 'artifact',
-    loadingTitle: 'Retouching your image…',
-    successTitle: 'Image retouched',
-    errorTitle: "Couldn't retouch your image",
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Retouching your photo…',
+    successTitle: 'Photo retouched',
+    errorTitle: "Couldn't retouch your photo",
   },
   createMerch: {
     label: 'Merch',
