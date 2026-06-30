@@ -187,4 +187,20 @@ describe('@critical GET /api/health', () => {
     expect(response.status).toBe(200);
     expect(mockPing).not.toHaveBeenCalled();
   });
+
+  it('does not issue a keepalive ping on the rate-limited path', async () => {
+    mockHealthLimiterLimit.mockResolvedValue({
+      success: false,
+      limit: 30,
+      remaining: 0,
+      reset: new Date(Date.now() + 60000),
+      reason: 'Rate limit exceeded',
+    });
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(new Request('http://localhost/api/health'));
+
+    expect(response.status).toBe(429);
+    expect(mockPing).not.toHaveBeenCalled();
+  });
 });
