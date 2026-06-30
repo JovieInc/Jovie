@@ -18,6 +18,8 @@ export interface ChatUsageData {
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
+  /** Present when billing was unavailable and the snapshot is cached or degraded. */
+  _stale?: boolean;
 }
 
 const fetchChatUsage = createQueryFn<ChatUsageData>('/api/chat/usage');

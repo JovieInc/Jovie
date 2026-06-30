@@ -260,6 +260,7 @@ export function SettingsUsageStatsSection() {
   const copy = getChatUsageCopy(data);
   const showUpgradeCta = copy.state !== 'healthy';
   const monthly = getMonthlyUsage(data);
+  const isStale = data._stale === true;
 
   return (
     <UsagePanelShell>
@@ -293,6 +294,18 @@ export function SettingsUsageStatsSection() {
             </Button>
           ))}
       </div>
+
+      {isStale ? (
+        <div className='border-b border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+          <div className='flex items-start gap-2 text-warning'>
+            <AlertCircle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
+            <p className='text-app leading-[18px]'>
+              Usage counts may be cached while billing syncs. Refresh in a
+              moment for the latest quota.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className='divide-y divide-(--linear-app-frame-seam)'>
         <UsageMeterRow
