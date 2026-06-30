@@ -771,20 +771,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     </div>
                   ) : null}
                   {/* ponytail: inline grid trick — no arbitrary Tailwind values, smooth height reserve */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
-                      transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
-                    }}
-                    aria-hidden={!showDictationBanner}
-                  >
-                    <div style={{ minHeight: 0, overflow: 'hidden' }}>
-                      <div className='system-b-chat-composer-seam border-t'>
-                        {dictationBanner}
+                  {isDictationSupported ? (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
+                        transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
+                      }}
+                      aria-hidden={!showDictationBanner}
+                    >
+                      <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                        <div className='system-b-chat-composer-seam border-t'>
+                          {dictationBanner}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : null}
                   <div className='system-b-chat-composer-seam border-t'>
                     <InputRow
                       containerRef={containerRef}
@@ -863,20 +865,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 ) : null}
 
                 {/* ponytail: inline grid trick — no arbitrary Tailwind values, smooth height reserve */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
-                    transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
-                  }}
-                  aria-hidden={!showDictationBanner}
-                >
-                  <div style={{ minHeight: 0, overflow: 'hidden' }}>
-                    <div className='system-b-chat-composer-seam border-b'>
-                      {dictationBanner}
+                {isDictationSupported ? (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateRows: showDictationBanner ? '1fr' : '0fr',
+                      transition: `grid-template-rows var(--ds-motion-subtle-duration) ease`,
+                    }}
+                    aria-hidden={!showDictationBanner}
+                  >
+                    <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                      <div className='system-b-chat-composer-seam border-b'>
+                        {dictationBanner}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : null}
 
                 <InputRow
                   containerRef={containerRef}
