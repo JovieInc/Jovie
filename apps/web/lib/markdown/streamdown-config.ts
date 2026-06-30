@@ -51,7 +51,8 @@ const baseStreamdownConfig: Omit<
   allowedTags: {
     a: ['href', 'title'],
     img: ['src', 'alt', 'title'],
-    th: ['scope'],
+    td: ['align'],
+    th: ['scope', 'align'],
   },
   caret: 'block',
 };
