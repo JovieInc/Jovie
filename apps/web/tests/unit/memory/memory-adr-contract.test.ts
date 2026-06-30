@@ -101,6 +101,10 @@ describe('MEMORY ADR contract (JOV-2705)', () => {
     expect(adr).toContain('Internal AgentOS');
     expect(adr).toContain('Product memory workflows');
     expect(adr).toContain('WorkflowRunner');
+    // Current cognition-harness decision (#12498): eve supersedes the OpenAI
+    // Agents SDK target. Pin it so a future edit can't silently revert it.
+    expect(adr).toContain('`eve`');
+    expect(adr).toContain('#12498');
 
     for (const section of REQUIRED_ADR_SECTIONS) {
       expect(adr, `missing ${section}`).toContain(section);
@@ -113,7 +117,11 @@ describe('MEMORY ADR contract (JOV-2705)', () => {
     const arch = readFileSync(MEMORY_CORE_ARCH_PATH, 'utf8');
     expect(arch).toContain('Issue: JOV-2705');
     expect(arch).toContain('Trigger.dev');
+    // OpenAI Agents SDK kept as the superseded/lineage target...
     expect(arch).toContain('OpenAI Agents SDK');
+    // ...with eve as the current selected harness (#12498).
+    expect(arch).toContain('`eve`');
+    expect(arch).toContain('#12498');
     expect(arch).toContain('studio-session-loop.ts');
     expect(arch).toContain('Graphiti');
     expect(arch).toContain('Honcho');
