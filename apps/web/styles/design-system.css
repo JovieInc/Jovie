@@ -579,6 +579,31 @@ html[data-profile-initial-mode]
   );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
+  /* Cross-cutting interaction state tokens (state-matrix.md) */
+  --color-link-default: var(--linear-accent-blue);
+  --color-link-hover: color-mix(
+    in oklab,
+    var(--linear-accent-blue) 82%,
+    var(--linear-text-primary)
+  );
+  --color-link-visited: var(--linear-accent-purple);
+  --state-disabled-opacity: 0.5;
+  --state-partial-opacity: 0.62;
+  --state-offline-bg: var(--color-warning-subtle);
+  --state-offline-border: color-mix(
+    in oklab,
+    var(--color-warning) 24%,
+    transparent
+  );
+  --state-offline-fg: var(--color-warning);
+  --state-permission-bg: var(--color-warning-subtle);
+  --state-permission-fg: var(--color-warning);
+  --state-permission-border: color-mix(
+    in oklab,
+    var(--color-warning) 20%,
+    transparent
+  );
+
   /* Focus ring — Jovie/Linear keyboard focus token */
   --color-focus-ring: var(--linear-border-focus);
   --focus-ring-width: 1px;
@@ -826,6 +851,31 @@ html[data-profile-initial-mode]
   );
   --color-skeleton-shimmer: oklch(
     24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Cross-cutting interaction state tokens (state-matrix.md) */
+  --color-link-default: var(--linear-accent-blue);
+  --color-link-hover: color-mix(
+    in oklab,
+    var(--linear-accent-blue) 78%,
+    var(--linear-text-primary)
+  );
+  --color-link-visited: var(--linear-accent-purple);
+  --state-disabled-opacity: 0.5;
+  --state-partial-opacity: 0.62;
+  --state-offline-bg: var(--color-warning-subtle);
+  --state-offline-border: color-mix(
+    in oklab,
+    var(--color-warning) 24%,
+    transparent
+  );
+  --state-offline-fg: var(--color-warning);
+  --state-permission-bg: var(--color-warning-subtle);
+  --state-permission-fg: var(--color-warning);
+  --state-permission-border: color-mix(
+    in oklab,
+    var(--color-warning) 20%,
+    transparent
   );
 }
 
