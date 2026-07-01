@@ -12,11 +12,11 @@ import {
   useState,
 } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { getSidebarNavRowClassName } from '@/components/shell/SidebarNavItem';
 import { APP_ROUTES } from '@/constants/routes';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/features/dashboard/organisms/DataPrivacySection';
-
 import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/features/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAudienceSection } from '@/features/dashboard/organisms/SettingsAudienceSection';
@@ -31,7 +31,6 @@ import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/set
 import { publicEnv } from '@/lib/env-public';
 import { useAppFlag } from '@/lib/flags/client';
 import { useBillingStatusQuery } from '@/lib/queries';
-import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
@@ -106,33 +105,34 @@ const SettingsSidebar = memo(
                   const href = useRouteLinks
                     ? getFocusedSettingsHref(section.id)
                     : `#${section.id}`;
+                  const rowClassName = getSidebarNavRowClassName({
+                    active: isActive,
+                    className:
+                      'grid-cols-[minmax(0,1fr)] before:hidden after:hidden text-left',
+                  });
+                  const rowContent = (
+                    <span className='min-w-0 truncate text-left justify-self-start'>
+                      {section.title}
+                    </span>
+                  );
+
                   return (
                     <li key={section.id}>
                       {useRouteLinks ? (
                         <Link
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
-                          className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-xs tracking-[-0.012em] transition-colors',
-                            isActive
-                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
-                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
-                          )}
+                          className={rowClassName}
                         >
-                          {section.title}
+                          {rowContent}
                         </Link>
                       ) : (
                         <a
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
-                          className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-xs tracking-[-0.012em] transition-colors',
-                            isActive
-                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
-                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
-                          )}
+                          className={rowClassName}
                         >
-                          {section.title}
+                          {rowContent}
                         </a>
                       )}
                     </li>
@@ -201,7 +201,7 @@ export function SettingsPolished({
       ) : (
         <div className='text-center py-4'>
           <h3 className='text-sm font-caption text-primary-token mb-3'>
-            Account settings unavailable
+            Account Settings Unavailable
           </h3>
           <p className='text-app text-secondary-token'>
             Clerk is not configured (missing publishable key). Set
@@ -254,7 +254,7 @@ export function SettingsPolished({
         id: 'touring',
         title: 'Touring',
         description:
-          'Connect Bandsintown to display tour dates on your profile.',
+          'Connect Bandsintown to display tour dates on your profile.', // ui-casing-allow: Bandsintown brand name
         render: () => <SettingsTouringSection profileId={artist.id} />,
       },
     ],
@@ -318,7 +318,7 @@ export function SettingsPolished({
             {
               id: 'payments',
               title: 'Payments',
-              description: 'Connect Stripe to receive payments from fans.',
+              description: 'Connect Stripe to receive payments from fans.', // ui-casing-allow: Stripe brand name
               render: () => <SettingsPaymentsSection />,
             },
           ]
