@@ -62,4 +62,12 @@ describe('library right-rail System B structural compliance', () => {
       /:where\(\.system-b-library-action\),\s*:where\(\.system-b-library-icon-button\)\s*\{\s*border-radius: var\(--radius-full\);/
     );
   });
+
+  it('edits approval status inline in Details without a native select', () => {
+    expect(surface).toContain("label='Approval Status'");
+    expect(surface).toContain('ApprovalStatusEditor');
+    expect(surface).not.toMatch(/<DrawerSection[^>]*title='Approval'/);
+    expect(surface).not.toMatch(/<select[^>]*library-approval-status-select/);
+    expect(surface).toContain('TOOLBAR_MENU_CONTENT_CLASS');
+  });
 });
