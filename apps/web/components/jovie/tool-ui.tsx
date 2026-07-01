@@ -19,6 +19,7 @@ import { isVideoRecordingProposalPayload } from '@/lib/teleprompter/types';
 import { cn } from '@/lib/utils';
 import { ChatAlbumArtCard } from './components/ChatAlbumArtCard';
 import { ChatAnalyticsCard } from './components/ChatAnalyticsCard';
+import { ChatArtifactErrorCard } from './components/ChatArtifactErrorCard';
 import { ChatAvatarUploadCard } from './components/ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
@@ -448,6 +449,21 @@ function renderAlbumArtArtifact(
 }
 
 function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
+  if (event.state === 'running') {
+    return <ChatPitchCard state='loading' />;
+  }
+
+  if (event.state === 'failed') {
+    return (
+      <ChatPitchCard
+        state='error'
+        error={
+          event.errorMessage ?? event.summary ?? 'Pitch generation failed.'
+        }
+      />
+    );
+  }
+
   if (!isPitchOutput(event.output)) {
     return null;
   }
@@ -585,15 +601,49 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
     renderMerchActionArtifact(event, profileId),
 };
 
+function renderArtifactFailureCard(
+  event: PersistedToolEvent
+): ReactNode | null {
+  const config = getToolUiConfig(event.toolName);
+  const presentation = resolveToolFailurePresentation({
+    toolName: event.toolName,
+    errorCode: event.errorCode,
+    errorMessage: event.errorMessage ?? event.summary,
+    retryable: event.retryable,
+  });
+
+  return (
+    <ChatArtifactErrorCard
+      title={config.errorTitle ?? `${config.label} Failed`}
+      message={
+        presentation.body === presentation.nextStep
+          ? presentation.body
+          : `${presentation.body} ${presentation.nextStep}`
+      }
+      retryPrompt={`Please retry ${config.label.toLowerCase()}.`}
+      showRetry={presentation.recoverable}
+    />
+  );
+}
+
 function renderArtifactCard(
   event: PersistedToolEvent,
   profileId?: string
 ): ReactNode {
+  const renderer = ARTIFACT_RENDERERS[event.toolName];
+
+  if (event.state === 'failed') {
+    return renderer?.(event, profileId) ?? renderArtifactFailureCard(event);
+  }
+
+  if (event.state === 'running') {
+    return renderer?.(event, profileId) ?? null;
+  }
+
   if (event.state !== 'succeeded') {
     return null;
   }
 
-  const renderer = ARTIFACT_RENDERERS[event.toolName];
   return renderer?.(event, profileId) ?? null;
 }
 

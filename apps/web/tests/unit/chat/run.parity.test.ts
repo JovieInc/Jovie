@@ -365,6 +365,7 @@ describe('executeChatTurn — parity assertions', () => {
         level: 'warning',
       })
     );
+    expect(turn.turnSignals.toolStepCapExhausted).toBe(true);
   });
 
   it('routes captureException through telemetry on stream error (no Sentry import in run.ts)', async () => {

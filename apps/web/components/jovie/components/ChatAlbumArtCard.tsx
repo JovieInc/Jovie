@@ -9,6 +9,7 @@ import {
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { ChatAlbumArtToolResult } from '../types';
+import { ChatArtifactErrorCard } from './ChatArtifactErrorCard';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
 interface ChatAlbumArtCardProps {
@@ -54,11 +55,15 @@ function insertCreateReleaseChip(): void {
   );
 }
 
-export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
+function ChatAlbumArtCardSuccess({
+  result,
+  profileId,
+}: Readonly<{
+  result: Extract<ChatAlbumArtToolResult, { success: true }>;
+  profileId: string;
+}>) {
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(
-    result.success && result.state === 'generated'
-      ? (result.candidates[0]?.id ?? null)
-      : null
+    result.state === 'generated' ? (result.candidates[0]?.id ?? null) : null
   );
   const [appliedCandidateId, setAppliedCandidateId] = useState<string | null>(
     null
@@ -67,7 +72,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
   const createMutation = useCreateReleaseWithGeneratedAlbumArtMutation();
 
   const selectedCandidate = useMemo(() => {
-    if (!result.success || result.state !== 'generated') return null;
+    if (result.state !== 'generated') return null;
     return (
       result.candidates.find(
         candidate => candidate.id === selectedCandidateId
@@ -81,7 +86,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
     appliedCandidateId === selectedCandidateId;
 
   const handleApply = useCallback(() => {
-    if (!result.success || result.state !== 'generated' || !selectedCandidate) {
+    if (result.state !== 'generated' || !selectedCandidate) {
       return;
     }
 
@@ -113,20 +118,6 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
       }
     );
   }, [applyMutation, createMutation, profileId, result, selectedCandidate]);
-
-  if (!result.success) {
-    return (
-      <output className='block text-app text-primary-token'>
-        <span className='block font-medium text-red-500'>Album Art Failed</span>
-        <span className='mt-1 block text-secondary-token'>{result.error}</span>
-        {result.retryable ? (
-          <span className='mt-2 block text-xs text-tertiary-token'>
-            Retry from chat when the provider is available.
-          </span>
-        ) : null}
-      </output>
-    );
-  }
 
   if (result.state === 'needs_release_target') {
     return (
@@ -246,4 +237,19 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
       ) : null}
     </ChatGenerationArtifactSurface>
   );
+}
+
+export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
+  if (!result.success) {
+    return (
+      <ChatArtifactErrorCard
+        title='Album Art Failed'
+        message={result.error}
+        retryPrompt='Please retry generating album art.'
+        showRetry={result.retryable}
+      />
+    );
+  }
+
+  return <ChatAlbumArtCardSuccess result={result} profileId={profileId} />;
 }

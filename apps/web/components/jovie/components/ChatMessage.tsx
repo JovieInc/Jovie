@@ -11,6 +11,7 @@ import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
 import { AssistantMessageText } from './AssistantMessageText';
+import { ChatStepLimitAffordance } from './ChatStepLimitAffordance';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
 
@@ -28,6 +29,8 @@ interface ChatMessageProps {
   readonly profileId?: string;
   /** Skip entrance animation for messages loaded from persistence. */
   readonly skipEntrance?: boolean;
+  /** Show the inline continue affordance after a tool-step cap stop. */
+  readonly toolStepCapExhausted?: boolean;
   /**
    * Render generic app tool cards/status rows. Callers with surface-specific
    * tool cards can opt out and render their own tool UI beside the message.
@@ -48,7 +51,8 @@ function areChatMessagePropsEqual(
     previous.avatarUrl === next.avatarUrl &&
     previous.profileId === next.profileId &&
     previous.skipEntrance === next.skipEntrance &&
-    previous.renderTools === next.renderTools
+    previous.renderTools === next.renderTools &&
+    previous.toolStepCapExhausted === next.toolStepCapExhausted
   );
 }
 
@@ -61,6 +65,7 @@ export const ChatMessage = memo(function ChatMessage({
   profileId,
   skipEntrance,
   renderTools = true,
+  toolStepCapExhausted = false,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess: fallbackCopySuccess } = useClipboard();
@@ -113,7 +118,8 @@ export const ChatMessage = memo(function ChatMessage({
       return { dedupeKey, url: file.url, name: file.name };
     });
   })();
-  const hasAssistantContent = Boolean(messageText) || toolEvents.length > 0;
+  const hasAssistantContent =
+    Boolean(messageText) || toolEvents.length > 0 || toolStepCapExhausted;
   const useUserPillBubble =
     isUser &&
     imageChips.length === 0 &&
@@ -214,6 +220,8 @@ export const ChatMessage = memo(function ChatMessage({
                   hasMessageText={Boolean(messageText)}
                 />
               ) : null}
+
+              {toolStepCapExhausted ? <ChatStepLimitAffordance /> : null}
             </div>
           ) : null}
 
