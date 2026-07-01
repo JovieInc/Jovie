@@ -96,6 +96,50 @@ describe('LibraryMediaThumbnail', () => {
     expect(screen.getByText('1:46')).toBeInTheDocument();
   });
 
+  it('enables artwork hover zoom for merch and image assets', () => {
+    Object.defineProperty(globalThis, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+
+    render(
+      <LibraryMediaThumbnail
+        asset={buildAsset({
+          itemKind: 'merch',
+          previewUrl: null,
+          videoUrl: null,
+        })}
+        size='card'
+      />
+    );
+
+    const zoomSurface = screen.getByTestId(
+      'library-artwork-hover-zoom-surface'
+    );
+    vi.spyOn(zoomSurface, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 200,
+      bottom: 200,
+      width: 200,
+      height: 200,
+      toJSON: () => ({}),
+    });
+    fireEvent.mouseEnter(zoomSurface, { clientX: 40, clientY: 40 });
+    fireEvent.mouseMove(zoomSurface, { clientX: 60, clientY: 80 });
+
+    expect(
+      screen.getByTestId('library-artwork-hover-zoom-popover')
+    ).toBeInTheDocument();
+  });
+
   it('prefers video scrub previews when a canvas video URL exists', () => {
     render(
       <LibraryMediaThumbnail

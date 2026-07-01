@@ -30,6 +30,8 @@ import {
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks/ReleaseTaskChecklist';
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
+import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import type { EntityCardModel } from '@/components/organisms/entity-card';
 import {
   chatReleaseContextToEntityCard,
@@ -346,32 +348,21 @@ function ChatEntityContextCard({
 function buildChatContextMenuItems({
   title,
   href,
-  onInspect,
   onDismiss,
 }: Readonly<{
   title: string;
   href?: string | null;
-  onInspect?: () => void;
   onDismiss?: () => void;
 }>): ContextMenuItemType[] {
   const items: ContextMenuItemType[] = [];
 
-  if (onInspect) {
-    items.push({
-      id: 'inspect',
-      label: `Inspect ${title}`,
-      icon: <ExternalLink className='h-3.5 w-3.5' />,
-      onClick: onInspect,
-    });
-  }
-
   if (href) {
     items.push({
-      id: 'open',
-      label: `Open ${title}`,
+      id: 'open-smart-link',
+      label: 'Open Smart Link',
       icon: <ExternalLink className='h-3.5 w-3.5' />,
       onClick: () => {
-        window.location.assign(href);
+        globalThis.open(href, '_blank', 'noopener,noreferrer');
       },
     });
   }
@@ -587,17 +578,41 @@ function ChatReleaseEntityPanel({
     Boolean(visibleProviders && visibleProviders.length > 0);
   const shouldShowReleaseTasksSection =
     isTasksWorkspaceGateLoading || canAccessTasksWorkspace || showTasksUpgrade;
+  const panelTitle = release?.title ?? label ?? 'Release';
+  const smartLinkPath = release?.smartLinkPath;
   const contextMenuItems = useMemo<ContextMenuItemType[]>(
     () =>
       buildChatContextMenuItems({
-        title: release?.title ?? label ?? 'Release',
-        href: release?.smartLinkPath,
-        onInspect: release
-          ? () => router.push(buildReleaseTasksRoute(release.id))
-          : undefined,
+        title: panelTitle,
+        href: smartLinkPath,
       }),
-    [label, release, router]
+    [panelTitle, smartLinkPath]
   );
+  const headerOverflowActions = useMemo<DrawerHeaderAction[]>(() => {
+    const actions: DrawerHeaderAction[] = [];
+
+    if (smartLinkPath) {
+      actions.push({
+        id: 'open-smart-link',
+        label: 'Open Smart Link',
+        icon: ExternalLink,
+        onClick: () => {
+          globalThis.open(smartLinkPath, '_blank', 'noopener,noreferrer');
+        },
+      });
+    }
+
+    actions.push({
+      id: 'copy-title',
+      label: 'Copy Title',
+      icon: Copy,
+      onClick: () => {
+        void globalThis.navigator?.clipboard?.writeText(panelTitle);
+      },
+    });
+
+    return actions;
+  }, [panelTitle, smartLinkPath]);
 
   useEffect(() => {
     setShowTasksUpgrade(true);
@@ -616,16 +631,11 @@ function ChatReleaseEntityPanel({
               {release?.title ?? label ?? 'Release'}
             </h2>
           </div>
-          <Button
-            type='button'
-            variant='ghost'
-            size='icon'
-            aria-label='Close Entity Panel'
-            onClick={onClose}
-            className='system-b-chat-entity-panel-close'
-          >
-            <X className='h-4 w-4' />
-          </Button>
+          <DrawerHeaderActions
+            primaryActions={[]}
+            overflowActions={headerOverflowActions}
+            onClose={onClose}
+          />
         </div>
 
         {loading ? (
@@ -875,16 +885,11 @@ function ChatSimpleEntityPanel({
           <p className='system-b-chat-entity-panel-eyebrow'>{eyebrow}</p>
           <h2 className='system-b-chat-entity-panel-title'>{title}</h2>
         </div>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon'
-          aria-label='Close Entity Panel'
-          onClick={onClose}
-          className='system-b-chat-entity-panel-close'
-        >
-          <X className='h-4 w-4' />
-        </Button>
+        <DrawerHeaderActions
+          primaryActions={[]}
+          overflowActions={[]}
+          onClose={onClose}
+        />
       </div>
       {loading ? (
         <div className='system-b-chat-entity-panel-status'>Loading…</div>
