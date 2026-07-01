@@ -22,6 +22,7 @@ export interface ChatTimelineMessage {
   readonly requestId?: string;
   readonly serverMessageId?: string;
   readonly failedReason?: string;
+  readonly toolStepCapExhausted?: boolean;
   readonly updatedAt: number;
   readonly completedAt?: number;
   readonly streamRevision: number;
@@ -129,6 +130,7 @@ export type ChatTimelineEvent =
       readonly clientTurnId: string;
       readonly turnId?: string | null;
       readonly parts?: MessagePart[];
+      readonly toolStepCapExhausted?: boolean;
     })
   | (BaseEvent & {
       readonly type: 'assistant.stream.failed';
@@ -344,6 +346,7 @@ function markRetryStarted(
             ...message,
             status: message.role === 'user' ? 'sending' : 'pending',
             failedReason: undefined,
+            toolStepCapExhausted: undefined,
             updatedAt: now,
           }
         : message
@@ -442,6 +445,8 @@ function completeStream(
         parts: completedParts,
         turnId: event.turnId ?? message.turnId,
         requestId: event.requestId ?? message.requestId,
+        toolStepCapExhausted:
+          event.toolStepCapExhausted ?? message.toolStepCapExhausted,
         updatedAt: now,
         completedAt: now,
         streamRevision: message.streamRevision + 1,
