@@ -41,7 +41,7 @@ export async function requireMobileProfileSession(request: Request): Promise<
   const session = await getSessionContext({
     clerkUserId: userId,
     requireUser: true,
-    requireProfile: true,
+    requireProfile: false,
   });
 
   if (!session.profile) {
