@@ -150,6 +150,7 @@ interface ChatThreadMessage {
   readonly role: 'user' | 'assistant' | 'system';
   readonly status?: string;
   readonly parts: MessagePart[];
+  readonly toolStepCapExhausted?: boolean;
 }
 
 interface ChatThreadMessagesProps {
@@ -229,6 +230,7 @@ export function ChatThreadMessages({
                     avatarUrl={message.role === 'user' ? avatarUrl : undefined}
                     profileId={profileId}
                     skipEntrance={knownMessageIds.has(message.id)}
+                    toolStepCapExhausted={message.toolStepCapExhausted}
                   />
                 </div>
               </div>
@@ -257,6 +259,7 @@ export function ChatThreadMessages({
                   avatarUrl={message.role === 'user' ? avatarUrl : undefined}
                   profileId={profileId}
                   skipEntrance={knownMessageIds.has(message.id)}
+                  toolStepCapExhausted={message.toolStepCapExhausted}
                 />
               </div>
             );

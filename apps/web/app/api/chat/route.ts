@@ -599,11 +599,15 @@ function buildChatTurnMetadata(input: {
   readonly conversationId: string;
   readonly turnId: string;
   readonly requestId: string;
+  readonly toolStepCapExhausted?: boolean;
 }) {
   return {
     conversationId: input.conversationId,
     turnId: input.turnId,
     requestId: input.requestId,
+    ...(input.toolStepCapExhausted
+      ? { toolStepCapExhausted: true as const }
+      : {}),
   };
 }
 
@@ -2821,6 +2825,7 @@ export async function POST(req: Request) {
               conversationId: reservedTurn.conversationId,
               turnId: reservedTurn.turnId,
               requestId,
+              toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,
       onFinish: async ({ responseMessage, isAborted }) => {

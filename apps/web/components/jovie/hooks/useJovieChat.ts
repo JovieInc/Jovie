@@ -85,6 +85,7 @@ interface ChatTurnMetadata {
   readonly conversationId?: string;
   readonly turnId?: string;
   readonly requestId?: string;
+  readonly toolStepCapExhausted?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -98,9 +99,13 @@ function extractChatTurnMetadata(value: unknown): ChatTurnMetadata | null {
   const turnId = typeof value.turnId === 'string' ? value.turnId : undefined;
   const requestId =
     typeof value.requestId === 'string' ? value.requestId : undefined;
+  const toolStepCapExhausted =
+    value.toolStepCapExhausted === true ? true : undefined;
 
-  if (!conversationId && !turnId && !requestId) return null;
-  return { conversationId, turnId, requestId };
+  if (!conversationId && !turnId && !requestId && !toolStepCapExhausted) {
+    return null;
+  }
+  return { conversationId, turnId, requestId, toolStepCapExhausted };
 }
 
 function inferToolIntentFromPrompt(text: string): string | null {
@@ -518,6 +523,7 @@ export function useJovieChat({
           turnId: metadata?.turnId,
           requestId: metadata?.requestId,
           parts: getMessageParts(message as UIMessage),
+          toolStepCapExhausted: metadata?.toolStepCapExhausted,
           now: Date.now(),
         });
       }
@@ -677,14 +683,16 @@ export function useJovieChat({
   // instead of waiting for the 30s safety timeout.
   const stop = useCallback(() => {
     const clientTurnId = activeClientTurnIdRef.current;
+    const assistantMessage = getLastAssistantMessage(sdkMessagesRef.current);
+    const assistantParts = getMessageParts(assistantMessage);
     rawStop();
     if (clientTurnId) {
       dispatchTimelineEvent({
-        type: 'assistant.stream.failed',
+        type: 'assistant.stream.completed',
         conversationId: activeConversationId,
         clientTurnId,
         requestId: clientTurnId,
-        error: 'Response stopped.',
+        parts: assistantParts,
         now: Date.now(),
       });
       activeClientTurnIdRef.current = null;

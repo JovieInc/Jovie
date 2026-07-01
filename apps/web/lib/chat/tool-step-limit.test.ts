@@ -2,11 +2,22 @@ import { stepCountIs } from 'ai';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHAT_TOOL_STEP_LIMIT_AFFORDANCE_MESSAGE,
+  CHAT_TOOL_STEP_LIMIT_CONTINUE_PROMPT,
   CHAT_TOOL_STEP_LIMIT_FREE,
   CHAT_TOOL_STEP_LIMIT_PAID,
   isChatToolStepCapExhausted,
   resolveChatToolStepLimit,
 } from '@/lib/chat/tool-step-limit';
+
+describe('step-limit affordance copy', () => {
+  it('exposes stable continue affordance copy', () => {
+    expect(CHAT_TOOL_STEP_LIMIT_AFFORDANCE_MESSAGE).toBe(
+      'I hit the step limit — continue?'
+    );
+    expect(CHAT_TOOL_STEP_LIMIT_CONTINUE_PROMPT).toBe('continue');
+  });
+});
 
 describe('resolveChatToolStepLimit', () => {
   it('uses the paid cap when advanced tools are enabled', () => {
