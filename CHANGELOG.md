@@ -28,6 +28,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **Smoother dashboard interactions (JOV-3800)**: opening a release, contact, or tour-date panel from chat now shows the details instantly instead of a brief loading state; settings pages no longer nudge when a change is being saved; and the calendar keeps its layout steady while it first loads.
 - [internal] Pre-push Biome gate scopes to changed files (mirroring CI) instead of a repo-wide `biome check .`, so pre-existing Biome drift on `main` no longer blocks `git push` from every worktree and stops training agents toward the `JOVIE_SKIP_PRE_PUSH_GATE=1` escape hatch (GitHub #12475).
 - [internal] Cleared the pre-existing Biome drift on `main` that #12475 unblocked (GitHub #12482): `biome format` reflow of `globals.css` + `design-system.css` (whitespace-only — design tokens byte-identical with whitespace stripped) and `biome migrate` on `biome.json` (schema `2.4.8`→`2.5.1`, deprecated `recommended: false`→`preset: "none"`). `biome ci .` is now clean. The issue's `setup.ts` and public-SVG `noSvgWithoutTitle` buckets were already non-issues on current main (Biome 2.5.1 does not lint raw `.svg` files).
 - **Library share links no longer error on re-open**: opening a release that already has share settings — or two tabs opening it at once — previously returned a 500. The "ensure share settings exist" path is now idempotent under a concurrent first-open race via an `ON CONFLICT DO NOTHING` insert plus re-read (GitHub #12407).

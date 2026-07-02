@@ -464,7 +464,7 @@ export function CalendarPageClient() {
                   setCursor(startOfMonth(next));
                 }}
                 className='system-b-calendar-icon-button grid h-7 w-7 place-items-center transition-colors duration-subtle ease-subtle'
-                aria-label='Previous month'
+                aria-label='Previous Month'
               >
                 <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
               </button>
@@ -479,7 +479,7 @@ export function CalendarPageClient() {
                   setCursor(startOfMonth(next));
                 }}
                 className='system-b-calendar-icon-button grid h-7 w-7 place-items-center transition-colors duration-subtle ease-subtle'
-                aria-label='Next month'
+                aria-label='Next Month'
               >
                 <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
               </button>
@@ -680,7 +680,7 @@ export function CalendarPageClient() {
                 <div className='mt-4'>
                   <div className='flex items-center justify-between'>
                     <h4 className='system-b-calendar-warning-heading font-medium'>
-                      Pending review · {pendingSelectedEvents.length}
+                      Pending Review · {pendingSelectedEvents.length}
                     </h4>
                   </div>
                   <ul className='mt-2 flex flex-col gap-2'>
@@ -774,11 +774,16 @@ export function CalendarPageClient() {
             </section>
           )}
 
-          {isLoading && (
-            <div className='system-b-calendar-loading-text'>
-              Loading calendar…
-            </div>
-          )}
+          {/* Always rendered so cold-load → loaded never changes page height */}
+          <div
+            className={cn(
+              'system-b-calendar-loading-text',
+              !isLoading && 'invisible'
+            )}
+            aria-hidden={!isLoading}
+          >
+            Loading calendar…
+          </div>
         </div>
       </PageContent>
     </PageShell>

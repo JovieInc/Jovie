@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { QueryClientContext } from '@tanstack/react-query';
 import {
   Calendar,
   CheckSquare,
@@ -21,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
@@ -46,6 +48,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { resolveChatRailContextLabel } from '@/lib/chat/context-label';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
+import { prefetchChatEntityPanelData } from '@/lib/queries/prefetch-dashboard';
 import { useContactsQuery } from '@/lib/queries/useContactsQuery';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
@@ -1021,6 +1024,15 @@ export function ChatEntityRightPanelHost({
   const { open: openPreviewPanel } = usePreviewPanelState();
   const { target, contextTargets, close, dismissContext } =
     useChatEntityPanel();
+  // Nullable so the host also renders outside a QueryClientProvider (tests).
+  const queryClient = useContext(QueryClientContext);
+
+  // Warm the panel data caches up front so clicking an entity chip opens a
+  // fully-painted panel — never a loading state on drawer open (JOV-3800).
+  useEffect(() => {
+    if (!enableChatEntityPanels || !profileId || !queryClient) return;
+    prefetchChatEntityPanelData(queryClient, profileId);
+  }, [enableChatEntityPanels, profileId, queryClient]);
 
   const handleOpenProfilePreview = useCallback(() => {
     close();
