@@ -1559,9 +1559,11 @@ tests:
           - proposeProfileEdit
           - proposeSocialLink
           - proposeSocialLinkRemoval
+          - proposeVideoRecording
           - publishMerchCard
           - recordInterviewSignal
           - reorderMerchCards
+          - retouchImage
           - searchSpotifyArtist
           - selectMerchDesign
           - showAccountStatus
@@ -2807,6 +2809,50 @@ tests:
         releaseTitle: Neon Reef
         styleId: analog_dream
         prompt: "Moonlit ocean textures with soft modular synth equipment."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts paid photo retouch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Retouch my profile photo."
+      target: tool-contract
+      toolName: retouchImage
+      mode: app
+      plan: pro
+      toolInput:
+        styleId: white-space
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts paid video recording proposal
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Propose a promo video recording."
+      target: tool-contract
+      toolName: proposeVideoRecording
+      mode: app
+      plan: pro
+      toolInput:
+        kind: promo
+        title: "Release day shout-out"
+        script: "Hey everyone, Neon Reef is out now. Thank you so much for listening."
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

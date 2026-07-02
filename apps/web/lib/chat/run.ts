@@ -158,6 +158,11 @@ export interface ExecuteChatTurnInput {
   mode?: 'app' | 'onboarding';
 }
 
+export interface ChatTurnFinishSignals {
+  /** True when the model still wanted another tool round at the step cap. */
+  readonly toolStepCapExhausted: boolean;
+}
+
 export interface ExecuteChatTurnResult {
   /** The streamText result. Caller wraps with `.toUIMessageStreamResponse()`. */
   streamResult: ReturnType<typeof streamText>;
@@ -169,6 +174,8 @@ export interface ExecuteChatTurnResult {
   toolNames: readonly string[];
   /** Pre-converted model messages (the AI SDK input). */
   modelMessages: ModelMessage[];
+  /** Terminal signals populated as the model stream finishes. */
+  readonly turnSignals: ChatTurnFinishSignals;
 }
 
 /**
@@ -282,6 +289,7 @@ export async function executeChatTurn(
   const toolStepLimit = resolveChatToolStepLimit(
     planLimits.booleans.aiCanUseTools
   );
+  const turnSignals = { toolStepCapExhausted: false };
 
   const disclosureProbeText =
     lastUserText ?? extractLastUserText(uiMessages) ?? '';
@@ -391,6 +399,8 @@ export async function executeChatTurn(
         return;
       }
 
+      turnSignals.toolStepCapExhausted = true;
+
       telemetry?.setTags?.({
         chat_tool_step_cap_exhausted: 'true',
       });
@@ -440,6 +450,7 @@ export async function executeChatTurn(
     systemPrompt,
     toolNames,
     modelMessages,
+    turnSignals,
   };
 }
 

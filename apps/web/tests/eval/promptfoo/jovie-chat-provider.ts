@@ -117,6 +117,7 @@ import {
 } from '@/lib/services/pitch/prompts';
 import { resolvePitchDestination } from '@/lib/services/pitch/targets';
 import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
+import { RECORDABLE_VIDEO_KINDS } from '@/lib/teleprompter/types';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { httpUrlSchema } from '@/lib/validation/schemas/base';
@@ -444,6 +445,15 @@ const ADVANCED_TOOL_SCHEMAS = {
       instructions: z.string().max(700).optional(),
     }),
   },
+  proposeVideoRecording: {
+    description:
+      'Propose recording a short talking-head video in the Jovie app. Use when Jovie has written a promo, thank-you, or behind-the-scenes script and the artist should record it. Shows Upload video and Record in app actions with an optional teleprompter showcase.',
+    inputSchema: z.object({
+      kind: z.enum(RECORDABLE_VIDEO_KINDS),
+      title: z.string().min(3).max(120),
+      script: z.string().min(12).max(1200),
+    }),
+  },
 } as const;
 
 const ALL_EVAL_TOOL_SCHEMAS = {
@@ -489,6 +499,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'createPromoStrategy',
   'markCanvasUploaded',
   'formatLyrics',
+  'proposeVideoRecording',
 ] as const;
 
 const PAID_TOOL_NAMES = [
@@ -4888,6 +4899,13 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
         releaseTitle: 'Neon Reef',
         target: 'playlist',
         platform: 'spotify',
+      };
+    case 'proposeVideoRecording':
+      return {
+        kind: 'promo',
+        title: 'Release day shout-out',
+        script:
+          'Hey everyone, Neon Reef is out now. Thank you so much for listening.',
       };
     default:
       return {};
