@@ -260,8 +260,6 @@ export const ServerEnvSchema = z.object({
   ELEVENLABS_API_KEY: z.string().optional(),
   ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
 
-  // Braintrust observability (LLM tracing + evals)
-  BRAINTRUST_API_KEY: z.string().optional(),
   /** Set to `1` to allow local Sentry bootstrap in dev/test/E2E. */
   JOVIE_ENABLE_LOCAL_SENTRY: z.enum(['0', '1']).optional(),
 
@@ -503,7 +501,6 @@ export const ENV_KEYS = [
   'OPENAI_API_KEY',
   'ELEVENLABS_API_KEY',
   'ELEVENLABS_WEBHOOK_SECRET',
-  'BRAINTRUST_API_KEY',
   'JOVIE_ENABLE_LOCAL_SENTRY',
   'AGNOST_ORG_ID',
   'JOVIE_ENABLE_AGNOST',

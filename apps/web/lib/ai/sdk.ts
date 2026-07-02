@@ -1,7 +1,6 @@
 import 'server-only';
 import { createGateway, gateway as defaultGateway } from '@ai-sdk/gateway';
 import * as ai from 'ai';
-import { wrapAISDK } from 'braintrust';
 
 import { env } from '@/lib/env-server';
 import {
@@ -14,13 +13,10 @@ import {
   wrapStreamTextResult,
 } from '@/lib/eval/leak-guard';
 
-// wrapAISDK returns a Proxy. Defer the wrap and per-key access to call time
-// so partial vi.mock('ai') in unit tests doesn't fault on sibling exports
-// the test never invokes.
-let cachedWrapped: typeof ai | null = null;
+// Braintrust removed (2026-07-02): calls go straight to the AI SDK. Keep the
+// indirection so leak-guard wrapping stays in one place.
 function getWrapped(): typeof ai {
-  if (!cachedWrapped) cachedWrapped = wrapAISDK(ai);
-  return cachedWrapped;
+  return ai;
 }
 
 function leakGuardContext(
