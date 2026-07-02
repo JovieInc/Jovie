@@ -128,6 +128,14 @@
       "remediation": "A sensitive change requires smoke evidence. Use the Playwright report and keep full E2E out of the default PR path."
     },
     {
+      "id": "ci-golden-path",
+      "name": "Golden Path (PR)",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": true,
+      "nextLocalCommand": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci",
+      "remediation": "The launch-gate golden path (signup -> onboarding -> import -> live public profile) regressed. Reproduce locally with the pinned Doppler command; do not weaken the spec to pass."
+    },
+    {
       "id": "ci-pr-vercel-preview",
       "name": "Preview Deploy (PR)",
       "tier": "preview-evidence",
