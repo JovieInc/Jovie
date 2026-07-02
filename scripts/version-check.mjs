@@ -32,10 +32,22 @@ if (!parsed) {
   const now = new Date();
   const yy = now.getUTCFullYear() % 100;
   const mm = now.getUTCMonth() + 1;
+  // Stamping is main-only and happens post-merge, so version.json lawfully
+  // lags the calendar between a UTC month rollover and the first release of
+  // the new month. Accept the previous month as a grace window; anything
+  // older is real CalVer drift (broke every branch on 2026-07-01 while main
+  // still read 26.6.x).
+  const prev = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
+  );
+  const prevYy = prev.getUTCFullYear() % 100;
+  const prevMm = prev.getUTCMonth() + 1;
+  const matchesCurrent = year === yy && month === mm;
+  const matchesPrevious = year === prevYy && month === prevMm;
 
-  if (year !== yy || month !== mm) {
+  if (!matchesCurrent && !matchesPrevious) {
     errors.push(
-      `version.json (${currentVersion}) does not match current UTC calendar (${yy}.${mm}.x).`
+      `version.json (${currentVersion}) does not match current UTC calendar (${yy}.${mm}.x) or the previous month (${prevYy}.${prevMm}.x).`
     );
   }
 }
