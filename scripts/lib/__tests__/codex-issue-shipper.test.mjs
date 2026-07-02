@@ -8,10 +8,12 @@ import {
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   eligibleCodexIssues,
+  finishDispatch,
   loadShipperConfig,
   NO_AUTO_LABEL,
   selectTaskRoute,
   shellQuote,
+  worktreeHasWork,
 } from '../../hermes/lib/codex-issue-shipper.ts';
 
 const config = {
@@ -352,5 +354,112 @@ describe('codex issue shipper prompt', () => {
     expect(command.args).not.toContain('--sandbox');
     expect(command.args).not.toContain('exec');
     expect(command.args).not.toContain('-C');
+  });
+});
+
+describe('deterministic finisher', () => {
+  const issue = {
+    number: 12721,
+    title:
+      'Ovie TS github-issue shipper:   grok agents abandon the ship contract',
+    body: '',
+    url: 'https://github.com/JovieInc/Jovie/issues/12721',
+    updatedAt: '2026-07-02T00:00:00.000Z',
+    labels: [],
+  };
+
+  function fakeRunner(responses) {
+    const calls = [];
+    const run = (args, opts) => {
+      calls.push({ args, opts });
+      const key = args.slice(0, 3).join(' ');
+      for (const [prefix, out] of Object.entries(responses)) {
+        if (key.startsWith(prefix)) return out;
+      }
+      return '';
+    };
+    return { run, calls };
+  }
+
+  it('worktreeHasWork: dirty tree counts', () => {
+    const { run } = fakeRunner({ 'git status --porcelain': ' M a.ts\n' });
+    expect(worktreeHasWork(run)).toBe(true);
+  });
+
+  it('worktreeHasWork: clean tree but unpushed commits count', () => {
+    const { run } = fakeRunner({
+      'git status --porcelain': '',
+      'git rev-list --count': '2\n',
+    });
+    expect(worktreeHasWork(run)).toBe(true);
+  });
+
+  it('worktreeHasWork: clean tree, no commits ahead — no work', () => {
+    const { run } = fakeRunner({
+      'git status --porcelain': '',
+      'git rev-list --count': '0\n',
+    });
+    expect(worktreeHasWork(run)).toBe(false);
+  });
+
+  it('finishDispatch commits dirty work, pushes, and opens the PR', () => {
+    const { run, calls } = fakeRunner({
+      'git status --porcelain': ' M a.ts\n',
+    });
+    finishDispatch(run, {
+      repo: 'JovieInc/Jovie',
+      branchName: 'codex/gh-12721-x',
+      issue,
+      logPath: '/tmp/agent.log',
+    });
+    const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
+    expect(cmds).toEqual([
+      'git status',
+      'git add',
+      'git -c',
+      'git push',
+      'gh pr',
+    ]);
+    const commit = calls[2].args;
+    expect(commit).toContain('commit');
+    const msg = commit[commit.indexOf('-m') + 1];
+    expect(msg).toMatch(
+      /^chore\(codex\): Ovie TS github-issue shipper: grok agents abandon/
+    );
+    expect(msg).toContain('(#12721)');
+    // hooks get a long timeout
+    expect(calls[2].opts?.timeoutMs).toBeGreaterThan(60_000);
+    const prCreate = calls[4].args;
+    expect(prCreate).toContain('--head');
+    expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Closes #12721');
+  });
+
+  it('finishDispatch skips commit when work is already committed', () => {
+    const { run, calls } = fakeRunner({ 'git status --porcelain': '' });
+    finishDispatch(run, {
+      repo: 'JovieInc/Jovie',
+      branchName: 'codex/gh-12721-x',
+      issue,
+      logPath: '/tmp/agent.log',
+    });
+    const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
+    expect(cmds).toEqual(['git status', 'git push', 'gh pr']);
+  });
+
+  it('finishDispatch propagates a failing step (caller releases the claim)', () => {
+    const run = args => {
+      if (args[0] === 'git' && args[1] === 'push')
+        throw new Error('push rejected');
+      return ' M a.ts\n';
+    };
+    expect(() =>
+      finishDispatch(run, {
+        repo: 'JovieInc/Jovie',
+        branchName: 'codex/gh-12721-x',
+        issue,
+        logPath: '/tmp/agent.log',
+      })
+    ).toThrow('push rejected');
   });
 });

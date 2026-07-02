@@ -38,6 +38,8 @@ import {
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   type DispatchPlan,
+  type FinisherRunner,
+  finishDispatch,
   type GbrainContext,
   type GithubIssue,
   HUMAN_REVIEW_LABEL,
@@ -45,6 +47,7 @@ import {
   loadShipperConfig,
   NO_AUTO_LABEL,
   type ShipperConfig,
+  worktreeHasWork,
 } from '../lib/codex-issue-shipper';
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
@@ -851,7 +854,50 @@ async function dispatchPlan(
       return;
     }
 
-    const pr = findPrForBranch(config, dispatch.branchName);
+    let pr = findPrForBranch(config, dispatch.branchName);
+
+    // Deterministic finisher: the agent exited 0 without opening a PR, but
+    // may have left real work in the worktree (grok 0.2.77 abandons the
+    // long ship contract mid-task). Same trust model as the kanban lane —
+    // the model produces the diff, deterministic code owns commit/push/PR.
+    // Pre-commit hooks gate the commit; any failure falls through to the
+    // existing release-for-retry path.
+    if (!pr) {
+      const runInWorktree: FinisherRunner = (args, opts) =>
+        execFileSync(args[0], args.slice(1), {
+          cwd: prepared.repoRoot,
+          encoding: 'utf8',
+          timeout: opts?.timeoutMs ?? 30_000,
+          maxBuffer: 5 * 1024 * 1024,
+        });
+      try {
+        if (worktreeHasWork(runInWorktree)) {
+          finishDispatch(runInWorktree, {
+            repo: config.repo,
+            branchName: dispatch.branchName,
+            issue: dispatch.issue,
+            logPath: agentResult.logPath,
+          });
+          pr = findPrForBranch(config, dispatch.branchName);
+          logJobEvent({
+            job: JOB,
+            event: 'deterministic_finish_shipped',
+            issue: dispatch.issue.number,
+            branch: dispatch.branchName,
+            pr: pr?.number,
+          });
+        }
+      } catch (err) {
+        logJobEvent({
+          job: JOB,
+          event: 'deterministic_finish_failed',
+          issue: dispatch.issue.number,
+          branch: dispatch.branchName,
+          error: shortError(err),
+        });
+      }
+    }
+
     if (!pr) {
       releaseClaimForRetry(
         config,
