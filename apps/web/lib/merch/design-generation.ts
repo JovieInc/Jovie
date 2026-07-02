@@ -17,11 +17,12 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 import { put } from '@vercel/blob';
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { uploadBufferToBlob } from '@/app/api/images/upload/lib/blob-upload';
 import { db } from '@/lib/db';
 import {
   type MerchArtistBrief,
+  merchCards,
   merchDesignOptions,
   merchGenerationBatches,
 } from '@/lib/db/schema/merch';
@@ -128,6 +129,55 @@ function defaultPricing() {
 }
 
 /**
+ * Selection is the win signal: a model whose design the artist picks earns a
+ * higher weight. `weight = 1 + picks` (Laplace-smoothed) so an unpicked model
+ * still starts at 1 and stays in rotation via the selector's floor — the A/B
+ * gently converges to the artist's preferred aesthetic without ever locking a
+ * model out. Pure + exported for testing.
+ */
+export function selectionCountsToWeights(
+  rows: readonly { readonly modelKey: string | null; readonly count: number }[]
+): Record<string, number> {
+  const weights: Record<string, number> = {};
+  for (const { modelKey, count } of rows) {
+    if (modelKey) weights[modelKey] = 1 + Math.max(0, count);
+  }
+  return weights;
+}
+
+/** Per-artist model weights from how often each model's design was selected. */
+async function getModelSelectionWeights(
+  profileId: string
+): Promise<Record<string, number>> {
+  try {
+    const rows = await db
+      .select({
+        modelKey: drizzleSql<
+          string | null
+        >`${merchDesignOptions.learning}->>'imageModelKey'`,
+        count: drizzleSql<number>`count(*)::int`,
+      })
+      .from(merchCards)
+      .innerJoin(
+        merchDesignOptions,
+        eq(merchCards.selectedDesignOptionId, merchDesignOptions.id)
+      )
+      .where(eq(merchCards.creatorProfileId, profileId))
+      .groupBy(drizzleSql`${merchDesignOptions.learning}->>'imageModelKey'`);
+    return selectionCountsToWeights(rows);
+  } catch (error) {
+    // Never let a weights read break generation — fall back to equal weighting.
+    logger.warn(
+      '[merch-designs] model weight read failed; using equal weights',
+      {
+        err: error instanceof Error ? error.message : String(error),
+      }
+    );
+    return {};
+  }
+}
+
+/**
  * Fire-and-forget: render the fulfillment-accurate Printful mockup for each
  * design (the alpha graphic on the real default product) and attach it. The
  * selected card then prefers the truthful Printful photo over the alpha preview
@@ -198,6 +248,9 @@ export async function generateMerchDesigns(params: {
     status: 'generating',
   });
 
+  // Bias model selection toward the artist's previously-picked aesthetic.
+  const modelWeights = await getModelSelectionWeights(params.profileId);
+
   const directions = STYLE_DIRECTIONS.slice(0, count);
   const grossMargin =
     pricing.retailPriceCents -
@@ -212,6 +265,7 @@ export async function generateMerchDesigns(params: {
         try {
           const graphic = await generatePrintGraphic({
             prompt: buildImagePrompt(name, params.prompt, direction.style),
+            selection: { weights: modelWeights },
           });
           const previewUrl = await uploadAlphaPng(
             `merch/generated/${params.profileId}/${generationId}/${optionId}.png`,
@@ -266,6 +320,7 @@ export async function generateMerchDesigns(params: {
               motifs: [direction.label],
               selectedOverOptionIds: [],
               rejectedAttributes: [],
+              imageModelKey: graphic.modelKey,
             },
           });
 
