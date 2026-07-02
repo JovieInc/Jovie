@@ -52,6 +52,20 @@ const BRAND_SCHEMA = {
   description: BRAND_PAGE_DESCRIPTION,
   url: `${BASE_URL}/brand`,
   isPartOf: { '@type': 'WebSite', name: APP_NAME, url: BASE_URL },
+  about: {
+    '@type': 'Organization',
+    name: APP_NAME,
+    description: 'Closed-loop operating system for music artists with AI agents for release planning, fan capture, and marketing automation.',
+    url: BASE_URL,
+    knowsAbout: [
+      'AI agent for artists',
+      'artist operating system',
+      'music marketing automation',
+      'release growth flywheel',
+    ],
+  },
+  keywords: ['Jovie', 'artist OS', 'music marketing'],
+  dateModified: new Date().toISOString(),
 };
 
 const sectionShell = 'system-b-brand-section';
@@ -63,45 +77,59 @@ const proseStrong = 'system-b-brand-copy system-b-brand-copy--strong';
 const smallText = 'system-b-brand-small';
 
 const DOWNLOADS = [
+  // Marks (light/dark)
   {
-    label: 'Download SVG Mark, Ink',
-    file: 'Jovie-Logo-Icon-Black.svg',
-    href: '/brand/Jovie-Logo-Icon-Black.svg',
+    label: 'SVG Mark — Ink (dark)',
+    file: 'Jovie-Logo-Mark-Black.svg',
+    href: '/brand/Jovie-Logo-Mark-Black.svg',
   },
   {
-    label: 'Download SVG Mark, Cream',
-    file: 'Jovie-Logo-Icon-White.svg',
-    href: '/brand/Jovie-Logo-Icon-White.svg',
+    label: 'SVG Mark — Cream (light)',
+    file: 'Jovie-Logo-Mark-Cream.svg',
+    href: '/brand/Jovie-Logo-Mark-Cream.svg',
+  },
+  // Wordmarks (light/dark)
+  {
+    label: 'SVG Wordmark — Ink (dark)',
+    file: 'Jovie-Wordmark-Black.svg',
+    href: '/brand/Jovie-Wordmark-Black.svg',
   },
   {
-    label: 'Download PNG Mark, 1024',
+    label: 'SVG Wordmark — Cream (light)',
+    file: 'Jovie-Wordmark-Cream.svg',
+    href: '/brand/Jovie-Wordmark-Cream.svg',
+  },
+  // Lockups (light/dark)
+  {
+    label: 'SVG Lockup — Ink (dark)',
+    file: 'Jovie-Lockup-Black.svg',
+    href: '/brand/Jovie-Lockup-Black.svg',
+  },
+  {
+    label: 'SVG Lockup — Cream (light)',
+    file: 'Jovie-Lockup-Cream.svg',
+    href: '/brand/Jovie-Lockup-Cream.svg',
+  },
+  // Raster assets
+  {
+    label: 'PNG Mark, 1024',
     file: 'apple-touch-icon.png',
     href: '/apple-touch-icon.png',
   },
   {
-    label: 'Download PNG Favicon, 32',
+    label: 'PNG Favicon, 32',
     file: 'favicon-32x32.png',
     href: '/favicon-32x32.png',
   },
   {
-    label: 'Download PNG PWA, 192',
+    label: 'PNG PWA, 192',
     file: 'web-app-manifest-192x192.png',
     href: '/web-app-manifest-192x192.png',
   },
   {
-    label: 'Download PNG PWA, 512',
+    label: 'PNG PWA, 512',
     file: 'web-app-manifest-512x512.png',
     href: '/web-app-manifest-512x512.png',
-  },
-  {
-    label: 'Download SVG Wordmark, Cream',
-    file: 'Jovie-Logo-Wordmark-Alt-White.svg',
-    href: '/brand/Jovie-Logo-Wordmark-Alt-White.svg',
-  },
-  {
-    label: 'Download SVG Wordmark, Ink',
-    file: 'Jovie-Logo-Wordmark-Alt-Black.svg',
-    href: '/brand/Jovie-Logo-Wordmark-Alt-Black.svg',
   },
 ] as const;
 
