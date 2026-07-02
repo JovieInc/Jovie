@@ -20,7 +20,8 @@ struct JovieAppIntentsTests {
     _ = try await intent.perform()
 
     #expect(
-      IntentNavigationStore.shared.consume() == .sendMessage("launch my single")
+      IntentNavigationStore.shared.consume() ==
+        .sendMessage(text: "launch my single", autoSend: true)
     )
   }
 

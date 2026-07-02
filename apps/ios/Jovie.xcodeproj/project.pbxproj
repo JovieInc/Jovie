@@ -25,6 +25,7 @@
 		71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */; };
 		74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E33DCDBD6A55190F563B419C /* DashboardView.swift */; };
 		7F479BE5BDDDDCF9BFFF256B /* JovieAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */; };
+		A0J0V11070000000000000002 /* ConversationUserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V11070000000000000001 /* ConversationUserActivity.swift */; };
 		8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */; };
 		89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */; };
 		964DEFE0F4D4206832B6888E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969DB5F8041C9A004CDB5234 /* RootView.swift */; };
@@ -83,6 +84,7 @@
 		EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93DB506915B418D06E897A4 /* AppStateTests.swift */; };
 		F178AB3E908746C78645E4EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E151E782B5462F89618579 /* SettingsView.swift */; };
 		F232904F618A4671B805D0BC /* JovieAppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4562819B40056163650929C /* JovieAppIntentsTests.swift */; };
+		A0J0V11070000000000000004 /* ConversationUserActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V11070000000000000003 /* ConversationUserActivityTests.swift */; };
 		F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FB8A38A81A1249F313D416 /* NeedsOnboardingView.swift */; };
 		F8BC948A5A68297B746E217F /* MeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918FBCBCF600AA8C10191F60 /* MeCache.swift */; };
 		F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */; };
@@ -111,6 +113,8 @@
 		000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
 		00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieApp.swift; sourceTree = "<group>"; };
 		0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntents.swift; sourceTree = "<group>"; };
+		A0J0V11070000000000000001 /* ConversationUserActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationUserActivity.swift; sourceTree = "<group>"; };
+		A0J0V11070000000000000003 /* ConversationUserActivityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationUserActivityTests.swift; sourceTree = "<group>"; };
 		178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenBrightnessManagerTests.swift; sourceTree = "<group>"; };
 		191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeRepositoryTests.swift; sourceTree = "<group>"; };
 		26F157EB66EC5E06F7EE8974 /* IntentNavigationStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentNavigationStore.swift; sourceTree = "<group>"; };
@@ -305,6 +309,7 @@
 				A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */,
 				5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */,
 				F4562819B40056163650929C /* JovieAppIntentsTests.swift */,
+				A0J0V11070000000000000003 /* ConversationUserActivityTests.swift */,
 			);
 			name = JovieTests;
 			path = JovieTests;
@@ -361,6 +366,7 @@
 			children = (
 				26F157EB66EC5E06F7EE8974 /* IntentNavigationStore.swift */,
 				0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */,
+				A0J0V11070000000000000001 /* ConversationUserActivity.swift */,
 			);
 			name = Intents;
 			path = Intents;
@@ -659,6 +665,7 @@
 				E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */,
 				71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */,
 				F232904F618A4671B805D0BC /* JovieAppIntentsTests.swift in Sources */,
+				A0J0V11070000000000000004 /* ConversationUserActivityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -712,6 +719,7 @@
 				FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */,
 				5E40E80F8AFF20CF3CE9A09B /* IntentNavigationStore.swift in Sources */,
 				7F479BE5BDDDDCF9BFFF256B /* JovieAppIntents.swift in Sources */,
+				A0J0V11070000000000000002 /* ConversationUserActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

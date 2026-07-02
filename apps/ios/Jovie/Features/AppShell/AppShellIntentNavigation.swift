@@ -3,6 +3,8 @@ import Foundation
 struct AppShellIntentNavigationState: Equatable {
   var selectedTab: AppShellTab
   var chatDraft: String
+  var autoSendMessage: String?
+  var openConversationID: String?
   var pendingRequest: IntentNavigationRequest?
 }
 
@@ -20,9 +22,17 @@ enum AppShellIntentNavigation {
     switch request {
     case .openChat, .continueLastConversation:
       state.selectedTab = .chat
-    case let .sendMessage(text):
-      state.chatDraft = text
+    case let .sendMessage(text, autoSend):
       state.selectedTab = .chat
+      if autoSend {
+        state.autoSendMessage = text
+        state.chatDraft = ""
+      } else {
+        state.chatDraft = text
+      }
+    case let .openConversation(conversationID):
+      state.selectedTab = .chat
+      state.openConversationID = conversationID
     }
 
     return true

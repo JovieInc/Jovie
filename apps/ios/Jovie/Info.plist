@@ -37,6 +37,10 @@
   <false/>
   <key>LSRequiresIPhoneOS</key>
   <true/>
+  <key>NSUserActivityTypes</key>
+  <array>
+    <string>ie.jov.Jovie.conversation</string>
+  </array>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsLocalNetworking</key>

@@ -243,6 +243,7 @@ private struct AppContentView: View {
           onStartNewChat: {
             chatRepository?.startNewConversation()
           },
+          onAutoSendMessage: handleAutoSendMessage,
           onTalk: {},
           onLogout: onLogout
         ) {
@@ -280,6 +281,7 @@ private struct AppContentView: View {
           onStartNewChat: {
             chatRepository?.startNewConversation()
           },
+          onAutoSendMessage: handleAutoSendMessage,
           onTalk: {},
           onLogout: onLogout
         ) {
@@ -350,6 +352,10 @@ private struct AppContentView: View {
 
       await reloadAudienceHighlights(for: activeUserID)
     }
+  }
+
+  private func handleAutoSendMessage(_ text: String) {
+    Task { await chatRepository?.send(text: text) }
   }
 
   @MainActor

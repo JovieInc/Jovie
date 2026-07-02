@@ -15,17 +15,20 @@ final class ChatRepository {
   private let cache: ChatCache
   private let clerkUserID: String
   private let webBaseURL: URL
+  private let activityDonator: (any ConversationActivityDonating)?
 
   init(
     client: MobileChatClientProtocol,
     cache: ChatCache,
     clerkUserID: String,
-    webBaseURL: URL
+    webBaseURL: URL,
+    activityDonator: (any ConversationActivityDonating)? = LiveConversationActivityDonator()
   ) {
     self.client = client
     self.cache = cache
     self.clerkUserID = clerkUserID
     self.webBaseURL = webBaseURL
+    self.activityDonator = activityDonator
   }
 
   func bootstrap() async {
@@ -58,10 +61,18 @@ final class ChatRepository {
       isOffline = false
       lastErrorMessage = nil
       await persistCache(messages: detail.messages, conversationID: conversationID)
+      donateConversationActivity(
+        conversationID: conversationID,
+        title: detail.conversation.title
+      )
     } catch {
       await hydrateConversationFromCache(conversationID)
       isOffline = true
       lastErrorMessage = error.localizedDescription
+      donateConversationActivity(
+        conversationID: conversationID,
+        title: conversations.first(where: { $0.id == conversationID })?.title
+      )
     }
   }
 
@@ -278,6 +289,15 @@ final class ChatRepository {
       clientTurnId: message.clientMessageId,
       requiresWebHandoff: message.requiresWebHandoff,
       handoffURL: handoffURL
+    )
+  }
+
+  private func donateConversationActivity(conversationID: String, title: String?) {
+    guard let activityDonator else { return }
+
+    activityDonator.donate(
+      conversationID: conversationID,
+      title: ConversationUserActivity.displayTitle(for: title)
     )
   }
 

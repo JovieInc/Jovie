@@ -19,8 +19,8 @@ struct IntentNavigationStoreTests {
     let store = IntentNavigationStore()
 
     store.submit(.openChat)
-    store.submit(.sendMessage("hi"))
+    store.submit(.sendMessage(text: "hi", autoSend: true))
 
-    #expect(store.consume() == .sendMessage("hi"))
+    #expect(store.consume() == .sendMessage(text: "hi", autoSend: true))
   }
 }
