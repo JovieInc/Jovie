@@ -8,8 +8,8 @@ import {
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   eligibleCodexIssues,
-  HUMAN_REVIEW_LABEL,
   loadShipperConfig,
+  NO_AUTO_LABEL,
   selectTaskRoute,
   shellQuote,
 } from '../../hermes/lib/codex-issue-shipper.ts';
@@ -40,11 +40,11 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters human-gated, claimed, and blocked issues before dispatch', () => {
+  it('filters no-auto, claimed, and blocked issues before dispatch', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
-    const human = issue({
+    const noAuto = issue({
       number: 2,
-      labels: [{ name: 'codex' }, { name: HUMAN_REVIEW_LABEL }],
+      labels: [{ name: 'codex' }, { name: NO_AUTO_LABEL }],
     });
     const claimed = issue({
       number: 3,
@@ -55,15 +55,15 @@ describe('codex issue shipper planner', () => {
       labels: [{ name: 'codex' }, { name: CODEX_BLOCKED_LABEL }],
     });
 
-    expect(eligibleCodexIssues([ready, human, claimed, blocked])).toEqual([
+    expect(eligibleCodexIssues([ready, noAuto, claimed, blocked])).toEqual([
       ready,
     ]);
     expect(
-      buildDispatchPlans([ready, human, claimed, blocked], config)
+      buildDispatchPlans([ready, noAuto, claimed, blocked], config)
     ).toHaveLength(1);
   });
 
-  it('requires maintainer approval before dispatching codex-labeled issues', () => {
+  it('does not require codex-approved before dispatching codex-labeled issues', () => {
     const untrusted = issue({
       labels: [{ name: 'codex' }],
     });
@@ -72,7 +72,10 @@ describe('codex issue shipper planner', () => {
       labels: [{ name: 'codex' }, { name: CODEX_TRUSTED_LABEL }],
     });
 
-    expect(eligibleCodexIssues([untrusted, trusted])).toEqual([trusted]);
+    expect(eligibleCodexIssues([untrusted, trusted])).toEqual([
+      untrusted,
+      trusted,
+    ]);
   });
 
   it('uses cheap models for simple work and escalation models for sensitive work', () => {
@@ -137,14 +140,44 @@ describe('codex issue shipper planner', () => {
     expect(plans.map(plan => plan.issue.number)).toEqual([1, 2]);
   });
 
-  it('defaults to three parallel shipper lanes with resource guardrails', () => {
+  it('defaults to grok composer with resource guardrails', () => {
     const loaded = loadShipperConfig({}, '/repo', 'JovieInc/Jovie');
 
-    expect(loaded.maxIssuesPerRun).toBe(3);
-    expect(loaded.maxParallelAgents).toBe(3);
-    expect(loaded.minFreeMemoryMb).toBe(4096);
+    expect(loaded.agent).toBe('grok');
+    expect(loaded.simpleModel).toBe('grok-composer-2.5-fast');
+    expect(loaded.standardModel).toBe('grok-composer-2.5-fast');
+    expect(loaded.escalationModel).toBe('grok-composer-2.5-fast');
+    expect(loaded.fallbackModel).toBe('grok-composer-2.5-fast');
+    expect(loaded.grokPermissionMode).toBe('auto');
+    expect(loaded.maxIssuesPerRun).toBe(5);
+    expect(loaded.maxParallelAgents).toBe(15);
+    expect(loaded.minFreeMemoryMb).toBe(256);
     expect(loaded.maxLoadPerCpu).toBe(1.5);
     expect(loaded.singletonLockStaleMs).toBe(8 * 60 * 60 * 1000);
+  });
+
+  it('preserves legacy model defaults for explicit claude and codex agents', () => {
+    const claude = loadShipperConfig(
+      { HERMES_CODEX_SHIPPER_AGENT: 'claude' },
+      '/repo',
+      'JovieInc/Jovie'
+    );
+    const codex = loadShipperConfig(
+      { HERMES_CODEX_SHIPPER_AGENT: 'codex' },
+      '/repo',
+      'JovieInc/Jovie'
+    );
+
+    expect(claude.agent).toBe('claude');
+    expect(codex.agent).toBe('codex');
+    expect(claude.simpleModel).toBe('sonnet');
+    expect(claude.standardModel).toBe('sonnet');
+    expect(claude.escalationModel).toBe('opus');
+    expect(claude.fallbackModel).toBe('sonnet');
+    expect(codex.simpleModel).toBe('sonnet');
+    expect(codex.standardModel).toBe('sonnet');
+    expect(codex.escalationModel).toBe('opus');
+    expect(codex.fallbackModel).toBe('sonnet');
   });
 });
 
@@ -280,6 +313,7 @@ describe('codex issue shipper prompt', () => {
         codexSandbox: 'workspace-write',
         codexApprovalPolicy: 'on-request',
         claudePermissionMode: 'auto',
+        grokPermissionMode: 'auto',
         agentTimeoutMs: 1000,
         dryRun: false,
       },
@@ -291,5 +325,32 @@ describe('codex issue shipper prompt', () => {
     expect(command.args).toContain('on-request');
     expect(command.args).not.toContain('danger-full-access');
     expect(command.args).not.toContain('--ask-for-approval');
+  });
+
+  it('runs grok with prompt-file, cwd, model, turns, and permission mode', () => {
+    const loaded = loadShipperConfig({}, '/repo', 'JovieInc/Jovie');
+    const command = buildAgentCommand(
+      loaded,
+      selectTaskRoute(issue(), loaded),
+      '/tmp/shipper.prompt.md'
+    );
+
+    expect(command.command).toBe('grok');
+    expect(command.args).toEqual([
+      '--prompt-file',
+      '/tmp/shipper.prompt.md',
+      '--cwd',
+      '/repo',
+      '--model',
+      'grok-composer-2.5-fast',
+      '--max-turns',
+      '50',
+      '--permission-mode',
+      'auto',
+      '--no-alt-screen',
+    ]);
+    expect(command.args).not.toContain('--sandbox');
+    expect(command.args).not.toContain('exec');
+    expect(command.args).not.toContain('-C');
   });
 });
