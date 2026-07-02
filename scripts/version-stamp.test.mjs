@@ -158,10 +158,15 @@ test('main release path: real stamp keeps the version fan-out consistent (versio
     }
     void manifestGlobs;
 
-    const current = JSON.parse(
-      readFileSync(join(tmp, 'version.json'), 'utf-8')
-    ).version;
-    const [yy, mm] = current.split('.');
+    // Derive the seed from the CURRENT UTC calendar (matching
+    // computeNextVersion's yy/mm formatting), not from the copied repo's
+    // version.json. That file drifts every month as the repo gets stamped,
+    // so pinning the seed to whatever month it happens to say breaks this
+    // test on every month rollover (version-check.mjs validates against
+    // the real UTC calendar, not the fixture's origin month).
+    const now = new Date();
+    const yy = now.getUTCFullYear() % 100;
+    const mm = now.getUTCMonth() + 1;
     const target = `${yy}.${mm}.999`;
 
     execFileSync('node', ['scripts/version-stamp.mjs', '--set', target], {
