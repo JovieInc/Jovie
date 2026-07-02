@@ -52,6 +52,12 @@ export const ServerEnvSchema = z.object({
     .optional(),
   VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
   PUBLIC_NOAUTH_SMOKE: z.string().optional(),
+  /**
+   * E2E-only: lets tests force the onboarding LLM path to fail so the
+   * deterministic fallback can be exercised. Hard-ignored on production
+   * deploys regardless of value (see onboarding-handler.ts).
+   */
+  CHAT_LLM_FAILURE_INJECTION: z.string().optional(),
 
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
@@ -381,6 +387,7 @@ export const ENV_KEYS = [
   'VERCEL_URL',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'PUBLIC_NOAUTH_SMOKE',
+  'CHAT_LLM_FAILURE_INJECTION',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
   'CLERK_PUBLISHABLE_KEY_STAGING',
