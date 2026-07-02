@@ -63,7 +63,7 @@ jobs:
           esac
 
           # Exclude generated / lock / snapshot / vendored noise from the count.
-          EXCLUDE='pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|/generated/|\.gen\.|__snapshots__/|\.snap$|\.svg$|\.po$|/dist/|/build/|\.min\.'
+          EXCLUDE='pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|/generated/|\.gen\.|__snapshots__/|\.snap$|\.svg$|\.po$|/dist/|/build/|\.min\.|drizzle/migrations/meta/'
           rows=$(gh pr view "$PR" -R "$REPO" --json files -q '.files[] | "\(.additions+.deletions)\t\(.path)"')
           counted=$(printf '%s\n' "$rows" | grep -vE "$EXCLUDE" || true)
           lines=$(printf '%s\n' "$counted" | awk -F'\t' '{s+=$1} END{print s+0}')
