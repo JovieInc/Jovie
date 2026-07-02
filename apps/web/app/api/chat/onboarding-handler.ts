@@ -48,6 +48,7 @@ import {
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
+import { logger } from '@/lib/utils/logger';
 
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
 const CHAT_DISABLED_GATE = 'ai_chat_disabled';
@@ -537,7 +538,12 @@ export async function tryHandleAnonymousOnboardingChat(
       });
     }
     // The LLM failure still pages — the fallback masks the user impact, not
-    // the incident.
+    // the incident. The logger line keeps the failure visible in local dev,
+    // where Sentry is a no-op and the fallback would otherwise hide it.
+    logger.error(
+      '[onboarding-chat] LLM turn failed; serving scripted fallback',
+      { error, requestId, turnCount }
+    );
     Sentry.captureException(error, {
       tags: { feature: 'ai-chat', chat_mode: 'onboarding' },
       extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
