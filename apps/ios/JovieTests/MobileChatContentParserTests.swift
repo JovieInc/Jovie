@@ -479,9 +479,18 @@ struct MobileChatEntityTokenParsingTests {
 
     #expect(segmentsA[0].id != segmentsB[0].id)
   }
+}
 
-  // MARK: - Contract-drift breadcrumb (expansion #1)
+// MARK: - Contract-drift breadcrumb (expansion #1)
 
+/// `.serialized`: these tests swap the process-global `Observability`
+/// provider (`useProviderForTesting`/`resetForTesting`). Swift Testing runs
+/// tests within a suite concurrently by default, so without serialization
+/// these races with themselves -- one test's `resetForTesting()` (or another
+/// test's `useProviderForTesting(spy)`) can fire in the middle of a sibling
+/// test's assertion window, making `spy.breadcrumbs` empty nondeterministically.
+@Suite(.serialized)
+struct MobileChatEntityTokenBreadcrumbTests {
   @Test func reportsBreadcrumbForPatternMatchedButUnmappedEntityKind() {
     let spy = SpyObservabilityProvider()
     Observability.useProviderForTesting(spy)
