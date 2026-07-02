@@ -9,11 +9,51 @@ vi.mock('@ai-sdk/gateway', () => ({
 }));
 
 import {
+  alphaProviderOptions,
   generatePrintGraphic,
   MERCH_IMAGE_MODELS,
   selectMerchImageModel,
   weightedPick,
 } from './graphic-engine';
+
+describe('alphaProviderOptions', () => {
+  it('maps each native provider to its transparent option', () => {
+    expect(
+      alphaProviderOptions({
+        id: 'openai/gpt-image-1.5',
+        key: 'gpt-image-1.5',
+        alpha: 'native',
+        enabled: true,
+      })
+    ).toEqual({ openai: { background: 'transparent' } });
+    expect(
+      alphaProviderOptions({
+        id: 'recraft/recraft-v3',
+        key: 'recraft-v3',
+        alpha: 'native',
+        enabled: true,
+      })
+    ).toEqual({ recraft: { response_format: 'png' } });
+    expect(
+      alphaProviderOptions({
+        id: 'bfl/flux-2-pro',
+        key: 'flux-2-pro',
+        alpha: 'knockout',
+        enabled: false,
+      })
+    ).toBeUndefined();
+  });
+
+  it('has at least two enabled native-alpha models for a real A/B', () => {
+    const enabledNative = MERCH_IMAGE_MODELS.filter(
+      m => m.enabled && m.alpha === 'native'
+    );
+    expect(enabledNative.length).toBeGreaterThanOrEqual(2);
+    for (const m of enabledNative) {
+      expect(alphaProviderOptions(m)).toBeDefined();
+    }
+  });
+});
 
 describe('weightedPick', () => {
   const models = [{ key: 'a' }, { key: 'b' }, { key: 'c' }] as const;

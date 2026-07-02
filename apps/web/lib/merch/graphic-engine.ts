@@ -51,12 +51,22 @@ export const MERCH_IMAGE_MODELS: readonly MerchImageModelConfig[] = [
     enabled: true,
   },
   {
+    // Native transparent output, distinct clean-illustration aesthetic.
+    // Verified alpha-clean in scripts/merch-knockout-spike.ts.
+    id: 'recraft/recraft-v3',
+    key: 'recraft-v3',
+    alpha: 'native',
+    enabled: true,
+  },
+  {
     id: 'openai/gpt-image-1',
     key: 'gpt-image-1',
     alpha: 'native',
     enabled: false,
   },
   {
+    // Knockout via chroma-key proved unreliable (residual background blocks —
+    // see merch-knockout-spike.ts); needs a proper bg-removal model to enable.
     id: 'bfl/flux-2-pro',
     key: 'flux-2-pro',
     alpha: 'knockout',
@@ -163,6 +173,22 @@ function toBuffer(image: RawImage): Buffer {
 }
 
 /**
+ * Provider-specific request options that yield a native transparent background.
+ * gpt-image takes `background: transparent`; Recraft returns a transparent PNG.
+ */
+export function alphaProviderOptions(
+  model: MerchImageModelConfig
+): Record<string, Record<string, string>> | undefined {
+  if (model.id.startsWith('openai/gpt-image')) {
+    return { openai: { background: 'transparent' } };
+  }
+  if (model.id.startsWith('recraft/')) {
+    return { recraft: { response_format: 'png' } };
+  }
+  return undefined;
+}
+
+/**
  * Opaque output → alpha. Not yet implemented; `knockout` models stay disabled
  * until this lands so the roster never emits a white-boxed (non-alpha) graphic.
  */
@@ -187,13 +213,13 @@ export async function generatePrintGraphic(params: {
   const model = params.model ?? selectMerchImageModel(params.selection);
   const started = Date.now();
 
+  const providerOptions =
+    model.alpha === 'native' ? alphaProviderOptions(model) : undefined;
   const result = await generateImage({
     model: gateway.image(model.id),
     prompt: `${params.prompt}\n${ALPHA_DIRECTIVE}`,
     size: '1024x1024',
-    ...(model.alpha === 'native'
-      ? { providerOptions: { openai: { background: 'transparent' } } }
-      : {}),
+    ...(providerOptions ? { providerOptions } : {}),
   });
 
   const raw = toBuffer(result.images[0] as RawImage);
