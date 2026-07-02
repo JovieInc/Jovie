@@ -93,7 +93,7 @@ export function LibraryArtworkHoverZoom({
           aria-valuenow={Math.round(focusRatio.x * 100)}
           tabIndex={-1}
           data-testid='library-artwork-hover-zoom-surface'
-          className='absolute inset-0 z-[1]'
+          className='absolute inset-0 z-10'
           onMouseEnter={event => {
             setIsHovering(true);
             updateFocus(event);
@@ -108,7 +108,7 @@ export function LibraryArtworkHoverZoom({
       {showZoom ? (
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute z-[2] rounded-full border border-subtle bg-surface-1 opacity-35 shadow-card backdrop-blur-[1px]'
+          className='pointer-events-none absolute z-20 rounded-full border border-subtle bg-surface-1 opacity-35 shadow-card backdrop-blur-sm'
           style={{
             width: LENS_SIZE_PX,
             height: LENS_SIZE_PX,
@@ -123,7 +123,7 @@ export function LibraryArtworkHoverZoom({
               role='presentation'
               aria-hidden='true'
               data-testid='library-artwork-hover-zoom-popover'
-              className='pointer-events-none fixed z-[80] overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-card'
+              className='pointer-events-none fixed z-50 overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-card'
               style={{
                 top: popoverPosition.top,
                 left: popoverPosition.left,
