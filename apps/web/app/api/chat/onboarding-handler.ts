@@ -538,12 +538,7 @@ export async function tryHandleAnonymousOnboardingChat(
       });
     }
     // The LLM failure still pages — the fallback masks the user impact, not
-    // the incident. The logger line keeps the failure visible in local dev,
-    // where Sentry is a no-op and the fallback would otherwise hide it.
-    logger.error(
-      '[onboarding-chat] LLM turn failed; serving scripted fallback',
-      { error, requestId, turnCount }
-    );
+    // the incident.
     Sentry.captureException(error, {
       tags: { feature: 'ai-chat', chat_mode: 'onboarding' },
       extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
