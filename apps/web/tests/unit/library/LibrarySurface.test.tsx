@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
@@ -443,6 +444,39 @@ describe('LibrarySurface', () => {
       'aria-hidden',
       'true'
     );
+  });
+
+  it('copies the canonical share URL from the drawer overflow menu', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderLibrary([
+      buildAsset({
+        share: {
+          assetId: 'release-1',
+          visibility: 'private',
+          shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
+        },
+      }),
+    ]);
+    clickGridView();
+
+    await user.click(
+      screen.getByRole('button', { name: /View Take Me Over/u })
+    );
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+
+    await user.click(drawer.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Copy Share Link' }));
+
+    expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
   });
 
   it('renders merch assets with prices and the shared detail drawer', () => {

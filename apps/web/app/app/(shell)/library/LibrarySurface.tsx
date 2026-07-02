@@ -102,10 +102,7 @@ import {
   libraryApprovalStatusClasses,
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
-import {
-  formatLibraryAssetShareDisplayUrl,
-  type LibraryAssetShareViewModel,
-} from '@/lib/library/asset-share';
+import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
   releaseStatusClasses,
   releaseStatusDotClasses,
@@ -1847,9 +1844,7 @@ function buildLibraryDrawerOverflowActions({
       label: 'Copy Share Link',
       icon: Share2,
       onClick: () => {
-        void globalThis.navigator?.clipboard?.writeText(
-          formatLibraryAssetShareDisplayUrl(shareUrl)
-        );
+        void globalThis.navigator?.clipboard?.writeText(shareUrl);
       },
     });
   }
@@ -2499,9 +2494,7 @@ export function LibrarySurface({
           label: 'Copy Share Link',
           icon: <Share2 className='h-3.5 w-3.5' />,
           onClick: () => {
-            void globalThis.navigator?.clipboard?.writeText(
-              formatLibraryAssetShareDisplayUrl(shareUrl)
-            );
+            void globalThis.navigator?.clipboard?.writeText(shareUrl);
           },
         });
       }
