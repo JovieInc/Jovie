@@ -281,6 +281,8 @@ function detectGithubRepo(repoRoot: string): string {
 }
 
 function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
+  // Fixed: gh CLI does not support --page; use single fetch with max limit
+  const fetchLimit = Math.min(100, config.issueFetchLimit || 100);
   const raw = run(
     [
       'gh',
@@ -291,13 +293,14 @@ function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
       '--state',
       'open',
       '--limit',
-      String(config.issueFetchLimit),
+      String(fetchLimit),
       '--json',
       'number,title,body,url,updatedAt,labels',
     ],
     config
   );
-  return JSON.parse(raw) as ReadonlyArray<GithubIssue>;
+  const issues = JSON.parse(raw) as GithubIssue[];
+  return issues.slice(0, config.issueFetchLimit || 100);
 }
 
 function ensureLabel(
@@ -644,7 +647,7 @@ function runAgent(
   );
 
   const agentConfig = { ...config, repoRoot };
-  const command = buildAgentCommand(agentConfig, plan.route);
+  const command = buildAgentCommand(agentConfig, plan.route, promptPath);
   const fd = openSync(logPath, 'a');
   return new Promise(resolve => {
     let settled = false;
@@ -694,7 +697,7 @@ function runAgent(
       });
     });
 
-    child.stdin.end(prompt);
+    child.stdin.end(config.agent === 'grok' ? undefined : prompt);
   });
 }
 
