@@ -14,17 +14,57 @@ struct MobileChatToolCallCardModel: Equatable, Identifiable, Sendable {
   let state: MobileChatToolCallState
 }
 
-enum MobileChatRenderableSegment: Equatable, Identifiable, Sendable {
+/// The four entity kinds understood by the chat wire format. Mirrors
+/// `EntityKind` in apps/web/lib/chat/tokens.ts -- these are the only kinds
+/// the model is instructed to emit. Any other `@kind:id[label]` token renders
+/// verbatim as plain text (web parity), never as a chip.
+enum MobileChatEntityKind: String, Equatable, Sendable {
+  case release
+  case artist
+  case track
+  case event
+}
+
+/// A single inline run within a prose text segment: either plain text or an
+/// entity/skill mention that should render as an inline chip. Ported from the
+/// `ChatToken` union in apps/web/lib/chat/tokens.ts. Positional index is
+/// folded into the caller-assigned identity (see `MobileChatRenderableSegment`
+/// prose run IDs) rather than a content hash, so segment identity doesn't
+/// churn across re-renders of unrelated text.
+enum MobileChatProseRun: Equatable, Sendable {
   case text(String)
+  case entity(kind: MobileChatEntityKind, id: String, label: String)
+  case skill(id: String, label: String)
+}
+
+enum MobileChatRenderableSegment: Equatable, Identifiable, Sendable {
+  case text(runs: [MobileChatProseRun])
   case toolCall(MobileChatToolCallCardModel)
 
   var id: String {
     switch self {
-    case let .text(text):
-      return "text:\(text.hashValue)"
+    case let .text(runs):
+      return "text:\(runs.count):\(Self.identitySeed(for: runs))"
     case let .toolCall(model):
       return model.id
     }
+  }
+
+  /// Cheap, positional identity seed. Avoids `String.hashValue`, which is
+  /// randomized per process launch and therefore unstable across app runs --
+  /// using it as a stable SwiftUI identity was the pre-JOV-3608 bug: IDs
+  /// could collide or needlessly churn as streaming deltas mutated content.
+  private static func identitySeed(for runs: [MobileChatProseRun]) -> String {
+    runs.prefix(4).map { run -> String in
+      switch run {
+      case let .text(text):
+        return "t\(text.count)"
+      case let .entity(kind, id, _):
+        return "e:\(kind.rawValue):\(id)"
+      case let .skill(id, _):
+        return "s:\(id)"
+      }
+    }.joined(separator: "|")
   }
 }
 
@@ -48,12 +88,67 @@ enum MobileChatContentParser {
     }
   }
 
+  /// Memoizes `segments(from:isStreaming:)` keyed by the exact `(content,
+  /// isStreaming)` pair. SwiftUI re-evaluates `MobileChatMessageRow.body` on
+  /// every timeline mutation while a message streams, which previously
+  /// re-ran the full tool-call/entity/skill parse on every delta even though
+  /// most deltas only append characters far from an already-parsed prefix.
+  /// `NSCache` (not a plain dictionary) so memory pressure can evict entries
+  /// automatically -- matches the cache pattern used elsewhere in the iOS
+  /// app (see `.claude/rules/ios.md` performance canon).
+  private final class SegmentCacheKey: NSObject {
+    let content: String
+    let isStreaming: Bool
+
+    init(content: String, isStreaming: Bool) {
+      self.content = content
+      self.isStreaming = isStreaming
+    }
+
+    override var hash: Int {
+      var hasher = Hasher()
+      hasher.combine(content)
+      hasher.combine(isStreaming)
+      return hasher.finalize()
+    }
+
+    override func isEqual(_ object: Any?) -> Bool {
+      guard let other = object as? SegmentCacheKey else { return false }
+      return content == other.content && isStreaming == other.isStreaming
+    }
+  }
+
+  private final class SegmentCacheBox {
+    let segments: [MobileChatRenderableSegment]
+    init(_ segments: [MobileChatRenderableSegment]) { self.segments = segments }
+  }
+
+  private static let segmentCache: NSCache<SegmentCacheKey, SegmentCacheBox> = {
+    let cache = NSCache<SegmentCacheKey, SegmentCacheBox>()
+    cache.countLimit = 64
+    return cache
+  }()
+
   static func segments(
     from content: String,
     isStreaming: Bool
   ) -> [MobileChatRenderableSegment] {
     guard !content.isEmpty else { return [] }
 
+    let cacheKey = SegmentCacheKey(content: content, isStreaming: isStreaming)
+    if let cached = segmentCache.object(forKey: cacheKey) {
+      return cached.segments
+    }
+
+    let parsed = parseSegments(from: content, isStreaming: isStreaming)
+    segmentCache.setObject(SegmentCacheBox(parsed), forKey: cacheKey)
+    return parsed
+  }
+
+  private static func parseSegments(
+    from content: String,
+    isStreaming: Bool
+  ) -> [MobileChatRenderableSegment] {
     let resultStates = parseToolResultStates(from: content)
     let sanitized = suppressIncompleteToolMarkup(
       stripToolResultMarkup(from: content),
@@ -69,6 +164,7 @@ enum MobileChatContentParser {
           sanitizeResidualToolMarkup(
             String(sanitized[cursor...]).trimmingCharacters(in: .whitespacesAndNewlines)
           ),
+          isStreaming: isStreaming,
           to: &segments
         )
         break
@@ -79,6 +175,7 @@ enum MobileChatContentParser {
           String(sanitized[cursor ..< nextBlock.openRange.lowerBound])
             .trimmingCharacters(in: .whitespacesAndNewlines)
         ),
+        isStreaming: false,
         to: &segments
       )
 
@@ -120,8 +217,8 @@ enum MobileChatContentParser {
   static func displayText(from content: String, isStreaming: Bool) -> String {
     segments(from: content, isStreaming: isStreaming)
       .compactMap { segment -> String? in
-        guard case let .text(text) = segment else { return nil }
-        return text
+        guard case let .text(runs) = segment else { return nil }
+        return runs.map(Self.plainText(for:)).joined()
       }
       .filter { !$0.isEmpty }
       .joined(separator: "\n\n")
@@ -168,6 +265,21 @@ enum MobileChatContentParser {
         .flatMap { $0.isEmpty ? nil : $0 }
     case .functionCalls:
       return extractInvokeToolName(from: block)
+    }
+  }
+
+  /// Reduces a prose run to its user-facing label text, discarding wire
+  /// markup. Used for `displayText` (accessibility / plain-text callers) --
+  /// interactive rendering should use `MobileChatProseRun` directly instead
+  /// so entity/skill runs can render as inline chips.
+  private static func plainText(for run: MobileChatProseRun) -> String {
+    switch run {
+    case let .text(text):
+      return text
+    case let .entity(_, _, label):
+      return label
+    case let .skill(_, label):
+      return label
     }
   }
 
@@ -576,9 +688,15 @@ enum MobileChatContentParser {
     return String(text[range])
   }
 
-  private static func appendTextSegment(_ text: String, to segments: inout [MobileChatRenderableSegment]) {
+  private static func appendTextSegment(
+    _ text: String,
+    isStreaming: Bool,
+    to segments: inout [MobileChatRenderableSegment]
+  ) {
     guard !text.isEmpty else { return }
-    segments.append(.text(text))
+    let runs = MobileChatProseTokenizer.tokenize(text, isStreaming: isStreaming)
+    guard !runs.isEmpty else { return }
+    segments.append(.text(runs: runs))
   }
 }
 
@@ -627,5 +745,343 @@ enum MobileChatToolLabels {
       ?? toolName
         .replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
         .capitalized
+  }
+}
+
+/// Human-facing labels for `/skill:id` tokens. Mirrors the `COMMANDS` skill
+/// registry in apps/web/lib/commands/registry.ts. Kept as a small static
+/// table (not derived from the tool-card registry above, which is keyed by a
+/// different vocabulary and only covers a subset of skills) so this stays a
+/// pure, direct port of the web source of truth.
+enum MobileChatSkillLabels {
+  static let registry: [String: String] = [
+    "generateAlbumArt": "Generate album art",
+    "generateReleasePitch": "Generate pitch",
+    "proposeAvatarUpload": "Change profile photo",
+    "proposeSocialLink": "Add social link",
+    "proposeSocialLinkRemoval": "Remove social link",
+    "submitFeedback": "Send feedback",
+  ]
+
+  /// Fallback for skill ids not yet in the registry (e.g. a newly shipped
+  /// web skill the app hasn't been updated to know about): humanize the
+  /// camelCase id into Title Case words, e.g. `someFutureSkillId` ->
+  /// "Some Future Skill Id".
+  static func label(for id: String) -> String {
+    if let known = registry[id] {
+      return known
+    }
+
+    guard !id.isEmpty else { return id }
+
+    let spaced = id.replacingOccurrences(
+      of: "([a-z0-9])([A-Z])",
+      with: "$1 $2",
+      options: .regularExpression
+    )
+    return spaced.capitalized
+  }
+}
+
+/// Swift port of the chat wire-format grammar defined in
+/// apps/web/lib/chat/tokens.ts (`ENTITY_PATTERN`, `SKILL_PATTERN`,
+/// `escapeLabel`/`unescapeLabel`). Parses `@kind:id[label]` entity mentions
+/// and `/skill:id` skill invocations out of prose text into inline
+/// `MobileChatProseRun`s, and -- while a message is still streaming --
+/// suppresses a trailing run of text that is a strict, in-progress prefix of
+/// a valid token so a chip never flickers through its raw wire form before
+/// the closing `]` arrives.
+///
+/// This is a total function: it never throws and always returns *some* runs
+/// (falling back to the original text verbatim) for any input, including
+/// degenerate/hostile ones (unbalanced brackets, huge labels, control
+/// characters, empty strings).
+enum MobileChatProseTokenizer {
+  private static let knownEntityKinds: Set<String> = ["release", "artist", "track", "event"]
+
+  // Mirrors ENTITY_PATTERN: @(release|artist|track|event):([^\s[\]]+)\[((?:\\.|[^\]\\])*)\]
+  private static let entityRegex = try? NSRegularExpression(
+    pattern: #"@(release|artist|track|event):([^\s\[\]]+)\[((?:\\.|[^\]\\])*)\]"#
+  )
+
+  // Broader than `entityRegex` -- matches ANY `@kind:id[label]`-shaped token
+  // regardless of kind, so a pattern-matched-but-unmapped kind (e.g. a future
+  // web-side kind this client hasn't shipped support for yet) can be told
+  // apart from an ordinary `@mention` like "DM @timwhite" for the
+  // contract-drift breadcrumb below. Never used to decide rendering -- only
+  // `entityRegex`'s four known kinds ever become chips; this is purely a
+  // detection signal.
+  private static let anyKindEntityRegex = try? NSRegularExpression(
+    pattern: #"@([A-Za-z]\w*):([^\s\[\]]+)\[(?:\\.|[^\]\\])*\]"#
+  )
+
+  // Mirrors SKILL_PATTERN: \/skill:([A-Za-z]\w*)
+  private static let skillRegex = try? NSRegularExpression(
+    pattern: #"/skill:([A-Za-z]\w*)"#
+  )
+
+  private struct Hit {
+    let range: Range<String.Index>
+    let run: MobileChatProseRun
+  }
+
+  static func tokenize(_ text: String, isStreaming: Bool) -> [MobileChatProseRun] {
+    guard !text.isEmpty else { return [] }
+
+    let visibleText = isStreaming ? suppressTrailingPartialToken(text) : text
+    guard !visibleText.isEmpty else { return [] }
+
+    let hits = sortedNonOverlappingHits(in: visibleText)
+    guard !hits.isEmpty else { return [.text(visibleText)] }
+
+    var runs: [MobileChatProseRun] = []
+    var cursor = visibleText.startIndex
+
+    for hit in hits {
+      if hit.range.lowerBound > cursor {
+        runs.append(.text(String(visibleText[cursor ..< hit.range.lowerBound])))
+      }
+      runs.append(hit.run)
+      cursor = hit.range.upperBound
+    }
+
+    if cursor < visibleText.endIndex {
+      runs.append(.text(String(visibleText[cursor...])))
+    }
+
+    return runs
+  }
+
+  private static func sortedNonOverlappingHits(in text: String) -> [Hit] {
+    var hits: [Hit] = []
+    let nsRange = NSRange(text.startIndex..., in: text)
+
+    if let entityRegex {
+      entityRegex.enumerateMatches(in: text, range: nsRange) { match, _, _ in
+        guard
+          let match,
+          let fullRange = Range(match.range, in: text),
+          let kindRange = Range(match.range(at: 1), in: text),
+          let idRange = Range(match.range(at: 2), in: text),
+          let labelRange = Range(match.range(at: 3), in: text)
+        else {
+          return
+        }
+
+        let kindRaw = String(text[kindRange])
+        guard
+          knownEntityKinds.contains(kindRaw),
+          let kind = MobileChatEntityKind(rawValue: kindRaw)
+        else {
+          return
+        }
+
+        let id = String(text[idRange])
+        let label = truncatedChipLabel(unescapeLabel(String(text[labelRange])))
+        hits.append(Hit(range: fullRange, run: .entity(kind: kind, id: id, label: label)))
+      }
+    }
+
+    reportUnmappedEntityKindsIfNeeded(in: text, nsRange: nsRange)
+
+    if let skillRegex {
+      skillRegex.enumerateMatches(in: text, range: nsRange) { match, _, _ in
+        guard
+          let match,
+          let fullRange = Range(match.range, in: text),
+          let idRange = Range(match.range(at: 1), in: text)
+        else {
+          return
+        }
+
+        let id = String(text[idRange])
+        let label = truncatedChipLabel(MobileChatSkillLabels.label(for: id))
+        hits.append(Hit(range: fullRange, run: .skill(id: id, label: label)))
+      }
+    }
+
+    hits.sort { $0.range.lowerBound < $1.range.lowerBound }
+
+    var nonOverlapping: [Hit] = []
+    var cursor = text.startIndex
+    for hit in hits {
+      guard hit.range.lowerBound >= cursor else { continue } // overlap -- drop later hit
+      nonOverlapping.append(hit)
+      cursor = hit.range.upperBound
+    }
+
+    return nonOverlapping
+  }
+
+  /// Contract-drift signal (JOV-3608 expansion #1): if the model emits a
+  /// well-formed `@kind:id[label]` token whose `kind` isn't one of the four
+  /// this client knows about, that's a strong sign the web-side emission
+  /// contract shipped a new kind this client hasn't been updated to render
+  /// -- as opposed to ordinary prose containing an `@` character, which is
+  /// never reported. Rendering is unaffected either way (unmapped kinds
+  /// still render verbatim, per web parity); this only adds an observability
+  /// breadcrumb so the drift is visible instead of silently degrading to
+  /// plain text forever.
+  private static func reportUnmappedEntityKindsIfNeeded(in text: String, nsRange: NSRange) {
+    guard let anyKindEntityRegex else { return }
+
+    anyKindEntityRegex.enumerateMatches(in: text, range: nsRange) { match, _, _ in
+      guard
+        let match,
+        let kindRange = Range(match.range(at: 1), in: text)
+      else {
+        return
+      }
+
+      let kindRaw = String(text[kindRange])
+      guard !knownEntityKinds.contains(kindRaw) else { return }
+
+      Observability.addBreadcrumb(
+        .chatEntityTokenUnmappedKind,
+        level: .warning,
+        context: ["kind": kindRaw]
+      )
+    }
+  }
+
+  /// Chip labels render inline within a single concatenated `Text` (per-run
+  /// `lineLimit`/`truncationMode` isn't expressible on `Text` concatenation
+  /// segments -- only on the whole view), so "~1 line" truncation for
+  /// hostile/oversized labels (JOV-3608 Visual Contract §3) is enforced here
+  /// at parse time instead of via SwiftUI layout. A generous character budget
+  /// keeps ordinary short titles untouched while still bounding worst-case
+  /// labels (the 10k-char hostile-input test) to something that reads as one
+  /// line rather than reflowing the whole message.
+  private static let maxChipLabelCharacters = 60
+
+  private static func truncatedChipLabel(_ label: String) -> String {
+    guard label.count > maxChipLabelCharacters else { return label }
+    let prefix = label.prefix(maxChipLabelCharacters).trimmingCharacters(in: .whitespaces)
+    return "\(prefix)…"
+  }
+
+  /// Reverse of `escapeLabel` in tokens.ts: strips each backslash that
+  /// precedes an escaped character (`\]` -> `]`, `\\` -> `\`).
+  private static func unescapeLabel(_ label: String) -> String {
+    var result = ""
+    result.reserveCapacity(label.count)
+    var iterator = label.makeIterator()
+    while let char = iterator.next() {
+      if char == "\\", let next = iterator.next() {
+        result.append(next)
+      } else {
+        result.append(char)
+      }
+    }
+    return result
+  }
+
+  /// If the tail of `text` is a strict, still-open prefix of a valid
+  /// `@kind:id[label]` or `/skill:id` token, trim it off so the raw wire
+  /// syntax never renders mid-stream. Returns `text` unchanged when the tail
+  /// is not a live token prefix (including plain `@mentions` like
+  /// "DM @timwhite", which never match a known entity kind).
+  private static func suppressTrailingPartialToken(_ text: String) -> String {
+    if let trimmed = suppressTrailingPartialEntity(text) {
+      return trimmed
+    }
+    if let trimmed = suppressTrailingPartialSkill(text) {
+      return trimmed
+    }
+    return text
+  }
+
+  private static func suppressTrailingPartialEntity(_ text: String) -> String? {
+    guard let atIndex = text.range(of: "@", options: .backwards) else { return nil }
+
+    let tail = text[atIndex.lowerBound...]
+
+    // Fast-path: if the tail already contains a fully-closed token starting
+    // at this `@`, there is nothing partial to suppress.
+    if tail.range(of: "\\]", options: .regularExpression) != nil,
+       isCompleteEntityToken(String(tail))
+    {
+      return nil
+    }
+
+    // `@kind:` must match one of the four known kinds -- otherwise this is
+    // an unrelated `@mention` (e.g. "DM @timwhite") and must render as-is.
+    guard let colonIndex = tail.firstIndex(of: ":") else {
+      // No colon yet: only a bare "@" or "@rel" partial kind name. Only
+      // suppress if what follows "@" so far is itself a valid prefix of one
+      // of the four kind names (so "@timwhite" is never touched).
+      let kindSoFar = tail.dropFirst()
+      guard isPrefixOfKnownKind(String(kindSoFar)) else { return nil }
+      return String(text[..<atIndex.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    let kind = String(tail[tail.index(after: atIndex.lowerBound) ..< colonIndex])
+    guard knownEntityKinds.contains(kind) else { return nil }
+
+    let afterColon = tail[tail.index(after: colonIndex)...]
+    guard let bracketIndex = afterColon.firstIndex(of: "[") else {
+      // "@release:rel_1" with no "[" yet -- still an open id, still partial.
+      // The id segment itself can't contain whitespace/brackets by grammar;
+      // if it does, this isn't a token in progress, so don't suppress.
+      if afterColon.contains(where: { $0.isWhitespace }) { return nil }
+      return String(text[..<atIndex.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    let idPart = afterColon[afterColon.startIndex ..< bracketIndex]
+    guard !idPart.isEmpty, !idPart.contains(where: { $0.isWhitespace }) else { return nil }
+
+    let labelPart = afterColon[afterColon.index(after: bracketIndex)...]
+    if hasUnescapedClosingBracket(String(labelPart)) {
+      // Label is fully closed -- this is a complete token, not a partial one.
+      return nil
+    }
+
+    // Open "[" with no closing "]" yet (respecting escapes) -- partial.
+    return String(text[..<atIndex.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private static func suppressTrailingPartialSkill(_ text: String) -> String? {
+    guard let slashIndex = text.range(of: "/skill:", options: .backwards) else { return nil }
+    let idPart = text[slashIndex.upperBound...]
+
+    // A skill token has no closing delimiter -- it ends at the first
+    // non-word character or end of string. If the tail (from "/skill:" to
+    // end of string) is entirely word characters, the stream could still be
+    // mid-id, so suppress. If a non-word character already terminates it,
+    // the token is already complete and was matched by the full regex pass.
+    guard !idPart.isEmpty else {
+      return String(text[..<slashIndex.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    let isAllWordChars = idPart.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+    guard isAllWordChars else { return nil }
+
+    return String(text[..<slashIndex.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private static func isPrefixOfKnownKind(_ prefix: String) -> Bool {
+    guard !prefix.isEmpty else { return true } // bare "@" -- always a live prefix
+    return knownEntityKinds.contains { $0.hasPrefix(prefix) }
+  }
+
+  private static func isCompleteEntityToken(_ candidate: String) -> Bool {
+    guard let entityRegex else { return false }
+    let range = NSRange(candidate.startIndex..., in: candidate)
+    guard let match = entityRegex.firstMatch(in: candidate, range: range) else { return false }
+    // Must match starting at the very first character (the "@") for this to
+    // be "this token is complete", not "a later token is complete".
+    return match.range.location == 0
+  }
+
+  /// True if `label` contains a `]` that is not escaped by a preceding `\`.
+  private static func hasUnescapedClosingBracket(_ label: String) -> Bool {
+    var previousWasBackslash = false
+    for char in label {
+      if char == "]", !previousWasBackslash {
+        return true
+      }
+      previousWasBackslash = (char == "\\") && !previousWasBackslash
+    }
+    return false
   }
 }

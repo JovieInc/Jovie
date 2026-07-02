@@ -82,6 +82,22 @@ final class ChatRepository {
     lastErrorMessage = nil
   }
 
+  /// Seeds a deterministic, in-memory timeline for UI-testing launch modes
+  /// only -- never called on `.live`. Bypasses the network client and cache
+  /// entirely so fixture content (e.g. entity/skill chip transcripts for
+  /// JOV-3608) renders without depending on a mocked backend. Callers gate
+  /// this on `LaunchMode`; this method itself performs no gating so it stays
+  /// trivially testable in isolation.
+  func seedTimelineForUITesting(
+    _ timeline: [MobileChatTimelineItem],
+    activeConversationID: String
+  ) {
+    self.activeConversationID = activeConversationID
+    self.timeline = timeline
+    isOffline = false
+    lastErrorMessage = nil
+  }
+
   func send(text: String) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !isSending else { return }

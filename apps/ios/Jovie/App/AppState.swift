@@ -73,7 +73,7 @@ final class AppState {
     case .uiTestingSignedOut:
       route = .signedOut
       dashboardState = .idle
-    case .uiTestingReady, .uiTestingChat, .uiTestingSettings, .uiTestingVenueMode:
+    case .uiTestingReady, .uiTestingChat, .uiTestingChatEntityFixture, .uiTestingSettings, .uiTestingVenueMode:
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false

@@ -192,6 +192,64 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
   }
 
+  // JOV-3608: entity/skill chat tokens must render as clean label text, with
+  // no raw `@kind:id[label]` / `/skill:id` wire syntax visible in the
+  // transcript -- in either the assistant bubble (onDark chip tone) or the
+  // user bubble (onLight chip tone). This is a text-level contract: chip
+  // runs are concatenated `Text`, not separately-identifiable views, so the
+  // assertion is "label text is present" + "no staticText matches the raw
+  // token grammar" rather than a per-chip accessibility identifier.
+  func testEntityAndSkillTokensRenderAsLabelsNotRawSyntax() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-entity-fixture",
+      expectedElementDescription: "\"Midnight Drive\""
+    ) {
+      $0.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Midnight Drive")).firstMatch
+    }
+
+    let rawTokenPredicate = NSPredicate(format: "label MATCHES %@", ".*@\\w+:.*")
+    let rawSkillTokenPredicate = NSPredicate(format: "label MATCHES %@", ".*/skill:\\w+.*")
+
+    XCTAssertEqual(
+      app.staticTexts.matching(rawTokenPredicate).count,
+      0,
+      "Transcript rendered a raw @kind:id[...] entity token instead of a chip label.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(rawSkillTokenPredicate).count,
+      0,
+      "Transcript rendered a raw /skill:id token instead of a chip label.\n\(app.debugDescription)"
+    )
+
+    // Assistant-bubble entity/skill labels (all four kinds + the skill token
+    // from MobileChatEntityFixture.default).
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Midnight Drive")).firstMatch.exists,
+      "Release entity chip label not found.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Opus")).firstMatch.exists,
+      "Track entity chip label not found.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Coachella 2027")).firstMatch.exists,
+      "Event entity chip label not found.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Generate album art")).firstMatch.exists,
+      "Skill chip label not found.\n\(app.debugDescription)"
+    )
+
+    // User-bubble entity token (onLight tone) -- the fixture's first message
+    // is a user turn mentioning @artist:art_1[Porter Robinson].
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Porter Robinson")).firstMatch.exists,
+      "User-bubble artist entity chip label not found.\n\(app.debugDescription)"
+    )
+
+    attachScreenshot(named: "chat-entity-chips", app: app)
+  }
+
   func testSwipeNavigatesBetweenProfileAndChat() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]

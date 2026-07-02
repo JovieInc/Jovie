@@ -229,13 +229,16 @@ private struct MobileChatMessageRow: View {
   }
 
   private var userMessageBubble: some View {
-    Text(item.content)
-      .font(JovieFont.body(size: 16))
-      .foregroundStyle(JovieColor.backgroundBase)
-      .padding(.horizontal, JovieSpacing.large)
-      .padding(.vertical, JovieSpacing.medium)
-      .background(Color.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-      .frame(maxWidth: 320, alignment: .trailing)
+    MobileChatProseText(
+      runs: MobileChatProseTokenizer.tokenize(item.content, isStreaming: false),
+      tone: .onLight
+    )
+    .font(JovieFont.body(size: 16))
+    .foregroundStyle(JovieColor.backgroundBase)
+    .padding(.horizontal, JovieSpacing.large)
+    .padding(.vertical, JovieSpacing.medium)
+    .background(Color.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .frame(maxWidth: 320, alignment: .trailing)
   }
 
   @ViewBuilder
@@ -255,7 +258,7 @@ private struct MobileChatMessageRow: View {
     } else {
       VStack(alignment: .leading, spacing: JovieSpacing.small) {
         if !displayText.isEmpty {
-          Text(displayText)
+          MobileChatProseText(runs: assistantProseRuns(from: segments), tone: .onDark)
             .font(JovieFont.body(size: 16))
             .foregroundStyle(JovieColor.textPrimary)
             .padding(.horizontal, JovieSpacing.large)
@@ -272,6 +275,22 @@ private struct MobileChatMessageRow: View {
         }
       }
     }
+  }
+
+  /// Flattens every `.text` segment's prose runs into one ordered run list,
+  /// joined by a blank-line run wherever segments were separated (mirrors
+  /// the `\n\n` join in `MobileChatContentParser.displayText`). Tool-call
+  /// segments render as their own cards below and are excluded here.
+  private func assistantProseRuns(from segments: [MobileChatRenderableSegment]) -> [MobileChatProseRun] {
+    var runs: [MobileChatProseRun] = []
+    for segment in segments {
+      guard case let .text(segmentRuns) = segment, !segmentRuns.isEmpty else { continue }
+      if !runs.isEmpty {
+        runs.append(.text("\n\n"))
+      }
+      runs.append(contentsOf: segmentRuns)
+    }
+    return runs
   }
 }
 
@@ -295,5 +314,74 @@ private struct ChatComposerView: View {
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
     )
+  }
+}
+
+/// Surface a `MobileChatProseText` renders on. Drives chip color mixing so
+/// an entity/skill chip stays legible on whichever bubble background it
+/// lands on -- mirrors `EntityChipTone` (`onLight` | `onDark`) on the web.
+enum MobileChatProseTone {
+  /// White user-message bubble (`userMessageBubble`).
+  case onLight
+  /// Dark assistant-transcript bubble (`assistantMessageContent`).
+  case onDark
+}
+
+/// Renders an ordered `[MobileChatProseRun]` as a single concatenated
+/// `Text`, matching web's `TokenizedText`/`AssistantMessageText`: entity and
+/// skill mentions render inline within the sentence (never as separate
+/// blocks that would shred prose), tinted with the entity's kind accent.
+///
+/// SwiftUI `Text` concatenation (`+`) is the only supported way to mix
+/// styled runs inline without breaking text flow/wrapping, so chips here are
+/// text-only (kind-accent color + underline for entities, secondary color
+/// for skills) rather than pill/dot chips -- v1 scope per JOV-3608.
+struct MobileChatProseText: View {
+  let runs: [MobileChatProseRun]
+  let tone: MobileChatProseTone
+
+  var body: some View {
+    runs.reduce(Text("")) { partial, run in
+      partial + textRun(for: run)
+    }
+  }
+
+  private func textRun(for run: MobileChatProseRun) -> Text {
+    switch run {
+    case let .text(value):
+      return Text(value)
+    case let .entity(kind, _, label):
+      return Text(label)
+        .foregroundColor(entityAccentColor(for: kind))
+        .underline(true, color: entityAccentColor(for: kind).opacity(0.55))
+    case let .skill(_, label):
+      return Text(label)
+        .foregroundColor(skillLabelColor)
+        .fontWeight(.medium)
+    }
+  }
+
+  private func entityAccentColor(for kind: MobileChatEntityKind) -> Color {
+    let accent = JovieColor.EntityAccent.color(for: kind)
+    switch tone {
+    case .onDark:
+      // Mirrors .system-b-entity-mention-span: accent blended toward the
+      // dark transcript's primary text color, not the raw accent hue.
+      return accent.opacity(0.86)
+    case .onLight:
+      // On the white user bubble, blend toward the dark bubble text color
+      // instead of white so the chip stays legible (mirrors the web
+      // [data-entity-tone="onLight"] text override).
+      return accent.opacity(0.92)
+    }
+  }
+
+  private var skillLabelColor: Color {
+    switch tone {
+    case .onDark:
+      return JovieColor.textSecondary
+    case .onLight:
+      return JovieColor.backgroundBase.opacity(0.72)
+    }
   }
 }

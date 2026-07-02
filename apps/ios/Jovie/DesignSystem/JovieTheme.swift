@@ -20,6 +20,35 @@ enum JovieColor {
   static let progressTrack = accentBlue.opacity(0.08)
   static let errorText = Color(hex: 0xFF7A73)
   static let qrSurface = Color.white
+
+  /// Per-entity-kind accent colors for inline chat chips (JOV-3608). Ported
+  /// 1:1 from the dark-mode carbon-palette CSS vars in
+  /// apps/web/styles/design-system.css (`--color-accent`,
+  /// `--color-accent-purple`, `--color-accent-blue`,
+  /// `--color-accent-orange`), which is what `EntityChip`/`EntityMentionSpan`
+  /// resolve to via `ENTITY_KIND_ACCENT_VAR` on the web. Distinct from the
+  /// generic `accentBlue`/`accentPurple`/`accentPink` above -- those back
+  /// unrelated iOS-only UI (tool-call cards, buttons) and must not be reused
+  /// here or web/iOS accent parity silently drifts on the next design pass.
+  enum EntityAccent {
+    /// release -> --color-accent
+    static let release = Color(hex: 0x7170FF)
+    /// artist -> --color-accent-purple
+    static let artist = Color(hex: 0x9B4DFF)
+    /// track -> --color-accent-blue
+    static let track = Color(hex: 0x4D7DFF)
+    /// event -> --color-accent-orange
+    static let event = Color(hex: 0xFFAB2E)
+
+    static func color(for kind: MobileChatEntityKind) -> Color {
+      switch kind {
+      case .release: return release
+      case .artist: return artist
+      case .track: return track
+      case .event: return event
+      }
+    }
+  }
 }
 
 enum JovieFont {
