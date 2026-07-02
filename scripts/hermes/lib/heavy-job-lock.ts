@@ -18,7 +18,7 @@ import { dirname } from 'node:path';
 
 import { HERMES_PATHS } from './hermes-paths';
 
-const LOCK = HERMES_PATHS.heavyJobLock;
+const DEFAULT_LOCK = HERMES_PATHS.heavyJobLock;
 const STALE_MS = 5 * 60 * 1000;
 
 export interface HeavyJobLockOwner {
@@ -47,11 +47,11 @@ function isProcessAlive(pid: number): boolean {
  * they won — the kernel makes the create-if-not-exists atomic. This
  * replaces the prior TOCTOU pattern (exists → write).
  */
-function tryClaim(caller: string): boolean {
-  mkdirSync(dirname(LOCK), { recursive: true });
+function tryClaim(caller: string, lock: string): boolean {
+  mkdirSync(dirname(lock), { recursive: true });
   let fd: number;
   try {
-    fd = openSync(LOCK, 'wx');
+    fd = openSync(lock, 'wx');
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === 'EEXIST') return false;
@@ -65,9 +65,9 @@ function tryClaim(caller: string): boolean {
   return true;
 }
 
-function readLockOwner(): HeavyJobLockOwner | null {
+function readLockOwner(lock: string): HeavyJobLockOwner | null {
   try {
-    return JSON.parse(readFileSync(LOCK, 'utf8')) as HeavyJobLockOwner;
+    return JSON.parse(readFileSync(lock, 'utf8')) as HeavyJobLockOwner;
   } catch {
     return null;
   }
@@ -78,12 +78,12 @@ function readLockOwner(): HeavyJobLockOwner | null {
  * remove it so the next claim attempt can succeed. Returns true if we
  * removed it.
  */
-function reapIfStale(staleMs = STALE_MS): boolean {
-  const data = readLockOwner();
+function reapIfStale(lock: string, staleMs = STALE_MS): boolean {
+  const data = readLockOwner(lock);
   if (!data) {
     // Unreadable lock — assume corrupt, try to remove.
     try {
-      unlinkSync(LOCK);
+      unlinkSync(lock);
       return true;
     } catch {
       return false;
@@ -96,7 +96,7 @@ function reapIfStale(staleMs = STALE_MS): boolean {
   const dead = typeof data.pid === 'number' ? !isProcessAlive(data.pid) : true;
   if (dead || age > staleMs) {
     try {
-      unlinkSync(LOCK);
+      unlinkSync(lock);
       return true;
     } catch {
       return false;
@@ -108,20 +108,21 @@ function reapIfStale(staleMs = STALE_MS): boolean {
 export async function tryWithHeavyJobLock<T>(
   caller: string,
   fn: () => Promise<T>,
-  options: { readonly staleMs?: number } = {}
+  options: { readonly staleMs?: number; readonly lockPath?: string } = {}
 ): Promise<HeavyJobLockResult<T>> {
+  const lock = options.lockPath ?? DEFAULT_LOCK;
   if (
-    !tryClaim(caller) &&
-    (!reapIfStale(options.staleMs) || !tryClaim(caller))
+    !tryClaim(caller, lock) &&
+    (!reapIfStale(lock, options.staleMs) || !tryClaim(caller, lock))
   ) {
-    return { acquired: false, owner: readLockOwner() };
+    return { acquired: false, owner: readLockOwner(lock) };
   }
 
   try {
     return { acquired: true, value: await fn() };
   } finally {
     try {
-      unlinkSync(LOCK);
+      unlinkSync(lock);
     } catch {
       // best effort
     }
@@ -131,25 +132,30 @@ export async function tryWithHeavyJobLock<T>(
 export async function withHeavyJobLock<T>(
   caller: string,
   fn: () => Promise<T>,
-  options: { readonly timeoutMs?: number; readonly staleMs?: number } = {}
+  options: {
+    readonly timeoutMs?: number;
+    readonly staleMs?: number;
+    readonly lockPath?: string;
+  } = {}
 ): Promise<T> {
   const timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
   const deadline = Date.now() + timeoutMs;
+  const lock = options.lockPath ?? DEFAULT_LOCK;
 
   while (Date.now() < deadline) {
-    if (tryClaim(caller)) {
+    if (tryClaim(caller, lock)) {
       try {
         return await fn();
       } finally {
         try {
-          unlinkSync(LOCK);
+          unlinkSync(lock);
         } catch {
           // best effort
         }
       }
     }
     // Couldn't claim; check for stale and retry.
-    if (!reapIfStale(options.staleMs)) {
+    if (!reapIfStale(lock, options.staleMs)) {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }

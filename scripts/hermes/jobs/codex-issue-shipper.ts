@@ -49,6 +49,13 @@ import {
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import {
+  journalEnd,
+  journalStart,
+  planRecovery,
+  readJournal,
+  SHIP_OWNER_LOCK,
+} from '../lib/ship-ledger';
 
 const JOB = 'codex-issue-shipper';
 
@@ -740,6 +747,15 @@ async function dispatchPlan(
   const dispatch = prepared.plan;
   try {
     claimIssue(config, dispatch);
+    journalStart({
+      job: JOB,
+      repo: config.repo,
+      issue: dispatch.issue.number,
+      branch: dispatch.branchName,
+      worktree: prepared.repoRoot,
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+    });
 
     let gbrain: GbrainContext;
     try {
@@ -891,7 +907,68 @@ async function dispatchPlan(
       successCommentPosted,
     });
   } finally {
+    // Terminal for every path (success, blocked, released, thrown): the
+    // dispatch is no longer in flight, so a restart must not "recover" it.
+    journalEnd(dispatch.issue.number, config.repo);
     cleanupWorktree(config, prepared.repoRoot);
+  }
+}
+
+/**
+ * Restart recovery: release claims journaled by a previous shipper process
+ * that died mid-dispatch (auto-update, crash, kickstart -k). The issue goes
+ * back to the dispatchable pool; the worktree is pruned. Runs once per
+ * process, under the ship-owner lock, before any new dispatch.
+ */
+function recoverStaleJobs(config: ShipperConfig): void {
+  const { stale, live } = planRecovery(readJournal());
+  for (const entry of stale) {
+    try {
+      run(
+        [
+          'gh',
+          'issue',
+          'edit',
+          String(entry.issue),
+          '--repo',
+          entry.repo,
+          '--remove-label',
+          CODEX_CLAIM_LABEL,
+        ],
+        config
+      );
+    } catch {
+      // Label already gone (or gh hiccup) — recovery stays best-effort.
+    }
+    try {
+      commentIssue(
+        config,
+        entry.issue,
+        `Jovie agent (codex issue shipper) restarted mid-dispatch (owner pid ${entry.pid} gone). Claim released for retry.`
+      );
+    } catch {
+      // Comment is informational only.
+    }
+    if (entry.worktree && existsSync(entry.worktree)) {
+      cleanupWorktree(config, entry.worktree);
+    }
+    journalEnd(entry.issue, entry.repo);
+    logJobEvent({
+      job: JOB,
+      event: 'restart_recovered_claim',
+      issue: entry.issue,
+      repo: entry.repo,
+      deadPid: entry.pid,
+      startedAt: entry.startedAt,
+    });
+  }
+  if (stale.length > 0 || live.length > 0) {
+    logJobEvent({
+      job: JOB,
+      event: 'restart_recovery_done',
+      recovered: stale.length,
+      stillLive: live.length,
+    });
   }
 }
 
@@ -938,6 +1015,7 @@ async function main(): Promise<void> {
     const lockResult = await tryWithHeavyJobLock(
       JOB,
       async () => {
+        recoverStaleJobs(config);
         let controlLabelsEnsured = false;
 
         for (;;) {
@@ -1003,7 +1081,9 @@ async function main(): Promise<void> {
           await dispatchBatch(config, batch);
         }
       },
-      { staleMs: config.singletonLockStaleMs }
+      // Machine-global lock: profile-scoped HERMES_HOME must not yield two
+      // "singletons" racing one GitHub queue (JovieInc/Jovie#12723).
+      { staleMs: config.singletonLockStaleMs, lockPath: SHIP_OWNER_LOCK }
     );
 
     if (!lockResult.acquired) {
