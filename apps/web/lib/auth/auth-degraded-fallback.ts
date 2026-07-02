@@ -130,3 +130,14 @@ export function isBrowserNavigation(acceptHeader: string | null): boolean {
   if (!acceptHeader) return false;
   return acceptHeader.includes('text/html');
 }
+
+/**
+ * Single entry point for degraded-auth 503 responses: HTML for browser
+ * navigations, JSON for API/fetch callers. Error capture stays at the call
+ * site (each has a distinct message/context).
+ */
+export function respondAuthDegraded(acceptHeader: string | null): Response {
+  return isBrowserNavigation(acceptHeader)
+    ? buildAuthDegradedHtmlResponse()
+    : buildAuthDegradedJsonResponse();
+}
