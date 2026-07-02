@@ -6,6 +6,14 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('server-only', () => ({}));
+// No DB in unit tests — loadScriptBank degrades to code seeds.
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: () => {
+      throw new Error('no db in unit tests');
+    },
+  },
+}));
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtist: hoisted.getSpotifyArtistMock,
   buildSpotifyArtistUrl: (id: string) =>
