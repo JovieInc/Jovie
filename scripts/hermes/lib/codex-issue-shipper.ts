@@ -28,7 +28,7 @@ export interface ShipperConfig {
   readonly singletonLockStaleMs: number;
   readonly issueFetchLimit: number;
   readonly integrationThreshold: number;
-  readonly agent: 'claude' | 'codex';
+  readonly agent: ShipperAgent;
   readonly simpleModel: string;
   readonly standardModel: string;
   readonly escalationModel: string;
@@ -36,10 +36,12 @@ export interface ShipperConfig {
   readonly codexSandbox: CodexSandboxMode;
   readonly codexApprovalPolicy: CodexApprovalPolicy;
   readonly claudePermissionMode: string;
+  readonly grokPermissionMode: string;
   readonly agentTimeoutMs: number;
   readonly dryRun: boolean;
 }
 
+export type ShipperAgent = 'claude' | 'codex' | 'grok';
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type ModelProfile = 'simple' | 'standard' | 'escalation';
 export type CodexSandboxMode =
@@ -131,7 +133,14 @@ export function loadShipperConfig(
   repoRoot: string,
   repo: string
 ): ShipperConfig {
-  const agent = env.HERMES_CODEX_SHIPPER_AGENT === 'codex' ? 'codex' : 'claude';
+  const agent = parseEnum<ShipperAgent>(
+    env.HERMES_CODEX_SHIPPER_AGENT,
+    ['claude', 'codex', 'grok'],
+    'grok'
+  );
+  const isGrok = agent === 'grok';
+  const defaultSessionModel = isGrok ? 'grok-composer-2.5-fast' : 'sonnet';
+  const defaultEscalationModel = isGrok ? 'grok-composer-2.5-fast' : 'opus';
   return {
     repo,
     repoRoot,
@@ -164,10 +173,13 @@ export function loadShipperConfig(
       4
     ),
     agent,
-    simpleModel: env.HERMES_CODEX_SHIPPER_SIMPLE_MODEL ?? 'sonnet',
-    standardModel: env.HERMES_CODEX_SHIPPER_STANDARD_MODEL ?? 'sonnet',
-    escalationModel: env.HERMES_CODEX_SHIPPER_ESCALATION_MODEL ?? 'opus',
-    fallbackModel: env.HERMES_CODEX_SHIPPER_FALLBACK_MODEL ?? 'sonnet',
+    simpleModel: env.HERMES_CODEX_SHIPPER_SIMPLE_MODEL ?? defaultSessionModel,
+    standardModel:
+      env.HERMES_CODEX_SHIPPER_STANDARD_MODEL ?? defaultSessionModel,
+    escalationModel:
+      env.HERMES_CODEX_SHIPPER_ESCALATION_MODEL ?? defaultEscalationModel,
+    fallbackModel:
+      env.HERMES_CODEX_SHIPPER_FALLBACK_MODEL ?? defaultSessionModel,
     codexSandbox: parseEnum<CodexSandboxMode>(
       env.HERMES_CODEX_SHIPPER_CODEX_SANDBOX,
       ['read-only', 'workspace-write', 'danger-full-access'],
@@ -180,6 +192,7 @@ export function loadShipperConfig(
     ),
     claudePermissionMode:
       env.HERMES_CODEX_SHIPPER_CLAUDE_PERMISSION_MODE ?? 'auto',
+    grokPermissionMode: env.HERMES_CODEX_SHIPPER_GROK_PERMISSION_MODE ?? 'auto',
     agentTimeoutMs: parsePositiveInt(
       env.HERMES_CODEX_SHIPPER_AGENT_TIMEOUT_MS,
       2 * 60 * 60 * 1000
@@ -216,6 +229,7 @@ export function eligibleCodexIssues(
 ): ReadonlyArray<GithubIssue> {
   return issues.filter(
     issue =>
+      !isHumanReviewRequired(issue) &&
       !isAlreadyClaimedOrBlocked(issue) &&
       !labelNames(issue).includes(NO_AUTO_LABEL)
   );
@@ -488,7 +502,8 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
 
 export function buildAgentCommand(
   config: ShipperConfig,
-  route: TaskRoute
+  route: TaskRoute,
+  promptPath?: string
 ): { readonly command: string; readonly args: ReadonlyArray<string> } {
   if (config.agent === 'codex') {
     return {
@@ -506,6 +521,28 @@ export function buildAgentCommand(
         route.sessionModel,
         '--color',
         'never',
+      ],
+    };
+  }
+
+  if (config.agent === 'grok') {
+    if (!promptPath) {
+      throw new Error('promptPath is required for grok agent');
+    }
+    return {
+      command: 'grok',
+      args: [
+        '--prompt-file',
+        promptPath,
+        '--cwd',
+        config.repoRoot,
+        '--model',
+        route.sessionModel,
+        '--max-turns',
+        String(route.maxTurns),
+        '--permission-mode',
+        config.grokPermissionMode,
+        '--no-alt-screen',
       ],
     };
   }

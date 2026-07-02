@@ -6,8 +6,7 @@
     <string>co.jovie.hermes.cron-codex-issue-shipper</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{{TSX_BIN}}</string>
-        <string>{{JOVIE_REPO}}/scripts/hermes/jobs/codex-issue-shipper.ts</string>
+        <string>{{HOME}}/.hermes/scripts/shipper-gated-entrypoint.py</string>
     </array>
     <key>WorkingDirectory</key>
     <string>{{JOVIE_REPO}}</string>
@@ -23,6 +22,8 @@
         <string>3</string>
         <key>HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS</key>
         <string>3</string>
+        <key>HERMES_CODEX_SHIPPER_ISSUE_FETCH_LIMIT</key>
+        <string>1000</string>
         <key>HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB</key>
         <string>4096</string>
         <key>HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU</key>
@@ -32,15 +33,17 @@
         <key>HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD</key>
         <string>4</string>
         <key>HERMES_CODEX_SHIPPER_AGENT</key>
-        <string>claude</string>
+        <string>grok</string>
         <key>HERMES_CODEX_SHIPPER_SIMPLE_MODEL</key>
-        <string>sonnet</string>
+        <string>grok-composer-2.5-fast</string>
         <key>HERMES_CODEX_SHIPPER_STANDARD_MODEL</key>
-        <string>sonnet</string>
+        <string>grok-composer-2.5-fast</string>
         <key>HERMES_CODEX_SHIPPER_ESCALATION_MODEL</key>
-        <string>opus</string>
+        <string>grok-composer-2.5-fast</string>
         <key>HERMES_CODEX_SHIPPER_FALLBACK_MODEL</key>
-        <string>sonnet</string>
+        <string>grok-composer-2.5-fast</string>
+        <key>HERMES_CODEX_SHIPPER_GROK_PERMISSION_MODE</key>
+        <string>auto</string>
         <key>PATH</key>
         <string>{{NODE_BIN_DIR}}:{{HOME}}/.bun/bin:{{HOME}}/.hermes/bin:{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
