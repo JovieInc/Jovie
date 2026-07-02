@@ -1,6 +1,12 @@
 'use client';
 
 import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import {
   type ColumnDef,
   createColumnHelper,
   type RowSelectionState,
@@ -30,7 +36,6 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  type ChangeEvent,
   type CSSProperties,
   cloneElement,
   createContext,
@@ -56,6 +61,10 @@ import {
   DrawerSection,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import {
+  TOOLBAR_MENU_CONTENT_CLASS,
+  ToolbarMenuChoiceItem,
+} from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
@@ -1709,20 +1718,13 @@ function ApprovalStatusEditor({
 }) {
   const [saving, setSaving] = useState(false);
 
-  async function handleChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextStatus = event.target.value;
-    if (
-      !profileId ||
-      !LIBRARY_APPROVAL_STATUSES.includes(nextStatus as LibraryApprovalStatus)
-    ) {
+  async function handleSelect(nextStatus: LibraryApprovalStatus) {
+    if (!profileId || nextStatus === asset.approvalStatus) {
       return;
     }
 
-    const approvalStatus = nextStatus as LibraryApprovalStatus;
-    if (approvalStatus === asset.approvalStatus) return;
-
     setSaving(true);
-    onStatusChange(asset.id, approvalStatus);
+    onStatusChange(asset.id, nextStatus);
 
     try {
       const response = await fetch('/api/library/approval-status', {
@@ -1732,7 +1734,7 @@ function ApprovalStatusEditor({
           profileId,
           assetId: asset.id,
           itemKind: getLibraryItemKind(asset),
-          approvalStatus,
+          approvalStatus: nextStatus,
         }),
       });
 
@@ -1747,35 +1749,58 @@ function ApprovalStatusEditor({
     }
   }
 
-  // The "Approval" DrawerSection already labels this control, so the select
-  // stands on its own (no stacked label, no nested card) — click-to-edit with
-  // an a11y label (issue #12317).
-  const selectId = useId();
+  const isDisabled = disabled || saving || !profileId;
+
   return (
-    <div>
-      <label htmlFor={selectId} className='sr-only'>
-        Approval Status
-      </label>
-      <select
-        id={selectId}
-        value={asset.approvalStatus}
-        onChange={event => {
-          void handleChange(event);
-        }}
-        disabled={disabled || saving || !profileId}
-        data-testid={`library-approval-status-select-${asset.id}`}
-        className={cn(
-          'system-b-library-action system-b-library-action--standard h-8 w-full border border-subtle px-2',
-          LIBRARY_BUTTON_FOCUS_CLASS
-        )}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type='button'
+          variant='ghost'
+          disabled={isDisabled}
+          aria-label='Approval Status'
+          data-testid={`library-approval-status-select-${asset.id}`}
+          className={cn(
+            'system-b-library-status-pill inline-flex h-6 items-center gap-1 border px-2',
+            libraryApprovalStatusClasses(asset.approvalStatus),
+            LIBRARY_BUTTON_FOCUS_CLASS
+          )}
+        >
+          <span>{formatLibraryApprovalStatus(asset.approvalStatus)}</span>
+          <ChevronDown
+            className='h-3 w-3 shrink-0 opacity-70'
+            aria-hidden='true'
+          />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align='start'
+        sideOffset={4}
+        data-menu-surface='toolbar'
+        className={TOOLBAR_MENU_CONTENT_CLASS}
       >
         {LIBRARY_APPROVAL_STATUSES.map(status => (
-          <option key={status} value={status}>
-            {formatLibraryApprovalStatus(status)}
-          </option>
+          <ToolbarMenuChoiceItem
+            key={status}
+            active={status === asset.approvalStatus}
+            leadingVisual={
+              <span
+                aria-hidden='true'
+                className={cn(
+                  'h-2 w-2 shrink-0 rounded-full',
+                  libraryApprovalStatusDotClasses(status)
+                )}
+              />
+            }
+            label={formatLibraryApprovalStatus(status)}
+            onSelect={() => {
+              void handleSelect(status);
+            }}
+            disabled={isDisabled || status === asset.approvalStatus}
+          />
         ))}
-      </select>
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -1961,15 +1986,6 @@ function AssetDrawer({
 
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
               <div className='space-y-2.5'>
-                <DrawerSection surface='card' title='Approval'>
-                  <ApprovalStatusEditor
-                    asset={current}
-                    profileId={profileId}
-                    disabled={!open}
-                    onStatusChange={onApprovalStatusChange}
-                  />
-                </DrawerSection>
-
                 {isMerch ? (
                   <DrawerSection surface='card' title='Merch'>
                     <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
@@ -2025,6 +2041,17 @@ function AssetDrawer({
 
                 <DrawerSection surface='card' title='Details'>
                   <dl>
+                    <MetadataRow
+                      label='Approval Status'
+                      value={
+                        <ApprovalStatusEditor
+                          asset={current}
+                          profileId={profileId}
+                          disabled={!open}
+                          onStatusChange={onApprovalStatusChange}
+                        />
+                      }
+                    />
                     <MetadataRow
                       label={isMerch ? 'Updated' : 'Release Date'}
                       value={formatLibraryReleaseDate(current.releaseDate)}
