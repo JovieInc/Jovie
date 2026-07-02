@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-
+import { fileGithubIssue, shouldMirrorLinear } from '../lib/tracker.mjs';
 import {
   enqueueForEve,
   shouldFastTrack,
@@ -55,32 +55,45 @@ export async function proposeQaSwarmFindings(input) {
         ? `P0 QA: ${finding.title}`
         : `QA swarm (${recipe.id}): ${finding.title}`;
 
-    const linearResult = dryRun
-      ? {
-          success: true,
-          identifier: 'DRY-RUN',
-          url: null,
-          queued: false,
-          dryRun: true,
-        }
-      : await fileLinearIssue({
+    // GitHub Issues is the primary tracker; Linear stays as a mirror during
+    // the migration parallel-run and drops out with TRACKER_GITHUB_ONLY=1.
+    const githubResult = dryRun
+      ? { success: true, identifier: 'DRY-RUN', url: null, dryRun: true }
+      : fileGithubIssue({
           title: issueTitle,
-          description,
+          body: description,
           labels: [...recipe.labels],
-          source: `qa-swarm:${recipe.id}`,
         });
+
+    const linearResult =
+      dryRun || !shouldMirrorLinear()
+        ? {
+            success: true,
+            identifier: dryRun ? 'DRY-RUN' : 'SKIPPED',
+            url: null,
+            queued: false,
+            dryRun,
+          }
+        : await fileLinearIssue({
+            title: issueTitle,
+            description,
+            labels: [...recipe.labels],
+            source: `qa-swarm:${recipe.id}`,
+          });
+
+    const trackerIssueUrl = githubResult.url ?? linearResult.url ?? null;
 
     let remediationPath = null;
     let eveQueued = false;
     if (shouldFastTrack(finding, eveEnabled)) {
       remediationPath = writeRemediationManifest(finding, {
         recipeId: input.recipeId,
-        linearIssueUrl: linearResult.url ?? null,
+        linearIssueUrl: trackerIssueUrl,
         gbrainSlug: gbrain.slug,
       });
     } else if (eveEnabled) {
       enqueueForEve(finding, {
-        linearIssueUrl: linearResult.url ?? null,
+        linearIssueUrl: trackerIssueUrl,
         gbrainSlug: gbrain.slug,
       });
       eveQueued = true;
@@ -91,6 +104,7 @@ export async function proposeQaSwarmFindings(input) {
       priority: finding.priority,
       gbrainSlug: gbrain.slug,
       gbrainPagePath: gbrain.pagePath,
+      github: githubResult,
       linear: linearResult,
       remediationPath,
       eveQueued,
