@@ -53,6 +53,7 @@ export { Button, buttonVariants } from './atoms/button';
 // Card
 export type {
   CardContentProps,
+  CardContentState,
   CardDescriptionProps,
   CardFooterProps,
   CardHeaderProps,
@@ -160,6 +161,9 @@ export {
   FormMessage,
   useFormField,
 } from './atoms/form';
+// Inline offline notice
+export type { InlineOfflineNoticeProps } from './atoms/inline-offline';
+export { InlineOfflineNotice } from './atoms/inline-offline';
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
@@ -172,6 +176,9 @@ export { Kbd } from './atoms/kbd';
 // Label
 export type { LabelProps } from './atoms/label';
 export { Label, labelVariants } from './atoms/label';
+// Link
+export type { LinkProps } from './atoms/link';
+export { Link, linkVariants } from './atoms/link';
 // Popover
 export {
   Popover,
