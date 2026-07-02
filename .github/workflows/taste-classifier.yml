@@ -9,9 +9,12 @@ name: Taste Classifier
 #   - Posts classification as a PR comment
 #   - Applies the appropriate label: needs-human-taste, llm-review, or merge-queue
 
+# NOTE: no `labeled` trigger — labels don't change the diff, and re-classifying
+# on label events created a loop where the classifier reverted human unlabels
+# (JOV-3808, PR #12688). Classification runs only when the content changes.
 on:
   pull_request:
-    types: [opened, ready_for_review, synchronize, labeled]
+    types: [opened, ready_for_review, synchronize]
 
 permissions:
   pull-requests: write

@@ -15,6 +15,12 @@
 
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import {
+  conventionalCommitType,
+  hasMaterialUxMarker,
+  MATERIAL_UX_MARKER,
+  NON_TASTE_COMMIT_TYPES,
+} from './lib/taste-label-guard.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
@@ -128,8 +134,19 @@ const NON_TASTE_BODY_KEYWORDS = [
   /\bno\s+taste\s+gate\b/i,
 ];
 
-/** Labels that force a classification */
-const FORCE_TASTE_LABELS = ['needs-human-taste', 'design', 'ui', 'ux'];
+/**
+ * Labels that force a classification. Deliberately does NOT include
+ * `needs-human-taste` — that is this classifier's own OUTPUT, and treating it
+ * as an input made every prior classification sticky forever (JOV-3808).
+ */
+const FORCE_TASTE_LABELS = ['design', 'ui', 'ux'];
+
+/**
+ * Terminal human decision: taste-approve.yml adds this when a maintainer
+ * clears the gate via /approve. Approval is final for the PR — the classifier
+ * must never re-gate it, even on later pushes.
+ */
+const TASTE_APPROVED_LABEL = 'taste-approved';
 
 const FORCE_NON_TASTE_LABELS = ['dependencies', 'automated', 'bot', 'ci-infra'];
 
@@ -163,8 +180,20 @@ export function classifyTaste(pr) {
     };
   }
 
-  // Force labels override everything
   const labelNames = labels.map(l => (typeof l === 'string' ? l : l.name));
+
+  // Terminal human decision — a prior /approve is never re-litigated.
+  if (labelNames.includes(TASTE_APPROVED_LABEL)) {
+    return {
+      classification: 'auto-ship',
+      confidence: 1,
+      reason:
+        'Taste already approved by a human (taste-approved label) — never re-gated',
+      signals: [`label:${TASTE_APPROVED_LABEL}`],
+    };
+  }
+
+  // Force labels override everything
   if (FORCE_TASTE_LABELS.some(l => labelNames.includes(l))) {
     return {
       classification: 'taste-required',
@@ -193,6 +222,24 @@ export function classifyTaste(pr) {
       signals: labelNames
         .filter(l => AUTO_SHIP_LABELS.includes(l))
         .map(l => `label:${l}`),
+    };
+  }
+
+  // Non-taste conventional-commit types are never taste calls on their own
+  // (Tim's 2026-06-26 directive; same policy as lib/taste-label-guard.mjs).
+  // A fix/chore/refactor/etc. PR only gets the gate with an explicit
+  // `ux:material` marker — this is how PR #12688 (a fix) got mis-gated.
+  const commitType = conventionalCommitType(title);
+  if (
+    commitType &&
+    NON_TASTE_COMMIT_TYPES.has(commitType) &&
+    !hasMaterialUxMarker(labelNames)
+  ) {
+    return {
+      classification: 'llm-reviewable',
+      confidence: 0.9,
+      reason: `\`${commitType}\` changes are not taste calls — add \`${MATERIAL_UX_MARKER}\` if this PR makes a material UX change`,
+      signals: [`commit-type:${commitType}`],
     };
   }
 

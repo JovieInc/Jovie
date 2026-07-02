@@ -96,5 +96,7 @@ jobs:
           fi
 
           # 4. Clear the gate and hand to Graphite (do NOT bypass-merge).
-          gh pr edit "$PR" --repo "$REPO" --remove-label needs-human-taste --add-label merge-queue
-          gh pr comment "$PR" --repo "$REPO" --body "Taste approved by @$ACTOR ✅ — cleared \`needs-human-taste\` and enrolled in the Graphite merge queue. Graphite will land it once checks pass."
+          #    `taste-approved` is the durable record of the human decision —
+          #    the classifier treats it as terminal and never re-gates (JOV-3808).
+          gh pr edit "$PR" --repo "$REPO" --remove-label needs-human-taste --add-label merge-queue --add-label taste-approved
+          gh pr comment "$PR" --repo "$REPO" --body "Taste approved by @$ACTOR ✅ — cleared \`needs-human-taste\`, stamped \`taste-approved\`, and enrolled in the Graphite merge queue. Graphite will land it once checks pass."
