@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
+import { ChatArtifactErrorCard } from './ChatArtifactErrorCard';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
 const PLATFORM_CONFIG = [
@@ -158,12 +159,11 @@ export function ChatPitchCard({
 
   if (state === 'error') {
     return (
-      <output className='system-b-chat-pitch-error'>
-        <span className='system-b-chat-pitch-error-title'>
-          Pitch Generation Failed
-        </span>
-        {error && <p className='system-b-chat-pitch-error-message'>{error}</p>}
-      </output>
+      <ChatArtifactErrorCard
+        title='Pitch Generation Failed'
+        message={error}
+        retryPrompt='Please retry generating the pitch.'
+      />
     );
   }
 
