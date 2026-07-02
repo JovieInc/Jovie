@@ -8239,22 +8239,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   line-height: var(--line-height-normal);
 }
 
-:where(.system-b-chat-step-limit-affordance-button) {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--system-b-bg-surface-0);
-  color: var(--color-text-primary-token);
-  cursor: pointer;
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
-  padding-block: var(--space-1-5);
-  padding-inline: var(--space-2-5);
-}
-
-:where(.system-b-chat-step-limit-affordance-button:hover) {
-  background: var(--system-b-bg-surface-2);
-}
-
 :where(.system-b-chat-artifact-error) {
   display: block;
   color: var(--color-text-primary-token);
@@ -8272,23 +8256,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   margin-top: var(--space-1-5);
   color: var(--color-text-secondary-token);
   font-size: var(--text-xs);
-}
-
-:where(.system-b-chat-artifact-error-retry) {
-  margin-top: var(--space-2);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--system-b-bg-surface-0);
-  color: var(--color-text-primary-token);
-  cursor: pointer;
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
-  padding-block: var(--space-1-5);
-  padding-inline: var(--space-2-5);
-}
-
-:where(.system-b-chat-artifact-error-retry:hover) {
-  background: var(--system-b-bg-surface-2);
 }
 
 :where(.system-b-chat-pitch-full-draft-row) {

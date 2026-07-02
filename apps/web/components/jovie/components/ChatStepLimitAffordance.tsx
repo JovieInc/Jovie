@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { CHAT_TOOL_STEP_LIMIT_AFFORDANCE_MESSAGE } from '@/lib/chat/tool-step-limit';
 
 function submitContinuePrompt(): void {
@@ -20,13 +21,15 @@ export function ChatStepLimitAffordance() {
       <p className='system-b-chat-step-limit-affordance-message'>
         {CHAT_TOOL_STEP_LIMIT_AFFORDANCE_MESSAGE}
       </p>
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='sm'
         onClick={submitContinuePrompt}
-        className='system-b-chat-step-limit-affordance-button focus-ring'
+        className='h-7 px-2 text-2xs'
       >
         Continue
-      </button>
+      </Button>
     </div>
   );
 }

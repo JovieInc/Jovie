@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 interface ChatArtifactErrorCardProps {
   readonly title: string;
   readonly message?: string;
@@ -31,13 +33,15 @@ export function ChatArtifactErrorCard({
         <p className='system-b-chat-artifact-error-message'>{message}</p>
       ) : null}
       {showRetry ? (
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='sm'
           onClick={() => submitRetryPrompt(retryPrompt)}
-          className='system-b-chat-artifact-error-retry focus-ring'
+          className='mt-2 h-7 px-2 text-2xs'
         >
           Retry
-        </button>
+        </Button>
       ) : null}
     </output>
   );
