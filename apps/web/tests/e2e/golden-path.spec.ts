@@ -1,6 +1,6 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ensureSignedInUser,
@@ -10,13 +10,18 @@ import {
 } from '../helpers/clerk-auth';
 
 /**
- * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Stripe
+ * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Live Profile
  *
  * Tests the complete new-user journey end to end with REAL data:
  * - No mocks for music fetch
  * - No pre-authenticated state
  * - Real Clerk auth (test environment)
- * - Real Stripe checkout session (test mode)
+ *
+ * Jovie's pricing is a 14-day reverse trial with NO card required at signup
+ * (see docs/PRICING-PHILOSOPHY.md), so the golden path's "first value" moment
+ * is the artist's public profile going live with imported music — not a
+ * paywall. Checkout is a post-activation upgrade path, not part of this
+ * journey; it is covered separately by billing-checkout.spec.ts (JOV-3757).
  *
  * Test artist: "Tim White" (~50 releases, deterministic)
  */
@@ -288,80 +293,6 @@ async function interceptTrackingCalls(page: Page) {
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 }
 
-interface CheckoutAttempt {
-  readonly status: number;
-  readonly url: string | null;
-  readonly body: string;
-}
-
-async function refreshClerkSessionForApi(page: Page): Promise<boolean> {
-  await setupClerkTestingToken({ page }).catch(() => {});
-  await page.goto('/app/chat', {
-    waitUntil: 'domcontentloaded',
-    timeout: 120_000,
-  });
-
-  if (/\/sign-?in/.test(page.url())) {
-    return false;
-  }
-
-  return page
-    .evaluate(async () => {
-      const clerk = (window as any).Clerk;
-      if (!clerk) return true;
-      if (!clerk.loaded) {
-        await new Promise<void>(resolve => {
-          const startedAt = Date.now();
-          const tick = () => {
-            if (clerk.loaded || Date.now() - startedAt > 15_000) {
-              resolve();
-              return;
-            }
-            window.setTimeout(tick, 100);
-          };
-          tick();
-        });
-      }
-
-      if (!clerk.user?.id || !clerk.session) return false;
-      await clerk.session.getToken({ skipCache: true }).catch(() => null);
-      return true;
-    })
-    .catch(() => false);
-}
-
-async function createCheckoutSessionFromBrowser(
-  page: Page,
-  priceId: string
-): Promise<CheckoutAttempt> {
-  return page.evaluate(async targetPriceId => {
-    const clerk = (window as any).Clerk;
-    const token = await clerk?.session
-      ?.getToken({ skipCache: true })
-      .catch(() => null);
-    const headers: Record<string, string> = {
-      'content-type': 'application/json',
-    };
-    if (token) {
-      headers.authorization = `Bearer ${token}`;
-    }
-
-    const response = await fetch('/api/stripe/checkout', {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-      body: JSON.stringify({ priceId: targetPriceId }),
-    });
-    const body = await response.text();
-    if (!response.ok) {
-      return { status: response.status, url: null, body };
-    }
-
-    const json = JSON.parse(body) as { url?: string };
-    return { status: response.status, url: json.url ?? null, body };
-  }, priceId);
-}
-
 /**
  * Create a brand-new Clerk test user session.
  * Uses `+clerk_test` email suffix which auto-verifies in Clerk test mode.
@@ -473,7 +404,7 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
 
-test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () => {
+test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile', () => {
   test.describe.configure({ mode: 'serial' });
 
   // Fresh browser — no inherited auth state
@@ -497,7 +428,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     await interceptTrackingCalls(page);
   });
 
-  test('complete user journey from signup to paid subscription', async ({
+  test('complete user journey from signup to live public profile', async ({
     page,
     browser,
   }) => {
@@ -691,14 +622,9 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       console.log('[golden-path] Profile DB check:', JSON.stringify(check));
     }
 
-    // Verify DSP links are persisted by checking the DB directly.
-    // We can't render the public listen page in this test because:
-    // 1. The fire-and-forget Spotify import saturates the Neon WebSocket pool
-    // 2. The proxy middleware needs a full DB query to check user state
-    // 3. Combined, this causes page loads to hang/timeout
-    //
-    // Instead, we hard-assert the spotify_url was saved to the profile,
-    // which is the prerequisite for DSP buttons rendering on the listen page.
+    // Verify DSP links are persisted by checking the DB directly first, as a
+    // fast, unambiguous signal before STEP 8 renders the public listen page.
+    // This hard-asserts the prerequisite for DSP buttons rendering there.
     {
       const dbUrl = process.env.DATABASE_URL!;
       const sql = neon(dbUrl);
@@ -770,103 +696,57 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 8: Stripe checkout session creation
+    // STEP 8: First value — the artist's public profile is LIVE
     // ──────────────────────────────────────────────────────────────────
+    // Reverse-trial pricing means there is no paywall between signup and
+    // value: the artist's first "win" is a live, public, shareable profile
+    // with their music imported. Render it as an anonymous fan would —
+    // fresh browser context, no auth — the way a real fan clicking a link
+    // in bio would land here.
+    const fanContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
+    const fanPage = await fanContext.newPage();
+    await interceptTrackingCalls(fanPage);
 
-    // Get available pricing. Local Next can restart under memory pressure after
-    // MusicFetch enrichment, so retry request-level ECONNRESET failures.
-    let pricingJson: {
-      pricingOptions?: Array<{
-        priceId?: string;
-        description?: string;
-        amount?: number;
-      }>;
-      options?: Array<{
-        priceId?: string;
-        description?: string;
-        amount?: number;
-      }>;
-    } | null = null;
+    try {
+      await expect(async () => {
+        const response = await fanPage.goto(`/${uniqueHandle}?mode=listen`, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60_000,
+        });
+        expect(
+          response?.status() ?? 0,
+          'Public profile did not render live'
+        ).toBe(200);
 
-    await expect
-      .poll(
-        async () => {
-          try {
-            const pricingResponse = await page.request.get(
-              '/api/stripe/pricing-options',
-              { timeout: 60_000 }
-            );
-            if (!pricingResponse.ok()) {
-              return `http-${pricingResponse.status()}`;
-            }
+        // The h1 must render the imported artist's real display name (not
+        // just any non-empty heading), so this can't pass on a placeholder
+        // or unrelated page.
+        const h1 = fanPage.locator('h1').first();
+        await expect(h1, 'Artist name missing on public profile').toBeVisible({
+          timeout: 10_000,
+        });
+        await expect(
+          h1,
+          'Artist name does not match imported artist'
+        ).toHaveText(/tim white/i, { timeout: 10_000 });
 
-            pricingJson = (await pricingResponse.json()) as NonNullable<
-              typeof pricingJson
-            >;
-            return 'ready';
-          } catch {
-            return 'request-error';
-          }
-        },
-        { timeout: 180_000, intervals: [2_000, 5_000, 10_000] }
-      )
-      .toBe('ready');
-
-    const allOptions =
-      pricingJson!.pricingOptions ?? pricingJson!.options ?? [];
-
-    // Find the primary paid Pro monthly plan specifically.
-    const proMonthlyOption = allOptions.find(
-      o => o.description === 'Pro' && o.amount === 3900 && o.priceId
-    );
-    expect(
-      proMonthlyOption,
-      'Pro monthly pricing option not returned — billing misconfigured'
-    ).toBeTruthy();
-
-    const proMonthlyPriceId = proMonthlyOption!.priceId!;
-    expect(
-      proMonthlyOption!.amount,
-      'Pro monthly price should be $39/mo (3900 cents)'
-    ).toBe(3900);
-
-    // Create checkout session with Pro monthly price
-    let checkoutUrl: string | null = null;
-    await expect
-      .poll(
-        async () => {
-          try {
-            let checkoutAttempt = await createCheckoutSessionFromBrowser(
-              page,
-              proMonthlyPriceId
-            );
-
-            if (checkoutAttempt.status === 401) {
-              const refreshed = await refreshClerkSessionForApi(page);
-              if (!refreshed) return 'http-401';
-              checkoutAttempt = await createCheckoutSessionFromBrowser(
-                page,
-                proMonthlyPriceId
-              );
-            }
-
-            if (checkoutAttempt.status < 200 || checkoutAttempt.status >= 300) {
-              return `http-${checkoutAttempt.status}`;
-            }
-
-            checkoutUrl = checkoutAttempt.url;
-            return checkoutUrl ?? 'missing-url';
-          } catch {
-            return 'request-error';
-          }
-        },
-        { timeout: 180_000, intervals: [2_000, 5_000, 10_000] }
-      )
-      .toMatch(/^https:\/\/checkout\.stripe\.com\//);
-
-    expect(
-      checkoutUrl,
-      'Stripe checkout URL missing — checkout session not created'
-    ).toMatch(/^https:\/\/checkout\.stripe\.com\//);
+        // Verify the imported Spotify link is actually rendered — not just a
+        // generic tab bar, which would pass even if DSP import silently failed.
+        await expect(
+          fanPage
+            .locator('a[href*="spotify"]')
+            .filter({ visible: true })
+            .first(),
+          'No Spotify listen link — imported DSP content not live'
+        ).toBeVisible({ timeout: 10_000 });
+      }).toPass({
+        timeout: 180_000,
+        intervals: [5_000, 10_000, 20_000],
+      });
+    } finally {
+      await fanContext.close();
+    }
   });
 });
