@@ -108,7 +108,7 @@ export function LibraryArtworkHoverZoom({
       {showZoom ? (
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute z-[2] rounded-full border border-subtle bg-surface-1/35 shadow-card backdrop-blur-[1px]'
+          className='pointer-events-none absolute z-[2] rounded-full border border-subtle bg-surface-1 opacity-35 shadow-card backdrop-blur-[1px]'
           style={{
             width: LENS_SIZE_PX,
             height: LENS_SIZE_PX,
