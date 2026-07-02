@@ -30,6 +30,7 @@ import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import { generatePrintGraphic } from './graphic-engine';
+import { attachMockupsToDesignOption, generateProductMockups } from './mockups';
 import {
   buildMerchPricingSnapshot,
   calculateRecommendedSalePriceCents,
@@ -124,6 +125,47 @@ function defaultPricing() {
     printfulCostSource: 'jovie_default',
     printfulCostUpdatedAt: null,
   });
+}
+
+/**
+ * Fire-and-forget: render the fulfillment-accurate Printful mockup for each
+ * design (the alpha graphic on the real default product) and attach it. The
+ * selected card then prefers the truthful Printful photo over the alpha preview
+ * (selectPreferredMockupUrl). Non-blocking and best-effort — a Printful outage
+ * leaves the alpha art in place. Pop-color / multi-product curation is a
+ * follow-up; this ships the truthful default-product mockup.
+ */
+function attachPrintfulMockupsAsync(
+  designs: readonly {
+    readonly optionId: string;
+    readonly printFileUrl: string;
+  }[]
+): void {
+  void Promise.allSettled(
+    designs.map(async ({ optionId, printFileUrl }) => {
+      try {
+        const { results } = await generateProductMockups({
+          printFileUrl,
+          catalogProductId: MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
+          catalogVariantIds: Object.values(
+            MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
+          ),
+          placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
+          technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
+          productTypes: [MERCH_DEFAULT_PRINTFUL_PRODUCT.productType],
+        });
+        const mockupUrls = results.flatMap(r => r.mockupUrls);
+        if (mockupUrls.length > 0) {
+          await attachMockupsToDesignOption(optionId, mockupUrls);
+        }
+      } catch (error) {
+        logger.warn('[merch-designs] printful mockup attach failed', {
+          optionId,
+          err: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })
+  );
 }
 
 /**
@@ -249,6 +291,13 @@ export async function generateMerchDesigns(params: {
   );
 
   const ready = designs.filter((d): d is MerchDesignPreview => d !== null);
+
+  // Non-blocking: attach the truthful Printful product mockup to each design.
+  attachPrintfulMockupsAsync(
+    ready.flatMap(d =>
+      d.preview_url ? [{ optionId: d.id, printFileUrl: d.preview_url }] : []
+    )
+  );
 
   await db
     .update(merchGenerationBatches)
