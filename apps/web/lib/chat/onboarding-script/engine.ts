@@ -10,7 +10,8 @@ import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
-import { pickLine, renderLine, type ScriptLine } from './script';
+import { loadScriptBank, pickFromBank } from './line-source';
+import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 
 /**
  * Deterministic onboarding fallback engine (JOV-3806).
@@ -175,10 +176,10 @@ function decisionTurn(
     uiMessages: readonly UIMessage[];
     state: OnboardingTurnState;
   }>,
-  existingDecisionKind: string | null
+  existingDecisionKind: string | null,
+  pick: (stepId: ScriptStepId) => ScriptLine
 ): FallbackTurn {
   const { uiMessages, state } = input;
-  const sessionId = state.sessionId;
 
   // Terminal decision already made — point back at the card.
   if (existingDecisionKind && existingDecisionKind !== 'needs_more_info') {
@@ -198,7 +199,7 @@ function decisionTurn(
         },
       });
     }
-    const line = pickLine('done', sessionId);
+    const line = pick('done');
     return { line, text: renderLine(line, {}), toolEvents: events };
   }
 
@@ -231,15 +232,15 @@ function decisionTurn(
         summary: 'Checkout handoff ready.',
       },
     });
-    const line = pickLine('instant_access', sessionId);
+    const line = pick('instant_access');
     return { line, text: renderLine(line, {}), toolEvents: events };
   }
   if (decision.kind === 'waitlist') {
     events.push(proposeNextStepEvent(decision));
-    const line = pickLine('waitlist', sessionId);
+    const line = pick('waitlist');
     return { line, text: renderLine(line, {}), toolEvents: events };
   }
-  const line = pickLine('ask_audience', sessionId);
+  const line = pick('ask_audience');
   return { line, text: renderLine(line, {}), toolEvents: events };
 }
 
@@ -257,6 +258,10 @@ export async function decideFallbackTurn(
 ): Promise<FallbackTurn> {
   const { uiMessages, state } = input;
   const sessionId = state.sessionId;
+  // Seeds merged with nightly-promoted lines (DB failure degrades to seeds).
+  const bank = await loadScriptBank();
+  const pick = (stepId: ScriptStepId): ScriptLine =>
+    pickFromBank(bank, stepId, sessionId);
   const latest = lastUserMessage(uiMessages);
   const selectedArtistId = parseArtistSelection(latest);
 
@@ -268,8 +273,8 @@ export async function decideFallbackTurn(
     );
     const hasData = state.spotifyFollowers !== null;
     const line = hasData
-      ? pickLine('confirm_artist', sessionId)
-      : pickLine('confirm_artist_no_data', sessionId);
+      ? pick('confirm_artist')
+      : pick('confirm_artist_no_data');
     return {
       line,
       text: renderLine(line, {
@@ -289,11 +294,11 @@ export async function decideFallbackTurn(
   // No artist yet: greet on the very first turn, otherwise open the picker.
   if (!state.spotifyArtistId) {
     if (state.turnCount <= 1) {
-      const line = pickLine('greet', sessionId);
+      const line = pick('greet');
       return { line, text: renderLine(line, {}), toolEvents: [] };
     }
     const query = latest ? messageText(latest).slice(0, 50) : '';
-    const line = pickLine('get_artist', sessionId);
+    const line = pick('get_artist');
     return {
       line,
       text: renderLine(line, {}),
@@ -314,7 +319,7 @@ export async function decideFallbackTurn(
   // Artist confirmed but handle not checked yet.
   if (!findLatestToolOutput(uiMessages, 'check_handle')) {
     const handle = handleFromArtistName(state.spotifyArtistName ?? '');
-    const line = pickLine('handle', sessionId);
+    const line = pick('handle');
     return {
       line,
       text: renderLine(line, { handle }),
@@ -342,5 +347,5 @@ export async function decideFallbackTurn(
       ? existingDecision.decision.kind
       : null
     : null;
-  return decisionTurn(input, existingDecisionKind);
+  return decisionTurn(input, existingDecisionKind, pick);
 }
