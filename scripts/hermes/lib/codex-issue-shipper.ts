@@ -562,3 +562,110 @@ export function buildAgentCommand(
     ],
   };
 }
+
+// --- Deterministic finisher -------------------------------------------------
+//
+// The kanban ship lane works because the MODEL only has to produce a diff —
+// deterministic code owns commit/push/PR. The issue lane historically trusted
+// the agent to run /ship itself, and grok CLI 0.2.77 abandons that long
+// contract mid-task (0 PRs from 334 "successful" runs, 2026-07-01..02).
+// classifyPostAgent + finishDispatch give this lane the same backstop: if the
+// agent exits 0 with real work in the worktree but no PR, the shipper commits,
+// pushes, and opens the PR itself. Pre-commit hooks still run — a diff that
+// fails lint/typecheck fails the finish and releases the claim as before.
+
+export interface FinisherRunner {
+  (args: ReadonlyArray<string>, opts?: { readonly timeoutMs?: number }): string;
+}
+
+/** Uncommitted changes or unpushed commits count as shippable work. */
+export function worktreeHasWork(runInWorktree: FinisherRunner): boolean {
+  const dirty = runInWorktree(['git', 'status', '--porcelain']).trim();
+  if (dirty.length > 0) return true;
+  const ahead = runInWorktree([
+    'git',
+    'rev-list',
+    '--count',
+    'origin/main..HEAD',
+  ]).trim();
+  return Number.parseInt(ahead, 10) > 0;
+}
+
+export function buildFinishCommitMessage(issue: GithubIssue): string {
+  const title = issue.title.replace(/\s+/g, ' ').trim().slice(0, 90);
+  return [
+    `chore(codex): ${title} (#${issue.number})`,
+    '',
+    'Deterministically finished by codex-issue-shipper: the coding agent',
+    'exited 0 with work in the worktree but no PR, so the shipper committed,',
+    'pushed, and opened the PR (same contract as the kanban ship lane).',
+  ].join('\n');
+}
+
+export function buildFinishPrBody(issue: GithubIssue, logPath: string): string {
+  return [
+    `Closes #${issue.number}`,
+    '',
+    'Opened by the codex-issue-shipper **deterministic finisher**: the coding',
+    'agent produced this diff but exited without opening a PR. Pre-commit hooks',
+    '(lint-staged, typecheck) passed at commit time; CI is the merge gate as',
+    'usual.',
+    '',
+    `Agent log: \`${logPath}\``,
+  ].join('\n');
+}
+
+/**
+ * Commit, push, and open the PR for work the agent left in the worktree.
+ * Throws on any step failure (caller releases the claim). All git/gh calls
+ * go through the injected runner so this stays unit-testable.
+ */
+export function finishDispatch(
+  runInWorktree: FinisherRunner,
+  input: {
+    readonly repo: string;
+    readonly branchName: string;
+    readonly issue: GithubIssue;
+    readonly logPath: string;
+  }
+): void {
+  const dirty = runInWorktree(['git', 'status', '--porcelain']).trim();
+  if (dirty.length > 0) {
+    runInWorktree(['git', 'add', '-A']);
+    runInWorktree(
+      [
+        'git',
+        '-c',
+        'user.name=Hermes',
+        '-c',
+        'user.email=hermes@jovie.co',
+        'commit',
+        '-m',
+        buildFinishCommitMessage(input.issue),
+      ],
+      // Pre-commit hooks run typecheck/lint on staged files — give them room.
+      { timeoutMs: 10 * 60 * 1000 }
+    );
+  }
+  runInWorktree(['git', 'push', '-u', 'origin', input.branchName], {
+    timeoutMs: 5 * 60 * 1000,
+  });
+  runInWorktree(
+    [
+      'gh',
+      'pr',
+      'create',
+      '--repo',
+      input.repo,
+      '--base',
+      'main',
+      '--head',
+      input.branchName,
+      '--title',
+      `chore(codex): ${input.issue.title.replace(/\s+/g, ' ').trim().slice(0, 90)} (#${input.issue.number})`,
+      '--body',
+      buildFinishPrBody(input.issue, input.logPath),
+    ],
+    { timeoutMs: 2 * 60 * 1000 }
+  );
+}
