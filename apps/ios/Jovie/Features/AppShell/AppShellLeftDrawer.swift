@@ -92,8 +92,6 @@ struct AppShellLeftDrawer: View {
     .frame(width: drawerWidth, alignment: .leading)
     .frame(maxHeight: .infinity)
     .background(JovieColor.backgroundBase)
-    .allowsHitTesting(isPresented)
-    .accessibilityHidden(!isPresented)
     .accessibilityIdentifier("shell-drawer")
     .onChange(of: isPresented) {
       guard !isPresented else { return }
