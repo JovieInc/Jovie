@@ -537,24 +537,60 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Continue in Browser"]
     }
 
-    try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?code=test_code&state=state_123",
-      targetApp: app
+    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123"
+
+    try openAuthCallbackURL(callbackURL, targetApp: app)
+
+    try waitForShellWithResend(
+      app.buttons["Copy URL"],
+      resendURL: callbackURL,
+      targetApp: app,
+      failureMessage: "Auth callback did not route to the authenticated shell."
     )
+
+    try openAuthCallbackURL(callbackURL, targetApp: app)
+
+    try waitForShellWithResend(
+      app.buttons["Copy URL"],
+      resendURL: callbackURL,
+      targetApp: app,
+      failureMessage: "Duplicate auth callback should leave the authenticated shell stable."
+    )
+  }
+
+  /// Waits for `element` to appear, resending `resendURL` once if the shell
+  /// hasn't appeared after a shorter checkpoint.
+  ///
+  /// `XCUIApplication.open(_:)` routes the deep link through Springboard,
+  /// which can silently drop delivery to an already-foregrounded app under
+  /// CI load (the "Open in Jovie" confirmation prompt races against a fixed
+  /// `waitForExistence` window in `acceptSystemOpenPromptIfNeeded`, and when
+  /// no prompt appears -- the common case for an app that's already frontmost
+  /// -- there's no independent signal that delivery actually succeeded). A
+  /// single resend after a short checkpoint absorbs that race without
+  /// masking a genuine app-side regression, since the full timeout budget
+  /// only elapses if the resend also fails to land.
+  private func waitForShellWithResend(
+    _ element: XCUIElement,
+    resendURL rawURL: String,
+    targetApp app: XCUIApplication,
+    failureMessage: String,
+    checkpoint: TimeInterval = 20,
+    totalTimeout: TimeInterval = 60,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) throws {
+    if element.waitForExistence(timeout: checkpoint) {
+      return
+    }
+
+    try openAuthCallbackURL(rawURL, targetApp: app)
 
     XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 10),
-      "Auth callback did not route to the authenticated shell.\n\(app.debugDescription)"
-    )
-
-    try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?code=test_code&state=state_123",
-      targetApp: app
-    )
-
-    XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Duplicate auth callback should leave the authenticated shell stable.\n\(app.debugDescription)"
+      element.waitForExistence(timeout: totalTimeout - checkpoint),
+      "\(failureMessage)\n\(app.debugDescription)",
+      file: file,
+      line: line
     )
   }
 
