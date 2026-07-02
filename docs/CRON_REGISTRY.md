@@ -80,7 +80,8 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 | 2 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
 | 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
 | 4 | cleanupSmsIntents | Every day | Marks expired SMS subscribe intents, hard-deletes rows >24h old (folded from standalone cron per JOV-1901) |
-| 5 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
+| 5 | onboardingScriptAggregation | Every day | Onboarding deterministic-script self-improvement (JOV-3806): recomputes per-line conversion counters, mines lint-clean LLM candidates, promotes/retires variants |
+| 6 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
 
 > **Note:** `scheduleNotifications` was previously listed here but has been called directly from `/api/cron/frequent` for sub-hourly scheduling. It is NOT a daily-maintenance sub-job. See AUTOMATION_AUDIT.md for rationale.
 
