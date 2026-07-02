@@ -227,6 +227,13 @@ platform :ios do
       observability_environment: observability_environment
     )
 
+    # Re-validate the WRITTEN configuration artifact (not just the env var
+    # checked pre-flight by validate-testflight-env.sh). Closes the drift
+    # window where write-configuration.sh's own fallback chain, or a stale
+    # cached Configuration.local.plist, could embed a non-live key that the
+    # earlier env-only check never saw.
+    sh("bash #{repo_path("apps/ios/scripts/validate-testflight-artifact.sh").shellescape}")
+
     setup_ci if ENV["CI"].to_s.downcase == "true"
 
     ensure_app_store_assets!(api_key: api_key, apple_team_id: apple_team_id)
