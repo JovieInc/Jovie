@@ -55,7 +55,8 @@ const BRAND_SCHEMA = {
   about: {
     '@type': 'Organization',
     name: APP_NAME,
-    description: 'Closed-loop operating system for music artists with AI agents for release planning, fan capture, and marketing automation.',
+    description:
+      'Closed-loop operating system for music artists with AI agents for release planning, fan capture, and marketing automation.',
     url: BASE_URL,
     knowsAbout: [
       'AI agent for artists',
