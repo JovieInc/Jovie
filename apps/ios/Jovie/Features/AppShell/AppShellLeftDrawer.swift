@@ -20,8 +20,12 @@ enum AppShellDrawerThreadsFilter {
   }
 }
 
+// The drawer is always mounted as the recessed BASE plane behind the
+// elevated content card (see AppShellView.body). It never overlays, dims, or
+// offsets itself — AppShellView owns all drag/open state and moves the
+// content plane instead. This view is a pure, stateless surface switcher.
 struct AppShellLeftDrawer: View {
-  @Binding var isPresented: Bool
+  let isPresented: Bool
   let profile: AppShellProfile
   let isOffline: Bool
   let chatEnabled: Bool
@@ -29,22 +33,13 @@ struct AppShellLeftDrawer: View {
   let selectedTab: AppShellTab
   let recentConversations: [MobileConversationSummary]
   let activeConversationID: String?
+  let drawerWidth: CGFloat
   let onSelectTab: (AppShellTab) -> Void
   let onStartNewChat: () -> Void
   let onSelectConversation: (String) -> Void
   let onOpenSettings: () -> Void
 
   @State private var threadSearch = ""
-  @State private var dragOffset: CGFloat = 0
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-  private var drawerWidth: CGFloat {
-    min(320, UIScreen.main.bounds.width * 0.86)
-  }
-
-  private var animation: Animation {
-    reduceMotion ? .easeInOut(duration: 0.2) : JovieMotion.cinematic
-  }
 
   private var filteredConversations: [MobileConversationSummary] {
     AppShellDrawerThreadsFilter.filtered(
@@ -53,93 +48,42 @@ struct AppShellLeftDrawer: View {
     )
   }
 
-  private var isVisible: Bool {
-    isPresented || dragOffset != 0
-  }
-
   var body: some View {
-    if isVisible {
-      GeometryReader { proxy in
-        let openOffset = drawerWidth + proxy.safeAreaInsets.leading
-        let progress = isPresented
-          ? max(0, min(1, 1 + (dragOffset / openOffset)))
-          : max(0, min(1, dragOffset / openOffset))
-
-        ZStack(alignment: .leading) {
-          Color.black
-            .opacity(0.42 * progress)
-            .ignoresSafeArea()
-            .onTapGesture { closeDrawer() }
-            .accessibilityHidden(true)
-
-          drawerPanel(openOffset: openOffset)
-            .offset(x: drawerOffset(openOffset: openOffset))
-            .gesture(drawerDragGesture(openOffset: openOffset))
-        }
-        .animation(animation, value: isPresented)
-        .animation(animation, value: dragOffset)
-      }
-      .accessibilityIdentifier("shell-drawer")
-    }
-  }
-
-  @ViewBuilder
-  private func drawerPanel(openOffset: CGFloat) -> some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack {
-        Text("Jovie")
-          .font(JovieFont.display(size: 22))
-          .foregroundStyle(JovieColor.textPrimary)
-
-        Spacer(minLength: 0)
-
-        Button(action: closeDrawer) {
-          Image(systemName: "xmark")
-        }
-        .buttonStyle(JovieIconButtonStyle())
-        .accessibilityLabel("Close navigation drawer")
-        .accessibilityIdentifier("shell-drawer-close")
-      }
-      .padding(.horizontal, JovieSpacing.large)
-      .padding(.top, JovieSpacing.large)
-      .padding(.bottom, JovieSpacing.medium)
+      Text("Jovie")
+        .font(JovieFont.display(size: 22))
+        .foregroundStyle(JovieColor.textPrimary)
+        .padding(.horizontal, JovieSpacing.large)
+        .padding(.top, JovieSpacing.large)
+        .padding(.bottom, JovieSpacing.medium)
 
       ScrollView {
         VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
-          DrawerAccountHeader(profile: profile, isOffline: isOffline)
-
+          // Surface switcher leads the drawer (approved IA 3A): it is the
+          // primary reason to open the drawer, so it sits above the account
+          // header rather than being buried mid-list.
           DrawerSurfaceSwitcher(
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
-            onSelectTab: { tab in
-              onSelectTab(tab)
-              closeDrawer()
-            }
+            onSelectTab: onSelectTab
           )
 
+          DrawerAccountHeader(profile: profile, isOffline: isOffline)
+
           if chatEnabled {
-            DrawerNewChatButton {
-              onStartNewChat()
-              closeDrawer()
-            }
+            DrawerNewChatButton(action: onStartNewChat)
 
             DrawerThreadsSection(
               searchText: $threadSearch,
               conversations: filteredConversations,
               totalCount: recentConversations.count,
               activeConversationID: activeConversationID,
-              onSelectConversation: { conversationID in
-                onSelectConversation(conversationID)
-                closeDrawer()
-              }
+              onSelectConversation: onSelectConversation
             )
           }
 
-          DrawerSettingsRow {
-            onOpenSettings()
-            closeDrawer()
-          }
+          DrawerSettingsRow(action: onOpenSettings)
         }
         .padding(.horizontal, JovieSpacing.large)
         .padding(.bottom, JovieSpacing.xxLarge)
@@ -147,72 +91,12 @@ struct AppShellLeftDrawer: View {
     }
     .frame(width: drawerWidth, alignment: .leading)
     .frame(maxHeight: .infinity)
-    .background(JovieColor.surface0)
-    .overlay(alignment: .trailing) {
-      Rectangle()
-        .fill(JovieColor.borderSubtle)
-        .frame(width: 1)
+    .background(JovieColor.backgroundBase)
+    .accessibilityIdentifier("shell-drawer")
+    .onChange(of: isPresented) {
+      guard !isPresented else { return }
+      threadSearch = ""
     }
-    .clipShape(
-      .rect(
-        topLeadingRadius: 0,
-        bottomLeadingRadius: 0,
-        bottomTrailingRadius: JovieRadius.xLarge,
-        topTrailingRadius: JovieRadius.xLarge
-      )
-    )
-    .shadow(color: .black.opacity(0.28), radius: 24, x: 8)
-  }
-
-  private func drawerOffset(openOffset: CGFloat) -> CGFloat {
-    if isPresented {
-      return min(0, dragOffset)
-    }
-    return -openOffset + max(0, dragOffset)
-  }
-
-  private func drawerDragGesture(openOffset: CGFloat) -> some Gesture {
-    DragGesture(minimumDistance: 8, coordinateSpace: .global)
-      .onChanged { value in
-        guard !reduceMotion else { return }
-
-        if isPresented {
-          dragOffset = min(0, value.translation.width)
-        } else if value.startLocation.x < 28, value.translation.width > 0 {
-          dragOffset = min(value.translation.width, openOffset)
-        }
-      }
-      .onEnded { value in
-        guard !reduceMotion else { return }
-
-        let predicted = value.predictedEndTranslation.width
-        if isPresented {
-          if value.translation.width < -72 || predicted < -120 {
-            closeDrawer()
-          } else {
-            dragOffset = 0
-          }
-          return
-        }
-
-        if value.startLocation.x < 28,
-           value.translation.width > 72 || predicted > 120
-        {
-          openDrawer()
-        }
-        dragOffset = 0
-      }
-  }
-
-  private func openDrawer() {
-    dragOffset = 0
-    isPresented = true
-  }
-
-  private func closeDrawer() {
-    dragOffset = 0
-    isPresented = false
-    threadSearch = ""
   }
 }
 
@@ -280,7 +164,6 @@ private struct DrawerSurfaceSwitcher: View {
         }
       }
     }
-    .accessibilityIdentifier("shell-drawer-surfaces")
   }
 }
 
