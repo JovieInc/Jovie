@@ -136,6 +136,17 @@ export const chatMessages = pgTable(
     role: chatMessageRoleEnum('role').notNull(),
     content: text('content').notNull(),
     toolCalls: jsonb('tool_calls'),
+    /**
+     * Which system produced an assistant message: 'llm' | 'script'
+     * (JOV-3806). Null on user rows and pre-feature assistant rows.
+     */
+    assistantSource: text('assistant_source'),
+    /**
+     * Deterministic script line key (e.g. 'greet:v1') when
+     * assistantSource='script'. Joined nightly against conversion outcomes
+     * to tune the response bank.
+     */
+    scriptLineKey: text('script_line_key'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
@@ -144,6 +155,9 @@ export const chatMessages = pgTable(
     ),
     turnIdIdx: index('idx_chat_messages_turn_id').on(table.turnId),
     createdAtIdx: index('idx_chat_messages_created_at').on(table.createdAt),
+    scriptLineKeyIdx: index('idx_chat_messages_script_line_key')
+      .on(table.scriptLineKey)
+      .where(drizzleSql`${table.scriptLineKey} IS NOT NULL`),
     conversationClientMessageUnique: uniqueIndex(
       'idx_chat_messages_conversation_client_message_unique'
     )
