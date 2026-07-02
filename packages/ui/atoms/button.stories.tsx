@@ -194,6 +194,22 @@ export const Disabled: Story = {
   },
 };
 
+export const DisabledVisual: Story = {
+  args: {
+    children: 'Disabled visual spec',
+    disabled: true,
+    variant: 'primary',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Disabled-visual spec: data-state="disabled", --state-disabled-opacity, and --color-text-disabled-token.',
+      },
+    },
+  },
+};
+
 export const LoadingDisabled: Story = {
   args: {
     children: 'Loading Disabled',

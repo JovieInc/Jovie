@@ -16,6 +16,8 @@ const badgeVariants = cva(
           'border border-(--color-border-default) text-(--linear-text-secondary) bg-transparent',
         success: 'bg-(--color-success-subtle) text-success',
         warning: 'bg-(--color-warning-subtle) text-warning',
+        'permission-restricted':
+          'border border-(--state-permission-border) bg-(--state-permission-bg) text-(--state-permission-fg)',
         // Backwards-compat aliases
         primary:
           'bg-(--color-bg-primary) text-(--linear-text-primary) border border-(--color-border-strong)',
@@ -49,9 +51,13 @@ export interface BadgeProps
 
 const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
   ({ className, variant, size, tone, ...props }, ref) => {
+    const dataState =
+      variant === 'permission-restricted' ? 'permission-restricted' : undefined;
+
     return (
       <span
         ref={ref}
+        data-state={dataState}
         className={cn(badgeVariants({ variant, size, tone }), className)}
         {...props}
       />

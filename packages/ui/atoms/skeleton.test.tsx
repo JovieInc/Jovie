@@ -17,6 +17,20 @@ describe('Skeleton', () => {
       expect(skeleton.className).toContain('skeleton');
     });
 
+    it('exposes shimmer loading state attrs', () => {
+      render(<Skeleton data-testid='skeleton' shimmer />);
+      const skeleton = screen.getByTestId('skeleton');
+      expect(skeleton).toHaveAttribute('data-state', 'shimmer');
+    });
+
+    it('supports static placeholder without shimmer', () => {
+      render(<Skeleton data-testid='skeleton' shimmer={false} />);
+      const skeleton = screen.getByTestId('skeleton');
+      expect(skeleton).toHaveAttribute('data-state', 'static');
+      expect(skeleton.className.split(/\s+/)).not.toContain('skeleton');
+      expect(skeleton.className).toContain('bg-(--color-skeleton-base)');
+    });
+
     it('is hidden from screen readers', () => {
       render(<Skeleton data-testid='skeleton' />);
       const skeleton = screen.getByTestId('skeleton');
@@ -149,10 +163,11 @@ describe('LoadingSkeleton', () => {
       expect(container).toBeInTheDocument();
     });
 
-    it('container is hidden from screen readers', () => {
+    it('container exposes busy status for assistive tech', () => {
       render(<LoadingSkeleton lines={3} />);
       const container = document.querySelector('.space-y-2');
-      expect(container).toHaveAttribute('aria-hidden', 'true');
+      expect(container).toHaveAttribute('aria-busy', 'true');
+      expect(container).toHaveAttribute('role', 'status');
     });
   });
 

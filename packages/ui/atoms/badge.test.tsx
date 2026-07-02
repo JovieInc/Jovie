@@ -211,5 +211,17 @@ describe('Badge', () => {
       expect(badge).toBeInTheDocument();
       expect(badge).toBeEmptyDOMElement();
     });
+
+    it('applies permission-restricted state', () => {
+      render(
+        <Badge variant='permission-restricted' data-testid='badge'>
+          Admin only
+        </Badge>
+      );
+
+      const badge = screen.getByTestId('badge');
+      expect(badge).toHaveAttribute('data-state', 'permission-restricted');
+      expect(badge.className).toContain('bg-(--state-permission-bg)');
+    });
   });
 });
