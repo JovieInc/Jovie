@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -1753,8 +1754,9 @@ function ApprovalStatusEditor({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           type='button'
+          variant='ghost'
           disabled={isDisabled}
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
@@ -1769,7 +1771,7 @@ function ApprovalStatusEditor({
             className='h-3 w-3 shrink-0 opacity-70'
             aria-hidden='true'
           />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='start'
