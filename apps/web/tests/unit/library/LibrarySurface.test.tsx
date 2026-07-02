@@ -418,7 +418,7 @@ describe('LibrarySurface', () => {
       })
     ).toBeInTheDocument();
     // Approval status stays a single accessible editor in the default-open
-    // Approval section while the drawer sections remain single-open.
+    // Details section while the drawer sections remain single-open.
     expect(
       drawer.getByRole('button', { name: 'Approval Status' })
     ).toBeInTheDocument();

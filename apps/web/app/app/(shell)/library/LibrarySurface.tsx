@@ -2004,22 +2004,8 @@ function AssetDrawer({
             </div>
 
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
-              <DrawerSectionGroup defaultOpenSectionId='approval'>
+              <DrawerSectionGroup defaultOpenSectionId='details'>
                 <div className='space-y-2.5'>
-                  <DrawerSection
-                    sectionId='approval'
-                    surface='card'
-                    title='Approval'
-                    defaultOpen={false}
-                  >
-                    <ApprovalStatusEditor
-                      asset={current}
-                      profileId={profileId}
-                      disabled={!open}
-                      onStatusChange={onApprovalStatusChange}
-                    />
-                  </DrawerSection>
-
                   {isMerch ? (
                     <DrawerSection
                       sectionId='merch'
@@ -2097,6 +2083,17 @@ function AssetDrawer({
                     defaultOpen={false}
                   >
                     <dl>
+                      <MetadataRow
+                        label='Approval Status'
+                        value={
+                          <ApprovalStatusEditor
+                            asset={current}
+                            profileId={profileId}
+                            disabled={!open}
+                            onStatusChange={onApprovalStatusChange}
+                          />
+                        }
+                      />
                       <MetadataRow
                         label={isMerch ? 'Updated' : 'Release Date'}
                         value={formatLibraryReleaseDate(current.releaseDate)}
