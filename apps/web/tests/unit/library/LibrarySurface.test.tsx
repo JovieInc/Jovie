@@ -381,16 +381,16 @@ describe('LibrarySurface', () => {
     });
   });
 
-  it('keeps the approval status select labelled after the inline refactor', () => {
-    // The visible label became sr-only (#12317 subtraction); guard a11y wiring.
+  it('keeps the approval status inline control labelled after the details refactor', () => {
     renderLibrary([buildAsset({ approvalStatus: 'draft' })]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
-    const select = screen.getByTestId(
+    const trigger = screen.getByTestId(
       'library-approval-status-select-release-1'
     );
-    expect(select).toHaveAccessibleName('Approval Status');
+    expect(trigger).toHaveAccessibleName('Approval Status');
+    expect(trigger.tagName).toBe('BUTTON');
   });
 
   it('renders release assets with grid cards and a read-only detail drawer', () => {
@@ -421,11 +421,11 @@ describe('LibrarySurface', () => {
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    // Approval editor is a bare, accessible select (no stacked label / nested
-    // card) — labeled only by its aria-label now that the section heading owns
-    // the visible title (issue #12317).
+    // Approval status is one inline metadata control in Details — no nested
+    // Approval card, no native select (JOV-3678).
+    expect(screen.getByText('Approval Status')).toBeInTheDocument();
     expect(
-      screen.getByRole('combobox', { name: 'Approval Status' })
+      screen.getByRole('button', { name: 'Approval Status' })
     ).toBeInTheDocument();
     const drawer = within(screen.getByTestId('library-asset-drawer'));
     expect(
