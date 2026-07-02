@@ -106,6 +106,8 @@ Labels are part of the CI control plane, not just project organization. Apply in
 - Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
 - If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
 
+- Never hand-edit the taste gate labels (`needs-human-taste`, `needs:taste`, `taste-approved`). The ONLY way to clear the gate is the `/approve` flow (`taste-approve.yml`): screenshot in the PR body + an `/approve`/`lgtm`/👍 comment from a maintainer. Hand-edits with a user token retrigger other label automation and get reverted (JOV-3808); the workflow's bot-token label surgery is the path that sticks.
+
 ## Auto-Merge Path Guardrails
 
 Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual review.
