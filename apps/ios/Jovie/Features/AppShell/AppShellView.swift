@@ -95,6 +95,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   let activeConversationID: String?
   let onSelectConversation: (String) -> Void
   let onStartNewChat: () -> Void
+  let onAutoSendMessage: (String) -> Void
   let onTalk: () -> Void
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
@@ -121,6 +122,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     activeConversationID: String? = nil,
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onStartNewChat: @escaping () -> Void = {},
+    onAutoSendMessage: @escaping (String) -> Void = { _ in },
     onTalk: @escaping () -> Void = {},
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
@@ -137,6 +139,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     self.activeConversationID = activeConversationID
     self.onSelectConversation = onSelectConversation
     self.onStartNewChat = onStartNewChat
+    self.onAutoSendMessage = onAutoSendMessage
     self.onTalk = onTalk
     self.onLogout = onLogout
     self.profileContent = profileContent()
@@ -215,6 +218,12 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     .onChange(of: intentStore.pending) {
       applyPendingIntentNavigation()
     }
+    .onContinueUserActivity(ConversationUserActivity.activityType) { activity in
+      guard let payload = ConversationUserActivity.payload(from: activity.userInfo ?? [:]) else {
+        return
+      }
+      intentStore.submit(.openConversation(payload.conversationID))
+    }
   }
 
   // Consume a navigation request raised by an App Intent (Siri / Shortcuts /
@@ -223,6 +232,8 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     var state = AppShellIntentNavigationState(
       selectedTab: selectedTab,
       chatDraft: chatDraft,
+      autoSendMessage: nil,
+      openConversationID: nil,
       pendingRequest: intentStore.consume()
     )
     let previousTab = selectedTab
@@ -233,6 +244,14 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     ) else { return }
 
     chatDraft = state.chatDraft
+
+    if let autoSendMessage = state.autoSendMessage {
+      onAutoSendMessage(autoSendMessage)
+    }
+
+    if let conversationID = state.openConversationID {
+      onSelectConversation(conversationID)
+    }
 
     if state.selectedTab != previousTab {
       withAnimation(.easeInOut(duration: 0.25)) {

@@ -6,6 +6,8 @@ struct AppShellIntentNavigationTests {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,
       chatDraft: "",
+      autoSendMessage: nil,
+      openConversationID: nil,
       pendingRequest: .openChat
     )
 
@@ -24,6 +26,8 @@ struct AppShellIntentNavigationTests {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,
       chatDraft: "keep me",
+      autoSendMessage: nil,
+      openConversationID: nil,
       pendingRequest: .continueLastConversation
     )
 
@@ -37,11 +41,13 @@ struct AppShellIntentNavigationTests {
     #expect(state.pendingRequest == nil)
   }
 
-  @Test func sendMessageSelectsChatTabAndPrefillsDraft() {
+  @Test func sendMessageAutoSendSelectsChatTabAndQueuesDispatch() {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,
       chatDraft: "",
-      pendingRequest: .sendMessage("launch my single")
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .sendMessage(text: "launch my single", autoSend: true)
     )
 
     AppShellIntentNavigation.applyPendingRequest(
@@ -50,7 +56,47 @@ struct AppShellIntentNavigationTests {
     )
 
     #expect(state.selectedTab == .chat)
-    #expect(state.chatDraft == "launch my single")
+    #expect(state.chatDraft == "")
+    #expect(state.autoSendMessage == "launch my single")
+    #expect(state.openConversationID == nil)
+    #expect(state.pendingRequest == nil)
+  }
+
+  @Test func sendMessageWithoutAutoSendPrefillsDraft() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .profile,
+      chatDraft: "",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .sendMessage(text: "draft only", autoSend: false)
+    )
+
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      state: &state
+    )
+
+    #expect(state.selectedTab == .chat)
+    #expect(state.chatDraft == "draft only")
+    #expect(state.autoSendMessage == nil)
+  }
+
+  @Test func openConversationSelectsChatTabAndQueuesConversationID() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .profile,
+      chatDraft: "",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .openConversation("conv_123")
+    )
+
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      state: &state
+    )
+
+    #expect(state.selectedTab == .chat)
+    #expect(state.openConversationID == "conv_123")
     #expect(state.pendingRequest == nil)
   }
 
@@ -58,7 +104,9 @@ struct AppShellIntentNavigationTests {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,
       chatDraft: "existing draft",
-      pendingRequest: .sendMessage("launch my single")
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .sendMessage(text: "launch my single", autoSend: true)
     )
 
     #expect(
@@ -76,7 +124,9 @@ struct AppShellIntentNavigationTests {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,
       chatDraft: "",
-      pendingRequest: .sendMessage("launch my single")
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .sendMessage(text: "launch my single", autoSend: true)
     )
 
     AppShellIntentNavigation.applyPendingRequest(
@@ -85,6 +135,7 @@ struct AppShellIntentNavigationTests {
     )
     state.selectedTab = .profile
     state.chatDraft = ""
+    state.autoSendMessage = nil
 
     #expect(
       AppShellIntentNavigation.applyPendingRequest(

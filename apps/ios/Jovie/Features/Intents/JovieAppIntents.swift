@@ -20,7 +20,7 @@ struct OpenChatIntent: AppIntent {
 struct SendMessageIntent: AppIntent {
   static let title: LocalizedStringResource = "Ask Jovie"
   static let description = IntentDescription(
-    "Opens Jovie chat with your message ready to send."
+    "Opens Jovie chat and sends your message to Jovie."
   )
   static let openAppWhenRun = true
 
@@ -32,7 +32,7 @@ struct SendMessageIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult {
-    IntentNavigationStore.shared.submit(.sendMessage(message))
+    IntentNavigationStore.shared.submit(.sendMessage(text: message, autoSend: true))
     return .result()
   }
 }
