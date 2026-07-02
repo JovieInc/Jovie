@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CollapsibleSectionHeading } from '@/components/molecules/drawer/CollapsibleSectionHeading';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
+import { DrawerSectionGroup } from '@/components/molecules/drawer/DrawerSectionGroup';
 
 function StatefulChild() {
   const [value, setValue] = useState('draft');
@@ -120,5 +121,28 @@ describe('DrawerSection', () => {
     await user.click(button);
 
     expect(input).toHaveValue('saved state');
+  });
+
+  it('keeps only one section open inside a DrawerSectionGroup', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DrawerSectionGroup defaultOpenSectionId='one'>
+        <DrawerSection sectionId='one' title='One' defaultOpen={false}>
+          <div data-testid='section-one'>One</div>
+        </DrawerSection>
+        <DrawerSection sectionId='two' title='Two' defaultOpen={false}>
+          <div data-testid='section-two'>Two</div>
+        </DrawerSection>
+      </DrawerSectionGroup>
+    );
+
+    expect(screen.getByTestId('section-one')).toBeVisible();
+    expect(screen.getByTestId('section-two')).not.toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Two' }));
+
+    expect(screen.getByTestId('section-one')).not.toBeVisible();
+    expect(screen.getByTestId('section-two')).toBeVisible();
   });
 });
