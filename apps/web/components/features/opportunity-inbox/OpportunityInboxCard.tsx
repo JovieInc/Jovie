@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ArrowRight, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useId, useState } from 'react';
 import { formatOpportunityInboxRelativeTime } from '@/lib/connectors/opportunity-inbox-time';
@@ -78,37 +79,43 @@ export function OpportunityInboxCard({
       <p className='system-b-opportunity-inbox-card-why'>{card.why}</p>
 
       <div className='system-b-opportunity-inbox-card-feedback'>
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           className={cn(
-            'system-b-opportunity-inbox-feedback-button',
+            'h-7 w-7 border border-transparent',
             selectedRating === 'positive' &&
-              'system-b-opportunity-inbox-feedback-button-active'
+              'border-subtle bg-surface-1 text-primary-token'
           )}
           aria-label='Mark Suggestion Helpful'
           disabled={isBusy}
           onClick={() => submitFeedback('positive')}
         >
           <ThumbsUp className='system-b-opportunity-inbox-feedback-icon' />
-        </button>
-        <button
+        </Button>
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           className={cn(
-            'system-b-opportunity-inbox-feedback-button',
+            'h-7 w-7 border border-transparent',
             selectedRating === 'negative' &&
-              'system-b-opportunity-inbox-feedback-button-active'
+              'border-subtle bg-surface-1 text-primary-token'
           )}
           aria-label='Mark Suggestion Not Helpful'
           disabled={isBusy}
           onClick={() => submitFeedback('negative')}
         >
           <ThumbsDown className='system-b-opportunity-inbox-feedback-icon' />
-        </button>
-        <button
+        </Button>
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           className={cn(
-            'system-b-opportunity-inbox-feedback-button',
-            commentOpen && 'system-b-opportunity-inbox-feedback-button-active'
+            'h-7 w-7 border border-transparent',
+            commentOpen && 'border-subtle bg-surface-1 text-primary-token'
           )}
           aria-expanded={commentOpen}
           aria-controls={commentFieldId}
@@ -117,7 +124,7 @@ export function OpportunityInboxCard({
           onClick={() => setCommentOpen(open => !open)}
         >
           <MessageSquare className='system-b-opportunity-inbox-feedback-icon' />
-        </button>
+        </Button>
       </div>
 
       <div

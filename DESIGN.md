@@ -442,8 +442,10 @@ of redefining them.
   - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
     modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
   - Raw durations and easings in route code are forbidden (enforced in Wave 4).
-- **Canonical button variants:** TBD by the Wave 1 audit; this section will
-  link forward to the Wave 1 PR once it lands.
+- **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
+  and `link`. Destructive styling is a `destructive` prop, not a variant.
+- **Canonical button sizes:** `sm` = 28px, `md` = 36px, `lg` = 44px;
+  `icon` uses the `md` control height with equal width.
 
 See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
 for the canonical CSS + Tailwind references.
@@ -548,14 +550,22 @@ duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ### Buttons
 
-| Variant | Light bg | Light fg | Dark bg | Dark fg |
-|---------|----------|----------|---------|---------|
-| Primary | `oklch(10% 0 0)` | `oklch(100% 0 0)` | `#e6e6e6` | `#08090a` |
-| Secondary | `oklch(93% chroma hue)` | `oklch(20% 0 0)` | `oklch(19% chroma hue)` | `oklch(90% 0 0)` |
-| Accent | `#7170ff` | white | `#7170ff` | white |
-| Marketing CTA | `#ffffff` | `#08090a` | `#ffffff` | `#08090a` |
+| Variant | Visual | Use case |
+|---------|--------|----------|
+| Primary | Solid high-contrast pill, black-on-light and white-on-dark via button tokens | Primary CTAs, submit, confirm |
+| Secondary | Subtle surface with 1px border and restrained hover elevation | Secondary actions, toolbar buttons, paired actions |
+| Tertiary | Transparent text/button chrome with hover reveal | Low-emphasis actions, row actions, dismiss |
+| Ghost | Transparent icon-first control with hover-circle reveal | Icon-only buttons, close, delete, add-row |
+| Link | Inline text with underline-on-hover, no control chrome | Inline actions, learn more, view all |
 
-Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padding: 12px horizontal.
+| Size | Height | Usage |
+|------|--------|-------|
+| Sm | 28px | Compact toolbar and table actions |
+| Md | 36px | Default all-purpose control |
+| Lg | 44px | Hero and feature callout CTAs |
+| Icon | 36px square | Icon-only controls |
+
+Destructive actions use `destructive` on any variant. Examples: primary destructive is a red filled button, secondary destructive is a red text/border action, and ghost destructive is a red icon/text control with subtle red hover surface.
 
 ### Sidebar (App Shell)
 
@@ -826,6 +836,7 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 | 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | Supersedes the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stay Inter. Driven by Frame.io-inspired hero composition where Inter at 80px reads narrow; Satoshi at 600/-0.045em matches Frame.io's FrameGothic computed style spec (verified by getComputedStyle). |
 | 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). **Superseded 2026-06-28** by DS_FOUNDATION_V1 1298px. |
 | 2026-06-28 | Canonical 1298px public/marketing width (DS_FOUNDATION_V1) | One width in code + docs. `--ds-public-content-max` is canonical; legacy 1200/1280 aliases resolve to 1298px. Linear.app container parity. |
+| 2026-07-02 | Canonical button variants shipped (DS_FOUNDATION_V1 Wave 1) | 5 variants (`primary`, `secondary`, `tertiary`, `ghost`, `link`) + `destructive` prop. 3 sizes (`sm`/`md`/`lg`) + `icon`. 19 surface-specific `system-b-*-button` classes migrated behind a shrink-only ratchet. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |

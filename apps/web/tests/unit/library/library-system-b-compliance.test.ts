@@ -57,10 +57,11 @@ describe('library right-rail System B structural compliance', () => {
     );
   });
 
-  it('makes library buttons and icon buttons pill / hover-circle', () => {
+  it('keeps remaining library action buttons pill-shaped and retires old icon button CSS', () => {
     expect(css).toMatch(
-      /:where\(\.system-b-library-action\),\s*:where\(\.system-b-library-icon-button\)\s*\{\s*border-radius: var\(--radius-full\);/
+      /:where\(\.system-b-library-action\)\s*\{\s*border-radius: var\(--radius-full\);/
     );
+    expect(css).not.toContain('system-b-library-icon-button');
   });
 
   it('edits approval status inline in Details without a native select', () => {

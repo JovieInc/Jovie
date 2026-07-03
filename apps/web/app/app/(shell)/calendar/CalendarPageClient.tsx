@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
@@ -456,41 +457,47 @@ export function CalendarPageClient() {
         <div className='flex h-full min-h-0 flex-col gap-4'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
             <div className='system-b-calendar-month-control inline-flex min-w-0 items-center gap-1'>
-              <button
+              <Button
                 type='button'
+                variant='ghost'
+                size='icon'
                 onClick={() => {
                   const next = new Date(cursor);
                   next.setMonth(cursor.getMonth() - 1);
                   setCursor(startOfMonth(next));
                 }}
-                className='system-b-calendar-icon-button grid h-7 w-7 place-items-center transition-colors duration-subtle ease-subtle'
+                className='h-7 w-7 text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
                 aria-label='Previous Month'
               >
                 <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
-              </button>
+              </Button>
               <h2 className='system-b-calendar-month-label'>
                 {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
               </h2>
-              <button
+              <Button
                 type='button'
+                variant='ghost'
+                size='icon'
                 onClick={() => {
                   const next = new Date(cursor);
                   next.setMonth(cursor.getMonth() + 1);
                   setCursor(startOfMonth(next));
                 }}
-                className='system-b-calendar-icon-button grid h-7 w-7 place-items-center transition-colors duration-subtle ease-subtle'
+                className='h-7 w-7 text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
                 aria-label='Next Month'
               >
                 <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
-              </button>
+              </Button>
             </div>
-            <button
+            <Button
               type='button'
+              variant='ghost'
+              size='sm'
               onClick={() => setCursor(startOfMonth(new Date()))}
-              className='system-b-calendar-toolbar-button h-7 px-3 font-caption transition-colors duration-subtle ease-subtle'
+              className='h-7 px-3 font-caption text-2xs text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
             >
               Today
-            </button>
+            </Button>
           </div>
 
           <div className='system-b-calendar-panel overflow-hidden'>

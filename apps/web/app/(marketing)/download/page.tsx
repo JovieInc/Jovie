@@ -68,6 +68,7 @@ const PLATFORM_ROWS = [
   },
   {
     icon: Smartphone,
+    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Apple platform casing
     label: 'iPhone',
     title: 'Internal TestFlight alpha',
     body: 'Mobile stays private while the alpha proves auth, Profile QR, Settings, and TestFlight reliability on real devices.',
@@ -96,10 +97,10 @@ const FEATURE_ROWS = [
 ] as const;
 
 const REQUIREMENTS = [
-  { label: 'Operating system', value: 'macOS 11 Big Sur or later' },
+  { label: 'Operating System', value: 'macOS 11 Big Sur or later' },
   { label: 'Architecture', value: 'Apple Silicon or Intel Mac' },
   { label: 'Memory', value: '4 GB RAM minimum, 8 GB recommended' },
-  { label: 'Disk space', value: '500 MB free' },
+  { label: 'Disk Space', value: '500 MB free' },
   { label: 'Network', value: 'Internet connection required' },
 ] as const;
 
@@ -150,7 +151,7 @@ export default function DownloadPage() {
                     id='download-hero-heading'
                     className='system-b-download-hero-title'
                   >
-                    Jovie, installed where you work.
+                    Jovie, Installed Where You Work.
                   </h1>
                   <p className='system-b-download-hero-lead'>
                     Run the native Mac workspace today. Keep the iPhone build
@@ -159,8 +160,9 @@ export default function DownloadPage() {
                   <div className='mt-8 flex flex-wrap items-center gap-3'>
                     <Button
                       asChild
-                      variant='whitePill'
-                      className='system-b-download-hero-button'
+                      variant='primary'
+                      size='lg'
+                      className='gap-2 px-6 text-mid font-semibold'
                     >
                       <a
                         href={DOWNLOAD_URL}
@@ -271,7 +273,7 @@ export default function DownloadPage() {
             <div>
               <p className='homepage-section-eyebrow'>Release workflow</p>
               <h2 className='system-b-download-section-title'>
-                Everything in Jovie, closer.
+                Everything In Jovie, Closer.
               </h2>
             </div>
             <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
@@ -299,7 +301,7 @@ export default function DownloadPage() {
               <div>
                 <p className='homepage-section-eyebrow'>Install details</p>
                 <h2 className='system-b-download-details-title'>
-                  Built to stay out of the way.
+                  Built To Stay Out Of The Way.
                 </h2>
               </div>
               <div className='grid gap-8 sm:grid-cols-3'>
