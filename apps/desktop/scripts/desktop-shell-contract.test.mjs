@@ -115,6 +115,16 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/
   );
+  assert.match(mainSource, /const initialVisibilityFallback = setTimeout/);
+  assert.match(mainSource, /current === 'about:blank'/);
+  assert.match(
+    mainSource,
+    /const authUrl = buildCentralDesktopAuthUrl\('sign_in', '\/app'\);/
+  );
+  assert.match(
+    mainSource,
+    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(authUrl\)\);/
+  );
   assert.match(
     mainSource,
     /void win\.loadURL\(buildDesktopAuthHandoffUrl\(initialAuthUrl\)\);/
@@ -178,10 +188,19 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
   assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
-  assert.match(mainSource, /if \(APP_ENV !== 'production'\)/);
-  assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
-  assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
-  assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
+  assert.match(mainSource, /APP_ENV === 'staging'\s*\?\s*'jovie-staging'/);
+  assert.match(mainSource, /APP_ENV === 'local'\s*\?\s*'jovie-local'/);
+  assert.match(mainSource, /:\s*'jovie';/);
+  assert.match(
+    mainSource,
+    /app\.setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME/
+  );
+  assert.match(stagingConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLTypes:/);
+  assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {
@@ -408,6 +427,21 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
     smokeSource,
     /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/
   );
+  assert.match(
+    smokeSource,
+    /const NATIVE_AUTH_CALLBACK_SCHEME = getNativeAuthSchemeForBaseUrl\(BASE_URL\);/
+  );
+  assert.match(
+    smokeSource,
+    /if \(hostname === 'staging\.jov\.ie'\) return 'jovie-staging';/
+  );
+  assert.match(smokeSource, /if \(hostname === 'jov\.ie'\) return 'jovie';/);
+  assert.match(
+    smokeSource,
+    /hostname === 'localhost'[\s\S]*return 'jovie-local';/
+  );
+  assert.match(smokeSource, /return 'jovie';\s*\n}/);
+  assert.match(smokeSource, /NATIVE_AUTH_CALLBACK_PREFIX/);
   assert.match(smokeSource, /async function waitForDesktopAuthHandoff/);
   assert.match(smokeSource, /state === 'opened'/);
   assert.match(
