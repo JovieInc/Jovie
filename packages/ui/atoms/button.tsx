@@ -10,59 +10,162 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Core variants — Linear-aligned shadows and radii
         primary:
-          'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)',
-        // EVENT: central actions stay neutral; keep this legacy variant as a
-        // primary alias so old callers do not render accent-filled CTAs.
-        accent:
           'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)',
         secondary:
           'border border-(--linear-border-subtle) bg-btn-secondary text-btn-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)] hover:border-(--linear-border-default) hover:bg-(--linear-btn-secondary-hover)',
+        tertiary:
+          'border border-transparent bg-transparent text-secondary-token shadow-none hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
         ghost:
-          'hover:bg-interactive-hover active:bg-interactive-active text-secondary-token hover:text-primary-token',
-        outline:
-          'border border-default bg-transparent hover:bg-surface-hover active:bg-interactive-active shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
-        // Destructive variant
-        destructive:
-          'bg-[var(--color-error)] text-[var(--color-error-foreground)] hover:opacity-90',
-        // Link variant
-        link: 'text-primary underline-offset-4 hover:underline p-0 h-auto',
-        // Frosted glass variants (glassmorphism) - using design tokens
-        frosted:
-          'backdrop-blur-sm bg-surface-0/60 dark:bg-surface-1/30 hover:bg-surface-1/80 dark:hover:bg-surface-2/40 border border-subtle',
-        'frosted-ghost':
-          'backdrop-blur-sm bg-surface-0/30 dark:bg-surface-1/10 hover:bg-surface-1/50 dark:hover:bg-surface-2/20 border border-subtle',
-        'frosted-outline':
-          'backdrop-blur-sm bg-transparent border border-subtle hover:bg-surface-1/20 dark:hover:bg-surface-2/10',
-        // Canonical white pill CTA — high-contrast hero/auth pill used across
-        // marketing headers and homepage sign-in.
-        whitePill:
-          'border border-white/88 bg-white text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/95 font-medium tracking-normal sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]',
+          'border border-transparent bg-transparent text-tertiary-token shadow-none hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
+        link: 'h-auto border-0 bg-transparent p-0 text-primary underline-offset-4 shadow-none hover:underline',
       },
       size: {
-        default:
-          'h-8 px-3 py-1.5 before:absolute before:left-1/2 before:top-1/2 before:h-10 before:min-w-10 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
         sm: 'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-10 before:min-w-10 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
-        lg: 'h-10 px-4 py-2 text-sm',
-        xl: 'h-12 px-6 py-3 text-sm',
-        hero: 'h-14 px-10 py-4 text-base font-semibold',
-        icon: 'h-10 w-10',
+        md: 'h-9 px-3 text-[13px] before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        lg: 'h-11 px-5 text-sm before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        icon: 'h-9 w-9 px-0 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
       },
     },
+    compoundVariants: [
+      {
+        variant: 'link',
+        size: ['sm', 'md', 'lg', 'icon'],
+        className:
+          'h-auto min-h-0 w-auto min-w-0 px-0 py-0 before:hidden disabled:opacity-60',
+      },
+    ],
     defaultVariants: {
       variant: 'primary',
-      size: 'default',
+      size: 'md',
     },
   }
 );
 
+type CanonicalButtonVariantProps = VariantProps<typeof buttonVariants>;
+export type ButtonVariant = NonNullable<CanonicalButtonVariantProps['variant']>;
+export type ButtonSize = NonNullable<CanonicalButtonVariantProps['size']>;
+
+type DeprecatedButtonVariant =
+  | 'accent'
+  | 'outline'
+  | 'destructive'
+  | 'frosted'
+  | 'frosted-ghost'
+  | 'frosted-outline'
+  | 'whitePill';
+type DeprecatedButtonSize = 'default' | 'xl' | 'hero';
+
+const DEPRECATED_VARIANT_ALIASES: Record<
+  DeprecatedButtonVariant,
+  ButtonVariant
+> = {
+  accent: 'primary',
+  outline: 'secondary',
+  destructive: 'primary',
+  frosted: 'secondary',
+  'frosted-ghost': 'ghost',
+  'frosted-outline': 'secondary',
+  whitePill: 'primary',
+};
+
+const DEPRECATED_SIZE_ALIASES: Record<DeprecatedButtonSize, ButtonSize> = {
+  default: 'md',
+  xl: 'lg',
+  hero: 'lg',
+};
+
+const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
+  primary:
+    'border-error bg-error text-[var(--color-error-foreground)] hover:border-error/90 hover:bg-error/90',
+  secondary:
+    'border-error/30 bg-error-subtle text-error hover:border-error/45 hover:bg-error-subtle hover:text-error',
+  tertiary: 'text-error hover:bg-error-subtle hover:text-error',
+  ghost: 'text-error hover:bg-error-subtle hover:text-error',
+  link: 'text-error hover:text-error',
+};
+
+const warnedDeprecatedValues = new Set<string>();
+
+function isProductionEnvironment(): boolean {
+  return (
+    (
+      globalThis as {
+        readonly process?: {
+          readonly env?: { readonly NODE_ENV?: string };
+        };
+      }
+    ).process?.env?.NODE_ENV === 'production'
+  );
+}
+
+function warnDeprecatedButtonValue(
+  kind: 'variant' | 'size',
+  value: string,
+  replacement: string
+): void {
+  if (isProductionEnvironment()) return;
+  const key = `${kind}:${value}`;
+  if (warnedDeprecatedValues.has(key)) return;
+  warnedDeprecatedValues.add(key);
+  console.warn(
+    `[Button] ${kind}="${value}" is deprecated. Use ${kind}="${replacement}" instead.`
+  );
+}
+
+function isDeprecatedButtonVariant(
+  variant: ButtonVariant | DeprecatedButtonVariant
+): variant is DeprecatedButtonVariant {
+  return variant in DEPRECATED_VARIANT_ALIASES;
+}
+
+function isDeprecatedButtonSize(
+  size: ButtonSize | DeprecatedButtonSize
+): size is DeprecatedButtonSize {
+  return size in DEPRECATED_SIZE_ALIASES;
+}
+
+function normalizeButtonVariant({
+  variant,
+  destructive,
+}: {
+  readonly variant?: ButtonVariant | DeprecatedButtonVariant | null;
+  readonly destructive: boolean;
+}): { readonly variant: ButtonVariant; readonly destructive: boolean } {
+  const requested = variant ?? 'primary';
+  if (!isDeprecatedButtonVariant(requested)) {
+    return { variant: requested, destructive };
+  }
+
+  const replacement = DEPRECATED_VARIANT_ALIASES[requested];
+  warnDeprecatedButtonValue('variant', requested, replacement);
+  return {
+    variant: replacement,
+    destructive: destructive || requested === 'destructive',
+  };
+}
+
+function normalizeButtonSize(
+  size?: ButtonSize | DeprecatedButtonSize | null
+): ButtonSize {
+  const requested = size ?? 'md';
+  if (!isDeprecatedButtonSize(requested)) {
+    return requested;
+  }
+
+  const replacement = DEPRECATED_SIZE_ALIASES[requested];
+  warnDeprecatedButtonValue('size', requested, replacement);
+  return replacement;
+}
+
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'size'> {
+  readonly variant?: ButtonVariant | DeprecatedButtonVariant | null;
+  readonly size?: ButtonSize | DeprecatedButtonSize | null;
   readonly asChild?: boolean;
   readonly loading?: boolean;
   readonly static?: boolean;
+  readonly destructive?: boolean;
 }
 
 // Helper to compute data-state attribute
@@ -95,7 +198,7 @@ function ButtonContent({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5',
+        'inline-flex items-center justify-center gap-1.5',
         loading ? 'opacity-0' : 'opacity-100'
       )}
     >
@@ -113,6 +216,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       asChild = false,
       loading = false,
       static: isStatic = false,
+      destructive = false,
       disabled,
       children,
       ...props
@@ -122,17 +226,31 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
     const dataState = getDataState(loading, isDisabled);
+    const normalizedVariant = normalizeButtonVariant({
+      variant,
+      destructive,
+    });
+    const normalizedSize = normalizeButtonSize(size);
 
     const sharedProps = {
       ref,
       className: cn(
-        buttonVariants({ variant, size, className }),
+        buttonVariants({
+          variant: normalizedVariant.variant,
+          size: normalizedSize,
+        }),
+        normalizedVariant.destructive &&
+          DESTRUCTIVE_CLASSES[normalizedVariant.variant],
+        className,
         !isStatic && !isDisabled && 'active:scale-[0.96]',
         isDisabled && 'pointer-events-none'
       ),
       'aria-disabled': isDisabled || undefined,
       'aria-busy': loading || undefined,
       'data-state': dataState,
+      'data-variant': normalizedVariant.variant,
+      'data-size': normalizedSize,
+      'data-destructive': normalizedVariant.destructive ? 'true' : undefined,
     };
 
     // In asChild mode (Radix Slot), React.Children.only requires a single child.
