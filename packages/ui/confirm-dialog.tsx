@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 
 import { Button } from './atoms/button';
 import {
@@ -61,7 +61,13 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent hideClose testId='confirm-dialog-content'>
+      <DialogContent
+        hideClose
+        testId='confirm-dialog-content'
+        overlayProps={{
+          onClick: () => onOpenChange(false),
+        }}
+      >
         <DialogHeader testId='confirm-dialog-header'>
           <DialogTitle data-testid='confirm-dialog-title'>{title}</DialogTitle>
           <DialogDescription data-testid='confirm-dialog-description'>

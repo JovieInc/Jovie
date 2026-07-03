@@ -17,12 +17,30 @@ const REQUIRED_CONFIRM_DIALOG_SURFACES: readonly {
   readonly label: string;
   readonly file: string;
 }[] = [
-  { label: 'delete release', file: 'components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx' },
-  { label: 'remove contact', file: 'components/features/dashboard/organisms/ContactsManager.tsx' },
-  { label: 'disconnect platform', file: 'components/features/dashboard/organisms/settings-artist-profile-section/ConnectedDspList.tsx' },
-  { label: 'delete account', file: 'components/features/dashboard/organisms/DataPrivacySection.tsx' },
-  { label: 'cancel subscription', file: 'components/organisms/billing/BillingActionsSection.tsx' },
-  { label: 'disconnect touring integration', file: 'components/features/dashboard/organisms/SettingsTouringSection.tsx' },
+  {
+    label: 'delete release',
+    file: 'components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx',
+  },
+  {
+    label: 'remove contact',
+    file: 'components/features/dashboard/organisms/ContactsManager.tsx',
+  },
+  {
+    label: 'disconnect platform',
+    file: 'components/features/dashboard/organisms/settings-artist-profile-section/ConnectedDspList.tsx',
+  },
+  {
+    label: 'delete account',
+    file: 'components/features/dashboard/organisms/DataPrivacySection.tsx',
+  },
+  {
+    label: 'cancel subscription',
+    file: 'components/organisms/billing/BillingActionsSection.tsx',
+  },
+  {
+    label: 'disconnect touring integration',
+    file: 'components/features/dashboard/organisms/SettingsTouringSection.tsx',
+  },
 ];
 
 const SOURCE_EXT = /\.(tsx|ts)$/;

@@ -28,8 +28,8 @@ function CancelSubscriptionDescription() {
         <li className='flex items-start gap-2'>
           <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-error' />
           <span>
-            <strong>Advanced analytics</strong> - Retention drops from 90 days to
-            7 days
+            <strong>Advanced analytics</strong> - Retention drops from 90 days
+            to 7 days
           </span>
         </li>
         <li className='flex items-start gap-2'>
