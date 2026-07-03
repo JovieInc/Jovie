@@ -722,3 +722,40 @@ export function routeForAgent(
   const session = route.modelProfile === 'escalation' ? 'opus' : 'sonnet';
   return { ...route, sessionModel: session, fallbackModel: 'sonnet' };
 }
+
+// --- Checkout freshness gate ------------------------------------------------
+//
+// The launchd shipper reads its OWN dispatcher code from the primary checkout
+// (~/Jovie HEAD). If some flow leaves that checkout on a PR branch or behind
+// main (JOV-3838: a UI PR branch was found checked out there, so the shipper
+// silently ran ~1h of stale pre-fallback code), the dispatcher regresses with
+// zero alarm. Agents are unaffected because they run in fresh worktrees — only
+// the dispatcher rots. The working tree here should ALWAYS be clean `main` at
+// origin/main; anything else is a hijack we self-heal before dispatching.
+
+export interface CheckoutState {
+  readonly branch: string;
+  readonly headSha: string;
+  readonly originMainSha: string;
+  readonly dirty: boolean;
+}
+
+export type CheckoutVerdict = 'fresh' | 'stale';
+
+export function classifyCheckout(state: CheckoutState): CheckoutVerdict {
+  const onMain = state.branch === 'main';
+  const upToDate = state.headSha === state.originMainSha;
+  return onMain && upToDate && !state.dirty ? 'fresh' : 'stale';
+}
+
+export function describeCheckout(state: CheckoutState): string {
+  const parts: string[] = [];
+  if (state.branch !== 'main') parts.push(`on '${state.branch}' (not main)`);
+  if (state.headSha !== state.originMainSha) {
+    parts.push(
+      `HEAD ${state.headSha.slice(0, 8)} != origin/main ${state.originMainSha.slice(0, 8)}`
+    );
+  }
+  if (state.dirty) parts.push('working tree dirty');
+  return parts.join('; ') || 'fresh';
+}
