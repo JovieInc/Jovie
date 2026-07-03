@@ -62,6 +62,11 @@ import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import {
+  isSpawnResourceUnavailable,
+  SpawnEagainTracker,
+  SpawnResourceUnavailableError,
+} from '../lib/spawn-resource';
+import {
   journalEnd,
   journalStart,
   planRecovery,
@@ -72,6 +77,7 @@ import { sendSlack } from '../lib/slack-client';
 import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'codex-issue-shipper';
+const spawnEagainTracker = new SpawnEagainTracker();
 
 /**
  * Sentinel file that, when present, pauses the shipper.
@@ -135,12 +141,21 @@ function loadHermesEnv(): void {
 }
 
 function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
-  return execFileSync(args[0], args.slice(1), {
-    cwd: config.repoRoot,
-    encoding: 'utf8',
-    timeout: 30_000,
-    maxBuffer: 5 * 1024 * 1024,
-  });
+  try {
+    const output = execFileSync(args[0], args.slice(1), {
+      cwd: config.repoRoot,
+      encoding: 'utf8',
+      timeout: 30_000,
+      maxBuffer: 5 * 1024 * 1024,
+    });
+    spawnEagainTracker.reset();
+    return output;
+  } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      throw new SpawnResourceUnavailableError(args[0], err);
+    }
+    throw err;
+  }
 }
 
 function systemCapacity(config: ShipperConfig): CapacitySnapshot {
@@ -219,8 +234,13 @@ function spawnSyncSafe(
       stdio: 'ignore',
     });
     void result;
+    spawnEagainTracker.reset();
     return { status: 0 };
   } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      spawnEagainTracker.record(command);
+      return { status: null };
+    }
     const status =
       typeof (err as { status?: unknown }).status === 'number'
         ? ((err as { status: number }).status ?? 1)
@@ -282,10 +302,19 @@ function cleanupWorktree(config: ShipperConfig, repoRoot: string): void {
 
 function detectRepoRoot(): string {
   if (process.env.HERMES_JOVIE_REPO) return process.env.HERMES_JOVIE_REPO;
-  return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-    timeout: 10_000,
-  }).trim();
+  try {
+    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+      timeout: 10_000,
+    }).trim();
+    spawnEagainTracker.reset();
+    return root;
+  } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      throw new SpawnResourceUnavailableError('git', err);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -395,38 +424,80 @@ async function notifyStaleCheckoutAbort(
 
 function detectGithubRepo(repoRoot: string): string {
   if (process.env.GH_REPO) return process.env.GH_REPO;
-  return execFileSync(
-    'gh',
-    ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-    {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      timeout: 30_000,
+  try {
+    const repo = execFileSync(
+      'gh',
+      ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 30_000,
+      }
+    ).trim();
+    spawnEagainTracker.reset();
+    return repo;
+  } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      throw new SpawnResourceUnavailableError('gh', err);
     }
-  ).trim();
+    throw err;
+  }
 }
 
-function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
+type IssueListResult =
+  | { readonly kind: 'ok'; readonly issues: ReadonlyArray<GithubIssue> }
+  | { readonly kind: 'spawn_unavailable'; readonly command: string };
+
+function listCodexIssues(config: ShipperConfig): IssueListResult {
   // Fixed: gh CLI does not support --page; use single fetch with max limit
   const fetchLimit = Math.min(100, config.issueFetchLimit || 100);
-  const raw = run(
-    [
-      'gh',
-      'issue',
-      'list',
-      '--repo',
-      config.repo,
-      '--state',
-      'open',
-      '--limit',
-      String(fetchLimit),
-      '--json',
-      'number,title,body,url,updatedAt,labels',
-    ],
-    config
-  );
-  const issues = JSON.parse(raw) as GithubIssue[];
-  return issues.slice(0, config.issueFetchLimit || 100);
+  try {
+    const raw = run(
+      [
+        'gh',
+        'issue',
+        'list',
+        '--repo',
+        config.repo,
+        '--state',
+        'open',
+        '--limit',
+        String(fetchLimit),
+        '--json',
+        'number,title,body,url,updatedAt,labels',
+      ],
+      config
+    );
+    const issues = JSON.parse(raw) as GithubIssue[];
+    return {
+      kind: 'ok',
+      issues: issues.slice(0, config.issueFetchLimit || 100),
+    };
+  } catch (err) {
+    if (err instanceof SpawnResourceUnavailableError) {
+      return { kind: 'spawn_unavailable', command: err.command };
+    }
+    throw err;
+  }
+}
+
+async function handleSpawnUnavailable(command: string): Promise<void> {
+  const consecutive = spawnEagainTracker.record(command);
+  logJobEvent({
+    job: JOB,
+    event: 'gh_eagain_skip',
+    command,
+    consecutive,
+  });
+  const backedOff = await spawnEagainTracker.maybeBackoff();
+  if (backedOff) {
+    logJobEvent({
+      job: JOB,
+      event: 'spawn_eagain_backoff',
+      command,
+      waitMs: 60_000,
+    });
+  }
 }
 
 function ensureLabel(
@@ -1210,7 +1281,16 @@ async function main(): Promise<void> {
     return;
   }
 
-  const repoRoot = detectRepoRoot();
+  let repoRoot: string;
+  try {
+    repoRoot = detectRepoRoot();
+  } catch (err) {
+    if (err instanceof SpawnResourceUnavailableError) {
+      await handleSpawnUnavailable(err.command);
+      return;
+    }
+    throw err;
+  }
   // JOV-3838 / #12841: fail-closed when the primary checkout is hijacked off
   // fresh main. Skipped in dry-run so dev/CI worktrees are never reset.
   if (process.env.HERMES_CODEX_SHIPPER_DRY_RUN !== '1') {
@@ -1227,7 +1307,16 @@ async function main(): Promise<void> {
       return;
     }
   }
-  const repo = detectGithubRepo(repoRoot);
+  let repo: string;
+  try {
+    repo = detectGithubRepo(repoRoot);
+  } catch (err) {
+    if (err instanceof SpawnResourceUnavailableError) {
+      await handleSpawnUnavailable(err.command);
+      return;
+    }
+    throw err;
+  }
   const config = loadShipperConfig(process.env, repoRoot, repo);
 
   await withJobLogging(JOB, async () => {
@@ -1238,7 +1327,12 @@ async function main(): Promise<void> {
         let controlLabelsEnsured = false;
 
         for (;;) {
-          const issues = listCodexIssues(config);
+          const issueList = listCodexIssues(config);
+          if (issueList.kind === 'spawn_unavailable') {
+            await handleSpawnUnavailable(issueList.command);
+            return;
+          }
+          const issues = issueList.issues;
           const plans = buildDispatchPlans(issues, config);
           const skippedHuman = issues.filter(issue =>
             labelNames(issue).includes(HUMAN_REVIEW_LABEL)
@@ -1320,7 +1414,11 @@ async function main(): Promise<void> {
   });
 }
 
-void main().catch(err => {
+void main().catch(async err => {
+  if (err instanceof SpawnResourceUnavailableError) {
+    await handleSpawnUnavailable(err.command);
+    return;
+  }
   logJobEvent({
     job: JOB,
     event: 'fatal',
