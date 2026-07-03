@@ -3,13 +3,13 @@ import {
   buildAuthStartUrl,
   buildElectronAuthCompleteUrl,
   buildIosAuthCompleteUrl,
-  getElectronAuthScheme,
-  resolveElectronAuthShell,
   buildNativeExchangeCodeRecord,
   classifyNavigation,
   createAuthAnalyticsEvent,
   createAuthStateRecord,
+  getElectronAuthScheme,
   resolveAuthCallback,
+  resolveElectronAuthShell,
   sanitizeReturnTo,
   validateNativeExchange,
 } from './index';
@@ -289,9 +289,9 @@ describe('auth routing boundary', () => {
     expect(
       resolveElectronAuthShell('https://staging.jov.ie/auth/callback')
     ).toBe('staging');
-    expect(resolveElectronAuthShell('http://localhost:3112/auth/callback')).toBe(
-      'local'
-    );
+    expect(
+      resolveElectronAuthShell('http://localhost:3112/auth/callback')
+    ).toBe('local');
     expect(getElectronAuthScheme('staging')).toBe('jovie-staging');
     expect(getElectronAuthScheme('local')).toBe('jovie-local');
   });

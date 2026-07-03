@@ -167,14 +167,19 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
 });
 
 test('desktop bundles declare per-env auth URL schemes', async () => {
-  const [builderConfig, protocolSource, mainSource, stagingConfig, localConfig] =
-    await Promise.all([
-      readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
-      readFile(join(desktopRoot, 'src/desktop-auth-protocol.ts'), 'utf8'),
-      readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
-      readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
-      readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
-    ]);
+  const [
+    builderConfig,
+    protocolSource,
+    mainSource,
+    stagingConfig,
+    localConfig,
+  ] = await Promise.all([
+    readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
+    readFile(join(desktopRoot, 'src/desktop-auth-protocol.ts'), 'utf8'),
+    readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
+    readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
+    readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
+  ]);
 
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
@@ -190,14 +195,20 @@ test('desktop bundles declare per-env auth URL schemes', async () => {
   assert.match(protocolSource, /local: 'jovie-local'/);
   assert.match(mainSource, /getDesktopAuthScheme\(APP_ENV\)/);
   assert.match(mainSource, /setAsDefaultProtocolClient\(scheme\)/);
-  assert.doesNotMatch(mainSource, /if \(APP_ENV !== 'production'\) \{\s*return;\s*\}/);
+  assert.doesNotMatch(
+    mainSource,
+    /if \(APP_ENV !== 'production'\) \{\s*return;\s*\}/
+  );
 });
 
 test('signed-out desktop launch recovers to a visible sign-in surface', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   assert.match(mainSource, /function isAnyDesktopWindowVisible\(\): boolean/);
-  assert.match(mainSource, /function ensureSignedOutSignInSurface\(win: BrowserWindow\)/);
+  assert.match(
+    mainSource,
+    /function ensureSignedOutSignInSurface\(win: BrowserWindow\)/
+  );
   assert.match(mainSource, /function loadMainWindowAuthHandoff\(/);
   assert.match(mainSource, /const DESKTOP_VISIBILITY_FALLBACK_MS = 2_000;/);
   assert.match(
