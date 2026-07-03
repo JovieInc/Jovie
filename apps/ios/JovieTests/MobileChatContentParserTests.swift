@@ -529,6 +529,50 @@ struct MobileChatEntityTokenBreadcrumbTests {
   }
 }
 
+// MARK: - Entity chip thumbnails v2 (GH-12708)
+
+struct MobileChatEntityThumbnailResolverTests {
+  @Test func resolvesFixtureReleaseThumbnail() {
+    let url = MobileChatEntityThumbnailResolver.thumbnailURL(kind: .release, id: "rel_1")
+    #expect(url?.absoluteString.contains("rel_1") == true)
+  }
+
+  @Test func resolvesFixtureArtistThumbnail() {
+    let url = MobileChatEntityThumbnailResolver.thumbnailURL(kind: .artist, id: "art_1")
+    #expect(url?.absoluteString.contains("art_1") == true)
+  }
+
+  @Test func eventFixtureHasNoThumbnail() {
+    let url = MobileChatEntityThumbnailResolver.thumbnailURL(kind: .event, id: "evt_1")
+    #expect(url == nil)
+  }
+
+  @Test func unknownEntityIdReturnsNil() {
+    let url = MobileChatEntityThumbnailResolver.thumbnailURL(kind: .release, id: "unknown")
+    #expect(url == nil)
+  }
+}
+
+struct MobileChatProseFlowTokenTests {
+  @Test func splitsPlainTextIntoWordTokens() {
+    let tokens = MobileChatProseText.flowTokens(from: [.text("Hello world")])
+    #expect(tokens == [.textWord("Hello"), .textWord(" "), .textWord("world")])
+  }
+
+  @Test func preservesEntityRunsAsSingleChipToken() {
+    let tokens = MobileChatProseText.flowTokens(from: [
+      .text("See "),
+      .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+      .text(" today"),
+    ])
+    #expect(tokens.count == 5)
+    guard case .entity(.release, "rel_1", "Midnight Drive") = tokens[1] else {
+      Issue.record("Expected entity token at index 1")
+      return
+    }
+  }
+}
+
 private final class SpyObservabilityProvider: ObservabilityProvider {
   struct Breadcrumb {
     let event: ObservabilityEvent
