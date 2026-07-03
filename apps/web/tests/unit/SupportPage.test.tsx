@@ -44,8 +44,8 @@ describe('SupportPage', () => {
     const contactButton = screen.getByRole('link', {
       name: /send email to support team/i,
     });
+    expect(contactButton).toHaveClass('public-action-secondary');
     expect(contactButton).not.toHaveClass('public-action-primary');
-    expect(contactButton.className).toMatch(/bg-btn-secondary/);
   });
 
   it('has proper accessibility attributes', () => {

@@ -104,7 +104,12 @@ export function SupportCta() {
             })
           }
         >
-          <a href={`mailto:${SUPPORT_EMAIL}`}>Contact Support</a>
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            className='public-action-secondary'
+          >
+            Contact Support
+          </a>
         </Button>
       </section>
     </MarketingContainer>
