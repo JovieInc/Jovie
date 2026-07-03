@@ -80,7 +80,8 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 | 2 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
 | 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
 | 4 | cleanupSmsIntents | Every day | Marks expired SMS subscribe intents, hard-deletes rows >24h old (folded from standalone cron per JOV-1901) |
-| 5 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
+| 5 | aiCrawlerAnalytics | Every day | Syncs Cloudflare zone AI-crawl analytics into `ai_crawler_analytics_snapshots` per artist profile (skips when CF GraphQL not configured) |
+| 6 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
 
 > **Note:** `scheduleNotifications` was previously listed here but has been called directly from `/api/cron/frequent` for sub-hourly scheduling. It is NOT a daily-maintenance sub-job. See AUTOMATION_AUDIT.md for rationale.
 
@@ -108,6 +109,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/data-retention` | 300s | Standalone entry with enhanced auth | `daily-maintenance` |
 | `/api/cron/pixel-forwarding` | 60s | Forwards up to 500 pixel events to ad platforms | `frequent` |
 | `/api/cron/process-campaigns` | 60s | Processes drip campaign sends | `frequent` |
+| `/api/cron/sync-ai-crawler-analytics` | 120s | Standalone entry for AI crawler analytics sync | `daily-maintenance` |
 | `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
