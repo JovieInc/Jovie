@@ -1,0 +1,8 @@
+import { buildAppleAppSiteAssociationResponse } from '@/lib/apple-app-site-association';
+
+export const revalidate = false;
+export const dynamic = 'force-static';
+
+export function GET() {
+  return buildAppleAppSiteAssociationResponse();
+}
