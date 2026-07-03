@@ -336,6 +336,12 @@ private struct AppContentView: View {
         return
       }
 
+      if appState.launchMode == .uiTestingAuthCallback {
+        chatRepository = nil
+        audienceHighlightsState = .loaded(.preview)
+        return
+      }
+
       if chatRepository == nil {
         let repository = ChatRepository(
           client: MobileChatClient(
@@ -363,6 +369,7 @@ private struct AppContentView: View {
     if appState.launchMode == .uiTestingAudience
       || appState.launchMode == .uiTestingReady
       || appState.launchMode == .uiTestingChat
+      || appState.launchMode == .uiTestingAuthCallback
       || appState.launchMode == .uiTestingSettings
       || appState.launchMode == .uiTestingVenueMode
     {
@@ -491,6 +498,10 @@ struct RootView: View {
     }
       .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
         if appState.launchMode.requiresAutoAuth, liveUserID == nil {
+          return
+        }
+
+        if appState.launchMode == .uiTestingAuthCallback, liveUserID == nil {
           return
         }
 
@@ -647,6 +658,9 @@ struct UITestingAuthCallbackRoot: View {
         UserDefaults.standard.set("waiting", forKey: statusKey)
         UserDefaults.standard.set(0, forKey: handledCountKey)
         MobileAuthPendingStore.shared.save(codeVerifier: expectedVerifier)
+        if let callbackURL = LiveAuthCallbackLaunchInput.callbackURL() {
+          handleCallbackURL(callbackURL)
+        }
         for url in MobileAuthCallbackURLInbox.shared.drain() {
           handleCallbackURL(url)
         }

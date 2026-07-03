@@ -178,8 +178,6 @@ enum MobileChatContentParser {
     let incompleteOpenTags = [
       "<tool_result",
       "<function_result",
-      "<tool_call",
-      "<function_calls",
     ]
 
     for openTag in incompleteOpenTags {

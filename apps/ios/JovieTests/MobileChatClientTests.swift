@@ -176,6 +176,137 @@ struct MobileChatClientTests {
     }
   }
 
+  @Test func listConversationsReturnsDecodedSummaries() async throws {
+    let requestRecorder = RequestRecorder()
+    MockChatURLProtocol.requestHandler = { request in
+      requestRecorder.record(request)
+      let payload = MobileConversationListResponse(conversations: [
+        MobileConversationSummary(
+          id: "conv_1",
+          title: "Launch plan",
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-02T00:00:00.000Z",
+          latestMessageRole: "assistant",
+          latestTurnStatus: "completed"
+        ),
+      ])
+      return (makeResponse(for: request), try JSONEncoder().encode(payload))
+    }
+
+    let client = makeClient()
+    let conversations = try await client.listConversations(limit: 20)
+    let request = try #require(requestRecorder.recordedRequest())
+
+    #expect(request.url?.path == "/api/mobile/v1/chat/conversations")
+    #expect(request.url?.query?.contains("limit=20") == true)
+    #expect(request.httpMethod == "GET")
+    #expect(conversations.map(\.id) == ["conv_1"])
+  }
+
+  @Test func fetchConversationReturnsDecodedDetail() async throws {
+    let requestRecorder = RequestRecorder()
+    MockChatURLProtocol.requestHandler = { request in
+      requestRecorder.record(request)
+      let payload = MobileConversationDetailResponse(
+        conversation: MobileConversationRecord(
+          id: "conv_1",
+          title: "Launch plan",
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-02T00:00:00.000Z"
+        ),
+        messages: [],
+        hasMore: false
+      )
+      return (makeResponse(for: request), try JSONEncoder().encode(payload))
+    }
+
+    let client = makeClient()
+    let detail = try await client.fetchConversation(id: "conv_1", limit: 100)
+    let request = try #require(requestRecorder.recordedRequest())
+
+    #expect(request.url?.path == "/api/mobile/v1/chat/conversations/conv_1")
+    #expect(request.url?.query?.contains("limit=100") == true)
+    #expect(detail.conversation.id == "conv_1")
+    #expect(detail.hasMore == false)
+  }
+
+  @Test func sendTurnRetriesWithFreshTokenAfterUnauthorized() async throws {
+    let tokenProvider = MockChatTokenProvider(tokens: ["stale-chat-token", "fresh-chat-token"])
+    var requestCount = 0
+
+    MockChatURLProtocol.requestHandler = { request in
+      requestCount += 1
+      if requestCount == 1 {
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-chat-token")
+        return (makeResponse(for: request, statusCode: 401), Data())
+      }
+
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer fresh-chat-token")
+      let ndjson = """
+      {"type":"assistant.completed","clientTurnId":"client_turn_1","conversationId":"conv_1","turnId":"turn_1","text":"Hello"}
+      """
+      return (makeResponse(for: request), Data(ndjson.utf8))
+    }
+
+    let client = makeClient(tokenProvider: tokenProvider)
+
+    // sendTurn does not itself retry on 401 (only sendJSON-backed GET calls do);
+    // a non-2xx response from the POST turn endpoint must surface as requestFailed.
+    await #expect(throws: MobileChatClientError.requestFailed(statusCode: 401)) {
+      _ = try await client.sendTurn(makeTurnRequest())
+    }
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+  }
+
+  @Test func listConversationsRetriesWithFreshTokenAfterUnauthorized() async throws {
+    let tokenProvider = MockChatTokenProvider(tokens: ["stale-chat-token", "fresh-chat-token"])
+    var requestCount = 0
+
+    MockChatURLProtocol.requestHandler = { request in
+      requestCount += 1
+      if requestCount == 1 {
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-chat-token")
+        return (makeResponse(for: request, statusCode: 401), Data())
+      }
+
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer fresh-chat-token")
+      let payload = MobileConversationListResponse(conversations: [])
+      return (makeResponse(for: request), try JSONEncoder().encode(payload))
+    }
+
+    let client = makeClient(tokenProvider: tokenProvider)
+    let conversations = try await client.listConversations(limit: 20)
+
+    #expect(conversations.isEmpty)
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
+  }
+
+  @Test func sendTurnMapsNonSuccessStatusToRequestFailed() async throws {
+    MockChatURLProtocol.requestHandler = { request in
+      (makeResponse(for: request, statusCode: 500), Data())
+    }
+
+    let client = makeClient()
+
+    await #expect(throws: MobileChatClientError.requestFailed(statusCode: 500)) {
+      _ = try await client.sendTurn(makeTurnRequest())
+    }
+  }
+
+  @Test func sendTurnMapsURLErrorToTransportFailed() async throws {
+    MockChatURLProtocol.requestHandler = { _ in
+      throw URLError(.notConnectedToInternet)
+    }
+
+    let client = makeClient()
+
+    await #expect(
+      throws: MobileChatClientError.transportFailed(code: URLError.notConnectedToInternet.rawValue)
+    ) {
+      _ = try await client.sendTurn(makeTurnRequest())
+    }
+  }
+
   @Test func cachedChatSnapshotRoundTripsThroughChatCache() async {
     let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-cache")!)
     await cache.remove(for: "user_chat_cache")
