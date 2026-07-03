@@ -282,6 +282,7 @@ export {
   useToggleVerificationMutation,
 } from './useCreatorVerificationMutation';
 export { useDashboardAnalyticsQuery } from './useDashboardAnalyticsQuery';
+export { useAiCrawlerAnalyticsQuery } from './useAiCrawlerAnalyticsQuery';
 export {
   type DashboardProfile,
   useDashboardProfileQuery,

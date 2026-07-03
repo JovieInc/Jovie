@@ -12,6 +12,7 @@
  * - Waitlist auto-accept: every day when enabled
  * - Data retention: Sundays only (heavy operation)
  * - Under-enriched discography sweep: every day (bounded batch)
+ * - AI crawler analytics sync: every day (Cloudflare GraphQL, GH-12748)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -30,6 +31,7 @@ import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
 import { cleanupOrphanedPhotos } from '../cleanup-photos/route';
 import { cleanupSmsIntents } from '../cleanup-sms-intents/route';
+import { syncAiCrawlerAnalyticsCron } from '../sync-ai-crawler-analytics/route';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for all sub-jobs
@@ -114,7 +116,13 @@ export async function GET(request: Request) {
     sweepUnderEnrichedProfilesForCron
   );
 
-  // 7. Data retention — Sundays only (heavy operation)
+  // 7. AI crawler analytics sync — Cloudflare edge analytics (GH-12748)
+  results.aiCrawlerAnalytics = await runSubJob(
+    'aiCrawlerAnalytics',
+    syncAiCrawlerAnalyticsCron
+  );
+
+  // 8. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

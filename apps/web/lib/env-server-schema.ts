@@ -293,6 +293,9 @@ export const ServerEnvSchema = z.object({
   /** Optional override for the Release-to-Revenue design-partner creator username */
   RELEASE_TO_REVENUE_DESIGN_PARTNER_USERNAME: z.string().optional(),
 
+  // Cloudflare zone analytics (AI crawler intelligence — GH-12748)
+  CLOUDFLARE_ZONE_ID: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
   JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED: z.string().optional(),
