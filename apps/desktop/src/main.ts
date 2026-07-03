@@ -688,6 +688,35 @@ function showDesktopAuthHandoff(authUrl: string): void {
     restoreMainWindowAfterAuthHandoff();
   });
 
+  // Blank-window safety net (JOV-3835 / #12822): the handoff window has no
+  // `ready-to-show` visibility fallback of its own, so a failed sign-in load or
+  // crashed renderer would leave a blank window with the main window hidden.
+  // Recover to the main window's failure page instead of stranding the user.
+  authHandoffWindow.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, _errorDescription, _validatedURL, isMainFrame) => {
+      // Ignore aborted navigations (-3): the handoff `will-navigate` guard
+      // deliberately cancels non-`/desktop-auth` navigations to hand them to the
+      // system browser. Only real load failures should trigger recovery.
+      if (!isMainFrame || errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
+        return;
+      }
+
+      console.error('[Jovie Desktop] Auth handoff load failure (recovering)', {
+        errorCode,
+      });
+      recoverFromAuthHandoffLoadFailure();
+    }
+  );
+
+  authHandoffWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[Jovie Desktop] Auth handoff renderer gone (recovering)', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
+    recoverFromAuthHandoffLoadFailure();
+  });
+
   authHandoffWindow.webContents.session.setPermissionRequestHandler(
     (_webContents, _permission, callback) => {
       callback(false);
@@ -722,6 +751,27 @@ function maybeShowDesktopAuthHandoff(urlString: string): boolean {
 
   showDesktopAuthHandoff(authUrl);
   return true;
+}
+
+// When the auth-handoff window can't render its sign-in surface (network blip,
+// server error, or a crashed renderer), never strand the user on a blank
+// handoff window while the main window sits hidden behind it. Close the handoff
+// and surface the recoverable load-failure page (with a working Retry) in the
+// main window, which we know can render app routes.
+function recoverFromAuthHandoffLoadFailure(): void {
+  if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
+    authHandoffWindow.close();
+  }
+
+  mainWindowHiddenForAuthHandoff = false;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    showDesktopLoadFailure(mainWindow);
+    showWindowNow(mainWindow);
+    return;
+  }
+
+  createWindow();
 }
 
 function shouldLoadDesktopAuthRouteInApp(urlString: string): boolean {

@@ -140,6 +140,37 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /radiusPill: '999px'/);
 });
 
+test('auth handoff window recovers from a failed sign-in load instead of a blank window', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  // The recovery helper must close the handoff and surface the main window's
+  // failure page (with a working Retry) rather than strand a blank window.
+  assert.match(
+    mainSource,
+    /function recoverFromAuthHandoffLoadFailure\(\): void/
+  );
+  assert.match(mainSource, /showDesktopLoadFailure\(mainWindow\)/);
+
+  // Both a failed load and a crashed renderer on the handoff window must route
+  // into the recovery path.
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.webContents\.on\(\s*'did-fail-load',/
+  );
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.webContents\.on\('render-process-gone', \(_event, details\) =>/
+  );
+  assert.match(mainSource, /recoverFromAuthHandoffLoadFailure\(\);/);
+
+  // Aborted navigations (-3) are the handoff `will-navigate` guard handing links
+  // to the system browser — they must NOT trigger recovery.
+  assert.match(
+    mainSource,
+    /if \(!isMainFrame \|\| errorCode === NAVIGATION_ABORTED_ERROR_CODE\) \{/
+  );
+});
+
 const FORBIDDEN_MAC_ENTITLEMENTS = [
   'com.apple.security.cs.allow-unsigned-executable-memory',
   'com.apple.security.cs.disable-library-validation',
