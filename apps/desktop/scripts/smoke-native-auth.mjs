@@ -678,40 +678,28 @@ async function requestRedirect(page, targetUrl, label) {
   );
 }
 
-async function completeNativeReturnBounce(page, nativeReturnUrl, label) {
-  const parsed = new URL(nativeReturnUrl);
-  const callbackPromise = Promise.race([
-    waitForNativeProtocolRequest(page, parsed.pathname),
-    waitForNativeRedirectResponse(page, parsed.pathname),
-  ]);
-  await page.goto(nativeReturnUrl, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-  const nativeCallbackUrl = await callbackPromise;
-  if (!nativeCallbackUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) {
-    throw new Error(
-      `${label} native-return bounce did not yield the Electron app callback: ${nativeCallbackUrl}`
-    );
-  }
-
-  return nativeCallbackUrl;
-}
-
 async function requestNativeCallbackRedirect(page, callbackPath, label) {
   const redirectUrl = await requestRedirect(page, callbackPath, label);
   if (redirectUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) {
     return redirectUrl;
   }
 
-  const parsedRedirect = new URL(redirectUrl);
-  if (parsedRedirect.pathname !== '/auth/native-return') {
-    throw new Error(
-      `${label} did not return the Electron app callback or native-return bounce: ${redirectUrl}`
-    );
+  const parsed = new URL(redirectUrl);
+  if (parsed.pathname === '/auth/native-return') {
+    const callbackPromise = Promise.race([
+      waitForNativeProtocolRequest(page, '/auth/native-return'),
+      waitForNativeRedirectResponse(page, '/auth/native-return'),
+    ]);
+    await page.goto(redirectUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    return await callbackPromise;
   }
 
-  return await completeNativeReturnBounce(page, redirectUrl, label);
+  throw new Error(
+    `${label} did not return the Electron app callback: ${redirectUrl}`
+  );
 }
 
 function waitForNativeProtocolRequest(page, label, timeout = 60_000) {

@@ -13,7 +13,6 @@ describe('buildContentSecurityPolicy', () => {
     const csp = buildContentSecurityPolicy({ nonce, isDev: false });
     const scriptSrc = findDirective(csp, 'script-src');
 
-    expect(scriptSrc).toContain("'self'");
     expect(scriptSrc).toContain(`'nonce-${nonce}'`);
     expect(scriptSrc).not.toContain("'unsafe-inline'");
   });

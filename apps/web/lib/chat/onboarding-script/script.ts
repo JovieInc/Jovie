@@ -118,47 +118,25 @@ export function linesForStep(stepId: ScriptStepId): readonly ScriptLine[] {
   return SCRIPT_LINES.filter(scriptLine => scriptLine.stepId === stepId);
 }
 
-/** Stable 32-bit hash of the onboarding session id (variant assignment). */
-export function hashSessionId(sessionId: string): number {
-  let hash = 0;
-  for (const char of sessionId) {
-    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
-  }
-  return hash;
-}
-
 /**
  * Stable per-conversation variant pick: one visitor sees one variant for a
  * given step across retries, while variants spread across visitors — which is
- * what conversion attribution needs.
+ * what PR2's conversion attribution needs.
  */
 export function pickLine(stepId: ScriptStepId, sessionId: string): ScriptLine {
   const candidates = linesForStep(stepId);
   if (candidates.length === 0) {
     throw new Error(`No script lines defined for step ${stepId}`);
   }
-  const picked = candidates[hashSessionId(sessionId) % candidates.length];
+  let hash = 0;
+  for (let i = 0; i < sessionId.length; i += 1) {
+    hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
+  }
+  const picked = candidates[hash % candidates.length];
   if (!picked) {
     throw new Error(`Variant pick failed for step ${stepId}`);
   }
   return picked;
-}
-
-export const SCRIPT_STEP_IDS: readonly ScriptStepId[] = [
-  'greet',
-  'get_artist',
-  'confirm_artist',
-  'confirm_artist_no_data',
-  'handle',
-  'ask_audience',
-  'instant_access',
-  'waitlist',
-  'done',
-  'stream_error',
-];
-
-export function isScriptStepId(value: string): value is ScriptStepId {
-  return (SCRIPT_STEP_IDS as readonly string[]).includes(value);
 }
 
 /** Mid-stream error line (used as the `onError` text — no SSE swap possible). */

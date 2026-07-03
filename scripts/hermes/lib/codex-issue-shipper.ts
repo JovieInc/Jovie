@@ -67,10 +67,15 @@ export const CODEX_CLAIM_LABEL = 'codex-in-progress';
 export const CODEX_BLOCKED_LABEL = 'codex-blocked';
 export const HUMAN_REVIEW_LABEL = 'human-review-required';
 export const NO_AUTO_LABEL = 'no-auto';
-export const EPIC_LABEL = 'type:epic';
+export const TYPE_EPIC_LABEL = 'type:epic';
+export const EPIC_LABEL = TYPE_EPIC_LABEL;
 /** Triaged misroutes (foreign codebase, no Jovie match) — never re-claim. */
 export const INVALID_LABEL = 'invalid';
 export const UI_FAST_TRACK_LABEL = 'fast-track-ui';
+
+/** Body/title signals that acceptance is tracker-only (no coder deliverable). */
+const DEPENDENCY_GATED_TRACKER_PATTERN =
+  /\b(tracker-pointer|no implementable deliverable|no shippable code|gated purely on child(?:\s+issues)?|acceptance is gated on child issues|human billing actions|migration pointer)\b/i;
 
 export interface GithubIssueLabel {
   readonly name: string;
@@ -296,7 +301,7 @@ export function isAlreadyClaimedOrBlocked(issue: GithubIssue): boolean {
 // so the shipper claims them, finds nothing to ship, releases, and re-claims in
 // a loop (see #12729/#12846). Treat epics as never directly dispatchable.
 export function isEpicPointer(issue: GithubIssue): boolean {
-  return labelNames(issue).includes(EPIC_LABEL);
+  return labelNames(issue).includes(TYPE_EPIC_LABEL);
 }
 
 export function isTrustedCodexIssue(issue: GithubIssue): boolean {
@@ -305,7 +310,7 @@ export function isTrustedCodexIssue(issue: GithubIssue): boolean {
 
 // Confirmed misroutes keep the `invalid` label after triage; agents cannot
 // close foreign issues, so the shipper must never re-claim them (LYB loop,
-// see #12675–#12678 / #12940).
+// see #12675-#12678 / #12940).
 export function isInvalidMisroute(issue: GithubIssue): boolean {
   return labelNames(issue).includes(INVALID_LABEL);
 }
@@ -329,7 +334,7 @@ export function isUiUxDesignIssue(issue: GithubIssue): boolean {
       return true;
     }
   }
-  // fallback keyword scanning
+
   const text = issueText(issue).toLowerCase();
   const keywords = [
     'interface',
@@ -353,6 +358,12 @@ export function isUiUxDesignIssue(issue: GithubIssue): boolean {
   return keywords.some(k => text.includes(k));
 }
 
+export function isTrackerOrDependencyGated(issue: GithubIssue): boolean {
+  const labels = labelNames(issue).map(label => label.toLowerCase());
+  if (labels.includes(TYPE_EPIC_LABEL)) return true;
+  return DEPENDENCY_GATED_TRACKER_PATTERN.test(issueText(issue));
+}
+
 export function eligibleCodexIssues(
   issues: ReadonlyArray<GithubIssue>
 ): ReadonlyArray<GithubIssue> {
@@ -360,9 +371,9 @@ export function eligibleCodexIssues(
     issue =>
       !isHumanReviewRequired(issue) &&
       !isAlreadyClaimedOrBlocked(issue) &&
-      !isEpicPointer(issue) &&
+      !labelNames(issue).includes(NO_AUTO_LABEL) &&
       !isInvalidMisroute(issue) &&
-      !labelNames(issue).includes(NO_AUTO_LABEL)
+      !isTrackerOrDependencyGated(issue)
   );
 }
 
@@ -585,6 +596,7 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
     `Working directory: ${input.repoRoot}`,
     `GitHub issue: #${input.issue.number} ${issueTitle}`,
     `Issue URL: ${input.issue.url}`,
+    `Branch to use: ${input.branchName}`,
     `Linear context: this work is part of the codex-label issue shipping automation.`,
     '',
     '## Hard Requirements',

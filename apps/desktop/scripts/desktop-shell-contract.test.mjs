@@ -193,18 +193,6 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(mainSource, /:\s*'jovie';/);
   assert.match(
     mainSource,
-    /function isAuthReturnDeepLinkCandidate\(urlString: string\): boolean/
-  );
-  assert.match(
-    mainSource,
-    /isAuthReturnDeepLinkCandidate\(arg\) && !parseDesktopAuthReturnDeepLink\(arg\)/
-  );
-  assert.doesNotMatch(
-    mainSource,
-    /startsWith\(`\$\{AUTH_RETURN_PROTOCOL\}\/\/\$\{AUTH_RETURN_HOST\}`\)/
-  );
-  assert.match(
-    mainSource,
     /app\.setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME/
   );
   assert.match(stagingConfig, /CFBundleURLTypes:/);
@@ -482,14 +470,10 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
     smokeSource,
     /new URL\(\s*`\/auth\/callback\?state=\$\{encodeURIComponent\(authState\)\}`,\s*BASE_URL\s*\)/
   );
-  assert.match(smokeSource, /async function completeNativeReturnBounce/);
+  assert.match(smokeSource, /parsed\.pathname === '\/auth\/native-return'/);
   assert.match(
     smokeSource,
-    /parsedRedirect\.pathname !== '\/auth\/native-return'/
-  );
-  assert.match(
-    smokeSource,
-    /redirectUrl\.startsWith\(NATIVE_AUTH_CALLBACK_PREFIX\)/
+    /waitForNativeProtocolRequest\(page, '\/auth\/native-return'\)/
   );
 });
 

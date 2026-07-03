@@ -1,10 +1,20 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  Button,
+} from '@jovie/ui';
 import { CreditCard, XCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { track } from '@/lib/analytics';
@@ -39,95 +49,90 @@ export function BillingActionsSection({
             Payment &amp; Invoices
           </BillingPortalLink>
 
-          <Button
-            variant='ghost'
-            size='sm'
-            className='justify-start text-destructive hover:bg-error-subtle hover:text-destructive'
-            onClick={() => {
-              track('subscription_cancel_clicked', {
-                source: 'billing_dashboard',
-              });
-              setCancelDialogOpen(true);
-            }}
-          >
-            <XCircle className='mr-2 h-4 w-4' />
-            Cancel Subscription
-          </Button>
-
-          <ConfirmDialog
+          <AlertDialog
             open={cancelDialogOpen}
             onOpenChange={setCancelDialogOpen}
-            title='Cancel your subscription?'
-            body={
-              <div className='space-y-3'>
-                <p>
-                  Your Pro access continues until the end of your current
-                  billing period. After that, you&apos;ll lose access to:
-                </p>
-                <ul className='space-y-2'>
-                  <li className='flex items-start gap-2 text-app'>
-                    <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
-                      aria-hidden='true'
-                    />
-                    <span>
-                      <strong>Branding removal</strong> - Jovie branding will
-                      reappear on your profile
-                    </span>
-                  </li>
-                  <li className='flex items-start gap-2'>
-                    <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
-                      aria-hidden='true'
-                    />
-                    <span>
-                      <strong>Advanced analytics</strong> - Retention drops from
-                      90 days to 7 days
-                    </span>
-                  </li>
-                  <li className='flex items-start gap-2'>
-                    <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
-                      aria-hidden='true'
-                    />
-                    <span>
-                      <strong>Contact export</strong> - You won&apos;t be able
-                      to export audience contacts
-                    </span>
-                  </li>
-                  <li className='flex items-start gap-2'>
-                    <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
-                      aria-hidden='true'
-                    />
-                    <span>
-                      <strong>Unlimited contacts</strong> - Contact limit drops
-                      to 100
-                    </span>
-                  </li>
-                  <li className='flex items-start gap-2'>
-                    <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
-                      aria-hidden='true'
-                    />
-                    <span>
-                      <strong>Self-filtering</strong> - Your own visits will
-                      count in analytics
-                    </span>
-                  </li>
-                </ul>
-                <p className='text-secondary-token'>
-                  You won&apos;t be charged again. You can re-subscribe any
-                  time.
-                </p>
-              </div>
-            }
-            cancelLabel='Keep Subscription'
-            confirmLabel='Cancel Subscription'
-            variant='destructive'
-            onConfirm={handleCancelSubscription}
-            isLoading={cancelMutationPending}
-          />
+          >
+            <AlertDialogTrigger asChild>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='justify-start text-destructive hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/10'
+                onClick={() => {
+                  track('subscription_cancel_clicked', {
+                    source: 'billing_dashboard',
+                  });
+                }}
+              >
+                <XCircle className='mr-2 h-4 w-4' />
+                Cancel Subscription
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel your subscription?</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className='space-y-3'>
+                    <p>
+                      Your Pro access continues until the end of your current
+                      billing period. After that, you&apos;ll lose access to:
+                    </p>
+                    <ul className='space-y-2'>
+                      <li className='flex items-start gap-2 text-app'>
+                        <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
+                        <span>
+                          <strong>Branding removal</strong> - Jovie branding
+                          will reappear on your profile
+                        </span>
+                      </li>
+                      <li className='flex items-start gap-2'>
+                        <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
+                        <span>
+                          <strong>Advanced analytics</strong> - Retention drops
+                          from 90 days to 7 days
+                        </span>
+                      </li>
+                      <li className='flex items-start gap-2'>
+                        <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
+                        <span>
+                          <strong>Contact export</strong> - You won&apos;t be
+                          able to export audience contacts
+                        </span>
+                      </li>
+                      <li className='flex items-start gap-2'>
+                        <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
+                        <span>
+                          <strong>Unlimited contacts</strong> - Contact limit
+                          drops to 100
+                        </span>
+                      </li>
+                      <li className='flex items-start gap-2'>
+                        <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
+                        <span>
+                          <strong>Self-filtering</strong> - Your own visits will
+                          count in analytics
+                        </span>
+                      </li>
+                    </ul>
+                    <p className='text-secondary-token'>
+                      You won&apos;t be charged again. You can re-subscribe any
+                      time.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleCancelSubscription}
+                  disabled={cancelMutationPending}
+                  className='bg-red-600 text-white dark:text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800'
+                >
+                  {cancelMutationPending ? 'Cancelling...' : 'Yes, Cancel'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </ContentSurfaceCard>
     </motion.div>

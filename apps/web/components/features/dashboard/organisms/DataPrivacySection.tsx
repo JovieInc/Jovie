@@ -1,9 +1,18 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+  Input,
+} from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
@@ -21,16 +30,18 @@ export function DataPrivacySection() {
     exportMutation.mutate();
   }, [exportMutation]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(() => {
     if (confirmText !== 'DELETE') return;
-    try {
-      await deleteMutation.mutateAsync({ confirmation: 'DELETE' });
-      setDeleteDialogOpen(false);
-      // Sign out to clear session cookies, then redirect to home.
-      signOut({ redirectUrl: '/' });
-    } catch {
-      // useDeleteAccountMutation surfaces the failure toast.
-    }
+    deleteMutation.mutate(
+      { confirmation: 'DELETE' },
+      {
+        onSuccess: () => {
+          setDeleteDialogOpen(false);
+          // Sign out to clear session cookies, then redirect to home
+          signOut({ redirectUrl: '/' });
+        },
+      }
+    );
   }, [confirmText, deleteMutation, signOut]);
 
   return (
@@ -67,45 +78,64 @@ export function DataPrivacySection() {
                 onClick={() => setDeleteDialogOpen(true)}
                 className='w-full shrink-0 sm:w-auto'
               >
-                Delete Account
+                Delete account
               </Button>
             }
           />
         </div>
       </SettingsPanel>
 
-      <ConfirmDialog
+      <AlertDialog
         open={deleteDialogOpen}
         onOpenChange={open => {
           setDeleteDialogOpen(open);
           if (!open) setConfirmText('');
         }}
-        title='Delete your account?'
-        description='This will permanently delete your account, profile, links, contacts, and all associated data. You will be signed out immediately. This action cannot be undone.'
-        cancelLabel='Cancel'
-        confirmLabel='Permanently Delete Account'
-        variant='destructive'
-        onConfirm={handleDelete}
-        isLoading={deleteMutation.isPending}
-        confirmDisabled={confirmText !== 'DELETE'}
-        onCancel={() => setConfirmText('')}
       >
-        <div className='py-4'>
-          <label
-            htmlFor='delete-confirm'
-            className='mb-2 block text-app text-secondary-token'
-          >
-            Type <strong>DELETE</strong> to confirm
-          </label>
-          <Input
-            id='delete-confirm'
-            value={confirmText}
-            onChange={e => setConfirmText(e.target.value)}
-            placeholder='DELETE'
-            autoComplete='off'
-          />
-        </div>
-      </ConfirmDialog>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your account, profile, links,
+              contacts, and all associated data. You will be signed out
+              immediately. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='py-4'>
+            <label
+              htmlFor='delete-confirm'
+              className='mb-2 block text-app text-secondary-token'
+            >
+              Type <strong>DELETE</strong> to confirm
+            </label>
+            <Input
+              id='delete-confirm'
+              value={confirmText}
+              onChange={e => setConfirmText(e.target.value)}
+              placeholder='DELETE'
+              autoComplete='off'
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setConfirmText('');
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              variant='destructive'
+              onClick={handleDelete}
+              disabled={confirmText !== 'DELETE' || deleteMutation.isPending}
+            >
+              {deleteMutation.isPending
+                ? 'Deleting...'
+                : 'Permanently Delete Account'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

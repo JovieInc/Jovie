@@ -73,17 +73,17 @@ describe('GoogleAnalytics', () => {
     cleanup();
   });
 
-  it('renders the gtag loader and configures GA without inline script children', () => {
+  it('renders gtag loader and config scripts', () => {
     const { container } = render(<GoogleAnalytics />);
     const scripts = getScripts(container);
 
-    expect(scripts).toHaveLength(1);
+    expect(scripts).toHaveLength(2);
     expect(scripts[0]?.id).toBe('ga-gtag-loader');
     expect(scripts[0]?.getAttribute('src')).toBe(
       'https://www.googletagmanager.com/gtag/js?id=G-TMY7Z8HK47'
     );
-    expect(globalThis.gtag).toHaveBeenCalledWith('js', expect.any(Date));
-    expect(globalThis.gtag).toHaveBeenCalledWith('config', 'G-TMY7Z8HK47');
+    expect(scripts[1]?.id).toBe('ga-config');
+    expect(scripts[1]?.textContent).toContain("gtag('config', 'G-TMY7Z8HK47')");
   });
 
   it('returns null when measurement ID is missing', () => {

@@ -1,158 +1,97 @@
 /**
- * Unit-economics model for x402-priced artist resources (Monetization Gateway P2 spike).
+ * x402 payment-rail unit economics for the Monetization-Gateway P2 spike (GitHub #12750).
  *
- * Sources: Cloudflare x402 docs, CDP facilitator pricing (2026-07), PRICING-PHILOSOPHY Principle 7.
- * UNVERIFIED items are flagged in the spike report — do not treat as production constants.
+ * Answers the unit-economics gate question: at what per-call price do the x402
+ * settlement rails stop eating the revenue? Values are the Base + Coinbase/CDP
+ * facilitator path; sources are cited in
+ * `docs/spikes/x402-payment-gated-artist-resources.md`. Update the constants there
+ * when the fee schedule changes.
+ *
+ * All amounts are USD. Functions return numbers (never `$`-strings) so callers do
+ * the formatting via the canonical currency helpers.
  */
 
-/** Minimum gross margin required per PRICING-PHILOSOPHY Principle 7. */
-export const X402_MIN_GROSS_MARGIN_RATE = 0.5;
-
-/** Recommended price floor for artist resources (USD). */
-export const X402_RECOMMENDED_PRICE_FLOOR_USD = 0.01;
-
+/** Base L2 gas per USDC transfer; x402 quotes "<one ten-thousandth of a dollar". */
 export const BASE_GAS_PER_CALL_USD = 0.0001;
-export const CDP_FREE_TIER_TX_PER_MONTH = 1_000;
+
+/** Coinbase/CDP facilitator settlement fee on USDC/Base: zero. */
+export const CDP_SETTLEMENT_FEE_USD = 0;
+
+/** CDP facilitator API metering: free up to this many settlements per month. */
+export const CDP_FREE_TIER_TX_PER_MONTH = 1000;
+
+/** CDP facilitator API metering charge per settlement above the free tier. */
 export const CDP_METERED_FEE_PER_CALL_USD = 0.001;
+
+/**
+ * USDC -> fiat off-ramp rate applied in batch at redemption, not per call.
+ * Range: ~0% (free ACH) to ~1.5% (instant debit rail). Plan on the worst case.
+ */
 export const OFFRAMP_RATE_WORST_CASE = 0.015;
-export const MAX_RAIL_OVERHEAD = 1 - X402_MIN_GROSS_MARGIN_RATE;
-export const TEMPLATE_PRICE_POINTS_USD = [0.01, 0.05, 0.1, 0.25] as const;
-
-export interface X402RailCostInputs {
-  /** Facilitator settlement fee per transaction (USD). Base/CDP: $0 at time of spike. */
-  readonly facilitatorSettlementFeeUsd: number;
-  /** On-chain gas amortized per call (USD). Base mainnet: sub-cent. */
-  readonly gasPerCallUsd: number;
-  /** CDP metering fee per tx above free tier (USD). $0.001/tx above 1,000/mo. */
-  readonly cdpMeteringPerTxUsd: number;
-  /** Whether monthly volume exceeds CDP free tier (1,000 tx/mo). */
-  readonly aboveCdpFreeTier: boolean;
-  /** Off-ramp fee as a fraction of gross (0–0.015). Batched USDC→fiat sweep. */
-  readonly offRampFeeRate: number;
-}
-
-export interface X402UnitEconomicsResult {
-  readonly priceUsd: number;
-  readonly railCostUsd: number;
-  readonly offRampCostUsd: number;
-  readonly totalCostUsd: number;
-  readonly grossMarginUsd: number;
-  readonly grossMarginRate: number;
-  readonly clearsMarginGate: boolean;
-  readonly minimumViablePriceUsd: number;
-}
-
-const DEFAULT_RAIL_INPUTS: X402RailCostInputs = {
-  facilitatorSettlementFeeUsd: 0,
-  gasPerCallUsd: BASE_GAS_PER_CALL_USD,
-  cdpMeteringPerTxUsd: CDP_METERED_FEE_PER_CALL_USD,
-  aboveCdpFreeTier: true,
-  offRampFeeRate: 0.0075,
-};
 
 /**
- * Fixed per-call rail cost before off-ramp (facilitator + gas + optional CDP metering).
+ * Fraction of the price the payment rails may consume before the resource is
+ * "not a tier, a subsidy" (PRICING-PHILOSOPHY Principle 7 leaves >=50% for the
+ * compute COGS + margin). Rails alone must stay under this.
  */
-export function estimateX402RailCostUsd(
-  inputs: X402RailCostInputs = DEFAULT_RAIL_INPUTS
-): number {
-  const metering = inputs.aboveCdpFreeTier ? inputs.cdpMeteringPerTxUsd : 0;
-  return inputs.facilitatorSettlementFeeUsd + inputs.gasPerCallUsd + metering;
+export const MAX_RAIL_OVERHEAD = 0.5;
+
+/**
+ * Fixed per-call rail cost (independent of price): gas + settlement fee, plus CDP
+ * metering once monthly volume clears the free tier. Off-ramp is percentage-based
+ * and excluded here (see {@link railOverheadRatio}).
+ */
+export function perCallRailFeeUsd(monthlyVolume: number): number {
+  const metered =
+    monthlyVolume > CDP_FREE_TIER_TX_PER_MONTH
+      ? CDP_METERED_FEE_PER_CALL_USD
+      : 0;
+  return BASE_GAS_PER_CALL_USD + CDP_SETTLEMENT_FEE_USD + metered;
 }
 
 /**
- * Minimum price that clears the ≥50% gross-margin gate at expected rail + off-ramp cost.
+ * Share of the price eaten by payment rails: percentage off-ramp plus the fixed
+ * per-call fee amortized over the price. railOverhead = offRampRate + fixedFee/price.
  */
-export function minimumViableX402PriceUsd(
-  inputs: X402RailCostInputs = DEFAULT_RAIL_INPUTS,
-  marginRate: number = X402_MIN_GROSS_MARGIN_RATE
-): number {
-  const rail = estimateX402RailCostUsd(inputs);
-  // totalCost = rail + price * offRampRate; margin = (price - totalCost) / price >= marginRate
-  // => price >= rail / (1 - offRampRate - marginRate)
-  const denominator = 1 - inputs.offRampFeeRate - marginRate;
-  if (denominator <= 0) {
-    return Number.POSITIVE_INFINITY;
-  }
-  return rail / denominator;
-}
-
-/**
- * Evaluate unit economics for a single x402-priced resource call.
- */
-export function evaluateX402UnitEconomics(
-  priceUsd: number,
-  inputs: X402RailCostInputs = DEFAULT_RAIL_INPUTS,
-  marginRate: number = X402_MIN_GROSS_MARGIN_RATE
-): X402UnitEconomicsResult {
-  const railCostUsd = estimateX402RailCostUsd(inputs);
-  const offRampCostUsd = priceUsd * inputs.offRampFeeRate;
-  const totalCostUsd = railCostUsd + offRampCostUsd;
-  const grossMarginUsd = priceUsd - totalCostUsd;
-  const grossMarginRate = priceUsd > 0 ? grossMarginUsd / priceUsd : 0;
-
-  return {
-    priceUsd,
-    railCostUsd,
-    offRampCostUsd,
-    totalCostUsd,
-    grossMarginUsd,
-    grossMarginRate,
-    clearsMarginGate: grossMarginRate >= marginRate,
-    minimumViablePriceUsd: minimumViableX402PriceUsd(inputs, marginRate),
-  };
-}
-
-/**
- * Returns true when the recommended $0.01 floor clears the margin gate with default rails.
- */
-export function recommendedFloorClearsMarginGate(
-  inputs: X402RailCostInputs = DEFAULT_RAIL_INPUTS
-): boolean {
-  return evaluateX402UnitEconomics(X402_RECOMMENDED_PRICE_FLOOR_USD, inputs)
-    .clearsMarginGate;
-}
-
-export function perCallRailFeeUsd(monthlyTransactions: number): number {
-  return estimateX402RailCostUsd({
-    ...DEFAULT_RAIL_INPUTS,
-    aboveCdpFreeTier: monthlyTransactions > CDP_FREE_TIER_TX_PER_MONTH,
-    offRampFeeRate: OFFRAMP_RATE_WORST_CASE,
-  });
-}
-
 export function railOverheadRatio(
   priceUsd: number,
-  monthlyTransactions: number,
+  monthlyVolume: number,
   offRampRate: number = OFFRAMP_RATE_WORST_CASE
 ): number {
-  if (priceUsd <= 0) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return offRampRate + perCallRailFeeUsd(monthlyTransactions) / priceUsd;
+  if (priceUsd <= 0) return Number.POSITIVE_INFINITY;
+  return offRampRate + perCallRailFeeUsd(monthlyVolume) / priceUsd;
 }
 
+/**
+ * Minimum per-call price at which rail overhead stays at/below `maxRailOverhead`.
+ * Closed form: price >= fixedFee / (maxRailOverhead - offRampRate).
+ * Returns Infinity if the off-ramp rate alone already exceeds the budget.
+ */
 export function minViablePriceUsd(
-  monthlyTransactions: number,
+  monthlyVolume: number,
   offRampRate: number = OFFRAMP_RATE_WORST_CASE,
   maxRailOverhead: number = MAX_RAIL_OVERHEAD
 ): number {
-  const denominator = maxRailOverhead - offRampRate;
-  if (denominator <= 0) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return perCallRailFeeUsd(monthlyTransactions) / denominator;
+  const budget = maxRailOverhead - offRampRate;
+  if (budget <= 0) return Number.POSITIVE_INFINITY;
+  return perCallRailFeeUsd(monthlyVolume) / budget;
 }
 
+/** Does this price clear the rail-overhead gate at the given volume? */
 export function clearsRailGate(
   priceUsd: number,
-  monthlyTransactions: number,
-  offRampRate: number = OFFRAMP_RATE_WORST_CASE
+  monthlyVolume: number,
+  offRampRate: number = OFFRAMP_RATE_WORST_CASE,
+  maxRailOverhead: number = MAX_RAIL_OVERHEAD
 ): boolean {
   return (
-    railOverheadRatio(priceUsd, monthlyTransactions, offRampRate) <=
-    MAX_RAIL_OVERHEAD
+    railOverheadRatio(priceUsd, monthlyVolume, offRampRate) <= maxRailOverhead
   );
 }
+
+/**
+ * The three price points shipped in Cloudflare's x402 Worker template README
+ * (`PROTECTED_PATTERNS`), modeled at a metered (>free-tier) volume so the fixed
+ * fee applies. Demonstrates per-resource pricing clearing the gate above ~$0.0023.
+ */
+export const TEMPLATE_PRICE_POINTS_USD = [0.01, 0.1, 1.0] as const;

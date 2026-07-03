@@ -424,15 +424,6 @@ function parseDesktopAuthReturnDeepLink(urlString: string) {
   );
 }
 
-function isAuthReturnDeepLinkCandidate(urlString: string): boolean {
-  const parsed = parseUrl(urlString);
-  return (
-    parsed?.protocol === AUTH_RETURN_PROTOCOL &&
-    parsed.hostname === AUTH_RETURN_HOST &&
-    parsed.pathname === AUTH_RETURN_COMPLETE_PATH
-  );
-}
-
 function findAuthReturnInArgv(argv: readonly string[]) {
   for (const arg of argv) {
     const completion = parseDesktopAuthReturnDeepLink(arg);
@@ -1433,7 +1424,8 @@ if (gotSingleInstanceLock) {
 
     const invalidAuthReturn = argv.some(
       arg =>
-        isAuthReturnDeepLinkCandidate(arg) && !parseDesktopAuthReturnDeepLink(arg)
+        arg.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}`) &&
+        !parseDesktopAuthReturnDeepLink(arg)
     );
     if (invalidAuthReturn) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
@@ -1459,7 +1451,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (isAuthReturnDeepLinkCandidate(url)) {
+    if (url.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}`)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }

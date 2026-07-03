@@ -1,7 +1,3 @@
-import {
-  type ElectronAuthCompleteProtocol,
-  getElectronAuthCompleteProtocolForOrigin,
-} from '@jovie/auth-routing';
 import { APP_ROUTES } from '@/constants/routes';
 
 export const DESKTOP_RETURN_PARAM = 'desktop_return';
@@ -9,7 +5,7 @@ export const DESKTOP_AUTH_RETURN_PATH = APP_ROUTES.AUTH_RETURN;
 export const DESKTOP_AUTH_HANDOFF_PATH = APP_ROUTES.DESKTOP_AUTH;
 export const DESKTOP_AUTH_START_PATH = APP_ROUTES.AUTH_START;
 export const DESKTOP_AUTH_URL_PARAM = 'auth_url';
-export const DEFAULT_DESKTOP_AUTH_RETURN_PROTOCOL = 'jovie';
+export const JOVIE_AUTH_RETURN_PROTOCOL_URL = 'jovie://auth-return';
 
 const AUTH_ROUTE_PREFIXES = [
   APP_ROUTES.SIGNIN,
@@ -120,19 +116,10 @@ export function buildDesktopAuthReturnPath(route: string): string {
   return `${url.pathname}${url.search}`;
 }
 
-export function getDesktopAuthReturnProtocolForOrigin(
-  origin: string
-): ElectronAuthCompleteProtocol {
-  return getElectronAuthCompleteProtocolForOrigin(origin);
-}
-
-export function buildDesktopAuthDeepLink(
-  route: string,
-  protocol: ElectronAuthCompleteProtocol = DEFAULT_DESKTOP_AUTH_RETURN_PROTOCOL
-): string {
+export function buildDesktopAuthDeepLink(route: string): string {
   const sanitizedRoute =
     sanitizeDesktopReturnRoute(route) ?? APP_ROUTES.DASHBOARD;
-  const url = new URL(`${protocol}://auth-return`);
+  const url = new URL(JOVIE_AUTH_RETURN_PROTOCOL_URL);
   url.searchParams.set('route', sanitizedRoute);
   return url.toString();
 }

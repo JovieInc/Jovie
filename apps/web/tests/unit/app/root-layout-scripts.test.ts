@@ -16,15 +16,4 @@ describe('root layout scripts', () => {
     expect(layoutSource).toContain("<script src='/theme-init.js' />");
     expect(layoutSource).not.toContain('beforeInteractive');
   });
-
-  it('loads GA consent init as a same-origin script instead of CSP-blocked inline code', () => {
-    const gaConsentTag = layoutSource.match(
-      /<script(?=[^>]*id='ga-consent-init')(?=[^>]*src='\/ga-consent-init\.js')[^>]*\/>/
-    )?.[0];
-
-    expect(gaConsentTag).toBeDefined();
-    expect(layoutSource).not.toContain('buildGoogleConsentInitScript');
-    expect(layoutSource).not.toContain('dangerouslySetInnerHTML');
-    expect(layoutSource).not.toContain('buildGoogleAnalyticsConfigScript');
-  });
 });

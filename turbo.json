@@ -103,14 +103,7 @@
       "cache": false,
       "persistent": true,
       "interruptible": true,
-      "inputs": [
-        "app/**/page.tsx",
-        "app/**/page.ts",
-        "app/**/route.ts",
-        "app/**/route.tsx",
-        "app/**/layout.tsx",
-        "app/**/layout.ts"
-      ]
+      "inputs": ["app/**/page.tsx", "app/**/route.ts", "app/**/layout.tsx"]
     },
     "test": {
       "description": "Runs the full Vitest unit/integration test suite with coverage output",

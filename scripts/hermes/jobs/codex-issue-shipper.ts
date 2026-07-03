@@ -6,9 +6,8 @@
  * eligible issue, writes dispatch context to gbrain, then starts a
  * coder-profile agent to ship it.
  *
- * Issues labeled `no-auto`, `invalid` (confirmed misroutes), `type:epic`
- * (pointer trackers with no code), or already claimed/blocked are excluded.
- * All other open issues are dispatchable.
+ * Issues labeled `no-auto`, `type:epic`, dependency-gated trackers, or already
+ * claimed/blocked are excluded. All other open issues are dispatchable.
  *
  * The empty-queue path is intentionally cheap: GitHub scan, log, exit. No
  * gbrain query, model call, subagent, or CodeRabbit work happens unless an
@@ -48,6 +47,7 @@ import {
   GhEagainBackoff,
   type GithubIssue,
   HUMAN_REVIEW_LABEL,
+  isSpawnEagain,
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
@@ -106,10 +106,6 @@ async function handleSpawnEagain(
     await sleep(backoff.sleepMs);
   }
 }
-
-const spawnResourceGuard = new SpawnResourceGuard({
-  onEvent: entry => logJobEvent({ job: JOB, ...entry }),
-});
 
 /**
  * Sentinel file that, when present, pauses the shipper.
@@ -174,18 +170,15 @@ function loadHermesEnv(): void {
 
 function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
   try {
-    const result = execFileSync(args[0], args.slice(1), {
+    return execFileSync(args[0], args.slice(1), {
       cwd: config.repoRoot,
       encoding: 'utf8',
       timeout: 30_000,
       maxBuffer: 5 * 1024 * 1024,
     });
-    spawnResourceGuard.recordSuccess();
-    return result;
   } catch (err) {
-    if (isSpawnResourceUnavailable(err)) {
-      spawnResourceGuard.recordFailure(args[0], err);
-      throw new SpawnResourceUnavailableError(args[0], err);
+    if (isSpawnEagain(err)) {
+      throw new SpawnEagainError(shortError(err), args[0] ?? 'unknown');
     }
     throw err;
   }
@@ -258,7 +251,7 @@ function spawnSyncSafe(
   command: string,
   args: ReadonlyArray<string>,
   cwd: string
-): { readonly status: number | null; readonly resourceUnavailable: boolean } {
+): { readonly status: number | null } {
   try {
     const result = execFileSync(command, args, {
       cwd,
@@ -267,18 +260,13 @@ function spawnSyncSafe(
       stdio: 'ignore',
     });
     void result;
-    spawnResourceGuard.recordSuccess();
-    return { status: 0, resourceUnavailable: false };
+    return { status: 0 };
   } catch (err) {
-    if (isSpawnResourceUnavailable(err)) {
-      spawnResourceGuard.recordFailure(command, err);
-      return { status: null, resourceUnavailable: true };
-    }
     const status =
       typeof (err as { status?: unknown }).status === 'number'
         ? ((err as { status: number }).status ?? 1)
         : 1;
-    return { status, resourceUnavailable: false };
+    return { status };
   }
 }
 
@@ -333,19 +321,16 @@ function cleanupWorktree(config: ShipperConfig, repoRoot: string): void {
   }
 }
 
-function detectRepoRoot(): string | null {
+function detectRepoRoot(): string {
   if (process.env.HERMES_JOVIE_REPO) return process.env.HERMES_JOVIE_REPO;
   try {
-    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
       timeout: 10_000,
     }).trim();
-    spawnResourceGuard.recordSuccess();
-    return root;
   } catch (err) {
-    if (isSpawnResourceUnavailable(err)) {
-      spawnResourceGuard.recordFailure('git', err);
-      return null;
+    if (isSpawnEagain(err)) {
+      throw new SpawnEagainError(shortError(err), 'git');
     }
     throw err;
   }
@@ -451,10 +436,10 @@ async function gatePrimaryCheckout(repoRoot: string): Promise<boolean> {
   return false;
 }
 
-function detectGithubRepo(repoRoot: string): string | null {
+function detectGithubRepo(repoRoot: string): string {
   if (process.env.GH_REPO) return process.env.GH_REPO;
   try {
-    const repo = execFileSync(
+    return execFileSync(
       'gh',
       ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
       {
@@ -463,63 +448,35 @@ function detectGithubRepo(repoRoot: string): string | null {
         timeout: 30_000,
       }
     ).trim();
-    spawnResourceGuard.recordSuccess();
-    return repo;
   } catch (err) {
-    if (isSpawnResourceUnavailable(err)) {
-      spawnResourceGuard.recordFailure('gh', err);
-      return null;
+    if (isSpawnEagain(err)) {
+      throw new SpawnEagainError(shortError(err), 'gh');
     }
     throw err;
   }
 }
 
-interface ListCodexIssuesResult {
-  readonly issues: ReadonlyArray<GithubIssue>;
-  readonly resourceUnavailable: boolean;
-}
-
-function listCodexIssues(config: ShipperConfig): ListCodexIssuesResult {
+function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
   // Fixed: gh CLI does not support --page; use single fetch with max limit
   const fetchLimit = Math.min(100, config.issueFetchLimit || 100);
-  try {
-    const raw = run(
-      [
-        'gh',
-        'issue',
-        'list',
-        '--repo',
-        config.repo,
-        '--state',
-        'open',
-        '--limit',
-        String(fetchLimit),
-        '--json',
-        'number,title,body,url,updatedAt,labels',
-      ],
-      config
-    );
-    const issues = JSON.parse(raw) as GithubIssue[];
-    return {
-      issues: issues.slice(0, config.issueFetchLimit || 100),
-      resourceUnavailable: false,
-    };
-  } catch (err) {
-    if (err instanceof SpawnResourceUnavailableError) {
-      return { issues: [], resourceUnavailable: true };
-    }
-    throw err;
-  }
-}
-
-async function handleSpawnResourcePressure(context: string): Promise<void> {
-  await spawnResourceGuard.maybeBackoff();
-  logJobEvent({
-    job: JOB,
-    event: 'spawn_resource_skip',
-    context,
-    consecutive: spawnResourceGuard.consecutiveFailures,
-  });
+  const raw = run(
+    [
+      'gh',
+      'issue',
+      'list',
+      '--repo',
+      config.repo,
+      '--state',
+      'open',
+      '--limit',
+      String(fetchLimit),
+      '--json',
+      'number,title,body,url,updatedAt,labels',
+    ],
+    config
+  );
+  const issues = JSON.parse(raw) as GithubIssue[];
+  return issues.slice(0, config.issueFetchLimit || 100);
 }
 
 function ensureLabel(
@@ -1331,10 +1288,6 @@ async function runShipper(): Promise<void> {
     return;
   }
   const repo = detectGithubRepo(repoRoot);
-  if (!repo) {
-    await handleSpawnResourcePressure('detect_github_repo');
-    return;
-  }
   const config = loadShipperConfig(process.env, repoRoot, repo);
 
   await withJobLogging(JOB, async () => {
@@ -1345,12 +1298,16 @@ async function runShipper(): Promise<void> {
         let controlLabelsEnsured = false;
 
         for (;;) {
-          const listed = listCodexIssues(config);
-          if (listed.resourceUnavailable) {
-            await handleSpawnResourcePressure('list_codex_issues');
-            return;
+          let issues: ReadonlyArray<GithubIssue>;
+          try {
+            issues = listCodexIssues(config);
+          } catch (err) {
+            if (err instanceof SpawnEagainError) {
+              await handleSpawnEagain(err, 'listCodexIssues');
+              return;
+            }
+            throw err;
           }
-          const issues = listed.issues;
           const plans = buildDispatchPlans(issues, config);
           const skippedHuman = issues.filter(issue =>
             labelNames(issue).includes(HUMAN_REVIEW_LABEL)
@@ -1433,16 +1390,6 @@ async function runShipper(): Promise<void> {
 }
 
 void main().catch(err => {
-  if (err instanceof SpawnResourceUnavailableError) {
-    logJobEvent({
-      job: JOB,
-      event: 'spawn_resource_skip',
-      context: 'main_uncaught',
-      command: err.command,
-      error: err.message,
-    });
-    return;
-  }
   logJobEvent({
     job: JOB,
     event: 'fatal',

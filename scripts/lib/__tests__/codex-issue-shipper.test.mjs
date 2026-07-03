@@ -17,12 +17,12 @@ import {
   GH_EAGAIN_BACKOFF_MS,
   GH_EAGAIN_BACKOFF_THRESHOLD,
   GhEagainBackoff,
-  INVALID_LABEL,
   isAlreadyClaimedOrBlocked,
   isInvalidMisroute,
   isShipperCriticalPath,
   isSpawnEagain,
   isUiUxDesignIssue,
+  isTrackerOrDependencyGated,
   loadShipperConfig,
   NO_AUTO_LABEL,
   parseAgentChain,
@@ -32,6 +32,7 @@ import {
   SpawnEagainError,
   selectTaskRoute,
   shellQuote,
+  TYPE_EPIC_LABEL,
   worktreeHasWork,
 } from '../../hermes/lib/codex-issue-shipper.ts';
 
@@ -102,7 +103,7 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters no-auto, claimed, blocked, epic, and invalid issues before dispatch', () => {
+  it('filters no-auto, claimed, blocked, and epic issues before dispatch', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
     const noAuto = issue({
       number: 2,
@@ -121,33 +122,43 @@ describe('codex issue shipper planner', () => {
       number: 5,
       labels: [{ name: 'codex' }, { name: EPIC_LABEL }],
     });
-    // Confirmed misroute: triage labels invalid but cannot close; shipper must
-    // not re-claim after release (#12675–#12678 / #12940).
-    const invalidMisroute = issue({
-      number: 6,
-      title: 'LYB PhotoUploadManager state machine',
-      labels: [
-        { name: 'codex' },
-        { name: INVALID_LABEL },
-        { name: 'blocked' },
-        { name: 'ai:needs-review' },
-      ],
+
+    expect(
+      eligibleCodexIssues([ready, noAuto, claimed, blocked, epic])
+    ).toEqual([ready]);
+    expect(
+      buildDispatchPlans([ready, noAuto, claimed, blocked, epic], config)
+    ).toHaveLength(1);
+  });
+
+  it('skips type:epic and dependency-gated tracker issues', () => {
+    const ready = issue({ number: 1, title: 'Fix docs typo' });
+    const epic = issue({
+      number: 12729,
+      title: 'Linear → GitHub Issues migration pointer',
+      labels: [{ name: 'codex' }, { name: TYPE_EPIC_LABEL }],
+      body: 'Epic tracker with no implementable deliverable.',
+    });
+    const trackerPointer = issue({
+      number: 12730,
+      title: 'Billing rollout tracker-pointer',
+      body: 'Acceptance is gated on child issues and human billing actions.',
+    });
+    const migrationPointer = issue({
+      number: 12731,
+      title: 'Phase 2 migration pointer',
+      body: 'This migration pointer has no shippable code.',
     });
 
-    expect(isInvalidMisroute(invalidMisroute)).toBe(true);
+    expect(isTrackerOrDependencyGated(epic)).toBe(true);
+    expect(isTrackerOrDependencyGated(trackerPointer)).toBe(true);
+    expect(isTrackerOrDependencyGated(migrationPointer)).toBe(true);
     expect(
-      eligibleCodexIssues([
-        ready,
-        noAuto,
-        claimed,
-        blocked,
-        epic,
-        invalidMisroute,
-      ])
+      eligibleCodexIssues([ready, epic, trackerPointer, migrationPointer])
     ).toEqual([ready]);
     expect(
       buildDispatchPlans(
-        [ready, noAuto, claimed, blocked, epic, invalidMisroute],
+        [ready, epic, trackerPointer, migrationPointer],
         config
       )
     ).toHaveLength(1);
