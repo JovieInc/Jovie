@@ -29,7 +29,7 @@ struct MobileActionLoopResponseTests {
     )
 
     #expect(response.pendingCount == 1)
-    #expect(response.items.first?.title.contains("Detroit"))
+    #expect(response.items.first?.title.contains("Detroit") == true)
   }
 
   @Test func decodesMobileActionLoopCalendarPayload() throws {

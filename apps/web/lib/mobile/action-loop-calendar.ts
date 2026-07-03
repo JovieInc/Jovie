@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { getReleasesForProfile } from '@/lib/discography/queries';
 import { db } from '@/lib/db';
 import { tourDates } from '@/lib/db/schema/tour';
+import { getReleasesForProfile } from '@/lib/discography/queries';
 import type {
   ConfirmationStatusValue,
   EventTypeValue,
@@ -10,6 +10,9 @@ import type {
   TourDateViewModel,
 } from '@/lib/tour-dates/types';
 import { mapTourDateToViewModel } from '@/lib/tour-dates/view-model';
+import { toISOStringOrNull } from '@/lib/utils/date';
+
+type MobileCalendarReleaseStatus = 'draft' | 'scheduled' | 'released';
 
 export type MobileCalendarEventItem = {
   readonly id: string;
@@ -98,8 +101,8 @@ function isUpcomingEvent(eventDate: string, now: Date): boolean {
 }
 
 function isUpcomingRelease(
-  releaseDate: string | undefined,
-  status: 'draft' | 'scheduled' | 'released',
+  releaseDate: Date | string | null | undefined,
+  status: MobileCalendarReleaseStatus,
   now: Date
 ): boolean {
   if (status === 'draft' || status === 'scheduled') {
@@ -113,6 +116,13 @@ function isUpcomingRelease(
     return false;
   }
   return parsed >= now;
+}
+
+function normalizeReleaseStatus(status: string): MobileCalendarReleaseStatus {
+  if (status === 'draft' || status === 'scheduled') {
+    return status;
+  }
+  return 'released';
 }
 
 async function loadTourDatesForProfile(
@@ -154,17 +164,17 @@ export async function buildMobileCalendar(
     .slice(0, UPCOMING_EVENT_LIMIT);
 
   const upcomingReleases = releases
-    .filter(release =>
-      isUpcomingRelease(release.releaseDate, release.status, now)
-    )
-    .slice(0, UPCOMING_RELEASE_LIMIT)
     .map(release => ({
       id: release.id,
       title: release.title,
-      releaseDate: release.releaseDate ?? null,
-      status: release.status,
-      artworkUrl: release.artworkUrl,
-    }));
+      releaseDate: toISOStringOrNull(release.releaseDate),
+      status: normalizeReleaseStatus(release.status),
+      artworkUrl: release.artworkUrl ?? undefined,
+    }))
+    .filter(release =>
+      isUpcomingRelease(release.releaseDate, release.status, now)
+    )
+    .slice(0, UPCOMING_RELEASE_LIMIT);
 
   return {
     rangeLabel: 'Upcoming',

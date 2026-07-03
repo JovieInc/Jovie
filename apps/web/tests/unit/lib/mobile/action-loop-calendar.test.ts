@@ -15,7 +15,9 @@ vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfile: hoisted.getReleasesForProfileMock,
 }));
 
-const { buildMobileCalendar } = await import('@/lib/mobile/action-loop-calendar');
+const { buildMobileCalendar } = await import(
+  '@/lib/mobile/action-loop-calendar'
+);
 
 function mockTourDateRows(rows: unknown[]) {
   const orderBy = vi.fn().mockResolvedValue(rows);
@@ -111,7 +113,7 @@ describe('buildMobileCalendar', () => {
       {
         id: 'release-1',
         title: 'Midnight Drive',
-        releaseDate: '2026-08-01T00:00:00.000Z',
+        releaseDate: new Date('2026-08-01T00:00:00.000Z'),
         status: 'scheduled',
         artworkUrl: 'https://cdn.example/art.jpg',
       },
