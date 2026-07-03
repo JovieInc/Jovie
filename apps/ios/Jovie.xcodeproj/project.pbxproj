@@ -54,6 +54,10 @@
 		A0GH12706000000000000002 /* MobileActionLoopInboxResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12706000000000000001 /* MobileActionLoopInboxResponse.swift */; };
 		A0GH12706000000000000004 /* MobileActionLoopCalendarResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12706000000000000003 /* MobileActionLoopCalendarResponse.swift */; };
 		A0GH12706000000000000006 /* MobileActionLoopResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */; };
+		A0GH12708000000000000002 /* AvatarImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12708000000000000001 /* AvatarImageCache.swift */; };
+		A0GH12708000000000000004 /* MobileChatEntityChipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12708000000000000003 /* MobileChatEntityChipView.swift */; };
+		A0GH12708000000000000006 /* MobileChatInlineFlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12708000000000000005 /* MobileChatInlineFlowLayout.swift */; };
+		A0GH12708000000000000008 /* MobileChatEntityChipViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12708000000000000007 /* MobileChatEntityChipViewTests.swift */; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */; };
 		A0J0V25490000000000000002 /* ChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000001 /* ChatCache.swift */; };
 		A0J0V25490000000000000004 /* ChatRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000003 /* ChatRepository.swift */; };
@@ -172,6 +176,10 @@
 		A0GH12706000000000000001 /* MobileActionLoopInboxResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopInboxResponse.swift; sourceTree = "<group>"; };
 		A0GH12706000000000000003 /* MobileActionLoopCalendarResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopCalendarResponse.swift; sourceTree = "<group>"; };
 		A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopResponseTests.swift; sourceTree = "<group>"; };
+		A0GH12708000000000000001 /* AvatarImageCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AvatarImageCache.swift; sourceTree = "<group>"; };
+		A0GH12708000000000000003 /* MobileChatEntityChipView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatEntityChipView.swift; sourceTree = "<group>"; };
+		A0GH12708000000000000005 /* MobileChatInlineFlowLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatInlineFlowLayout.swift; sourceTree = "<group>"; };
+		A0GH12708000000000000007 /* MobileChatEntityChipViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatEntityChipViewTests.swift; sourceTree = "<group>"; };
 		F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsEscapeTrapGuardTests.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000001 /* ChatCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatCache.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000003 /* ChatRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRepository.swift; sourceTree = "<group>"; };
@@ -300,6 +308,7 @@
 				A0J0V2549000000000000000D /* MobileChatClientTests.swift */,
 				A0J0V36390000000000000003 /* ComposerWorkflowSheetTests.swift */,
 				A0J0V36070000000000000005 /* MobileChatContentParserTests.swift */,
+				A0GH12708000000000000007 /* MobileChatEntityChipViewTests.swift */,
 				191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */,
 				B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */,
 				A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */,
@@ -393,6 +402,7 @@
 			isa = PBXGroup;
 			children = (
 				A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */,
+				A0GH12708000000000000001 /* AvatarImageCache.swift */,
 				9924B177AFB753A4C23A4098 /* APIClient.swift */,
 				A0J0V25490000000000000001 /* ChatCache.swift */,
 				A0J0V25490000000000000003 /* ChatRepository.swift */,
@@ -461,6 +471,8 @@
 			isa = PBXGroup;
 			children = (
 				A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */,
+				A0GH12708000000000000003 /* MobileChatEntityChipView.swift */,
+				A0GH12708000000000000005 /* MobileChatInlineFlowLayout.swift */,
 				A0J0V25490000000000000009 /* MobileChatView.swift */,
 				A0J0V36070000000000000003 /* MobileChatToolCardView.swift */,
 			);
@@ -657,6 +669,7 @@
 				A0J0V2549000000000000000E /* MobileChatClientTests.swift in Sources */,
 				A0J0V36390000000000000004 /* ComposerWorkflowSheetTests.swift in Sources */,
 				A0J0V36070000000000000006 /* MobileChatContentParserTests.swift in Sources */,
+				A0GH12708000000000000008 /* MobileChatEntityChipViewTests.swift in Sources */,
 				FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */,
 				CE7C4C47EFA23AFA2B205BE4 /* MobileMeResponseTests.swift in Sources */,
 				A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */,
@@ -705,8 +718,11 @@
 				F8BC948A5A68297B746E217F /* MeCache.swift in Sources */,
 				8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */,
 				A0J0V25490000000000000006 /* MobileChatClient.swift in Sources */,
+				A0GH12708000000000000002 /* AvatarImageCache.swift in Sources */,
 				A0J0V25490000000000000008 /* MobileChatModels.swift in Sources */,
 				A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */,
+				A0GH12708000000000000004 /* MobileChatEntityChipView.swift in Sources */,
+				A0GH12708000000000000006 /* MobileChatInlineFlowLayout.swift in Sources */,
 				52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */,
 				A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */,
 				A0GH12706000000000000002 /* MobileActionLoopInboxResponse.swift in Sources */,

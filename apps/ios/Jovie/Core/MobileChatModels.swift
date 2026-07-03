@@ -72,6 +72,21 @@ struct CachedChatSnapshot: Codable, Equatable, Sendable {
 /// invocation, and a user-authored turn containing a mention, so UI tests can
 /// assert chips render as label text with no raw `@kind:id[...]` / `/skill:`
 /// wire syntax visible -- the JOV-3608 regression symptom.
+/// Stable artwork URLs for the UI-testing entity fixture. Production chat
+/// degrades to accent-dot chips until a profile-scoped entity cache lands.
+enum MobileChatEntityFixtureThumbnailRegistry {
+  private static let urls: [String: URL] = [
+    "release:rel_1": URL(string: "https://picsum.photos/seed/jovie-rel-1/64/64")!,
+    "artist:art_1": URL(string: "https://picsum.photos/seed/jovie-art-1/64/64")!,
+    "track:trk_1": URL(string: "https://picsum.photos/seed/jovie-trk-1/64/64")!,
+    "event:evt_1": URL(string: "https://picsum.photos/seed/jovie-evt-1/64/64")!,
+  ]
+
+  static func thumbnailURL(kind: MobileChatEntityKind, id: String) -> URL? {
+    urls["\(kind.rawValue):\(id)"]
+  }
+}
+
 enum MobileChatEntityFixture {
   static let conversationID = "conv_ui_testing_entity_fixture"
 
