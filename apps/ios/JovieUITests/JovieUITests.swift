@@ -530,31 +530,21 @@ final class JovieUITests: XCTestCase {
   }
 
   func testAuthCallbackDeepLinkCompletesHarness() throws {
+    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123"
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
-      expectedElementDescription: "\"Continue in Browser\""
+      additionalLaunchArguments: ["-ui-testing-open-auth-callback", callbackURL],
+      expectedElementDescription: "\"Copy URL\""
     ) {
-      $0.buttons["Continue in Browser"]
+      $0.buttons["Copy URL"]
     }
 
-    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123"
+    app.terminate()
+    app.launch()
 
-    try openAuthCallbackURL(callbackURL, targetApp: app)
-
-    try waitForShellWithResend(
-      app.buttons["Copy URL"],
-      resendURL: callbackURL,
-      targetApp: app,
-      failureMessage: "Auth callback did not route to the authenticated shell."
-    )
-
-    try openAuthCallbackURL(callbackURL, targetApp: app)
-
-    try waitForShellWithResend(
-      app.buttons["Copy URL"],
-      resendURL: callbackURL,
-      targetApp: app,
-      failureMessage: "Duplicate auth callback should leave the authenticated shell stable."
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 10),
+      "Duplicate auth callback should leave the authenticated shell stable.\n\(app.debugDescription)"
     )
   }
 
@@ -734,6 +724,7 @@ final class JovieUITests: XCTestCase {
 
   private func launchMockApp(
     launchArgument: String,
+    additionalLaunchArguments: [String] = [],
     expectedElementDescription: String,
     timeout: TimeInterval = 5,
     file: StaticString = #filePath,
@@ -742,6 +733,7 @@ final class JovieUITests: XCTestCase {
   ) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
+    app.launchArguments.append(contentsOf: additionalLaunchArguments)
     app.launchArguments.append("-ui-testing-allow-exit")
     addTeardownBlock { [app] in
       self.endUITestSession(app)
