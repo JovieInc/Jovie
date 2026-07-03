@@ -58,8 +58,7 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(app.staticTexts["Tim White"].exists)
-    XCTAssertTrue(app.buttons["Chat"].exists)
-    XCTAssertTrue(app.buttons["Profile"].exists)
+    XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
     XCTAssertTrue(app.buttons["Open Settings"].exists)
     attachScreenshot(named: "profile", app: app)
   }
@@ -137,7 +136,7 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  func testBottomNavigationSwitchesBetweenChatAndProfile() {
+  func testDrawerSwitchesBetweenChatAndProfile() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.staticTexts["Ask Jovie"]
     }
@@ -147,21 +146,115 @@ final class JovieUITests: XCTestCase {
       app.staticTexts["Ask Jovie about your profile, releases, and next moves."].exists,
       "Chat empty state did not explain the online intro behavior.\n\(app.debugDescription)"
     )
-    let profileTab = app.buttons["shell-tab-profile"]
-    let chatTab = app.buttons["shell-tab-chat"]
-    XCTAssertTrue(
-      profileTab.waitForExistence(timeout: 3),
-      "Bottom navigation did not appear.\n\(app.debugDescription)"
-    )
-    XCTAssertTrue(chatTab.exists)
     attachScreenshot(named: "chat", app: app)
 
-    profileTab.tap()
+    app.buttons["Open navigation drawer"].tap()
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Drawer surface switcher did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(chatSurface.exists)
+
+    profileSurface.tap()
 
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Bottom nav did not switch to Profile.\n\(app.debugDescription)"
+      "Drawer switcher did not switch to Profile.\n\(app.debugDescription)"
     )
+  }
+
+  // JOV-3670 evidence (a): the drawer is the SOLE surface switcher. The former
+  // bottom QR/sparkle pill (shell-tab-* buttons, no drawer prefix) must not
+  // exist anywhere in the shell, whether the drawer is closed or open.
+  func testDrawerIsSoleSurfaceSwitcherNoPillRemains() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    // Closed-drawer state: no bare shell-tab-* pill buttons anywhere in the shell.
+    XCTAssertFalse(
+      app.buttons["shell-tab-chat"].exists,
+      "Removed bottom pill chat button still exists with drawer closed.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["shell-tab-profile"].exists,
+      "Removed bottom pill profile button still exists with drawer closed.\n\(app.debugDescription)"
+    )
+
+    // Talk FAB is present and unrelated to the removed pill.
+    XCTAssertTrue(
+      app.buttons["shell-talk-fab"].waitForExistence(timeout: 3),
+      "Talk FAB did not appear on the chat tab.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open navigation drawer"].tap()
+
+    // Open-drawer state: only the drawer-namespaced surface switcher exists.
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Drawer surface switcher did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(chatSurface.exists)
+    XCTAssertFalse(
+      app.buttons["shell-tab-chat"].exists,
+      "Bare (non-drawer) chat pill button still exists with drawer open.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["shell-tab-profile"].exists,
+      "Bare (non-drawer) profile pill button still exists with drawer open.\n\(app.debugDescription)"
+    )
+  }
+
+  // JOV-3670 evidence (b): removing the bottom pill's safeAreaInset must not
+  // leave a ghost reserved footprint. Assert the composer/content region
+  // extends to fill the reclaimed space, and that layout stays stable across
+  // chat/profile x chatEnabled(true/false) states.
+  func testNoGhostFootprintAfterPillRemovalAcrossStates() {
+    // chatEnabled == true (ready dashboard loaded): composer sits at the true
+    // safe-area bottom, not floating above a reserved-but-empty pill gap.
+    let chatApp = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+    let composerInput = chatApp.textFields["Ask Jovie"]
+    XCTAssertTrue(waitForHittable(composerInput, timeout: 3))
+    let chatWindowMaxY = chatApp.windows.firstMatch.frame.maxY
+    XCTAssertGreaterThan(
+      composerInput.frame.maxY,
+      chatWindowMaxY - 160,
+      "Chat composer left a ghost gap where the removed bottom pill used to sit.\n\(chatApp.debugDescription)"
+    )
+    attachScreenshot(named: "no-ghost-footprint-chat", app: chatApp)
+
+    chatApp.buttons["Open navigation drawer"].tap()
+    chatApp.buttons["shell-drawer-surface-shell-tab-profile"].tap()
+    let copyURLButton = chatApp.buttons["Copy URL"]
+    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 3))
+    attachScreenshot(named: "no-ghost-footprint-profile", app: chatApp)
+    endUITestSession(chatApp)
+
+    // chatEnabled == false (needs-onboarding shell): no chat composer/pill at
+    // all, and no leftover blank strip reserved at the bottom of the shell.
+    let onboardingApp = launchMockApp(
+      launchArgument: "-ui-testing-needs-onboarding",
+      expectedElementDescription: "\"Continue on Web\""
+    ) {
+      $0.buttons["Continue on Web"]
+    }
+    let continueButton = onboardingApp.buttons["Continue on Web"]
+    XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
+    XCTAssertFalse(
+      onboardingApp.buttons["shell-talk-fab"].exists,
+      "Talk FAB should not render when chat is disabled.\n\(onboardingApp.debugDescription)"
+    )
+    XCTAssertFalse(
+      onboardingApp.buttons["shell-tab-chat"].exists,
+      "Removed pill must not render in the chatEnabled == false shell.\n\(onboardingApp.debugDescription)"
+    )
+    attachScreenshot(named: "no-ghost-footprint-needs-onboarding", app: onboardingApp)
   }
 
   func testTalkFABAppearsOnChatTab() {
@@ -274,13 +367,15 @@ final class JovieUITests: XCTestCase {
     input.typeText(draft)
     XCTAssertEqual(input.value as? String, draft)
 
-    app.buttons["shell-tab-profile"].tap()
+    app.buttons["Open navigation drawer"].tap()
+    app.buttons["shell-drawer-surface-shell-tab-profile"].tap()
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
       "Shell navigation did not switch to Profile.\n\(app.debugDescription)"
     )
 
-    app.buttons["shell-tab-chat"].tap()
+    app.buttons["Open navigation drawer"].tap()
+    app.buttons["shell-drawer-surface-shell-tab-chat"].tap()
     let restoredInput = app.textFields["Ask Jovie"]
     XCTAssertTrue(
       waitForHittable(restoredInput, timeout: 3),
@@ -305,25 +400,35 @@ final class JovieUITests: XCTestCase {
       $0.textFields["Ask Jovie"]
     }
 
-    let profileTab = app.buttons["shell-tab-profile"]
-    let chatTab = app.buttons["shell-tab-chat"]
+    let drawerOpenButton = app.buttons["Open navigation drawer"]
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
     let profileReady = app.buttons["Copy URL"]
     let chatReady = app.textFields["Ask Jovie"]
 
     XCTAssertTrue(
-      profileTab.waitForExistence(timeout: timeoutSeconds),
-      "Bottom navigation did not appear before runtime measurement.\n\(app.debugDescription)"
+      drawerOpenButton.waitForExistence(timeout: timeoutSeconds),
+      "Drawer open control did not appear before runtime measurement.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(chatTab.exists)
 
     measure(metrics: shellRuntimeMetrics(for: app)) {
-      profileTab.tap()
+      drawerOpenButton.tap()
+      XCTAssertTrue(
+        waitForHittable(profileSurface, timeout: timeoutSeconds),
+        "Drawer surface switcher did not become hittable.\n\(app.debugDescription)"
+      )
+      profileSurface.tap()
       XCTAssertTrue(
         waitForHittable(profileReady, timeout: timeoutSeconds),
         "Measured transition to Profile did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
       )
 
-      chatTab.tap()
+      drawerOpenButton.tap()
+      XCTAssertTrue(
+        waitForHittable(chatSurface, timeout: timeoutSeconds),
+        "Drawer surface switcher did not become hittable.\n\(app.debugDescription)"
+      )
+      chatSurface.tap()
       XCTAssertTrue(
         waitForHittable(chatReady, timeout: timeoutSeconds),
         "Measured transition to Chat did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"

@@ -38,14 +38,6 @@ enum AppShellTab: Equatable, Hashable {
     }
   }
 
-  var isBottomBarDestination: Bool {
-    switch self {
-    case .chat, .profile:
-      return true
-    case .audience:
-      return false
-    }
-  }
 }
 
 // File-level so unit tests can call it without importing SwiftUI.
@@ -204,6 +196,17 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
       }
     }
     .background(JovieColor.backgroundBase)
+    // Talk FAB is a fixed shell-level overlay (JOV-3670) — not part of the
+    // elevated content transform, so it stays anchored at a constant offset
+    // regardless of drawer state. Hidden while the drawer is elevated so it
+    // doesn't float interactively on top of the recessed drawer plane.
+    .overlay(alignment: .bottomTrailing) {
+      if chatEnabled, !(isShowingDrawer || drawerDragOffset != 0) {
+        talkFAB
+          .padding(.trailing, JovieSpacing.large)
+          .padding(.bottom, JovieSpacing.large)
+      }
+    }
     .task(id: opensSettingsOnLaunch) {
       guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
       didOpenLaunchSettings = true
@@ -230,9 +233,11 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     }
   }
 
-  // The elevated content plane: toolbar, paged content, and composer/bottom bar
-  // all ride together as one transformable container so the drawer transform
-  // reads as a single spatial move, not independently animated pieces.
+  // The elevated content plane: toolbar and paged content ride together as one
+  // transformable container so the drawer transform reads as a single spatial
+  // move, not independently animated pieces. The drawer is the sole surface
+  // switcher (JOV-3670) — there is no shell-level bottom bar; each screen's
+  // own composer/content extends into the reclaimed space.
   private var shellContent: some View {
     let isElevated = isShowingDrawer || drawerDragOffset != 0
 
@@ -248,9 +253,6 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
       }
       .safeAreaInset(edge: .top, spacing: 0) {
         shellToolbar
-      }
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        bottomBar
       }
       .simultaneousGesture(pageSwipe)
       .navigationBarHidden(true)
@@ -411,10 +413,11 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     )
   }
 
-  // Horizontally paged primary screens. The floating bottom bar drives the same
-  // `selectedTab` selection so taps and the horizontal swipe gesture stay in sync,
-  // and each screen keeps its own vertical scrolling (the swipe is recognized
-  // simultaneously and only acts on a clearly-horizontal end gesture).
+  // Horizontally paged primary screens. The left drawer (sole surface switcher,
+  // JOV-3670) drives the same `selectedTab` selection so drawer taps and the
+  // horizontal swipe gesture stay in sync, and each screen keeps its own
+  // vertical scrolling (the swipe is recognized simultaneously and only acts
+  // on a clearly-horizontal end gesture).
   @ViewBuilder
   private var pagedContent: some View {
     switch selectedTab {
@@ -558,27 +561,10 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     .background(JovieColor.backgroundBase.opacity(0.96))
   }
 
-  // Floating, icon-only bottom bar: nav capsule centered, Talk FAB trailing.
-  private var bottomBar: some View {
-    HStack(spacing: 4) {
-      navIcon(.profile)
-      if chatEnabled {
-        navIcon(.chat)
-      }
-    }
-    .padding(6)
-    .modifier(BottomBarSurface())
-    .frame(maxWidth: .infinity)
-    .overlay(alignment: .trailing) {
-      if chatEnabled {
-        talkFAB
-          .padding(.trailing, JovieSpacing.large)
-      }
-    }
-    .padding(.bottom, JovieSpacing.medium)
-  }
-
   // Global Talk FAB — voice entry point (wired to voice feature in JOV-10378/2928).
+  // Anchored as a fixed shell-level overlay (see AppShellView.body) rather
+  // than living inside a bottom nav bar — the drawer is now the sole surface
+  // switcher (JOV-3670), so there is no shell nav chrome for the FAB to ride.
   private var talkFAB: some View {
     Button(action: onTalk) {
       Image(systemName: "mic.fill")
@@ -590,51 +576,5 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     .buttonStyle(.plain)
     .accessibilityLabel("Talk to Jovie")
     .accessibilityIdentifier("shell-talk-fab")
-  }
-
-  private func navIcon(_ tab: AppShellTab) -> some View {
-    let isSelected = selectedTab == tab
-
-    return Button {
-      withAnimation(.easeInOut(duration: 0.25)) {
-        selectedTab = tab
-      }
-    } label: {
-      Image(systemName: tab.systemImage)
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textTertiary)
-        .frame(width: 48, height: 40)
-        .background(
-          isSelected ? JovieColor.surface1 : Color.clear,
-          in: RoundedRectangle(cornerRadius: 13, style: .continuous)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(tab.title)
-    .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    .accessibilityIdentifier(tab.accessibilityID)
-  }
-}
-
-private struct BottomBarSurface: ViewModifier {
-  func body(content: Content) -> some View {
-    content.background {
-      if #available(iOS 26.0, *) {
-        Capsule(style: .continuous)
-          .fill(JovieColor.surface1.opacity(0.4))
-          .glassEffect(
-            .regular.tint(JovieColor.surface1.opacity(0.4)),
-            in: .rect(cornerRadius: 28)
-          )
-      } else {
-        Capsule(style: .continuous)
-          .fill(.ultraThinMaterial)
-          .overlay {
-            Capsule(style: .continuous)
-              .stroke(JovieColor.borderDefault, lineWidth: 1)
-          }
-      }
-    }
   }
 }

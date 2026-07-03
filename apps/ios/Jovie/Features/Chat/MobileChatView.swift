@@ -85,7 +85,9 @@ struct MobileChatView: View {
       .onChange(of: isComposerFocused) {
         scrollToBottomIfPinned(using: proxy, animated: true)
       }
-      .overlay(alignment: .bottomTrailing) {
+      // Bottom-center, above the composer: the shell-level Talk FAB now owns
+      // bottom-trailing (JOV-3670), so this button relocates to avoid overlap.
+      .overlay(alignment: .bottom) {
         if !isAtBottom {
           Button {
             isAtBottom = true
@@ -96,7 +98,6 @@ struct MobileChatView: View {
             Image(systemName: "arrow.down")
           }
           .buttonStyle(JovieIconButtonStyle())
-          .padding(.trailing, JovieSpacing.large)
           .padding(.bottom, JovieSpacing.medium)
           .transition(.opacity.combined(with: .scale(scale: 0.85)))
           .animation(.spring(duration: 0.2), value: isAtBottom)
