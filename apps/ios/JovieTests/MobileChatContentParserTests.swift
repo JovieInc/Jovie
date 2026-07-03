@@ -140,6 +140,85 @@ struct MobileChatContentParserTests {
     #expect(model.toolName == "createMerch")
     #expect(MobileChatContentParser.displayText(from: content, isStreaming: true) == "Working on it")
   }
+
+  @Test func hydratesMerchProductOptionsFromToolResultJson() {
+    let content = """
+    Pick your favorite.
+    <tool_call><name>createMerch</name><parameters><artistName>Tim White</artistName></parameters></tool_call>
+    <tool_result><name>createMerch</name><state>success</state><json>{"success":true,"generationId":"00000000-0000-4000-8000-000000000100","nextStep":"Pick one.","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Premium Tee","colorway":"black","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}}]}</json></tool_result>
+    """
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments.count == 3)
+    #expect(segments[0] == .text(runs: [.text("Pick your favorite.")]))
+
+    guard case let .toolCall(model) = segments[1] else {
+      Issue.record("Expected tool call segment")
+      return
+    }
+    #expect(model.toolName == "createMerch")
+    #expect(model.state == .succeeded)
+
+    guard case let .merchArtifact(.productOptions(payload)) = segments[2] else {
+      Issue.record("Expected merch options artifact")
+      return
+    }
+    #expect(payload.generationId == "00000000-0000-4000-8000-000000000100")
+    #expect(payload.options.count == 1)
+    #expect(payload.options[0].designName == "Neon Pulse Tee")
+    #expect(payload.options[0].salePrice == "$45.00")
+    #expect(MobileChatContentParser.displayText(from: content, isStreaming: false) == "Pick your favorite.")
+  }
+
+  @Test func suppressesDuplicateMarkdownEnumerationWhenMerchCardsHydrate() {
+    let content = """
+    **1. Neon Pulse Tee** — bold neon typography.
+    **2. Signal Hoodie** — heavyweight fleece.
+    <tool_call><name>createMerch</name><parameters></parameters></tool_call>
+    <tool_result><name>createMerch</name><state>success</state><json>{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":[]}]}</json></tool_result>
+    """
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+    let proseSegments = segments.compactMap { segment -> String? in
+      guard case let .text(runs) = segment else { return nil }
+      return runs.compactMap { run -> String? in
+        guard case let .text(text) = run else { return nil }
+        return text
+      }.joined()
+    }
+
+    #expect(proseSegments.isEmpty)
+    #expect(segments.contains { if case .merchArtifact = $0 { return true } else { return false } })
+  }
+
+  @Test func hydratesMerchDesignCarouselFromToolResultJson() {
+    let content = """
+    <tool_call><name>previewMerchOptions</name><parameters></parameters></tool_call>
+    <tool_result><name>previewMerchOptions</name><state>success</state><json>{"success":true,"generationId":"gen-2","designs":[{"id":"d-1","option_number":1,"design_name":"Mono Mark","concept":"Minimal line art.","status":"ready","preview_url":"https://cdn.test/mono.png","slots":{"artist_name":"Tim White"}}]}</json></tool_result>
+    """
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    guard case let .merchArtifact(.designCarousel(payload)) = segments.last else {
+      Issue.record("Expected design carousel artifact")
+      return
+    }
+    #expect(payload.designs.count == 1)
+    #expect(payload.designs[0].designName == "Mono Mark")
+    #expect(payload.designs[0].isReady)
+  }
+
+  @Test func sanitizeMerchEnumerationProseDetectsNumberedMarkdown() {
+    #expect(
+      MobileChatContentParser.sanitizeMerchEnumerationProse("**1. Neon Pulse Tee**")
+        .isEmpty
+    )
+    #expect(
+      MobileChatContentParser.sanitizeMerchEnumerationProse("Here is a short intro.")
+        == "Here is a short intro."
+    )
+  }
 }
 
 // MARK: - Entity + skill token parsing (JOV-3608)

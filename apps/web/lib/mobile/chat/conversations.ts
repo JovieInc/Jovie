@@ -4,6 +4,7 @@ import {
   getCreatorConversationDetail,
   listCreatorConversations,
 } from '@/lib/chat/conversation-queries';
+import { embedMobileMerchArtifactsInContent } from '@/lib/mobile/chat/tool-artifacts';
 
 export interface MobileConversationSummary {
   readonly id: string;
@@ -59,7 +60,10 @@ export async function getMobileConversationDetail(input: {
     messages: detail.messages.map(message => ({
       id: message.id,
       role: message.role,
-      content: message.content,
+      content: embedMobileMerchArtifactsInContent(
+        message.content,
+        message.toolCalls
+      ),
       clientMessageId: message.clientMessageId,
       turnId: message.turnId,
       turnStatus: message.turnStatus,
