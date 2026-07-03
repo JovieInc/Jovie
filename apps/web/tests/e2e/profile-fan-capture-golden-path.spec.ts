@@ -165,9 +165,12 @@ async function enterOtpCode(page: Page, code: string) {
     .first();
   const firstDigitInput = flow.getByLabel('Digit 1 of 6');
 
+  // The email→OTP transition includes an OTP send (Resend) + write on a
+  // cold ephemeral Neon branch; the first mobile run in CI regularly needs
+  // longer than the standard visibility budget (3×20s timeouts observed).
   await otpStep.waitFor({
     state: 'visible',
-    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    timeout: SMOKE_TIMEOUTS.VISIBILITY * 3,
   });
   await firstDigitInput.click();
   await firstDigitInput.pressSequentially(code);
