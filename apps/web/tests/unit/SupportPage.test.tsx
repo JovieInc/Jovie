@@ -96,11 +96,7 @@ describe('SupportPage', () => {
       screen.getByRole('heading', { level: 2, name: 'How can we help?' })
     ).toBeInTheDocument();
 
-    for (const title of [
-      'Documentation',
-      'Email Support',
-      'Getting Started',
-    ]) {
+    for (const title of ['Documentation', 'Email Support', 'Getting Started']) {
       expect(
         screen.getByRole('heading', { level: 3, name: title })
       ).toBeInTheDocument();

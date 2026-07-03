@@ -1,8 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ArrowRight, BookOpen, Mail, Rocket } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { ArrowRight, BookOpen, Mail, Rocket } from 'lucide-react';
 import { useEffect } from 'react';
 import { MarketingContainer } from '@/components/marketing';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
@@ -67,10 +67,7 @@ export function SupportChannels() {
                 key={channel.title}
                 className='rounded-2xl border border-subtle bg-surface-1 p-6'
               >
-                <Icon
-                  className='h-5 w-5 text-accent'
-                  aria-hidden='true'
-                />
+                <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
                 <h3 className='mt-4 font-medium text-primary-token'>
                   {channel.title}
                 </h3>
