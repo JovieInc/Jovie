@@ -12,7 +12,12 @@ export async function collectPageFiles(directory) {
   try {
     entries = await readdir(directory, { withFileTypes: true });
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
       return [];
     }
     throw error;
@@ -62,7 +67,12 @@ export async function getNextServerAppMtimeMs(nextServerAppDir) {
     const dirStat = await stat(nextServerAppDir);
     return dirStat.mtimeMs;
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
       return null;
     }
     throw error;
