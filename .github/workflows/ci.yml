@@ -3133,6 +3133,11 @@ jobs:
     # E2E_USE_TEST_AUTH_BYPASS — those make golden-path.spec.ts self-skip.
     # Path-triggered (not always-on): the spec has a 600s timeout, so always-on would
     # blow the CI budget and churn the Clerk dev-instance 100-user cap.
+    # Non-blocking on ordinary `PR Ready` by design (informational/preview-evidence
+    # lane, same bucket as Lighthouse/E2E Smoke — see .github/MERGE_QUEUE.md); it only
+    # hard-gates the manual launch-candidate checklist in docs/launch/LAUNCH_GATES.md.
+    # If this job is red, fix the spec/build wiring rather than adding it to
+    # ci-pr-ready.needs (GH #12697 / JOV-3800).
     needs: [ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || contains(github.event.pull_request.labels.*.name, 'testing')) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ubuntu-latest
