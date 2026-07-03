@@ -89,6 +89,7 @@ Skip issues labeled `human-review-required` or containing "This issue requires h
 | [`.claude/rules/ios.md`](.claude/rules/ios.md) | SwiftUI guardrails, cache-first loads |
 | [`.claude/rules/code-style.md`](.claude/rules/code-style.md) | TypeScript, React, prior-art gate |
 | [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership |
+| [`.claude/rules/agent-coordination.md`](.claude/rules/agent-coordination.md) | Pre-work gbrain/ownership check |
 | [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Skill routing, vendored toolkit |
 | [`.claude/rules/swarm.md`](.claude/rules/swarm.md) | Parallel swarms, worktrees |
 | [`.claude/rules/hermes-air.md`](.claude/rules/hermes-air.md) | Hermes node, voice/Telegram intake |
@@ -112,4 +113,4 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 
 Indexes (`docs/API_ROUTE_MAP.md`, `docs/CRON_REGISTRY.md`, `docs/WEBHOOK_MAP.md`, …) are system-of-record — navigate via this map.
 
-<!-- doc-freshness:scoped-rules-count:16 -->
+<!-- doc-freshness:scoped-rules-count:17 -->
