@@ -38,15 +38,17 @@ export function assertPinnedSpikeAssets(fixture: SpikeTestAssetJson): void {
   if (fixture.assets.length < 2) {
     throw new Error('Spike fixture must define MCP + press-kit assets');
   }
-  const mcp = fixture.assets.find((a) => a.kind === 'mcp-artist');
+  const mcp = fixture.assets.find(a => a.kind === 'mcp-artist');
   if (!mcp?.mcpSmokeRequest) {
-    throw new Error('MCP asset must include mcpSmokeRequest for agent client smoke');
+    throw new Error(
+      'MCP asset must include mcpSmokeRequest for agent client smoke'
+    );
   }
   if (fixture.primaryAsset !== 'mcp-artist') {
     throw new Error('Primary spike asset must be mcp-artist per issue scope');
   }
   for (const libAsset of X402_SPIKE_TEST_ASSETS) {
-    const match = fixture.assets.find((a) => a.kind === libAsset.kind);
+    const match = fixture.assets.find(a => a.kind === libAsset.kind);
     if (!match) {
       throw new Error(`Fixture missing lib asset kind: ${libAsset.kind}`);
     }
