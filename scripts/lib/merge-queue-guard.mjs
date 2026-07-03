@@ -772,12 +772,13 @@ function secondsBetween(start, end) {
   return Math.max(0, Math.round((new Date(end) - new Date(start)) / 1000));
 }
 
-export function parseMergeQueueTimeline(events) {
+export function parseMergeQueueTimeline(events, options = {}) {
   const queuedAt = [];
   const dequeued = [];
   const telemetry = [];
   const conflictComments = [];
   const ciComments = [];
+  const readyForReviewAt = [];
   let mergedAt = null;
 
   for (const event of events ?? []) {
@@ -792,6 +793,9 @@ export function parseMergeQueueTimeline(events) {
         at: event.created_at,
         actor: event.actor?.login ?? null,
       });
+    }
+    if (event.event === 'ready_for_review') {
+      readyForReviewAt.push(event.created_at);
     }
     if (event.event === 'merged') {
       mergedAt = event.created_at;
@@ -826,11 +830,20 @@ export function parseMergeQueueTimeline(events) {
       entry.speculativeRerun === true || entry.event === 'speculative_rerun'
   ).length;
 
+  // Ready-for-review is the "author says this is done" signal. Most PRs are
+  // never drafted (opened ready), so fall back to the PR's createdAt when no
+  // ready_for_review event exists — matches how fullMergeTimesSeconds treats
+  // non-drafted PRs in ci-metrics-compute.mjs.
+  const lastReadyForReviewAt =
+    readyForReviewAt.at(-1) ?? options.prCreatedAt ?? null;
+
   return {
     queuedAt,
     mergedAt,
+    readyForReviewAt,
     queuedToMergedSeconds: secondsBetween(firstQueuedAt, mergedAt),
     lastQueuedToMergedSeconds: secondsBetween(lastQueuedAt, mergedAt),
+    readyToMergedSeconds: secondsBetween(lastReadyForReviewAt, mergedAt),
     requeueCount: Math.max(0, queuedAt.length - 1),
     conflictEvictions: conflictComments.length,
     ciEvictions: ciComments.length,
