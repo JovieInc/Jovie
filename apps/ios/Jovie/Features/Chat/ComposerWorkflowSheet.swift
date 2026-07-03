@@ -138,11 +138,13 @@ private struct ComposerWorkflowTile: View {
 
 struct ChatComposerBar: View {
   @Binding var draft: String
+  @FocusState.Binding var isFocused: Bool
   let placeholder: String
   let isSending: Bool
   let isPlusEnabled: Bool
   let onSend: () -> Void
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
+  let onDraftEdited: () -> Void
 
   @State private var isShowingWorkflowSheet = false
 
@@ -168,11 +170,15 @@ struct ChatComposerBar: View {
       .accessibilityElement(children: .ignore)
 
       TextField(placeholder, text: $draft)
+        .focused($isFocused)
         .textInputAutocapitalization(.sentences)
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
         .foregroundStyle(JovieColor.textPrimary)
         .frame(height: 52)
+        .onChange(of: draft) {
+          onDraftEdited()
+        }
 
       Button(action: onSend) {
         Image(systemName: isSending ? "ellipsis" : "arrow.up")
