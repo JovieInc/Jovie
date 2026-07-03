@@ -15,8 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Codex issue shipper stale-checkout fail-closed gate (GH-12841)**: primary `~/Jovie` checkout must be clean `main` at `origin/main` before dispatch; unsafe drift logs `stale_checkout_abort` + Telegram/Slack and refuses to ship; safe detritus auto-heals for the next launchd tick; adds `shipper-gated-entrypoint.py` (gbrain/grok preflight) and blocks `git checkout` in the primary repo from agent bash hooks.
-- [internal] **Dev server stale `.next` cache guard (GH-12899)**: `node scripts/dev.mjs` now wipes `.next` when app route sources are newer than the compiled manifest, logs the on-disk route count at first compile, and Turbo `dev` restarts when `page.tsx` / `route.ts` / `layout.tsx` inputs change.
+- [internal] **Desktop signed-out recovery (GH-12822)**: Prime the main window with the sign-in handoff when auth redirects are intercepted, recover immediately from `about:blank`, and register per-env deep-link schemes (`jovie-staging://`, `jovie-local://`) so staging/local Mac apps receive auth callbacks without stealing production `jovie://` handlers.
+
 - [internal] **Dev server resource hygiene (GH-12902)**: `pnpm dev` now starts web-only fast dev instead of all workspace Next.js servers; use `pnpm run dev:all` for the full turbo dev matrix. Added `pnpm run dev:cleanup` / `dev:cleanup:force` to report or terminate stale `next dev` / `turbo dev` processes (default threshold: 4h).
 - [internal] **Desktop build clarity (GH-12900)**: Documented the canonical production/staging/local Electron shells (`apps/desktop/BUILDS.md`), restricted `jovie://` URL registration to production only, disabled auto-update on local shells, gated CDP behind `JOVIE_DEV=1`, and added `pnpm run desktop:audit` for `/Applications` hygiene.
 - **iOS chat entity chip thumbnails (GH-12708)**: Inline transcript entity mentions now render as pill chips with a fixed 16×16 thumbnail slot using the shared `AvatarImageCache` loader (no raw `AsyncImage`); unresolved entities keep the accent-dot fallback.

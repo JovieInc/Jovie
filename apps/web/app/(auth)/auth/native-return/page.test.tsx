@@ -50,6 +50,20 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     );
   });
 
+  it('uses the staging deep-link scheme on staging.jov.ie', () => {
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: { hostname: 'staging.jov.ie', href: 'https://staging.jov.ie/' },
+    });
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+      'href',
+      `jovie-staging://auth/complete?code=${CODE}&state=${STATE}`
+    );
+  });
+
   it('preserves the deep link without desktop_flow when absent', () => {
     setSearchParams(`code=${CODE}&state=${STATE}`);
     render(<NativeReturnPage />);

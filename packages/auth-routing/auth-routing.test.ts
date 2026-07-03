@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAuthStartUrl,
   buildElectronAuthCompleteUrl,
+  resolveElectronAuthScheme,
   buildIosAuthCompleteUrl,
   buildNativeExchangeCodeRecord,
   classifyNavigation,
@@ -264,6 +265,16 @@ describe('auth routing boundary', () => {
     ).toBe(
       'jovie://auth/complete?code=c&state=s&desktop_flow=desktop_flow_nonce_12345'
     );
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        scheme: 'jovie-staging',
+      })
+    ).toBe('jovie-staging://auth/complete?code=c&state=s');
+    expect(resolveElectronAuthScheme('staging.jov.ie')).toBe('jovie-staging');
+    expect(resolveElectronAuthScheme('localhost')).toBe('jovie-local');
+    expect(resolveElectronAuthScheme('jov.ie')).toBe('jovie');
   });
 
   it('creates analytics payloads without leaking return URLs or token values', () => {

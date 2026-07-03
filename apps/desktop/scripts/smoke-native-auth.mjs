@@ -2,6 +2,17 @@ import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3112';
+
+function resolveElectronAuthScheme(hostname) {
+  if (hostname === 'staging.jov.ie') return 'jovie-staging';
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return 'jovie-local';
+  return 'jovie';
+}
+
+function getElectronAuthCompletePrefix(baseUrl = BASE_URL) {
+  const scheme = resolveElectronAuthScheme(new URL(baseUrl).hostname);
+  return `${scheme}://auth/complete?`;
+}
 const ELECTRON_CDP_URL =
   process.env.ELECTRON_CDP_URL ?? 'http://localhost:9223';
 const MACOS_PROTOCOL_OPEN_BUNDLE_ID =
@@ -663,7 +674,7 @@ async function requestRedirect(page, targetUrl, label) {
 
 async function requestNativeCallbackRedirect(page, callbackPath, label) {
   const redirectUrl = await requestRedirect(page, callbackPath, label);
-  if (redirectUrl.startsWith('jovie://auth/complete?')) {
+  if (redirectUrl.startsWith(getElectronAuthCompletePrefix())) {
     return redirectUrl;
   }
 
@@ -686,6 +697,7 @@ async function requestNativeCallbackRedirect(page, callbackPath, label) {
 }
 
 function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
+  const authCompletePrefix = getElectronAuthCompletePrefix();
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       page.off('request', onRequest);
@@ -694,7 +706,7 @@ function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
 
     function onRequest(request) {
       const requestUrl = request.url();
-      if (!requestUrl.startsWith('jovie://auth/complete?')) return;
+      if (!requestUrl.startsWith(authCompletePrefix)) return;
       clearTimeout(timeoutId);
       page.off('request', onRequest);
       resolve(requestUrl);
@@ -705,6 +717,7 @@ function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
 }
 
 function waitForNativeRedirectResponse(page, label, timeout = 60_000) {
+  const authCompletePrefix = getElectronAuthCompletePrefix();
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       page.off('response', onResponse);
@@ -713,7 +726,7 @@ function waitForNativeRedirectResponse(page, label, timeout = 60_000) {
 
     function onResponse(response) {
       const location = response.headers().location;
-      if (!location?.startsWith('jovie://auth/complete?')) return;
+      if (!location?.startsWith(authCompletePrefix)) return;
       clearTimeout(timeoutId);
       page.off('response', onResponse);
       resolve(location);
@@ -780,8 +793,9 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
 async function requestNativeCallback(page, authUrl, email) {
   const authCallbackUrl = await requestRedirect(page, authUrl, 'auth start');
   const parsedAuthCallback = new URL(authCallbackUrl);
-  if (parsedAuthCallback.protocol === 'jovie:') {
-    if (!authCallbackUrl.startsWith('jovie://auth/complete?')) {
+  const expectedScheme = resolveElectronAuthScheme(new URL(BASE_URL).hostname);
+  if (parsedAuthCallback.protocol === `${expectedScheme}:`) {
+    if (!authCallbackUrl.startsWith(getElectronAuthCompletePrefix())) {
       throw new Error(
         `Auth start did not return the Electron app callback: ${authCallbackUrl}`
       );

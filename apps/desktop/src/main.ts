@@ -90,9 +90,9 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
+const LEGACY_AUTH_RETURN_PROTOCOL = 'jovie:';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
@@ -408,11 +408,25 @@ function buildDesktopAuthHandoffUrl(authUrl: string): string {
   return url.toString();
 }
 
+function getDesktopAuthReturnScheme(): string {
+  if (APP_ENV === 'staging') return 'jovie-staging';
+  if (APP_ENV === 'local') return 'jovie-local';
+  return 'jovie';
+}
+
+function getDesktopAuthReturnProtocol(): string {
+  return `${getDesktopAuthReturnScheme()}:`;
+}
+
+function getDesktopAuthCompletePrefix(): string {
+  return `${getDesktopAuthReturnScheme()}://auth/complete`;
+}
+
 function parseDesktopAuthReturnDeepLink(urlString: string) {
   return parseAuthReturnDeepLink(
     urlString,
     parseUrl,
-    AUTH_RETURN_PROTOCOL,
+    getDesktopAuthReturnProtocol(),
     AUTH_RETURN_HOST,
     AUTH_RETURN_COMPLETE_PATH
   );
@@ -430,7 +444,7 @@ function parseLegacyAuthReturnRouteDeepLink(urlString: string): string | null {
   const parsed = parseUrl(urlString);
   if (
     !parsed ||
-    parsed.protocol !== AUTH_RETURN_PROTOCOL ||
+    parsed.protocol !== LEGACY_AUTH_RETURN_PROTOCOL ||
     parsed.hostname !== LEGACY_AUTH_RETURN_HOST
   ) {
     return null;
@@ -716,11 +730,29 @@ function showDesktopAuthHandoff(authUrl: string): void {
   showWindow(authHandoffWindow);
 }
 
+function primeMainWindowAuthHandoff(authUrl: string): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  void mainWindow.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+}
+
+function recoverMainWindowFromBlank(): void {
+  if (!mainWindow || mainWindow.isDestroyed() || isAuthHandoffOpen()) return;
+  if (mainWindow.webContents.getURL() !== 'about:blank') return;
+
+  const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+  void mainWindow.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+  showWindowNow(mainWindow);
+}
+
 function maybeShowDesktopAuthHandoff(urlString: string): boolean {
   const authUrl = buildDesktopBrowserAuthUrl(urlString);
   if (!authUrl) return false;
 
   showDesktopAuthHandoff(authUrl);
+  // Passive redirects (e.g. signed-out /app/chat → /signin) cancel in-window
+  // navigation and strand the main view on about:blank. Prime the main window
+  // with the handoff surface so a failed separate handoff window still recovers.
+  primeMainWindowAuthHandoff(authUrl);
   return true;
 }
 
@@ -929,6 +961,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   let rendererCrashReloadCount = 0;
   win.webContents.on('did-finish-load', () => {
     rendererCrashReloadCount = 0;
+    if (win === mainWindow) {
+      recoverMainWindowFromBlank();
+    }
   });
   win.webContents.on('render-process-gone', (_event, details) => {
     const action = decideRendererRecovery({
@@ -1390,13 +1425,7 @@ ipcMain.handle(
 );
 
 function registerAuthReturnProtocol(): void {
-  // Only the canonical production bundle (app.jov.ie) may own jovie:// deep
-  // links. Staging/local shells use separate bundle IDs and must not compete
-  // with the installed production handler — see apps/desktop/BUILDS.md.
-  if (APP_ENV !== 'production') {
-    return;
-  }
-
+  const scheme = getDesktopAuthReturnScheme();
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
   };
@@ -1406,13 +1435,13 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+    app.setAsDefaultProtocolClient(scheme, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(scheme);
 }
 
 if (gotSingleInstanceLock) {
@@ -1423,10 +1452,10 @@ if (gotSingleInstanceLock) {
       return;
     }
 
+    const authCompletePrefix = getDesktopAuthCompletePrefix();
     const invalidAuthReturn = argv.some(
       arg =>
-        arg.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}`) &&
-        !parseDesktopAuthReturnDeepLink(arg)
+        arg.startsWith(`${authCompletePrefix}?`) && !parseDesktopAuthReturnDeepLink(arg)
     );
     if (invalidAuthReturn) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
@@ -1452,7 +1481,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (url.startsWith('jovie://auth/complete')) {
+    if (url.startsWith(`${getDesktopAuthCompletePrefix()}?`)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }

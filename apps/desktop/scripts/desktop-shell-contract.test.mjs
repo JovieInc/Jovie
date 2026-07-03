@@ -178,10 +178,17 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
   assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
-  assert.match(mainSource, /if \(APP_ENV !== 'production'\)/);
-  assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
-  assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
-  assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLTypes:/);
+  assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
+  assert.match(mainSource, /function getDesktopAuthReturnScheme\(\)/);
+  assert.match(mainSource, /app\.setAsDefaultProtocolClient\(scheme\)/);
+  assert.match(mainSource, /function primeMainWindowAuthHandoff/);
+  assert.match(mainSource, /function recoverMainWindowFromBlank/);
+  assert.match(mainSource, /primeMainWindowAuthHandoff\(authUrl\)/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {

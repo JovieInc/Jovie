@@ -79,9 +79,37 @@ export interface AuthAnalyticsEventPayload {
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
-const ELECTRON_AUTH_COMPLETE_URL = 'jovie://auth/complete';
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
+
+/** Per-env Electron deep-link schemes so staging/local apps don't steal prod callbacks. */
+export const ELECTRON_AUTH_SCHEMES = [
+  'jovie',
+  'jovie-staging',
+  'jovie-local',
+] as const;
+export type ElectronAuthScheme = (typeof ELECTRON_AUTH_SCHEMES)[number];
+
+const ELECTRON_AUTH_SCHEME_BY_HOST: Record<string, ElectronAuthScheme> = {
+  'jov.ie': 'jovie',
+  'staging.jov.ie': 'jovie-staging',
+  localhost: 'jovie-local',
+  '127.0.0.1': 'jovie-local',
+};
+
+export function isElectronAuthScheme(value: string): value is ElectronAuthScheme {
+  return (ELECTRON_AUTH_SCHEMES as readonly string[]).includes(value);
+}
+
+export function resolveElectronAuthScheme(hostname: string): ElectronAuthScheme {
+  return ELECTRON_AUTH_SCHEME_BY_HOST[hostname] ?? 'jovie';
+}
+
+export function buildElectronAuthCompleteBaseUrl(
+  scheme: ElectronAuthScheme = 'jovie'
+): string {
+  return `${scheme}://auth/complete`;
+}
 
 const RETURN_BLOCKED_PREFIXES = [
   '/api',
@@ -352,8 +380,13 @@ export function buildElectronAuthCompleteUrl(input: {
   readonly code: string;
   readonly state: string;
   readonly desktopFlow?: string | null;
+  readonly scheme?: ElectronAuthScheme;
 }): string {
-  return buildUrlWithCodeAndState(ELECTRON_AUTH_COMPLETE_URL, input);
+  const scheme = input.scheme ?? 'jovie';
+  if (!isElectronAuthScheme(scheme)) {
+    throw new Error('Invalid electron auth scheme');
+  }
+  return buildUrlWithCodeAndState(buildElectronAuthCompleteBaseUrl(scheme), input);
 }
 
 export function resolveAuthCallback(input: {
