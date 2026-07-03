@@ -24,7 +24,7 @@ describe('voice-stack bake-off test script (gh-12768)', () => {
 
   it('defines exactly five turns with tool call on turn 3', () => {
     expect(BAKE_OFF_FIVE_TURN_FLOW).toHaveLength(5);
-    const toolTurn = BAKE_OFF_FIVE_TURN_FLOW.find((t) => t.expectsToolCall);
+    const toolTurn = BAKE_OFF_FIVE_TURN_FLOW.find(t => t.expectsToolCall);
     expect(toolTurn?.turn).toBe(3);
     expect(toolTurn?.expectedToolName).toBe('lookup_upcoming_release');
   });

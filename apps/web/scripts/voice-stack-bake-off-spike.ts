@@ -8,12 +8,13 @@
  *   doppler run --project jovie-web --config dev -- \
  *     pnpm --filter @jovie/web exec tsx scripts/voice-stack-bake-off-spike.ts --probe-xai
  */
+
+import { compareStacks } from '@/lib/voice-stack-bake-off/cost-model';
 import {
   BAKE_OFF_FIVE_TURN_FLOW,
   BAKE_OFF_LOOKUP_RELEASE_TOOL,
   JOVIE_VOICE_PERSONA_PROMPT,
 } from '@/lib/voice-stack-bake-off/test-script';
-import { compareStacks } from '@/lib/voice-stack-bake-off/cost-model';
 
 const probeXai = process.argv.includes('--probe-xai');
 
@@ -116,7 +117,7 @@ async function main(): Promise<void> {
   printSection(
     '5-turn flow',
     BAKE_OFF_FIVE_TURN_FLOW.map(
-      (t) =>
+      t =>
         `Turn ${t.turn} [${t.role}]: ${t.utterance}` +
         (t.expectsToolCall ? ` (expect tool: ${t.expectedToolName})` : '')
     ).join('\n')
@@ -145,7 +146,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(err);
   process.exit(1);
 });
