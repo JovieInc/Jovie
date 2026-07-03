@@ -53,7 +53,7 @@ function TeaserOverlay({
 }) {
   return (
     <div
-      className='absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] px-4 text-center backdrop-blur-[2px]'
+      className='absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-surface-1/90 px-4 text-center backdrop-blur'
       data-testid='ai-crawler-card-teaser'
     >
       <div className='flex h-9 w-9 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
@@ -130,9 +130,7 @@ export function AiCrawlerIntelligenceCard({
         model={model}
         treatment='detailed'
         surface='app'
-        className={cn(
-          showTeaser && 'pointer-events-none select-none blur-[3px]'
-        )}
+        className={cn(showTeaser && 'pointer-events-none select-none blur-sm')}
         onClick={
           !showTeaser
             ? () => {

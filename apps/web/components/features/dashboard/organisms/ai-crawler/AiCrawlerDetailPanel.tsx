@@ -106,7 +106,7 @@ function CrawlerRows({
               <span
                 className={cn(
                   'text-app text-secondary-token',
-                  blurred && 'blur-[4px]'
+                  blurred && 'blur-sm'
                 )}
               >
                 {crawler.name}
@@ -161,10 +161,10 @@ export function AiCrawlerDetailPanel({
             </div>
             <div className='space-y-3 pr-8'>
               <div className='space-y-1'>
-                <p className='text-mid font-semibold tracking-[-0.016em] text-primary-token'>
+                <p className='text-mid font-semibold tracking-tight text-primary-token'>
                   AI Crawler Activity
                 </p>
-                <p className='text-xs leading-[16px] text-secondary-token'>
+                <p className='text-xs leading-4 text-secondary-token'>
                   Which AI services read your profile and asset pages.
                 </p>
               </div>
