@@ -12,7 +12,6 @@ import {
   decideCheckoutGate,
   describeCheckout,
   dirtyTouchesShipper,
-  parseDirtyPaths,
   EPIC_LABEL,
   eligibleCodexIssues,
   finishDispatch,

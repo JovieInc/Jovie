@@ -795,9 +795,7 @@ function touchesShipperCriticalPath(path: string): boolean {
   );
 }
 
-export function dirtyTouchesShipper(
-  paths: ReadonlyArray<string>
-): boolean {
+export function dirtyTouchesShipper(paths: ReadonlyArray<string>): boolean {
   return paths.some(path => touchesShipperCriticalPath(path));
 }
 
