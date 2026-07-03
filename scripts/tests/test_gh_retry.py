@@ -20,6 +20,7 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GH_RETRY = _REPO_ROOT / "scripts" / "lib" / "gh-retry.sh"
 _DRAIN_SCRIPT = _REPO_ROOT / "scripts" / "drain-pr-queue.sh"
+_WATCHDOG_SCRIPT = _REPO_ROOT / "scripts" / "merge-queue-watchdog.sh"
 
 
 def _run_bash(script: str, *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -465,3 +466,279 @@ JSON
         assert "#999" in result.stdout
         assert "[dry-run] would -merge-queue on #999" not in result.stdout
         assert "[dry-run] would +needs-conflict-resolution on #999" not in result.stdout
+
+
+class TestMergeQueueWatchdog:
+    """
+    Regression tests for scripts/merge-queue-watchdog.sh.
+
+    The watchdog rescues PRs stalled *inside* the merge queue (already
+    labeled `merge-queue`, but Graphite has stopped progressing on them).
+    It is distinct from drain-pr-queue.sh, which only handles enrollment.
+    """
+
+    @staticmethod
+    def _fake_gh(
+        tmp_path: Path,
+        *,
+        pr_list_json: str,
+        timeline_by_pr: dict[int, str] | None = None,
+        comments_by_pr: dict[int, str] | None = None,
+        checks_by_pr: dict[int, tuple[str, int]] | None = None,
+    ) -> Path:
+        """Write a fake `gh` that answers pr list / api timeline / api comments /
+        pr checks / pr edit for the watchdog script's exact call shapes."""
+        timeline_by_pr = timeline_by_pr or {}
+        comments_by_pr = comments_by_pr or {}
+        checks_by_pr = checks_by_pr or {}
+
+        # `gh api ... --jq FILTER` applies FILTER server-side before returning
+        # output. Fixtures below provide the raw (unfiltered) API payload; the
+        # fake `gh` runs it through the real `jq` binary using whatever --jq
+        # expression was passed on argv, matching real `gh` behavior exactly.
+        timeline_cases = "\n".join(
+            f'''  if [[ "$path" == "repos/JovieInc/Jovie/issues/{n}/timeline" ]]; then
+    echo '{body}' | jq -r "$jq_filter"
+    exit 0
+  fi'''
+            for n, body in timeline_by_pr.items()
+        )
+        comments_cases = "\n".join(
+            f'''  if [[ "$path" == "repos/JovieInc/Jovie/issues/{n}/comments" ]]; then
+    echo '{body}' | jq -r "$jq_filter"
+    exit 0
+  fi'''
+            for n, body in comments_by_pr.items()
+        )
+        checks_cases = "\n".join(
+            f'''  if [[ "$n" == "{n}" ]]; then
+    echo '{out}'
+    exit {code}
+  fi'''
+            for n, (out, code) in checks_by_pr.items()
+        )
+
+        script = textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr list" ]]; then
+              cat <<'JSON'
+{pr_list_json}
+JSON
+              exit 0
+            fi
+            if [[ "$1" == "api" ]]; then
+              path="$2"
+              jq_filter="."
+              for ((i=3; i<=$#; i++)); do
+                if [[ "${{!i}}" == "--jq" ]]; then
+                  j=$((i+1))
+                  jq_filter="${{!j}}"
+                fi
+              done
+{textwrap.indent(timeline_cases, "  ")}
+{textwrap.indent(comments_cases, "  ")}
+              # default: empty timeline/comments
+              echo '[]' | jq -r "$jq_filter"
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr checks" ]]; then
+              n="$3"
+{textwrap.indent(checks_cases, "  ")}
+              echo '[]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr edit" ]]; then
+              echo "edit $*" >> "{tmp_path}/edits.log"
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr comment" ]]; then
+              echo "comment $*" >> "{tmp_path}/edits.log"
+              exit 0
+            fi
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        )
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(script, encoding="utf-8")
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        return fake_gh
+
+    def _run_watchdog(
+        self, tmp_path: Path, *, extra_env: str = "", dry_run: bool = True
+    ) -> subprocess.CompletedProcess[str]:
+        dry_run_flag = "DRY_RUN=1" if dry_run else "DRY_RUN=0"
+        return _run_bash(
+            f'PATH="{tmp_path}:$PATH" {dry_run_flag} REPO=JovieInc/Jovie {extra_env} '
+            f'bash "{_WATCHDOG_SCRIPT}"'
+        )
+
+    def test_stale_clean_pr_gets_label_cycled(self, tmp_path: Path) -> None:
+        stale_ts = "2020-01-01T00:00:00Z"
+        pr_list = (
+            '[{"n":100,"t":"Stale clean PR","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-100","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={100: timeline},
+            comments_by_pr={100: "[]"},
+            checks_by_pr={100: ("[]", 0)},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45")
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would -merge-queue on #100" in result.stdout
+        assert "[dry-run] would +merge-queue on #100" in result.stdout
+        assert "kicked (label-cycled): 1" in result.stdout
+
+    def test_freshly_labeled_pr_is_skipped(self, tmp_path: Path) -> None:
+        fresh_ts = subprocess.run(
+            ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        pr_list = (
+            '[{"n":101,"t":"Fresh PR","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-101","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{fresh_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={101: timeline},
+            comments_by_pr={101: "[]"},
+            checks_by_pr={101: ("[]", 0)},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45")
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would -merge-queue on #101" not in result.stdout
+        assert "[dry-run] would +merge-queue on #101" not in result.stdout
+        assert "kicked (label-cycled): 0" in result.stdout
+        assert "skipped (fresh, <45m): 1" in result.stdout
+
+    def test_recent_kick_is_skipped_via_cooldown(self, tmp_path: Path) -> None:
+        stale_ts = "2020-01-01T00:00:00Z"
+        recent_kick_ts = subprocess.run(
+            ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        pr_list = (
+            '[{"n":102,"t":"Cooldown PR","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-102","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        comments = (
+            '[{"body":"<!-- bot-comment:merge-queue-watchdog-kick -->already kicked",'
+            f'"updated_at":"{recent_kick_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={102: timeline},
+            comments_by_pr={102: comments},
+            checks_by_pr={102: ("[]", 0)},
+        )
+
+        result = self._run_watchdog(
+            tmp_path, extra_env="STALL_MINUTES=45 COOLDOWN_HOURS=2"
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "STALLED but in cooldown" in result.stdout
+        assert "kicked (label-cycled): 0" in result.stdout
+        assert "skipped (cooldown): 1" in result.stdout
+
+    def test_conflicting_pr_gets_conflict_label_without_dequeue(
+        self, tmp_path: Path
+    ) -> None:
+        stale_ts = "2020-01-01T00:00:00Z"
+        pr_list = (
+            '[{"n":103,"t":"Conflicting PR","m":"CONFLICTING","ms":"DIRTY",'
+            '"head":"tim/jov-103","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={103: timeline},
+            comments_by_pr={103: "[]"},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45")
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +needs-conflict-resolution on #103" in result.stdout
+        assert "[dry-run] would -merge-queue on #103" not in result.stdout
+        assert "conflicts flagged: 1" in result.stdout
+
+    def test_terminal_red_check_dequeues(self, tmp_path: Path) -> None:
+        stale_ts = "2020-01-01T00:00:00Z"
+        pr_list = (
+            '[{"n":104,"t":"Red CI PR","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-104","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={104: timeline},
+            comments_by_pr={104: "[]"},
+            checks_by_pr={104: ('["Typecheck"]', 1)},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45")
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would -merge-queue on #104" in result.stdout
+        assert "[dry-run] would +merge-queue on #104" not in result.stdout
+        assert "dequeued (terminal red): 1" in result.stdout
+
+    def test_pending_and_cancelled_checks_do_not_count_as_failures(
+        self, tmp_path: Path
+    ) -> None:
+        # gh pr checks --required with --jq exits 8 on pending checks even with
+        # valid JSON output (same behavior drain-pr-queue.sh guards against).
+        stale_ts = "2020-01-01T00:00:00Z"
+        pr_list = (
+            '[{"n":105,"t":"Pending checks PR","m":"MERGEABLE","ms":"UNSTABLE",'
+            '"head":"tim/jov-105","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={105: timeline},
+            comments_by_pr={105: "[]"},
+            checks_by_pr={105: ("[]", 8)},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45")
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        # Pending checks are NOT a terminal failure, so this must not dequeue —
+        # it falls through to the stuck-clean kick path instead.
+        assert "dequeued (terminal red): 0" in result.stdout
+        assert "kicked (label-cycled): 1" in result.stdout
