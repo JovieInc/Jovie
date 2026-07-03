@@ -442,45 +442,22 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
       timeout: 30_000,
     });
 
-    // A signup CTA must be visible — either the claim input or a signup link
-    const signupCta = page
-      .locator('#handle-input')
-      .or(page.locator('a[href*="/signup"]').first());
-    await expect(signupCta.first()).toBeVisible({ timeout: 20_000 });
+    // The collapsed homepage (#11988) is hero + minimal footer: no claim
+    // input, no signup links — the funnel routes through the hero command
+    // center into /start chat. Assert the hero rendered, then enter the
+    // classic signup path directly (this spec's scope is signup →
+    // onboarding → live profile, not the chat funnel).
+    await expect(page.getByTestId('homepage-hero-command-center')).toBeVisible({
+      timeout: 20_000,
+    });
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 2: Initiate signup
     // ──────────────────────────────────────────────────────────────────
-    const claimInput = page.locator('#handle-input');
-    const claimVisible = await claimInput
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-
-    if (claimVisible) {
-      // Use claim handle form — stores pendingClaim in sessionStorage
-      const testHandle = `gp-${Date.now().toString(36)}`;
-      await claimInput.fill(testHandle);
-
-      // Wait for the availability check to reach a terminal state. We
-      // can't just poll the spinner's visibility — the spinner is
-      // conditionally rendered (only present while `showChecking` is
-      // true), so `toBeHidden` passes both before the spinner mounts
-      // AND after the check completes. Instead, wait for the success
-      // helper text, which only appears in the available terminal state
-      // (the handle is generated with Date.now().toString(36) so a
-      // collision with an existing creator is extremely unlikely).
-      await expect(page.getByText(/is available — tap/i)).toBeVisible({
-        timeout: 10_000,
-      });
-
-      // Submit the form
-      await claimInput.press('Enter');
-    } else {
-      // Fall back to signup link
-      await page.locator('a[href*="/signup"]').first().click();
-    }
-
-    // Should navigate to signup or onboarding
+    await page.goto('/signup', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
     await page.waitForURL(/\/(signup|onboarding)/, { timeout: 30_000 });
 
     // ──────────────────────────────────────────────────────────────────
