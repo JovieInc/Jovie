@@ -25,6 +25,7 @@ import { DesignProposalReviewPanel } from '@/components/features/admin/design-la
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
+import { WhatShipped } from '@/components/features/admin/WhatShipped';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -784,6 +785,7 @@ export function HudDashboardClient({
   if (isShell) {
     return (
       <div className={outerClass}>
+        <WhatShipped />
         <TimActionRequiredSection />
         <DesignProposalReviewPanel />
 
@@ -933,6 +935,8 @@ export function HudDashboardClient({
           </div>
         </ContentSurfaceCard>
       ) : null}
+
+      <WhatShipped />
 
       {/* Tim Action Required — personal manual items, surfaces above everything else */}
       {/* ContentSurfaceCard is rendered by TimActionRequiredSection itself so it can self-hide */}
