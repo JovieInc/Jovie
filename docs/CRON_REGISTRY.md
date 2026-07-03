@@ -25,6 +25,14 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `Test Coverage Audit` | `0 6 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage. Commits if changed. | `.github/workflows/test-coverage-audit.yml` |
 | `Neon Ephemeral Branch Cleanup` | (see workflow) | Reaps Neon branches created by per-PR ephemeral DB tests. | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
 
+## Local Hermes Launchd Schedule
+
+These are machine-local Hermes jobs, not Vercel production crons. They run from launchd on the operator Mac and write to `~/.hermes`.
+
+| Unit | Schedule | Purpose | Source |
+|------|----------|---------|--------|
+| `co.jovie.hermes.cron-pipeline-scoreboard` | every 60 min | Computes the daily codex shipping funnel, writes `pipeline-scoreboard-latest.json` + gbrain `ops/pipeline-scoreboard/latest`, and alerts on 12h shipper stalls. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
+
 ## Production Schedule
 
 Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is set to `apps/web/` (verified via `vercel project inspect jovie`), so Vercel reads that file, not the repo-root `vercel.json`. The root-level `vercel.json` exists for historical reasons and is **not** what Vercel consumes — keep both in sync until it can be deleted (see JOV-1901 / AUTOMATION_AUDIT.md for the original deletion intent).

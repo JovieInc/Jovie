@@ -17,7 +17,13 @@ fi
 
 echo "==> Local verify (integration fast path)"
 pnpm --filter @jovie/web run typecheck -- --pretty false
-pnpm biome check --write "$(git diff --name-only "origin/${INTEGRATION_BRANCH}"...HEAD | grep -E '\.(ts|tsx|js|mjs)$' || true)" 2>/dev/null || pnpm biome check apps/web
+CHANGED_CODE_FILES=()
+while IFS= read -r file; do
+  [[ -n "$file" ]] && CHANGED_CODE_FILES+=("$file")
+done < <(git diff --name-only "origin/${INTEGRATION_BRANCH}"...HEAD | grep -E '\.(ts|tsx|js|mjs)$' || true)
+if (( ${#CHANGED_CODE_FILES[@]} > 0 )); then
+  pnpm biome check --write "${CHANGED_CODE_FILES[@]}"
+fi
 
 echo "==> Push $FEATURE_BRANCH"
 git push -u origin "$FEATURE_BRANCH"
