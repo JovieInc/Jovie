@@ -13,8 +13,13 @@ import {
   EPIC_LABEL,
   eligibleCodexIssues,
   finishDispatch,
+  GhEagainBackoff,
+  GH_EAGAIN_BACKOFF_MS,
+  GH_EAGAIN_BACKOFF_THRESHOLD,
   isRecoverableDetritus,
+  isSpawnEagain,
   loadShipperConfig,
+  SpawnEagainError,
   NO_AUTO_LABEL,
   parseAgentChain,
   parseDirtyPaths,
@@ -44,6 +49,46 @@ function issue(overrides = {}) {
     ...overrides,
   };
 }
+
+describe('spawn EAGAIN recovery helpers', () => {
+  it('isSpawnEagain detects errno, message, and SpawnEagainError', () => {
+    expect(isSpawnEagain(new SpawnEagainError('spawnSync gh EAGAIN', 'gh'))).toBe(
+      true
+    );
+    expect(
+      isSpawnEagain(
+        Object.assign(new Error('spawnSync gh EAGAIN'), { code: undefined })
+      )
+    ).toBe(true);
+    expect(
+      isSpawnEagain(
+        Object.assign(new Error('fork failed'), { code: 'EAGAIN' })
+      )
+    ).toBe(true);
+    expect(isSpawnEagain(new Error('command not found'))).toBe(false);
+  });
+
+  it('GhEagainBackoff sleeps after consecutive threshold', () => {
+    const backoff = new GhEagainBackoff(GH_EAGAIN_BACKOFF_THRESHOLD, GH_EAGAIN_BACKOFF_MS);
+    expect(backoff.record()).toEqual({
+      shouldBackoff: false,
+      sleepMs: 0,
+      consecutive: 1,
+    });
+    expect(backoff.record()).toEqual({
+      shouldBackoff: false,
+      sleepMs: 0,
+      consecutive: 2,
+    });
+    expect(backoff.record()).toEqual({
+      shouldBackoff: true,
+      sleepMs: GH_EAGAIN_BACKOFF_MS,
+      consecutive: 3,
+    });
+    backoff.reset();
+    expect(backoff.record().consecutive).toBe(1);
+  });
+});
 
 describe('codex issue shipper planner', () => {
   it('returns no dispatch plans for an empty queue', () => {

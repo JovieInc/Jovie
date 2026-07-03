@@ -63,6 +63,15 @@ describe('shipper-gated entrypoint', () => {
       '/Users/tester/.hermes/scripts/shipper-gated-entrypoint.py'
     );
     expect(rendered).toContain('/Users/tester/Jovie');
+    expect(rendered).toContain('<key>KeepAlive</key>');
+    expect(rendered).toContain('<key>SuccessfulExit</key>');
+    expect(rendered).toContain('<false/>');
+    expect(rendered).toContain('<key>ThrottleInterval</key>');
+    expect(rendered).toContain('<integer>60</integer>');
+    expect(rendered).toContain(
+      '<key>HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS</key>'
+    );
+    expect(rendered).toContain('<string>2</string>');
   });
 });
 

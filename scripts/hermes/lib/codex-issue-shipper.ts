@@ -1,3 +1,66 @@
+export const GH_EAGAIN_BACKOFF_THRESHOLD = 3;
+export const GH_EAGAIN_BACKOFF_MS = 60_000;
+
+/** Thrown when execFileSync/spawnSync hits EAGAIN (resource temporarily unavailable). */
+export class SpawnEagainError extends Error {
+  readonly command: string;
+
+  constructor(message: string, command: string) {
+    super(message);
+    this.name = 'SpawnEagainError';
+    this.command = command;
+  }
+}
+
+/** True when a child_process sync spawn failed with macOS EAGAIN / resource pressure. */
+export function isSpawnEagain(err: unknown): boolean {
+  if (err instanceof SpawnEagainError) return true;
+  if (err instanceof Error) {
+    const errno = (err as NodeJS.ErrnoException).code;
+    if (errno === 'EAGAIN') return true;
+    return /spawnSync\b.*\bEAGAIN\b|resource temporarily unavailable/i.test(
+      err.message
+    );
+  }
+  return /EAGAIN|resource temporarily unavailable/i.test(String(err));
+}
+
+/** Tracks consecutive EAGAIN skips; triggers a longer pause after N failures. */
+export class GhEagainBackoff {
+  private consecutive = 0;
+
+  constructor(
+    private readonly threshold = GH_EAGAIN_BACKOFF_THRESHOLD,
+    private readonly backoffMs = GH_EAGAIN_BACKOFF_MS
+  ) {}
+
+  record(): {
+    readonly shouldBackoff: boolean;
+    readonly sleepMs: number;
+    readonly consecutive: number;
+  } {
+    this.consecutive += 1;
+    if (this.consecutive >= this.threshold) {
+      const consecutive = this.consecutive;
+      this.consecutive = 0;
+      return {
+        shouldBackoff: true,
+        sleepMs: this.backoffMs,
+        consecutive,
+      };
+    }
+    return {
+      shouldBackoff: false,
+      sleepMs: 0,
+      consecutive: this.consecutive,
+    };
+  }
+
+  reset(): void {
+    this.consecutive = 0;
+  }
+}
+
 export const CODEX_SOURCE_LABEL = 'codex';
 export const CODEX_TRUSTED_LABEL = 'codex-approved';
 export const CODEX_CLAIM_LABEL = 'codex-in-progress';
