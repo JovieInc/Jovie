@@ -221,7 +221,7 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain(
       'coderabbit review --agent -c AGENTS.md -t uncommitted'
     );
-    expect(prompt).toContain('Closes #<issue-number>');
+    expect(prompt).toContain('Fixes #<issue-number>');
     expect(prompt).toContain('Session model: cheap-model');
     expect(prompt).toContain(
       'Captured slug: ops/codex-issue-shipper/github-123'
@@ -447,7 +447,7 @@ describe('deterministic finisher', () => {
     const prCreate = calls[4].args;
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
-    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Closes #12721');
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
   });
 
   it('finishDispatch skips commit when work is already committed', () => {

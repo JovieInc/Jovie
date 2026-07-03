@@ -13,7 +13,7 @@
  *     back to whisper.cpp (~700 MB peak, guarded by heavy-job lock).
  *  3. Write the full transcript to gbrain (durable memory).
  *  4. Classify into spans: memory | issue | task.
- *  5. For each `issue` span → file a Linear issue.
+ *  5. For each `issue` span → file a GitHub issue (Linear mirror optional).
  *  6. For each `task` span → log for Hermes daemon routing (the daemon
  *     polls this log and routes to sub-agents). v1: log only; Hermes
  *     daemon integration follows after observability.
@@ -40,8 +40,8 @@ import { chat } from '../lib/free-model-router';
 import { withHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS, VOICE_MEMOS_RECORDINGS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
 import { sendTelegram } from '../lib/telegram-client';
+import { buildFollowUpBody, fileIssue } from '../lib/tracker-client';
 
 const JOB = 'voice-memo-ingest';
 
@@ -216,7 +216,7 @@ async function classifyTranscript(
   const system =
     'You segment voice-memo transcripts for an orchestration agent named Hermes. ' +
     'Return ONLY a JSON array of spans. Each span is {"kind":"memory"|"issue"|"task","text":"...","title":"...","target":"chief|cfo|founder-os|code-orchestrator"}. ' +
-    'kind=memory for ambient brain dumps. kind=issue for engineering/product/ops work that should become a Linear ticket (include a concise imperative title). kind=task for non-engineering actions (calendar, airtable, email) routed to a sub-agent (set target). ' +
+    'kind=memory for ambient brain dumps. kind=issue for engineering/product/ops work that should become a GitHub issue (include a concise imperative title). kind=task for non-engineering actions (calendar, airtable, email) routed to a sub-agent (set target). ' +
     'If unsure, default to memory. Do not include any prose outside the JSON.';
 
   const result = await chat(
@@ -304,7 +304,7 @@ async function fileIssueFromSpan(args: {
   if (filed.success && filed.identifier && filed.url) {
     return { identifier: filed.identifier, url: filed.url, queued: false };
   }
-  // Linear is down but the intent landed in the retry queue. Treat as
+  // GitHub is down but the intent landed in the retry queue. Treat as
   // "handled" so the memo can be marked seen; the queue will replay.
   if (filed.queued) {
     return {
@@ -385,7 +385,7 @@ async function ingestFile(filePath: string): Promise<void> {
     }
   }
 
-  // Only mark the memo seen if every issue span landed in Linear (a
+  // Only mark the memo seen if every issue span landed in GitHub (a
   // queued fallback counts as landed — the queue will retry). If even one
   // span dropped on the floor, leave the memo unsigned so the next run
   // can retry the whole classification.
@@ -411,7 +411,7 @@ async function ingestFile(filePath: string): Promise<void> {
     `Memo ingested (${durationS}s).`,
     `gbrain: ${gbrainId.slice(0, 12)}…`,
     filedIssues.length > 0
-      ? `Linear: ${filedIssues.map(f => f.identifier).join(', ')}`
+      ? `GitHub: ${filedIssues.map(f => f.identifier).join(', ')}`
       : null,
     taskCount > 0 ? `Tasks queued: ${taskCount}` : null,
     memoryCount > 0 ? `Memory spans: ${memoryCount}` : null,

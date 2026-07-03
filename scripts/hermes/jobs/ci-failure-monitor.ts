@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
+import { buildFollowUpBody, fileIssue } from '../lib/tracker-client';
 
 const JOB = 'ci-failure-monitor';
 
