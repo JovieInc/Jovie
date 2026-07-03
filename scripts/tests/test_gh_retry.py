@@ -434,6 +434,13 @@ JSON
         assert "[dry-run] would -merge-queue on #889" not in result.stdout
         assert "[dry-run] would +merge-queue on #889" not in result.stdout
 
+    def test_drain_remediate_script_exists(self) -> None:
+        remediate = _REPO_ROOT / "scripts" / "drain-pr-remediate.mjs"
+        assert remediate.is_file()
+        content = remediate.read_text(encoding="utf-8")
+        assert "listBlockedAgentPrs" in content
+        assert "force-with-lease" in content
+
     def test_gtmq_drafts_are_report_only_even_when_labeled(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
