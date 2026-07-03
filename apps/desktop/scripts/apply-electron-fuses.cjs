@@ -75,6 +75,17 @@ module.exports = async function applyElectronFuses(context) {
     '@electron/fuses'
   );
 
+  // The `dir` target (local + staging test builds) does not inject the
+  // `ElectronAsarIntegrity` hash into Info.plist the way the signed dmg/zip
+  // release targets do. With asar-integrity validation enabled the packaged
+  // app then fails its sandbox bootstrap ("sandboxed_renderer.bundle.js script
+  // failed to run") and renders blank. Disable ONLY that fuse for dir-only
+  // test builds; the published dmg/zip release builds keep the full hardened
+  // fuse set. (JOV-3835)
+  const targets = context.targets || [];
+  const isDirOnlyTestBuild =
+    targets.length > 0 && targets.every(target => target.name === 'dir');
+
   await flipFuses(getElectronBinaryPath(context), {
     version: FuseVersion.V1,
     resetAdHocDarwinSignature: true,
@@ -83,7 +94,7 @@ module.exports = async function applyElectronFuses(context) {
     [FuseV1Options.EnableCookieEncryption]: true,
     [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
     [FuseV1Options.EnableNodeCliInspectArguments]: false,
-    [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+    [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: !isDirOnlyTestBuild,
     [FuseV1Options.OnlyLoadAppFromAsar]: true,
     [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false,
     [FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
