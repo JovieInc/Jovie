@@ -121,8 +121,8 @@ export function linesForStep(stepId: ScriptStepId): readonly ScriptLine[] {
 /** Stable 32-bit hash of the onboarding session id (variant assignment). */
 export function hashSessionId(sessionId: string): number {
   let hash = 0;
-  for (let i = 0; i < sessionId.length; i += 1) {
-    hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
+  for (const char of sessionId) {
+    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
   }
   return hash;
 }
