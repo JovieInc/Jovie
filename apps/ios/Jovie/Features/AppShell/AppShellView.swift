@@ -105,6 +105,8 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   @State private var selectedTab: AppShellTab
   @State private var navigationPath: [AppShellRoute] = []
   @State private var isShowingDrawer = false
+  @State private var drawerDragOffset: CGFloat = 0
+  @State private var isKeyboardVisible = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
   @State private var intentStore = IntentNavigationStore.shared
@@ -152,57 +154,53 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
 
   var body: some View {
     NavigationStack(path: $navigationPath) {
-      ZStack {
-        JovieColor.backgroundBase.ignoresSafeArea()
+      GeometryReader { proxy in
+        let openOffset = drawerOpenOffset(safeAreaLeading: proxy.safeAreaInsets.leading)
 
-        pagedContent
-          .id(selectedTab)
-          .transition(pageTransition)
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .clipped()
-      }
-      .safeAreaInset(edge: .top, spacing: 0) {
-        shellToolbar
-      }
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        bottomBar
-      }
-      .simultaneousGesture(pageSwipe)
-      .simultaneousGesture(edgeSwipeToOpenDrawer)
-      .navigationBarHidden(true)
-      .navigationDestination(for: AppShellRoute.self) { route in
-        switch route {
-        case .settings:
-          SettingsView(
+        // Drawer is the recessed BASE plane of the ZStack: it never overlays or
+        // dims content. The content container is the elevated plane that slides
+        // right to reveal it, matching the ChatGPT/desktop-app model.
+        ZStack(alignment: .leading) {
+          AppShellLeftDrawer(
+            isPresented: isShowingDrawer,
             profile: profile,
-            buildInfo: .current(),
-            billingURL: billingURL,
-            onClose: { navigationPath.removeLast() },
-            onLogout: onLogout
+            isOffline: isOffline,
+            chatEnabled: chatEnabled,
+            audienceEnabled: audienceEnabled,
+            selectedTab: selectedTab,
+            recentConversations: recentConversations,
+            activeConversationID: activeConversationID,
+            drawerWidth: drawerWidth,
+            onSelectTab: { tab in
+              closeDrawerThenSelect(tab)
+            },
+            onStartNewChat: {
+              closeDrawer()
+              startNewChat()
+            },
+            onSelectConversation: { conversationID in
+              closeDrawer()
+              onSelectConversation(conversationID)
+              selectTab(.chat)
+            },
+            onOpenSettings: {
+              closeDrawer()
+              navigationPath.append(.settings)
+            }
           )
-          .navigationBarBackButtonHidden()
+          // reduceMotion: the drawer beneath is otherwise fully static, so
+          // crossfade its opacity with the content card instead of relying on
+          // the (also-disabled) spatial slide to reveal it.
+          .opacity(reduceMotion ? (isShowingDrawer ? 1 : 0) : 1)
+          .animation(reduceMotion ? drawerAnimation : nil, value: isShowingDrawer)
+
+          shellContent
+            .offset(x: reduceMotion ? 0 : contentOffset(openOffset: openOffset))
+            .opacity(reduceMotion && isShowingDrawer ? 0 : 1)
+            .animation(drawerAnimation, value: isShowingDrawer)
+            .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
         }
-      }
-      .overlay {
-        AppShellLeftDrawer(
-          isPresented: $isShowingDrawer,
-          profile: profile,
-          isOffline: isOffline,
-          chatEnabled: chatEnabled,
-          audienceEnabled: audienceEnabled,
-          selectedTab: selectedTab,
-          recentConversations: recentConversations,
-          activeConversationID: activeConversationID,
-          onSelectTab: selectTab,
-          onStartNewChat: startNewChat,
-          onSelectConversation: { conversationID in
-            onSelectConversation(conversationID)
-            selectTab(.chat)
-          },
-          onOpenSettings: {
-            navigationPath.append(.settings)
-          }
-        )
+        .simultaneousGesture(edgeSwipeToOpenDrawer(openOffset: openOffset))
       }
     }
     .background(JovieColor.backgroundBase)
@@ -224,6 +222,81 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
       }
       intentStore.submit(.openConversation(payload.conversationID))
     }
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+      isKeyboardVisible = true
+    }
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+      isKeyboardVisible = false
+    }
+  }
+
+  // The elevated content plane: toolbar, paged content, and composer/bottom bar
+  // all ride together as one transformable container so the drawer transform
+  // reads as a single spatial move, not independently animated pieces.
+  private var shellContent: some View {
+    let isElevated = isShowingDrawer || drawerDragOffset != 0
+
+    return ZStack {
+      ZStack {
+        JovieColor.backgroundBase.ignoresSafeArea()
+
+        pagedContent
+          .id(selectedTab)
+          .transition(pageTransition)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .clipped()
+      }
+      .safeAreaInset(edge: .top, spacing: 0) {
+        shellToolbar
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        bottomBar
+      }
+      .simultaneousGesture(pageSwipe)
+      .navigationBarHidden(true)
+      .navigationDestination(for: AppShellRoute.self) { route in
+        switch route {
+        case .settings:
+          SettingsView(
+            profile: profile,
+            buildInfo: .current(),
+            billingURL: billingURL,
+            onClose: { navigationPath.removeLast() },
+            onLogout: onLogout
+          )
+          .navigationBarBackButtonHidden()
+        }
+      }
+      // Content is a non-interactive, dimmed-free card while the drawer is
+      // open: taps land on the transparent overlay below (which closes the
+      // drawer) instead of reaching gear/composer/chat rows underneath.
+      .allowsHitTesting(!isElevated)
+      .accessibilityHidden(isElevated)
+
+      if isElevated {
+        Color.clear
+          .contentShape(Rectangle())
+          .onTapGesture { closeDrawer() }
+          .accessibilityHidden(true)
+      }
+    }
+    .background(JovieColor.backgroundBase)
+    .clipShape(shellContentClipShape(isElevated: isElevated))
+    .overlay(alignment: .leading) {
+      if isElevated {
+        Rectangle()
+          .fill(JovieColor.borderSubtle)
+          .frame(width: 1)
+      }
+    }
+    .shadow(color: .black.opacity(isElevated ? 0.28 : 0), radius: 24, x: 8)
+  }
+
+  private func shellContentClipShape(isElevated: Bool) -> AnyShape {
+    if isElevated {
+      return AnyShape(RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous))
+    }
+    return AnyShape(Rectangle())
   }
 
   // Consume a navigation request raised by an App Intent (Siri / Shortcuts /
@@ -287,9 +360,55 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     resolveShellInitialTab(initialTab, chatEnabled: chatEnabled)
   }
 
+  private var drawerWidth: CGFloat {
+    min(320, UIScreen.main.bounds.width * 0.86)
+  }
+
+  private var drawerAnimation: Animation {
+    reduceMotion ? .easeInOut(duration: 0.2) : JovieMotion.cinematic
+  }
+
+  private func drawerOpenOffset(safeAreaLeading: CGFloat) -> CGFloat {
+    drawerWidth + safeAreaLeading
+  }
+
+  // Content translates right by however far the drawer is open/dragged so the
+  // two planes move together as one gesture-driven transform.
+  private func contentOffset(openOffset: CGFloat) -> CGFloat {
+    if isShowingDrawer {
+      return max(0, openOffset + drawerDragOffset)
+    }
+    return max(0, drawerDragOffset)
+  }
+
   private func openDrawer() {
     guard !isShowingDrawer else { return }
+    dismissKeyboardIfNeeded()
     isShowingDrawer = true
+  }
+
+  private func closeDrawer() {
+    drawerDragOffset = 0
+    isShowingDrawer = false
+  }
+
+  // Closing must finish its transform before the page crossfade starts —
+  // never animate the drawer-close and the tab-change spatial motion at once.
+  private func closeDrawerThenSelect(_ tab: AppShellTab) {
+    closeDrawer()
+    DispatchQueue.main.asyncAfter(deadline: .now() + JovieMotion.cinematicDuration) {
+      selectTab(tab)
+    }
+  }
+
+  private func dismissKeyboardIfNeeded() {
+    guard isKeyboardVisible else { return }
+    UIApplication.shared.sendAction(
+      #selector(UIResponder.resignFirstResponder),
+      to: nil,
+      from: nil,
+      for: nil
+    )
   }
 
   // Horizontally paged primary screens. The floating bottom bar drives the same
@@ -361,14 +480,40 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
       }
   }
 
-  private var edgeSwipeToOpenDrawer: some Gesture {
-    DragGesture(minimumDistance: 12, coordinateSpace: .global)
+  // Drives both directions: an edge-drag from the leading edge opens the
+  // drawer, and (while open) a drag anywhere on the elevated content closes
+  // it. Suppressed entirely while the composer is focused so an edge-drag
+  // inside the chat input can't fight text selection/cursor placement.
+  private func edgeSwipeToOpenDrawer(openOffset: CGFloat) -> some Gesture {
+    DragGesture(minimumDistance: 8, coordinateSpace: .global)
+      .onChanged { value in
+        guard !reduceMotion, !isKeyboardVisible else { return }
+
+        if isShowingDrawer {
+          drawerDragOffset = min(0, value.translation.width)
+        } else if value.startLocation.x < 28, value.translation.width > 0 {
+          drawerDragOffset = min(value.translation.width, openOffset)
+        }
+      }
       .onEnded { value in
-        guard !isShowingDrawer, !reduceMotion else { return }
-        guard value.startLocation.x < 28 else { return }
-        if value.translation.width > 72 || value.predictedEndTranslation.width > 120 {
+        guard !reduceMotion, !isKeyboardVisible else { return }
+
+        let predicted = value.predictedEndTranslation.width
+        if isShowingDrawer {
+          if value.translation.width < -72 || predicted < -120 {
+            closeDrawer()
+          } else {
+            drawerDragOffset = 0
+          }
+          return
+        }
+
+        if value.startLocation.x < 28,
+           value.translation.width > 72 || predicted > 120
+        {
           openDrawer()
         }
+        drawerDragOffset = 0
       }
   }
 

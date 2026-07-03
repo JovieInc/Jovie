@@ -397,7 +397,7 @@ final class JovieUITests: XCTestCase {
 
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
-      app.otherElements["shell-drawer"].waitForExistence(timeout: 3),
+      app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
@@ -406,11 +406,18 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(app.buttons["New chat"].exists)
     XCTAssertTrue(app.buttons["Settings"].exists)
+    XCTAssertFalse(
+      app.buttons["Close navigation drawer"].exists,
+      "Drawer IA (gate 3A) removes the X close button; close is tap-content-card or edge-drag only.\n\(app.debugDescription)"
+    )
 
-    app.buttons["Close navigation drawer"].tap()
+    // Gate 3A: no close button. Closing happens by tapping the elevated
+    // content card's exposed sliver (the transparent scrim covering it).
+    let contentSliver = app.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5))
+    contentSliver.tap()
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Closing the drawer did not restore the profile surface.\n\(app.debugDescription)"
+      "Tapping the exposed content card did not close the drawer.\n\(app.debugDescription)"
     )
 
     app.buttons["Open navigation drawer"].tap()
@@ -418,6 +425,53 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
       "Shell navigation did not open settings from the drawer.\n\(app.debugDescription)"
+    )
+  }
+
+  // JOV-3672: while the drawer is open, the elevated content card must be
+  // non-interactive so the drawer is the sole active switcher — a tap on the
+  // (visually still-present but inert) gear icon must not open Settings.
+  func testDrawerOpenMakesContentCardInert() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
+      "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
+    )
+
+    XCTAssertFalse(
+      app.buttons["Open Settings"].isHittable,
+      "Content card's Settings gear stayed hittable while the drawer was open — content must be inert.\n\(app.debugDescription)"
+    )
+
+    // Drawer's own surface switcher remains the sole active switcher.
+    XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-profile"].isHittable)
+  }
+
+  // JOV-3672 (eng F11): an edge-drag starting while the composer has focus
+  // must not open the drawer — it would fight text selection/cursor placement.
+  func testEdgeDragDoesNotOpenDrawerWhileComposerFocused() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(input, timeout: 3),
+      "Chat composer input did not become hittable.\n\(app.debugDescription)"
+    )
+    input.tap()
+
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+    start.press(forDuration: 0.05, thenDragTo: end)
+
+    XCTAssertFalse(
+      app.descendants(matching: .any)["shell-drawer"].isHittable,
+      "Edge-drag opened the drawer while the composer was focused.\n\(app.debugDescription)"
     )
   }
 
