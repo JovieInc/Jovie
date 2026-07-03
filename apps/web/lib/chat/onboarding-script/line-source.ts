@@ -118,7 +118,7 @@ export function pickFromBank(
     cursor -= Math.max(entry.weight, 0);
     if (cursor < 0) return entry.line;
   }
-  const last = entries[entries.length - 1];
+  const last = entries.at(-1);
   if (!last) throw new Error(`Weighted pick failed for step ${stepId}`);
   return last.line;
 }
