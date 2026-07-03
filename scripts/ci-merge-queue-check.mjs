@@ -117,9 +117,12 @@ async function main() {
     case 'policy':
       printPolicySummary();
       break;
+    case 'max-queue-depth':
+      console.log(String(GRAPHITE_QUEUE_POLICY.maxQueueDepth));
+      break;
     default:
       console.error(
-        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy>'
+        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy|max-queue-depth>'
       );
       process.exitCode = 1;
   }

@@ -106,12 +106,14 @@ function fmtMin(seconds: number): string {
 function renderBody(m: ReturnType<typeof summarizeCiMetrics>): string {
   const t = m.throughput;
   const l = m.latency;
+  const v = m.throughputVerdict;
   return [
     `Window: ${m.window.mergedPrs} merged PRs · ${m.window.ciRuns} CI runs · ${m.window.spanDays}d span`,
     `Throughput (primary): ${t.mergedPrsPerDay}/day · ${t.ciRunHoursPerMergedPr ?? '?'} runner-h/PR · flaky ${(t.flakyRerunRate * 100).toFixed(1)}% · queue-wait p50 ${fmtMin(t.queueWaitSeconds.p50)} / p95 ${fmtMin(t.queueWaitSeconds.p95)}`,
     `Latency (secondary): gate p50 ${fmtMin(l.gateWallclockSeconds.p50)} / p75 ${fmtMin(l.gateWallclockSeconds.p75)} / p95 ${fmtMin(l.gateWallclockSeconds.p95)} · full-merge p50 ${fmtMin(l.fullMergeTimeSeconds.p50)} / p95 ${fmtMin(l.fullMergeTimeSeconds.p95)}`,
     `Ready→merged (target p50<10m / p95<15m): p50 ${fmtMin(l.readyToMergeSeconds.p50)} / p75 ${fmtMin(l.readyToMergeSeconds.p75)} / p95 ${fmtMin(l.readyToMergeSeconds.p95)}`,
     `Samples: gate ${m.sampleSizes.gate} · full-merge ${m.sampleSizes.fullMerge} · queue-wait ${m.sampleSizes.queueWait} · ready-to-merge ${m.sampleSizes.readyToMerge}`,
+    `Throughput verdict: ${v.status} — ${v.reason} (action: ${v.action})`,
   ].join('\n');
 }
 
@@ -156,6 +158,8 @@ async function main(): Promise<void> {
       fullMergeP95: metrics.latency.fullMergeTimeSeconds.p95,
       readyToMergeP50: metrics.latency.readyToMergeSeconds.p50,
       readyToMergeP95: metrics.latency.readyToMergeSeconds.p95,
+      throughputVerdictStatus: metrics.throughputVerdict.status,
+      throughputVerdictAction: metrics.throughputVerdict.action,
       samples: metrics.sampleSizes,
     });
 
