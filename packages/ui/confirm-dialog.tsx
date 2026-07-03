@@ -26,13 +26,7 @@ export interface ConfirmDialogProps {
   readonly children?: ReactNode;
 }
 
-/**
- * Canonical confirmation dialog for irreversible and destructive actions.
- *
- * Shape: title + body + neutral cancel + confirm (red when destructive).
- * Dismisses on Escape and outside click (both cancel). Focus is trapped
- * while open via Radix Dialog.
- */
+/** Canonical confirmation dialog for irreversible/destructive actions. */
 export function ConfirmDialog({
   open,
   onOpenChange,
