@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { GET as getLegacyAasa } from '@/app/apple-app-site-association/route';
 import { GET as getWellKnownAasa } from '@/app/.well-known/apple-app-site-association/route';
+import { GET as getLegacyAasa } from '@/app/apple-app-site-association/route';
 import {
   APPLE_APP_SITE_ASSOCIATION,
   JOVIE_IOS_BUNDLE_ID,
