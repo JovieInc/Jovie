@@ -112,12 +112,24 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   );
   assert.match(mainSource, /mainWindowHiddenForAuthHandoff/);
   assert.match(mainSource, /win === mainWindow && isAuthHandoffOpen\(\)/);
-  assert.match(mainSource, /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/);
-  assert.match(mainSource, /function loadMainWindowAuthPlaceholder\(authUrl: string\)/);
+  assert.match(
+    mainSource,
+    /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/
+  );
+  assert.match(
+    mainSource,
+    /function loadMainWindowAuthPlaceholder\(authUrl: string\)/
+  );
   assert.match(mainSource, /loadMainWindowAuthPlaceholder\(authUrl\)/);
   assert.match(mainSource, /function recoverSignedOutShellNavigationAbort\(/);
-  assert.match(mainSource, /recoverSignedOutShellNavigationAbort\(validatedURL\)/);
-  assert.match(mainSource, /const AUTH_RETURN_SCHEME = getElectronAuthScheme\(APP_ENV\)/);
+  assert.match(
+    mainSource,
+    /recoverSignedOutShellNavigationAbort\(validatedURL\)/
+  );
+  assert.match(
+    mainSource,
+    /const AUTH_RETURN_SCHEME = getElectronAuthScheme\(APP_ENV\)/
+  );
   assert.match(mainSource, /show: true,/);
   assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
@@ -423,7 +435,10 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
   assert.match(smokeSource, /const callbackOrigin = parsed\.origin;/);
   assert.match(smokeSource, /resolveNativeCallbackFromRedirect/);
   assert.match(smokeSource, /\/auth\/native-return/);
-  assert.match(smokeSource, /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/);
+  assert.match(
+    smokeSource,
+    /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/
+  );
   assert.match(smokeSource, /async function waitForDesktopAuthHandoff/);
   assert.match(smokeSource, /state === 'opened'/);
   assert.match(
