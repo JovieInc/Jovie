@@ -107,4 +107,30 @@ describe('SupportPage', () => {
     const section = container.querySelector('section');
     expect(section).toBeInTheDocument();
   });
+
+  it('renders support channels as surfaced cards with icons', () => {
+    render(<SupportPage />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'How can we help?' })
+    ).toBeInTheDocument();
+
+    for (const title of ['Documentation', 'Email Support', 'Getting Started']) {
+      expect(
+        screen.getByRole('heading', { level: 3, name: title })
+      ).toBeInTheDocument();
+    }
+
+    const cards = screen.getAllByRole('article');
+    expect(cards).toHaveLength(3);
+    for (const card of cards) {
+      expect(card).toHaveClass(
+        'rounded-2xl',
+        'border',
+        'border-subtle',
+        'bg-surface-1',
+        'p-6'
+      );
+    }
+  });
 });
