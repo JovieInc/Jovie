@@ -264,6 +264,20 @@ describe('auth routing boundary', () => {
     ).toBe(
       'jovie://auth/complete?code=c&state=s&desktop_flow=desktop_flow_nonce_12345'
     );
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        origin: 'https://staging.jov.ie',
+      })
+    ).toBe('jovie-staging://auth/complete?code=c&state=s');
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        origin: 'http://localhost:3112',
+      })
+    ).toBe('jovie-local://auth/complete?code=c&state=s');
   });
 
   it('creates analytics payloads without leaking return URLs or token values', () => {

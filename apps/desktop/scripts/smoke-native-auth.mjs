@@ -2,6 +2,23 @@ import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3112';
+
+function getNativeCallbackPrefix(baseUrl = BASE_URL) {
+  const { hostname } = new URL(baseUrl);
+  if (hostname === 'staging.jov.ie') {
+    return 'jovie-staging://auth/complete?';
+  }
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1'
+  ) {
+    return 'jovie-local://auth/complete?';
+  }
+  return 'jovie://auth/complete?';
+}
+
+const NATIVE_CALLBACK_PREFIX = getNativeCallbackPrefix();
 const ELECTRON_CDP_URL =
   process.env.ELECTRON_CDP_URL ?? 'http://localhost:9223';
 const MACOS_PROTOCOL_OPEN_BUNDLE_ID =
@@ -661,28 +678,29 @@ async function requestRedirect(page, targetUrl, label) {
   );
 }
 
-async function requestNativeCallbackRedirect(page, callbackPath, label) {
-  const redirectUrl = await requestRedirect(page, callbackPath, label);
-  if (redirectUrl.startsWith('jovie://auth/complete?')) {
+async function resolveNativeCallbackFromRedirect(page, redirectUrl, label) {
+  if (redirectUrl.startsWith(NATIVE_CALLBACK_PREFIX)) {
     return redirectUrl;
   }
 
-  const parsed = new URL(redirectUrl);
-  if (parsed.pathname === '/auth/native-return') {
-    const callbackPromise = Promise.race([
-      waitForNativeProtocolRequest(page, '/auth/native-return'),
-      waitForNativeRedirectResponse(page, '/auth/native-return'),
-    ]);
-    await page.goto(redirectUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60_000,
-    });
-    return await callbackPromise;
+  const nativeReturn = new URL(redirectUrl);
+  if (nativeReturn.pathname !== '/auth/native-return') {
+    throw new Error(
+      `${label} did not return the Electron app callback: ${redirectUrl}`
+    );
   }
 
-  throw new Error(
-    `${label} did not return the Electron app callback: ${redirectUrl}`
-  );
+  const deepLinkPromise = waitForNativeProtocolRequest(page, label);
+  await page.goto(redirectUrl, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+  return await deepLinkPromise;
+}
+
+async function requestNativeCallbackRedirect(page, callbackPath, label) {
+  const redirectUrl = await requestRedirect(page, callbackPath, label);
+  return await resolveNativeCallbackFromRedirect(page, redirectUrl, label);
 }
 
 function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
@@ -694,7 +712,7 @@ function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
 
     function onRequest(request) {
       const requestUrl = request.url();
-      if (!requestUrl.startsWith('jovie://auth/complete?')) return;
+      if (!requestUrl.startsWith(NATIVE_CALLBACK_PREFIX)) return;
       clearTimeout(timeoutId);
       page.off('request', onRequest);
       resolve(requestUrl);
@@ -713,7 +731,7 @@ function waitForNativeRedirectResponse(page, label, timeout = 60_000) {
 
     function onResponse(response) {
       const location = response.headers().location;
-      if (!location?.startsWith('jovie://auth/complete?')) return;
+      if (!location?.startsWith(NATIVE_CALLBACK_PREFIX)) return;
       clearTimeout(timeoutId);
       page.off('response', onResponse);
       resolve(location);
@@ -780,8 +798,12 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
 async function requestNativeCallback(page, authUrl, email) {
   const authCallbackUrl = await requestRedirect(page, authUrl, 'auth start');
   const parsedAuthCallback = new URL(authCallbackUrl);
-  if (parsedAuthCallback.protocol === 'jovie:') {
-    if (!authCallbackUrl.startsWith('jovie://auth/complete?')) {
+  if (
+    parsedAuthCallback.protocol === 'jovie:' ||
+    parsedAuthCallback.protocol === 'jovie-staging:' ||
+    parsedAuthCallback.protocol === 'jovie-local:'
+  ) {
+    if (!authCallbackUrl.startsWith(NATIVE_CALLBACK_PREFIX)) {
       throw new Error(
         `Auth start did not return the Electron app callback: ${authCallbackUrl}`
       );

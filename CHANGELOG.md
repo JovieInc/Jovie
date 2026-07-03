@@ -22,6 +22,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] x402 payment-gated artist resources spike (#12750): `docs/spikes/x402-payment-gated-artist-resources.md` (conditional GO — self-hosted Cloudflare Worker template for per-resource pricing; defer managed Monetization Gateway) + reproducible unit-economics model `apps/web/lib/x402-spike/unit-economics.ts`.
 - [internal] Schedule the codex kanban ship loop via Houston launchd (`co.jovie.hermes.cron-codex-kanban-ship`, every 15m) with PAUSE-respecting `scripts/hermes/ship-loop.sh`.
 
+### Fixed
+
+- **Desktop signed-out launch (GitHub #12822)**: packaged Mac apps no longer strand users on a blank window when the session is expired — passive `/app/chat` → `/signin` redirects now open the browser auth handoff, keep the hidden main window on `/desktop-auth`, and register per-environment deep-link schemes (`jovie`, `jovie-staging`, `jovie-local`) so auth returns to the correct installed app.
+
 > Connector enrichment turns synced Gmail and Calendar objects into graph facts and calendar suggestions; assistant chat replies surface entity mentions as subdued accent spans that reveal detail cards on hover.
 
 ### Added
