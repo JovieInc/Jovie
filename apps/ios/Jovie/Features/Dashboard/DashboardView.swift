@@ -129,7 +129,6 @@ struct DashboardAvatarView: View {
 
 struct DashboardView: View {
   let state: DashboardLoadState
-  let isOffline: Bool
   let brightnessManager: BrightnessControlling
   let showVenueModeOnLaunch: Bool
   let loadAppleWalletProfilePass: @Sendable () async throws -> Data
@@ -144,7 +143,6 @@ struct DashboardView: View {
 
   init(
     state: DashboardLoadState,
-    isOffline: Bool,
     brightnessManager: BrightnessControlling,
     showVenueModeOnLaunch: Bool = false,
     loadAppleWalletProfilePass: @escaping @Sendable () async throws -> Data = {
@@ -153,7 +151,6 @@ struct DashboardView: View {
     onRetry: @escaping () async -> Void
   ) {
     self.state = state
-    self.isOffline = isOffline
     self.brightnessManager = brightnessManager
     self.showVenueModeOnLaunch = showVenueModeOnLaunch
     self.loadAppleWalletProfilePass = loadAppleWalletProfilePass
@@ -230,15 +227,6 @@ struct DashboardView: View {
       }
 
       Spacer()
-
-      if isOffline {
-        Text("Offline")
-          .font(JovieFont.body(size: 12, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(JovieColor.surface1, in: Capsule())
-      }
     }
     .padding(.bottom, JovieSpacing.large)
     .overlay(alignment: .bottom) {

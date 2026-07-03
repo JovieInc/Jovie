@@ -27,7 +27,6 @@ enum AppShellDrawerThreadsFilter {
 struct AppShellLeftDrawer: View {
   let isPresented: Bool
   let profile: AppShellProfile
-  let isOffline: Bool
   let chatEnabled: Bool
   let audienceEnabled: Bool
   let selectedTab: AppShellTab
@@ -69,7 +68,7 @@ struct AppShellLeftDrawer: View {
             onSelectTab: onSelectTab
           )
 
-          DrawerAccountHeader(profile: profile, isOffline: isOffline)
+          DrawerAccountHeader(profile: profile)
 
           if chatEnabled {
             DrawerNewChatButton(action: onStartNewChat)
@@ -104,7 +103,6 @@ struct AppShellLeftDrawer: View {
 
 private struct DrawerAccountHeader: View {
   let profile: AppShellProfile
-  let isOffline: Bool
 
   var body: some View {
     HStack(spacing: JovieSpacing.medium) {
@@ -120,7 +118,7 @@ private struct DrawerAccountHeader: View {
           .foregroundStyle(JovieColor.textPrimary)
           .lineLimit(1)
 
-        Text(isOffline ? "Offline" : profile.secondaryText)
+        Text(profile.secondaryText)
           .font(JovieFont.body(size: 13, weight: .medium))
           .foregroundStyle(JovieColor.textTertiary)
           .lineLimit(1)
