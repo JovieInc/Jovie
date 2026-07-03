@@ -180,6 +180,9 @@ private struct DrawerSurfaceButton: View {
 
         Text(tab.title)
           .font(JovieFont.body(size: 15, weight: .semibold))
+          .lineLimit(1)
+          .minimumScaleFactor(0.85)
+          .allowsTightening(true)
       }
       .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
       .padding(.horizontal, JovieSpacing.medium)

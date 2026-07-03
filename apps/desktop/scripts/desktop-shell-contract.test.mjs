@@ -436,6 +436,11 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
     smokeSource,
     /new URL\(\s*`\/auth\/callback\?state=\$\{encodeURIComponent\(authState\)\}`,\s*BASE_URL\s*\)/
   );
+  assert.match(smokeSource, /parsed\.pathname === '\/auth\/native-return'/);
+  assert.match(
+    smokeSource,
+    /waitForNativeProtocolRequest\(page, '\/auth\/native-return'\)/
+  );
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {

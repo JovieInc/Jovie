@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
-"""Launchd entrypoint for codex-issue-shipper — gbrain/grok preflight gates.
+"""Gated launchd entrypoint for the codex issue shipper.
 
-Installed to ~/.hermes/scripts/ by bootstrap-air.sh. WorkingDirectory is the
-primary ~/Jovie checkout; the TypeScript shipper enforces main@origin/main
-before dispatching.
+Checks pause, gbrain reachability, and grok auth before exec'ing the TS job.
+Checkout freshness is enforced inside codex-issue-shipper.ts (fail-closed).
 """
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
-
-
-def log(msg: str) -> None:
-    print(msg, flush=True)
 
 
 def hermes_home() -> Path:
     return Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+
+
+LOG = hermes_home() / "logs" / "launchd" / "cron-codex-issue-shipper.log"
+
+
+def log(msg: str) -> None:
+    line = f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} shipper-gate {msg}\n"
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    with LOG.open("a", encoding="utf-8") as handle:
+        handle.write(line)
+    print(line, end="")
 
 
 def pause_active() -> bool:
@@ -34,20 +42,20 @@ def pause_active() -> bool:
 
 
 def gbrain_alive() -> bool:
-    gbrain_bin = os.environ.get("HERMES_GBRAIN_BIN", str(hermes_home() / "bin" / "gbrain"))
-    if not Path(gbrain_bin).is_file():
-        found = subprocess.run(["bash", "-lc", "command -v gbrain"], capture_output=True, text=True)
-        gbrain_bin = found.stdout.strip()
+    gbrain_bin = os.environ.get("HERMES_GBRAIN_BIN")
     if not gbrain_bin:
+        gbrain_bin = shutil.which("gbrain") or str(hermes_home() / "bin" / "gbrain")
+    if not Path(gbrain_bin).is_file():
         return False
     try:
         out = subprocess.run(
-            ["timeout", "30", gbrain_bin, "doctor", "--fast", "--json"],
+            [gbrain_bin, "doctor", "--fast", "--json"],
             capture_output=True,
             text=True,
             check=False,
+            timeout=30,
         )
-    except FileNotFoundError:
+    except (subprocess.TimeoutExpired, OSError):
         return False
     if out.returncode != 0 or not out.stdout.strip():
         return False
@@ -75,37 +83,41 @@ def resolve_tsx() -> str | None:
         candidate = Path(node_bin) / "tsx"
         if candidate.is_file():
             return str(candidate)
-    found = subprocess.run(["bash", "-lc", "command -v tsx"], capture_output=True, text=True)
-    if found.returncode == 0 and found.stdout.strip():
-        return found.stdout.strip()
+    for candidate in (
+        os.environ.get("HERMES_TSX_BIN"),
+        shutil.which("tsx"),
+        str(hermes_home() / "bin" / "tsx"),
+    ):
+        if candidate and Path(candidate).is_file():
+            return candidate
     return None
 
 
 def main() -> int:
     if pause_active():
-        log("shipper-gated SKIP: pause sentinel active")
+        log("SKIP: pause sentinel active")
         return 0
 
     if not gbrain_alive():
-        log("shipper-gated ABORT: gbrain is dead/unreachable — refusing to ship blind")
+        log("ABORT: gbrain dead/unreachable (gbrain_gate)")
         return 3
 
     if not grok_ready():
-        log("shipper-gated ABORT: grok agent selected but grok CLI/auth missing")
+        log("ABORT: grok agent selected but grok CLI/auth missing (grok_gate)")
         return 4
 
     tsx = resolve_tsx()
     if not tsx:
-        log("shipper-gated ABORT: tsx not found on PATH")
+        log("ABORT: tsx not found on PATH")
         return 5
 
     repo_root = os.environ.get("HERMES_JOVIE_REPO", os.getcwd())
     shipper = Path(repo_root) / "scripts" / "hermes" / "jobs" / "codex-issue-shipper.ts"
     if not shipper.is_file():
-        log(f"shipper-gated ABORT: missing {shipper}")
+        log(f"ABORT: missing shipper job at {shipper}")
         return 6
 
-    log("shipper-gated preflight OK: launching codex-issue-shipper")
+    log("preflight OK: launching codex-issue-shipper")
     result = subprocess.run([tsx, str(shipper)], cwd=repo_root)
     return result.returncode
 
