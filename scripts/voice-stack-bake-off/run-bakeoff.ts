@@ -30,7 +30,8 @@ const STACKS: readonly StackProbe[] = [
     label: 'xAI Voice Agent Builder',
     apiKeyEnv: 'XAI_API_KEY',
     telephonyBundled: true,
-    docsUrl: 'https://docs.x.ai/developers/model-capabilities/audio/voice-agent',
+    docsUrl:
+      'https://docs.x.ai/developers/model-capabilities/audio/voice-agent',
   },
   {
     id: 'elevenlabs-convai-twilio',
