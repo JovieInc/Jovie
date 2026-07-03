@@ -317,11 +317,30 @@ final class JovieUITests: XCTestCase {
 
     XCTAssertTrue(app.staticTexts["Ask Jovie"].exists)
     XCTAssertTrue(
+      app.staticTexts["Offline"].exists,
+      "Shell header did not show the canonical offline status.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(NSPredicate(format: "label == %@", "Offline")).count,
+      1,
+      "Offline chat launch showed more than one standalone offline status indicator.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
       app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
       "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
 
+<<<<<<< HEAD
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.staticTexts["@tim"].exists,
+      "Drawer account subtitle replaced @handle with offline status.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["shell-drawer-account"].staticTexts["Offline"].exists,
+      "Drawer account header showed a redundant offline status.\n\(app.debugDescription)"
+=======
     let offlineStatusPredicate = NSPredicate(format: "label == %@", "Offline")
     XCTAssertEqual(
       app.staticTexts.matching(offlineStatusPredicate).count,
@@ -337,6 +356,7 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(
       app.staticTexts["@tim"].exists,
       "Drawer account subtitle should keep the @handle while offline.\n\(app.debugDescription)"
+>>>>>>> origin/main
     )
   }
 
