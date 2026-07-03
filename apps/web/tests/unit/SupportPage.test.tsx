@@ -90,6 +90,15 @@ describe('SupportPage', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveClass('marketing-h1-linear');
+
+    const sectionHeadings = screen.getAllByRole('heading', { level: 2 });
+    expect(sectionHeadings).toHaveLength(3);
+    for (const sectionHeading of sectionHeadings) {
+      expect(sectionHeading).toHaveClass('marketing-h2-linear');
+      expect(sectionHeading).toHaveClass('text-primary-token');
+      expect(sectionHeading).not.toHaveClass('text-2xl');
+      expect(sectionHeading).not.toHaveClass('font-semibold');
+    }
   });
 
   it('renders within a MarketingHero component', () => {

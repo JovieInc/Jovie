@@ -44,7 +44,7 @@ export function SupportChannels() {
   return (
     <MarketingContainer width='prose' className='pb-16'>
       <section>
-        <h2 className='text-2xl font-semibold text-primary-token'>
+        <h2 className='marketing-h2-linear text-primary-token'>
           How can we help?
         </h2>
         <div className='mt-6 grid gap-8 sm:grid-cols-3'>
@@ -86,7 +86,7 @@ export function SupportCta() {
   return (
     <MarketingContainer width='prose' className='pb-24'>
       <section>
-        <h2 className='text-2xl font-semibold text-primary-token'>
+        <h2 className='marketing-h2-linear text-primary-token'>
           Still need help?
         </h2>
         <p className='mt-4 text-base leading-relaxed text-secondary-token'>
