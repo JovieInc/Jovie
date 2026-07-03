@@ -125,6 +125,10 @@ tail -50 ~/.hermes/logs/dispatch.jsonl | jq .
 tail -50 ~/.hermes/logs/launchd/cron-codex-issue-shipper.log
 tail -50 ~/.hermes/logs/codex-issue-shipper/*.log 2>/dev/null  # after a non-dry-run agent dispatch
 
+# Hermes/OpenClaw agent config health
+tsx scripts/hermes/jobs/agent-config-health.ts
+tail -50 ~/.hermes/logs/launchd/cron-agent-config-health.err.log
+
 # Free-model rankings
 cat ~/.hermes/state/model-router-rankings.json | jq .
 ```
@@ -227,9 +231,22 @@ Ship now / Re-evaluate when / Then:
 
 1. Check launchd state: `launchctl print gui/$(id -u)/ai.hermes.gateway | grep -A 3 "last exit"`
 2. Tail gateway log: `tail -100 ~/.hermes/logs/gateway.error.log`
-3. Confirm the supported Hermes gateway command works: `hermes gateway status`
-4. Re-run bootstrap: `./scripts/hermes/bootstrap-air.sh` (idempotent)
-5. If config is corrupt: `mv ~/.hermes/config.yaml ~/.hermes/config.yaml.bak && ./scripts/hermes/bootstrap-air.sh --reconfigure`
+3. Run the config sentinel: `tsx scripts/hermes/jobs/agent-config-health.ts`
+4. Confirm the supported Hermes gateway command works: `hermes gateway status`
+5. Re-run bootstrap: `./scripts/hermes/bootstrap-air.sh` (idempotent)
+6. If config is corrupt: `mv ~/.hermes/config.yaml ~/.hermes/config.yaml.bak && ./scripts/hermes/bootstrap-air.sh --reconfigure`
+
+### Agents keep failing after Telegram dispatch
+
+Run the config sentinel before changing models or restarting services:
+
+```bash
+tsx scripts/hermes/jobs/agent-config-health.ts
+tail -20 ~/.hermes/logs/jobs.jsonl | jq 'select(.job == "agent-config-health")'
+```
+
+It fails on the recurring local-agent patterns that caused OpenClaw/Hermes churn:
+schema-clobbered `memorySearch` blocks in `~/.openclaw/openclaw.json`, Vercel AI Gateway embedding model names without the `openai/` prefix, and stale Hermes fallbacks such as `nex-agi/nex-n2-pro`.
 
 ### Voice memo ingest stopped working
 
