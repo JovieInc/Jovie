@@ -548,6 +548,38 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  // GH-12948: the Audience tab label must stay single-line in the drawer
+  // surface switcher. Wrapped labels stack to ~3 lines and read as broken.
+  func testDrawerSurfaceSwitcherLabelsStaySingleLine() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let audienceSurface = app.buttons["shell-drawer-surface-shell-tab-audience"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Drawer surface switcher did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(audienceSurface.exists)
+    XCTAssertTrue(chatSurface.exists)
+
+    let profileHeight = profileSurface.frame.height
+    let audienceHeight = audienceSurface.frame.height
+    let chatHeight = chatSurface.frame.height
+    let maxSingleLineHeight = max(profileHeight, chatHeight) + 4
+
+    XCTAssertLessThanOrEqual(
+      audienceHeight,
+      maxSingleLineHeight,
+      "Audience drawer tab wrapped to multiple lines (height \(audienceHeight) vs peers \(profileHeight)/\(chatHeight)).\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "drawer-surface-switcher-labels", app: app)
+  }
+
   func testAudienceAskJovieCTAOpensScopedChat() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-audience",
