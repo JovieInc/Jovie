@@ -7,6 +7,7 @@ import {
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  EPIC_LABEL,
   eligibleCodexIssues,
   finishDispatch,
   loadShipperConfig,
@@ -44,7 +45,7 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters no-auto, claimed, and blocked issues before dispatch', () => {
+  it('filters no-auto, claimed, blocked, and epic issues before dispatch', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
     const noAuto = issue({
       number: 2,
@@ -58,12 +59,17 @@ describe('codex issue shipper planner', () => {
       number: 4,
       labels: [{ name: 'codex' }, { name: CODEX_BLOCKED_LABEL }],
     });
+    // Epic pointer: no code of its own; claiming it loops forever (#12729/#12846).
+    const epic = issue({
+      number: 5,
+      labels: [{ name: 'codex' }, { name: EPIC_LABEL }],
+    });
 
-    expect(eligibleCodexIssues([ready, noAuto, claimed, blocked])).toEqual([
-      ready,
-    ]);
     expect(
-      buildDispatchPlans([ready, noAuto, claimed, blocked], config)
+      eligibleCodexIssues([ready, noAuto, claimed, blocked, epic])
+    ).toEqual([ready]);
+    expect(
+      buildDispatchPlans([ready, noAuto, claimed, blocked, epic], config)
     ).toHaveLength(1);
   });
 

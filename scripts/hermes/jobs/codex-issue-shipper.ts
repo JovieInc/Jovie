@@ -6,8 +6,8 @@
  * eligible issue, writes dispatch context to gbrain, then starts a
  * coder-profile agent to ship it.
  *
- * Issues labeled `no-auto` or already claimed/blocked are excluded.
- * All other open issues are dispatchable.
+ * Issues labeled `no-auto`, `type:epic` (pointer trackers with no code), or
+ * already claimed/blocked are excluded. All other open issues are dispatchable.
  *
  * The empty-queue path is intentionally cheap: GitHub scan, log, exit. No
  * gbrain query, model call, subagent, or CodeRabbit work happens unless an
@@ -38,6 +38,7 @@ import {
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   type DispatchPlan,
+  EPIC_LABEL,
   type FinisherRunner,
   finishDispatch,
   type GbrainContext,
@@ -1116,6 +1117,9 @@ async function main(): Promise<void> {
           const skippedNoAuto = issues.filter(issue =>
             labelNames(issue).includes(NO_AUTO_LABEL)
           ).length;
+          const skippedEpic = issues.filter(issue =>
+            labelNames(issue).includes(EPIC_LABEL)
+          ).length;
           const capacity = systemCapacity(config);
           const batch = plans.slice(0, capacity.allowedAgents);
 
@@ -1126,6 +1130,7 @@ async function main(): Promise<void> {
             dispatchableCount: plans.length,
             skippedHuman,
             skippedNoAuto,
+            skippedEpic,
             batchCount: batch.length,
             maxIssuesPerRun: config.maxIssuesPerRun,
             maxParallelAgents: config.maxParallelAgents,
