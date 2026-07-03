@@ -6676,18 +6676,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   background: var(--system-b-bg-surface-1);
 }
 
-:where(.system-b-calendar-icon-button),
-:where(.system-b-calendar-toolbar-button) {
-  border-radius: var(--radius-pill);
-  color: var(--color-text-tertiary-token);
-}
-
-:where(.system-b-calendar-icon-button:hover),
-:where(.system-b-calendar-toolbar-button:hover) {
-  background: var(--system-b-bg-surface-0);
-  color: var(--color-text-primary-token);
-}
-
 :where(.system-b-calendar-panel) {
   border: 1px solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-lg);
@@ -6703,7 +6691,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   border-bottom: 1px solid var(--system-b-app-frame-seam);
 }
 
-:where(.system-b-calendar-toolbar-button),
 :where(.system-b-calendar-detail-section-heading),
 :where(.system-b-calendar-warning-heading),
 :where(.system-b-calendar-error-text),
