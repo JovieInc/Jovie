@@ -1,6 +1,6 @@
 'use client';
 
-import { SimpleTooltip, Skeleton } from '@jovie/ui';
+import { Button, SimpleTooltip, Skeleton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
@@ -239,10 +239,12 @@ export const ChatMessage = memo(function ChatMessage({
                 <SimpleTooltip
                   content={isCopySuccess ? 'Copied!' : 'Copy response'}
                 >
-                  <button
+                  <Button
                     type='button'
+                    variant='ghost'
+                    size='icon'
                     onClick={handleCopyMessage}
-                    className='system-b-chat-copy-button'
+                    className='h-7 w-7 shadow-none'
                     aria-label={
                       isCopySuccess ? 'Copied to clipboard' : 'Copy message'
                     }
@@ -252,7 +254,7 @@ export const ChatMessage = memo(function ChatMessage({
                     ) : (
                       <Copy className='system-b-chat-copy-icon' />
                     )}
-                  </button>
+                  </Button>
                 </SimpleTooltip>
               ) : null}
             </div>

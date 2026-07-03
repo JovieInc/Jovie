@@ -9,7 +9,7 @@ const meta: Meta<typeof Button> = {
     docs: {
       description: {
         component:
-          'Primary button component with comprehensive variants, loading states, and full accessibility support. Built on Radix UI Slot primitive for flexible composition.',
+          'Canonical Button component with five variants, three sizes, destructive tone, loading states, and Radix Slot composition.',
       },
     },
   },
@@ -17,24 +17,17 @@ const meta: Meta<typeof Button> = {
   argTypes: {
     variant: {
       control: { type: 'select' },
-      options: [
-        'primary',
-        'accent',
-        'secondary',
-        'ghost',
-        'outline',
-        'destructive',
-        'link',
-        'frosted',
-        'frosted-ghost',
-        'frosted-outline',
-      ],
+      options: ['primary', 'secondary', 'tertiary', 'ghost', 'link'],
       description: 'Visual style variant',
     },
     size: {
       control: { type: 'select' },
-      options: ['default', 'sm', 'lg', 'icon'],
+      options: ['sm', 'md', 'lg', 'icon'],
       description: 'Button size',
+    },
+    destructive: {
+      control: { type: 'boolean' },
+      description: 'Apply destructive tone to the selected variant',
     },
     loading: {
       control: { type: 'boolean' },
@@ -62,17 +55,17 @@ export const Primary: Story = {
   },
 };
 
-export const NeutralAlias: Story = {
-  args: {
-    children: 'Neutral Alias',
-    variant: 'accent',
-  },
-};
-
 export const Secondary: Story = {
   args: {
     children: 'Secondary Button',
     variant: 'secondary',
+  },
+};
+
+export const Tertiary: Story = {
+  args: {
+    children: 'Tertiary Button',
+    variant: 'tertiary',
   },
 };
 
@@ -83,17 +76,11 @@ export const Ghost: Story = {
   },
 };
 
-export const Outline: Story = {
-  args: {
-    children: 'Outline Button',
-    variant: 'outline',
-  },
-};
-
 export const Destructive: Story = {
   args: {
     children: 'Delete',
-    variant: 'destructive',
+    variant: 'primary',
+    destructive: true,
   },
 };
 
@@ -101,37 +88,6 @@ export const Link: Story = {
   args: {
     children: 'Link Button',
     variant: 'link',
-  },
-};
-
-// Frosted Glass Variants
-export const Frosted: Story = {
-  args: {
-    children: 'Frosted Button',
-    variant: 'frosted',
-  },
-  parameters: {
-    backgrounds: { default: 'dark' },
-  },
-};
-
-export const FrostedGhost: Story = {
-  args: {
-    children: 'Frosted Ghost',
-    variant: 'frosted-ghost',
-  },
-  parameters: {
-    backgrounds: { default: 'dark' },
-  },
-};
-
-export const FrostedOutline: Story = {
-  args: {
-    children: 'Frosted Outline',
-    variant: 'frosted-outline',
-  },
-  parameters: {
-    backgrounds: { default: 'dark' },
   },
 };
 
@@ -143,10 +99,10 @@ export const Small: Story = {
   },
 };
 
-export const Default: Story = {
+export const Medium: Story = {
   args: {
-    children: 'Default Button',
-    size: 'default',
+    children: 'Medium Button',
+    size: 'md',
   },
 };
 
@@ -272,21 +228,31 @@ export const AllVariants: Story = {
         <h3 className='text-sm font-semibold mb-2'>Core Variants</h3>
         <div className='flex gap-2 flex-wrap'>
           <Button variant='primary'>Primary</Button>
-          <Button variant='accent'>Neutral Alias</Button>
           <Button variant='secondary'>Secondary</Button>
+          <Button variant='tertiary'>Tertiary</Button>
           <Button variant='ghost'>Ghost</Button>
-          <Button variant='outline'>Outline</Button>
-          <Button variant='destructive'>Destructive</Button>
           <Button variant='link'>Link</Button>
         </div>
       </div>
 
       <div>
-        <h3 className='text-sm font-semibold mb-2'>Frosted Variants</h3>
+        <h3 className='text-sm font-semibold mb-2'>Destructive Tone</h3>
         <div className='flex gap-2 flex-wrap'>
-          <Button variant='frosted'>Frosted</Button>
-          <Button variant='frosted-ghost'>Frosted Ghost</Button>
-          <Button variant='frosted-outline'>Frosted Outline</Button>
+          <Button variant='primary' destructive>
+            Primary
+          </Button>
+          <Button variant='secondary' destructive>
+            Secondary
+          </Button>
+          <Button variant='tertiary' destructive>
+            Tertiary
+          </Button>
+          <Button variant='ghost' destructive>
+            Ghost
+          </Button>
+          <Button variant='link' destructive>
+            Link
+          </Button>
         </div>
       </div>
 
@@ -294,7 +260,7 @@ export const AllVariants: Story = {
         <h3 className='text-sm font-semibold mb-2'>Sizes</h3>
         <div className='flex gap-2 items-center flex-wrap'>
           <Button size='sm'>Small</Button>
-          <Button size='default'>Default</Button>
+          <Button size='md'>Medium</Button>
           <Button size='lg'>Large</Button>
           <Button size='icon'>
             <svg

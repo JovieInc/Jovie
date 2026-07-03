@@ -12,7 +12,7 @@ import {
   titleStyles,
 } from '../lib/overlay-styles';
 import { cn } from '../lib/utils';
-import { buttonVariants } from './button';
+import { Button } from './button';
 
 const AlertDialog = AlertDialogPrimitive.Root;
 
@@ -139,48 +139,54 @@ const AlertDialogDescription = React.forwardRef<
 AlertDialogDescription.displayName =
   AlertDialogPrimitive.Description.displayName;
 
+type AlertDialogActionVariant =
+  | 'primary'
+  | 'secondary'
+  | 'tertiary'
+  | 'ghost'
+  | 'link'
+  | 'destructive';
+
 interface AlertDialogActionProps
   extends React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> {
-  variant?:
-    | 'primary'
-    | 'accent'
-    | 'secondary'
-    | 'ghost'
-    | 'outline'
-    | 'destructive'
-    | 'link'
-    | 'frosted'
-    | 'frosted-ghost'
-    | 'frosted-outline';
+  readonly variant?: AlertDialogActionVariant;
+  readonly destructive?: boolean;
 }
 
 const AlertDialogAction = React.forwardRef<
   React.ComponentRef<typeof AlertDialogPrimitive.Action>,
   AlertDialogActionProps
->(({ className, variant, ...props }, ref) => (
-  <AlertDialogPrimitive.Action
-    ref={ref}
-    className={cn(buttonVariants({ variant }), className)}
-    data-testid='alert-dialog-action'
-    {...props}
-  />
-));
+>(({ className, variant = 'primary', destructive = false, ...props }, ref) => {
+  const buttonVariant = variant === 'destructive' ? 'primary' : variant;
+
+  return (
+    <Button
+      asChild
+      variant={buttonVariant}
+      destructive={destructive || variant === 'destructive'}
+      className={className}
+    >
+      <AlertDialogPrimitive.Action
+        ref={ref}
+        data-testid='alert-dialog-action'
+        {...props}
+      />
+    </Button>
+  );
+});
 AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName;
 
 const AlertDialogCancel = React.forwardRef<
   React.ComponentRef<typeof AlertDialogPrimitive.Cancel>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Cancel>
 >(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Cancel
-    ref={ref}
-    className={cn(
-      buttonVariants({ variant: 'outline' }),
-      'mt-2 sm:mt-0',
-      className
-    )}
-    data-testid='alert-dialog-cancel'
-    {...props}
-  />
+  <Button asChild variant='secondary' className={cn('mt-2 sm:mt-0', className)}>
+    <AlertDialogPrimitive.Cancel
+      ref={ref}
+      data-testid='alert-dialog-cancel'
+      {...props}
+    />
+  </Button>
 ));
 AlertDialogCancel.displayName = AlertDialogPrimitive.Cancel.displayName;
 

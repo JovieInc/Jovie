@@ -22,6 +22,16 @@ vi.mock('motion/react', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  Button: ({
+    children,
+    size,
+    variant,
+    ...props
+  }: ComponentProps<'button'> & { size?: string; variant?: string }) => (
+    <button data-size={size} data-variant={variant} {...props}>
+      {children}
+    </button>
+  ),
   SimpleTooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 

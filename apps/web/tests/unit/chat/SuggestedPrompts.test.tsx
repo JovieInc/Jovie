@@ -139,7 +139,7 @@ describe('SuggestedPrompts', () => {
     getByRole('button', { name: 'Generate Album Art' }).click();
     expect(onSelect).not.toHaveBeenCalled();
 
-    const draftBrief = getByRole('button', { name: 'Draft album-art brief' });
+    const draftBrief = getByRole('button', { name: 'Draft Album-art Brief' });
     expect(draftBrief).toBeEnabled();
 
     draftBrief.click();
@@ -164,7 +164,7 @@ describe('SuggestedPrompts', () => {
     getByRole('button', { name: 'Generate Album Art' }).click();
 
     expect(onSelect).not.toHaveBeenCalled();
-    expect(queryByRole('button', { name: 'Draft album-art brief' })).toBeNull();
+    expect(queryByRole('button', { name: 'Draft Album-art Brief' })).toBeNull();
   });
 
   it('omits "Generate album art" entirely when provider is unavailable and surfaces the brief in its place', () => {
@@ -184,7 +184,7 @@ describe('SuggestedPrompts', () => {
     expect(queryByRole('button', { name: 'Generate Album Art' })).toBeNull();
 
     // Brief fallback still surfaces a useful creative action.
-    const draftBrief = getByRole('button', { name: 'Draft album-art brief' });
+    const draftBrief = getByRole('button', { name: 'Draft Album-art Brief' });
     expect(draftBrief).toBeEnabled();
     draftBrief.click();
     expect(onSelect).toHaveBeenCalledWith(
@@ -207,7 +207,7 @@ describe('SuggestedPrompts', () => {
 
     expect(queryByRole('button', { name: 'Generate Album Art' })).toBeNull();
     expect(
-      getByRole('button', { name: 'Draft album-art brief' })
+      getByRole('button', { name: 'Draft Album-art Brief' })
     ).toBeEnabled();
   });
 
@@ -230,7 +230,7 @@ describe('SuggestedPrompts', () => {
 
     // Brief fallback still surfaces for the free-tier user.
     expect(
-      getByRole('button', { name: 'Draft album-art brief' })
+      getByRole('button', { name: 'Draft Album-art Brief' })
     ).toBeEnabled();
   });
 });
