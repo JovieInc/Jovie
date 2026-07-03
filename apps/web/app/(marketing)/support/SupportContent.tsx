@@ -94,6 +94,7 @@ export function SupportCta() {
         </p>
         <Button
           asChild
+          variant='secondary'
           className='mt-6'
           aria-label={`Send email to support team at ${SUPPORT_EMAIL}`}
           onClick={() =>
@@ -103,9 +104,7 @@ export function SupportCta() {
             })
           }
         >
-          <a href={`mailto:${SUPPORT_EMAIL}`} className='public-action-primary'>
-            Contact Support
-          </a>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>Contact Support</a>
         </Button>
       </section>
     </MarketingContainer>
