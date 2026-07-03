@@ -60,6 +60,27 @@ for pattern in "${dangerous_patterns[@]}"; do
   fi
 done
 
+# Block git checkout/switch in the primary Jovie shipper checkout (#12841).
+# Agents must use isolated worktrees — hijacking ~/Jovie silently regresses
+# the dispatcher while agents still get fresh worktrees from origin/main.
+primary_repo="${HERMES_JOVIE_REPO:-${HOME}/Jovie}"
+if echo "$command" | grep -qE '(^|[;&|[:space:]])(git checkout|git switch|gh pr checkout)'; then
+  if echo "$command" | grep -qF "$primary_repo"; then
+    echo "🚨 BLOCKED: git checkout/switch in primary Jovie repo ($primary_repo)"
+    echo "Use isolated worktrees only. Hijacking the shipper checkout runs stale dispatcher code."
+    echo "Command: $command"
+    exit 1
+  fi
+  if echo "$command" | grep -qE '(^|[[:space:]])(cd|pushd)[[:space:]]+.*Jovie'; then
+    if ! echo "$command" | grep -qE 'worktree'; then
+      echo "🚨 BLOCKED: likely git checkout in primary ~/Jovie checkout"
+      echo "Use isolated worktrees only (git worktree add ...)."
+      echo "Command: $command"
+      exit 1
+    fi
+  fi
+fi
+
 # Warn about potentially risky commands (but don't block)
 risky_patterns=(
   "rm -rf"

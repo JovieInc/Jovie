@@ -32,6 +32,34 @@ describe('hermes launchd pro templates', () => {
   });
 });
 
+describe('shipper-gated entrypoint', () => {
+  it('documents gbrain and grok preflight gates', () => {
+    const script = readFileSync(
+      join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
+      'utf8'
+    );
+    expect(script).toContain('gbrain_alive');
+    expect(script).toContain('grok_ready');
+    expect(script).toContain('codex-issue-shipper.ts');
+  });
+
+  it('codex issue shipper launchd plist uses the gated entrypoint', () => {
+    const templatePath = join(
+      REPO_ROOT,
+      'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template'
+    );
+    const rendered = renderTemplate(templatePath, {
+      '{{HOME}}': '/Users/tester',
+      '{{JOVIE_REPO}}': '/Users/tester/Jovie',
+      '{{NODE_BIN_DIR}}': '/Users/tester/.nvm/versions/node/v22.13.0/bin',
+    });
+    expect(rendered).toContain(
+      '/Users/tester/.hermes/scripts/shipper-gated-entrypoint.py'
+    );
+    expect(rendered).toContain('/Users/tester/Jovie');
+  });
+});
+
 describe('ship-loop pause semantics', () => {
   it('documents pause sentinels in the wrapper script', () => {
     const script = readFileSync(
