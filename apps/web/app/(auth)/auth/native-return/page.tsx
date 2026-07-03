@@ -1,6 +1,9 @@
 'use client';
 
-import { buildElectronAuthCompleteUrl } from '@jovie/auth-routing';
+import {
+  buildElectronAuthCompleteUrl,
+  resolveElectronAuthSchemeFromOrigin,
+} from '@jovie/auth-routing';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo } from 'react';
@@ -35,7 +38,10 @@ function NativeReturnContent() {
         ? rawDesktopFlow
         : null;
 
-    return buildElectronAuthCompleteUrl({ code, state, desktopFlow });
+    const scheme = resolveElectronAuthSchemeFromOrigin(
+      globalThis.location?.origin ?? 'https://jov.ie'
+    );
+    return buildElectronAuthCompleteUrl({ code, state, desktopFlow, scheme });
   }, [searchParams]);
 
   useEffect(() => {
