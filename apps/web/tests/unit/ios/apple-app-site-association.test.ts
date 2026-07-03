@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { GET as getLegacy } from '@/app/apple-app-site-association/route';
 import { GET as getWellKnown } from '@/app/.well-known/apple-app-site-association/route';
+import { GET as getLegacy } from '@/app/apple-app-site-association/route';
 import {
   JOVIE_APPLE_APP_SITE_ASSOCIATION,
-  JOVIE_IOS_BUNDLE_ID,
   JOVIE_APPLE_TEAM_ID,
+  JOVIE_IOS_BUNDLE_ID,
 } from '@/lib/ios/apple-app-site-association';
 
 async function readAasaResponse(response: Response) {
