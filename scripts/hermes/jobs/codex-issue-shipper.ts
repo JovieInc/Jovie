@@ -34,16 +34,14 @@ import {
   buildDispatchPlans,
   buildGbrainCaptureText,
   buildGbrainQuery,
-  canAutoRecoverCheckout,
   type CheckoutState,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  canAutoRecoverCheckout,
   classifyCheckout,
   type DispatchPlan,
   describeCheckout,
-  parseDirtyPaths,
-  type PrimaryCheckoutGuardResult,
   EPIC_LABEL,
   type FinisherRunner,
   finishDispatch,
@@ -53,7 +51,9 @@ import {
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
+  type PrimaryCheckoutGuardResult,
   parseAgentChain,
+  parseDirtyPaths,
   routeForAgent,
   type ShipperConfig,
   worktreeHasWork,
@@ -61,8 +61,6 @@ import {
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { sendSlack } from '../lib/slack-client';
-import { sendTelegram } from '../lib/telegram-client';
 import {
   journalEnd,
   journalStart,
@@ -70,6 +68,8 @@ import {
   readJournal,
   SHIP_OWNER_LOCK,
 } from '../lib/ship-ledger';
+import { sendSlack } from '../lib/slack-client';
+import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'codex-issue-shipper';
 

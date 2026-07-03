@@ -772,9 +772,10 @@ export const SHIPPER_CRITICAL_PATH_PREFIXES = [
 export function parseDirtyPaths(porcelain: string): ReadonlyArray<string> {
   return porcelain
     .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
+    .map(line => line.replace(/\r$/, ''))
+    .filter(line => line.length > 3)
     .map(line => {
+      // Porcelain is fixed-width: XY<space>path — do not trim the line first.
       const path = line.slice(3).trim();
       const renameIdx = path.indexOf(' -> ');
       return renameIdx >= 0 ? path.slice(renameIdx + 4).trim() : path;

@@ -10,14 +10,14 @@ import {
   canAutoRecoverCheckout,
   classifyCheckout,
   describeCheckout,
-  isRecoverableDetritus,
-  parseDirtyPaths,
   EPIC_LABEL,
   eligibleCodexIssues,
   finishDispatch,
+  isRecoverableDetritus,
   loadShipperConfig,
   NO_AUTO_LABEL,
   parseAgentChain,
+  parseDirtyPaths,
   routeForAgent,
   selectTaskRoute,
   shellQuote,
@@ -599,17 +599,16 @@ describe('checkout auto-recovery eligibility', () => {
   });
 
   it('clean wrong-branch checkout can auto-recover', () => {
-    expect(
-      canAutoRecoverCheckout({ ...fresh, branch: 'pr12780' }, [])
-    ).toBe(true);
+    expect(canAutoRecoverCheckout({ ...fresh, branch: 'pr12780' }, [])).toBe(
+      true
+    );
   });
 
   it('dirty shipper file blocks auto-recovery', () => {
     expect(
-      canAutoRecoverCheckout(
-        { ...fresh, dirty: true },
-        ['scripts/hermes/lib/codex-issue-shipper.ts']
-      )
+      canAutoRecoverCheckout({ ...fresh, dirty: true }, [
+        'scripts/hermes/lib/codex-issue-shipper.ts',
+      ])
     ).toBe(false);
   });
 
