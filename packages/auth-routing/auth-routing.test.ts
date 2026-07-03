@@ -8,6 +8,8 @@ import {
   createAuthAnalyticsEvent,
   createAuthStateRecord,
   resolveAuthCallback,
+  resolveElectronAuthSchemeFromAppEnv,
+  resolveElectronAuthSchemeFromOrigin,
   sanitizeReturnTo,
   validateNativeExchange,
 } from './index';
@@ -264,6 +266,38 @@ describe('auth routing boundary', () => {
     ).toBe(
       'jovie://auth/complete?code=c&state=s&desktop_flow=desktop_flow_nonce_12345'
     );
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        scheme: 'jovie-staging',
+      })
+    ).toBe('jovie-staging://auth/complete?code=c&state=s');
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        scheme: 'jovie-local',
+      })
+    ).toBe('jovie-local://auth/complete?code=c&state=s');
+  });
+
+  it('resolves per-env electron auth schemes from origin and app env', () => {
+    expect(resolveElectronAuthSchemeFromOrigin('https://jov.ie')).toBe('jovie');
+    expect(resolveElectronAuthSchemeFromOrigin('https://staging.jov.ie')).toBe(
+      'jovie-staging'
+    );
+    expect(resolveElectronAuthSchemeFromOrigin('http://localhost:3112')).toBe(
+      'jovie-local'
+    );
+    expect(resolveElectronAuthSchemeFromOrigin('http://127.0.0.1:3112')).toBe(
+      'jovie-local'
+    );
+    expect(resolveElectronAuthSchemeFromAppEnv('production')).toBe('jovie');
+    expect(resolveElectronAuthSchemeFromAppEnv('staging')).toBe(
+      'jovie-staging'
+    );
+    expect(resolveElectronAuthSchemeFromAppEnv('local')).toBe('jovie-local');
   });
 
   it('creates analytics payloads without leaking return URLs or token values', () => {

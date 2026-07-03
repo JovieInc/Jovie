@@ -90,7 +90,14 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
+function getAuthReturnScheme(): string {
+  if (APP_ENV === 'staging') return 'jovie-staging';
+  if (APP_ENV === 'local') return 'jovie-local';
+  return 'jovie';
+}
+
+const AUTH_RETURN_SCHEME = getAuthReturnScheme();
+const AUTH_RETURN_PROTOCOL = `${AUTH_RETURN_SCHEME}:`;
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
@@ -1390,13 +1397,8 @@ ipcMain.handle(
 );
 
 function registerAuthReturnProtocol(): void {
-  // Only the canonical production bundle (app.jov.ie) may own jovie:// deep
-  // links. Staging/local shells use separate bundle IDs and must not compete
-  // with the installed production handler — see apps/desktop/BUILDS.md.
-  if (APP_ENV !== 'production') {
-    return;
-  }
-
+  // Each desktop bundle registers its own custom scheme so auth callbacks
+  // return to the matching env (jovie / jovie-staging / jovie-local).
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
   };
@@ -1406,13 +1408,13 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+    app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME);
 }
 
 if (gotSingleInstanceLock) {
@@ -1452,7 +1454,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (url.startsWith('jovie://auth/complete')) {
+    if (url.startsWith(`${AUTH_RETURN_SCHEME}://auth/complete`)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }
