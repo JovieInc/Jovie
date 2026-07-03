@@ -15,6 +15,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { ensureJovieRepoCwd } from '../lib/ensure-jovie-repo-cwd';
 import { gbrainLearn } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
@@ -184,6 +185,7 @@ async function processPr(pr: Pr): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  ensureJovieRepoCwd(import.meta.url);
   await withJobLogging(JOB, async () => {
     const prs = listOpenPRs();
     logJobEvent({ job: JOB, event: 'scanned', count: prs.length });

@@ -38,6 +38,48 @@ describe('hermes launchd pro templates', () => {
   });
 });
 
+describe('hermes gh monitor launchd templates', () => {
+  const mapping = {
+    '{{HOME}}': '/Users/tester',
+    '{{JOVIE_REPO}}': '/Users/tester/Jovie',
+    '{{TSX_BIN}}': '/Users/tester/.hermes/node/bin/tsx',
+  };
+
+  it('ci monitor plist sets WorkingDirectory to the Jovie repo', () => {
+    const templatePath = join(
+      REPO_ROOT,
+      'scripts/hermes/launchd/co.jovie.hermes.cron-ci-monitor.plist.template'
+    );
+    const rendered = renderTemplate(templatePath, mapping);
+
+    expect(rendered).toContain(
+      '<string>co.jovie.hermes.cron-ci-monitor</string>'
+    );
+    expect(rendered).toContain(
+      '/Users/tester/Jovie/scripts/hermes/jobs/ci-failure-monitor.ts'
+    );
+    expect(rendered).toContain('<key>WorkingDirectory</key>');
+    expect(rendered).toContain('<string>/Users/tester/Jovie</string>');
+  });
+
+  it('pr monitor plist sets WorkingDirectory to the Jovie repo', () => {
+    const templatePath = join(
+      REPO_ROOT,
+      'scripts/hermes/launchd/co.jovie.hermes.cron-pr-monitor.plist.template'
+    );
+    const rendered = renderTemplate(templatePath, mapping);
+
+    expect(rendered).toContain(
+      '<string>co.jovie.hermes.cron-pr-monitor</string>'
+    );
+    expect(rendered).toContain(
+      '/Users/tester/Jovie/scripts/hermes/jobs/pr-stuck-monitor.ts'
+    );
+    expect(rendered).toContain('<key>WorkingDirectory</key>');
+    expect(rendered).toContain('<string>/Users/tester/Jovie</string>');
+  });
+});
+
 describe('shipper-gated entrypoint', () => {
   it('documents gbrain and grok preflight gates', () => {
     const script = readFileSync(

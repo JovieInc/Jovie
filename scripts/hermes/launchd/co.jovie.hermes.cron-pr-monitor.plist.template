@@ -9,6 +9,8 @@
         <string>{{TSX_BIN}}</string>
         <string>{{JOVIE_REPO}}/scripts/hermes/jobs/pr-stuck-monitor.ts</string>
     </array>
+    <key>WorkingDirectory</key>
+    <string>{{JOVIE_REPO}}</string>
     <key>StartInterval</key>
     <integer>600</integer>
     <key>RunAtLoad</key>
