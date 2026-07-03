@@ -661,13 +661,27 @@ async function requestRedirect(page, targetUrl, label) {
 }
 
 async function requestNativeCallbackRedirect(page, callbackPath, label) {
-  const nativeCallbackUrl = await requestRedirect(page, callbackPath, label);
-  if (!nativeCallbackUrl.startsWith('jovie://auth/complete?')) {
-    throw new Error(
-      `${label} did not return the Electron app callback: ${nativeCallbackUrl}`
-    );
+  const redirectUrl = await requestRedirect(page, callbackPath, label);
+  if (redirectUrl.startsWith('jovie://auth/complete?')) {
+    return redirectUrl;
   }
-  return nativeCallbackUrl;
+
+  const parsed = new URL(redirectUrl);
+  if (parsed.pathname === '/auth/native-return') {
+    const callbackPromise = Promise.race([
+      waitForNativeProtocolRequest(page, '/auth/native-return'),
+      waitForNativeRedirectResponse(page, '/auth/native-return'),
+    ]);
+    await page.goto(redirectUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    return await callbackPromise;
+  }
+
+  throw new Error(
+    `${label} did not return the Electron app callback: ${redirectUrl}`
+  );
 }
 
 function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
