@@ -74,7 +74,7 @@ async function requestTestingToken(secretKey) {
       throw new Error(`Testing token request failed: ${response.status}`);
     }
     data = await response.json();
-  } catch (error) {
+  } catch {
     const output = execFileSync(
       'curl',
       [
@@ -100,7 +100,11 @@ async function requestTestingToken(secretKey) {
   return data.token;
 }
 
-async function clerkBackendRequest(secretKey, path, { method = 'GET', body } = {}) {
+async function clerkBackendRequest(
+  secretKey,
+  path,
+  { method = 'GET', body } = {}
+) {
   const response = await fetch(`https://api.clerk.com/v1${path}`, {
     method,
     headers: {
@@ -241,13 +245,9 @@ async function newAuthContext(browser, fapiHost, testingToken) {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
-  await page.waitForFunction(
-    () => Boolean(window.Clerk?.loaded),
-    undefined,
-    {
-      timeout: 90_000,
-    }
-  );
+  await page.waitForFunction(() => Boolean(window.Clerk?.loaded), undefined, {
+    timeout: 90_000,
+  });
   return { context, page };
 }
 
@@ -255,7 +255,10 @@ async function signUpFresh(page, email, redirectUrl = null) {
   try {
     return await page.evaluate(
       async ({ email: targetEmail, code, redirectUrl: targetRedirectUrl }) => {
-        async function waitForActiveIdentity(fallbackSessionId, fallbackUserId) {
+        async function waitForActiveIdentity(
+          fallbackSessionId,
+          fallbackUserId
+        ) {
           for (let attempt = 0; attempt < 30; attempt += 1) {
             if (clerk.user?.id || clerk.session?.id) {
               return {
@@ -314,12 +317,10 @@ async function signUpFresh(page, email, redirectUrl = null) {
     );
   } catch (error) {
     if (!isNavigationInterruption(error)) throw error;
-    return await getClerkPageIdentity(page, 'fresh-signup').catch(
-      async () => {
-        await waitForAppSessionCookie(page.context(), 'fresh-signup');
-        return getClerkSessionIdentity(page.context(), 'fresh-signup');
-      }
-    );
+    return await getClerkPageIdentity(page, 'fresh-signup').catch(async () => {
+      await waitForAppSessionCookie(page.context(), 'fresh-signup');
+      return getClerkSessionIdentity(page.context(), 'fresh-signup');
+    });
   }
 }
 
@@ -405,7 +406,12 @@ async function signInExisting(page, email, redirectUrl = null) {
   }
 }
 
-async function signInWithTicket(page, ticket, expectedUserId, redirectUrl = null) {
+async function signInWithTicket(
+  page,
+  ticket,
+  expectedUserId,
+  redirectUrl = null
+) {
   try {
     return await page.evaluate(
       async ({
@@ -465,13 +471,13 @@ async function signInWithTicket(page, ticket, expectedUserId, redirectUrl = null
               );
             });
         } else if (signIn?.ticket && signIn?.finalize) {
-          ticketAttempt = await signIn.ticket({ ticket: signInTicket }).catch(
-            error => {
+          ticketAttempt = await signIn
+            .ticket({ ticket: signInTicket })
+            .catch(error => {
               throw new Error(
                 `Clerk ticket sign-in threw: ${describeError(error)}`
               );
-            }
-          );
+            });
           if (ticketAttempt.error) {
             throw new Error(
               `Clerk ticket sign-in failed: ${describeError(ticketAttempt.error)}`
@@ -483,13 +489,13 @@ async function signInWithTicket(page, ticket, expectedUserId, redirectUrl = null
             );
           });
         } else {
-          ticketAttempt = await futureSignIn.ticket({ ticket: signInTicket }).catch(
-            error => {
+          ticketAttempt = await futureSignIn
+            .ticket({ ticket: signInTicket })
+            .catch(error => {
               throw new Error(
                 `Clerk future ticket sign-in threw: ${describeError(error)}`
               );
-            }
-          );
+            });
         }
 
         if (ticketAttempt.error) {
@@ -552,12 +558,7 @@ async function signInWithFreshTicket(
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     try {
       const ticket = await createSignInTicket(secretKey, expectedUserId);
-      return await signInWithTicket(
-        page,
-        ticket,
-        expectedUserId,
-        redirectUrl
-      );
+      return await signInWithTicket(page, ticket, expectedUserId, redirectUrl);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
       if (attempt < 4) {
@@ -738,13 +739,9 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
-  await page.waitForFunction(
-    () => Boolean(window.Clerk?.loaded),
-    undefined,
-    {
-      timeout: 90_000,
-    }
-  );
+  await page.waitForFunction(() => Boolean(window.Clerk?.loaded), undefined, {
+    timeout: 90_000,
+  });
 
   const activeSessionId = await page.evaluate(
     () => window.Clerk?.session?.id ?? null
@@ -1115,9 +1112,7 @@ async function startElectronBrowserAuth() {
       })()`);
       if (!result?.ok) {
         throw new Error(
-          `Desktop auth handoff bridge failed: ${
-            result?.reason ?? 'unknown'
-          }`
+          `Desktop auth handoff bridge failed: ${result?.reason ?? 'unknown'}`
         );
       }
     } finally {
@@ -1144,58 +1139,6 @@ async function startElectronBrowserAuth() {
   }
 
   return new URL(rawAuthUrl, BASE_URL).toString();
-}
-
-async function findAuthenticatedElectronPage(expectedUserId) {
-  const deadline = Date.now() + 60_000;
-  const unwaitlistedTargets = new Set();
-
-  while (Date.now() < deadline) {
-    const targets = (await getElectronTargets()).filter(isBaseUrlTarget);
-    for (const target of targets) {
-      const page = await connectCdpPage(target).catch(() => null);
-      if (!page) continue;
-      try {
-        if (!unwaitlistedTargets.has(target.id)) {
-          const unwaitlistResult = await page.evaluate(`(async () => {
-            const body = document.body?.innerText ?? '';
-            if (!/waitlist/i.test(body)) return null;
-            const response = await fetch('/api/dev/unwaitlist', {
-              method: 'POST',
-            });
-            return { status: response.status, ok: response.ok };
-          })()`);
-          if (unwaitlistResult) {
-            unwaitlistedTargets.add(target.id);
-            if (!unwaitlistResult.ok && unwaitlistResult.status !== 404) {
-              throw new Error(
-                `Dev unwaitlist failed with ${unwaitlistResult.status}`
-              );
-            }
-            await page.navigate(`${BASE_URL}/app/chat?runtime=electron`);
-            page.close();
-            continue;
-          }
-        }
-
-        const matched = await page.evaluate(`(() => {
-          return Boolean(
-            window.Clerk?.loaded &&
-              window.Clerk?.user?.id === ${JSON.stringify(expectedUserId)} &&
-              window.Clerk?.session
-          );
-        })()`);
-        if (matched) return page;
-        page.close();
-      } catch {
-        page.close();
-      }
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  throw new Error('Electron did not become authenticated');
 }
 
 function parseStoredSmokeAuthEvidence(value, expectedUserId, minCapturedAt) {
