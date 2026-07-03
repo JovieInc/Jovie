@@ -14,8 +14,12 @@ interface LayoutShiftEntry extends PerformanceEntry {
   readonly hadRecentInput?: boolean;
 }
 
-function isLayoutShiftEntry(entry: PerformanceEntry): entry is LayoutShiftEntry {
-  return 'value' in entry && typeof (entry as LayoutShiftEntry).value === 'number';
+function isLayoutShiftEntry(
+  entry: PerformanceEntry
+): entry is LayoutShiftEntry {
+  return (
+    'value' in entry && typeof (entry as LayoutShiftEntry).value === 'number'
+  );
 }
 
 function sumLayoutShiftEntries(entries: PerformanceEntryList): number {
@@ -79,7 +83,8 @@ export async function installInteractionClsObserver(page: Page): Promise<void> {
           typeof (entry as LayoutShiftEntry).value === 'number' &&
           !(entry as LayoutShiftEntry).hadRecentInput
         ) {
-          win.__clsValue = (win.__clsValue ?? 0) + (entry as LayoutShiftEntry).value;
+          win.__clsValue =
+            (win.__clsValue ?? 0) + (entry as LayoutShiftEntry).value;
         }
       }
     });

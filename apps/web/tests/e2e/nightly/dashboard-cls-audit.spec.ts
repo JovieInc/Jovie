@@ -16,8 +16,8 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../../helpers/clerk-auth';
 import {
-  CLS_INTERACTION_BUDGET,
   attachClsResult,
+  CLS_INTERACTION_BUDGET,
   collectInteractionCls,
   installInteractionClsObserver,
   shouldSkipClsInDevMode,
@@ -64,7 +64,9 @@ async function gotoAppRoute(page: Page, route: string): Promise<void> {
 }
 
 async function getFirstReleaseTrigger(page: Page): Promise<Locator | null> {
-  const mobileRow = page.locator('[data-testid^="mobile-release-row-"]').first();
+  const mobileRow = page
+    .locator('[data-testid^="mobile-release-row-"]')
+    .first();
   if (await mobileRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
     return mobileRow;
   }
@@ -122,7 +124,10 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
   }, testInfo) => {
     test.setTimeout(180_000);
     if (shouldSkipClsInDevMode()) {
-      test.skip(true, 'CLS budgets are unreliable in dev mode (Turbopack overhead)');
+      test.skip(
+        true,
+        'CLS budgets are unreliable in dev mode (Turbopack overhead)'
+      );
       return;
     }
 
@@ -146,7 +151,10 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
       .isVisible({ timeout: TIMEOUTS.SIDEBAR })
       .catch(() => false);
     if (!drawerOpened) {
-      test.skip(true, 'Release drawer did not open — cannot measure drawer CLS');
+      test.skip(
+        true,
+        'Release drawer did not open — cannot measure drawer CLS'
+      );
       return;
     }
 
@@ -170,7 +178,10 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
   }, testInfo) => {
     test.setTimeout(180_000);
     if (shouldSkipClsInDevMode()) {
-      test.skip(true, 'CLS budgets are unreliable in dev mode (Turbopack overhead)');
+      test.skip(
+        true,
+        'CLS budgets are unreliable in dev mode (Turbopack overhead)'
+      );
       return;
     }
 
@@ -212,7 +223,10 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
   }, testInfo) => {
     test.setTimeout(180_000);
     if (shouldSkipClsInDevMode()) {
-      test.skip(true, 'CLS budgets are unreliable in dev mode (Turbopack overhead)');
+      test.skip(
+        true,
+        'CLS budgets are unreliable in dev mode (Turbopack overhead)'
+      );
       return;
     }
 

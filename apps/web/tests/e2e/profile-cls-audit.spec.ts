@@ -17,8 +17,8 @@
 import type { Page } from '@playwright/test';
 
 import {
-  CLS_INTERACTION_BUDGET,
   attachClsResult,
+  CLS_INTERACTION_BUDGET,
   collectInteractionCls,
   installInteractionClsObserver,
   measureBufferedCls,

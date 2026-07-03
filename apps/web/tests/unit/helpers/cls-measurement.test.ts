@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  CLS_INTERACTION_BUDGET,
   assertClsWithinBudget,
+  CLS_INTERACTION_BUDGET,
   shouldSkipClsInDevMode,
   sumLayoutShiftEntries,
 } from '../../helpers/cls-measurement';
