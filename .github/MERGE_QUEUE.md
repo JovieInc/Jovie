@@ -34,7 +34,7 @@ Graphite and branch protection must wait on **aggregate** contexts only — neve
 | `CI / Migration Guard` | Path-gated schema/migration safety (independent aggregate) |
 | `Fork PR Gate` | Blocks unreviewed fork PRs (auto-passes for agents + team) |
 
-**Queue CI = PR CI.** Graphite does not use GitHub `merge_group` events. Speculative queue runs trigger the same `pull_request` workflow (`ci.yml` → `PR Ready` lane). There is no separate slim merge-queue lane.
+**Queue CI runs the same workflow file and trigger as PR CI, with a reduced job set on `gtmq_*` batches.** Graphite does not use GitHub `merge_group` events. Speculative queue runs trigger the same `pull_request` workflow (`ci.yml`). `gtmq_*`-based PRs still get the real merge gates (`PR Ready`'s fast/unit/build checks, `Migration Guard`), but job-level `if:` conditions skip informational/preview-evidence lanes (Lighthouse, A11y, Mobile Overflow, Layout Guard, E2E Smoke, Golden Path, `DB Migrate (PR main)`, Preview Deploy, `PR Summary`) that never gated `PR Ready` and whose evidence was already produced on the source PR pre-enqueue. See `docs/PR_FLOW.md` §2 for the full rationale. There is no separate slim merge-queue *workflow file* — the reduction happens via existing job conditions in `ci.yml`.
 
 ### Graphite dashboard (`app.graphite.com/settings/merge-queue`) — OWL/human verify
 
