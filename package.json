@@ -81,7 +81,10 @@
     }
   },
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "bash scripts/dev-web-fast.sh",
+    "dev:all": "turbo dev",
+    "dev:cleanup": "bash scripts/cleanup-stale-dev.sh",
+    "dev:cleanup:force": "bash scripts/cleanup-stale-dev.sh --force",
     "dev:web": "turbo dev --filter=@jovie/web",
     "dev:web:local": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run dev:local",
     "dev:web:browse": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run dev:local:browse",
