@@ -58,6 +58,16 @@ Rules:
   isn't required for correctness of *this* diff, path-gate it or move it off-PR.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
+- **`gtmq_*` batch branches run a slim lane.** Graphite's merge queue re-runs the
+  full `ci.yml` `pull_request` workflow on each batch branch. Batches keep `PR
+  Ready`'s fast/unit/build checks plus `Migration Guard` — the actual merge
+  gates — but skip Lighthouse (all four surfaces), A11y, Mobile Overflow, Layout
+  Guard, E2E Smoke, Golden Path, `DB Migrate (PR main)`, Preview Deploy, and the
+  `PR Summary` comment. None of those lanes ever gated `PR Ready`; the evidence
+  they produce was already generated on the source PR before it entered the
+  queue, so re-running them per-batch is redundant compute, not redundant
+  safety. Layout Guard also moved off PRs entirely to run once post-merge
+  (`push: main`) instead of once per PR and once per gtmq batch.
 
 ### Does my change need the heavy lane, a preview, or taste approval?
 
