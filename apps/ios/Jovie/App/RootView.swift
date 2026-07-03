@@ -428,10 +428,12 @@ private struct MobileChatPlaceholderView: View {
         .padding(.horizontal, JovieSpacing.xLarge)
 
         Spacer(minLength: 48)
-
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
         ChatComposerPreview(draft: $draft, isOffline: isOffline)
           .padding(.horizontal, JovieSpacing.large)
           .padding(.bottom, JovieSpacing.medium)
+          .background(JovieColor.backgroundBase)
       }
     }
     .accessibilityIdentifier("mobile-chat")
@@ -441,17 +443,20 @@ private struct MobileChatPlaceholderView: View {
 private struct ChatComposerPreview: View {
   @Binding var draft: String
   let isOffline: Bool
+  @FocusState private var isComposerFocused: Bool
 
   var body: some View {
     ChatComposerBar(
       draft: $draft,
+      isFocused: $isComposerFocused,
       placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
       isSending: false,
       isPlusEnabled: true,
       onSend: { draft = "" },
       onSelectWorkflow: { action in
         draft = action.prompt
-      }
+      },
+      onDraftEdited: {}
     )
   }
 }

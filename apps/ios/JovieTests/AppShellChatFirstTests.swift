@@ -51,4 +51,12 @@ struct AppShellChatFirstTests {
   @Test func resolvedInitialTabPassesThroughProfileTab() {
     #expect(resolveShellInitialTab(.profile, chatEnabled: true) == .profile)
   }
+
+  @Test func keyboardDismissesOnStreamingStartWhenUserHasNotEditedSinceSend() {
+    #expect(MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(userEditedSinceSend: false))
+  }
+
+  @Test func keyboardStaysOpenOnStreamingStartWhenUserEditedSinceSend() {
+    #expect(MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(userEditedSinceSend: true) == false)
+  }
 }
