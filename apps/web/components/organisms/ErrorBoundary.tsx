@@ -86,11 +86,15 @@ export default function ErrorBoundary({
             </Button>
           ) : (
             <Button variant='primary' size='sm' onClick={reset}>
-              Try again
+              Try Again
             </Button>
           )}
-          <Button variant='outline' size='sm' onClick={() => router.push('/')}>
-            Go home
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={() => router.push('/')}
+          >
+            Go Home
           </Button>
         </div>
 

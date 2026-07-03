@@ -63,7 +63,7 @@ function SearchResultsLoadingSkeleton() {
     <output
       className='block space-y-1 p-2.5'
       aria-live='polite'
-      aria-label='Loading Spotify artist results'
+      aria-label='Loading Spotify Artist Results'
       aria-busy='true'
     >
       {LOADING_SKELETON_KEYS.map(key => (
@@ -137,9 +137,8 @@ function SearchInputTrailing({
           disabled={claimButtonDisabled}
           onClick={onClaimArtist}
           className={cn(
-            'system-b-spotify-connect-claim-button h-8 shrink-0 px-3 text-app',
-            claimButtonDisabled &&
-              'system-b-spotify-connect-claim-button--disabled'
+            'h-8 w-full shrink-0 justify-center px-3 text-app',
+            claimButtonDisabled && 'text-btn-primary-foreground/60'
           )}
         >
           {(isLoading || isPending) && (
@@ -518,7 +517,7 @@ export function SpotifyConnectDialog({
                   id='spotify-connect-results'
                   className='sr-only'
                   size={Math.min(totalItems, 6)}
-                  aria-label='Spotify artist results'
+                  aria-label='Spotify Artist Results'
                   value={
                     formState.activeResultIndex === pasteUrlIndex
                       ? '__paste__'
