@@ -1,6 +1,9 @@
 'use client';
 
-import { buildElectronAuthCompleteUrl } from '@jovie/auth-routing';
+import {
+  buildElectronAuthCompleteUrl,
+  isElectronAuthShell,
+} from '@jovie/auth-routing';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo } from 'react';
@@ -34,8 +37,11 @@ function NativeReturnContent() {
       rawDesktopFlow && DESKTOP_FLOW_PATTERN.test(rawDesktopFlow)
         ? rawDesktopFlow
         : null;
+    const rawShell = searchParams.get('shell');
+    const shell =
+      rawShell && isElectronAuthShell(rawShell) ? rawShell : 'production';
 
-    return buildElectronAuthCompleteUrl({ code, state, desktopFlow });
+    return buildElectronAuthCompleteUrl({ code, state, desktopFlow, shell });
   }, [searchParams]);
 
   useEffect(() => {

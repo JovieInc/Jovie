@@ -69,7 +69,7 @@ describe('GET /auth/callback', () => {
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
     expect(location).toBe(
-      'https://jov.ie/auth/native-return?code=00000000000040008000000000000001&state=state_123'
+      'https://jov.ie/auth/native-return?code=00000000000040008000000000000001&state=state_123&shell=production'
     );
     // The browser must never receive a bare custom-scheme redirect here.
     expect(location?.startsWith('jovie://')).toBe(false);
@@ -110,7 +110,7 @@ describe('GET /auth/callback', () => {
     );
 
     expect(response.headers.get('location')).toBe(
-      'https://jov.ie/auth/native-return?code=00000000000040008000000000000001&state=state_123&desktop_flow=flow_nonce_abcdef123456'
+      'https://jov.ie/auth/native-return?code=00000000000040008000000000000001&state=state_123&shell=production&desktop_flow=flow_nonce_abcdef123456'
     );
   });
 

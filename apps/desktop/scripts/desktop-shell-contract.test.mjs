@@ -166,10 +166,11 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   }
 });
 
-test('desktop production bundle declares the jovie auth protocol', async () => {
-  const [builderConfig, mainSource, stagingConfig, localConfig] =
+test('desktop bundles declare per-env auth URL schemes', async () => {
+  const [builderConfig, protocolSource, mainSource, stagingConfig, localConfig] =
     await Promise.all([
       readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
+      readFile(join(desktopRoot, 'src/desktop-auth-protocol.ts'), 'utf8'),
       readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
       readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
       readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
@@ -178,10 +179,40 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
   assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
-  assert.match(mainSource, /if \(APP_ENV !== 'production'\)/);
-  assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
-  assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
-  assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLTypes:/);
+  assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
+  assert.match(protocolSource, /production: 'jovie'/);
+  assert.match(protocolSource, /staging: 'jovie-staging'/);
+  assert.match(protocolSource, /local: 'jovie-local'/);
+  assert.match(mainSource, /getDesktopAuthScheme\(APP_ENV\)/);
+  assert.match(mainSource, /setAsDefaultProtocolClient\(scheme\)/);
+  assert.doesNotMatch(mainSource, /if \(APP_ENV !== 'production'\) \{\s*return;\s*\}/);
+});
+
+test('signed-out desktop launch recovers to a visible sign-in surface', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  assert.match(mainSource, /function isAnyDesktopWindowVisible\(\): boolean/);
+  assert.match(mainSource, /function ensureSignedOutSignInSurface\(win: BrowserWindow\)/);
+  assert.match(mainSource, /function loadMainWindowAuthHandoff\(/);
+  assert.match(mainSource, /const DESKTOP_VISIBILITY_FALLBACK_MS = 2_000;/);
+  assert.match(
+    mainSource,
+    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\), \{\s*mainWin: win,\s*\}\)/
+  );
+  assert.match(
+    mainSource,
+    /maybeShowDesktopAuthHandoff\(navigationUrl, \{ mainWin: win \}\)/
+  );
+  assert.match(mainSource, /loadMainWindowAuthHandoff\(win, initialAuthUrl\)/);
+  assert.doesNotMatch(
+    mainSource,
+    /if \(win\.isDestroyed\(\) \|\| isAuthHandoffOpen\(\) \|\| win\.isVisible\(\)\) return;/
+  );
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {

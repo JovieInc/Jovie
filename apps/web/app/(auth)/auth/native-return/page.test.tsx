@@ -60,6 +60,16 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     );
   });
 
+  it('uses the staging desktop shell scheme when shell=staging', () => {
+    setSearchParams(`code=${CODE}&state=${STATE}&shell=staging`);
+    render(<NativeReturnPage />);
+
+    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+      'href',
+      `jovie-staging://auth/complete?code=${CODE}&state=${STATE}`
+    );
+  });
+
   it('shows a recovery message and no deep link when required params are missing', () => {
     setSearchParams(`state=${STATE}`);
     render(<NativeReturnPage />);

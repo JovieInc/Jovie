@@ -39,6 +39,10 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import {
+  getDesktopAuthProtocol,
+  getDesktopAuthScheme,
+} from './desktop-auth-protocol';
 import { decideRendererRecovery } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
@@ -90,7 +94,8 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
+const AUTH_RETURN_PROTOCOL = getDesktopAuthProtocol(APP_ENV);
+const AUTH_RETURN_SCHEME = getDesktopAuthScheme(APP_ENV);
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
@@ -144,6 +149,9 @@ const AUTH_HANDOFF_WINDOW_BOUNDS = {
   minWidth: 680,
   minHeight: 460,
 } as const;
+// If neither the main nor handoff window becomes visible shortly after launch,
+// force a recoverable sign-in surface instead of leaving the user on black.
+const DESKTOP_VISIBILITY_FALLBACK_MS = 2_000;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
@@ -525,6 +533,43 @@ function isAuthHandoffOpen(): boolean {
   return Boolean(authHandoffWindow && !authHandoffWindow.isDestroyed());
 }
 
+function isAnyDesktopWindowVisible(): boolean {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && win.isVisible()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function loadMainWindowAuthHandoff(
+  win: BrowserWindow,
+  authUrl: string
+): void {
+  if (win.isDestroyed()) return;
+  void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+}
+
+function ensureSignedOutSignInSurface(win: BrowserWindow): void {
+  if (win.isDestroyed() || isAnyDesktopWindowVisible()) return;
+
+  const current = win.webContents.getURL();
+  if (!current || current === 'about:blank') {
+    const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+    loadMainWindowAuthHandoff(win, authUrl);
+  }
+
+  if (
+    authHandoffWindow &&
+    !authHandoffWindow.isDestroyed() &&
+    !authHandoffWindow.isVisible()
+  ) {
+    showWindowNow(authHandoffWindow);
+  }
+
+  showWindowNow(win);
+}
+
 function hideMainWindowForAuthHandoff(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindowHiddenForAuthHandoff = true;
@@ -678,7 +723,23 @@ function showDesktopAuthHandoff(authUrl: string): void {
     `${authHandoffWindow.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
   );
 
+  const handoffVisibilityFallback = setTimeout(() => {
+    if (
+      !authHandoffWindow ||
+      authHandoffWindow.isDestroyed() ||
+      authHandoffWindow.isVisible()
+    ) {
+      return;
+    }
+
+    restoreMainWindowAfterAuthHandoff();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      ensureSignedOutSignInSurface(mainWindow);
+    }
+  }, DESKTOP_VISIBILITY_FALLBACK_MS);
+
   authHandoffWindow.once('ready-to-show', () => {
+    clearTimeout(handoffVisibilityFallback);
     hideMainWindowForAuthHandoff();
     if (authHandoffWindow) showWindow(authHandoffWindow);
   });
@@ -716,11 +777,17 @@ function showDesktopAuthHandoff(authUrl: string): void {
   showWindow(authHandoffWindow);
 }
 
-function maybeShowDesktopAuthHandoff(urlString: string): boolean {
+function maybeShowDesktopAuthHandoff(
+  urlString: string,
+  options?: { readonly mainWin?: BrowserWindow }
+): boolean {
   const authUrl = buildDesktopBrowserAuthUrl(urlString);
   if (!authUrl) return false;
 
   showDesktopAuthHandoff(authUrl);
+  if (options?.mainWin) {
+    loadMainWindowAuthHandoff(options.mainWin, authUrl);
+  }
   return true;
 }
 
@@ -851,14 +918,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // sign in. If nothing has become visible shortly after launch, force a
   // usable sign-in surface into THIS (main) window, which we know can render.
   const initialVisibilityFallback = setTimeout(() => {
-    if (win.isDestroyed() || isAuthHandoffOpen() || win.isVisible()) return;
-    const current = win.webContents.getURL();
-    if (!current || current === 'about:blank') {
-      const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
-      void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
-    }
-    showWindowNow(win);
-  }, 6000);
+    if (win.isDestroyed()) return;
+    ensureSignedOutSignInSurface(win);
+  }, DESKTOP_VISIBILITY_FALLBACK_MS);
 
   win.once('ready-to-show', () => {
     clearTimeout(initialVisibilityFallback);
@@ -901,8 +963,11 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
         if (
           typeof validatedURL === 'string' &&
-          maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL))
+          maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL), {
+            mainWin: win,
+          })
         ) {
+          ensureSignedOutSignInSurface(win);
           return;
         }
 
@@ -990,7 +1055,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // dedicated handoff; all other safe URLs open in the system browser.
   win.webContents.on('will-navigate', (event, url) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (maybeShowDesktopAuthHandoff(navigationUrl, { mainWin: win })) {
       event.preventDefault();
       return;
     }
@@ -1015,7 +1080,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (maybeShowDesktopAuthHandoff(navigationUrl, { mainWin: win })) {
       event.preventDefault();
       return;
     }
@@ -1037,7 +1102,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // navigation guards. Internal targets stay in the app, safe external links
   // open in the system browser, and unsafe protocols are silently dropped.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (maybeShowDesktopAuthHandoff(url)) {
+    if (maybeShowDesktopAuthHandoff(url, { mainWin: win })) {
       return { action: 'deny' };
     }
 
@@ -1076,7 +1141,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
   if (initialAuthUrl) {
     showDesktopAuthHandoff(initialAuthUrl);
-    void win.loadURL(buildDesktopAuthHandoffUrl(initialAuthUrl));
+    loadMainWindowAuthHandoff(win, initialAuthUrl);
   } else {
     void win.loadURL(initialUrl);
   }
@@ -1390,13 +1455,7 @@ ipcMain.handle(
 );
 
 function registerAuthReturnProtocol(): void {
-  // Only the canonical production bundle (app.jov.ie) may own jovie:// deep
-  // links. Staging/local shells use separate bundle IDs and must not compete
-  // with the installed production handler — see apps/desktop/BUILDS.md.
-  if (APP_ENV !== 'production') {
-    return;
-  }
-
+  const scheme = AUTH_RETURN_SCHEME;
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
   };
@@ -1406,13 +1465,13 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+    app.setAsDefaultProtocolClient(scheme, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(scheme);
 }
 
 if (gotSingleInstanceLock) {
@@ -1452,7 +1511,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (url.startsWith('jovie://auth/complete')) {
+    if (url.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}/complete`)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }

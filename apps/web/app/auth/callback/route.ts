@@ -4,6 +4,7 @@ import {
   createAuthAnalyticsEvent,
   type NativeAuthClient,
   resolveAuthCallback,
+  resolveElectronAuthShell,
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
@@ -95,6 +96,7 @@ export async function GET(request: Request) {
       const bounce = new URL('/auth/native-return', request.url);
       bounce.searchParams.set('code', exchangeCode);
       bounce.searchParams.set('state', stateRecord.state);
+      bounce.searchParams.set('shell', resolveElectronAuthShell(request.url));
       if (stateRecord.desktopFlow) {
         bounce.searchParams.set('desktop_flow', stateRecord.desktopFlow);
       }

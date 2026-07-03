@@ -83,6 +83,43 @@ const ELECTRON_AUTH_COMPLETE_URL = 'jovie://auth/complete';
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 
+/** Per-shell custom URL schemes so prod/staging/local Mac apps do not compete. */
+export const ELECTRON_AUTH_SCHEME_BY_SHELL = {
+  production: 'jovie',
+  staging: 'jovie-staging',
+  local: 'jovie-local',
+} as const;
+
+export type ElectronAuthShell = keyof typeof ELECTRON_AUTH_SCHEME_BY_SHELL;
+
+const ELECTRON_AUTH_SHELLS = new Set<string>(
+  Object.keys(ELECTRON_AUTH_SCHEME_BY_SHELL)
+);
+
+export function isElectronAuthShell(value: string): value is ElectronAuthShell {
+  return ELECTRON_AUTH_SHELLS.has(value);
+}
+
+export function getElectronAuthScheme(shell: ElectronAuthShell): string {
+  return ELECTRON_AUTH_SCHEME_BY_SHELL[shell];
+}
+
+export function resolveElectronAuthShell(origin: string): ElectronAuthShell {
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname === 'staging.jov.ie') {
+      return 'staging';
+    }
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      return 'local';
+    }
+  } catch {
+    // Fall through to production.
+  }
+
+  return 'production';
+}
+
 const RETURN_BLOCKED_PREFIXES = [
   '/api',
   '/__clerk',
@@ -352,8 +389,10 @@ export function buildElectronAuthCompleteUrl(input: {
   readonly code: string;
   readonly state: string;
   readonly desktopFlow?: string | null;
+  readonly shell?: ElectronAuthShell;
 }): string {
-  return buildUrlWithCodeAndState(ELECTRON_AUTH_COMPLETE_URL, input);
+  const scheme = getElectronAuthScheme(input.shell ?? 'production');
+  return buildUrlWithCodeAndState(`${scheme}://auth/complete`, input);
 }
 
 export function resolveAuthCallback(input: {
