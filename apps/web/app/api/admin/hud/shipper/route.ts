@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
-import { getHudShipperStatus } from '@/lib/hud/shipper-state';
 import { requireAdminHudApiAccess } from '@/lib/hud/require-admin-hud-api';
+import { getHudShipperStatus } from '@/lib/hud/shipper-state';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -19,7 +19,10 @@ export async function GET(): Promise<Response> {
       headers: NO_STORE_HEADERS,
     });
   } catch (error) {
-    logger.error('[api/admin/hud/shipper] Failed to load shipper status', error);
+    logger.error(
+      '[api/admin/hud/shipper] Failed to load shipper status',
+      error
+    );
     await captureError('HUD shipper status failed', error, {
       route: '/api/admin/hud/shipper',
       method: 'GET',

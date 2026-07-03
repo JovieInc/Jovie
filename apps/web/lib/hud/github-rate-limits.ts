@@ -67,20 +67,23 @@ export async function getHudGithubRateLimits(): Promise<HudGithubRateLimitsPaylo
       coreResponse.headers.get('x-ratelimit-reset')
     );
 
-    const graphqlResponse = await serverFetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-      body: JSON.stringify({
-        query: `query HudRateLimit { rateLimit { limit remaining resetAt } }`,
-      }),
-      cache: 'no-store',
-      context: 'HUD GitHub GraphQL rate limit',
-    });
+    const graphqlResponse = await serverFetch(
+      'https://api.github.com/graphql',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        body: JSON.stringify({
+          query: `query HudRateLimit { rateLimit { limit remaining resetAt } }`,
+        }),
+        cache: 'no-store',
+        context: 'HUD GitHub GraphQL rate limit',
+      }
+    );
 
     let graphql: HudGithubRateLimitBucket | null = null;
     if (graphqlResponse.ok) {

@@ -1,10 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const redirectMock = vi.fn();
-const unauthorizedMock = vi.fn();
-const forbiddenMock = vi.fn();
-const getCurrentAdminPageAccessMock = vi.fn();
-const getHudMetricsMock = vi.fn();
+const {
+  redirectMock,
+  unauthorizedMock,
+  forbiddenMock,
+  getCurrentAdminPageAccessMock,
+  getHudMetricsMock,
+} = vi.hoisted(() => ({
+  redirectMock: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+  unauthorizedMock: vi.fn(),
+  forbiddenMock: vi.fn(),
+  getCurrentAdminPageAccessMock: vi.fn(),
+  getHudMetricsMock: vi.fn(),
+}));
 
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
@@ -28,17 +38,20 @@ vi.mock('@/lib/env-server', () => ({
 
 describe('/hud page auth', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     getHudMetricsMock.mockResolvedValue({ accessMode: 'admin' });
   });
 
   it('redirects kiosk bookmarks to /hud-tv', async () => {
     const { default: HudPage } = await import('@/app/hud/page');
-    await HudPage({
-      searchParams: Promise.resolve({ kiosk: 'test-token' }),
-    });
 
-    expect(redirectMock).toHaveBeenCalledWith('/hud-tv?kiosk=test-token');
+    await expect(
+      HudPage({
+        searchParams: Promise.resolve({ kiosk: 'test-token' }),
+      })
+    ).rejects.toThrow('NEXT_REDIRECT:/hud-tv?kiosk=test-token');
+    expect(getCurrentAdminPageAccessMock).not.toHaveBeenCalled();
   });
 
   it('calls unauthorized for signed-out users', async () => {

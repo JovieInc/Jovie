@@ -104,16 +104,19 @@ function resolveShipperState(
 ): HudShipperState {
   if (isPaused) return 'paused';
 
-  const lastStart = [...events].reverse().find(event => event.event === 'start');
+  const lastStart = [...events]
+    .reverse()
+    .find(event => event.event === 'start');
   const lastFinish = [...events]
     .reverse()
     .find(event => event.event === 'finish');
-  const lastFatal = [...events].reverse().find(event => event.event === 'fatal');
+  const lastFatal = [...events]
+    .reverse()
+    .find(event => event.event === 'fatal');
 
   let state: HudShipperState = 'idle';
   if (lastStart && lastFinish) {
-    state =
-      (lastStart.ts ?? '') > (lastFinish.ts ?? '') ? 'running' : 'idle';
+    state = (lastStart.ts ?? '') > (lastFinish.ts ?? '') ? 'running' : 'idle';
   } else if (lastStart) {
     state = 'running';
   } else if (events.length === 0) {
@@ -167,8 +170,12 @@ export function getHudShipperStatus(): HudShipperStatusPayload {
   const events = parseShipperEvents(tailLines(JOBS_LOG_PATH, 200));
   const isPaused = existsSync(PAUSE_SENTINEL_PATH);
   const inFlightJobs = readInflightJobs();
-  const lastFinish = [...events].reverse().find(event => event.event === 'finish');
-  const lastFatal = [...events].reverse().find(event => event.event === 'fatal');
+  const lastFinish = [...events]
+    .reverse()
+    .find(event => event.event === 'finish');
+  const lastFatal = [...events]
+    .reverse()
+    .find(event => event.event === 'fatal');
   const lastScanned = [...events]
     .reverse()
     .find(event => event.event === 'scanned');
@@ -215,7 +222,9 @@ export function getHudShipperStatus(): HudShipperStatusPayload {
     dispatchableCount: lastScanned?.dispatchableCount ?? 0,
     inFlightCount: inFlightJobs.length,
     inFlightJobs,
-    currentAgents: lastPlanned?.plans ? formatAgentLabel(lastPlanned.plans) : [],
+    currentAgents: lastPlanned?.plans
+      ? formatAgentLabel(lastPlanned.plans)
+      : [],
     lastError: lastFatal?.error ?? null,
     recentErrors: readRecentErrors(),
     capacity: lastScanned?.capacity ?? null,

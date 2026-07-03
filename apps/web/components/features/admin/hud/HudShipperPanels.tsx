@@ -7,16 +7,16 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
+import type { HudTone } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
+import { cn } from '@/lib/utils';
 import type {
   HudGithubRateLimitsPayload,
   HudShipperState,
   HudShipperStatusPayload,
   HudWhatShippedPayload,
 } from '@/types/hud-shipper';
-import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
-import type { HudTone } from '@/lib/hud/tone-determination';
-import { cn } from '@/lib/utils';
 
 function formatTimestamp(value: string | null): string {
   if (!value) return '—';
@@ -45,9 +45,7 @@ function shipperLabel(state: HudShipperState): string {
   return 'Not Running';
 }
 
-function rateLimitSubtitle(
-  bucket: HudGithubRateLimitsPayload['core']
-): string {
+function rateLimitSubtitle(bucket: HudGithubRateLimitsPayload['core']): string {
   if (!bucket) return 'No data';
   return `${bucket.remaining.toLocaleString('en-US')} / ${bucket.limit.toLocaleString('en-US')} remaining`;
 }
@@ -239,7 +237,10 @@ function GithubRateLimitsPanel({
       data-testid='hud-github-rate-limits-panel'
     >
       <div className='flex items-center gap-2'>
-        <GitBranch className='h-4 w-4 text-secondary-token' aria-hidden='true' />
+        <GitBranch
+          className='h-4 w-4 text-secondary-token'
+          aria-hidden='true'
+        />
         <SectionLabel>GitHub rate limits</SectionLabel>
       </div>
       <div className='grid gap-3 sm:grid-cols-2'>
@@ -272,8 +273,14 @@ function GithubRateLimitsPanel({
 
 function PanelSkeleton() {
   return (
-    <ContentSurfaceCard surface='details' className='flex min-h-40 items-center justify-center p-3'>
-      <Loader2 className='h-5 w-5 animate-spin text-tertiary-token' aria-hidden='true' />
+    <ContentSurfaceCard
+      surface='details'
+      className='flex min-h-40 items-center justify-center p-3'
+    >
+      <Loader2
+        className='h-5 w-5 animate-spin text-tertiary-token'
+        aria-hidden='true'
+      />
       <span className='sr-only'>Loading HUD panel</span>
     </ContentSurfaceCard>
   );
