@@ -47,11 +47,17 @@ describe('chat composer System B source contract', () => {
       'system-b-chat-composer-thread-scroll-padding',
       'system-b-chat-composer-surface',
       'system-b-chat-composer-picker-shell',
-      'system-b-chat-composer-icon-button',
       'system-b-chat-composer-primary-action',
       'system-b-chat-composer-menu',
     ]) {
       expect(styles).toContain(className);
     }
+
+    const toolbarSource = readFileSync(
+      resolve(appRoot, 'components/jovie/components/ChatComposerToolbar.tsx'),
+      'utf8'
+    );
+    expect(toolbarSource).toContain("variant='ghost'");
+    expect(toolbarSource).not.toContain('system-b-chat-composer-icon-button');
   });
 });

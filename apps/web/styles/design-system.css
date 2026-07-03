@@ -2102,14 +2102,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   text-wrap: balance;
 }
 
-:where(.system-b-download-hero-button) {
-  height: calc(var(--space-10) + var(--space-1));
-  gap: var(--space-2);
-  padding-inline: var(--space-6);
-  font-size: var(--text-mid);
-  font-weight: var(--font-weight-semibold);
-}
-
 :where(.system-b-download-secondary-link) {
   display: inline-flex;
   height: calc(var(--space-10) + var(--space-1));
@@ -3124,64 +3116,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: var(--color-text-primary-token);
 }
 
-.system-b-claim-handle-button {
-  height: 36px;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-primary-bg) 22%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
-  padding-inline: 0.875rem;
-  font-size: var(--text-app);
-  font-weight: 510;
-  letter-spacing: 0;
-  transition:
-    background var(--system-b-duration-fast) var(--system-b-ease),
-    border-color var(--system-b-duration-fast) var(--system-b-ease),
-    color var(--system-b-duration-fast) var(--system-b-ease),
-    opacity var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-.system-b-claim-handle-button[data-size="hero"] {
-  height: 38px;
-  border-radius: 0.8rem;
-  padding-inline: var(--space-4);
-  font-size: var(--text-xs);
-}
-
-.system-b-claim-handle-button[data-size="display"] {
-  height: 64px;
-  border-radius: 1rem;
-  padding-inline: var(--space-6);
-  font-size: var(--text-base);
-}
-
-.system-b-claim-handle-button:not(:disabled):hover,
-.system-b-claim-handle-button:not(:disabled):focus-visible {
-  border-color: color-mix(
-    in oklab,
-    var(--system-b-primary-bg) 34%,
-    transparent
-  );
-  background: color-mix(
-    in oklab,
-    var(--system-b-primary-bg) 92%,
-    var(--system-b-primary-fg) 8%
-  );
-}
-
-.system-b-claim-handle-button[data-disabled="true"] {
-  cursor: not-allowed;
-  border-color: transparent;
-  background: color-mix(
-    in oklab,
-    var(--system-b-bg-surface-2) 82%,
-    transparent
-  );
-  color: var(--color-text-quaternary-token);
-  opacity: 0.42;
-}
-
 html:not(.dark) .system-b-claim-handle-row,
 html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   transition: none !important;
@@ -3202,14 +3136,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 @media (min-width: 640px) {
   .system-b-claim-handle-row[data-size="display"] {
     padding: var(--space-2);
-  }
-
-  .system-b-claim-handle-button {
-    padding-inline: var(--space-4);
-  }
-
-  .system-b-claim-handle-button[data-size="display"] {
-    padding-inline: var(--space-7);
   }
 }
 
@@ -4631,24 +4557,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   gap: var(--space-1);
 }
 
-:where(.system-b-chat-profile-preview-phone-button) {
-  height: var(--space-6);
-  border-radius: var(--radius-md);
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 22%,
-    transparent
-  );
-}
-
-:where(.system-b-chat-profile-preview-phone-button-muted) {
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 14%,
-    transparent
-  );
-}
-
 :where(.system-b-chat-profile-preview-device-icon) {
   position: absolute;
   bottom: var(--space-4);
@@ -4970,34 +4878,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   inset: 0;
   display: grid;
   place-items: center;
-}
-
-:where(.system-b-thread-play-button) {
-  display: grid;
-  width: var(--space-12);
-  height: var(--space-12);
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
-  transition:
-    background-color var(--system-b-duration-fast) var(--system-b-ease),
-    opacity var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-:where(
-  .system-b-thread-video-preview:hover
-    .system-b-thread-play-button[data-interactive="true"]
-) {
-  background: color-mix(
-    in oklab,
-    var(--system-b-primary-bg) 94%,
-    var(--system-b-bg-surface-2)
-  );
-}
-
-:where(.system-b-thread-play-button[data-interactive="false"]) {
-  background: color-mix(in oklab, var(--system-b-primary-bg) 42%, transparent);
 }
 
 :where(.system-b-thread-duration-badge) {
@@ -5480,21 +5360,12 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   line-height: calc(var(--space-4) + var(--space-px));
 }
 
-:where(.system-b-spotify-connect-claim-button--disabled) {
-  color: color-mix(in oklab, var(--color-btn-primary-fg) 60%, transparent);
-}
-
 :where(.system-b-spotify-connect-trailing) {
   display: flex;
   min-height: var(--space-8);
   width: calc(var(--space-24) + var(--space-8));
   flex: 0 0 calc(var(--space-24) + var(--space-8));
   align-items: center;
-  justify-content: center;
-}
-
-:where(.system-b-spotify-connect-claim-button) {
-  width: 100%;
   justify-content: center;
 }
 
@@ -6240,8 +6111,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 :where(.system-b-library-artwork-shell),
 :where(.system-b-library-status-pill),
 :where(.system-b-library-count-pill),
-:where(.system-b-library-rail-button),
-:where(.system-b-library-filter-section-button),
 :where(.system-b-library-filter-row),
 :where(.system-b-library-kind-pill),
 :where(.system-b-library-provider-link) {
@@ -6250,8 +6119,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 /* Buttons + icon buttons are pill / hover-circle per System B (DESIGN.md:
    App buttons, inputs, controls → 9999px). */
-:where(.system-b-library-action),
-:where(.system-b-library-icon-button) {
+:where(.system-b-library-action) {
   border-radius: var(--radius-full);
 }
 
@@ -6335,7 +6203,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-library-filter-pill),
 :where(.system-b-library-rail-count),
-:where(.system-b-library-clear-button),
 :where(.system-b-library-filter-count),
 :where(.system-b-library-card-count),
 :where(.system-b-library-audio-hint),
@@ -6344,30 +6211,23 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-size: var(--text-2xs);
 }
 
-:where(.system-b-library-rail-button),
 :where(.system-b-library-filter-row),
 :where(.system-b-library-action),
-:where(.system-b-library-icon-button),
 :where(.system-b-library-provider-link) {
   transition-duration: var(--duration-fast);
   transition-property: background-color, border-color, box-shadow, color;
   transition-timing-function: var(--ease-subtle);
 }
 
-:where(.system-b-library-rail-button),
 :where(.system-b-library-filter-row) {
   color: var(--color-text-secondary-token);
   font-size: var(--text-xs);
 }
 
-:where(
-  .system-b-library-rail-button:not(.system-b-library-rail-button--active)
-),
 :where(.system-b-library-filter-row:not(.system-b-library-filter-row--active)) {
   border-color: transparent;
 }
 
-:where(.system-b-library-rail-button--active),
 :where(.system-b-library-filter-row--active) {
   border-color: var(--color-border-default);
   background: var(--system-b-bg-surface-1);
@@ -6375,38 +6235,9 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(
-  .system-b-library-rail-button:not(.system-b-library-rail-button--active):hover
-),
-:where(
   .system-b-library-filter-row:not(.system-b-library-filter-row--active):hover
 ) {
   border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-library-clear-button) {
-  border-radius: var(--radius-xs);
-  transition-duration: var(--duration-fast);
-  transition-property: background-color, color;
-  transition-timing-function: var(--ease-subtle);
-}
-
-:where(.system-b-library-clear-button:hover) {
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-library-filter-section-button) {
-  color: var(--color-text-tertiary-token);
-  font-size: var(--text-2xs);
-  font-weight: var(--font-weight-medium);
-  transition-duration: var(--duration-fast);
-  transition-property: background-color, color;
-  transition-timing-function: var(--ease-subtle);
-}
-
-:where(.system-b-library-filter-section-button:hover) {
   background: var(--system-b-bg-surface-1);
   color: var(--color-text-primary-token);
 }
@@ -6471,12 +6302,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   box-shadow:
     inset 2px 0 0 0 var(--color-border-default),
     inset 0 0 0 1px var(--color-border-subtle);
-}
-
-:where(.system-b-library-card-button) {
-  transition-duration: var(--duration-fast);
-  transition-property: background-color, box-shadow;
-  transition-timing-function: var(--ease-subtle);
 }
 
 :where(.system-b-library-card-status) {
@@ -6646,8 +6471,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 /* Issue #12317 — System B compliance: pill action buttons + borderless
    circular icon buttons. Overrides the shared --radius-md primitive above. */
-:where(.system-b-library-action),
-:where(.system-b-library-icon-button) {
+:where(.system-b-library-action) {
   border-radius: var(--radius-full);
 }
 
@@ -6724,22 +6548,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-weight: var(--font-weight-semibold);
 }
 
-/* Borderless icon buttons; the round hover background reads as a hover-circle. */
-:where(.system-b-library-icon-button) {
-  border-radius: var(--radius-full);
-  color: var(--color-text-tertiary-token);
-}
-
-:where(.system-b-library-icon-button:hover) {
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-library-icon-button--bordered:hover) {
-  border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-2);
-}
-
 :where(.system-b-library-drawer-artwork) {
   border-radius: var(--radius-lg);
 }
@@ -6785,18 +6593,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   background: var(--system-b-bg-surface-1);
 }
 
-:where(.system-b-calendar-icon-button),
-:where(.system-b-calendar-toolbar-button) {
-  border-radius: var(--radius-pill);
-  color: var(--color-text-tertiary-token);
-}
-
-:where(.system-b-calendar-icon-button:hover),
-:where(.system-b-calendar-toolbar-button:hover) {
-  background: var(--system-b-bg-surface-0);
-  color: var(--color-text-primary-token);
-}
-
 :where(.system-b-calendar-panel) {
   border: 1px solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-lg);
@@ -6812,7 +6608,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   border-bottom: 1px solid var(--system-b-app-frame-seam);
 }
 
-:where(.system-b-calendar-toolbar-button),
 :where(.system-b-calendar-detail-section-heading),
 :where(.system-b-calendar-warning-heading),
 :where(.system-b-calendar-error-text),
@@ -7848,36 +7643,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   gap: var(--space-1);
 }
 
-:where(.system-b-opportunity-inbox-feedback-button) {
-  display: inline-flex;
-  width: var(--system-b-chat-action-card-icon-size);
-  height: var(--system-b-chat-action-card-icon-size);
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  color: var(--color-text-tertiary-token);
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    border-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-opportunity-inbox-feedback-button:hover),
-:where(.system-b-opportunity-inbox-feedback-button-active) {
-  border-color: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 8%,
-    transparent
-  );
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 5%,
-    transparent
-  );
-  color: var(--color-text-primary-token);
-}
-
 :where(.system-b-opportunity-inbox-feedback-icon) {
   width: calc(var(--space-3) + var(--space-0-5));
   height: calc(var(--space-3) + var(--space-0-5));
@@ -8178,25 +7943,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   text-decoration-line: underline;
 }
 
-:where(.system-b-chat-pitch-copy-button) {
-  display: inline-flex;
-  width: var(--space-6);
-  height: var(--space-6);
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  color: var(--color-text-tertiary-token);
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-chat-pitch-copy-button:hover) {
-  background: var(--system-b-bg-surface-2);
-  color: var(--color-text-secondary-token);
-}
-
 :where(.system-b-chat-pitch-copy-icon) {
   width: calc(var(--space-3) + var(--space-0-5));
   height: calc(var(--space-3) + var(--space-0-5));
@@ -8357,37 +8103,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     var(--system-b-bg-surface-0)
   );
   color: var(--color-text-primary-token);
-}
-
-.system-b-copy-link-button {
-  top: 50%;
-  transform: translateY(-50%);
-  border-color: transparent;
-  color: var(--color-text-tertiary-token);
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    border-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-.system-b-copy-link-button:hover {
-  border-color: var(--system-b-app-frame-seam);
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-.system-b-copy-link-button[data-copied="true"] {
-  border-color: color-mix(
-    in oklab,
-    var(--color-success) 32%,
-    var(--system-b-app-frame-seam)
-  );
-  background: color-mix(
-    in oklab,
-    var(--color-success) 10%,
-    var(--system-b-bg-surface-1)
-  );
-  color: var(--color-success);
 }
 
 .system-b-copy-link-icon {
@@ -8652,39 +8367,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-size: var(--text-xs);
 }
 
-:where(.system-b-chat-composer-icon-button) {
-  border: 1px solid transparent;
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 88%,
-    var(--system-b-bg-surface-0)
-  );
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    border-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle),
-    box-shadow var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-chat-composer-icon-button:not(:disabled):hover),
-:where(.system-b-chat-composer-icon-button[data-state="open"]) {
-  border-color: var(--system-b-app-shell-border);
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--system-b-app-shell-border) 40%, transparent);
-}
-
-:where(.system-b-chat-composer-icon-button[data-active="true"]) {
-  border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-2);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-chat-composer-icon-button:disabled) {
-  color: var(--color-text-quaternary-token);
-}
-
 :where(.system-b-chat-composer-primary-action) {
   border: 1px solid transparent;
   background: var(--color-btn-primary-bg);
@@ -8843,40 +8525,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   margin-inline: auto;
   flex-direction: column;
   gap: var(--space-1-5);
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button) {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--space-2);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary-token);
-  font-size: 12.5px;
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button:enabled:hover) {
-  background: var(--surface-0);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button:disabled) {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button:focus-visible) {
-  border-color: var(--color-border-focus);
-  background: var(--surface-0);
-  outline: none;
-  box-shadow: 0 0 0 2px
-    color-mix(in oklab, var(--color-border-focus) 12%, transparent);
 }
 
 :where(.system-b-chat-suggested-prompts-rail-wrapper) {
@@ -9485,32 +9133,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   opacity: 1;
 }
 
-:where(.system-b-chat-copy-button) {
-  display: inline-flex;
-  width: calc(var(--space-6) + var(--space-1));
-  height: calc(var(--space-6) + var(--space-1));
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-tertiary-token);
-  box-shadow: none;
-  transition:
-    background-color var(--duration-subtle) var(--ease-subtle),
-    color var(--duration-subtle) var(--ease-subtle);
-}
-
-:where(.system-b-chat-copy-button:hover),
-:where(.system-b-chat-copy-button:focus-visible) {
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-secondary-token);
-}
-
-:where(.system-b-chat-copy-button:focus-visible) {
-  outline: none;
-}
-
 :where(.system-b-chat-copy-icon) {
   width: calc(var(--space-3) + var(--space-0-5));
   height: calc(var(--space-3) + var(--space-0-5));
@@ -9687,39 +9309,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     color-mix(in oklab, black 25%, transparent),
     transparent
   );
-}
-
-:where(.system-b-image-preview-remove-button) {
-  position: absolute;
-  top: var(--space-1-5);
-  right: var(--space-1-5);
-  display: flex;
-  width: var(--space-6);
-  height: var(--space-6);
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in oklab, white 15%, transparent);
-  border-radius: var(--radius-lg);
-  background: color-mix(in oklab, black 55%, transparent);
-  color: white;
-  opacity: 1;
-  transition: opacity var(--duration-fast) var(--ease-subtle);
-}
-
-@media (hover: hover) {
-  :where(.system-b-image-preview-remove-button) {
-    opacity: 0;
-  }
-
-  :where(
-    .system-b-image-preview-item:hover .system-b-image-preview-remove-button
-  ) {
-    opacity: 1;
-  }
-}
-
-:where(.system-b-image-preview-remove-button:focus-visible) {
-  opacity: 1;
 }
 
 :where(.system-b-chat-avatar-upload-state-card) {
