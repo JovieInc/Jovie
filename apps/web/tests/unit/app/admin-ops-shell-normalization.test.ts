@@ -23,11 +23,17 @@ const OPERATIONAL_CONTROL_PANEL = join(
   '../../../components/features/admin/OperationalControlPanel.tsx'
 );
 
+const WHAT_SHIPPED = join(
+  TEST_DIR,
+  '../../../components/features/admin/WhatShipped.tsx'
+);
+
 const OPS_COMPONENT_FILES = [
   OPS_PAGE,
   HUD_DASHBOARD_CLIENT,
   HUD_STATUS_PILL,
   OPERATIONAL_CONTROL_PANEL,
+  WHAT_SHIPPED,
   join(OPS_ROUTE_DIR, 'HudClockClient.tsx'),
 ] as const;
 
@@ -68,6 +74,18 @@ describe('admin ops shell normalization', () => {
     expect(source).not.toContain('SectionEyebrow');
     expect(source).not.toMatch(
       /className=['"][^'"]*(uppercase[^'"]*tracking|tracking[^'"]*uppercase)[^'"]*['"]/
+    );
+  });
+
+  it('mounts WhatShipped as the first HUD card in shell and kiosk modes', () => {
+    const source = readSource(HUD_DASHBOARD_CLIENT);
+
+    expect(source).toContain(
+      "import { WhatShipped } from '@/components/features/admin/WhatShipped';"
+    );
+    expect(source.indexOf('<WhatShipped />')).toBeGreaterThan(-1);
+    expect(source.indexOf('<WhatShipped />')).toBeLessThan(
+      source.indexOf('<TimActionRequiredSection />')
     );
   });
 
