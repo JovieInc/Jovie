@@ -29,17 +29,21 @@ function setSearchParams(query: string) {
   searchParamsMock.mockReturnValue(new URLSearchParams(query));
 }
 
+function mockLocation(hostname: string) {
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: { href: `https://${hostname}/`, hostname },
+  });
+}
+
 describe('NativeReturnPage (desktop auth bounce)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLocation('jov.ie');
     // jsdom cannot navigate to a custom scheme; swallow the auto-fire assign.
-    Object.defineProperty(globalThis, 'location', {
-      configurable: true,
-      value: { href: 'http://localhost/' },
-    });
   });
 
-  it('renders an Open Jovie button pointing at the jovie:// deep link', () => {
+  it('renders an Open Jovie button pointing at the production jovie:// deep link', () => {
     setSearchParams(`code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`);
     render(<NativeReturnPage />);
 
@@ -47,6 +51,28 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     expect(link).toHaveAttribute(
       'href',
       `jovie://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`
+    );
+  });
+
+  it('uses jovie-staging:// on staging.jov.ie', () => {
+    mockLocation('staging.jov.ie');
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+      'href',
+      `jovie-staging://auth/complete?code=${CODE}&state=${STATE}`
+    );
+  });
+
+  it('uses jovie-local:// on localhost', () => {
+    mockLocation('localhost');
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+      'href',
+      `jovie-local://auth/complete?code=${CODE}&state=${STATE}`
     );
   });
 

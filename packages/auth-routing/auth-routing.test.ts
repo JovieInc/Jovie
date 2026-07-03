@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAuthStartUrl,
   buildElectronAuthCompleteUrl,
+  resolveElectronAuthSchemeFromHost,
   buildIosAuthCompleteUrl,
   buildNativeExchangeCodeRecord,
   classifyNavigation,
@@ -264,6 +265,32 @@ describe('auth routing boundary', () => {
     ).toBe(
       'jovie://auth/complete?code=c&state=s&desktop_flow=desktop_flow_nonce_12345'
     );
+  });
+
+  it('resolves per-env electron auth schemes from hostnames', () => {
+    expect(resolveElectronAuthSchemeFromHost('jov.ie')).toBe('jovie');
+    expect(resolveElectronAuthSchemeFromHost('staging.jov.ie')).toBe(
+      'jovie-staging'
+    );
+    expect(resolveElectronAuthSchemeFromHost('localhost')).toBe('jovie-local');
+    expect(resolveElectronAuthSchemeFromHost('127.0.0.1')).toBe('jovie-local');
+  });
+
+  it('builds electron auth complete URLs for each desktop scheme', () => {
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        scheme: 'jovie-staging',
+      })
+    ).toBe('jovie-staging://auth/complete?code=c&state=s');
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        scheme: 'jovie-local',
+      })
+    ).toBe('jovie-local://auth/complete?code=c&state=s');
   });
 
   it('creates analytics payloads without leaking return URLs or token values', () => {
