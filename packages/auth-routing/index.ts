@@ -79,7 +79,12 @@ export interface AuthAnalyticsEventPayload {
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
-const ELECTRON_AUTH_COMPLETE_URL = 'jovie://auth/complete';
+const ELECTRON_AUTH_COMPLETE_SCHEME_BY_HOST = {
+  'staging.jov.ie': 'jovie-staging',
+  'localhost': 'jovie-local',
+  '127.0.0.1': 'jovie-local',
+} as const satisfies Record<string, string>;
+const DEFAULT_ELECTRON_AUTH_COMPLETE_SCHEME = 'jovie';
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 
@@ -348,12 +353,27 @@ export function buildIosUniversalAuthCompleteUrl(input: {
   );
 }
 
+export function resolveElectronAuthReturnScheme(
+  hostname: string
+): typeof DEFAULT_ELECTRON_AUTH_COMPLETE_SCHEME | 'jovie-staging' | 'jovie-local' {
+  const normalized = hostname.trim().toLowerCase();
+  const scheme =
+    ELECTRON_AUTH_COMPLETE_SCHEME_BY_HOST[
+      normalized as keyof typeof ELECTRON_AUTH_COMPLETE_SCHEME_BY_HOST
+    ];
+  return scheme ?? DEFAULT_ELECTRON_AUTH_COMPLETE_SCHEME;
+}
+
 export function buildElectronAuthCompleteUrl(input: {
   readonly code: string;
   readonly state: string;
   readonly desktopFlow?: string | null;
+  readonly origin?: string | null;
 }): string {
-  return buildUrlWithCodeAndState(ELECTRON_AUTH_COMPLETE_URL, input);
+  const scheme = input.origin
+    ? resolveElectronAuthReturnScheme(new URL(input.origin).hostname)
+    : DEFAULT_ELECTRON_AUTH_COMPLETE_SCHEME;
+  return buildUrlWithCodeAndState(`${scheme}://auth/complete`, input);
 }
 
 export function resolveAuthCallback(input: {

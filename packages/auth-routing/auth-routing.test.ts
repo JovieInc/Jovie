@@ -259,6 +259,20 @@ describe('auth routing boundary', () => {
       buildElectronAuthCompleteUrl({
         code: 'c',
         state: 's',
+        origin: 'https://staging.jov.ie',
+      })
+    ).toBe('jovie-staging://auth/complete?code=c&state=s');
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        origin: 'http://localhost:3112',
+      })
+    ).toBe('jovie-local://auth/complete?code=c&state=s');
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
         desktopFlow: 'desktop_flow_nonce_12345',
       })
     ).toBe(

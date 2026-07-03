@@ -115,9 +115,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/
   );
+  assert.match(mainSource, /function showDesktopAuthInMainWindow\(/);
+  assert.match(mainSource, /showDesktopAuthInMainWindow\(win, initialAuthUrl\)/);
+  assert.match(mainSource, /SIGNED_OUT_VISIBILITY_FALLBACK_MS = 2_000/);
   assert.match(
     mainSource,
-    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(initialAuthUrl\)\);/
+    /maybeShowDesktopAuthHandoff\(url, 'popup'\)/
   );
   assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
@@ -166,7 +169,7 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   }
 });
 
-test('desktop production bundle declares the jovie auth protocol', async () => {
+test('desktop bundles declare per-environment auth return protocols', async () => {
   const [builderConfig, mainSource, stagingConfig, localConfig] =
     await Promise.all([
       readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
@@ -178,10 +181,15 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
   assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
-  assert.match(mainSource, /if \(APP_ENV !== 'production'\)/);
-  assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
-  assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
-  assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLTypes:/);
+  assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
+  assert.match(mainSource, /const AUTH_RETURN_SCHEME =/);
+  assert.match(mainSource, /setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME\)/);
+  assert.doesNotMatch(mainSource, /if \(APP_ENV !== 'production'\) \{\s*return;\s*\}/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {
@@ -409,6 +417,12 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
     /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/
   );
   assert.match(smokeSource, /async function waitForDesktopAuthHandoff/);
+  assert.match(smokeSource, /async function resolveNativeReturnDeepLink/);
+  assert.match(smokeSource, /parsed\.pathname === '\/auth\/native-return'/);
+  assert.match(
+    smokeSource,
+    /\^jovie(?:-staging|-local)?:\\\/\\\/auth\\\/complete\\\?/
+  );
   assert.match(smokeSource, /state === 'opened'/);
   assert.match(
     smokeSource,
