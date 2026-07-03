@@ -17,10 +17,10 @@ function main(): void {
   console.log(`Primary asset: ${X402_SPIKE_PRIMARY_ASSET.label}`);
   console.log(`Pattern: ${X402_SPIKE_PRIMARY_ASSET.proxyProtectedPattern}`);
   console.log(`Price: ${X402_SPIKE_PRIMARY_ASSET.suggestedPriceUsd}`);
-  console.log(`First-request latency (p50 est.): ${totalFirstPaidRequestP50Ms()}ms`);
   console.log(
-    `Artist net @ $0.01: $${lanes.artistNetAtOneCent.toFixed(4)}`
+    `First-request latency (p50 est.): ${totalFirstPaidRequestP50Ms()}ms`
   );
+  console.log(`Artist net @ $0.01: $${lanes.artistNetAtOneCent.toFixed(4)}`);
   console.log('\nWrangler vars:\n');
   console.log(JSON.stringify(buildWranglerVarsSnippet(), null, 2));
   console.log(

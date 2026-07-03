@@ -15,13 +15,13 @@ describe('x402 spike test asset fixture (#12750)', () => {
   it('pins lunawaves as demo MCP username', () => {
     const fixture = loadSpikeTestAssetJson();
     expect(fixture.demoUsername).toBe('lunawaves');
-    const mcp = fixture.assets.find((a) => a.kind === 'mcp-artist');
+    const mcp = fixture.assets.find(a => a.kind === 'mcp-artist');
     expect(mcp?.originPath).toBe('/api/mcp/lunawaves');
   });
 
   it('includes MCP smoke JSON-RPC request for agent client replay', () => {
     const fixture = loadSpikeTestAssetJson();
-    const mcp = fixture.assets.find((a) => a.kind === 'mcp-artist');
+    const mcp = fixture.assets.find(a => a.kind === 'mcp-artist');
     expect(mcp?.mcpSmokeRequest?.method).toBe('resources/list');
     expect(mcp?.mcpSmokeRequest?.jsonrpc).toBe('2.0');
   });

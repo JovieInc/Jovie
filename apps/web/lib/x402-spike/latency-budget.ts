@@ -47,7 +47,7 @@ export function totalFirstPaidRequestP95Ms(): number {
 
 export function cookieAmortizedRequestP50Ms(): number {
   const retry = X402_LATENCY_BUDGET.find(
-    (r) => r.phase === 'Retry with PAYMENT-SIGNATURE + origin proxy'
+    r => r.phase === 'Retry with PAYMENT-SIGNATURE + origin proxy'
   );
   return retry?.p50Ms ?? 50;
 }

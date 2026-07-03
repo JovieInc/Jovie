@@ -79,8 +79,12 @@ function main(): void {
 
   console.log(`# x402 spike runner — ${fixture.issue}\n`);
   console.log(`Primary test asset: ${X402_SPIKE_PRIMARY_ASSET.label}`);
-  console.log(`Origin: ${fixture.originBaseUrl}${X402_SPIKE_PRIMARY_ASSET.originPathPattern}`);
-  console.log(`Protected pattern: ${X402_SPIKE_PRIMARY_ASSET.proxyProtectedPattern}`);
+  console.log(
+    `Origin: ${fixture.originBaseUrl}${X402_SPIKE_PRIMARY_ASSET.originPathPattern}`
+  );
+  console.log(
+    `Protected pattern: ${X402_SPIKE_PRIMARY_ASSET.proxyProtectedPattern}`
+  );
   console.log(`Suggested price: ${X402_SPIKE_PRIMARY_ASSET.suggestedPriceUsd}`);
 
   printLatencyBudget();
@@ -96,7 +100,9 @@ function main(): void {
     ]) {
       console.log(`${env}: ${keyStatus(env)}`);
     }
-    console.log('\nLive 402→pay→retry loop requires all three + wrangler deploy.');
+    console.log(
+      '\nLive 402→pay→retry loop requires all three + wrangler deploy.'
+    );
   }
 
   console.log('\n## Live E2E blockers (human)\n');

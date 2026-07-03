@@ -10,8 +10,8 @@ import {
   totalFirstPaidRequestP50Ms,
 } from '@/lib/x402-spike/latency-budget';
 import {
-  buildJovieProtectedPatterns,
   buildBotFilteredMcpPattern,
+  buildJovieProtectedPatterns,
 } from '@/lib/x402-spike/protected-patterns';
 import {
   getTestAssetByKind,

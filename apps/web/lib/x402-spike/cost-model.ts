@@ -3,7 +3,10 @@
  * Sources cited in docs/product/x402-payment-gated-artist-resources-spike.md.
  */
 
-export type X402PricingLane = 'worker-template' | 'pay-per-crawl' | 'monetization-gateway';
+export type X402PricingLane =
+  | 'worker-template'
+  | 'pay-per-crawl'
+  | 'monetization-gateway';
 
 export interface X402CostBreakdown {
   readonly lane: X402PricingLane;
@@ -109,7 +112,11 @@ export function compareX402Lanes(): {
 export function estimateMonthlyVolume(
   callsPerDay: number,
   priceUsd: number
-): { readonly grossUsd: number; readonly netUsd: number; readonly railCostUsd: number } {
+): {
+  readonly grossUsd: number;
+  readonly netUsd: number;
+  readonly railCostUsd: number;
+} {
   const worker = getWorkerTemplateCostBreakdown();
   const grossUsd = callsPerDay * 30 * priceUsd;
   const railCostUsd = callsPerDay * 30 * worker.fullyLoadedPerTx;

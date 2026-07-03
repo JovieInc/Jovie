@@ -47,5 +47,5 @@ export const X402_SPIKE_PRIMARY_ASSET = X402_SPIKE_TEST_ASSETS[0];
 export function getTestAssetByKind(
   kind: X402TestAssetKind
 ): X402TestAsset | undefined {
-  return X402_SPIKE_TEST_ASSETS.find((asset) => asset.kind === kind);
+  return X402_SPIKE_TEST_ASSETS.find(asset => asset.kind === kind);
 }
