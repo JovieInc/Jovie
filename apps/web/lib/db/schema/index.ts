@@ -756,6 +756,14 @@ export {
   selectSmsSubscribeIntentSchema,
   smsSubscribeIntents,
 } from './notifications';
+// Onboarding deterministic script lines (JOV-3806)
+export {
+  insertOnboardingScriptLineSchema,
+  type NewOnboardingScriptLine,
+  type OnboardingScriptLine,
+  onboardingScriptLines,
+  selectOnboardingScriptLineSchema,
+} from './onboarding-script';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
