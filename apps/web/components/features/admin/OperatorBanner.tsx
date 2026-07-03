@@ -49,7 +49,8 @@ export function OperatorBanner({
     }
   }, []);
 
-  const shouldFetchHealth = !hasInitialIssues && !isDismissed && !isE2EClientRuntime;
+  const shouldFetchHealth =
+    !hasInitialIssues && !isDismissed && !isE2EClientRuntime;
 
   const { data: envHealth } = useEnvHealthQuery({
     enabled: shouldFetchHealth,
