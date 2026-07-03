@@ -85,7 +85,7 @@ Only non-overlapping docs/schema/UI chunks may run in parallel. Shared infrastru
 
 ## Admin Ops Boundary
 
-The private operator surface belongs under `/app/admin/ops`. The current `/hud` route remains a readable kiosk/status board and must not become a dense command center.
+The private operator surface belongs under `/app/admin/ops`. `/hud` is now a thin redirector — token-bearing kiosk bookmarks (`?kiosk=TOKEN`) go to `/hud-tv`, everything else goes to `/app/admin/ops`. `/hud-tv` is the readable kiosk/status board; it must not become a dense command center.
 
 Admin Ops v1 should use compact admin-shell patterns. Feature-specific components live under `apps/web/components/features/admin/agent-os/*`. Components should move to shared workflow organisms only after a second product surface actually reuses them.
 
@@ -95,7 +95,7 @@ Admin Ops v1 should use compact admin-shell patterns. Feature-specific component
 
 - Ovie is a launcher only: no main window, no product UI of its own. `/hud` (→ `/app/admin/ops`, see "Admin Ops Boundary" above) is the canonical ops surface. Ovie's "Open Ovie" menu item hands off to `/hud` via `NSWorkspace.shared.open` (system-browser handoff, no embedded WKWebView).
 - No new Swift design tokens, ever. Ovie's menu uses system chrome only (`Color.green/.yellow/.red/.gray`, system fonts). Jovie theme values (`system-b-tokens.ts`, `design-system.css`) do not get hand-typed into Swift.
-- The repo stays active — do not archive — until its build/deploy issues are resolved and the deployed binary is confirmed working end to end. See open issues on `JovieInc/ovie` for current blockers.
+- The repo stays active — do not archive — until its build/deploy issues are resolved and the deployed binary is confirmed working end to end. Tracked at [`JovieInc/ovie#12`](https://github.com/JovieInc/ovie/issues/12).
 
 Reference: [GH-12894](https://github.com/JovieInc/Jovie/issues/12894).
 
