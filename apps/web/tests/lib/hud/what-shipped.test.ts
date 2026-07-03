@@ -63,7 +63,11 @@ describe('readWhatShippedFromDisk', () => {
     tempDir = await mkdtemp(join(tmpdir(), 'what-shipped-invalid-'));
     const filePath = join(tempDir, 'what_shipped.json');
 
-    await writeFile(filePath, JSON.stringify({ items: [{ number: 'nope' }] }), 'utf8');
+    await writeFile(
+      filePath,
+      JSON.stringify({ items: [{ number: 'nope' }] }),
+      'utf8'
+    );
 
     await expect(readWhatShippedFromDisk(filePath)).resolves.toEqual(
       EMPTY_WHAT_SHIPPED_RESPONSE

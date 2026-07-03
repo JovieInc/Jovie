@@ -84,7 +84,7 @@ describe('admin ops shell normalization', () => {
   it('mounts WhatShipped as the first HUD card', () => {
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
 
-    expect(hudSource).toContain("import { WhatShipped }");
+    expect(hudSource).toContain('import { WhatShipped }');
     expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
     expect(hudSource.indexOf('<WhatShipped')).toBeLessThan(
       hudSource.indexOf('<TimActionRequiredSection')

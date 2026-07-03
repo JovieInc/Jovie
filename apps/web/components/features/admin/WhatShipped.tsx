@@ -9,7 +9,10 @@ import { formatTimeAgo } from '@/lib/utils/date-formatting';
 
 const WHAT_SHIPPED_POLL_MS = 60_000;
 const WHAT_SHIPPED_QUERY_GC_MS = WHAT_SHIPPED_POLL_MS * 2;
-const SKELETON_ROW_KEYS = ['what-shipped-skel-1', 'what-shipped-skel-2'] as const;
+const SKELETON_ROW_KEYS = [
+  'what-shipped-skel-1',
+  'what-shipped-skel-2',
+] as const;
 
 const EMPTY_MESSAGE = 'nothing shipped in the last few hours';
 
@@ -88,9 +91,7 @@ export interface WhatShippedProps {
   readonly kioskToken?: string | null;
 }
 
-export function WhatShipped({
-  kioskToken = null,
-}: Readonly<WhatShippedProps>) {
+export function WhatShipped({ kioskToken = null }: Readonly<WhatShippedProps>) {
   const { data, isLoading, isError } = useQuery<WhatShippedResponse>({
     queryKey: ['ops', 'what-shipped', kioskToken],
     queryFn: ({ signal }) => fetchWhatShipped(kioskToken, signal),

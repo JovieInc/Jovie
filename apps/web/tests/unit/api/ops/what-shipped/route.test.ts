@@ -10,7 +10,8 @@ vi.mock('@/lib/auth/hud', () => ({
 }));
 
 vi.mock('@/lib/hud/what-shipped', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/hud/what-shipped')>();
+  const actual =
+    await importOriginal<typeof import('@/lib/hud/what-shipped')>();
   return {
     ...actual,
     readWhatShippedFromDisk: mockReadWhatShippedFromDisk,
@@ -84,7 +85,9 @@ describe('GET /api/ops/what-shipped', () => {
 
   it('returns an empty payload when disk read throws', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
-    mockReadWhatShippedFromDisk.mockRejectedValue(new Error('disk read failed'));
+    mockReadWhatShippedFromDisk.mockRejectedValue(
+      new Error('disk read failed')
+    );
 
     const { GET } = await import('@/app/api/ops/what-shipped/route');
     const response = await GET(
