@@ -50,32 +50,50 @@ export default function ButtonsPage() {
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Button</h1>
       <p className='mb-8 text-[13px] text-tertiary-token'>
-        Matches Linear.app — font weight 510, tracking -0.011em, 8px radius,
-        32px default height
+        Canonical variants: primary, secondary, tertiary, ghost, and link.
+        Destructive is a tone prop, not a standalone variant.
       </p>
 
       {/* Variants */}
       <Section title='Variants'>
         <Stack title='primary'>
-          <Button variant='primary'>Save changes</Button>
+          <Button variant='primary'>Save Changes</Button>
         </Stack>
         <Stack title='secondary'>
           <Button variant='secondary'>Cancel</Button>
         </Stack>
+        <Stack title='tertiary'>
+          <Button variant='tertiary'>Dismiss</Button>
+        </Stack>
         <Stack title='ghost'>
-          <Button variant='ghost'>View details</Button>
-        </Stack>
-        <Stack title='outline'>
-          <Button variant='outline'>Export</Button>
-        </Stack>
-        <Stack title='destructive'>
-          <Button variant='destructive'>Delete</Button>
-        </Stack>
-        <Stack title='upgrade'>
-          <Button variant='primary'>Upgrade</Button>
+          <Button variant='ghost'>View Details</Button>
         </Stack>
         <Stack title='link'>
-          <Button variant='link'>Learn more</Button>
+          <Button variant='link'>Learn More</Button>
+        </Stack>
+      </Section>
+
+      {/* Destructive tone */}
+      <Section title='Destructive Tone'>
+        <Stack title='primary destructive'>
+          <Button destructive variant='primary'>
+            Delete
+          </Button>
+        </Stack>
+        <Stack title='secondary destructive'>
+          <Button destructive variant='secondary'>
+            Remove
+          </Button>
+        </Stack>
+        <Stack title='tertiary destructive'>
+          <Button destructive variant='tertiary'>
+            Reject
+          </Button>
+        </Stack>
+        <Stack title='ghost destructive'>
+          <Button destructive variant='ghost'>
+            Clear
+          </Button>
         </Stack>
       </Section>
 
@@ -84,10 +102,10 @@ export default function ButtonsPage() {
         <Stack title='sm'>
           <Button size='sm'>Small</Button>
         </Stack>
-        <Stack title='default (32px)'>
-          <Button>Default</Button>
+        <Stack title='md (default)'>
+          <Button size='md'>Medium</Button>
         </Stack>
-        <Stack title='lg (40px)'>
+        <Stack title='lg'>
           <Button size='lg'>Large</Button>
         </Stack>
       </Section>
@@ -97,7 +115,7 @@ export default function ButtonsPage() {
         <Stack title='icon left'>
           <Button variant='primary'>
             <Plus className='h-4 w-4' />
-            New release
+            New Release
           </Button>
         </Stack>
         <Stack title='icon right'>
@@ -113,7 +131,7 @@ export default function ButtonsPage() {
           <Button variant='secondary' size='icon' aria-label='Archive'>
             <Archive className='h-4 w-4' />
           </Button>
-          <Button variant='destructive' size='icon' aria-label='Delete'>
+          <Button destructive variant='ghost' size='icon' aria-label='Delete'>
             <Trash2 className='h-4 w-4' />
           </Button>
         </Stack>
@@ -171,7 +189,7 @@ export default function ButtonsPage() {
 
       {/* Secondary hover demo — previously broken */}
       <Section title='Secondary Hover (was broken — verify hover works)'>
-        <Button variant='secondary'>Hover me</Button>
+        <Button variant='secondary'>Hover Me</Button>
         <Button variant='secondary'>
           <Archive className='h-4 w-4' />
           Archive
