@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AiCrawlerIntelligenceCard } from '@/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
@@ -139,8 +139,11 @@ describe('AiCrawlerIntelligenceCard', () => {
     expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveClass(
       'min-h-45'
     );
-    expect(screen.getByTestId('ai-crawler-card-teaser')).toBeInTheDocument();
-    expect(screen.getByText('42 AI reads in 30 days')).toBeInTheDocument();
-    expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument();
+    const teaser = screen.getByTestId('ai-crawler-card-teaser');
+    expect(teaser).toBeInTheDocument();
+    expect(
+      within(teaser).getByText('42 AI reads in 30 days')
+    ).toBeInTheDocument();
+    expect(within(teaser).getByText('Upgrade to Pro')).toBeInTheDocument();
   });
 });
