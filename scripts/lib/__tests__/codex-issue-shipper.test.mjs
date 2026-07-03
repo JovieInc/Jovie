@@ -7,8 +7,10 @@ import {
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
-  EPIC_LABEL,
+  classifyCheckout,
+  describeCheckout,
   eligibleCodexIssues,
+  EPIC_LABEL,
   finishDispatch,
   loadShipperConfig,
   NO_AUTO_LABEL,
@@ -519,5 +521,49 @@ describe('agent fallback chain', () => {
       modelProfile: 'escalation',
     });
     expect(esc.sessionModel).toBe('opus');
+  });
+});
+
+describe('checkout freshness gate', () => {
+  const fresh = {
+    branch: 'main',
+    headSha: 'abc123def456',
+    originMainSha: 'abc123def456',
+    dirty: false,
+  };
+
+  it('clean main at origin/main is fresh', () => {
+    expect(classifyCheckout(fresh)).toBe('fresh');
+    expect(describeCheckout(fresh)).toBe('fresh');
+  });
+
+  it('a non-main branch is stale', () => {
+    expect(classifyCheckout({ ...fresh, branch: 'pr12780' })).toBe('stale');
+    expect(describeCheckout({ ...fresh, branch: 'pr12780' })).toContain(
+      "on 'pr12780'"
+    );
+  });
+
+  it('behind/ahead of origin/main is stale', () => {
+    const behind = { ...fresh, headSha: 'old000000000' };
+    expect(classifyCheckout(behind)).toBe('stale');
+    expect(describeCheckout(behind)).toContain('!= origin/main');
+  });
+
+  it('a dirty working tree is stale even on fresh main', () => {
+    expect(classifyCheckout({ ...fresh, dirty: true })).toBe('stale');
+    expect(describeCheckout({ ...fresh, dirty: true })).toContain('dirty');
+  });
+
+  it('describe concatenates every problem', () => {
+    const d = describeCheckout({
+      branch: 'pr1',
+      headSha: 'aaaaaaaa',
+      originMainSha: 'bbbbbbbb',
+      dirty: true,
+    });
+    expect(d).toContain("on 'pr1'");
+    expect(d).toContain('!= origin/main');
+    expect(d).toContain('dirty');
   });
 });

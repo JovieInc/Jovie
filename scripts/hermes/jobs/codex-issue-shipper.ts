@@ -34,10 +34,13 @@ import {
   buildDispatchPlans,
   buildGbrainCaptureText,
   buildGbrainQuery,
+  type CheckoutState,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  classifyCheckout,
   type DispatchPlan,
+  describeCheckout,
   EPIC_LABEL,
   type FinisherRunner,
   finishDispatch,
@@ -278,6 +281,75 @@ function detectRepoRoot(): string {
     encoding: 'utf8',
     timeout: 10_000,
   }).trim();
+}
+
+/**
+ * Self-heal the primary checkout before dispatching (JOV-3838). The shipper
+ * runs its own dispatcher code from repoRoot; if that checkout drifted off
+ * fresh main (a PR branch left checked out, commits behind, or a dirty tree),
+ * stash any stray work and hard-reset to origin/main so the NEXT launchd tick
+ * execs correct code. Stash-not-drop keeps stray edits recoverable. Returns
+ * true if it recovered (this run keeps going on freshly-fetched worktrees;
+ * the dispatcher-code fix lands on the re-exec).
+ */
+function ensureFreshCheckout(repoRoot: string): boolean {
+  const git = (args: ReadonlyArray<string>): string =>
+    execFileSync('git', args, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      timeout: 60_000,
+    }).trim();
+
+  let state: CheckoutState;
+  try {
+    git(['fetch', 'origin', 'main']);
+    state = {
+      branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
+      headSha: git(['rev-parse', 'HEAD']),
+      originMainSha: git(['rev-parse', 'origin/main']),
+      dirty: git(['status', '--porcelain', '--untracked-files=no']).length > 0,
+    };
+  } catch (err) {
+    // Can't determine freshness — log and let the run proceed rather than
+    // wedging the shipper on a transient git hiccup.
+    logJobEvent({
+      job: JOB,
+      event: 'checkout_check_failed',
+      error: shortError(err),
+    });
+    return false;
+  }
+
+  if (classifyCheckout(state) === 'fresh') return false;
+
+  const detail = describeCheckout(state);
+  try {
+    // Preserve any stray tracked edits (recoverable via `git stash list`).
+    if (state.dirty) {
+      git([
+        'stash',
+        'push',
+        '-m',
+        `shipper-stale-checkout-recovery: ${detail}`,
+      ]);
+    }
+    git(['checkout', 'main']);
+    git(['reset', '--hard', 'origin/main']);
+    logJobEvent({
+      job: JOB,
+      event: 'stale_checkout_recovered',
+      detail,
+      stashed: state.dirty,
+    });
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'stale_checkout_recovery_failed',
+      detail,
+      error: shortError(err),
+    });
+  }
+  return true;
 }
 
 function detectGithubRepo(repoRoot: string): string {
@@ -1098,6 +1170,13 @@ async function main(): Promise<void> {
   }
 
   const repoRoot = detectRepoRoot();
+  // JOV-3838: never dispatch on stale dispatcher code — self-heal the primary
+  // checkout to fresh origin/main first (agents run in worktrees regardless).
+  // Skipped in dry-run so dev/CI invocations in a feature-branch worktree are
+  // never reset to main; only the real launchd run (in ~/Jovie on main) heals.
+  if (process.env.HERMES_CODEX_SHIPPER_DRY_RUN !== '1') {
+    ensureFreshCheckout(repoRoot);
+  }
   const repo = detectGithubRepo(repoRoot);
   const config = loadShipperConfig(process.env, repoRoot, repo);
 
