@@ -91,6 +91,20 @@ test('parseAuthReturnDeepLink rejects malformed deep links', () => {
     state: VALID_STATE,
     flowNonce: null,
   });
+
+  expect(
+    parseAuthReturnDeepLink(
+      `jovie-staging://auth/complete?code=${VALID_CODE}&state=${VALID_STATE}&${DESKTOP_AUTH_FLOW_PARAM}=${VALID_FLOW}`,
+      parseTestUrl,
+      'jovie-staging:',
+      'auth',
+      '/complete'
+    )
+  ).toEqual({
+    code: VALID_CODE,
+    state: VALID_STATE,
+    flowNonce: VALID_FLOW,
+  });
 });
 
 test('bindPendingDesktopAuthCompletion enforces pending flow, ttl, and nonce', () => {
