@@ -182,6 +182,9 @@ apps/desktop/src/*
 !apps/desktop/src/renderer-recovery.ts
 !apps/desktop/src/tray.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs
+!apps/desktop/scripts/
+!apps/desktop/scripts/desktop-csp-watchdog.test.ts
+!apps/desktop/electron-builder.local.yml
 apps/extension/
 .agents/
 
