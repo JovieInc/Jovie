@@ -39,14 +39,14 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     });
   });
 
-  it('renders an Open Jovie button pointing at the jovie:// deep link', () => {
+  it('renders an Open Jovie button pointing at the local desktop deep link', () => {
     setSearchParams(`code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`);
     render(<NativeReturnPage />);
 
     const link = screen.getByRole('link', { name: 'Open Jovie' });
     expect(link).toHaveAttribute(
       'href',
-      `jovie://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`
+      `jovie-local://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`
     );
   });
 
@@ -56,7 +56,7 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
 
     expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
       'href',
-      `jovie://auth/complete?code=${CODE}&state=${STATE}`
+      `jovie-local://auth/complete?code=${CODE}&state=${STATE}`
     );
   });
 

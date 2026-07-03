@@ -97,8 +97,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(
     mainSource,
-    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
+    /recoverSignedOutShellHandoff\(navigationUrl\)/
   );
+  assert.match(mainSource, /awaitingSignedOutShellRecovery/);
+  assert.match(mainSource, /getDesktopAuthReturnProtocol\(APP_ENV\)/);
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
@@ -182,6 +184,20 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
   assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
   assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
+});
+
+test('desktop staging and local bundles declare per-environment auth protocols', async () => {
+  const stagingConfig = await readFile(
+    join(desktopRoot, 'electron-builder.staging.yml'),
+    'utf8'
+  );
+  const localConfig = await readFile(
+    join(desktopRoot, 'electron-builder.local.yml'),
+    'utf8'
+  );
+
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {

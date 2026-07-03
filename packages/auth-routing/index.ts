@@ -80,6 +80,45 @@ const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
 const ELECTRON_AUTH_COMPLETE_URL = 'jovie://auth/complete';
+
+export type ElectronAuthReturnScheme =
+  | 'jovie'
+  | 'jovie-staging'
+  | 'jovie-local';
+
+export function resolveElectronAuthScheme(
+  origin: string
+): ElectronAuthReturnScheme {
+  let hostname: string;
+  try {
+    hostname = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return 'jovie';
+  }
+
+  if (hostname === 'staging.jov.ie') return 'jovie-staging';
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1'
+  ) {
+    return 'jovie-local';
+  }
+
+  return 'jovie';
+}
+
+export function buildElectronAuthCompleteUrlForOrigin(
+  origin: string,
+  input: {
+    readonly code: string;
+    readonly state: string;
+    readonly desktopFlow?: string | null;
+  }
+): string {
+  const scheme = resolveElectronAuthScheme(origin);
+  return buildUrlWithCodeAndState(`${scheme}://auth/complete`, input);
+}
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 

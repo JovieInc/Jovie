@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAuthStartUrl,
   buildElectronAuthCompleteUrl,
+  buildElectronAuthCompleteUrlForOrigin,
   buildIosAuthCompleteUrl,
   buildNativeExchangeCodeRecord,
   classifyNavigation,
   createAuthAnalyticsEvent,
   createAuthStateRecord,
   resolveAuthCallback,
+  resolveElectronAuthScheme,
   sanitizeReturnTo,
   validateNativeExchange,
 } from './index';
@@ -264,6 +266,22 @@ describe('auth routing boundary', () => {
     ).toBe(
       'jovie://auth/complete?code=c&state=s&desktop_flow=desktop_flow_nonce_12345'
     );
+  });
+
+  it('resolves desktop deep-link schemes from the auth origin', () => {
+    expect(resolveElectronAuthScheme('https://jov.ie')).toBe('jovie');
+    expect(resolveElectronAuthScheme('https://staging.jov.ie')).toBe(
+      'jovie-staging'
+    );
+    expect(resolveElectronAuthScheme('http://127.0.0.1:3112')).toBe(
+      'jovie-local'
+    );
+    expect(
+      buildElectronAuthCompleteUrlForOrigin('https://staging.jov.ie', {
+        code: 'c',
+        state: 's',
+      })
+    ).toBe('jovie-staging://auth/complete?code=c&state=s');
   });
 
   it('creates analytics payloads without leaking return URLs or token values', () => {

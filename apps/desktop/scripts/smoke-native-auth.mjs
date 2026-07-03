@@ -661,27 +661,54 @@ async function requestRedirect(page, targetUrl, label) {
   );
 }
 
-async function requestNativeCallbackRedirect(page, callbackPath, label) {
-  const redirectUrl = await requestRedirect(page, callbackPath, label);
-  if (redirectUrl.startsWith('jovie://auth/complete?')) {
-    return redirectUrl;
+function isDesktopAuthCompleteDeepLink(urlString) {
+  try {
+    const parsed = new URL(urlString);
+    return (
+      ['jovie:', 'jovie-staging:', 'jovie-local:'].includes(parsed.protocol) &&
+      parsed.hostname === 'auth' &&
+      parsed.pathname === '/complete' &&
+      parsed.searchParams.has('code') &&
+      parsed.searchParams.has('state')
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function extractNativeReturnDeepLink(page, nativeReturnUrl) {
+  await page.goto(nativeReturnUrl, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+
+  const deepLink = await page.evaluate(() => {
+    const link = document.querySelector('a[href]');
+    return link?.getAttribute('href') ?? null;
+  });
+
+  if (!deepLink || !isDesktopAuthCompleteDeepLink(deepLink)) {
+    throw new Error(
+      `native-return page did not expose a desktop auth deep link: ${nativeReturnUrl}`
+    );
   }
 
-  const parsed = new URL(redirectUrl);
+  return deepLink;
+}
+
+async function requestNativeCallbackRedirect(page, callbackPath, label) {
+  const nativeCallbackUrl = await requestRedirect(page, callbackPath, label);
+  if (isDesktopAuthCompleteDeepLink(nativeCallbackUrl)) {
+    return nativeCallbackUrl;
+  }
+
+  const parsed = new URL(nativeCallbackUrl);
   if (parsed.pathname === '/auth/native-return') {
-    const callbackPromise = Promise.race([
-      waitForNativeProtocolRequest(page, '/auth/native-return'),
-      waitForNativeRedirectResponse(page, '/auth/native-return'),
-    ]);
-    await page.goto(redirectUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60_000,
-    });
-    return await callbackPromise;
+    return await extractNativeReturnDeepLink(page, nativeCallbackUrl);
   }
 
   throw new Error(
-    `${label} did not return the Electron app callback: ${redirectUrl}`
+    `${label} did not return the Electron app callback: ${nativeCallbackUrl}`
   );
 }
 
@@ -694,7 +721,7 @@ function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
 
     function onRequest(request) {
       const requestUrl = request.url();
-      if (!requestUrl.startsWith('jovie://auth/complete?')) return;
+      if (!isDesktopAuthCompleteDeepLink(requestUrl)) return;
       clearTimeout(timeoutId);
       page.off('request', onRequest);
       resolve(requestUrl);
@@ -713,7 +740,7 @@ function waitForNativeRedirectResponse(page, label, timeout = 60_000) {
 
     function onResponse(response) {
       const location = response.headers().location;
-      if (!location?.startsWith('jovie://auth/complete?')) return;
+      if (!location || !isDesktopAuthCompleteDeepLink(location)) return;
       clearTimeout(timeoutId);
       page.off('response', onResponse);
       resolve(location);
@@ -780,13 +807,12 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
 async function requestNativeCallback(page, authUrl, email) {
   const authCallbackUrl = await requestRedirect(page, authUrl, 'auth start');
   const parsedAuthCallback = new URL(authCallbackUrl);
-  if (parsedAuthCallback.protocol === 'jovie:') {
-    if (!authCallbackUrl.startsWith('jovie://auth/complete?')) {
-      throw new Error(
-        `Auth start did not return the Electron app callback: ${authCallbackUrl}`
-      );
-    }
+  if (isDesktopAuthCompleteDeepLink(authCallbackUrl)) {
     return authCallbackUrl;
+  }
+
+  if (parsedAuthCallback.pathname === '/auth/native-return') {
+    return await extractNativeReturnDeepLink(page, authCallbackUrl);
   }
 
   if (

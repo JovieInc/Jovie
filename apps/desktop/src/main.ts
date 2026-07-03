@@ -39,6 +39,11 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import { getDesktopAuthReturnProtocol } from './desktop-auth-protocol';
+import {
+  resolveSignedOutNavigationAbortedHandoff,
+  shouldRecoverStrandedSignedOutShell,
+} from './desktop-signed-out-recovery';
 import { decideRendererRecovery } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
@@ -90,7 +95,7 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
+const AUTH_RETURN_PROTOCOL = getDesktopAuthReturnProtocol(APP_ENV);
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
@@ -156,6 +161,7 @@ let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
+let awaitingSignedOutShellRecovery = false;
 
 function getDesktopAppDisplayName(): string {
   if (APP_ENV === 'staging') return 'Jovie Staging';
@@ -652,7 +658,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
   }
 
   authHandoffWindow = new BrowserWindow({
-    show: false,
+    show: true,
     ...AUTH_HANDOFF_WINDOW_BOUNDS,
     resizable: false,
     maximizable: false,
@@ -714,6 +720,29 @@ function showDesktopAuthHandoff(authUrl: string): void {
 
   void authHandoffWindow.loadURL(handoffUrl);
   showWindow(authHandoffWindow);
+}
+
+function buildDefaultSignedOutEntryHandoffAuthUrl(): string {
+  return (
+    buildDesktopBrowserAuthUrl(
+      new URL('/signin', APP_URL).toString()
+    ) ?? buildCentralDesktopAuthUrl('sign_in', APP_ENTRY_URL)
+  );
+}
+
+function recoverSignedOutShellHandoff(
+  navigationUrl: string | undefined
+): boolean {
+  const authUrl = resolveSignedOutNavigationAbortedHandoff({
+    validatedUrl: navigationUrl,
+    awaitingSignedOutEntry: awaitingSignedOutShellRecovery,
+    tryBuildHandoff: buildDesktopBrowserAuthUrl,
+    buildDefaultEntryHandoff: buildDefaultSignedOutEntryHandoffAuthUrl,
+  });
+  if (!authUrl) return false;
+
+  showDesktopAuthHandoff(authUrl);
+  return true;
 }
 
 function maybeShowDesktopAuthHandoff(urlString: string): boolean {
@@ -899,9 +928,13 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
           });
         }
 
+        const navigationUrl =
+          typeof validatedURL === 'string'
+            ? resolveNavigationUrl(validatedURL)
+            : undefined;
         if (
-          typeof validatedURL === 'string' &&
-          maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL))
+          (navigationUrl && maybeShowDesktopAuthHandoff(navigationUrl)) ||
+          recoverSignedOutShellHandoff(navigationUrl)
         ) {
           return;
         }
@@ -929,6 +962,24 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   let rendererCrashReloadCount = 0;
   win.webContents.on('did-finish-load', () => {
     rendererCrashReloadCount = 0;
+
+    if (
+      shouldRecoverStrandedSignedOutShell({
+        currentUrl: win.webContents.getURL(),
+        awaitingSignedOutEntry: awaitingSignedOutShellRecovery,
+      })
+    ) {
+      recoverSignedOutShellHandoff(undefined);
+      return;
+    }
+
+    const loadedUrl = parseUrl(win.webContents.getURL());
+    if (
+      loadedUrl?.origin === APP_ORIGIN &&
+      matchesPathPrefix(loadedUrl.pathname, '/app')
+    ) {
+      awaitingSignedOutShellRecovery = false;
+    }
   });
   win.webContents.on('render-process-gone', (_event, details) => {
     const action = decideRendererRecovery({
@@ -1004,6 +1055,11 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
     event.preventDefault();
     if (disposition === 'external') {
+      const parsed = parseUrl(navigationUrl);
+      if (parsed && isDesktopAuthPath(parsed.pathname)) {
+        recoverSignedOutShellHandoff(navigationUrl);
+        return;
+      }
       void openExternalUrl(navigationUrl);
     }
   });
@@ -1028,7 +1084,14 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     if (disposition === 'in-app') return;
 
     event.preventDefault();
-    if (isMainFrame && disposition === 'external') {
+    if (!isMainFrame) return;
+
+    if (disposition === 'external') {
+      const parsed = parseUrl(navigationUrl);
+      if (parsed && isDesktopAuthPath(parsed.pathname)) {
+        recoverSignedOutShellHandoff(navigationUrl);
+        return;
+      }
       void openExternalUrl(navigationUrl);
     }
   });
@@ -1078,6 +1141,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     showDesktopAuthHandoff(initialAuthUrl);
     void win.loadURL(buildDesktopAuthHandoffUrl(initialAuthUrl));
   } else {
+    awaitingSignedOutShellRecovery = initialUrl === APP_ENTRY_URL;
     void win.loadURL(initialUrl);
   }
 
@@ -1390,13 +1454,7 @@ ipcMain.handle(
 );
 
 function registerAuthReturnProtocol(): void {
-  // Only the canonical production bundle (app.jov.ie) may own jovie:// deep
-  // links. Staging/local shells use separate bundle IDs and must not compete
-  // with the installed production handler — see apps/desktop/BUILDS.md.
-  if (APP_ENV !== 'production') {
-    return;
-  }
-
+  const authScheme = AUTH_RETURN_PROTOCOL.replace(/:$/, '');
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
   };
@@ -1406,13 +1464,13 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+    app.setAsDefaultProtocolClient(authScheme, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(authScheme);
 }
 
 if (gotSingleInstanceLock) {
@@ -1452,7 +1510,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (url.startsWith('jovie://auth/complete')) {
+    if (url.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}/complete`)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }
