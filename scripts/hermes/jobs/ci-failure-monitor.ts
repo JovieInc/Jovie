@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureJovieRepoCwd } from '../lib/ensure-jovie-repo-cwd';
 import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
@@ -157,6 +158,7 @@ async function processFailure(
 }
 
 async function main(): Promise<void> {
+  ensureJovieRepoCwd(import.meta.url);
   await withJobLogging(JOB, async () => {
     const flakes = loadKnownFlakes();
     const failures = listRecentFailures();
