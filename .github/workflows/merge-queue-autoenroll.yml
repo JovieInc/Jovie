@@ -7,16 +7,30 @@ name: Merge Queue Auto-Enroll
 # the queue dequeues failures; main never goes red.
 #
 # Opt out per-PR with any of: needs-human, hold, gated.
+#
+# Two jobs share this workflow:
+#   enroll   — runs the drain (see above) on PR events, CI completion, and the
+#              */20 cron safety net.
+#   watchdog — runs scripts/merge-queue-watchdog.sh on a separate */10 cron tick
+#              (and workflow_dispatch) to rescue PRs that are clean, green, and
+#              enrolled but stuck in the queue itself (Graphite-side stall, not
+#              an enrollment gap — see docs/PR_FLOW.md).
+# Both jobs share one concurrency group so they never mutate merge-queue labels
+# at the same time.
 
 on:
   schedule:
-    - cron: '*/20 * * * *'   # catch anything missed between events
+    - cron: '*/20 * * * *'   # enroll: catch anything missed between events
+    - cron: '*/10 * * * *'   # watchdog: rescue PRs stalled inside the queue
   pull_request:
-    types: [ready_for_review, reopened]
+    types: [ready_for_review, reopened, synchronize]
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
-  group: merge-queue-autoenroll
+  group: merge-queue-drain-mutex
   cancel-in-progress: false
 
 permissions:
@@ -25,6 +39,9 @@ permissions:
 
 jobs:
   enroll:
+    if: >-
+      github.event.schedule != '*/10 * * * *' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -41,3 +58,23 @@ jobs:
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
         run: bash scripts/drain-pr-queue.sh
+
+  watchdog:
+    if: >-
+      github.event.schedule == '*/10 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+      - name: Run merge-queue drain regression tests
+        run: pip install pytest --quiet && pytest scripts/tests/test_gh_retry.py -v
+      - name: Rescue stalled merge-queue PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
+        run: bash scripts/merge-queue-watchdog.sh
