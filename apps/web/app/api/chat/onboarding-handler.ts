@@ -463,6 +463,8 @@ export async function tryHandleAnonymousOnboardingChat(
       latestUserClientMessageId: latestUserMessage.clientMessageId,
       content: turn.text,
       toolCalls: built.persistedToolEvents,
+      assistantSource: 'script',
+      scriptLineKey: turn.line.key,
     });
     Sentry.addBreadcrumb({
       category: 'onboarding-chat',
@@ -694,6 +696,8 @@ async function persistAnonymousAssistantMessage({
     latestUserClientMessageId,
     content: assistantText,
     toolCalls: encodeToolEvents(responseMessage.parts),
+    assistantSource: 'llm',
+    scriptLineKey: null,
   });
 }
 
@@ -702,11 +706,16 @@ async function persistAnonymousAssistantRecord({
   latestUserClientMessageId,
   content,
   toolCalls,
+  assistantSource,
+  scriptLineKey,
 }: {
   readonly conversationId: string;
   readonly latestUserClientMessageId: string;
   readonly content: string;
   readonly toolCalls: PersistedToolEvent[] | undefined;
+  /** Attribution for the nightly script-tuning job (JOV-3806). */
+  readonly assistantSource: 'llm' | 'script';
+  readonly scriptLineKey: string | null;
 }): Promise<void> {
   const now = new Date();
   await db
@@ -721,6 +730,8 @@ async function persistAnonymousAssistantRecord({
           ? ''
           : 'Done. What would you like to do next?'),
       toolCalls,
+      assistantSource,
+      scriptLineKey,
       createdAt: now,
     })
     .onConflictDoNothing({
