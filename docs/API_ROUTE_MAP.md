@@ -187,6 +187,7 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/dashboard/activity/recent` | GET | `auth` | Recent activity feed |
+| `/api/dashboard/ai-crawlers` | GET | `auth` | AI crawler analytics (Pro detail; free users get teaser counts) |
 | `/api/dashboard/analytics` | GET | `auth` | Analytics overview |
 | `/api/dashboard/audience/members` | GET | `auth` | Audience member list |
 | `/api/dashboard/audience/source-groups` | GET, POST | `auth` | Audience source group management |
