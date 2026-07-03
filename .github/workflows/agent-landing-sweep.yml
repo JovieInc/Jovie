@@ -20,7 +20,7 @@
 # 5. Scope judge = success
 # 6. CodeRabbit not blocking (no CHANGES_REQUESTED)
 # 7. CI harness risk classifier does not block unattended auto-merge
-# 8. Queue pressure guard: defers if 12+ other PRs already queued for auto-merge
+# 8. Queue pressure guard: defers when merge-queue depth hits GRAPHITE_QUEUE_POLICY.maxQueueDepth
 #
 # RELATIONSHIP TO agent-pipeline.yml:
 # This workflow is idempotent. Enabling auto-merge on an already-queued PR is
@@ -77,9 +77,9 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
-          READY_THRESHOLD: '12'
         run: |
           set -euo pipefail
+          READY_THRESHOLD=$(node scripts/ci-merge-queue-check.mjs max-queue-depth)
 
           echo "=== Agent Landing Sweep ==="
           echo "Repository: $GH_REPO"

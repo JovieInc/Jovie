@@ -671,7 +671,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
-          READY_THRESHOLD=12
+          READY_THRESHOLD=$(node scripts/ci-merge-queue-check.mjs max-queue-depth)
 
           OPEN_PRS=$(gh pr list --state open --base main --limit 100 --json number,isDraft,mergeStateStatus,labels,headRefName)
 

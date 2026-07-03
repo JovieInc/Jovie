@@ -19,6 +19,12 @@ import {
 
 export const CI_METRICS_SCHEMA_VERSION = 1;
 
+/** Ready→merged merge-time targets (docs/PR_FLOW.md, gbrain ci-metrics/latest). */
+export const READY_TO_MERGE_P50_TARGET_SECONDS = 600; // 10m
+export const READY_TO_MERGE_P95_TARGET_SECONDS = 900; // 15m
+/** Minimum ready→merged samples before a throughput verdict is actionable. */
+export const MIN_READY_TO_MERGE_SAMPLES = 10;
+
 /** {p50,p75,p95} of an array (0s when empty). */
 export function percentilesOf(values) {
   return {
@@ -128,6 +134,91 @@ export function readyToMergeSeconds(timelineResults) {
  * Assemble the one-line metrics record. Pure: callers pass `ts` so tests stay
  * deterministic (Date.now lives in the I/O job, not here).
  */
+/**
+ * Verdict for merge-queue throughput re-evaluation (GH #12771).
+ * Returns a machine-readable action without mutating CI config.
+ */
+export function evaluateMergeQueueThroughput(metrics, options = {}) {
+  const now = options.now ?? new Date();
+  const eligibleAfter =
+    options.eligibleAfter ?? new Date('2026-07-09T00:00:00Z');
+  const sampleCount = metrics?.sampleSizes?.readyToMerge ?? 0;
+  const p50 = metrics?.latency?.readyToMergeSeconds?.p50 ?? 0;
+  const p95 = metrics?.latency?.readyToMergeSeconds?.p95 ?? 0;
+
+  if (now < eligibleAfter) {
+    return {
+      status: 'defer',
+      reason: `Re-evaluation eligible after ${eligibleAfter.toISOString().slice(0, 10)}`,
+      sampleCount,
+      p50Seconds: p50,
+      p95Seconds: p95,
+      targets: {
+        p50Seconds: READY_TO_MERGE_P50_TARGET_SECONDS,
+        p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
+      },
+      action: 'wait_for_evaluation_window',
+    };
+  }
+
+  if (sampleCount < MIN_READY_TO_MERGE_SAMPLES) {
+    return {
+      status: 'insufficient_data',
+      reason: `Need >=${MIN_READY_TO_MERGE_SAMPLES} ready→merged samples (have ${sampleCount})`,
+      sampleCount,
+      p50Seconds: p50,
+      p95Seconds: p95,
+      targets: {
+        p50Seconds: READY_TO_MERGE_P50_TARGET_SECONDS,
+        p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
+      },
+      action: 'collect_more_samples',
+    };
+  }
+
+  const p50OnTarget = p50 > 0 && p50 < READY_TO_MERGE_P50_TARGET_SECONDS;
+  const p95OnTarget = p95 > 0 && p95 < READY_TO_MERGE_P95_TARGET_SECONDS;
+
+  if (p50OnTarget && p95OnTarget) {
+    return {
+      status: 'on_target',
+      reason: 'Ready→merged p50 and p95 are within targets',
+      sampleCount,
+      p50Seconds: p50,
+      p95Seconds: p95,
+      targets: {
+        p50Seconds: READY_TO_MERGE_P50_TARGET_SECONDS,
+        p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
+      },
+      action: 'close_follow_up',
+    };
+  }
+
+  const actions = [];
+  if (!p95OnTarget) {
+    actions.push('raise_max_queue_depth_12_to_16');
+  }
+  if (!p50OnTarget) {
+    actions.push('tune_unit_test_shards');
+  }
+
+  return {
+    status: 'off_target',
+    reason:
+      p95 > READY_TO_MERGE_P95_TARGET_SECONDS
+        ? `Ready→merged p95 ${Math.round(p95 / 60)}m exceeds ${READY_TO_MERGE_P95_TARGET_SECONDS / 60}m target`
+        : `Ready→merged p50 ${Math.round(p50 / 60)}m exceeds ${READY_TO_MERGE_P50_TARGET_SECONDS / 60}m target`,
+    sampleCount,
+    p50Seconds: p50,
+    p95Seconds: p95,
+    targets: {
+      p50Seconds: READY_TO_MERGE_P50_TARGET_SECONDS,
+      p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
+    },
+    action: actions.join(';'),
+  };
+}
+
 export function summarizeCiMetrics({ ts, runs, prs, timelineResults }) {
   const gate = gateDurationsSeconds(runs);
   const fullMerge = fullMergeTimesSeconds(prs);
@@ -166,5 +257,11 @@ export function summarizeCiMetrics({ ts, runs, prs, timelineResults }) {
       queueWait: queueWaits.length,
       readyToMerge: readyToMerge.length,
     },
+    throughputVerdict: evaluateMergeQueueThroughput({
+      latency: {
+        readyToMergeSeconds: percentilesOf(readyToMerge),
+      },
+      sampleSizes: { readyToMerge: readyToMerge.length },
+    }),
   };
 }

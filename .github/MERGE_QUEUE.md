@@ -50,7 +50,7 @@ These settings have no CLI/API; confirm in the Graphite UI after any queue incid
 | Bisect on batch failure | **On** | One bad PR must not fail its siblings — isolate culprit, requeue rest |
 | CI optimization | **On** | `optimize_ci` job in `ci.yml` skips redundant PR CI Graphite re-validates |
 | Queue timeout | **≤ 60 min** | Prevents a regression from hanging the queue |
-| Max queue depth | **12** | Matches `READY_THRESHOLD` in `agent-pipeline.yml` pressure guard |
+| Max queue depth | **12** | Source-of-record: `GRAPHITE_QUEUE_POLICY.maxQueueDepth` in `scripts/lib/merge-queue-guard.mjs`; agent workflows read it via `node scripts/ci-merge-queue-check.mjs max-queue-depth` |
 | Per-agent enqueue rate | **≤ 6/hour** | Prevents one agent from flooding the queue (set in Graphite if available) |
 | Push actor | `graphite-app` | Must be able to push through protected `main` |
 

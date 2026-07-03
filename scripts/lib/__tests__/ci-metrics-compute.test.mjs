@@ -3,12 +3,16 @@ import {
   CI_METRICS_SCHEMA_VERSION,
   ciRunHours,
   completedDurationsSeconds,
+  evaluateMergeQueueThroughput,
   flakyRerunRate,
   fullMergeTimesSeconds,
   gateDurationsSeconds,
   mergedThroughput,
+  MIN_READY_TO_MERGE_SAMPLES,
   percentilesOf,
   queueWaitSeconds,
+  READY_TO_MERGE_P50_TARGET_SECONDS,
+  READY_TO_MERGE_P95_TARGET_SECONDS,
   readyToMergeSeconds,
   summarizeCiMetrics,
 } from '../ci-metrics-compute.mjs';
@@ -179,6 +183,69 @@ describe('percentilesOf', () => {
   });
 });
 
+const metricsFixture = (overrides = {}) => ({
+  latency: {
+    readyToMergeSeconds: { p50: 480, p75: 600, p95: 840 },
+  },
+  sampleSizes: { readyToMerge: MIN_READY_TO_MERGE_SAMPLES },
+  ...overrides,
+});
+
+const afterEvalWindow = new Date('2026-07-10T12:00:00Z');
+
+describe('evaluateMergeQueueThroughput', () => {
+  it('defers before the 2026-07-09 evaluation window', () => {
+    const verdict = evaluateMergeQueueThroughput(metricsFixture(), {
+      now: new Date('2026-07-02T12:00:00Z'),
+    });
+    expect(verdict.status).toBe('defer');
+    expect(verdict.action).toBe('wait_for_evaluation_window');
+  });
+
+  it('requires minimum samples after the evaluation window', () => {
+    const verdict = evaluateMergeQueueThroughput(
+      metricsFixture({ sampleSizes: { readyToMerge: 3 } }),
+      { now: afterEvalWindow }
+    );
+    expect(verdict.status).toBe('insufficient_data');
+    expect(verdict.action).toBe('collect_more_samples');
+  });
+
+  it('closes the follow-up when p50 and p95 are on target', () => {
+    const verdict = evaluateMergeQueueThroughput(
+      metricsFixture({
+        latency: {
+          readyToMergeSeconds: {
+            p50: READY_TO_MERGE_P50_TARGET_SECONDS - 60,
+            p75: 700,
+            p95: READY_TO_MERGE_P95_TARGET_SECONDS - 60,
+          },
+        },
+      }),
+      { now: afterEvalWindow }
+    );
+    expect(verdict.status).toBe('on_target');
+    expect(verdict.action).toBe('close_follow_up');
+  });
+
+  it('recommends raising max queue depth when p95 is off target', () => {
+    const verdict = evaluateMergeQueueThroughput(
+      metricsFixture({
+        latency: {
+          readyToMergeSeconds: {
+            p50: READY_TO_MERGE_P50_TARGET_SECONDS - 60,
+            p75: 1200,
+            p95: READY_TO_MERGE_P95_TARGET_SECONDS + 120,
+          },
+        },
+      }),
+      { now: afterEvalWindow }
+    );
+    expect(verdict.status).toBe('off_target');
+    expect(verdict.action).toContain('raise_max_queue_depth_12_to_16');
+  });
+});
+
 describe('summarizeCiMetrics', () => {
   it('assembles a complete record with primary throughput + secondary latency', () => {
     const runs = [
@@ -229,5 +296,7 @@ describe('summarizeCiMetrics', () => {
       queueWait: 2,
       readyToMerge: 2,
     });
+    expect(out.throughputVerdict.status).toBe('defer');
+    expect(out.throughputVerdict.action).toBe('wait_for_evaluation_window');
   });
 });
