@@ -26,9 +26,13 @@ vi.mock('motion/react', () => ({
 vi.mock('@jovie/ui', () => ({
   Button: ({
     children,
+    size,
+    variant,
     ...props
   }: ComponentProps<'button'> & { size?: string; variant?: string }) => (
-    <button {...props}>{children}</button>
+    <button data-size={size} data-variant={variant} {...props}>
+      {children}
+    </button>
   ),
   Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
   PopoverContent: ({
@@ -204,7 +208,9 @@ describe('ChatMessage', () => {
       'system-b-chat-message-reply'
     );
     const copyButton = screen.getByRole('button', { name: 'Copy message' });
-    expect(copyButton).toHaveClass('system-b-chat-copy-button');
+    expect(copyButton).toHaveAttribute('data-variant', 'ghost');
+    expect(copyButton).toHaveAttribute('data-size', 'icon');
+    expect(copyButton).toHaveClass('h-7');
     expect(copyButton.querySelector('.system-b-chat-copy-icon')).toBeTruthy();
   });
 
