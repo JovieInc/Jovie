@@ -119,7 +119,7 @@ export const APP_ROUTES = {
   UNAVAILABLE: '/unavailable',
   USER_CREATION_ERROR: '/error/user-creation-failed',
   DESIGN_STUDIO: '/exp/page-builder',
-  /** Legacy HUD URL — redirects to /app/admin/ops (admin) or /hud-tv (token). */
+  /** Admin Ops HUD — shipper status, KPIs, and live metrics (admin-gated). */
   HUD: '/hud',
   /** Token-only TV/wallboard view of the Ops HUD. */
   HUD_TV: '/hud-tv',
