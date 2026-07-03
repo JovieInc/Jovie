@@ -573,10 +573,8 @@ html[data-profile-initial-mode]
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.66), 0 18px 42px rgba(15, 17, 24, 0.12);
 
-  /* Skeleton/loading states */
-  --color-skeleton-base: oklch(
-    95% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  /* Skeleton/loading states — placeholder matches surface-1 (JovieColor.surface1) */
+  --color-skeleton-base: var(--color-bg-surface-1);
   --color-skeleton-shimmer: oklch(100% 0 0);
 
   /* Cross-cutting interaction state tokens (state-matrix.md) */
@@ -845,12 +843,12 @@ html[data-profile-initial-mode]
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 20px 44px rgba(0, 0, 0, 0.32);
 
-  /* Skeleton/loading states */
-  --color-skeleton-base: oklch(
-    18% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-skeleton-shimmer: oklch(
-    24% var(--theme-base-chroma) var(--theme-base-hue)
+  /* Skeleton/loading states — placeholder matches surface-1 (JovieColor.surface1) */
+  --color-skeleton-base: var(--color-bg-surface-1);
+  --color-skeleton-shimmer: color-mix(
+    in oklab,
+    var(--color-bg-surface-1) 72%,
+    var(--color-text-primary-token) 28%
   );
 
   /* Cross-cutting interaction state tokens (state-matrix.md) */

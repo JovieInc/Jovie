@@ -1,150 +1,15 @@
 'use client';
 
+import { LoadingSkeleton as CanonicalLoadingSkeleton, Skeleton } from '@jovie/ui';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { logger } from '@/lib/utils/logger';
 
 // Generate stable keys for skeleton items to avoid array index key warnings
 function generateSkeletonKeys(prefix: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `${prefix}-${i}`);
 }
 
-interface LoadingSkeletonProps {
-  readonly className?: string;
-  readonly lines?: number;
-  readonly height?: string;
-  readonly width?: string;
-  readonly rounded?: 'sm' | 'md' | 'lg' | 'full';
-}
-
-const SIZE_TOKEN_PATTERN = /^\d+(?:\.\d+)?$/;
-const FRACTION_TOKEN_PATTERN = /^\d+\/\d+$/;
-const ARBITRARY_TOKEN_PATTERN = /^\[[^\]]+\]$/;
-
-const VALID_HEIGHT_KEYWORDS = new Set([
-  'auto',
-  'full',
-  'screen',
-  'svh',
-  'lvh',
-  'dvh',
-  'min',
-  'max',
-  'fit',
-  'px',
-]);
-
-const VALID_WIDTH_KEYWORDS = new Set([
-  'auto',
-  'full',
-  'screen',
-  'svw',
-  'lvw',
-  'dvw',
-  'min',
-  'max',
-  'fit',
-  'px',
-]);
-
-function isValidSizeClass(
-  value: string,
-  propName: 'height' | 'width'
-): boolean {
-  const prefix = propName === 'height' ? 'h-' : 'w-';
-
-  if (!value.startsWith(prefix)) {
-    return false;
-  }
-
-  const token = value.slice(prefix.length);
-  if (!token) {
-    return false;
-  }
-
-  if (SIZE_TOKEN_PATTERN.test(token) || ARBITRARY_TOKEN_PATTERN.test(token)) {
-    return true;
-  }
-
-  if (propName === 'width' && FRACTION_TOKEN_PATTERN.test(token)) {
-    return true;
-  }
-
-  return propName === 'height'
-    ? VALID_HEIGHT_KEYWORDS.has(token)
-    : VALID_WIDTH_KEYWORDS.has(token);
-}
-
-function validateSizeClass(value: string, propName: string): string {
-  const sizePropName = propName === 'height' ? 'height' : 'width';
-
-  if (!isValidSizeClass(value, sizePropName)) {
-    logger.warn(
-      `Invalid ${propName} class "${value}". Using default value instead.`,
-      undefined,
-      'LoadingSkeleton'
-    );
-    return propName === 'height' ? 'h-4' : 'w-full';
-  }
-  return value;
-}
-
-export function LoadingSkeleton({
-  className,
-  lines = 1,
-  height = 'h-4',
-  width = 'w-full',
-  rounded = 'sm',
-}: Readonly<LoadingSkeletonProps>) {
-  // Validate height and width classes
-  const validatedHeight = validateSizeClass(height, 'height');
-  const validatedWidth = validateSizeClass(width, 'width');
-
-  const roundedClasses = {
-    sm: 'rounded-sm',
-    md: 'rounded-md',
-    lg: 'rounded-lg',
-    full: 'rounded-full',
-  };
-
-  // Generate stable keys for multi-line skeletons
-  const lineKeys = useMemo(
-    () => generateSkeletonKeys('skeleton-line', lines),
-    [lines]
-  );
-
-  if (lines === 1) {
-    return (
-      <div
-        className={cn(
-          'skeleton motion-reduce:animate-none',
-          roundedClasses[rounded],
-          validatedHeight,
-          validatedWidth,
-          className
-        )}
-        aria-hidden='true'
-      />
-    );
-  }
-
-  return (
-    <div className='space-y-2' aria-hidden='true'>
-      {lineKeys.map((key, index) => (
-        <div
-          key={key}
-          className={cn(
-            'skeleton motion-reduce:animate-none',
-            roundedClasses[rounded],
-            validatedHeight,
-            index === lines - 1 ? 'w-3/4' : validatedWidth,
-            className
-          )}
-        />
-      ))}
-    </div>
-  );
-}
+export { CanonicalLoadingSkeleton as LoadingSkeleton };
 
 // Specific skeleton components for common use cases
 export function ProfileSkeleton() {

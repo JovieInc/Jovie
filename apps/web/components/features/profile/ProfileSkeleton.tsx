@@ -2,8 +2,10 @@
  * Profile loading skeleton — matches the V2 ProfileViewportShell + ArtistHero + ProfileScrollBody layout.
  * Full-bleed hero gradient at top, then rounded panel placeholders in the scroll body zone.
  */
+const skeletonBlock =
+  'skeleton motion-reduce:animate-none bg-white/[0.06]';
+
 export function ProfileSkeleton() {
-  const pulse = 'animate-pulse motion-reduce:animate-none';
   const panelClass =
     'rounded-(--profile-card-radius) bg-white/[0.04] backdrop-blur-sm';
 
@@ -23,7 +25,7 @@ export function ProfileSkeleton() {
         <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-(--profile-shell-card-radius) md:border md:border-white/[0.06]'>
           {/* Hero placeholder — matches ArtistHero height */}
           <div
-            className={`relative h-[48dvh] max-h-155 min-h-105 w-full overflow-hidden md:h-[56dvh] md:min-h-130 md:rounded-t-[var(--profile-shell-card-radius)] xl:max-h-160 2xl:max-h-170 ${pulse}`}
+            className={`relative h-[48dvh] max-h-155 min-h-105 w-full overflow-hidden md:h-[56dvh] md:min-h-130 md:rounded-t-[var(--profile-shell-card-radius)] xl:max-h-160 2xl:max-h-170 ${skeletonBlock}`}
           >
             {/* Gradient overlay: artistic dark hero fade — intentional profile-stage values */}
             <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(18,20,26,0.6)_50%,rgba(10,11,14,0.95)_100%)]' />
@@ -32,17 +34,17 @@ export function ProfileSkeleton() {
             <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6'>
               <div className='flex justify-between gap-3'>
                 <div
-                  className={`h-13 w-23 rounded-full bg-white/[0.06] ${pulse}`}
+                  className={`h-13 w-23 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                 />
                 <div className='flex items-center gap-2'>
                   <div
-                    className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
+                    className={`h-11 w-11 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                   />
                   <div
-                    className={`h-11 w-19 rounded-full bg-white/[0.06] ${pulse}`}
+                    className={`h-11 w-19 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                   />
                   <div
-                    className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
+                    className={`h-11 w-11 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                   />
                 </div>
               </div>
@@ -52,20 +54,20 @@ export function ProfileSkeleton() {
                 <div className='flex items-end justify-between gap-4'>
                   <div className='space-y-2'>
                     <div
-                      className={`h-3 w-24 rounded-full bg-white/[0.08] ${pulse}`}
+                      className={`h-3 w-24 rounded-full bg-white/[0.08] ${skeletonBlock}`}
                     />
                     <div
-                      className={`h-10 w-56 rounded-lg bg-white/[0.10] md:h-14 md:w-72 ${pulse}`}
+                      className={`h-10 w-56 rounded-lg bg-white/[0.10] md:h-14 md:w-72 ${skeletonBlock}`}
                     />
                   </div>
                   <div
-                    className={`h-11 w-22 shrink-0 rounded-full bg-white/[0.06] ${pulse}`}
+                    className={`h-11 w-22 shrink-0 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                   />
                 </div>
                 {/* Primary action placeholder (e.g. Get Tickets, Listen) */}
                 <div className='flex flex-wrap items-center gap-3'>
                   <div
-                    className={`h-12 w-40 rounded-full bg-white/[0.08] ${pulse}`}
+                    className={`h-12 w-40 rounded-full bg-white/[0.08] ${skeletonBlock}`}
                   />
                 </div>
               </div>
@@ -76,8 +78,8 @@ export function ProfileSkeleton() {
           <div className='flex-1 px-5 pt-6 pb-[max(env(safe-area-inset-bottom),28px)] md:px-7 md:pt-7 md:pb-8 space-y-7'>
             {/* Featured section placeholder */}
             <div className='space-y-3'>
-              <div className={`h-4 w-20 rounded bg-white/[0.06] ${pulse}`} />
-              <div className={`${panelClass} px-5 py-5 space-y-3 ${pulse}`}>
+              <div className={`h-4 w-20 rounded bg-white/[0.06] ${skeletonBlock}`} />
+              <div className={`${panelClass} px-5 py-5 space-y-3 ${skeletonBlock}`}>
                 <div className='flex items-center gap-3'>
                   <div className='h-14 w-14 shrink-0 rounded-xl bg-white/[0.06]' />
                   <div className='flex-1 space-y-2'>
@@ -90,8 +92,8 @@ export function ProfileSkeleton() {
 
             {/* Subscribe section placeholder */}
             <div className='space-y-3'>
-              <div className={`h-4 w-20 rounded bg-white/[0.06] ${pulse}`} />
-              <div className={`${panelClass} px-5 py-5 space-y-3 ${pulse}`}>
+              <div className={`h-4 w-20 rounded bg-white/[0.06] ${skeletonBlock}`} />
+              <div className={`${panelClass} px-5 py-5 space-y-3 ${skeletonBlock}`}>
                 <div className='h-5 w-48 rounded bg-white/[0.06]' />
                 <div className='h-12 w-full rounded-full bg-white/[0.06]' />
               </div>
@@ -99,8 +101,8 @@ export function ProfileSkeleton() {
 
             {/* Tour dates section placeholder */}
             <div className='space-y-3'>
-              <div className={`h-4 w-24 rounded bg-white/[0.06] ${pulse}`} />
-              <div className={`${panelClass} px-5 py-5 space-y-4 ${pulse}`}>
+              <div className={`h-4 w-24 rounded bg-white/[0.06] ${skeletonBlock}`} />
+              <div className={`${panelClass} px-5 py-5 space-y-4 ${skeletonBlock}`}>
                 <div className='flex items-center justify-between'>
                   <div className='space-y-1.5'>
                     <div className='h-4 w-28 rounded bg-white/[0.06]' />
@@ -120,8 +122,8 @@ export function ProfileSkeleton() {
 
             {/* About section placeholder */}
             <div className='space-y-3'>
-              <div className={`h-4 w-14 rounded bg-white/[0.06] ${pulse}`} />
-              <div className={`${panelClass} px-5 py-5 space-y-3 ${pulse}`}>
+              <div className={`h-4 w-14 rounded bg-white/[0.06] ${skeletonBlock}`} />
+              <div className={`${panelClass} px-5 py-5 space-y-3 ${skeletonBlock}`}>
                 <div className='h-7 w-40 rounded-full bg-white/[0.06]' />
                 <div className='h-4 w-full rounded bg-white/[0.06]' />
                 <div className='h-4 w-3/4 rounded bg-white/[0.06]' />
@@ -130,16 +132,16 @@ export function ProfileSkeleton() {
 
             {/* Connect / social links section placeholder */}
             <div className='space-y-3'>
-              <div className={`h-4 w-16 rounded bg-white/[0.06] ${pulse}`} />
+              <div className={`h-4 w-16 rounded bg-white/[0.06] ${skeletonBlock}`} />
               <div className='flex flex-wrap gap-2.5'>
                 <div
-                  className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
+                  className={`h-11 w-11 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                 />
                 <div
-                  className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
+                  className={`h-11 w-11 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                 />
                 <div
-                  className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
+                  className={`h-11 w-11 rounded-full bg-white/[0.06] ${skeletonBlock}`}
                 />
               </div>
             </div>

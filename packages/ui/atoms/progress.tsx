@@ -1,117 +1,66 @@
 'use client';
 
-import type { HTMLAttributes, ReactNode } from 'react';
-import { useId } from 'react';
+import type { ReactNode } from 'react';
 
 import { cn } from '../lib/utils';
 
-type ProgressSize = 'sm' | 'md';
-
-export interface ProgressBarProps extends HTMLAttributes<HTMLDivElement> {
-  /**
-   * Completion percentage, 0–100. Values outside the range are clamped.
-   */
+export interface ProgressBarProps {
+  /** Progress value from 0 to 100. */
   readonly value: number;
-  /**
-   * Optional label rendered above the bar (left side).
-   * Use for "Importing releases", "Uploading track", etc.
-   */
+  readonly className?: string;
+  readonly trackClassName?: string;
+  readonly fillClassName?: string;
+  /** Optional label rendered above the track (e.g. percent or status copy). */
   readonly label?: ReactNode;
-  /**
-   * Show the numeric percent on the right of the label row.
-   * @default true
-   */
-  readonly showValue?: boolean;
-  /**
-   * Track height.
-   * @default 'md'
-   */
-  readonly size?: ProgressSize;
-  /**
-   * Accessible name used when no visible `label` is provided.
-   * @default 'Progress'
-   */
-  readonly ariaLabel?: string;
+  readonly 'aria-label'?: string;
 }
 
-const trackHeight: Record<ProgressSize, string> = {
-  sm: 'h-1',
-  md: 'h-2',
-};
+function clampProgress(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
 
-const clampPercent = (value: number): number => {
-  if (Number.isNaN(value)) return 0;
   return Math.min(100, Math.max(0, Math.round(value)));
-};
+}
 
 /**
- * Canonical determinate progress bar for long-running actions
- * (uploads, imports). Shows a percent and an optional label slot.
- *
- * Loading-state contract (see docs/LOADING_STATES.md):
- * use a ProgressBar only when real percent is known. For predictable
- * page/list loads use `Skeleton`; for in-flight buttons/actions use
- * `Spinner`. Never mix (no spinner inside a skeleton).
- *
- * Keep `label`/`showValue` stable for a mounted instance — toggling
- * either flips the header row on/off and would shift the track. Reset
- * with a `key` remount if the header composition must change.
- *
- * @example
- * ```tsx
- * <ProgressBar value={62} label="Importing releases" />
- * <ProgressBar value={40} size="sm" ariaLabel="Upload progress" showValue={false} />
- * ```
+ * Determinate progress bar for long uploads and imports.
+ * Pair with percent copy in `label`; never mix with Skeleton or Spinner.
  */
 export function ProgressBar({
   value,
-  label,
-  showValue = true,
-  size = 'md',
-  ariaLabel = 'Progress',
   className,
-  ...rest
+  trackClassName,
+  fillClassName,
+  label,
+  'aria-label': ariaLabel = 'Progress',
 }: ProgressBarProps) {
-  const percent = clampPercent(value);
-  const hasLabel = label != null;
-  const showHeader = hasLabel || showValue;
-  const labelId = useId();
+  const progress = clampProgress(value);
 
   return (
-    <div className={cn('w-full', className)} {...rest}>
-      {showHeader && (
-        <div className='mb-1 flex items-center justify-between gap-2 text-sm'>
-          <span
-            id={hasLabel ? labelId : undefined}
-            className='text-secondary-token'
-          >
-            {label}
-          </span>
-          {showValue && (
-            <span className='text-tertiary-token tabular-nums'>{percent}%</span>
-          )}
+    <div className={cn('w-full', className)} data-testid='progress-bar'>
+      {label ? (
+        <div className='mb-1 text-2xs text-tertiary-token tabular-nums'>
+          {label}
         </div>
-      )}
+      ) : null}
       <div
+        className={cn(
+          'h-1 w-full overflow-hidden rounded-full bg-surface-1',
+          trackClassName
+        )}
         role='progressbar'
-        aria-label={hasLabel ? undefined : ariaLabel}
-        aria-labelledby={hasLabel ? labelId : undefined}
-        aria-valuenow={percent}
+        aria-label={ariaLabel}
+        aria-valuenow={progress}
         aria-valuemin={0}
         aria-valuemax={100}
-        className={cn(
-          'w-full overflow-hidden rounded-full bg-surface-2',
-          trackHeight[size]
-        )}
       >
         <div
           className={cn(
-            'h-full rounded-full bg-accent',
-            'transition-[width] duration-normal ease-out motion-reduce:transition-none'
+            'h-full rounded-full bg-accent transition-[width] duration-subtle ease-out motion-reduce:transition-none',
+            fillClassName
           )}
-          // Inline width is dynamic data (clamped 0–100), not a static design
-          // value — do not convert to an arbitrary Tailwind class.
-          style={{ width: `${percent}%` }}
+          style={{ width: `${progress}%` }}
         />
       </div>
     </div>

@@ -242,9 +242,15 @@ export {
 // Simple Tooltip (convenience wrapper for common use cases)
 export type { SimpleTooltipProps } from './atoms/simple-tooltip';
 export { SimpleTooltip } from './atoms/simple-tooltip';
+// Progress
+export type { ProgressBarProps } from './atoms/progress';
+export { ProgressBar } from './atoms/progress';
 // Skeleton
 export type { LoadingSkeletonProps, SkeletonProps } from './atoms/skeleton';
 export { LoadingSkeleton, Skeleton } from './atoms/skeleton';
+// Spinner
+export type { SpinnerProps, SpinnerSize, SpinnerTone } from './atoms/spinner';
+export { Spinner } from './atoms/spinner';
 // Switch
 export { Switch } from './atoms/switch';
 // Textarea
@@ -300,6 +306,7 @@ export {
   buttons,
   featureAccents,
   interactive,
+  JovieColor,
   radii,
   shadows,
   sidebar,

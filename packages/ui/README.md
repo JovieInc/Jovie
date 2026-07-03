@@ -22,7 +22,7 @@ The package is barrel-exported from `index.ts`. Sub-paths (`@jovie/ui/atoms/*`, 
 
 Form: `Button` · `Input` · `InputGroup` · `Textarea` · `Checkbox` · `Switch` · `RadioGroup` · `Select` · `Field` · `Form` · `Label`
 
-Feedback: `Skeleton` / `LoadingSkeleton` · `Tooltip` / `SimpleTooltip` / `TooltipShortcut` · `Badge` · `Kbd`
+Feedback: `Skeleton` / `LoadingSkeleton` · `Spinner` · `ProgressBar` · `Tooltip` / `SimpleTooltip` / `TooltipShortcut` · `Badge` · `Kbd`
 
 Overlays: `Dialog` · `AlertDialog` · `Sheet` · `Popover` · `DropdownMenu` · `ContextMenu` · `SearchableSubmenu` · `CommonDropdown`
 

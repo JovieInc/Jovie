@@ -22,7 +22,9 @@ These states apply across families and were previously undocumented.
 | Visited | `--color-link-visited` | `a:visited`, `[data-state="visited"]` | `shadcn/Link/Visited` | `packages/ui/atoms/link.tsx` |
 | Link styling | `--color-link-default`, `--color-link-hover` | `[data-variant="link"]` | `shadcn/Link/Default` | `packages/ui/atoms/link.tsx` |
 | Disabled visual | `--state-disabled-opacity`, `--color-text-disabled-token` | `[data-state="disabled"]`, `:disabled`, `[aria-disabled="true"]` | `shadcn/Button/DisabledVisual` | `packages/ui/atoms/button.tsx` |
-| Loading shimmer | `--color-skeleton-base`, `--color-skeleton-shimmer` | `.skeleton`, `[data-state="shimmer"]` | `shadcn/Skeleton/LoadingShimmer` | `packages/ui/atoms/skeleton.tsx` |
+| Loading shimmer | `--color-skeleton-base` (= surface-1), `--color-skeleton-shimmer` | `.skeleton`, `[data-state="shimmer"]` | `shadcn/Skeleton/LoadingShimmer` | `packages/ui/atoms/skeleton.tsx` |
+| Inline spinner | `--color-text-primary-token` | `[data-testid="spinner"]`, `[data-size]` | `shadcn/Spinner/Medium` | `packages/ui/atoms/spinner.tsx` |
+| Upload progress | `--color-bg-surface-1`, `--color-accent` | `[role="progressbar"]` | `shadcn/ProgressBar/Default` | `packages/ui/atoms/progress.tsx` |
 | Partial data | `--state-partial-opacity` | `[data-content-state="partial"]` | `UI/Atoms/Card/PartialData` | `packages/ui/atoms/card.tsx` |
 | Permission restricted | `--state-permission-bg`, `--state-permission-fg`, `--state-permission-border` | `[data-state="permission-restricted"]` | `shadcn/Badge/PermissionRestricted` | `packages/ui/atoms/badge.tsx` |
 | Long content | `--color-text-primary-token` + clamp utilities | `[data-content-length="long"]`, `.line-clamp-*`, `.truncate` | `UI/Atoms/Card/LongContent` | `packages/ui/atoms/card.tsx` (`CardTitle`) |
@@ -39,7 +41,7 @@ These states apply across families and were previously undocumented.
 | Focus-visible | `--color-focus-ring`, `--linear-border-focus` | `:focus-visible`, `focus-visible:ring-*` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Active/pressed | `--color-interactive-active` | `:active`, `active:scale-[0.96]` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Disabled | `--state-disabled-opacity`, `--color-text-disabled-token` | `[data-state="disabled"]`, `:disabled` | `shadcn/Button/Disabled` | `packages/ui/atoms/button.tsx` |
-| Loading | `--linear-text-primary` (spinner) | `[data-state="loading"]`, `[aria-busy="true"]` | `shadcn/Button/Loading` | `packages/ui/atoms/button.tsx` |
+| Loading | `--linear-text-primary` (spinner) | `[data-state="loading"]`, `[aria-busy="true"]` | `shadcn/Button/Loading` | `packages/ui/atoms/button.tsx` (`Spinner` sm) |
 | Success | `--color-success`, `--color-success-subtle` | `[data-state="success"]` | `Molecules/FormStatus/Success` | `apps/web/components/molecules/FormStatus.tsx` |
 | Visited | `--color-link-visited` | `a:visited`, `[data-state="visited"]` | `shadcn/Link/Visited` | `packages/ui/atoms/link.tsx` |
 | Link styling | `--color-link-default`, `--color-link-hover` | `[data-variant="link"]` | `shadcn/Link/Default` | `packages/ui/atoms/link.tsx` |

@@ -10,57 +10,28 @@ const meta: Meta<typeof ProgressBar> = {
     docs: {
       description: {
         component:
-          'Canonical determinate progress bar for uploads/imports. Track is bg-surface-2, fill is bg-accent. Use only when a real percent is known — otherwise use Skeleton (page/list loads) or Spinner (in-flight actions). Never mix.',
+          'Determinate progress for long uploads and imports. Track uses surface-1; fill uses accent.',
       },
     },
   },
   tags: ['autodocs'],
-  args: {
-    value: 62,
-  },
-  decorators: [
-    Story => (
-      <div className='w-80'>
-        <Story />
-      </div>
-    ),
-  ],
 };
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const WithLabel: Story = {
-  args: {
-    label: 'Importing releases',
-  },
-};
-
-export const PercentOnly: Story = {
-  args: {
-    value: 40,
-  },
-};
-
-export const NoHeader: Story = {
-  args: {
-    value: 75,
-    showValue: false,
-    ariaLabel: 'Upload progress',
-  },
-};
-
-export const Small: Story = {
-  args: {
-    value: 30,
-    size: 'sm',
-    label: 'Uploading track',
-  },
+export const Default: Story = {
+  render: () => (
+    <div className='w-72'>
+      <ProgressBar value={42} label='Uploading 42%' />
+    </div>
+  ),
 };
 
 export const Complete: Story = {
-  args: {
-    value: 100,
-    label: 'Import complete',
-  },
+  render: () => (
+    <div className='w-72'>
+      <ProgressBar value={100} label='Import complete' />
+    </div>
+  ),
 };

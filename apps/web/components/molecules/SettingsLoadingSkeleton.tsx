@@ -1,3 +1,5 @@
+import { Skeleton } from '@jovie/ui';
+
 /**
  * Reusable loading skeleton for settings pages.
  * Reduces duplication across settings loading.tsx files.
@@ -25,8 +27,8 @@ export function SettingsLoadingSkeleton({
       <div className='space-y-6 pb-8'>
         <section className='scroll-mt-4'>
           <div className='mb-4 space-y-2'>
-            <div className={`h-7 ${titleWidth} rounded skeleton`} />
-            <div className={`h-4 ${descriptionWidth} rounded skeleton`} />
+            <Skeleton className={`h-7 ${titleWidth}`} rounded='md' />
+            <Skeleton className={`h-4 ${descriptionWidth}`} rounded='sm' />
           </div>
           <div className='space-y-4 rounded-2xl border border-subtle bg-surface-0 p-4 sm:p-5'>
             {children}
@@ -41,14 +43,14 @@ export function SettingsLoadingSkeleton({
 export function InputSkeleton({
   width = 'w-full',
 }: Readonly<{ width?: string }>) {
-  return <div className={`h-10 ${width} rounded-md skeleton`} />;
+  return <Skeleton className={`h-10 ${width}`} rounded='md' />;
 }
 
 /** Skeleton for a button in settings context */
 export function SettingsButtonSkeleton({
   width = 'w-40',
 }: Readonly<{ width?: string }>) {
-  return <div className={`h-9 ${width} rounded-md skeleton`} />;
+  return <Skeleton className={`h-9 ${width}`} rounded='md' />;
 }
 
 /** Skeleton for a toggle row (label + switch) */
@@ -59,8 +61,8 @@ export function ToggleRowSkeleton({
 }>) {
   return (
     <div className='flex items-center justify-between gap-4 rounded-xl bg-surface-0 px-3 py-2.5'>
-      <div className={`h-4 ${labelWidth} rounded skeleton`} />
-      <div className='h-6 w-10 rounded-full skeleton' />
+      <Skeleton className={`h-4 ${labelWidth}`} rounded='sm' />
+      <Skeleton className='h-6 w-10' rounded='full' />
     </div>
   );
 }
@@ -74,7 +76,7 @@ export function SettingsCardSkeleton({
   width?: string;
 }>) {
   return (
-    <div className={`${height} ${width} rounded-xl bg-surface-0 skeleton`} />
+    <Skeleton className={`${height} ${width} rounded-xl`} rounded='lg' />
   );
 }
 

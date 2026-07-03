@@ -1,4 +1,4 @@
-import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { LoadingSkeleton } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 function createActionSkeletonItems(widths: readonly string[]) {

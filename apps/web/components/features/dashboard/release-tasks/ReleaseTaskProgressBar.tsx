@@ -1,13 +1,6 @@
 'use client';
 
-import { motion } from 'motion/react';
-
-const SPRING = {
-  type: 'spring',
-  damping: 10,
-  mass: 0.75,
-  stiffness: 100,
-} as const;
+import { ProgressBar } from '@jovie/ui';
 
 interface ReleaseTaskProgressBarProps {
   readonly done: number;
@@ -27,39 +20,28 @@ export function ReleaseTaskProgressBar({
   const pct = Math.round((done / total) * 100);
   const isComplete = done === total;
 
+  const label = isComplete ? (
+    <span className='text-accent'>
+      Campaign complete! All {total} tasks done.
+    </span>
+  ) : (
+    <>
+      {done}/{total} done
+      {overdueCount > 0 && (
+        <span className='text-red-400'>
+          {' '}
+          &middot; {overdueCount} overdue
+        </span>
+      )}
+    </>
+  );
+
   return (
-    <div className={className}>
-      <p className='text-2xs text-tertiary-token mb-1 tabular-nums'>
-        {isComplete ? (
-          <span className='text-accent'>
-            Campaign complete! All {total} tasks done.
-          </span>
-        ) : (
-          <>
-            {done}/{total} done
-            {overdueCount > 0 && (
-              <span className='text-red-400'>
-                {' '}
-                &middot; {overdueCount} overdue
-              </span>
-            )}
-          </>
-        )}
-      </p>
-      <div
-        className='h-1 w-full rounded-full bg-surface-1'
-        role='progressbar'
-        aria-valuenow={pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <motion.div
-          className='h-1 rounded-full bg-accent'
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={SPRING}
-        />
-      </div>
-    </div>
+    <ProgressBar
+      className={className}
+      value={pct}
+      label={label}
+      aria-label='Release task progress'
+    />
   );
 }

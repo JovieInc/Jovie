@@ -272,3 +272,20 @@ export const animation = {
     shadow: 'var(--transition-shadow)',
   },
 } as const;
+
+/**
+ * Cross-platform color aliases (iOS JovieColor parity).
+ * Skeleton placeholders must resolve to `surface1`.
+ */
+export const JovieColor = {
+  backgroundBase: surfaces.base,
+  surface0: surfaces['surface-0'],
+  surface1: surfaces['surface-1'],
+  surface2: surfaces['surface-2'],
+  textPrimary: text.primary,
+  textSecondary: text.secondary,
+  textTertiary: text.tertiary,
+  borderDefault: borders.default,
+  borderSubtle: borders.subtle,
+  accent: accent.base,
+} as const;

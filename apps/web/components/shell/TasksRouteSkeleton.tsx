@@ -1,3 +1,4 @@
+import { Skeleton } from '@jovie/ui';
 import { PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
 
@@ -22,15 +23,15 @@ export function TasksRouteSkeleton() {
         <PageToolbar
           start={
             <div className='flex items-center gap-1.5'>
-              <div className='skeleton h-7 w-20 rounded-full' />
-              <div className='skeleton h-7 w-28 rounded-full' />
-              <div className='skeleton h-7 w-32 rounded-full' />
+              <Skeleton className='h-7 w-20' rounded='full' />
+              <Skeleton className='h-7 w-28' rounded='full' />
+              <Skeleton className='h-7 w-32' rounded='full' />
             </div>
           }
           end={
             <div className='flex items-center gap-1'>
-              <div className='skeleton h-7 w-7 rounded-full' />
-              <div className='skeleton h-7 w-7 rounded-full' />
+              <Skeleton className='h-7 w-7' rounded='full' />
+              <Skeleton className='h-7 w-7' rounded='full' />
             </div>
           }
           className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
@@ -44,19 +45,21 @@ export function TasksRouteSkeleton() {
               key={`task-board-skeleton-${column}`}
               className='min-w-0 flex-1 rounded-lg border border-subtle bg-surface-1 p-2'
             >
-              <div className='skeleton mb-3 h-4 w-20 rounded' />
+              <Skeleton className='mb-3 h-4 w-20' rounded='sm' />
               <div className='space-y-2'>
                 {TASK_ROWS.slice(0, 3).map(row => (
                   <div
                     key={`${column}-${row.key}`}
                     className='rounded-md border border-subtle bg-surface-0 p-2.5'
                   >
-                    <div
-                      className='skeleton h-3.5 rounded'
+                    <Skeleton
+                      className='h-3.5'
+                      rounded='sm'
                       style={{ width: row.titleWidth }}
                     />
-                    <div
-                      className='skeleton mt-2 h-3 rounded'
+                    <Skeleton
+                      className='mt-2 h-3'
+                      rounded='sm'
                       style={{ width: row.metaWidth }}
                     />
                   </div>
@@ -73,12 +76,14 @@ export function TasksRouteSkeleton() {
               className='flex h-16 shrink-0 items-center border-b border-subtle px-2'
             >
               <div className='min-w-0 flex-1 space-y-2'>
-                <div
-                  className='skeleton h-3.5 rounded'
+                <Skeleton
+                  className='h-3.5'
+                  rounded='sm'
                   style={{ width: row.titleWidth }}
                 />
-                <div
-                  className='skeleton h-3 rounded'
+                <Skeleton
+                  className='h-3'
+                  rounded='sm'
                   style={{ width: row.metaWidth }}
                 />
               </div>
