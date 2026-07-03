@@ -19,7 +19,17 @@ function getHeaderValue(
   headers: Record<string, string | string[] | undefined>,
   name: string
 ): string | null {
-  const value = headers[name];
+  // Electron's `details.responseHeaders` preserves the origin server's header
+  // casing (and it varies by HTTP version / proxy), so a direct `headers[name]`
+  // lookup with a fixed-case key silently misses a present header. Match the
+  // key case-insensitively. (JOV-3835: a missed lowercase `content-security-policy`
+  // made the watchdog inject a restrictive fallback CSP that the browser
+  // intersected with the real policy, blocking every nonce'd script → blank app.)
+  const lowerName = name.toLowerCase();
+  const matchKey = Object.keys(headers).find(
+    key => key.toLowerCase() === lowerName
+  );
+  const value = matchKey === undefined ? undefined : headers[matchKey];
   if (typeof value === 'string' && value.trim().length > 0) {
     return value;
   }
@@ -86,15 +96,21 @@ export function installDesktopCspWatchdog(input: {
       responseHeaders: headers,
     });
 
-    if (status === 'missing') {
-      input.report('csp-header-missing', responseUrl.pathname);
-      headers['Content-Security-Policy'] = [SHELL_FALLBACK_CSP];
-      callback({ cancel: false, responseHeaders: headers });
-      return;
-    }
-
-    if (status === 'weakened') {
-      input.report('csp-header-weakened', responseUrl.pathname);
+    if (status === 'missing' || status === 'weakened') {
+      input.report(
+        status === 'missing' ? 'csp-header-missing' : 'csp-header-weakened',
+        responseUrl.pathname
+      );
+      // Drop any existing CSP header (any casing) before injecting the fallback.
+      // Browsers enforce the INTERSECTION of multiple CSP headers, so leaving a
+      // stale (possibly differently-cased) policy alongside the fallback would
+      // over-restrict the page. Replace, don't stack.
+      const cspHeaderNames: readonly string[] = CSP_HEADER_NAMES;
+      for (const key of Object.keys(headers)) {
+        if (cspHeaderNames.includes(key.toLowerCase())) {
+          delete headers[key];
+        }
+      }
       headers['Content-Security-Policy'] = [SHELL_FALLBACK_CSP];
       callback({ cancel: false, responseHeaders: headers });
       return;

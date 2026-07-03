@@ -838,7 +838,24 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     report: reportDesktopSecurityEvent,
   });
 
+  // Visibility safety net (JOV-3835): if `ready-to-show` never fires — e.g. a
+  // signed-out initial navigation redirects to /signin, the in-window nav is
+  // aborted to about:blank, and the separate auth-handoff window fails to
+  // appear — the app would launch to an invisible/black window with no way to
+  // sign in. If nothing has become visible shortly after launch, force a
+  // usable sign-in surface into THIS (main) window, which we know can render.
+  const initialVisibilityFallback = setTimeout(() => {
+    if (win.isDestroyed() || isAuthHandoffOpen() || win.isVisible()) return;
+    const current = win.webContents.getURL();
+    if (!current || current === 'about:blank') {
+      const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+      void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+    }
+    showWindowNow(win);
+  }, 6000);
+
   win.once('ready-to-show', () => {
+    clearTimeout(initialVisibilityFallback);
     if (isAuthHandoffOpen()) {
       mainWindowHiddenForAuthHandoff = true;
       return;
