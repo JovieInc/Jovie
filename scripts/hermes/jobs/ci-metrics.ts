@@ -82,15 +82,18 @@ function fetchMergedPrs(): MergedPr[] {
   return JSON.parse(out) as MergedPr[];
 }
 
-function fetchTimeline(repo: string, prNumber: number) {
-  // ponytail: first 100 timeline events captures the merge-queue label + merge
-  // events for nearly all PRs; skip --paginate to bound per-tick API cost.
+function fetchTimeline(repo: string, pr: MergedPr) {
+  // ponytail: first 100 timeline events captures the merge-queue label,
+  // ready_for_review, and merge events for nearly all PRs; skip --paginate to
+  // bound per-tick API cost.
   try {
     const out = gh(
-      ['api', `repos/${repo}/issues/${prNumber}/timeline?per_page=100`],
+      ['api', `repos/${repo}/issues/${pr.number}/timeline?per_page=100`],
       20_000
     );
-    return parseMergeQueueTimeline(JSON.parse(out));
+    return parseMergeQueueTimeline(JSON.parse(out), {
+      prCreatedAt: pr.createdAt,
+    });
   } catch {
     return null;
   }
@@ -107,7 +110,8 @@ function renderBody(m: ReturnType<typeof summarizeCiMetrics>): string {
     `Window: ${m.window.mergedPrs} merged PRs · ${m.window.ciRuns} CI runs · ${m.window.spanDays}d span`,
     `Throughput (primary): ${t.mergedPrsPerDay}/day · ${t.ciRunHoursPerMergedPr ?? '?'} runner-h/PR · flaky ${(t.flakyRerunRate * 100).toFixed(1)}% · queue-wait p50 ${fmtMin(t.queueWaitSeconds.p50)} / p95 ${fmtMin(t.queueWaitSeconds.p95)}`,
     `Latency (secondary): gate p50 ${fmtMin(l.gateWallclockSeconds.p50)} / p75 ${fmtMin(l.gateWallclockSeconds.p75)} / p95 ${fmtMin(l.gateWallclockSeconds.p95)} · full-merge p50 ${fmtMin(l.fullMergeTimeSeconds.p50)} / p95 ${fmtMin(l.fullMergeTimeSeconds.p95)}`,
-    `Samples: gate ${m.sampleSizes.gate} · full-merge ${m.sampleSizes.fullMerge} · queue-wait ${m.sampleSizes.queueWait}`,
+    `Ready→merged (target p50<10m / p95<15m): p50 ${fmtMin(l.readyToMergeSeconds.p50)} / p75 ${fmtMin(l.readyToMergeSeconds.p75)} / p95 ${fmtMin(l.readyToMergeSeconds.p95)}`,
+    `Samples: gate ${m.sampleSizes.gate} · full-merge ${m.sampleSizes.fullMerge} · queue-wait ${m.sampleSizes.queueWait} · ready-to-merge ${m.sampleSizes.readyToMerge}`,
   ].join('\n');
 }
 
@@ -117,7 +121,7 @@ async function main(): Promise<void> {
     const runs = fetchCiRuns(repo);
     const prs = fetchMergedPrs();
     const timelineResults = prs
-      .map(pr => fetchTimeline(repo, pr.number))
+      .map(pr => fetchTimeline(repo, pr))
       .filter((t): t is NonNullable<typeof t> => t !== null);
 
     const metrics = summarizeCiMetrics({
@@ -150,6 +154,8 @@ async function main(): Promise<void> {
       queueWaitP95: metrics.throughput.queueWaitSeconds.p95,
       gateP95: metrics.latency.gateWallclockSeconds.p95,
       fullMergeP95: metrics.latency.fullMergeTimeSeconds.p95,
+      readyToMergeP50: metrics.latency.readyToMergeSeconds.p50,
+      readyToMergeP95: metrics.latency.readyToMergeSeconds.p95,
       samples: metrics.sampleSizes,
     });
 

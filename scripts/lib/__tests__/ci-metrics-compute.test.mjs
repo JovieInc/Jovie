@@ -9,6 +9,7 @@ import {
   mergedThroughput,
   percentilesOf,
   queueWaitSeconds,
+  readyToMergeSeconds,
   summarizeCiMetrics,
 } from '../ci-metrics-compute.mjs';
 
@@ -149,6 +150,22 @@ describe('queueWaitSeconds', () => {
   });
 });
 
+describe('readyToMergeSeconds', () => {
+  it('extracts positive readyToMergedSeconds', () => {
+    const tl = [
+      { readyToMergedSeconds: 300 },
+      { readyToMergedSeconds: null },
+      { readyToMergedSeconds: 0 },
+      { readyToMergedSeconds: 900 },
+    ];
+    expect(readyToMergeSeconds(tl)).toEqual([300, 900]);
+  });
+
+  it('returns [] for nullish input', () => {
+    expect(readyToMergeSeconds(undefined)).toEqual([]);
+  });
+});
+
 describe('percentilesOf', () => {
   it('returns p50/p75/p95', () => {
     expect(percentilesOf([10, 20, 30, 40, 50])).toEqual({
@@ -173,8 +190,8 @@ describe('summarizeCiMetrics', () => {
       { createdAt: '2026-06-19T10:00:00Z', mergedAt: '2026-06-19T12:00:00Z' }, // 7200
     ];
     const timelineResults = [
-      { queuedToMergedSeconds: 240 },
-      { queuedToMergedSeconds: 480 },
+      { queuedToMergedSeconds: 240, readyToMergedSeconds: 500 },
+      { queuedToMergedSeconds: 480, readyToMergedSeconds: 700 },
     ];
     const out = summarizeCiMetrics({
       ts: '2026-06-19T13:00:00Z',
@@ -201,6 +218,16 @@ describe('summarizeCiMetrics', () => {
       p75: 7200,
       p95: 7200,
     });
-    expect(out.sampleSizes).toEqual({ gate: 2, fullMerge: 2, queueWait: 2 });
+    expect(out.latency.readyToMergeSeconds).toEqual({
+      p50: 500,
+      p75: 700,
+      p95: 700,
+    });
+    expect(out.sampleSizes).toEqual({
+      gate: 2,
+      fullMerge: 2,
+      queueWait: 2,
+      readyToMerge: 2,
+    });
   });
 });

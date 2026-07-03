@@ -113,6 +113,18 @@ export function queueWaitSeconds(timelineResults) {
 }
 
 /**
+ * Ready→merged seconds from parseMergeQueueTimeline results
+ * (readyToMergedSeconds). Tracks the ready→merged p50<10m / p95<15m target —
+ * separate from queueWaitSeconds (merge-queue-label→merged), since a PR can
+ * sit ready-for-review for a while before ever being queued.
+ */
+export function readyToMergeSeconds(timelineResults) {
+  return (timelineResults ?? [])
+    .map(t => t && t.readyToMergedSeconds)
+    .filter(s => Number.isFinite(s) && s > 0);
+}
+
+/**
  * Assemble the one-line metrics record. Pure: callers pass `ts` so tests stay
  * deterministic (Date.now lives in the I/O job, not here).
  */
@@ -120,6 +132,7 @@ export function summarizeCiMetrics({ ts, runs, prs, timelineResults }) {
   const gate = gateDurationsSeconds(runs);
   const fullMerge = fullMergeTimesSeconds(prs);
   const queueWaits = queueWaitSeconds(timelineResults);
+  const readyToMerge = readyToMergeSeconds(timelineResults);
   const { mergedPrsPerDay, spanDays, mergedCount } = mergedThroughput(prs);
 
   return {
@@ -144,11 +157,14 @@ export function summarizeCiMetrics({ ts, runs, prs, timelineResults }) {
     latency: {
       gateWallclockSeconds: percentilesOf(gate),
       fullMergeTimeSeconds: percentilesOf(fullMerge),
+      // Tracks the ready→merged p50<10m / p95<15m target.
+      readyToMergeSeconds: percentilesOf(readyToMerge),
     },
     sampleSizes: {
       gate: gate.length,
       fullMerge: fullMerge.length,
       queueWait: queueWaits.length,
+      readyToMerge: readyToMerge.length,
     },
   };
 }

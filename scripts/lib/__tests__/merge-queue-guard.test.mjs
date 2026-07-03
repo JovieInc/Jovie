@@ -316,4 +316,51 @@ describe('merge queue telemetry parser', () => {
     expect(metrics.branchStalenessAtEnqueue).toBe(3);
     expect(metrics.speculativeReruns).toBe(1);
   });
+
+  it('computes readyToMergedSeconds from the latest ready_for_review event', () => {
+    const metrics = parseMergeQueueTimeline([
+      {
+        event: 'ready_for_review',
+        created_at: '2026-06-20T01:00:00Z',
+      },
+      {
+        event: 'labeled',
+        label: { name: 'merge-queue' },
+        created_at: '2026-06-20T01:05:00Z',
+      },
+      {
+        event: 'merged',
+        created_at: '2026-06-20T01:10:00Z',
+      },
+    ]);
+
+    expect(metrics.readyForReviewAt).toEqual(['2026-06-20T01:00:00Z']);
+    expect(metrics.readyToMergedSeconds).toBe(600);
+  });
+
+  it('falls back to the PR createdAt when never drafted (no ready_for_review event)', () => {
+    const metrics = parseMergeQueueTimeline(
+      [
+        {
+          event: 'merged',
+          created_at: '2026-06-20T01:10:00Z',
+        },
+      ],
+      { prCreatedAt: '2026-06-20T01:00:00Z' }
+    );
+
+    expect(metrics.readyForReviewAt).toEqual([]);
+    expect(metrics.readyToMergedSeconds).toBe(600);
+  });
+
+  it('returns null readyToMergedSeconds when neither ready_for_review nor prCreatedAt is available', () => {
+    const metrics = parseMergeQueueTimeline([
+      {
+        event: 'merged',
+        created_at: '2026-06-20T01:10:00Z',
+      },
+    ]);
+
+    expect(metrics.readyToMergedSeconds).toBeNull();
+  });
 });
