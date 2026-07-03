@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **iOS chat entity chip thumbnails (GH-12708)**: Inline transcript entity mentions now render as pill chips with a fixed 16×16 thumbnail slot using the shared `AvatarImageCache` loader (no raw `AsyncImage`); unresolved entities keep the accent-dot fallback.
 - [internal] Codex issue shipper now skips `type:epic` pointer issues (they have no code of their own), fixing the claim/find-nothing/release/re-claim loop on epics like #12729. Adds a `skippedEpic` scan counter. (#12846)
 - [internal] Schedule the codex kanban ship loop via Houston launchd (`co.jovie.hermes.cron-codex-kanban-ship`, every 15m) with PAUSE-respecting `scripts/hermes/ship-loop.sh`.
 

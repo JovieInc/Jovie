@@ -235,7 +235,6 @@ private struct MobileChatMessageRow: View {
       tone: .onLight
     )
     .font(JovieFont.body(size: 16))
-    .foregroundStyle(JovieColor.backgroundBase)
     .padding(.horizontal, JovieSpacing.large)
     .padding(.vertical, JovieSpacing.medium)
     .background(Color.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -261,7 +260,6 @@ private struct MobileChatMessageRow: View {
         if !displayText.isEmpty {
           MobileChatProseText(runs: assistantProseRuns(from: segments), tone: .onDark)
             .font(JovieFont.body(size: 16))
-            .foregroundStyle(JovieColor.textPrimary)
             .padding(.horizontal, JovieSpacing.large)
             .padding(.vertical, JovieSpacing.medium)
             .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -328,52 +326,200 @@ enum MobileChatProseTone {
   case onDark
 }
 
-/// Renders an ordered `[MobileChatProseRun]` as a single concatenated
-/// `Text`, matching web's `TokenizedText`/`AssistantMessageText`: entity and
-/// skill mentions render inline within the sentence (never as separate
-/// blocks that would shred prose), tinted with the entity's kind accent.
-///
-/// SwiftUI `Text` concatenation (`+`) is the only supported way to mix
-/// styled runs inline without breaking text flow/wrapping, so chips here are
-/// text-only (kind-accent color + underline for entities, secondary color
-/// for skills) rather than pill/dot chips -- v1 scope per JOV-3608.
+// MARK: - Inline prose flow (GH-12708 entity chip thumbnails v2)
+
+private enum MobileChatFlowToken: Hashable {
+  case textWord(String)
+  case entity(kind: MobileChatEntityKind, id: String, label: String)
+  case skill(id: String, label: String)
+}
+
+/// Word-wrap layout for inline transcript prose. Mixes plain `Text` words with
+/// entity pill chips and skill labels without shredding sentence flow.
+private struct MobileChatInlineFlowLayout: Layout {
+  var horizontalSpacing: CGFloat = 0
+  var verticalSpacing: CGFloat = 2
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    guard !subviews.isEmpty else { return .zero }
+
+    let maxWidth = proposal.width ?? .greatestFiniteMagnitude
+    var x: CGFloat = 0
+    var y: CGFloat = 0
+    var rowHeight: CGFloat = 0
+    var maxLineWidth: CGFloat = 0
+
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      if x > 0, x + size.width > maxWidth {
+        maxLineWidth = max(maxLineWidth, x - horizontalSpacing)
+        x = 0
+        y += rowHeight + verticalSpacing
+        rowHeight = 0
+      }
+      rowHeight = max(rowHeight, size.height)
+      x += size.width + horizontalSpacing
+    }
+
+    maxLineWidth = max(maxLineWidth, x > 0 ? x - horizontalSpacing : 0)
+    return CGSize(width: maxLineWidth, height: y + rowHeight)
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    guard !subviews.isEmpty else { return }
+
+    let maxWidth = bounds.width
+    var x = bounds.minX
+    var y = bounds.minY
+    var rowHeight: CGFloat = 0
+
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      if x > bounds.minX, x + size.width > bounds.minX + maxWidth {
+        x = bounds.minX
+        y += rowHeight + verticalSpacing
+        rowHeight = 0
+      }
+      subview.place(
+        at: CGPoint(x: x, y: y + (rowHeight - size.height) / 2),
+        anchor: .topLeading,
+        proposal: ProposedViewSize(width: size.width, height: size.height)
+      )
+      rowHeight = max(rowHeight, size.height)
+      x += size.width + horizontalSpacing
+    }
+  }
+}
+
+/// Transcript-variant entity chip with a fixed 16×16 thumbnail/dot slot and
+/// cached remote artwork (no raw `AsyncImage`). Mirrors web
+/// `.system-b-entity-chip[data-entity-variant="transcript"]`.
+private struct MobileChatEntityChipView: View {
+  let kind: MobileChatEntityKind
+  let id: String
+  let label: String
+  let tone: MobileChatProseTone
+
+  private static let mediaSize: CGFloat = 16
+  private static let maxChipWidth: CGFloat = 220
+
+  var body: some View {
+    HStack(spacing: 6) {
+      mediaSlot
+      Text(label)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+    .font(JovieFont.body(size: 16))
+    .foregroundStyle(chipTextColor)
+    .padding(.horizontal, 8)
+    .padding(.vertical, 4)
+    .frame(maxWidth: Self.maxChipWidth)
+    .background(chipBackground, in: Capsule())
+    .overlay(
+      Capsule().stroke(chipBorderColor, lineWidth: 1)
+    )
+    .accessibilityLabel("\(kindPrefix): \(label)")
+  }
+
+  @ViewBuilder
+  private var mediaSlot: some View {
+    let thumbnailURL = MobileChatEntityThumbnailResolver.thumbnailURL(kind: kind, id: id)
+    CachedRemoteImageView(imageURL: thumbnailURL, size: Self.mediaSize) {
+      accentDot
+    }
+    .frame(width: Self.mediaSize, height: Self.mediaSize)
+    .accessibilityHidden(true)
+  }
+
+  private var accentDot: some View {
+    ZStack {
+      Circle()
+        .fill(accentColor.opacity(0.18))
+      Circle()
+        .fill(accentColor)
+        .padding(4)
+    }
+  }
+
+  private var accentColor: Color {
+    JovieColor.EntityAccent.color(for: kind)
+  }
+
+  private var kindPrefix: String {
+    switch kind {
+    case .release: return "Release"
+    case .artist: return "Artist"
+    case .track: return "Track"
+    case .event: return "Event"
+    }
+  }
+
+  private var chipTextColor: Color {
+    switch tone {
+    case .onDark:
+      return JovieColor.textPrimary
+    case .onLight:
+      return JovieColor.backgroundBase
+    }
+  }
+
+  private var chipBackground: Color {
+    switch tone {
+    case .onDark:
+      return accentColor.opacity(0.12)
+    case .onLight:
+      return accentColor.opacity(0.08)
+    }
+  }
+
+  private var chipBorderColor: Color {
+    switch tone {
+    case .onDark:
+      return accentColor.opacity(0.22)
+    case .onLight:
+      return accentColor.opacity(0.30)
+    }
+  }
+}
+
+/// Renders an ordered `[MobileChatProseRun]` inline within a chat bubble.
+/// Entity mentions use transcript pill chips with cached thumbnails (GH-12708);
+/// skill invocations stay text-only; plain text wraps word-by-word.
 struct MobileChatProseText: View {
   let runs: [MobileChatProseRun]
   let tone: MobileChatProseTone
 
   var body: some View {
-    runs.reduce(Text("")) { partial, run in
-      partial + textRun(for: run)
+    let tokens = Self.flowTokens(from: runs)
+    MobileChatInlineFlowLayout(horizontalSpacing: 0, verticalSpacing: 2) {
+      ForEach(Array(tokens.enumerated()), id: \.offset) { _, token in
+        flowSubview(for: token)
+      }
     }
   }
 
-  private func textRun(for run: MobileChatProseRun) -> Text {
-    switch run {
-    case let .text(value):
-      return Text(value)
-    case let .entity(kind, _, label):
-      return Text(label)
-        .foregroundColor(entityAccentColor(for: kind))
-        .underline(true, color: entityAccentColor(for: kind).opacity(0.55))
+  @ViewBuilder
+  private func flowSubview(for token: MobileChatFlowToken) -> some View {
+    switch token {
+    case let .textWord(value):
+      Text(verbatim: value)
+        .foregroundStyle(primaryTextColor)
+    case let .entity(kind, id, label):
+      MobileChatEntityChipView(kind: kind, id: id, label: label, tone: tone)
     case let .skill(_, label):
-      return Text(label)
-        .foregroundColor(skillLabelColor)
+      Text(label)
+        .foregroundStyle(skillLabelColor)
         .fontWeight(.medium)
     }
   }
 
-  private func entityAccentColor(for kind: MobileChatEntityKind) -> Color {
-    let accent = JovieColor.EntityAccent.color(for: kind)
+  private var primaryTextColor: Color {
     switch tone {
     case .onDark:
-      // Mirrors .system-b-entity-mention-span: accent blended toward the
-      // dark transcript's primary text color, not the raw accent hue.
-      return accent.opacity(0.86)
+      return JovieColor.textPrimary
     case .onLight:
-      // On the white user bubble, blend toward the dark bubble text color
-      // instead of white so the chip stays legible (mirrors the web
-      // [data-entity-tone="onLight"] text override).
-      return accent.opacity(0.92)
+      return JovieColor.backgroundBase
     }
   }
 
@@ -384,5 +530,43 @@ struct MobileChatProseText: View {
     case .onLight:
       return JovieColor.backgroundBase.opacity(0.72)
     }
+  }
+
+  static func flowTokens(from runs: [MobileChatProseRun]) -> [MobileChatFlowToken] {
+    runs.flatMap { run -> [MobileChatFlowToken] in
+      switch run {
+      case let .text(value):
+        return splitTextIntoFlowTokens(value)
+      case let .entity(kind, id, label):
+        return [.entity(kind: kind, id: id, label: label)]
+      case let .skill(id, label):
+        return [.skill(id: id, label: label)]
+      }
+    }
+  }
+
+  private static func splitTextIntoFlowTokens(_ text: String) -> [MobileChatFlowToken] {
+    guard !text.isEmpty else { return [] }
+
+    var tokens: [MobileChatFlowToken] = []
+    var current = ""
+
+    for character in text {
+      if character.isWhitespace {
+        if !current.isEmpty {
+          tokens.append(.textWord(current))
+          current = ""
+        }
+        tokens.append(.textWord(String(character)))
+      } else {
+        current.append(character)
+      }
+    }
+
+    if !current.isEmpty {
+      tokens.append(.textWord(current))
+    }
+
+    return tokens
   }
 }
