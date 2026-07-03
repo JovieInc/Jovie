@@ -66,6 +66,7 @@
 		A0J0V2549000000000000000E /* MobileChatClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V2549000000000000000D /* MobileChatClientTests.swift */; };
 		A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36070000000000000001 /* MobileChatContentParser.swift */; };
 		A0J0V36070000000000000004 /* MobileChatToolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36070000000000000003 /* MobileChatToolCardView.swift */; };
+		A0J0V36080000000000000002 /* MobileChatMerchOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36080000000000000001 /* MobileChatMerchOptionsView.swift */; };
 		A0J0V36070000000000000006 /* MobileChatContentParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36070000000000000005 /* MobileChatContentParserTests.swift */; };
 		A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V26350000000000000001 /* MobileAuthFinalization.swift */; };
 		A0J0V26350000000000000004 /* MobileAuthFinalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V26350000000000000003 /* MobileAuthFinalizationTests.swift */; };
@@ -184,6 +185,7 @@
 		A0J0V2549000000000000000D /* MobileChatClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatClientTests.swift; sourceTree = "<group>"; };
 		A0J0V36070000000000000001 /* MobileChatContentParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatContentParser.swift; sourceTree = "<group>"; };
 		A0J0V36070000000000000003 /* MobileChatToolCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatToolCardView.swift; sourceTree = "<group>"; };
+		A0J0V36080000000000000001 /* MobileChatMerchOptionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatMerchOptionsView.swift; sourceTree = "<group>"; };
 		A0J0V36070000000000000005 /* MobileChatContentParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatContentParserTests.swift; sourceTree = "<group>"; };
 		A0J0V26350000000000000001 /* MobileAuthFinalization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthFinalization.swift; sourceTree = "<group>"; };
 		A0J0V26350000000000000003 /* MobileAuthFinalizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthFinalizationTests.swift; sourceTree = "<group>"; };
@@ -463,6 +465,7 @@
 				A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */,
 				A0J0V25490000000000000009 /* MobileChatView.swift */,
 				A0J0V36070000000000000003 /* MobileChatToolCardView.swift */,
+				A0J0V36080000000000000001 /* MobileChatMerchOptionsView.swift */,
 			);
 			name = Chat;
 			path = Chat;
@@ -728,6 +731,7 @@
 				A0J0V36390000000000000002 /* ComposerWorkflowSheet.swift in Sources */,
 				A0J0V2549000000000000000A /* MobileChatView.swift in Sources */,
 				A0J0V36070000000000000004 /* MobileChatToolCardView.swift in Sources */,
+				A0J0V36080000000000000002 /* MobileChatMerchOptionsView.swift in Sources */,
 				FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */,
 				5E40E80F8AFF20CF3CE9A09B /* IntentNavigationStore.swift in Sources */,
 				7F479BE5BDDDDCF9BFFF256B /* JovieAppIntents.swift in Sources */,
