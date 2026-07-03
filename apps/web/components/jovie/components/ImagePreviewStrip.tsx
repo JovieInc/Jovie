@@ -57,8 +57,7 @@ export function ImagePreviewStrip({
                 variant='ghost'
                 size='icon'
                 onClick={() => onRemove(image.id)}
-                // eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- media overlay control needs fixed white on black contrast
-                className='absolute right-1.5 top-1.5 h-6 w-6 rounded-lg border border-white/15 bg-black/55 text-white opacity-100 transition-opacity duration-fast ease-subtle hover:bg-black/55 hover:text-white focus-visible:opacity-100 md:opacity-0 md:group-hover/image-preview:opacity-100'
+                className='absolute right-1.5 top-1.5 h-6 w-6 rounded-lg border border-white/15 bg-black/55 text-white opacity-100 transition-opacity duration-fast ease-subtle hover:bg-black/55 hover:text-white focus-visible:opacity-100 dark:text-white md:opacity-0 md:group-hover/image-preview:opacity-100'
                 aria-label={`Remove ${image.name}`}
               >
                 <X className='h-3.5 w-3.5' />
