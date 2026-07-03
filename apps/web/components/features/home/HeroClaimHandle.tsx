@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import { APP_ROUTES } from '@/constants/routes';
 
 interface HeroClaimHandleProps {
@@ -23,7 +24,7 @@ export function HeroClaimHandle({
             jov.ie/
           </span>
           <input
-            aria-label='Choose your handle'
+            aria-label='Choose Your Handle'
             autoCapitalize='none'
             autoComplete='off'
             autoCorrect='off'
@@ -31,20 +32,19 @@ export function HeroClaimHandle({
             data-size='hero'
             data-available='false'
             name='handle'
-            placeholder='you'
+            placeholder='You'
             type='text'
           />
         </div>
 
-        <button
-          className='system-b-claim-handle-button group inline-flex shrink-0 items-center justify-center gap-1.5 focus-ring-themed'
+        <Button
+          className='h-10 shrink-0 gap-1.5 rounded-lg px-4 text-xs focus-ring-themed'
           data-testid={submitButtonTestId}
-          data-size='hero'
-          data-disabled='false'
+          size='md'
           type='submit'
         >
           <span className='whitespace-nowrap'>Claim</span>
-        </button>
+        </Button>
       </div>
     </form>
   );

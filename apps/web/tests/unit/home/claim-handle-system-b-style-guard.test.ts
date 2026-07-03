@@ -44,11 +44,12 @@ describe('ClaimHandleForm System B source contract', () => {
     expect(row).toHaveAttribute('data-size', 'hero');
     expect(row).toHaveAttribute('data-available', 'false');
     expect(input).toHaveClass('system-b-claim-handle-input');
-    expect(button).toHaveClass('system-b-claim-handle-button');
-    expect(button).toHaveAttribute('data-disabled', 'false');
+    expect(button).toHaveAttribute('data-variant', 'primary');
+    expect(button).toHaveAttribute('data-size', 'md');
+    expect(button).toHaveClass('h-10');
   });
 
-  it('keeps claim-handle chrome on named System B primitives', () => {
+  it('keeps claim-handle chrome on named System B primitives and canonical Button', () => {
     for (const sourcePath of claimHandleSourcePaths) {
       const source = readFileSync(resolve(appRoot, sourcePath), 'utf8');
 
@@ -60,16 +61,11 @@ describe('ClaimHandleForm System B source contract', () => {
         'system-b-claim-handle-row',
         'system-b-claim-handle-domain',
         'system-b-claim-handle-input',
-        'system-b-claim-handle-button',
       ]) {
         expect(source).toContain(className);
       }
 
-      for (const stateAttribute of [
-        'data-size',
-        'data-available',
-        'data-disabled',
-      ]) {
+      for (const stateAttribute of ['data-size', 'data-available']) {
         expect(source).toContain(stateAttribute);
       }
     }
@@ -82,12 +78,21 @@ describe('ClaimHandleForm System B source contract', () => {
       'utf8'
     );
     expect(interactiveSource).toContain('system-b-claim-handle-helper');
+    expect(interactiveSource).toContain('submitButtonClassName');
+    expect(interactiveSource).toContain('size={submitButtonSize}');
     expect(interactiveSource).toContain('data-visible');
   });
 
-  it('defines stable claim-handle visual states in the design system source of truth', () => {
+  it('defines stable claim-handle visual states in CSS and Button geometry in source', () => {
     const styles = readFileSync(
       resolve(appRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    const interactiveSource = readFileSync(
+      resolve(
+        appRoot,
+        'components/features/home/claim-handle/ClaimHandleForm.tsx'
+      ),
       'utf8'
     );
 
@@ -99,10 +104,6 @@ describe('ClaimHandleForm System B source contract', () => {
       '.system-b-claim-handle-domain',
       '.system-b-claim-handle-input',
       '.system-b-claim-handle-input[data-available="true"]',
-      '.system-b-claim-handle-button',
-      '.system-b-claim-handle-button[data-size="hero"]',
-      '.system-b-claim-handle-button[data-size="display"]',
-      '.system-b-claim-handle-button[data-disabled="true"]',
       '.system-b-claim-handle-helper',
       '.system-b-claim-handle-helper[data-visible="false"]',
     ]) {
@@ -113,12 +114,15 @@ describe('ClaimHandleForm System B source contract', () => {
       'min-height: 52px;',
       'min-height: 56px;',
       'min-height: 88px;',
-      'height: 36px;',
-      'height: 38px;',
-      'height: 64px;',
       'min-height: 16px;',
     ]) {
       expect(styles).toContain(stableDimension);
     }
+
+    for (const stableButtonClass of ['h-9', 'h-10', 'h-16']) {
+      expect(interactiveSource).toContain(stableButtonClass);
+    }
+
+    expect(styles).not.toContain('system-b-claim-handle-button');
   });
 });
