@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
+import { buildFollowUpBody, fileIssue } from '../lib/tracker-client';
 
 const JOB = 'deterministic-tracker';
 const THRESHOLD = 5;

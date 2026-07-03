@@ -18,6 +18,7 @@ import {
   GH_EAGAIN_BACKOFF_MS,
   GH_EAGAIN_BACKOFF_THRESHOLD,
   GhEagainBackoff,
+  isAlreadyClaimedOrBlocked,
   isRecoverableDetritus,
   isSpawnEagain,
   loadShipperConfig,
@@ -269,7 +270,7 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain(
       'coderabbit review --agent -c AGENTS.md -t uncommitted'
     );
-    expect(prompt).toContain('Closes #<issue-number>');
+    expect(prompt).toContain('Fixes #<issue-number>');
     expect(prompt).toContain('Never run `git checkout`');
     expect(prompt).toContain('HERMES_JOVIE_REPO');
     expect(prompt).toContain('Session model: cheap-model');
@@ -422,6 +423,21 @@ describe('codex issue shipper prompt', () => {
   });
 });
 
+describe('codex issue claim detection', () => {
+  it('treats GitHub tracker status labels as already claimed', () => {
+    expect(
+      isAlreadyClaimedOrBlocked(
+        issue({ labels: [{ name: 'status:in-progress' }] })
+      )
+    ).toBe(true);
+    expect(
+      isAlreadyClaimedOrBlocked(
+        issue({ labels: [{ name: 'status:in-review' }] })
+      )
+    ).toBe(true);
+  });
+});
+
 describe('deterministic finisher', () => {
   const issue = {
     number: 12721,
@@ -497,7 +513,7 @@ describe('deterministic finisher', () => {
     const prCreate = calls[4].args;
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
-    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Closes #12721');
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
   });
 
   it('finishDispatch skips commit when work is already committed', () => {
