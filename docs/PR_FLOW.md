@@ -94,6 +94,32 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   `evaluate` → merge → `active`) exists only to land a fix that repairs the queue
   itself, when the queue can't yet land it. It is not the normal path.
 
+### Merge-queue stall watchdog
+
+Enrollment (`drain-pr-queue.sh`) only guarantees a clean PR *gets* the
+`merge-queue` label — it doesn't watch what happens after. Measured stall
+data showed a p90 of 94 minutes and a max of 770 minutes between label and
+merge, with no rescue for a PR that stays clean and green but Graphite stops
+progressing on. `scripts/merge-queue-watchdog.sh` runs on its own `*/10`
+cron tick and rescues those PRs:
+
+- A PR must have carried `merge-queue` for at least `STALL_MINUTES` (default
+  45) before the watchdog acts on it.
+- Conflicting/dirty PRs get `needs-conflict-resolution` only — the watchdog
+  never removes `merge-queue` itself for conflicts; the next `drain-pr-queue.sh`
+  pass owns that dequeue, so the two scripts never race on the same label.
+- A terminal red required check (same definition as drain: only
+  `FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`/`STARTUP_FAILURE`) dequeues.
+- Otherwise — clean, green, and still stuck — the watchdog label-cycles
+  `merge-queue` (remove, re-add) to force Graphite to re-observe the PR.
+  Graphite is not the GitHub-native merge queue, so there is no
+  `dequeuePullRequest` GraphQL mutation to call; a label cycle is the only
+  lever available.
+- **Anti-thrash:** at most one label-cycle kick per PR per `COOLDOWN_HOURS`
+  (default 2), tracked via a hidden-marker PR comment. The enroll and
+  watchdog jobs share one concurrency group so they never mutate labels
+  concurrently.
+
 ## 4. The one human gate: taste
 
 - Taste-touching changes (design / UX / copy) get `needs-human-taste` **and a
