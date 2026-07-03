@@ -32,6 +32,29 @@ describe('hermes launchd pro templates', () => {
   });
 });
 
+describe('codex issue shipper launchd template', () => {
+  it('renders shipper plist with gated entrypoint and 15m schedule', () => {
+    const templatePath = join(
+      REPO_ROOT,
+      'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template'
+    );
+    const rendered = renderTemplate(templatePath, {
+      '{{HOME}}': '/Users/tester',
+      '{{JOVIE_REPO}}': '/Users/tester/Jovie',
+      '{{NODE_BIN_DIR}}': '/Users/tester/.nvm/versions/node/v22.13.0/bin',
+    });
+
+    expect(rendered).toContain(
+      '<string>co.jovie.hermes.cron-codex-issue-shipper</string>'
+    );
+    expect(rendered).toContain('<integer>900</integer>');
+    expect(rendered).toContain(
+      '/Users/tester/.hermes/scripts/shipper-gated-entrypoint.py'
+    );
+    expect(rendered).toContain('/Users/tester/Jovie');
+  });
+});
+
 describe('ship-loop pause semantics', () => {
   it('documents pause sentinels in the wrapper script', () => {
     const script = readFileSync(

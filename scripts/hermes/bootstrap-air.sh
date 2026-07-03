@@ -239,11 +239,16 @@ fi
 # 9. Hermes home + state dirs
 mkdir -p \
   "$HERMES_HOME" \
+  "$HERMES_HOME/bin" \
+  "$HERMES_HOME/scripts" \
   "$HERMES_HOME/logs" \
   "$HERMES_HOME/logs/launchd" \
   "$HERMES_HOME/state"
 chmod 700 "$HERMES_HOME"
-ok "Hermes home: $HERMES_HOME"
+install -m 755 "${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py" \
+  "${HERMES_HOME}/scripts/shipper-gated-entrypoint.py"
+ln -sf "$TSX_BIN" "${HERMES_HOME}/bin/tsx"
+ok "Hermes home: $HERMES_HOME (shipper-gated-entrypoint installed)"
 
 # 10. Render ~/.hermes/.env from Doppler
 log "Rendering ~/.hermes/.env"

@@ -38,9 +38,12 @@ import {
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  canAutoRecoverCheckout,
   classifyCheckout,
+  decideCheckoutGate,
   type DispatchPlan,
   describeCheckout,
+  parseDirtyPaths,
   EPIC_LABEL,
   type FinisherRunner,
   finishDispatch,
@@ -58,6 +61,7 @@ import {
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import { notifyOps } from '../lib/ops-notify';
 import {
   journalEnd,
   journalStart,
@@ -283,16 +287,28 @@ function detectRepoRoot(): string {
   }).trim();
 }
 
+function readCheckoutState(
+  git: (args: ReadonlyArray<string>) => string
+): CheckoutState {
+  const porcelain = git(['status', '--porcelain', '--untracked-files=no']);
+  const dirtyPaths = parseDirtyPaths(porcelain);
+  return {
+    branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
+    headSha: git(['rev-parse', 'HEAD']),
+    originMainSha: git(['rev-parse', 'origin/main']),
+    dirty: dirtyPaths.length > 0,
+    dirtyPaths,
+  };
+}
+
 /**
- * Self-heal the primary checkout before dispatching (JOV-3838). The shipper
- * runs its own dispatcher code from repoRoot; if that checkout drifted off
- * fresh main (a PR branch left checked out, commits behind, or a dirty tree),
- * stash any stray work and hard-reset to origin/main so the NEXT launchd tick
- * execs correct code. Stash-not-drop keeps stray edits recoverable. Returns
- * true if it recovered (this run keeps going on freshly-fetched worktrees;
- * the dispatcher-code fix lands on the re-exec).
+ * Fail-closed checkout gate (#12841). The shipper runs dispatcher code from
+ * repoRoot HEAD; if that checkout is not clean main at origin/main, refuse to
+ * dispatch. Safe drift (wrong branch / behind / non-shipper detritus) is
+ * auto-healed for the NEXT launchd tick, but THIS process still aborts because
+ * it is already executing stale code.
  */
-function ensureFreshCheckout(repoRoot: string): boolean {
+async function enforceCheckoutFreshness(repoRoot: string): Promise<boolean> {
   const git = (args: ReadonlyArray<string>): string =>
     execFileSync('git', args, {
       cwd: repoRoot,
@@ -300,56 +316,87 @@ function ensureFreshCheckout(repoRoot: string): boolean {
       timeout: 60_000,
     }).trim();
 
-  let state: CheckoutState;
+  let before: CheckoutState;
   try {
     git(['fetch', 'origin', 'main']);
-    state = {
-      branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
-      headSha: git(['rev-parse', 'HEAD']),
-      originMainSha: git(['rev-parse', 'origin/main']),
-      dirty: git(['status', '--porcelain', '--untracked-files=no']).length > 0,
-    };
+    before = readCheckoutState(git);
   } catch (err) {
-    // Can't determine freshness — log and let the run proceed rather than
-    // wedging the shipper on a transient git hiccup.
     logJobEvent({
       job: JOB,
       event: 'checkout_check_failed',
       error: shortError(err),
     });
+    await notifyOps(
+      `Codex issue shipper: checkout freshness check failed (${shortError(err)}). Refusing to dispatch.`
+    );
     return false;
   }
 
-  if (classifyCheckout(state) === 'fresh') return false;
+  if (classifyCheckout(before) === 'fresh') return true;
 
-  const detail = describeCheckout(state);
-  try {
-    // Preserve any stray tracked edits (recoverable via `git stash list`).
-    if (state.dirty) {
-      git([
-        'stash',
-        'push',
-        '-m',
-        `shipper-stale-checkout-recovery: ${detail}`,
-      ]);
+  let after: CheckoutState | null = null;
+  let recoveryAttempted = false;
+  let recoveryFailed = false;
+
+  if (canAutoRecoverCheckout(before)) {
+    recoveryAttempted = true;
+    const detail = describeCheckout(before);
+    try {
+      if (before.dirty) {
+        git([
+          'stash',
+          'push',
+          '-m',
+          `shipper-stale-checkout-recovery: ${detail}`,
+        ]);
+      }
+      git(['checkout', 'main']);
+      git(['reset', '--hard', 'origin/main']);
+      after = readCheckoutState(git);
+    } catch (err) {
+      recoveryFailed = true;
+      logJobEvent({
+        job: JOB,
+        event: 'stale_checkout_recovery_failed',
+        detail,
+        error: shortError(err),
+      });
     }
-    git(['checkout', 'main']);
-    git(['reset', '--hard', 'origin/main']);
-    logJobEvent({
-      job: JOB,
-      event: 'stale_checkout_recovered',
-      detail,
-      stashed: state.dirty,
-    });
-  } catch (err) {
-    logJobEvent({
-      job: JOB,
-      event: 'stale_checkout_recovery_failed',
-      detail,
-      error: shortError(err),
-    });
   }
-  return true;
+
+  const decision = decideCheckoutGate(
+    before,
+    after,
+    recoveryAttempted,
+    recoveryFailed
+  );
+  if (decision.action === 'proceed') return true;
+
+  logJobEvent({
+    job: JOB,
+    event: decision.event,
+    detail: decision.detail,
+    repoRoot,
+    recoveryAttempted,
+    recoveryFailed,
+    afterFresh: after ? classifyCheckout(after) === 'fresh' : false,
+  });
+
+  if (decision.notify) {
+    await notifyOps(
+      [
+        `Codex issue shipper: ${decision.event}`,
+        decision.detail,
+        `Repo: ${repoRoot}`,
+        'Dispatch refused until the primary checkout is clean main at origin/main.',
+        recoveryAttempted
+          ? 'Auto-recovery was attempted; inspect git stash list if edits are missing.'
+          : 'Auto-recovery skipped (shipper dispatcher files are dirty).',
+      ].join('\n')
+    );
+  }
+
+  return false;
 }
 
 function detectGithubRepo(repoRoot: string): string {
@@ -1170,12 +1217,12 @@ async function main(): Promise<void> {
   }
 
   const repoRoot = detectRepoRoot();
-  // JOV-3838: never dispatch on stale dispatcher code — self-heal the primary
-  // checkout to fresh origin/main first (agents run in worktrees regardless).
-  // Skipped in dry-run so dev/CI invocations in a feature-branch worktree are
-  // never reset to main; only the real launchd run (in ~/Jovie on main) heals.
+  // #12841: never dispatch on stale dispatcher code. Fail closed like gbrain/grok
+  // gates. Skipped in dry-run so dev/CI invocations in feature-branch worktrees
+  // are not wedged; only the real launchd run (~/Jovie on main) enforces this.
   if (process.env.HERMES_CODEX_SHIPPER_DRY_RUN !== '1') {
-    ensureFreshCheckout(repoRoot);
+    const fresh = await enforceCheckoutFreshness(repoRoot);
+    if (!fresh) return;
   }
   const repo = detectGithubRepo(repoRoot);
   const config = loadShipperConfig(process.env, repoRoot, repo);
