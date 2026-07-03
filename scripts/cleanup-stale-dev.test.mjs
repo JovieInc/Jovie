@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const cleanupScript = path.join(scriptsDir, 'cleanup-stale-dev.sh');
@@ -36,7 +36,9 @@ test('cleanup-stale-dev exits cleanly when no stale processes match', () => {
 });
 
 test('cleanup-stale-dev rejects invalid max-age env', () => {
-  const result = runCleanup([], { JOVIE_STALE_DEV_MAX_AGE_HOURS: 'not-a-number' });
+  const result = runCleanup([], {
+    JOVIE_STALE_DEV_MAX_AGE_HOURS: 'not-a-number',
+  });
   const output = `${result.stdout}\n${result.stderr}`;
 
   assert.notEqual(result.status, 0, output);
@@ -44,8 +46,8 @@ test('cleanup-stale-dev rejects invalid max-age env', () => {
 });
 
 test('cleanup-stale-dev parser flags only aged next/turbo dev processes', () => {
-  const sample = `12345       10:04 next dev
-23456       01:17 next dev --port 3001
+  const sample = `12345       05:00:00 next dev
+23456       10:04:00 next dev --port 3001
 34567       00:05 next-server (v16.2.6)
 45678       02:00 turbo dev
 99999       12:00 node scripts/foo.js
@@ -54,9 +56,9 @@ test('cleanup-stale-dev parser flags only aged next/turbo dev processes', () => 
   const result = spawnSync(
     'node',
     [
-      '-',
-      '3600',
-      String.raw`
+      '-e',
+      `
+const input = ${JSON.stringify(sample)};
 function parseElapsedSeconds(raw) {
   const value = raw.trim();
   if (!value) return null;
@@ -72,14 +74,14 @@ function parseElapsedSeconds(raw) {
   return parts[0];
 }
 function isDevProcess(command) {
-  return /\bnext dev\b/.test(command) || /\bnext-server\b/.test(command) || (/\bturbo dev\b/.test(command) && !/\bgrep\b/.test(command));
+  return /\\bnext dev\\b/.test(command) || /\\bnext-server\\b/.test(command) || (/\\bturbo dev\\b/.test(command) && !/\\bgrep\\b/.test(command));
 }
-const maxAgeSeconds = Number(process.argv[2]);
+const maxAgeSeconds = 3600;
 const stale = [];
-for (const line of require('node:fs').readFileSync(0, 'utf8').split('\n')) {
+for (const line of input.split('\\n')) {
   const trimmed = line.trim();
   if (!trimmed) continue;
-  const match = trimmed.match(/^(\d+)\s+(\S+)\s+(.*)$/);
+  const match = trimmed.match(/^(\\d+)\\s+(\\S+)\\s+(.*)$/);
   if (!match) continue;
   const pid = Number(match[1]);
   const elapsedSeconds = parseElapsedSeconds(match[2]);
@@ -92,7 +94,7 @@ for (const line of require('node:fs').readFileSync(0, 'utf8').split('\n')) {
 process.stdout.write(stale.join(','));
 `,
     ],
-    { input: sample, encoding: 'utf8' }
+    { encoding: 'utf8' }
   );
 
   assert.equal(result.status, 0, result.stderr);
