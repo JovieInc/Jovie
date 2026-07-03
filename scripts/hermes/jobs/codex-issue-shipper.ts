@@ -6,8 +6,9 @@
  * eligible issue, writes dispatch context to gbrain, then starts a
  * coder-profile agent to ship it.
  *
- * Issues labeled `no-auto`, `type:epic` (pointer trackers with no code), or
- * already claimed/blocked are excluded. All other open issues are dispatchable.
+ * Issues labeled `no-auto`, `invalid` (confirmed misroutes), `type:epic`
+ * (pointer trackers with no code), or already claimed/blocked are excluded.
+ * All other open issues are dispatchable.
  *
  * The empty-queue path is intentionally cheap: GitHub scan, log, exit. No
  * gbrain query, model call, subagent, or CodeRabbit work happens unless an

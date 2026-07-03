@@ -13,7 +13,9 @@ import {
   describeCheckout,
   dirtyTouchesShipper,
   EPIC_LABEL,
+  INVALID_LABEL,
   eligibleCodexIssues,
+  isInvalidMisroute,
   finishDispatch,
   GH_EAGAIN_BACKOFF_MS,
   GH_EAGAIN_BACKOFF_THRESHOLD,
@@ -99,7 +101,7 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters no-auto, claimed, blocked, and epic issues before dispatch', () => {
+  it('filters no-auto, claimed, blocked, epic, and invalid issues before dispatch', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
     const noAuto = issue({
       number: 2,
@@ -118,12 +120,35 @@ describe('codex issue shipper planner', () => {
       number: 5,
       labels: [{ name: 'codex' }, { name: EPIC_LABEL }],
     });
+    // Confirmed misroute: triage labels invalid but cannot close; shipper must
+    // not re-claim after release (#12675–#12678 / #12940).
+    const invalidMisroute = issue({
+      number: 6,
+      title: 'LYB PhotoUploadManager state machine',
+      labels: [
+        { name: 'codex' },
+        { name: INVALID_LABEL },
+        { name: 'blocked' },
+        { name: 'ai:needs-review' },
+      ],
+    });
 
+    expect(isInvalidMisroute(invalidMisroute)).toBe(true);
     expect(
-      eligibleCodexIssues([ready, noAuto, claimed, blocked, epic])
+      eligibleCodexIssues([
+        ready,
+        noAuto,
+        claimed,
+        blocked,
+        epic,
+        invalidMisroute,
+      ])
     ).toEqual([ready]);
     expect(
-      buildDispatchPlans([ready, noAuto, claimed, blocked, epic], config)
+      buildDispatchPlans(
+        [ready, noAuto, claimed, blocked, epic, invalidMisroute],
+        config
+      )
     ).toHaveLength(1);
   });
 

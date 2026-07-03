@@ -216,6 +216,7 @@ Control labels:
 | `codex` | Eligible source queue |
 | `codex-in-progress` | Claimed by the local shipper |
 | `codex-blocked` | Real blocker; the shipper will not retry automatically |
+| `invalid` | Confirmed misroute; the shipper will not claim or retry |
 | `human-review-required` | Hard skip |
 | `integration-branch` | Batch trainable issues through the integration branch |
 

@@ -68,6 +68,8 @@ export const CODEX_BLOCKED_LABEL = 'codex-blocked';
 export const HUMAN_REVIEW_LABEL = 'human-review-required';
 export const NO_AUTO_LABEL = 'no-auto';
 export const EPIC_LABEL = 'type:epic';
+/** Triaged misroutes (foreign codebase, no Jovie match) — never re-claim. */
+export const INVALID_LABEL = 'invalid';
 
 export interface GithubIssueLabel {
   readonly name: string;
@@ -300,6 +302,13 @@ export function isTrustedCodexIssue(issue: GithubIssue): boolean {
   return labelNames(issue).includes(CODEX_TRUSTED_LABEL);
 }
 
+// Confirmed misroutes keep the `invalid` label after triage; agents cannot
+// close foreign issues, so the shipper must never re-claim them (LYB loop,
+// see #12675–#12678 / #12940).
+export function isInvalidMisroute(issue: GithubIssue): boolean {
+  return labelNames(issue).includes(INVALID_LABEL);
+}
+
 export function eligibleCodexIssues(
   issues: ReadonlyArray<GithubIssue>
 ): ReadonlyArray<GithubIssue> {
@@ -308,6 +317,7 @@ export function eligibleCodexIssues(
       !isHumanReviewRequired(issue) &&
       !isAlreadyClaimedOrBlocked(issue) &&
       !isEpicPointer(issue) &&
+      !isInvalidMisroute(issue) &&
       !labelNames(issue).includes(NO_AUTO_LABEL)
   );
 }
