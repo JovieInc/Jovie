@@ -1,7 +1,12 @@
 import { readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-const ROUTE_FILE_NAMES = new Set(['page.tsx', 'page.ts', 'route.ts', 'route.tsx']);
+const ROUTE_FILE_NAMES = new Set([
+  'page.tsx',
+  'page.ts',
+  'route.ts',
+  'route.tsx',
+]);
 
 /**
  * @param {string} dir

@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -24,7 +31,10 @@ test('scanAppRouteSources counts page and route handlers', () => {
     mkdirSync(path.join(root, 'hud'), { recursive: true });
     mkdirSync(path.join(root, 'api', 'health'), { recursive: true });
     touch(path.join(root, 'hud', 'page.tsx'), new Date('2026-07-01T00:00:00Z'));
-    touch(path.join(root, 'api', 'health', 'route.ts'), new Date('2026-07-02T00:00:00Z'));
+    touch(
+      path.join(root, 'api', 'health', 'route.ts'),
+      new Date('2026-07-02T00:00:00Z')
+    );
 
     const summary = scanAppRouteSources(root);
 
@@ -49,8 +59,14 @@ test('ensureDevNextCacheFresh wipes .next when source routes are newer', () => {
     mkdirSync(path.join(appDir, 'hud'), { recursive: true });
     mkdirSync(compiledRoutesDir, { recursive: true });
 
-    touch(path.join(compiledRoutesDir, 'manifest.json'), new Date('2026-06-20T00:00:00Z'));
-    touch(path.join(appDir, 'hud', 'page.tsx'), new Date('2026-07-03T00:00:00Z'));
+    touch(
+      path.join(compiledRoutesDir, 'manifest.json'),
+      new Date('2026-06-20T00:00:00Z')
+    );
+    touch(
+      path.join(appDir, 'hud', 'page.tsx'),
+      new Date('2026-07-03T00:00:00Z')
+    );
 
     const summary = ensureDevNextCacheFresh({
       appDir,
@@ -61,10 +77,7 @@ test('ensureDevNextCacheFresh wipes .next when source routes are newer', () => {
 
     assert.equal(summary.cacheState, 'stale');
     assert.throws(() => statSync(nextDir), /ENOENT/);
-    assert.match(
-      formatDevRouteDiscoveryLog(summary),
-      /wiped stale \.next/
-    );
+    assert.match(formatDevRouteDiscoveryLog(summary), /wiped stale \.next/);
   } finally {
     rmSync(root, { force: true, recursive: true });
   }
@@ -80,8 +93,14 @@ test('ensureDevNextCacheFresh keeps cache when compiled routes are newer', () =>
     mkdirSync(path.join(appDir, 'hud'), { recursive: true });
     mkdirSync(compiledRoutesDir, { recursive: true });
 
-    touch(path.join(appDir, 'hud', 'page.tsx'), new Date('2026-06-20T00:00:00Z'));
-    touch(path.join(compiledRoutesDir, 'manifest.json'), new Date('2026-07-03T00:00:00Z'));
+    touch(
+      path.join(appDir, 'hud', 'page.tsx'),
+      new Date('2026-06-20T00:00:00Z')
+    );
+    touch(
+      path.join(compiledRoutesDir, 'manifest.json'),
+      new Date('2026-07-03T00:00:00Z')
+    );
 
     const summary = ensureDevNextCacheFresh({
       appDir,

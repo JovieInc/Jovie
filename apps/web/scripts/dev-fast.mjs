@@ -41,11 +41,11 @@ const nextDev = spawn(
   process.execPath,
   [nextBin, 'dev', '-p', port, ...extraArgs],
   {
-  cwd: webRoot,
-  env: {
-    ...process.env,
-    NODE_OPTIONS: nodeOptions,
-  },
+    cwd: webRoot,
+    env: {
+      ...process.env,
+      NODE_OPTIONS: nodeOptions,
+    },
     stdio: 'inherit',
   }
 );
