@@ -1,10 +1,33 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AiCrawlerIntelligenceCard } from '@/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
+
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
+  useFeatureFlag: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
 }));
 
 const hoisted = vi.hoisted(() => ({
@@ -63,7 +86,7 @@ describe('AiCrawlerIntelligenceCard', () => {
       isError: false,
     });
 
-    render(<AiCrawlerIntelligenceCard />);
+    renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     const skeleton = screen.getByTestId('ai-crawler-card-skeleton');
     expect(skeleton).toHaveClass('min-h-45');
@@ -76,7 +99,7 @@ describe('AiCrawlerIntelligenceCard', () => {
       isError: true,
     });
 
-    render(<AiCrawlerIntelligenceCard />);
+    renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     const errorCard = screen.getByTestId('ai-crawler-card-error');
     expect(errorCard).toHaveClass('min-h-45');
@@ -92,14 +115,16 @@ describe('AiCrawlerIntelligenceCard', () => {
       isError: false,
     });
 
-    render(<AiCrawlerIntelligenceCard />);
+    renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveClass(
       'min-h-45'
     );
     expect(screen.getByTestId('ai-crawler-entity-card')).toBeInTheDocument();
     expect(screen.getByText('420 reads')).toBeInTheDocument();
-    expect(screen.queryByTestId('ai-crawler-card-teaser')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('ai-crawler-card-teaser')
+    ).not.toBeInTheDocument();
   });
 
   it('shows teaser overlay for free users while keeping card footprint', () => {
@@ -109,15 +134,13 @@ describe('AiCrawlerIntelligenceCard', () => {
       isError: false,
     });
 
-    render(<AiCrawlerIntelligenceCard />);
+    renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveClass(
       'min-h-45'
     );
     expect(screen.getByTestId('ai-crawler-card-teaser')).toBeInTheDocument();
-    expect(
-      screen.getByText('42 AI reads in 30 days')
-    ).toBeInTheDocument();
+    expect(screen.getByText('42 AI reads in 30 days')).toBeInTheDocument();
     expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument();
   });
 });
