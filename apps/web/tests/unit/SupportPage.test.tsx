@@ -38,6 +38,16 @@ describe('SupportPage', () => {
     expect(contactButton).toHaveTextContent('Contact Support');
   });
 
+  it('uses secondary CTA styling on the light support section', () => {
+    render(<SupportPage />);
+
+    const contactButton = screen.getByRole('link', {
+      name: /send email to support team/i,
+    });
+    expect(contactButton).not.toHaveClass('public-action-primary');
+    expect(contactButton.className).toMatch(/bg-btn-secondary/);
+  });
+
   it('has proper accessibility attributes', () => {
     render(<SupportPage />);
 
