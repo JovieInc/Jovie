@@ -806,10 +806,12 @@ export function routeForAgent(
 //
 // The launchd shipper reads its OWN dispatcher code from the primary checkout
 // (~/Jovie HEAD). If some flow leaves that checkout on a PR branch or behind
-// main (#12841: a PR branch was found checked out there, so the shipper silently
-// ran ~1h of stale pre-fallback code), the dispatcher regresses with zero alarm.
-// Agents are unaffected because they run in fresh worktrees — only the dispatcher
-// rots. Fail closed: refuse to dispatch until the checkout is fresh origin/main.
+// main (JOV-3838: a UI PR branch was found checked out there, so the shipper
+// silently ran ~1h of stale pre-fallback code), the dispatcher regresses with
+// zero alarm. Agents are unaffected because they run in fresh worktrees — only
+// the dispatcher rots. The working tree here should ALWAYS be clean `main` at
+// origin/main. On any stale signal we fail-closed for THIS tick (even after
+// disk recovery) so the next launchd re-exec loads fresh dispatcher code.
 
 export interface CheckoutState {
   readonly branch: string;
@@ -820,6 +822,14 @@ export interface CheckoutState {
 }
 
 export type CheckoutVerdict = 'fresh' | 'stale';
+
+/** Paths that must never be auto-reset — edits here may be in-flight shipper work. */
+export const SHIPPER_CRITICAL_PATHS = [
+  'scripts/hermes/jobs/codex-issue-shipper.ts',
+  'scripts/hermes/lib/codex-issue-shipper.ts',
+  'scripts/hermes/lib/ship-ledger.ts',
+  'scripts/hermes/shipper-gated-entrypoint.py',
+] as const;
 
 export function classifyCheckout(state: CheckoutState): CheckoutVerdict {
   const onMain = state.branch === 'main';
@@ -839,116 +849,71 @@ export function describeCheckout(state: CheckoutState): string {
   return parts.join('; ') || 'fresh';
 }
 
-/** Dispatcher-critical paths — dirty edits here block auto-recovery. */
-export const SHIPPER_CRITICAL_PATH_PREFIXES = [
-  'scripts/hermes/jobs/codex-issue-shipper.ts',
-  'scripts/hermes/lib/codex-issue-shipper.ts',
-  'scripts/hermes/ship-loop.sh',
-  'scripts/hermes/shipper-gated-entrypoint.py',
-  'scripts/hermes/lib/ship-ledger.ts',
-  'scripts/hermes/lib/gbrain.ts',
-  'scripts/hermes/lib/heavy-job-lock.ts',
-  'scripts/hermes/lib/jobs-log.ts',
-] as const;
-
-/** @deprecated Use SHIPPER_CRITICAL_PATH_PREFIXES */
-export const SHIPPER_DISPATCHER_PATHS = SHIPPER_CRITICAL_PATH_PREFIXES;
-
-export function parseDirtyPaths(porcelain: string): ReadonlyArray<string> {
+/** Parse `git status --porcelain` paths (tracked modifications only). */
+export function parseDirtyPaths(porcelain: string): readonly string[] {
   return porcelain
     .split('\n')
-    .map(line => line.replace(/\r$/, ''))
-    .filter(line => line.length > 3)
-    .map(line => {
-      // Porcelain is fixed-width: XY<space>path — do not trim the line first.
-      const path = line.slice(3).trim();
-      const renameIdx = path.indexOf(' -> ');
-      return renameIdx >= 0 ? path.slice(renameIdx + 4).trim() : path;
-    });
+    .map(line => line.trimEnd())
+    .filter(line => line.length > 2)
+    .map(line => line.slice(3).trim())
+    .filter(Boolean);
 }
 
-function touchesShipperCriticalPath(path: string): boolean {
-  return SHIPPER_CRITICAL_PATH_PREFIXES.some(
+export function isShipperCriticalPath(path: string): boolean {
+  return SHIPPER_CRITICAL_PATHS.some(
     critical => path === critical || path.startsWith(`${critical}/`)
   );
 }
 
-export function dirtyTouchesShipper(paths: ReadonlyArray<string>): boolean {
-  return paths.some(path => touchesShipperCriticalPath(path));
-}
-
-/** True when stray edits are safe to stash (no shipper/dispatcher files). */
-export function isRecoverableDetritus(
-  dirtyPaths: ReadonlyArray<string>
+export function dirtyPathsAreRecoverableDetritus(
+  paths: readonly string[]
 ): boolean {
-  if (dirtyPaths.length === 0) return true;
-  return dirtyPaths.every(path => !touchesShipperCriticalPath(path));
+  if (paths.length === 0) return true;
+  return paths.every(path => !isShipperCriticalPath(path));
 }
 
-/** Whether auto-recovery (stash + reset to origin/main) is allowed. */
-export function canAutoRecoverCheckout(
+export interface CheckoutGatePlan {
+  readonly proceed: boolean;
+  readonly detail: string;
+  readonly attemptRecovery: boolean;
+  readonly recoveryBlockedReason?: string;
+}
+
+export function planCheckoutGate(
   state: CheckoutState,
-  dirtyPaths?: ReadonlyArray<string>
-): boolean {
-  const paths = dirtyPaths ?? state.dirtyPaths ?? [];
-  if (classifyCheckout(state) === 'fresh') return false;
-  if (!state.dirty) return true;
-  return isRecoverableDetritus(paths);
-}
-
-export type CheckoutGateDecision =
-  | { readonly action: 'proceed' }
-  | {
-      readonly action: 'abort';
-      readonly event: 'stale_checkout_abort' | 'stale_checkout_recovered';
-      readonly detail: string;
-      readonly notify: boolean;
-    };
-
-export function decideCheckoutGate(
-  before: CheckoutState,
-  after: CheckoutState | null,
-  recoveryAttempted: boolean,
-  recoveryFailed: boolean
-): CheckoutGateDecision {
-  if (classifyCheckout(before) === 'fresh') {
-    return { action: 'proceed' };
+  dirtyPaths: readonly string[]
+): CheckoutGatePlan {
+  if (classifyCheckout(state) === 'fresh') {
+    return { proceed: true, detail: 'fresh', attemptRecovery: false };
   }
 
-  const detail = describeCheckout(before);
-  if (recoveryFailed || !canAutoRecoverCheckout(before)) {
-    return {
-      action: 'abort',
-      event: 'stale_checkout_abort',
-      detail,
-      notify: true,
-    };
-  }
+  const detail = describeCheckout(state);
+  const branchOrBehind =
+    state.branch !== 'main' || state.headSha !== state.originMainSha;
+  const dirtyOnly = state.dirty && !branchOrBehind;
 
-  if (recoveryAttempted && after && classifyCheckout(after) === 'fresh') {
+  if (dirtyOnly && !dirtyPathsAreRecoverableDetritus(dirtyPaths)) {
     return {
-      action: 'abort',
-      event: 'stale_checkout_recovered',
+      proceed: false,
       detail,
-      notify: false,
+      attemptRecovery: false,
+      recoveryBlockedReason: 'dirty shipper-critical files',
     };
   }
 
   return {
-    action: 'abort',
-    event: 'stale_checkout_abort',
-    detail: recoveryAttempted
-      ? `${detail}; recovery left checkout stale`
-      : detail,
-    notify: true,
+    proceed: false,
+    detail,
+    attemptRecovery: true,
   };
 }
 
-export type PrimaryCheckoutGuardVerdict = 'fresh' | 'abort';
-
-export interface PrimaryCheckoutGuardResult {
-  readonly verdict: PrimaryCheckoutGuardVerdict;
-  readonly detail: string;
+export interface CheckoutRecoveryResult {
   readonly recovered: boolean;
-  readonly dirtyPaths: ReadonlyArray<string>;
+  readonly stashed: boolean;
+  readonly error?: string;
+}
+
+export function buildRecoveryStashMessage(detail: string): string {
+  return `shipper-stale-checkout-recovery: ${detail}`;
 }

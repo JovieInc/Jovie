@@ -35,14 +35,15 @@ import {
   buildDispatchPlans,
   buildGbrainCaptureText,
   buildGbrainQuery,
+  buildRecoveryStashMessage,
   type CheckoutState,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
-  canAutoRecoverCheckout,
-  classifyCheckout,
   type DispatchPlan,
   describeCheckout,
+  parseDirtyPaths,
+  planCheckoutGate,
   EPIC_LABEL,
   type FinisherRunner,
   finishDispatch,
@@ -55,7 +56,6 @@ import {
   NO_AUTO_LABEL,
   type PrimaryCheckoutGuardResult,
   parseAgentChain,
-  parseDirtyPaths,
   routeForAgent,
   type ShipperConfig,
   SpawnEagainError,
@@ -64,6 +64,7 @@ import {
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import { sendOpsAlert } from '../lib/ops-notify';
 import {
   journalEnd,
   journalStart,
@@ -355,13 +356,12 @@ function detectRepoRoot(): string | null {
 }
 
 /**
- * Fail-closed primary-checkout gate (JOV-3838 / #12841). The shipper reads its
- * OWN dispatcher code from repoRoot HEAD — a hijacked checkout silently regresses
- * dispatch logic while agents still get fresh worktrees. When stale, optionally
- * auto-recover (stash + reset) for non-shipper detritus, then abort THIS run so
- * launchd re-execs fresh code on the next tick.
+ * Fail-closed primary-checkout gate (#12841). The shipper process already
+ * loaded dispatcher code from repoRoot at startup; if that checkout is not
+ * clean main at origin/main we refuse to dispatch THIS tick even after disk
+ * recovery so the next launchd re-exec loads fresh code.
  */
-function guardPrimaryCheckout(repoRoot: string): PrimaryCheckoutGuardResult {
+async function gatePrimaryCheckout(repoRoot: string): Promise<boolean> {
   const git = (args: ReadonlyArray<string>): string =>
     execFileSync('git', args, {
       cwd: repoRoot,
@@ -382,7 +382,6 @@ function guardPrimaryCheckout(repoRoot: string): PrimaryCheckoutGuardResult {
       dirty: porcelain.length > 0,
     };
   } catch (err) {
-    const detail = `checkout check failed: ${shortError(err)}`;
     logJobEvent({
       job: JOB,
       event: 'stale_checkout_abort',
@@ -390,28 +389,22 @@ function guardPrimaryCheckout(repoRoot: string): PrimaryCheckoutGuardResult {
       recovered: false,
       dirtyPaths,
     });
-    return { verdict: 'abort', detail, recovered: false, dirtyPaths };
+    return true;
   }
 
-  if (classifyCheckout(state) === 'fresh') {
-    return {
-      verdict: 'fresh',
-      detail: 'fresh',
-      recovered: false,
-      dirtyPaths,
-    };
-  }
+  const plan = planCheckoutGate(state, dirtyPaths);
+  if (plan.proceed) return true;
 
-  const detail = describeCheckout(state);
   let recovered = false;
-  if (canAutoRecoverCheckout(state, dirtyPaths)) {
+  let recoveryError: string | undefined;
+  if (plan.attemptRecovery) {
     try {
       if (state.dirty) {
         git([
           'stash',
           'push',
           '-m',
-          `shipper-stale-checkout-recovery: ${detail}`,
+          buildRecoveryStashMessage(plan.detail),
         ]);
       }
       git(['checkout', 'main']);
@@ -420,43 +413,51 @@ function guardPrimaryCheckout(repoRoot: string): PrimaryCheckoutGuardResult {
       logJobEvent({
         job: JOB,
         event: 'stale_checkout_recovered',
-        detail,
+        detail: plan.detail,
         stashed: state.dirty,
         dirtyPaths,
       });
     } catch (err) {
+      recoveryError = shortError(err);
       logJobEvent({
         job: JOB,
         event: 'stale_checkout_recovery_failed',
-        detail,
-        error: shortError(err),
+        detail: plan.detail,
+        error: recoveryError,
         dirtyPaths,
       });
     }
   }
 
-  return { verdict: 'abort', detail, recovered, dirtyPaths };
-}
-
-async function notifyStaleCheckoutAbort(
-  repoRoot: string,
-  guard: PrimaryCheckoutGuardResult
-): Promise<void> {
-  const message = [
-    'Ovie shipper: stale_checkout_abort',
+  const alertLines = [
+    'Ovie shipper stale_checkout_abort',
     `repo: ${repoRoot}`,
-    `detail: ${guard.detail}`,
-    guard.recovered
-      ? 'auto-recovery: reset to origin/main (next tick will run fresh code)'
-      : 'auto-recovery: skipped (shipper-critical dirty paths or recovery failed)',
-    guard.dirtyPaths.length > 0
-      ? `dirty: ${guard.dirtyPaths.slice(0, 8).join(', ')}`
-      : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+    `detail: ${plan.detail}`,
+    plan.recoveryBlockedReason
+      ? `recovery skipped: ${plan.recoveryBlockedReason}`
+      : null,
+    recovered
+      ? 'disk recovery: succeeded (this tick still aborts — next launchd re-exec loads fresh dispatcher code)'
+      : recoveryError
+        ? `disk recovery: failed (${recoveryError})`
+        : plan.attemptRecovery
+          ? 'disk recovery: not attempted'
+          : null,
+    dirtyPaths.length > 0 ? `dirty paths: ${dirtyPaths.join(', ')}` : null,
+  ].filter((line): line is string => line !== null);
 
-  await Promise.all([sendTelegram(message), sendSlack(message)]);
+  logJobEvent({
+    job: JOB,
+    event: 'stale_checkout_abort',
+    repoRoot,
+    detail: plan.detail,
+    recovered,
+    recoveryError,
+    recoveryBlockedReason: plan.recoveryBlockedReason,
+    dirtyPaths,
+  });
+  await sendOpsAlert(alertLines.join('\n'));
+  return false;
 }
 
 function detectGithubRepo(repoRoot: string): string | null {
@@ -1329,21 +1330,14 @@ async function runShipper(): Promise<void> {
     await handleSpawnResourcePressure('detect_repo_root');
     return;
   }
-  // JOV-3838 / #12841: fail-closed when the primary checkout is hijacked off
-  // fresh main. Skipped in dry-run so dev/CI worktrees are never reset.
-  if (process.env.HERMES_CODEX_SHIPPER_DRY_RUN !== '1') {
-    const guard = guardPrimaryCheckout(repoRoot);
-    if (guard.verdict === 'abort') {
-      logJobEvent({
-        job: JOB,
-        event: 'stale_checkout_abort',
-        detail: guard.detail,
-        recovered: guard.recovered,
-        dirtyPaths: guard.dirtyPaths,
-      });
-      await notifyStaleCheckoutAbort(repoRoot, guard);
-      return;
-    }
+  // #12841: fail-closed when the primary checkout is not clean main at
+  // origin/main. Skipped in dry-run so dev/CI feature-branch worktrees are not
+  // reset or blocked.
+  if (
+    process.env.HERMES_CODEX_SHIPPER_DRY_RUN !== '1' &&
+    !(await gatePrimaryCheckout(repoRoot))
+  ) {
+    return;
   }
   const repo = detectGithubRepo(repoRoot);
   if (!repo) {
