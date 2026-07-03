@@ -272,3 +272,14 @@ export const animation = {
     shadow: 'var(--transition-shadow)',
   },
 } as const;
+
+// ============================================
+// JOVIE COLOR ALIASES (canonical loading-state fills)
+// ============================================
+export const JovieColor = {
+  surface0: surfaces['surface-0'],
+  surface1: surfaces['surface-1'],
+  surface2: surfaces['surface-2'],
+  skeletonBase: 'var(--color-skeleton-base)',
+  skeletonShimmer: 'var(--color-skeleton-shimmer)',
+} as const;

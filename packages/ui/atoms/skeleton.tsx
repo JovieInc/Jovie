@@ -54,7 +54,7 @@ export function Skeleton({
     <div
       className={cn(
         shimmer && 'skeleton motion-reduce:animate-none',
-        !shimmer && 'bg-(--color-skeleton-base) motion-reduce:animate-none',
+        !shimmer && 'bg-surface-1 motion-reduce:animate-none',
         roundedClasses[rounded],
         className
       )}

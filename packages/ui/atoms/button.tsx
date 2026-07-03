@@ -5,6 +5,8 @@ import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
+import { Spinner } from './spinner';
+
 const buttonVariants = cva(
   'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)] disabled:text-(--color-text-disabled-token)',
   {
@@ -175,14 +177,10 @@ function getDataState(loading: boolean, isDisabled: boolean): string {
   return 'idle';
 }
 
-// Loading spinner component
-function LoadingSpinner() {
+function ButtonLoadingSpinner() {
   return (
-    <span
-      className='absolute inset-0 flex items-center justify-center'
-      data-testid='spinner'
-    >
-      <span className='h-4 w-4 animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent' />
+    <span className='absolute inset-0 flex items-center justify-center'>
+      <Spinner size='sm' tone='primary' label='Loading' />
     </span>
   );
 }
@@ -273,7 +271,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <Comp {...sharedProps} {...buttonProps} {...props}>
-        {loading && <LoadingSpinner />}
+        {loading && <ButtonLoadingSpinner />}
         <ButtonContent loading={loading}>{children}</ButtonContent>
       </Comp>
     );

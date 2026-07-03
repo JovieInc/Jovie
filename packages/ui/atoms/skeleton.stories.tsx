@@ -10,7 +10,7 @@ const meta: Meta<typeof Skeleton> = {
     docs: {
       description: {
         component:
-          'Loading shimmer uses .skeleton, data-state="shimmer", and --color-skeleton-base / --color-skeleton-shimmer tokens.',
+          'Loading shimmer uses .skeleton on JovieColor.surface1 (--color-skeleton-base). See packages/ui/docs/loading-states.md.',
       },
     },
   },

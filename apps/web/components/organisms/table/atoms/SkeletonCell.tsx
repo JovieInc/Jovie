@@ -1,4 +1,6 @@
-import { cn, skeleton } from '../table.styles';
+import { Skeleton } from '@jovie/ui';
+
+import { cn } from '../table.styles';
 
 interface SkeletonCellProps
   extends Readonly<{
@@ -25,6 +27,26 @@ interface SkeletonCellProps
     readonly className?: string;
   }> {}
 
+const variantDimensions: Record<
+  Exclude<SkeletonCellProps['variant'], 'release' | 'meta' | undefined>,
+  string
+> = {
+  text: 'h-4 w-24',
+  avatar: 'h-8 w-8',
+  badge: 'h-5 w-16',
+  button: 'h-8 w-20',
+};
+
+const variantRounded: Record<
+  Exclude<SkeletonCellProps['variant'], 'release' | 'meta' | undefined>,
+  'sm' | 'md' | 'full'
+> = {
+  text: 'sm',
+  avatar: 'full',
+  badge: 'full',
+  button: 'md',
+};
+
 /**
  * SkeletonCell - Loading skeleton for table cells
  *
@@ -41,10 +63,10 @@ export function SkeletonCell({
         className={cn('flex items-start gap-2', className)}
         style={{ width }}
       >
-        <div className='mt-0.5 h-4 w-4 shrink-0 rounded skeleton' />
+        <Skeleton className='mt-0.5 h-4 w-4 shrink-0' />
         <div className='min-w-0 flex-1 space-y-0.5'>
-          <div className='system-b-table-skeleton-release-title rounded-sm skeleton' />
-          <div className='system-b-table-skeleton-release-meta rounded-sm skeleton' />
+          <Skeleton className='system-b-table-skeleton-release-title' />
+          <Skeleton className='system-b-table-skeleton-release-meta' />
         </div>
       </div>
     );
@@ -59,18 +81,19 @@ export function SkeletonCell({
         )}
         style={{ width }}
       >
-        <div className='h-5 rounded-sm skeleton' />
-        <div className='h-2.5 w-2.5 justify-self-center rounded-full skeleton' />
-        <div className='h-3 w-7 justify-self-end rounded-sm skeleton' />
+        <Skeleton className='h-5' />
+        <Skeleton className='h-2.5 w-2.5 justify-self-center' rounded='full' />
+        <Skeleton className='h-3 w-7 justify-self-end' />
       </div>
     );
   }
 
-  const variantClass = skeleton[variant];
-
   return (
     <div className={cn('flex items-center', className)} style={{ width }}>
-      <div className={cn(skeleton.base, variantClass)} />
+      <Skeleton
+        className={variantDimensions[variant]}
+        rounded={variantRounded[variant]}
+      />
     </div>
   );
 }
