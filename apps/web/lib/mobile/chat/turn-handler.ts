@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { randomUUID } from 'node:crypto';
-import type { UIMessage } from 'ai';
+import type { ToolSet, UIMessage } from 'ai';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
@@ -11,6 +11,11 @@ import {
   decodeToolEvents,
   resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
+import {
+  createMerchGenerateTool,
+  createMerchPreviewTool,
+  createMerchSelectTool,
+} from '@/lib/chat/tools/merch-tools';
 import {
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
@@ -31,6 +36,10 @@ import {
   type ParsedMobileChatTurnRequest,
 } from '@/lib/mobile/chat/contract';
 import { getMobileConversationDetail } from '@/lib/mobile/chat/conversations';
+import {
+  embedMobileMerchArtifactsInContent,
+  mobileMerchToolEventsFromResults,
+} from '@/lib/mobile/chat/tool-artifacts';
 import { checkAiChatRateLimitForPlan } from '@/lib/rate-limit';
 
 function buildUiMessagesFromHistory(
@@ -300,6 +309,29 @@ export async function handleMobileChatTurn(
 
   await markChatTurnStreaming(reservation.turn.id);
 
+  const mobileMerchTools: ToolSet = {
+    ...(accountContext.planLimits.booleans.canAccessMerchCreation
+      ? {
+          createMerch: createMerchGenerateTool({
+            profileId,
+            clerkUserId: userId,
+            conversationId: reservation.conversationId,
+            turnId: reservation.turn.id,
+          }),
+          previewMerchOptions: createMerchPreviewTool({
+            profileId,
+            clerkUserId: userId,
+            conversationId: reservation.conversationId,
+            turnId: reservation.turn.id,
+          }),
+          selectMerchDesign: createMerchSelectTool({
+            profileId,
+            clerkUserId: userId,
+          }),
+        }
+      : {}),
+  };
+
   const { streamResult } = await executeChatTurn({
     uiMessages,
     artistContext,
@@ -313,7 +345,7 @@ export async function handleMobileChatTurn(
     accountContext,
     forceLightModel: false,
     lastUserText: parsed.text,
-    tools: {},
+    tools: mobileMerchTools,
     signal,
     requestId,
     onStreamError: async error => {
@@ -358,12 +390,18 @@ export async function handleMobileChatTurn(
         }
 
         const trimmed = sanitizeAssistantResponse(fullText.trim()).text;
+        const toolResults = await streamResult.toolResults;
+        const merchToolEvents = mobileMerchToolEventsFromResults(toolResults);
+        const contentWithArtifacts = embedMobileMerchArtifactsInContent(
+          trimmed,
+          merchToolEvents
+        );
         const finalText =
-          trimmed.length > 0
-            ? trimmed
+          contentWithArtifacts.length > 0
+            ? contentWithArtifacts
             : 'I could not produce a text reply for that request. Open the web chat to continue with richer actions.';
 
-        if (trimmed.length === 0) {
+        if (trimmed.length === 0 && merchToolEvents.length === 0) {
           enqueue({
             type: 'web.handoff',
             clientTurnId: parsed.clientTurnId,
@@ -376,9 +414,16 @@ export async function handleMobileChatTurn(
         await persistTerminalAssistantMessage({
           conversationId: reservation.conversationId,
           turnId: reservation.turn.id,
-          status: trimmed.length > 0 ? 'completed' : 'failed_tool_unavailable',
+          status:
+            trimmed.length > 0 || merchToolEvents.length > 0
+              ? 'completed'
+              : 'failed_tool_unavailable',
           content: finalText,
-          errorCode: trimmed.length > 0 ? null : 'WEB_HANDOFF_REQUIRED',
+          toolCalls: merchToolEvents.length > 0 ? merchToolEvents : null,
+          errorCode:
+            trimmed.length > 0 || merchToolEvents.length > 0
+              ? null
+              : 'WEB_HANDOFF_REQUIRED',
         });
 
         enqueue({

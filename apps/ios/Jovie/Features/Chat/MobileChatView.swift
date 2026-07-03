@@ -43,10 +43,17 @@ struct MobileChatView: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: JovieSpacing.large) {
           ForEach(repository.timeline) { item in
-            MobileChatMessageRow(item: item, webBaseURL: webBaseURL) {
-              guard let clientTurnId = item.clientTurnId else { return }
-              Task { await repository.retry(clientTurnId: clientTurnId) }
-            }
+            MobileChatMessageRow(
+              item: item,
+              webBaseURL: webBaseURL,
+              onRetry: {
+                guard let clientTurnId = item.clientTurnId else { return }
+                Task { await repository.retry(clientTurnId: clientTurnId) }
+              },
+              onSubmitPrompt: { prompt in
+                Task { await repository.send(text: prompt) }
+              }
+            )
           }
         }
         .padding(.horizontal, JovieSpacing.large)
@@ -193,6 +200,7 @@ private struct MobileChatMessageRow: View {
   let item: MobileChatTimelineItem
   let webBaseURL: URL
   let onRetry: () -> Void
+  let onSubmitPrompt: (String) -> Void
 
   private var isStreamingAssistant: Bool {
     item.role == .assistant && item.status == .streaming
@@ -245,7 +253,13 @@ private struct MobileChatMessageRow: View {
   private var assistantMessageContent: some View {
     let segments = assistantSegments
     let displayText = assistantDisplayText
-    let showsThinking = displayText.isEmpty && segments.isEmpty && isStreamingAssistant
+    let hasRenderableSegments = segments.contains { segment in
+      switch segment {
+      case .text, .toolCall, .merchArtifact:
+        return true
+      }
+    }
+    let showsThinking = displayText.isEmpty && !hasRenderableSegments && isStreamingAssistant
 
     if showsThinking {
       Text("Thinking…")
@@ -257,8 +271,9 @@ private struct MobileChatMessageRow: View {
         .frame(maxWidth: 320, alignment: .leading)
     } else {
       VStack(alignment: .leading, spacing: JovieSpacing.small) {
-        if !displayText.isEmpty {
-          MobileChatProseText(runs: assistantProseRuns(from: segments), tone: .onDark)
+        let proseRuns = assistantProseRuns(from: segments)
+        if !proseRuns.isEmpty {
+          MobileChatProseText(runs: proseRuns, tone: .onDark)
             .font(JovieFont.body(size: 16))
             .padding(.horizontal, JovieSpacing.large)
             .padding(.vertical, JovieSpacing.medium)
@@ -267,9 +282,15 @@ private struct MobileChatMessageRow: View {
         }
 
         ForEach(segments) { segment in
-          if case let .toolCall(model) = segment {
+          switch segment {
+          case let .toolCall(model):
             MobileChatToolCardView(model: model)
               .frame(maxWidth: 320, alignment: .leading)
+          case let .merchArtifact(artifact):
+            MobileChatMerchOptionsView(artifact: artifact, onSelectPrompt: onSubmitPrompt)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          case .text:
+            EmptyView()
           }
         }
       }
@@ -328,7 +349,7 @@ enum MobileChatProseTone {
 
 // MARK: - Inline prose flow (GH-12708 entity chip thumbnails v2)
 
-private enum MobileChatFlowToken: Hashable {
+enum MobileChatFlowToken: Hashable {
   case textWord(String)
   case entity(kind: MobileChatEntityKind, id: String, label: String)
   case skill(id: String, label: String)

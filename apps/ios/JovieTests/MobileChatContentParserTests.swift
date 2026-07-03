@@ -140,6 +140,43 @@ struct MobileChatContentParserTests {
     #expect(model.toolName == "createMerch")
     #expect(MobileChatContentParser.displayText(from: content, isStreaming: true) == "Working on it")
   }
+
+  @Test func hydratesMerchArtifactsAndSuppressesDuplicateMarkdown() {
+    let merchJSON =
+      #"{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}}]}"#
+    let content = """
+    **1. Neon Pulse Tee** — bold neon typography.
+    <tool_call><name>createMerch</name><parameters></parameters></tool_call>
+    <tool_result><name>createMerch</name><state>success</state><json>\(merchJSON)</json></tool_result>
+    """
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+    let hasText = segments.contains { if case .text = $0 { return true } else { return false } }
+
+    #expect(!hasText)
+    #expect(MobileChatContentParser.sanitizeMerchEnumerationProse("**1. Neon Pulse Tee**").isEmpty)
+
+    guard case let .merchArtifact(.productOptions(payload)) = segments.last else {
+      Issue.record("Expected merch options artifact")
+      return
+    }
+    #expect(payload.options[0].designName == "Neon Pulse Tee")
+    #expect(payload.options[0].salePrice == "$45.00")
+  }
+
+  @Test func hydratesMerchDesignCarouselFromToolResultJson() {
+    let content = #"<tool_call><name>previewMerchOptions</name><parameters></parameters></tool_call><tool_result><name>previewMerchOptions</name><state>success</state><json>{"success":true,"generationId":"gen-2","designs":[{"id":"d-1","option_number":1,"design_name":"Mono Mark","concept":"Minimal line art.","status":"ready","preview_url":"https://cdn.test/mono.png"}]}</json></tool_result>"#
+
+    guard case let .merchArtifact(.designCarousel(payload)) = MobileChatContentParser
+      .segments(from: content, isStreaming: false).last
+    else {
+      Issue.record("Expected design carousel artifact")
+      return
+    }
+    #expect(payload.designs[0].designName == "Mono Mark")
+    #expect(payload.designs[0].isReady)
+  }
+
 }
 
 // MARK: - Entity + skill token parsing (JOV-3608)

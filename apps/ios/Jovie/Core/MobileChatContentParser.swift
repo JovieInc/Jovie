@@ -37,9 +37,56 @@ enum MobileChatProseRun: Equatable, Sendable {
   case skill(id: String, label: String)
 }
 
+enum MobileChatMerchArtifact: Equatable, Identifiable, Sendable {
+  case productOptions(MobileChatMerchOptionsPayload)
+  case designCarousel(MobileChatMerchDesignsPayload)
+
+  var id: String {
+    switch self {
+    case let .productOptions(payload):
+      return "merch-options:\(payload.generationId)"
+    case let .designCarousel(payload):
+      return "merch-designs:\(payload.generationId)"
+    }
+  }
+}
+
+struct MobileChatMerchOptionsPayload: Equatable, Sendable {
+  let generationId: String
+  let nextStep: String?
+  let options: [MobileChatMerchOptionCard]
+}
+
+struct MobileChatMerchOptionCard: Equatable, Identifiable, Sendable {
+  let id: String
+  let optionNumber: Int
+  let designName: String
+  let productLabel: String
+  let colorway: String?
+  let concept: String
+  let mockupURL: URL?
+  let salePrice: String?
+}
+
+struct MobileChatMerchDesignsPayload: Equatable, Sendable {
+  let generationId: String
+  let nextStep: String?
+  let designs: [MobileChatMerchDesignCard]
+}
+
+struct MobileChatMerchDesignCard: Equatable, Identifiable, Sendable {
+  let id: String
+  let optionNumber: Int
+  let designName: String
+  let concept: String
+  let previewURL: URL?
+  let isReady: Bool
+}
+
 enum MobileChatRenderableSegment: Equatable, Identifiable, Sendable {
   case text(runs: [MobileChatProseRun])
   case toolCall(MobileChatToolCallCardModel)
+  case merchArtifact(MobileChatMerchArtifact)
 
   var id: String {
     switch self {
@@ -47,6 +94,8 @@ enum MobileChatRenderableSegment: Equatable, Identifiable, Sendable {
       return "text:\(runs.count):\(Self.identitySeed(for: runs))"
     case let .toolCall(model):
       return model.id
+    case let .merchArtifact(artifact):
+      return artifact.id
     }
   }
 
@@ -149,7 +198,9 @@ enum MobileChatContentParser {
     from content: String,
     isStreaming: Bool
   ) -> [MobileChatRenderableSegment] {
-    let resultStates = parseToolResultStates(from: content)
+    let toolResults = parseToolResults(from: content)
+    let merchArtifacts = toolResults.merchArtifacts
+    let resultStates = toolResults.states
     let sanitized = suppressIncompleteToolMarkup(
       stripToolResultMarkup(from: content),
       isStreaming: isStreaming
@@ -206,12 +257,19 @@ enum MobileChatContentParser {
         resultState: toolName.flatMap { resultStates[$0] }
       ) {
         segments.append(.toolCall(model))
+        if
+          let toolName,
+          let artifact = merchArtifacts[toolName],
+          model.state == .succeeded
+        {
+          segments.append(.merchArtifact(artifact))
+        }
       }
 
       cursor = closeRange.upperBound
     }
 
-    return segments
+    return suppressMerchEnumerationProse(in: segments, hasMerchArtifacts: !merchArtifacts.isEmpty)
   }
 
   static func displayText(from content: String, isStreaming: Bool) -> String {
@@ -349,8 +407,14 @@ enum MobileChatContentParser {
     return sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private static func parseToolResultStates(from content: String) -> [String: MobileChatToolCallState] {
+  private struct ParsedToolResults {
+    let states: [String: MobileChatToolCallState]
+    let merchArtifacts: [String: MobileChatMerchArtifact]
+  }
+
+  private static func parseToolResults(from content: String) -> ParsedToolResults {
     var states: [String: MobileChatToolCallState] = [:]
+    var merchArtifacts: [String: MobileChatMerchArtifact] = [:]
     let fallbackToolName = extractMostRecentToolName(from: content)
     let patterns = [
       "<tool_result>([\\s\\S]*?)</tool_result>",
@@ -384,10 +448,20 @@ enum MobileChatContentParser {
         guard !trimmedName.isEmpty else { return }
 
         states[trimmedName] = resolveResultState(from: block)
+
+        guard
+          merchArtifactToolNames.contains(trimmedName),
+          let jsonPayload = extractJsonPayload(from: block),
+          let artifact = decodeMerchArtifact(from: jsonPayload)
+        else {
+          return
+        }
+
+        merchArtifacts[trimmedName] = artifact
       }
     }
 
-    return states
+    return ParsedToolResults(states: states, merchArtifacts: merchArtifacts)
   }
 
   private static func extractMostRecentToolName(from content: String) -> String? {
@@ -697,6 +771,172 @@ enum MobileChatContentParser {
     let runs = MobileChatProseTokenizer.tokenize(text, isStreaming: isStreaming)
     guard !runs.isEmpty else { return }
     segments.append(.text(runs: runs))
+  }
+
+  private static let merchArtifactToolNames: Set<String> = [
+    "createMerch",
+    "previewMerchOptions",
+  ]
+
+  private static func extractJsonPayload(from block: String) -> Data? {
+    if let tagged = firstCapture(in: block, pattern: "<json>\\s*([\\s\\S]*?)\\s*</json>") {
+      return tagged.data(using: .utf8)
+    }
+
+    let trimmed = block.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.hasPrefix("{"), let data = trimmed.data(using: .utf8) {
+      return data
+    }
+
+    guard
+      let start = trimmed.firstIndex(of: "{"),
+      let end = trimmed.lastIndex(of: "}")
+    else {
+      return nil
+    }
+
+    return String(trimmed[start ... end]).data(using: .utf8)
+  }
+
+  private static func decodeMerchArtifact(from data: Data) -> MobileChatMerchArtifact? {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return nil
+    }
+
+    guard (object["success"] as? Bool) == true else { return nil }
+    guard let generationId = object["generationId"] as? String, !generationId.isEmpty else {
+      return nil
+    }
+
+    if let options = object["options"] as? [[String: Any]], !options.isEmpty {
+      let cards = options.compactMap(parseMerchOptionCard)
+      guard !cards.isEmpty else { return nil }
+      return .productOptions(
+        MobileChatMerchOptionsPayload(
+          generationId: generationId,
+          nextStep: object["nextStep"] as? String,
+          options: cards
+        )
+      )
+    }
+
+    if let designs = object["designs"] as? [[String: Any]], !designs.isEmpty {
+      let cards = designs.compactMap(parseMerchDesignCard)
+      guard !cards.isEmpty else { return nil }
+      return .designCarousel(
+        MobileChatMerchDesignsPayload(
+          generationId: generationId,
+          nextStep: object["nextStep"] as? String,
+          designs: cards
+        )
+      )
+    }
+
+    return nil
+  }
+
+  private static func parseMerchOptionCard(_ raw: [String: Any]) -> MobileChatMerchOptionCard? {
+    guard
+      let id = raw["id"] as? String,
+      let designName = raw["design_name"] as? String,
+      let productType = raw["product_type"] as? String
+    else {
+      return nil
+    }
+
+    let optionNumber =
+      (raw["option_number"] as? Int)
+        ?? (raw["option_number"] as? NSNumber)?.intValue
+        ?? 0
+    let concept = (raw["concept"] as? String) ?? ""
+    let printfulName = raw["printful_product_name"] as? String
+    let mockupURL = preferredMockupURL(from: raw["mockup_urls"])
+    let salePrice = (raw["price_recommendation"] as? [String: Any])?["sale_price"] as? String
+
+    return MobileChatMerchOptionCard(
+      id: id,
+      optionNumber: optionNumber,
+      designName: designName,
+      productLabel: printfulName ?? productType,
+      colorway: raw["colorway"] as? String,
+      concept: concept,
+      mockupURL: mockupURL,
+      salePrice: salePrice
+    )
+  }
+
+  private static func parseMerchDesignCard(_ raw: [String: Any]) -> MobileChatMerchDesignCard? {
+    guard
+      let id = raw["id"] as? String,
+      let designName = raw["design_name"] as? String
+    else {
+      return nil
+    }
+
+    let optionNumber =
+      (raw["option_number"] as? Int)
+        ?? (raw["option_number"] as? NSNumber)?.intValue
+        ?? 0
+    let status = (raw["status"] as? String) ?? "ready"
+    let previewURL = (raw["preview_url"] as? String).flatMap(URL.init(string:))
+
+    return MobileChatMerchDesignCard(
+      id: id,
+      optionNumber: optionNumber,
+      designName: designName,
+      concept: (raw["concept"] as? String) ?? "",
+      previewURL: previewURL,
+      isReady: status == "ready" && previewURL != nil
+    )
+  }
+
+  private static func preferredMockupURL(from value: Any?) -> URL? {
+    guard let urls = value as? [String] else { return nil }
+    return urls.compactMap(URL.init(string:)).first
+  }
+
+  private static func suppressMerchEnumerationProse(
+    in segments: [MobileChatRenderableSegment],
+    hasMerchArtifacts: Bool
+  ) -> [MobileChatRenderableSegment] {
+    guard hasMerchArtifacts else { return segments }
+
+    return segments.compactMap { segment -> MobileChatRenderableSegment? in
+      guard case let .text(runs) = segment else { return segment }
+
+      let filteredRuns = runs.compactMap { run -> MobileChatProseRun? in
+        guard case let .text(text) = run else { return run }
+        let sanitized = sanitizeMerchEnumerationProse(text)
+        guard !sanitized.isEmpty else { return nil }
+        return .text(sanitized)
+      }
+
+      guard !filteredRuns.isEmpty else { return nil }
+      return .text(runs: filteredRuns)
+    }
+  }
+
+  static func sanitizeMerchEnumerationProse(_ text: String) -> String {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return "" }
+
+    let enumerationPatterns = [
+      #"\*\*\d+\."#,
+      #"^\d+\.\s+\*\*"#,
+      #"(?i)\boption\s+[123]\b"#,
+    ]
+
+    for pattern in enumerationPatterns {
+      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+        continue
+      }
+      let range = NSRange(trimmed.startIndex..., in: trimmed)
+      if regex.firstMatch(in: trimmed, range: range) != nil {
+        return ""
+      }
+    }
+
+    return trimmed
   }
 }
 
