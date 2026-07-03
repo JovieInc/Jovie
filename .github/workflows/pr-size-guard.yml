@@ -12,8 +12,10 @@ name: PR Size Guard
 # merge loop does this constantly) cancels the in-flight run via
 # cancel-in-progress, leaving a CANCELLED/QUEUED run as the latest for a
 # required context → GitHub pins the PR BLOCKED even though it's green
-# (JOV-3580). The big-pr/codemod opt-out is still honored: it's read via
-# `gh pr view` at run time, which works on push events too.
+# (JOV-3580). The big-pr/codemod opt-out is still honored on push via
+# `gh pr view` at run time. If the label is added after a failing push run,
+# pr-size-guard-label-override.yml posts a passing Checks API override without
+# re-running size computation or sharing this workflow's concurrency group.
 on:
   pull_request:
     types: [opened, synchronize, reopened]

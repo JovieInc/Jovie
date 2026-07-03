@@ -1,0 +1,61 @@
+name: PR Size Guard Label Override
+
+# Companion to pr-size-guard.yml. The size guard intentionally does NOT run on
+# labeled events — rapid label churn cancels in-flight runs via
+# cancel-in-progress and pins required contexts BLOCKED (JOV-3580). When a human
+# adds big-pr/codemod after an initial failing push run, this workflow posts a
+# passing Checks API override for the literal "PR Size Guard" context on the
+# current head SHA without re-running size computation or sharing a concurrency
+# group with the main guard.
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  checks: write
+  pull-requests: read
+
+jobs:
+  override:
+    name: PR Size Guard label override
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: >-
+      github.event.pull_request.head.repo.fork == false &&
+      (github.event.label.name == 'big-pr' || github.event.label.name == 'codemod') &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.ref != 'screenshots/auto-update'
+    steps:
+      - name: Post passing PR Size Guard check (opt-out label)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          LABEL: ${{ github.event.label.name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          labels=$(gh pr view "$PR" -R "$REPO" --json labels -q '[.labels[].name]|join(",")')
+          case ",$labels," in
+            *,big-pr,*|*,codemod,*)
+              ;;
+            *)
+              echo "Opt-out label no longer present — skipping override"
+              exit 0
+              ;;
+          esac
+
+          gh api "repos/$REPO/check-runs" \
+            --method POST \
+            -f name='PR Size Guard' \
+            -f head_sha="$SHA" \
+            -f status='completed' \
+            -f conclusion='success' \
+            -f details_url="$RUN_URL" \
+            -f output[title]='Opt-out label applied' \
+            -f output[summary]="The \`$LABEL\` label bypasses the size cap. This overrides a prior failing PR Size Guard result without re-running size computation (avoids JOV-3580 cancel-in-progress race)."
+
+          echo "✅ Posted passing PR Size Guard check for opt-out label \`$LABEL\` on $SHA"
