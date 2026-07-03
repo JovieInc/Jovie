@@ -209,6 +209,44 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  // GH-12948: "Audience" must stay on one line in the drawer surface switcher.
+  func testDrawerSurfaceSwitcherLabelsStaySingleLine() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let audienceSurface = app.buttons["shell-drawer-surface-shell-tab-audience"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Profile drawer surface did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      audienceSurface.waitForExistence(timeout: 3),
+      "Audience drawer surface did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      chatSurface.waitForExistence(timeout: 3),
+      "Chat drawer surface did not appear.\n\(app.debugDescription)"
+    )
+
+    // Wrapped labels stack vertically and make the offending tab much taller.
+    let heights = [
+      profileSurface.frame.height,
+      audienceSurface.frame.height,
+      chatSurface.frame.height,
+    ]
+    XCTAssertLessThanOrEqual(
+      heights.max()! - heights.min()!,
+      4,
+      "Surface tab heights diverged — a label likely wrapped.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(audienceSurface.label, "Audience")
+  }
+
   // JOV-3670 evidence (b): removing the bottom pill's safeAreaInset must not
   // leave a ghost reserved footprint. Assert the composer/content region
   // extends to fill the reclaimed space, and that layout stays stable across
