@@ -244,7 +244,7 @@ describe('LibrarySurface', () => {
     expect(source).toContain('releaseStatusClasses');
     expect(source).toContain('libraryApprovalStatusClasses');
     expect(source).toContain('system-b-library-filter-pill-active');
-    expect(source).toContain('system-b-library-rail-button--active');
+    expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('ReleaseAudioAssetPanel');
