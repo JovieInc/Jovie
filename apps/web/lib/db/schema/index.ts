@@ -46,6 +46,8 @@ export {
   type ToolsCatalogRow,
   toolsCatalog,
 } from './agents';
+// AI crawler analytics snapshots
+export { aiCrawlerAnalyticsSnapshots } from './ai-crawler-analytics';
 // Analytics (Clicks, Audience, Tips, Blocks)
 export {
   type AudienceAction,

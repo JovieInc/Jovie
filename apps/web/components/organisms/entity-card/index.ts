@@ -6,6 +6,7 @@ export type {
   TourDateEntityOptions,
 } from './adapters';
 export {
+  aiCrawlerAnalyticsToEntityCard,
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   merchToEntityCard,

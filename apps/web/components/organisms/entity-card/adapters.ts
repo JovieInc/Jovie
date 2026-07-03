@@ -2,6 +2,7 @@ import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { formatLocationString } from '@/lib/utils/string-utils';
+import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 import { KIND_PRESETS } from './kind-presets';
 import type {
   EntityAccent,
@@ -333,6 +334,42 @@ export function tourDateToEntityCard(
       canBuyTickets && !isCancelled
         ? { label: 'Add To Calendar', href: null }
         : null,
+  };
+}
+
+/** AI crawler analytics summary → dashboard entity card model. */
+export function aiCrawlerAnalyticsToEntityCard(
+  analytics: Pick<
+    AiCrawlerAnalyticsResponse,
+    'totalRequests' | 'weeklyRequests' | 'crawlers' | 'isTeaser'
+  >
+): EntityCardModel {
+  const topCrawler = analytics.crawlers[0]?.name;
+  const meta =
+    analytics.crawlers.length > 1
+      ? `${analytics.crawlers.length} services tracked`
+      : (topCrawler ?? 'Waiting for first AI crawl');
+
+  return {
+    id: 'ai-crawler-intelligence',
+    kind: 'music',
+    accent: 'blue',
+    eyebrow: 'AI Visibility',
+    title: `${analytics.totalRequests.toLocaleString()} reads`,
+    meta,
+    secondaryMeta:
+      analytics.weeklyRequests > 0
+        ? `${analytics.weeklyRequests.toLocaleString()} this week`
+        : 'Last 30 days',
+    status:
+      analytics.totalRequests > 0
+        ? { label: 'Active', tone: 'live' }
+        : { label: 'Collecting', tone: 'neutral' },
+    cta: analytics.isTeaser
+      ? { label: 'Upgrade to Pro', href: null, disabled: true }
+      : { label: 'View Details', href: null },
+    interactive: true,
+    imageAlt: 'AI crawler analytics',
   };
 }
 
