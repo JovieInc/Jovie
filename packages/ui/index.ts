@@ -186,6 +186,9 @@ export {
   PopoverContent,
   PopoverTrigger,
 } from './atoms/popover';
+// Progress
+export type { ProgressBarProps } from './atoms/progress';
+export { ProgressBar } from './atoms/progress';
 // Radio Group
 export { RadioGroup, RadioGroupItem } from './atoms/radio-group';
 // Searchable Submenu
