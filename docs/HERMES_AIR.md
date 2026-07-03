@@ -4,7 +4,7 @@ Day-to-day operations for the always-on Hermes gateway running on the dedicated 
 
 ## What This Machine Is
 
-A single-purpose orchestration node. It listens for brain dumps (Telegram + Voice Memos), persists them to gbrain, routes engineering work to Linear, and routes ops tasks to sub-agents. The Hermes scanner code does **zero coding** itself. The opt-in codex issue shipper can start a separate `JOVIE_AGENT_PROFILE=coder` child session for GitHub issues explicitly labeled `codex`.
+A single-purpose orchestration node. It listens for brain dumps (Telegram + Voice Memos), persists them to gbrain, routes engineering work to **GitHub Issues** (Linear mirror optional via `TRACKER_GITHUB_ONLY`), and routes ops tasks to sub-agents. The Hermes scanner code does **zero coding** itself. The opt-in codex issue shipper can start a separate `JOVIE_AGENT_PROFILE=coder` child session for GitHub issues explicitly labeled `codex`. CI dispatch uses the `agent-ready` label via `.github/workflows/github-ai-orchestrator.yml`.
 
 ## First-Time Setup
 
@@ -80,8 +80,8 @@ doppler secrets set HERMES_TELEGRAM_CHAT_ID="<telegram-chat-id>" \
 |---|---|---|
 | `HERMES_TELEGRAM_BOT_TOKEN` | Telegram gateway authentication | manual (BotFather) |
 | `OPENROUTER_API_KEY` | Free-model router authentication | already provisioned |
-| `LINEAR_API_KEY` | Filing issues from voice/Telegram intake | already provisioned |
-| `GITHUB_TOKEN` | PR-stuck / CI-failure monitors | already provisioned |
+| `LINEAR_API_KEY` | Optional Linear mirror during tracker cutover | already provisioned |
+| `GITHUB_TOKEN` | Filing GitHub issues + PR-stuck / CI-failure monitors (`gh`) | already provisioned |
 | `AIRTABLE_API_KEY` | Founder-OS profile (fundraising base) | already provisioned |
 | `SENTRY_AUTH_TOKEN` | Optional: ship Hermes errors to Sentry `hermes-air` env | already provisioned |
 | `HERMES_TELEGRAM_CHAT_ID` | Optional: Telegram private-chat allowlist + outbound target | manual after first bot message |
@@ -90,13 +90,14 @@ The bootstrap script verifies every required secret is present before continuing
 
 ## Daily Operation
 
-Once installed, you should never need to interact with the Air directly. All control is through Telegram and Linear.
+Once installed, you should never need to interact with the Air directly. All control is through Telegram and GitHub Issues.
 
 | To do this | Do this |
 |---|---|
 | Brain-dump an idea | Telegram the bot, or record a Voice Memo on iPhone |
-| File a bug | Voice-memo "Hermes, file a Linear issue for ..." or type it |
-| Queue local coding work | Add the GitHub issue label `codex` |
+| File a bug | Voice-memo "Hermes, file a GitHub issue for ..." or type it |
+| Queue local coding work (Air shipper) | Add the GitHub issue label `codex` |
+| Queue CI orchestrator dispatch | Add the GitHub issue label `agent-ready` |
 | Ask a strategic question | Telegram the bot; the chief profile routes |
 | Get a daily summary | Wait for the 07:00 briefing, or Telegram "brief me" |
 | Push back rate-limited | Hermes will respond with which model it used |

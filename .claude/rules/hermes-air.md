@@ -8,15 +8,15 @@ A dedicated orchestration node that:
 
 - Ingests brain dumps (Telegram typed messages + macOS Voice Memos transcripts via iCloud).
 - Persists every dump to gbrain (Air-as-server, PGLite backend, exposed over Tailscale as a remote-MCP HTTP server).
-- Segments dumps into `memory` (gbrain only), `issue` (Linear), and `task` (sub-agent dispatch).
-- Files Linear issues for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md`. The Pro's existing Hermes issue runner picks them up automatically — Linear is the only contract between Air and Pro for engineering work.
+- Segments dumps into `memory` (gbrain only), `issue` (GitHub Issues), and `task` (sub-agent dispatch).
+- Files GitHub issues for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` (via `scripts/lib/tracker.mjs` / `gh issue create`). Linear mirrors during parallel-run unless `TRACKER_GITHUB_ONLY=1`. The Pro's Hermes/codex runners consume GitHub issues — label `agent-ready` for CI orchestrator dispatch, `codex` for the local shipper.
 - Routes non-engineering tasks (calendar moves, Airtable updates, emails) to the right sub-agent which calls the appropriate MCP.
 - Runs deterministic cron jobs: PR-stuck monitor, CI failure triage, HUD refresh, daily briefing, cost monitor, deterministic-tracker (self-improvement), free-model health.
 
 ## What Hermes-Air IS NOT
 
 - **NOT a code editor.** No Claude Code sessions, no `pnpm` builds, no Conductor worktrees, no `git` commits, no PR merges from this node.
-- **NOT a dispatcher for engineering work over `repository_dispatch`.** All engineering work flows through Linear issues. The Pro's existing runner consumes them.
+- **NOT a dispatcher for engineering work over `repository_dispatch`.** Engineering work flows through GitHub Issues (`.github/workflows/github-ai-orchestrator.yml` on `agent-ready`, or `codex-issue-shipper` on `codex`). The Pro's runners consume them.
 - **NOT a hot path for product traffic.** Vercel still runs all product crons. Hermes-Air owns ops crons only.
 - **NOT a single source of truth.** Linear, GitHub, Airtable, Calendar, and gbrain are durable systems of record; Hermes-Air is a router and watcher.
 
@@ -25,7 +25,7 @@ A dedicated orchestration node that:
 | Invariant | Enforced by |
 |---|---|
 | Hermes-Air never edits code or merges PRs | Profile gate (`JOVIE_AGENT_PROFILE!=coder`); `orchestrator-boundary-check.sh` hook on any Claude Code session that ever runs on Air (should be zero) |
-| All engineering follow-ups go through Linear | `voice-memo-ingest.ts` and Telegram intake handlers both call the Linear API directly; no `repository_dispatch` from Air |
+| All engineering follow-ups go through GitHub Issues | `voice-memo-ingest.ts` and Telegram intake handlers file via `tracker.mjs` (`gh issue create`); Linear mirror optional; no `repository_dispatch` from Air |
 | Inference cost is $0 unless user explicitly opts in | `free-model-router.ts` only selects `:free` OpenRouter variants; `cost-monitor.ts` kills non-watchdog jobs if any paid spend exceeds $0 in 24h |
 | gbrain stays local (Air-hosted, Tailscale-bound) | `gbrain serve --http --bind <tailscale-ip>` binds to the Tailscale interface only; no public exposure |
 | Voice memo transcripts never leave the Air | Stored only in gbrain PGLite; embedding API calls use free providers; no Supabase sync in v1 |
@@ -41,17 +41,17 @@ Profiles are defined in `~/.hermes/config.yaml` (template at `scripts/hermes/con
 | `chief` | default routing, clarification questions, status replies | Linear, gbrain | edit code, spend money |
 | `cfo` | finance/spend/runway questions; cost monitor escalations | gbrain, Doppler (read-only), OpenRouter usage | edit code, move money, call Stripe |
 | `founder-os` | fundraising, GTM, company-state, warm network recall | Airtable (fundraising base), Gmail (read+draft, not send), Calendar, gbrain | edit code, send emails without confirmation |
-| `code-orchestrator` | PR triage, CI failure classification, file Linear repair issues | GitHub (read), Linear (write), gbrain | edit code, merge PRs, push branches |
+| `code-orchestrator` | PR triage, CI failure classification, file GitHub repair issues | GitHub (read/write issues), gbrain | edit code, merge PRs, push branches |
 
 ## Engineering Work Handoff (the only contract with the Pro)
 
 1. Voice memo or Telegram intake → classified as `issue` span.
-2. Hermes-Air files a Linear issue using the canonical follow-up shape from `.claude/rules/linear.md` (Source / Follow-up / Why it matters / Classification / Acceptance criteria). `Source` references the gbrain entry permalink.
-3. Issue is created with state `In Progress` (Hermes-Air is the agent claiming it per `.claude/rules/linear.md`).
-4. The Pro's existing Hermes issue runner discovers the issue and starts work — no Air-side push, no `repository_dispatch`, no SSH.
-5. PR opens on the Pro; merge transitions issue to `Done` via existing `linear-sync-on-merge.yml`.
+2. Hermes-Air files a GitHub issue using the canonical follow-up shape from `.claude/rules/linear.md` (Source / Follow-up / Why it matters / Classification / Acceptance criteria). `Source` references the gbrain entry permalink.
+3. Optional: Linear mirror when `TRACKER_GITHUB_ONLY` is unset (parallel-run window).
+4. The Pro's codex issue shipper or GitHub orchestrator (`agent-ready` label) discovers the issue and starts work — no Air-side push, no `repository_dispatch`, no SSH.
+5. PR opens on the Pro with `Fixes #N` in the body; merge on `main` closes the GitHub issue (robust to Graphite close-vs-merge). Legacy Linear markers still sync via `linear-sync-on-merge.yml` during cutover.
 
-If the Air cannot file the Linear issue (network down, Linear outage), queue the intent in `~/.hermes/state/linear-queue.jsonl` and retry every 5 minutes. Telegram notifies the user only if backlog exceeds 5 entries.
+If the Air cannot file the GitHub issue (network down, `gh` outage), queue the intent in `~/.hermes/state/tracker-queue.jsonl` and retry every 5 minutes. Telegram notifies the user only if backlog exceeds 5 entries.
 
 ## Self-Improvement Loop
 
@@ -59,7 +59,7 @@ If the Air cannot file the Linear issue (network down, Linear outage), queue the
 
 - Reads Hermes dispatch log (`~/.hermes/logs/dispatch.jsonl`).
 - Clusters intents by shape (similar input → similar action).
-- For any cluster firing ≥5 times in a 30-day window, files a Linear issue: "Replace LLM-driven path X with deterministic script."
+- For any cluster firing ≥5 times in a 30-day window, files a GitHub issue: "Replace LLM-driven path X with deterministic script."
 - The Pro's runner picks up these issues like any other and proposes a code change.
 
 This is how Hermes-Air keeps trending toward $0 model calls over time.

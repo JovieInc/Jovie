@@ -1,4 +1,24 @@
 #!/usr/bin/env node
+/**
+ * @deprecated Use scripts/github-query-todo.mjs for GitHub Issues.
+ * When TRACKER_GITHUB_ONLY=1, delegates to the GitHub query script.
+ */
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+if (process.env.TRACKER_GITHUB_ONLY === '1') {
+  const script = join(
+    dirname(fileURLToPath(import.meta.url)),
+    'github-query-todo.mjs'
+  );
+  const result = spawnSync(process.execPath, [script], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  process.exit(result.status ?? 1);
+}
+
 const key = process.env.LINEAR_API_KEY;
 if (!key) {
   console.error('LINEAR_API_KEY missing');

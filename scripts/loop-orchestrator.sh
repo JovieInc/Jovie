@@ -9,9 +9,9 @@ mkdir -p "$LOG"
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG/orchestrator.log"; }
 open_prs() { gh pr list --state open --json number --jq 'length' 2>/dev/null || echo 999; }
 eligible_todos() {
-  if [[ ! -f "$ROOT/scripts/linear-query-todo.mjs" ]]; then echo 999; return; fi
+  if [[ ! -f "$ROOT/scripts/github-query-todo.mjs" ]]; then echo 999; return; fi
   local output
-  if ! output="$(doppler run --project jovie-web --config dev -- node "$ROOT/scripts/linear-query-todo.mjs" 2>/dev/null)"; then
+  if ! output="$(GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-JovieInc/Jovie}" node "$ROOT/scripts/github-query-todo.mjs" 2>/dev/null)"; then
     echo 999
     return
   fi

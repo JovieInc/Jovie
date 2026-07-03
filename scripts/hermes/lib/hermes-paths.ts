@@ -23,6 +23,8 @@ export const HERMES_PATHS = {
   voiceMemosSeen: join(HERMES_HOME, 'state', 'voice-memos-seen.json'),
   heavyJobLock: join(HERMES_HOME, 'state', 'heavy-job.lock'),
   modelRankings: join(HERMES_HOME, 'state', 'model-router-rankings.json'),
+  /** Retry queue when GitHub issue filing fails. Legacy linear-queue.jsonl still read by drain jobs. */
+  trackerQueue: join(HERMES_HOME, 'state', 'tracker-queue.jsonl'),
   linearQueue: join(HERMES_HOME, 'state', 'linear-queue.jsonl'),
   telegramChatId: join(HERMES_HOME, 'state', 'telegram-chat-id'),
 } as const;

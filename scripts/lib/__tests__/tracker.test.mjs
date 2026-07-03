@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_READY_LABEL,
+  buildClaimArgs,
   buildIssueCreateArgs,
+  buildTransitionArgs,
+  claimIssue,
   fileGithubIssue,
   parseIssueNumber,
+  queryTodoIssues,
   shouldMirrorLinear,
+  shouldSkipGithubIssue,
+  STATUS_IN_PROGRESS,
+  STATUS_IN_REVIEW,
+  transitionIssue,
 } from '../tracker.mjs';
 
 const URL = 'https://github.com/JovieInc/Jovie/issues/1234\n';
@@ -90,5 +99,124 @@ describe('shouldMirrorLinear', () => {
     expect(shouldMirrorLinear({})).toBe(true);
     expect(shouldMirrorLinear({ TRACKER_GITHUB_ONLY: '1' })).toBe(false);
     expect(shouldMirrorLinear({ TRACKER_GITHUB_ONLY: '0' })).toBe(true);
+  });
+});
+
+describe('buildClaimArgs', () => {
+  it('adds in-progress label, removes agent-ready, and assigns', () => {
+    expect(
+      buildClaimArgs({ number: 42, assignee: 'jovie-bot', repo: 'o/r' })
+    ).toEqual([
+      'issue',
+      'edit',
+      '42',
+      '--repo',
+      'o/r',
+      '--add-label',
+      STATUS_IN_PROGRESS,
+      '--remove-label',
+      AGENT_READY_LABEL,
+      '--add-assignee',
+      'jovie-bot',
+    ]);
+  });
+});
+
+describe('buildTransitionArgs', () => {
+  it('closes and strips status labels for done', () => {
+    expect(buildTransitionArgs({ number: 9, status: 'done' })).toEqual([
+      'issue',
+      'close',
+      '9',
+      '--remove-label',
+      STATUS_IN_PROGRESS,
+      '--remove-label',
+      STATUS_IN_REVIEW,
+    ]);
+  });
+
+  it('swaps to in-review', () => {
+    expect(buildTransitionArgs({ number: 9, status: 'in-review' })).toEqual([
+      'issue',
+      'edit',
+      '9',
+      '--add-label',
+      STATUS_IN_REVIEW,
+      '--remove-label',
+      STATUS_IN_PROGRESS,
+    ]);
+  });
+});
+
+describe('claimIssue', () => {
+  it('claims and comments without throwing', () => {
+    const calls = [];
+    const exec = (args, input) => {
+      calls.push({ args, input });
+      return '';
+    };
+    const result = claimIssue(
+      { number: 7, assignee: 'bot', comment: 'hi' },
+      exec
+    );
+    expect(result.success).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(calls[1].args).toContain('comment');
+  });
+});
+
+describe('transitionIssue', () => {
+  it('never throws on gh failure', () => {
+    const exec = () => {
+      throw new Error('gh down');
+    };
+    expect(transitionIssue({ number: 1, status: 'done' }, exec)).toMatchObject({
+      success: false,
+      error: 'gh down',
+    });
+  });
+});
+
+describe('shouldSkipGithubIssue', () => {
+  it('skips human-review and in-progress issues', () => {
+    expect(
+      shouldSkipGithubIssue({
+        title: 'x',
+        labels: [{ name: 'human-review-required' }],
+      })
+    ).toBe(true);
+    expect(
+      shouldSkipGithubIssue({
+        title: 'x',
+        labels: [{ name: STATUS_IN_PROGRESS }],
+      })
+    ).toBe(true);
+    expect(
+      shouldSkipGithubIssue({ title: 'ok', labels: [{ name: 'agent-ready' }] })
+    ).toBe(false);
+  });
+});
+
+describe('queryTodoIssues', () => {
+  it('filters and sorts eligible issues', () => {
+    const exec = () =>
+      JSON.stringify([
+        {
+          number: 2,
+          title: 'skip me',
+          labels: [{ name: STATUS_IN_PROGRESS }],
+          updatedAt: '2026-07-02T00:00:00Z',
+        },
+        {
+          number: 1,
+          title: 'ready',
+          labels: [{ name: AGENT_READY_LABEL }],
+          updatedAt: '2026-07-03T00:00:00Z',
+        },
+      ]);
+    const result = queryTodoIssues({}, exec);
+    expect(result.success).toBe(true);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0].number).toBe(1);
   });
 });

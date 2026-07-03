@@ -1,0 +1,114 @@
+# GitHub AI Dispatcher
+#
+# Scheduled retry loop for issues labeled `agent-ready` that were not claimed
+# (capacity limits, transient failures). Replaces linear-ai-dispatcher.yml.
+
+name: GitHub AI Dispatcher
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      ready_label:
+        description: 'Only dispatch open issues with this label'
+        required: false
+        default: 'agent-ready'
+      max_dispatch:
+        description: 'Maximum issues to dispatch this run'
+        required: false
+        default: '2'
+      dry_run:
+        description: 'Log candidates without dispatching'
+        required: false
+        default: 'false'
+
+permissions: {}
+
+concurrency:
+  group: github-ai-dispatcher
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch Ready GitHub Issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+      issues: read
+      pull-requests: read
+    env:
+      READY_LABEL: ${{ inputs.ready_label || 'agent-ready' }}
+      MAX_DISPATCH: ${{ inputs.max_dispatch || '2' }}
+      DRY_RUN: ${{ inputs.dry_run || 'false' }}
+      MAX_OPEN_AGENT_PRS: '5'
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Find capacity and dispatch candidates
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          OPEN_AGENT_PRS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+-"; "i"))] | length')
+
+          CAPACITY=$((MAX_OPEN_AGENT_PRS - OPEN_AGENT_PRS))
+          if [[ "$CAPACITY" -le 0 ]]; then
+            echo "No dispatch capacity: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS agent PRs are open"
+            exit 0
+          fi
+
+          if [[ "$MAX_DISPATCH" -gt "$CAPACITY" ]]; then
+            MAX_DISPATCH="$CAPACITY"
+          fi
+
+          echo "Dispatch capacity: $MAX_DISPATCH issue(s)"
+
+          CANDIDATES=$(node scripts/github-query-todo.mjs | head -n "$MAX_DISPATCH")
+          if [[ -z "$CANDIDATES" ]]; then
+            echo "No eligible issues with label '$READY_LABEL'"
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r ISSUE_NUMBER _UPDATED TITLE; do
+            [[ -z "$ISSUE_NUMBER" ]] && continue
+            echo "Candidate: #${ISSUE_NUMBER} — ${TITLE}"
+
+            EXISTING_PR_COUNT=$(gh pr list --state open --limit 100 --json number,title,body \
+              | jq --arg num "$ISSUE_NUMBER" \
+                'map(select(((.title // "") + "\n" + (.body // "")) | test("Fixes #" + $num + "\\b"; "i"))) | length')
+            if [[ "$EXISTING_PR_COUNT" != "0" ]]; then
+              echo "Open PR already exists for #${ISSUE_NUMBER}; skipping"
+              continue
+            fi
+
+            if [[ "${DRY_RUN,,}" == "true" ]]; then
+              continue
+            fi
+
+            if ! gh workflow run github-ai-orchestrator.yml \
+                --repo "$GITHUB_REPOSITORY" \
+                -f issue_number="$ISSUE_NUMBER" \
+                -f plan_ready=true; then
+              echo "::warning::workflow dispatch failed for #${ISSUE_NUMBER}"
+              continue
+            fi
+
+            echo "Dispatched github-ai-orchestrator for #${ISSUE_NUMBER}"
+          done <<< "$CANDIDATES"

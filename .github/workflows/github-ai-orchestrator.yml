@@ -1,0 +1,376 @@
+# GitHub AI Orchestrator
+#
+# Dispatches agent implementation when an issue is labeled `agent-ready`.
+# Replaces linear-ai-orchestrator.yml — no Linear API calls.
+#
+# PR auto-close: commit + PR body use `Fixes #N` so merge on main closes the
+# issue (robust to Graphite close-vs-merge).
+
+name: GitHub AI Orchestrator
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'GitHub issue number (required for manual replay)'
+        required: true
+        type: string
+      plan_ready:
+        description: 'Skip CodeRabbit plan poll when true'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions: {}
+
+concurrency:
+  group: github-ai-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  MAX_PLAN_WAIT_ATTEMPTS: '45'
+  PLAN_POLL_INTERVAL_SECONDS: '20'
+  AGENT_READY_LABEL: 'agent-ready'
+
+jobs:
+  guard:
+    name: Guard + Deduplicate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      should_run: ${{ steps.gather.outputs.should_run }}
+      issue_number: ${{ steps.gather.outputs.issue_number }}
+      issue_title: ${{ steps.gather.outputs.issue_title }}
+      issue_body: ${{ steps.gather.outputs.issue_body }}
+      issue_url: ${{ steps.gather.outputs.issue_url }}
+      branch_name: ${{ steps.gather.outputs.branch_name }}
+      plan_ready: ${{ steps.gather.outputs.plan_ready }}
+    steps:
+      - name: Gather payload
+        id: gather
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          LABEL_NAME: ${{ github.event.label.name }}
+          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
+          INPUT_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          INPUT_PLAN_READY: ${{ inputs.plan_ready }}
+        run: |
+          ISSUE_NUMBER=""
+          PLAN_READY="${INPUT_PLAN_READY,,}"
+
+          if [[ "$EVENT_NAME" == "issues" ]]; then
+            if [[ "$LABEL_NAME" != "$AGENT_READY_LABEL" ]]; then
+              echo "Label '$LABEL_NAME' is not $AGENT_READY_LABEL; skipping"
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            ISSUE_NUMBER="$EVENT_ISSUE_NUMBER"
+          else
+            ISSUE_NUMBER="$INPUT_ISSUE_NUMBER"
+          fi
+
+          if [[ -z "$ISSUE_NUMBER" ]]; then
+            echo "Missing issue_number; cannot continue"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json number,title,body,url,state,labels)
+          ISSUE_STATE=$(echo "$ISSUE_JSON" | jq -r '.state')
+          if [[ "$ISSUE_STATE" != "OPEN" ]]; then
+            echo "Issue #$ISSUE_NUMBER is not open ($ISSUE_STATE); skipping"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          HAS_IN_PROGRESS=$(echo "$ISSUE_JSON" | jq -r '
+            [.labels[].name | ascii_downcase]
+            | index("status:in-progress") != null
+          ')
+          if [[ "$HAS_IN_PROGRESS" == "true" && "$EVENT_NAME" == "issues" ]]; then
+            echo "Issue #$ISSUE_NUMBER already status:in-progress; skipping duplicate label dispatch"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
+          ISSUE_BODY=$(echo "$ISSUE_JSON" | jq -r '.body // ""')
+          ISSUE_URL=$(echo "$ISSUE_JSON" | jq -r '.url')
+
+          SAFE_TITLE=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-' | sed 's/^-//;s/-$//' | cut -c1-48)
+          BRANCH_NAME="codex/gh-${ISSUE_NUMBER}-${SAFE_TITLE}-${GITHUB_RUN_ID}"
+
+          EXISTING_PR=$(gh pr list --state open --json number,title,body,headRefName --limit 100 \
+            | jq --arg branch "$BRANCH_NAME" --arg num "$ISSUE_NUMBER" '
+              map(
+                select(
+                  (.headRefName == $branch)
+                  or ((.title // "") + "\n" + (.body // "")) | test("Fixes #" + $num + "\\b"; "i")
+                  or ((.title // "") + "\n" + (.body // "")) | test("#" + $num + "\\b")
+                )
+              )
+              | .[0].number // empty
+            ')
+          if [[ -n "$EXISTING_PR" ]]; then
+            echo "Open PR #${EXISTING_PR} already exists for issue #${ISSUE_NUMBER}; skipping"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          MAX_OPEN_AGENT_PRS=5
+          OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
+            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))] | length')
+
+          echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS"
+          if [[ "$OPEN_AGENT_PRS" -ge "$MAX_OPEN_AGENT_PRS" ]]; then
+            echo "::warning::Rate limit reached ($OPEN_AGENT_PRS open agent PRs >= $MAX_OPEN_AGENT_PRS). Deferring #${ISSUE_NUMBER}."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$PLAN_READY" != "true" ]]; then
+            PLAN_READY="false"
+          fi
+
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "issue_title=$ISSUE_TITLE" >> "$GITHUB_OUTPUT"
+          echo "issue_body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$ISSUE_BODY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "issue_url=$ISSUE_URL" >> "$GITHUB_OUTPUT"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "plan_ready=$PLAN_READY" >> "$GITHUB_OUTPUT"
+
+  wait_for_coderabbit_plan:
+    name: Wait for CodeRabbit Plan
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      issues: read
+    steps:
+      - name: Poll issue comments for CodeRabbit plan marker
+        env:
+          ISSUE_NUMBER: ${{ needs.guard.outputs.issue_number }}
+          MAX_ATTEMPTS: ${{ env.MAX_PLAN_WAIT_ATTEMPTS }}
+          SLEEP_SECONDS: ${{ env.PLAN_POLL_INTERVAL_SECONDS }}
+        run: |
+          if [[ "${{ needs.guard.outputs.plan_ready }}" == "true" ]]; then
+            echo "Plan-ready dispatch; skipping poll loop"
+            exit 0
+          fi
+
+          ATTEMPT=1
+          while [[ $ATTEMPT -le $MAX_ATTEMPTS ]]; do
+            echo "Checking for CodeRabbit plan on #${ISSUE_NUMBER} (attempt ${ATTEMPT}/${MAX_ATTEMPTS})"
+
+            COMMENTS=$(gh api "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}/comments" --paginate)
+            PLAN_READY=$(echo "$COMMENTS" | jq -r '
+              [.[] | select(
+                ((.user.login // "") | ascii_downcase | contains("coderabbit"))
+                and ((.body // "") | test("coderabbit-plan-ready|##[[:space:]]+Implementation[[:space:]]+Plan"; "i"))
+              )] | length > 0
+            ')
+
+            if [[ "$PLAN_READY" == "true" ]]; then
+              echo "CodeRabbit plan marker found. Continuing."
+              exit 0
+            fi
+
+            ISSUE_STATE=$(gh issue view "$ISSUE_NUMBER" --json state --jq '.state')
+            if [[ "$ISSUE_STATE" != "OPEN" ]]; then
+              echo "Issue no longer open ($ISSUE_STATE); stopping run"
+              exit 1
+            fi
+
+            echo "Plan not ready yet; sleeping ${SLEEP_SECONDS}s"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep "$SLEEP_SECONDS"
+          done
+
+          echo "CodeRabbit plan marker not found after ${MAX_ATTEMPTS} attempts"
+          exit 1
+
+  claim_issue:
+    name: Claim GitHub issue
+    needs: [guard, wait_for_coderabbit_plan]
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Claim issue (status:in-progress)
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_AGENT_ASSIGNEE: jovie-bot
+          ISSUE_NUMBER: ${{ needs.guard.outputs.issue_number }}
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+        run: |
+          node scripts/github-claim-issue.mjs "$ISSUE_NUMBER" \
+            "GitHub AI Orchestrator claimed #${ISSUE_NUMBER}. Working branch: ${BRANCH_NAME}."
+
+  implement_and_open_pr:
+    name: Implement + Push + Open PR
+    needs: [guard, wait_for_coderabbit_plan, claim_issue]
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create feature branch
+        env:
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+        run: |
+          git checkout -b "$BRANCH_NAME"
+
+      - name: Run Claude Code for implementation
+        uses: anthropics/claude-code-action@a92e7c70a4da9793dc164451d829089dc057a464 # v1
+        env:
+          JOVIE_AGENT_PROFILE: coder
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Implement the GitHub issue below with a minimal root-cause change and open-ready quality.
+
+            Issue:
+            - Number: #${{ needs.guard.outputs.issue_number }}
+            - Title: ${{ needs.guard.outputs.issue_title }}
+            - URL: ${{ needs.guard.outputs.issue_url }}
+            - Description:
+              ${{ needs.guard.outputs.issue_body }}
+
+            Hard requirements:
+            1) Node.js 22.x and pnpm 9.15.4 conventions only.
+            2) Run from repo root. Use pnpm/turbo commands only.
+            3) Never edit drizzle/migrations files.
+            4) Never add // biome-ignore.
+            5) Find and fix sibling occurrences if this is a bug-pattern issue.
+            6) Keep changes focused and minimal.
+
+            Validation requirements:
+            - Run: pnpm turbo typecheck --affected
+            - Run: pnpm turbo lint --affected
+            - Run targeted tests for touched areas.
+
+            Do not create commits yourself. Leave changes in working tree for the workflow commit step.
+
+      - name: Run automation verify bundle
+        run: |
+          bash scripts/automation-verify.sh affected
+
+      - name: Commit, push, and open PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+          ISSUE_NUMBER: ${{ needs.guard.outputs.issue_number }}
+          ISSUE_TITLE: ${{ needs.guard.outputs.issue_title }}
+          ISSUE_URL: ${{ needs.guard.outputs.issue_url }}
+        run: |
+          if git diff --quiet && git diff --staged --quiet && [[ -z "$(git status --porcelain)" ]]; then
+            echo "No changes produced by automation"
+            exit 1
+          fi
+
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "feat: implement #${ISSUE_NUMBER} - ${ISSUE_TITLE}
+
+          Fixes #${ISSUE_NUMBER}"
+          git push origin "HEAD:${BRANCH_NAME}"
+
+          BODY_FILE=$(mktemp)
+          trap 'rm -f "$BODY_FILE"' EXIT
+          {
+            echo "Fixes #${ISSUE_NUMBER}"
+            echo ""
+            echo "## Goal"
+            echo ""
+            echo "Implements GitHub issue #${ISSUE_NUMBER}."
+            echo ""
+            echo "- Issue: #${ISSUE_NUMBER}"
+            echo "- URL: ${ISSUE_URL}"
+            echo ""
+            echo "---"
+            echo "*PR opened by [GitHub AI Orchestrator](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*"
+          } > "$BODY_FILE"
+
+          PR_URL=$(gh pr create \
+            --repo "${{ github.repository }}" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --draft \
+            --title "#${ISSUE_NUMBER}: ${ISSUE_TITLE}" \
+            --body-file "$BODY_FILE")
+
+          echo "Created PR: $PR_URL"
+
+  sync_in_review:
+    name: Sync issue to In Review
+    needs: [guard, implement_and_open_pr]
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Transition to status:in-review
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ needs.guard.outputs.issue_number }}
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+        run: |
+          PR_URL=$(gh pr list --head "$BRANCH_NAME" --state open --json url --jq '.[0].url // empty')
+          COMMENT="Automated PR opened for #${ISSUE_NUMBER}"
+          if [[ -n "$PR_URL" ]]; then
+            COMMENT="${COMMENT}: ${PR_URL}"
+          fi
+          node scripts/github-transition-issue.mjs "$ISSUE_NUMBER" in-review "$COMMENT"

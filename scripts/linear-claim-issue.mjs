@@ -1,10 +1,38 @@
 #!/usr/bin/env node
+/**
+ * @deprecated Use scripts/github-claim-issue.mjs for GitHub Issues.
+ * Retained for legacy Linear JOV-NNNN callers during cutover.
+ */
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
 const identifier = process.argv[2];
 const note = process.argv[3] ?? 'Loop orchestrator dispatch';
+
+const ghMatch = identifier?.match(/^#?(\d+)$/);
+if (ghMatch) {
+  const script = join(
+    dirname(fileURLToPath(import.meta.url)),
+    'github-claim-issue.mjs'
+  );
+  const result = spawnSync(
+    process.execPath,
+    [script, ghMatch[1], note],
+    { stdio: 'inherit', env: process.env }
+  );
+  process.exit(result.status ?? 1);
+}
+
 const key = process.env.LINEAR_API_KEY;
 if (!identifier || !key) process.exit(1);
 const m = identifier.match(/^JOV-(\d+)$/i);
-if (!m) process.exit(1);
+if (!m) {
+  console.error(
+    'linear-claim-issue.mjs: expected JOV-NNNN or GitHub issue number'
+  );
+  process.exit(1);
+}
 async function gql(q, v = {}) {
   const r = await fetch('https://api.linear.app/graphql', {
     method: 'POST',

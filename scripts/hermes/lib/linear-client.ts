@@ -1,14 +1,19 @@
 /**
- * Minimal Linear GraphQL client for Hermes-Air. Files issues using the
- * canonical follow-up shape from .claude/rules/linear.md.
+ * Tracker client for Hermes-Air.
  *
- * Only needs: LINEAR_API_KEY (from ~/.hermes/.env).
- * Falls back to writing to ~/.hermes/state/linear-queue.jsonl on network failure.
+ * GitHub Issues is the primary tracker (via scripts/lib/tracker.mjs / `gh`).
+ * Linear remains a mirror during parallel-run unless TRACKER_GITHUB_ONLY=1.
+ *
+ * Falls back to ~/.hermes/state/tracker-queue.jsonl on network failure.
  */
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+import {
+  fileGithubIssue,
+  shouldMirrorLinear,
+} from '../../lib/tracker.mjs';
 import { HERMES_PATHS } from './hermes-paths';
 import { withRetry } from './retry';
 
@@ -30,6 +35,8 @@ export interface FileIssueResult {
   readonly url?: string;
   readonly queued?: boolean;
   readonly error?: string;
+  readonly githubOnly?: boolean;
+  readonly linearMirrored?: boolean;
 }
 
 interface TeamLookup {
@@ -56,11 +63,9 @@ async function gql<T>(
         signal: AbortSignal.timeout(15_000),
       });
       if (response.status === 429 || response.status >= 500) {
-        // transient — retry
         throw new Error(`Linear ${response.status}`);
       }
       if (!response.ok) {
-        // 4xx other than 429 = permanent; don't retry
         const body = await response.text().catch(() => '');
         const err = new Error(`Linear ${response.status}: ${body}`);
         (err as Error & { permanent?: boolean }).permanent = true;
@@ -112,14 +117,13 @@ async function findLabelIds(
 }
 
 /**
- * Best-effort append. Returns true if the queue line was persisted; false
- * means we couldn't even persist the retry intent (rare, e.g. disk full).
+ * Best-effort append. Returns true if the queue line was persisted.
  */
 function queueForRetry(input: FileIssueInput, error: string): boolean {
   try {
-    mkdirSync(dirname(HERMES_PATHS.linearQueue), { recursive: true });
+    mkdirSync(dirname(HERMES_PATHS.trackerQueue), { recursive: true });
     appendFileSync(
-      HERMES_PATHS.linearQueue,
+      HERMES_PATHS.trackerQueue,
       `${JSON.stringify({ input, error, ts: new Date().toISOString() })}\n`
     );
     return true;
@@ -128,9 +132,9 @@ function queueForRetry(input: FileIssueInput, error: string): boolean {
   }
 }
 
-export async function fileIssue(
+async function fileLinearMirror(
   input: FileIssueInput
-): Promise<FileIssueResult> {
+): Promise<FileIssueResult | null> {
   const teamKey = input.teamKey ?? 'JOV';
   try {
     const teamId = await findTeamId(teamKey);
@@ -165,12 +169,59 @@ export async function fileIssue(
       id: data.issueCreate.issue.id,
       identifier: data.issueCreate.issue.identifier,
       url: data.issueCreate.issue.url,
+      linearMirrored: true,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const queued = queueForRetry(input, msg);
-    return { success: false, queued, error: msg };
+    return { success: false, error: msg, linearMirrored: true };
   }
+}
+
+export async function fileIssue(
+  input: FileIssueInput
+): Promise<FileIssueResult> {
+  const githubResult = fileGithubIssue({
+    title: input.title,
+    body: input.description,
+    labels: input.labels ?? [],
+  });
+
+  if (!githubResult.success) {
+    const queued = queueForRetry(input, githubResult.error ?? 'github failed');
+    return {
+      success: false,
+      queued,
+      error: githubResult.error,
+      githubOnly: shouldMirrorLinear() === false,
+    };
+  }
+
+  const primary: FileIssueResult = {
+    success: true,
+    id: githubResult.number ? String(githubResult.number) : undefined,
+    identifier: githubResult.identifier,
+    url: githubResult.url ?? undefined,
+    githubOnly: !shouldMirrorLinear(),
+  };
+
+  if (!shouldMirrorLinear()) {
+    return primary;
+  }
+
+  const linearResult = await fileLinearMirror(input);
+  if (linearResult?.success) {
+    return {
+      ...primary,
+      linearMirrored: true,
+    };
+  }
+
+  // GitHub filed successfully; Linear mirror failed non-fatally.
+  return {
+    ...primary,
+    linearMirrored: false,
+    error: linearResult?.error,
+  };
 }
 
 /**

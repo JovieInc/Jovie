@@ -229,17 +229,21 @@ jobs:
         run: |
           source .github/scripts/github-output.sh
 
-          # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
-          # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
-          TICKET=$(echo "$BRANCH" | grep -oiP 'jov-\d+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
+          # Extract Linear ticket ID (JOV-123) or GitHub issue number (gh-12725) from branch
+          TICKET=$(echo "$BRANCH" | grep -oiE 'jov-[0-9]+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
+          GH_ISSUE=$(echo "$BRANCH" | grep -oiE 'gh-[0-9]+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
+          GH_ISSUE_NUMBER=$(echo "$GH_ISSUE" | grep -oiE '[0-9]+' | head -1 || echo "")
           write_output ticket "$TICKET"
+          write_output gh_issue_number "$GH_ISSUE_NUMBER"
 
           # Build PR title from branch name
           # Strip the agent prefix (codex/, claude/, etc.)
           SLUG="${BRANCH#*/}"
 
-          if [[ -n "$TICKET" ]]; then
-            # Remove ticket from slug to avoid duplication in title
+          if [[ -n "$GH_ISSUE_NUMBER" ]]; then
+            DESC=$(echo "$SLUG" | sed -E "s/[-_]?gh-${GH_ISSUE_NUMBER}[-_]?//gi" | sed 's/^[-_]//;s/[-_]$//' | tr -- '-_' '  ')
+            TITLE="#${GH_ISSUE_NUMBER}: ${DESC}"
+          elif [[ -n "$TICKET" ]]; then
             DESC=$(echo "$SLUG" | sed -E "s/[-_]?${TICKET,,}[-_]?//gI" | sed 's/^[-_]//;s/[-_]$//' | tr -- '-_' '  ')
             TITLE="${TICKET}: ${DESC}"
           else
@@ -253,9 +257,36 @@ jobs:
           write_output title "$TITLE"
           echo "PR title: $TITLE"
 
+      - name: Fetch GitHub issue details
+        id: github_issue
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true' && steps.parse.outputs.gh_issue_number != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          source .github/scripts/github-output.sh
+
+          ISSUE_NUMBER="${{ steps.parse.outputs.gh_issue_number }}"
+          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json number,title,body,url 2>/dev/null || echo "")
+
+          ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title // ""')
+          ISSUE_URL=$(echo "$ISSUE_JSON" | jq -r '.url // ""')
+          ISSUE_DESC=$(echo "$ISSUE_JSON" | jq -r '.body // ""' | head -c 2000)
+
+          if [[ -n "$ISSUE_TITLE" ]]; then
+            echo "Found GitHub issue #${ISSUE_NUMBER}: $ISSUE_TITLE"
+            write_output has_details true
+            write_output issue_title "$ISSUE_TITLE"
+            write_output issue_url "$ISSUE_URL"
+            write_output title "#${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+            write_output issue_desc "$(echo "$ISSUE_DESC" | base64 -w0)"
+          else
+            echo "GitHub issue not found for #${ISSUE_NUMBER}"
+            write_output has_details false
+          fi
+
       - name: Fetch Linear ticket details
         id: linear
-        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true' && steps.parse.outputs.ticket != ''
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true' && steps.parse.outputs.ticket != '' && steps.parse.outputs.gh_issue_number == ''
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
@@ -306,6 +337,11 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BRANCH: ${{ github.ref_name }}
           TICKET: ${{ steps.parse.outputs.ticket }}
+          GH_ISSUE_NUMBER: ${{ steps.parse.outputs.gh_issue_number }}
+          HAS_GITHUB: ${{ steps.github_issue.outputs.has_details }}
+          GITHUB_TITLE: ${{ steps.github_issue.outputs.title }}
+          GITHUB_ISSUE_URL: ${{ steps.github_issue.outputs.issue_url }}
+          GITHUB_ISSUE_DESC_B64: ${{ steps.github_issue.outputs.issue_desc }}
           HAS_LINEAR: ${{ steps.linear.outputs.has_details }}
           LINEAR_TITLE: ${{ steps.linear.outputs.title }}
           PARSED_TITLE: ${{ steps.parse.outputs.title }}
@@ -314,8 +350,9 @@ jobs:
           LINEAR_ISSUE_DESC_B64: ${{ steps.linear.outputs.issue_desc }}
         run: |
 
-          # Use Linear title if available, otherwise parsed title
-          if [[ "$HAS_LINEAR" == "true" ]]; then
+          if [[ "$HAS_GITHUB" == "true" ]]; then
+            TITLE="$GITHUB_TITLE"
+          elif [[ "$HAS_LINEAR" == "true" ]]; then
             TITLE="$LINEAR_TITLE"
           else
             TITLE="$PARSED_TITLE"
@@ -323,11 +360,36 @@ jobs:
 
           RUN_URL="/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # Build PR body using a temp file to safely handle special characters
           BODY_FILE=$(mktemp)
           trap 'rm -f "$BODY_FILE"' EXIT
 
-          if [[ "$HAS_LINEAR" == "true" ]]; then
+          if [[ -n "$GH_ISSUE_NUMBER" ]]; then
+            ISSUE_DESC=""
+            if [[ "$HAS_GITHUB" == "true" ]]; then
+              ISSUE_DESC=$(echo "$GITHUB_ISSUE_DESC_B64" | base64 -d 2>/dev/null || echo "")
+            fi
+            {
+              echo "Fixes #${GH_ISSUE_NUMBER}"
+              echo ""
+              echo "## Goal"
+              echo ""
+              if [[ -n "$ISSUE_DESC" ]]; then
+                printf '%s\n' "$ISSUE_DESC"
+              else
+                echo "Implements GitHub issue #${GH_ISSUE_NUMBER}."
+              fi
+              echo ""
+              echo "## GitHub"
+              echo ""
+              echo "- Issue: #${GH_ISSUE_NUMBER}"
+              if [[ -n "$GITHUB_ISSUE_URL" ]]; then
+                echo "- URL: ${GITHUB_ISSUE_URL}"
+              fi
+              echo ""
+              echo "---"
+              echo "*PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*"
+            } > "$BODY_FILE"
+          elif [[ "$HAS_LINEAR" == "true" ]]; then
             ISSUE_DESC=$(echo "$LINEAR_ISSUE_DESC_B64" | base64 -d 2>/dev/null || echo "")
             {
               echo "## Goal"
