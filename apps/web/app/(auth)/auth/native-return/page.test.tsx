@@ -53,7 +53,10 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
   it('uses the staging callback scheme for staging origins', () => {
     Object.defineProperty(globalThis, 'location', {
       configurable: true,
-      value: { origin: 'https://staging.jov.ie', href: 'https://staging.jov.ie/' },
+      value: {
+        origin: 'https://staging.jov.ie',
+        href: 'https://staging.jov.ie/',
+      },
     });
     setSearchParams(`code=${CODE}&state=${STATE}`);
     render(<NativeReturnPage />);

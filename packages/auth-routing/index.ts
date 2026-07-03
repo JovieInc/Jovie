@@ -81,7 +81,6 @@ const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
 
-
 export type ElectronDesktopEnv = 'production' | 'staging' | 'local';
 
 export function getElectronAuthScheme(
