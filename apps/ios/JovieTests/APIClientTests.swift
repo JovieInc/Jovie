@@ -116,6 +116,60 @@ struct APIClientTests {
     #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
+  @Test func fetchesActionLoopInboxWithBearerToken() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/inbox")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      let data = try JSONEncoder().encode(MobileActionLoopInboxResponse.preview)
+      return (response, data)
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    let response = try await client.fetchActionLoopInbox()
+
+    #expect(response.pendingCount == 1)
+    #expect(response.items.count == 1)
+  }
+
+  @Test func fetchesActionLoopCalendarWithBearerToken() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/calendar")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      let data = try JSONEncoder().encode(MobileActionLoopCalendarResponse.preview)
+      return (response, data)
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    let response = try await client.fetchActionLoopCalendar()
+
+    #expect(response.pendingReviewCount == 1)
+    #expect(response.upcomingReleases.count == 1)
+  }
+
   @Test func fetchesAudienceHighlightsWithBearerToken() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in

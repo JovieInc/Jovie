@@ -135,6 +135,8 @@ protocol APIClientProtocol: Sendable {
   func fetchMe() async throws -> MobileMeResponse
   func fetchAppleWalletProfilePass() async throws -> Data
   func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse
+  func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse
+  func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse
 }
 
 struct APIClient: APIClientProtocol, Sendable {
@@ -167,6 +169,14 @@ struct APIClient: APIClientProtocol, Sendable {
 
   func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse {
     try await sendAudienceHighlightsRequest(forceRefresh: false)
+  }
+
+  func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse {
+    try await sendActionLoopInboxRequest(forceRefresh: false)
+  }
+
+  func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
+    try await sendActionLoopCalendarRequest(forceRefresh: false)
   }
 
   private func sendMeRequest(forceRefresh: Bool) async throws -> MobileMeResponse {
@@ -289,6 +299,86 @@ struct APIClient: APIClientProtocol, Sendable {
 
     do {
       return try decoder.decode(MobileAudienceHighlightsResponse.self, from: data)
+    } catch {
+      throw APIClientError.decodingFailed
+    }
+  }
+
+  private func sendActionLoopInboxRequest(
+    forceRefresh: Bool
+  ) async throws -> MobileActionLoopInboxResponse {
+    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/inbox"))
+    request.httpMethod = "GET"
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+    let data: Data
+    let response: URLResponse
+
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401, !forceRefresh {
+      return try await sendActionLoopInboxRequest(forceRefresh: true)
+    }
+
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    do {
+      return try decoder.decode(MobileActionLoopInboxResponse.self, from: data)
+    } catch {
+      throw APIClientError.decodingFailed
+    }
+  }
+
+  private func sendActionLoopCalendarRequest(
+    forceRefresh: Bool
+  ) async throws -> MobileActionLoopCalendarResponse {
+    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/calendar"))
+    request.httpMethod = "GET"
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+    let data: Data
+    let response: URLResponse
+
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401, !forceRefresh {
+      return try await sendActionLoopCalendarRequest(forceRefresh: true)
+    }
+
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    do {
+      return try decoder.decode(MobileActionLoopCalendarResponse.self, from: data)
     } catch {
       throw APIClientError.decodingFailed
     }

@@ -24,6 +24,14 @@ private actor MockAudienceHighlightsAPIClient: APIClientProtocol {
     }
     return response
   }
+
+  func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse {
+    .preview
+  }
+
+  func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
+    .preview
+  }
 }
 
 struct AudienceHighlightsRepositoryTests {

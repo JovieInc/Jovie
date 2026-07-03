@@ -31,6 +31,14 @@ private actor MutableAPIClient: APIClientProtocol {
     .preview
   }
 
+  func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse {
+    .preview
+  }
+
+  func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
+    .preview
+  }
+
   func updateMode(_ mode: Mode) {
     self.mode = mode
   }

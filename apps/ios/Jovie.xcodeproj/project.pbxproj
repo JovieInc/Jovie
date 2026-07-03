@@ -51,6 +51,9 @@
 		A0J0V36380000000000000006 /* AudienceHighlightsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */; };
 		A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */; };
 		A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */; };
+		A0GH12706000000000000002 /* MobileActionLoopInboxResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12706000000000000001 /* MobileActionLoopInboxResponse.swift */; };
+		A0GH12706000000000000004 /* MobileActionLoopCalendarResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12706000000000000003 /* MobileActionLoopCalendarResponse.swift */; };
+		A0GH12706000000000000006 /* MobileActionLoopResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */; };
 		A0J0V25490000000000000002 /* ChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000001 /* ChatCache.swift */; };
 		A0J0V25490000000000000004 /* ChatRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000003 /* ChatRepository.swift */; };
@@ -166,6 +169,9 @@
 		A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudienceHighlightsRepository.swift; sourceTree = "<group>"; };
 		A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudienceHighlightsRepositoryTests.swift; sourceTree = "<group>"; };
 		A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAudienceHighlightsResponseTests.swift; sourceTree = "<group>"; };
+		A0GH12706000000000000001 /* MobileActionLoopInboxResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopInboxResponse.swift; sourceTree = "<group>"; };
+		A0GH12706000000000000003 /* MobileActionLoopCalendarResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopCalendarResponse.swift; sourceTree = "<group>"; };
+		A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopResponseTests.swift; sourceTree = "<group>"; };
 		F1E2D3C4B5A697886756453E /* SettingsEscapeTrapGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsEscapeTrapGuardTests.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000001 /* ChatCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatCache.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000003 /* ChatRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRepository.swift; sourceTree = "<group>"; };
@@ -307,6 +313,7 @@
 				A0GH12170000000000000003 /* AppShellChatFirstTests.swift */,
 				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
 				A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */,
+				A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */,
 				5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */,
 				F4562819B40056163650929C /* JovieAppIntentsTests.swift */,
 				A0J0V11070000000000000003 /* ConversationUserActivityTests.swift */,
@@ -397,6 +404,8 @@
 				A0J0V25490000000000000007 /* MobileChatModels.swift */,
 				3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */,
 				A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */,
+				A0GH12706000000000000001 /* MobileActionLoopInboxResponse.swift */,
+				A0GH12706000000000000003 /* MobileActionLoopCalendarResponse.swift */,
 				A0B10F00000000000000000B /* Observability */,
 				44B3D151E21A49C2876932A8 /* NativeSessionTokenStore.swift */,
 				A0J0V26350000000000000001 /* MobileAuthFinalization.swift */,
@@ -662,6 +671,7 @@
 				A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */,
 				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
 				A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */,
+				A0GH12706000000000000006 /* MobileActionLoopResponseTests.swift in Sources */,
 				E1F2A3B4C5D6E7F8A9B0C1D2 /* SettingsEscapeTrapGuardTests.swift in Sources */,
 				71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */,
 				F232904F618A4671B805D0BC /* JovieAppIntentsTests.swift in Sources */,
@@ -699,6 +709,8 @@
 				A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */,
 				52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */,
 				A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */,
+				A0GH12706000000000000002 /* MobileActionLoopInboxResponse.swift in Sources */,
+				A0GH12706000000000000004 /* MobileActionLoopCalendarResponse.swift in Sources */,
 				DA0F3A9E1C4B4B149B7D4C21 /* NativeSessionTokenStore.swift in Sources */,
 				A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */,
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
