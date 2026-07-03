@@ -2102,14 +2102,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   text-wrap: balance;
 }
 
-:where(.system-b-download-hero-button) {
-  height: calc(var(--space-10) + var(--space-1));
-  gap: var(--space-2);
-  padding-inline: var(--space-6);
-  font-size: var(--text-mid);
-  font-weight: var(--font-weight-semibold);
-}
-
 :where(.system-b-download-secondary-link) {
   display: inline-flex;
   height: calc(var(--space-10) + var(--space-1));
@@ -3124,64 +3116,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   color: var(--color-text-primary-token);
 }
 
-.system-b-claim-handle-button {
-  height: 36px;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-primary-bg) 22%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
-  padding-inline: 0.875rem;
-  font-size: var(--text-app);
-  font-weight: 510;
-  letter-spacing: 0;
-  transition:
-    background var(--system-b-duration-fast) var(--system-b-ease),
-    border-color var(--system-b-duration-fast) var(--system-b-ease),
-    color var(--system-b-duration-fast) var(--system-b-ease),
-    opacity var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-.system-b-claim-handle-button[data-size="hero"] {
-  height: 38px;
-  border-radius: 0.8rem;
-  padding-inline: var(--space-4);
-  font-size: var(--text-xs);
-}
-
-.system-b-claim-handle-button[data-size="display"] {
-  height: 64px;
-  border-radius: 1rem;
-  padding-inline: var(--space-6);
-  font-size: var(--text-base);
-}
-
-.system-b-claim-handle-button:not(:disabled):hover,
-.system-b-claim-handle-button:not(:disabled):focus-visible {
-  border-color: color-mix(
-    in oklab,
-    var(--system-b-primary-bg) 34%,
-    transparent
-  );
-  background: color-mix(
-    in oklab,
-    var(--system-b-primary-bg) 92%,
-    var(--system-b-primary-fg) 8%
-  );
-}
-
-.system-b-claim-handle-button[data-disabled="true"] {
-  cursor: not-allowed;
-  border-color: transparent;
-  background: color-mix(
-    in oklab,
-    var(--system-b-bg-surface-2) 82%,
-    transparent
-  );
-  color: var(--color-text-quaternary-token);
-  opacity: 0.42;
-}
-
 html:not(.dark) .system-b-claim-handle-row,
 html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   transition: none !important;
@@ -3202,14 +3136,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 @media (min-width: 640px) {
   .system-b-claim-handle-row[data-size="display"] {
     padding: var(--space-2);
-  }
-
-  .system-b-claim-handle-button {
-    padding-inline: var(--space-4);
-  }
-
-  .system-b-claim-handle-button[data-size="display"] {
-    padding-inline: var(--space-7);
   }
 }
 
@@ -5434,21 +5360,12 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   line-height: calc(var(--space-4) + var(--space-px));
 }
 
-:where(.system-b-spotify-connect-claim-button--disabled) {
-  color: color-mix(in oklab, var(--color-btn-primary-fg) 60%, transparent);
-}
-
 :where(.system-b-spotify-connect-trailing) {
   display: flex;
   min-height: var(--space-8);
   width: calc(var(--space-24) + var(--space-8));
   flex: 0 0 calc(var(--space-24) + var(--space-8));
   align-items: center;
-  justify-content: center;
-}
-
-:where(.system-b-spotify-connect-claim-button) {
-  width: 100%;
   justify-content: center;
 }
 
@@ -7724,36 +7641,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-}
-
-:where(.system-b-opportunity-inbox-feedback-button) {
-  display: inline-flex;
-  width: var(--system-b-chat-action-card-icon-size);
-  height: var(--system-b-chat-action-card-icon-size);
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  color: var(--color-text-tertiary-token);
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    border-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-opportunity-inbox-feedback-button:hover),
-:where(.system-b-opportunity-inbox-feedback-button-active) {
-  border-color: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 8%,
-    transparent
-  );
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 5%,
-    transparent
-  );
-  color: var(--color-text-primary-token);
 }
 
 :where(.system-b-opportunity-inbox-feedback-icon) {
