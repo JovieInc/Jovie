@@ -28,7 +28,10 @@ const extraArgs = process.argv.slice(2);
 const electronArgs = ['.'];
 
 if (process.env.JOVIE_DEV === '1') {
-  const port = Number.parseInt(process.env.JOVIE_ELECTRON_CDP_PORT ?? '9223', 10);
+  const port = Number.parseInt(
+    process.env.JOVIE_ELECTRON_CDP_PORT ?? '9223',
+    10
+  );
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
     console.error(
       '[launch-electron] JOVIE_ELECTRON_CDP_PORT must be a valid TCP port.'

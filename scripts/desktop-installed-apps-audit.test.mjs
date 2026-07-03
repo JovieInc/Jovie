@@ -65,10 +65,14 @@ test('evaluateDesktopInstalledAppsAudit flags legacy and concurrent shells', () 
 
   assert.equal(result.ok, false);
   assert.ok(
-    result.findings.some(finding => finding.includes('legacy bundle id ie.jov.Jovie'))
+    result.findings.some(finding =>
+      finding.includes('legacy bundle id ie.jov.Jovie')
+    )
   );
   assert.ok(
-    result.findings.some(finding => finding.includes('2 Jovie desktop processes'))
+    result.findings.some(finding =>
+      finding.includes('2 Jovie desktop processes')
+    )
   );
   assert.ok(
     result.findings.some(finding => finding.includes('--remote-debugging-port'))
@@ -83,7 +87,9 @@ test('commandExposesRemoteDebugging detects CDP flags', () => {
     true
   );
   assert.equal(
-    commandExposesRemoteDebugging('/Applications/Jovie.app/Contents/MacOS/Jovie'),
+    commandExposesRemoteDebugging(
+      '/Applications/Jovie.app/Contents/MacOS/Jovie'
+    ),
     false
   );
 });

@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const APPLICATIONS_DIR = '/Applications';
@@ -78,16 +78,18 @@ export function readCodesignMetadata(appPath) {
  */
 export function listRunningJovieProcesses() {
   try {
-    const output = execFileSync(
-      'ps',
-      ['-axo', 'pid=,command='],
-      { encoding: 'utf8' }
-    );
+    const output = execFileSync('ps', ['-axo', 'pid=,command='], {
+      encoding: 'utf8',
+    });
     return output
       .split('\n')
       .map(line => line.trim())
       .filter(Boolean)
-      .filter(line => /\/Jovie/i.test(line) && !/grep|desktop-installed-apps-audit/.test(line))
+      .filter(
+        line =>
+          /\/Jovie/i.test(line) &&
+          !/grep|desktop-installed-apps-audit/.test(line)
+      )
       .map(line => {
         const match = line.match(/^(\d+)\s+(.+)$/);
         return {
@@ -125,7 +127,8 @@ export function evaluateDesktopInstalledAppsAudit(input) {
 
   const canonicalBundles = input.bundles.filter(
     bundle =>
-      bundle.identifier && KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]?.canonical
+      bundle.identifier &&
+      KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]?.canonical
   );
   if (canonicalBundles.length === 0) {
     findings.push(
@@ -183,7 +186,8 @@ function formatReport({ bundles, processes, findings, ok }) {
     lines.push('Installed bundles:');
     for (const bundle of bundles) {
       const role =
-        (bundle.identifier && KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]?.role) ||
+        (bundle.identifier &&
+          KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]?.role) ||
         (bundle.identifier && LEGACY_DESKTOP_BUNDLE_IDS.has(bundle.identifier)
           ? 'legacy'
           : 'unknown');
