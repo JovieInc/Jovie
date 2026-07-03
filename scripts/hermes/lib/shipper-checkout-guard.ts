@@ -1,14 +1,38 @@
-/**
- * Fail-closed guard: the codex issue shipper dispatcher must run from a fresh
- * primary ~/Jovie checkout on origin/main. Stale dispatcher code silently
- * degrades shipping while agent worktrees still fetch from origin/main.
- */
-
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { sendSlack } from './slack-client';
+import { withRetry } from './retry';
 import { sendTelegram } from './telegram-client';
+
+async function sendSlack(text: string): Promise<boolean> {
+  const webhookUrl =
+    process.env.HERMES_SLACK_WEBHOOK_URL ?? process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) return false;
+  try {
+    await withRetry(
+      async () => {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text.slice(0, 3000) }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (response.status === 429 || response.status >= 500) {
+          throw new Error(`Slack ${response.status}`);
+        }
+        if (!response.ok) {
+          const err = new Error(`Slack ${response.status}`);
+          (err as Error & { permanent?: boolean }).permanent = true;
+          throw err;
+        }
+      },
+      { caller: 'slack.send', attempts: 3, baseMs: 300 }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export const SHIPPER_CHECKOUT_EVENT = 'stale_checkout_abort';
 
@@ -169,18 +193,18 @@ export async function notifyStaleCheckoutAbort(details: {
   readonly snapshot: CheckoutSnapshot;
   readonly recovered: boolean;
 }): Promise<void> {
-  const lines = [
+  const { repoRoot, reasons, snapshot, recovered } = details;
+  const message = [
     'codex-issue-shipper stale_checkout_abort',
-    `repo: ${details.repoRoot}`,
-    `branch: ${details.snapshot.branch || '(detached)'}`,
-    `head: ${details.snapshot.head.slice(0, 12)}`,
-    `origin/main: ${details.snapshot.originMain.slice(0, 12)}`,
-    `worktree: ${details.snapshot.isWorktree ? 'yes' : 'no'}`,
-    `recovered: ${details.recovered ? 'yes' : 'no'}`,
+    `repo: ${repoRoot}`,
+    `branch: ${snapshot.branch || '(detached)'}`,
+    `head: ${snapshot.head.slice(0, 12)}`,
+    `origin/main: ${snapshot.originMain.slice(0, 12)}`,
+    `worktree: ${snapshot.isWorktree ? 'yes' : 'no'}`,
+    `recovered: ${recovered ? 'yes' : 'no'}`,
     'reasons:',
-    ...details.reasons.map(reason => `- ${reason}`),
-  ];
-  const message = lines.join('\n');
+    ...reasons.map(reason => `- ${reason}`),
+  ].join('\n');
   await Promise.all([sendTelegram(message), sendSlack(message)]);
 }
 

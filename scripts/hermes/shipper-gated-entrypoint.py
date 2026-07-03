@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""
-Launchd entrypoint for codex-issue-shipper.
-
-Gates (fail-closed, in order):
-  1. Pause sentinel (~/.hermes/shipping-paused)
-  2. gbrain reachability (doctor --fast --json)
-  3. Primary ~/Jovie checkout on origin/main (self-contained git checks)
-  4. Exec tsx scripts/hermes/jobs/codex-issue-shipper.ts from JOVIE_REPO
-
-The checkout guard is embedded here so a hijacked ~/Jovie branch cannot
-disable the guard by serving stale TypeScript.
-"""
+"""Launchd entrypoint: pause → gbrain → checkout guard → exec codex-issue-shipper."""
 
 from __future__ import annotations
 
@@ -23,12 +12,10 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
 
 JOB = "codex-issue-shipper"
 EVENT = "stale_checkout_abort"
-
-SHIPPER_CRITICAL_PREFIXES = (
+CRITICAL = (
     "scripts/hermes/jobs/codex-issue-shipper.ts",
     "scripts/hermes/lib/codex-issue-shipper.ts",
     "scripts/hermes/lib/ship-ledger.ts",
@@ -44,18 +31,11 @@ def hermes_home() -> Path:
 
 def jovie_repo() -> Path:
     env = os.environ.get("HERMES_JOVIE_REPO")
-    if env:
-        return Path(env).expanduser()
-    return Path.cwd()
+    return Path(env).expanduser() if env else Path.cwd()
 
 
 def log_event(event: str, **fields: object) -> None:
-    payload = {
-        "job": JOB,
-        "event": event,
-        "ts": datetime.now(timezone.utc).isoformat(),
-        **fields,
-    }
+    payload = {"job": JOB, "event": event, "ts": datetime.now(timezone.utc).isoformat(), **fields}
     line = json.dumps(payload, separators=(",", ":"))
     print(line, flush=True)
     jobs_log = hermes_home() / "logs" / "jobs.jsonl"
@@ -68,93 +48,61 @@ def log_event(event: str, **fields: object) -> None:
 
 
 def run_git(repo: Path, *args: str, timeout: int = 60) -> str:
-    completed = subprocess.run(
+    return subprocess.run(
         ["git", "-C", str(repo), *args],
         check=True,
         capture_output=True,
         text=True,
         timeout=timeout,
-    )
-    return completed.stdout.strip()
+    ).stdout.strip()
 
 
-def is_git_worktree(repo: Path) -> bool:
-    git_entry = repo / ".git"
-    return git_entry.is_file()
-
-
-def is_shipper_critical(path: str) -> bool:
+def is_critical(path: str) -> bool:
     normalized = path.strip().removeprefix("./")
-    return any(
-        normalized == prefix or normalized.startswith(prefix + "/")
-        for prefix in SHIPPER_CRITICAL_PREFIXES
-    )
+    return any(normalized == p or normalized.startswith(p + "/") for p in CRITICAL)
 
 
-def dirty_paths_are_only_detritus(porcelain: str) -> bool:
+def detritus_only(porcelain: str) -> bool:
     lines = [line for line in porcelain.splitlines() if line.strip()]
-    if not lines:
-        return True
     for line in lines:
         payload = line[3:].strip()
         path = payload.split(" -> ")[-1].strip() if " -> " in payload else payload
-        if is_shipper_critical(path):
+        if is_critical(path):
             return False
     return True
 
 
-def checkout_reasons(
-    *,
-    branch: str,
-    head: str,
-    origin_main: str,
-    dirty: bool,
-    porcelain: str,
-    worktree: bool,
-) -> list[str]:
-    reasons: list[str] = []
-    if worktree:
-        reasons.append("dispatcher repoRoot is a git worktree, not the primary checkout")
-    if branch != "main":
-        reasons.append(f"branch is {branch or '(detached)'}, expected main")
-    if head != origin_main:
-        reasons.append(f"HEAD {head[:12]} != origin/main {origin_main[:12]}")
-    if dirty and not dirty_paths_are_only_detritus(porcelain):
-        reasons.append("working tree has shipper-critical edits")
-    return reasons
+def snapshot(repo: Path) -> dict[str, object]:
+    porcelain = run_git(repo, "status", "--porcelain")
+    return {
+        "branch": run_git(repo, "branch", "--show-current"),
+        "head": run_git(repo, "rev-parse", "HEAD"),
+        "origin_main": run_git(repo, "rev-parse", "origin/main"),
+        "dirty": bool(porcelain.strip()),
+        "porcelain": porcelain,
+        "worktree": (repo / ".git").is_file(),
+    }
 
 
-def can_auto_recover(
-    *,
-    branch: str,
-    head: str,
-    origin_main: str,
-    dirty: bool,
-    porcelain: str,
-    worktree: bool,
-) -> bool:
-    if worktree:
-        return False
-    if dirty and not dirty_paths_are_only_detritus(porcelain):
-        return False
-    return branch != "main" or head != origin_main or dirty
+def reasons(s: dict[str, object]) -> list[str]:
+    out: list[str] = []
+    if s["worktree"]:
+        out.append("dispatcher repoRoot is a git worktree, not the primary checkout")
+    if s["branch"] != "main":
+        out.append(f"branch is {s['branch'] or '(detached)'}, expected main")
+    if s["head"] != s["origin_main"]:
+        out.append(f"HEAD {str(s['head'])[:12]} != origin/main {str(s['origin_main'])[:12]}")
+    if s["dirty"] and not detritus_only(str(s["porcelain"])):
+        out.append("working tree has shipper-critical edits")
+    return out
 
 
-def auto_recover(repo: Path) -> None:
+def recover(repo: Path) -> None:
     porcelain = run_git(repo, "status", "--porcelain")
     if porcelain.strip():
         stamp = datetime.now(timezone.utc).isoformat().replace(":", "-")
         subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo),
-                "stash",
-                "push",
-                "-u",
-                "-m",
-                f"shipper-checkout-guard auto-recover {stamp}",
-            ],
+            ["git", "-C", str(repo), "stash", "push", "-u", "-m", f"shipper-checkout-guard auto-recover {stamp}"],
             check=True,
             timeout=60,
         )
@@ -162,60 +110,24 @@ def auto_recover(repo: Path) -> None:
     run_git(repo, "reset", "--hard", "origin/main", timeout=60)
 
 
-def read_checkout_snapshot(repo: Path) -> dict[str, object]:
-    branch = run_git(repo, "branch", "--show-current")
-    head = run_git(repo, "rev-parse", "HEAD")
-    origin_main = run_git(repo, "rev-parse", "origin/main")
-    porcelain = run_git(repo, "status", "--porcelain")
-    return {
-        "branch": branch,
-        "head": head,
-        "origin_main": origin_main,
-        "dirty": bool(porcelain.strip()),
-        "porcelain": porcelain,
-        "worktree": is_git_worktree(repo),
-    }
-
-
-def assert_primary_checkout_fresh(repo: Path) -> tuple[bool, bool, dict[str, object], list[str]]:
+def assert_fresh(repo: Path) -> tuple[bool, bool, dict[str, object], list[str]]:
     run_git(repo, "fetch", "origin", "main", timeout=120)
-    snapshot = read_checkout_snapshot(repo)
-    reasons = checkout_reasons(
-        branch=str(snapshot["branch"]),
-        head=str(snapshot["head"]),
-        origin_main=str(snapshot["origin_main"]),
-        dirty=bool(snapshot["dirty"]),
-        porcelain=str(snapshot["porcelain"]),
-        worktree=bool(snapshot["worktree"]),
-    )
-    if not reasons:
-        return True, False, snapshot, []
-
-    if can_auto_recover(
-        branch=str(snapshot["branch"]),
-        head=str(snapshot["head"]),
-        origin_main=str(snapshot["origin_main"]),
-        dirty=bool(snapshot["dirty"]),
-        porcelain=str(snapshot["porcelain"]),
-        worktree=bool(snapshot["worktree"]),
-    ):
-        auto_recover(repo)
-        snapshot = read_checkout_snapshot(repo)
-        reasons = checkout_reasons(
-            branch=str(snapshot["branch"]),
-            head=str(snapshot["head"]),
-            origin_main=str(snapshot["origin_main"]),
-            dirty=bool(snapshot["dirty"]),
-            porcelain=str(snapshot["porcelain"]),
-            worktree=bool(snapshot["worktree"]),
-        )
-        if not reasons:
-            return True, True, snapshot, []
-
-    return False, False, snapshot, reasons
+    snap = snapshot(repo)
+    why = reasons(snap)
+    if not why:
+        return True, False, snap, []
+    if snap["worktree"] or (snap["dirty"] and not detritus_only(str(snap["porcelain"]))):
+        return False, False, snap, why
+    if snap["branch"] != "main" or snap["head"] != snap["origin_main"] or snap["dirty"]:
+        recover(repo)
+        snap = snapshot(repo)
+        why = reasons(snap)
+        if not why:
+            return True, True, snap, []
+    return False, False, snap, why
 
 
-def load_env_file(path: Path) -> None:
+def load_env(path: Path) -> None:
     if not path.is_file():
         return
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -228,85 +140,53 @@ def load_env_file(path: Path) -> None:
             os.environ[key] = value.strip().strip('"').strip("'")
 
 
-def send_telegram(message: str) -> None:
+def post_json(url: str, payload: dict[str, object]) -> None:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(request, timeout=10)
+    except (urllib.error.URLError, TimeoutError):
+        pass
+
+
+def notify(repo: Path, snap: dict[str, object], why: list[str]) -> None:
+    message = "\n".join(
+        [
+            "codex-issue-shipper stale_checkout_abort",
+            f"repo: {repo}",
+            f"branch: {snap.get('branch') or '(detached)'}",
+            f"head: {str(snap.get('head', ''))[:12]}",
+            f"origin/main: {str(snap.get('origin_main', ''))[:12]}",
+            f"worktree: {'yes' if snap.get('worktree') else 'no'}",
+            "reasons:",
+            *[f"- {reason}" for reason in why],
+        ]
+    )
     token = os.environ.get("HERMES_TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("HERMES_TELEGRAM_CHAT_ID")
     chat_file = hermes_home() / "state" / "telegram-chat-id"
     if not chat_id and chat_file.is_file():
         chat_id = chat_file.read_text(encoding="utf-8").strip()
-    if not token or not chat_id:
-        return
-    payload = json.dumps(
-        {
-            "chat_id": chat_id,
-            "text": message[:4000],
-            "disable_web_page_preview": True,
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        f"https://api.telegram.org/bot{token}/sendMessage",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        urllib.request.urlopen(request, timeout=10)
-    except (urllib.error.URLError, TimeoutError):
-        pass
-
-
-def send_slack(message: str) -> None:
-    webhook = os.environ.get("HERMES_SLACK_WEBHOOK_URL") or os.environ.get(
-        "SLACK_WEBHOOK_URL"
-    )
-    if not webhook:
-        return
-    payload = json.dumps({"text": message[:3000]}).encode("utf-8")
-    request = urllib.request.Request(
-        webhook,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        urllib.request.urlopen(request, timeout=10)
-    except (urllib.error.URLError, TimeoutError):
-        pass
-
-
-def notify_abort(repo: Path, snapshot: dict[str, object], reasons: Iterable[str], recovered: bool) -> None:
-    lines = [
-        "codex-issue-shipper stale_checkout_abort",
-        f"repo: {repo}",
-        f"branch: {snapshot.get('branch') or '(detached)'}",
-        f"head: {str(snapshot.get('head', ''))[:12]}",
-        f"origin/main: {str(snapshot.get('origin_main', ''))[:12]}",
-        f"worktree: {'yes' if snapshot.get('worktree') else 'no'}",
-        f"recovered: {'yes' if recovered else 'no'}",
-        "reasons:",
-        *[f"- {reason}" for reason in reasons],
-    ]
-    message = "\n".join(lines)
-    send_telegram(message)
-    send_slack(message)
+    if token and chat_id:
+        post_json(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            {"chat_id": chat_id, "text": message[:4000], "disable_web_page_preview": True},
+        )
+    webhook = os.environ.get("HERMES_SLACK_WEBHOOK_URL") or os.environ.get("SLACK_WEBHOOK_URL")
+    if webhook:
+        post_json(webhook, {"text": message[:3000]})
 
 
 def gbrain_alive() -> bool:
-    gbrain_bin = os.environ.get("HERMES_GBRAIN_BIN")
-    candidates: list[str] = []
-    if gbrain_bin:
-        candidates.append(gbrain_bin)
-    home_bin = hermes_home() / "bin" / "gbrain"
-    if home_bin.is_file():
-        candidates.append(str(home_bin))
-    which = subprocess.run(
-        ["bash", "-lc", "command -v gbrain"],
-        capture_output=True,
-        text=True,
-    )
+    candidates = [os.environ.get("HERMES_GBRAIN_BIN"), str(hermes_home() / "bin" / "gbrain")]
+    which = subprocess.run(["bash", "-lc", "command -v gbrain"], capture_output=True, text=True)
     if which.returncode == 0 and which.stdout.strip():
         candidates.append(which.stdout.strip())
-    for candidate in candidates:
+    for candidate in [c for c in candidates if c]:
         try:
             completed = subprocess.run(
                 [candidate, "doctor", "--fast", "--json"],
@@ -322,34 +202,23 @@ def gbrain_alive() -> bool:
             status = json.loads(completed.stdout).get("status", "")
         except json.JSONDecodeError:
             continue
-        if status in ("error", "fail", "failed", "dead", ""):
-            continue
-        return True
+        if status not in ("error", "fail", "failed", "dead", ""):
+            return True
     return False
 
 
 def resolve_tsx() -> str:
-    for candidate in (
-        os.environ.get("TSX_BIN"),
-        str(Path.home() / ".bun/bin/tsx"),
-        "tsx",
-    ):
-        if not candidate:
-            continue
-        if candidate == "tsx":
-            return candidate
-        if Path(candidate).is_file():
+    for candidate in (os.environ.get("TSX_BIN"), str(Path.home() / ".bun/bin/tsx"), "tsx"):
+        if candidate and (candidate == "tsx" or Path(candidate).is_file()):
             return candidate
     return "tsx"
 
 
 def main() -> int:
-    load_env_file(hermes_home() / ".env")
-    pause_sentinel = hermes_home() / "shipping-paused"
-    if pause_sentinel.is_file():
+    load_env(hermes_home() / ".env")
+    if (hermes_home() / "shipping-paused").is_file():
         log_event("paused_skip")
         return 0
-
     if not gbrain_alive():
         log_event("gbrain_abort")
         print(f"{JOB}: gbrain dead/unreachable — refusing to dispatch", file=sys.stderr)
@@ -362,27 +231,24 @@ def main() -> int:
         return 4
 
     try:
-        ok, recovered, snapshot, reasons = assert_primary_checkout_fresh(repo)
+        ok, recovered, snap, why = assert_fresh(repo)
     except subprocess.CalledProcessError as err:
         log_event(EVENT, repo=str(repo), error=str(err))
         print(f"{JOB}: checkout guard failed: {err}", file=sys.stderr)
         return 5
 
     if not ok:
-        notify_abort(repo, snapshot, reasons, recovered=False)
+        notify(repo, snap, why)
         log_event(
             EVENT,
             repo=str(repo),
-            branch=snapshot.get("branch"),
-            head=str(snapshot.get("head", ""))[:12],
-            originMain=str(snapshot.get("origin_main", ""))[:12],
-            worktree=bool(snapshot.get("worktree")),
-            reasons=list(reasons),
+            branch=snap.get("branch"),
+            head=str(snap.get("head", ""))[:12],
+            originMain=str(snap.get("origin_main", ""))[:12],
+            worktree=bool(snap.get("worktree")),
+            reasons=why,
         )
-        print(
-            f"{JOB}: stale_checkout_abort — refusing to dispatch from {repo}",
-            file=sys.stderr,
-        )
+        print(f"{JOB}: stale_checkout_abort — refusing to dispatch from {repo}", file=sys.stderr)
         return 6
 
     if recovered:
@@ -394,9 +260,8 @@ def main() -> int:
         print(f"{JOB}: missing {shipper}", file=sys.stderr)
         return 7
 
-    tsx = resolve_tsx()
     os.chdir(repo)
-    os.execvp(tsx, [tsx, str(shipper)])
+    os.execvp(resolve_tsx(), [resolve_tsx(), str(shipper)])
 
 
 if __name__ == "__main__":

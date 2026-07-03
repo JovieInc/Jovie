@@ -12,11 +12,10 @@ describe('shipper-gated-entrypoint.py', () => {
     );
 
     expect(script).toContain('stale_checkout_abort');
-    expect(script).toContain('assert_primary_checkout_fresh');
+    expect(script).toContain('assert_fresh');
     expect(script).toContain('gbrain_alive');
     expect(script).toContain('shipping-paused');
     expect(script).toContain('codex-issue-shipper.ts');
-    expect(script).toContain('send_telegram');
-    expect(script).toContain('send_slack');
+    expect(script).toContain('post_json');
   });
 });
