@@ -29,7 +29,7 @@ PORT_STATUS=$?
 set -e
 
 if [ "$PORT_STATUS" -eq 42 ]; then
-  echo "Port $PORT is already in use. Stop that server or run: PORT=$((PORT + 1)) pnpm run dev:web:fast" >&2
+  echo "Port $PORT is already in use. Stop that server, run: pnpm run dev:cleanup, or use PORT=$((PORT + 1)) pnpm dev" >&2
   exit 1
 fi
 if [ "$PORT_STATUS" -ne 0 ]; then

@@ -743,17 +743,6 @@ export interface CheckoutState {
 
 export type CheckoutVerdict = 'fresh' | 'stale';
 
-/** Paths that must never be auto-stashed — stale dispatcher edits need human eyes. */
-export const SHIPPER_DISPATCHER_PATHS = [
-  'scripts/hermes/jobs/codex-issue-shipper.ts',
-  'scripts/hermes/lib/codex-issue-shipper.ts',
-  'scripts/hermes/shipper-gated-entrypoint.py',
-  'scripts/hermes/lib/ship-ledger.ts',
-  'scripts/hermes/lib/gbrain.ts',
-  'scripts/hermes/lib/heavy-job-lock.ts',
-  'scripts/hermes/lib/jobs-log.ts',
-] as const;
-
 export function classifyCheckout(state: CheckoutState): CheckoutVerdict {
   const onMain = state.branch === 'main';
   const upToDate = state.headSha === state.originMainSha;
@@ -772,31 +761,63 @@ export function describeCheckout(state: CheckoutState): string {
   return parts.join('; ') || 'fresh';
 }
 
+/** Dispatcher-critical paths — dirty edits here block auto-recovery. */
+export const SHIPPER_CRITICAL_PATH_PREFIXES = [
+  'scripts/hermes/jobs/codex-issue-shipper.ts',
+  'scripts/hermes/lib/codex-issue-shipper.ts',
+  'scripts/hermes/ship-loop.sh',
+  'scripts/hermes/shipper-gated-entrypoint.py',
+  'scripts/hermes/lib/ship-ledger.ts',
+  'scripts/hermes/lib/gbrain.ts',
+  'scripts/hermes/lib/heavy-job-lock.ts',
+  'scripts/hermes/lib/jobs-log.ts',
+] as const;
+
+/** @deprecated Use SHIPPER_CRITICAL_PATH_PREFIXES */
+export const SHIPPER_DISPATCHER_PATHS = SHIPPER_CRITICAL_PATH_PREFIXES;
+
 export function parseDirtyPaths(porcelain: string): ReadonlyArray<string> {
   return porcelain
     .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(line => line.slice(3).trim())
-    .filter(Boolean);
+    .map(line => line.replace(/\r$/, ''))
+    .filter(line => line.length > 3)
+    .map(line => {
+      // Porcelain is fixed-width: XY<space>path — do not trim the line first.
+      const path = line.slice(3).trim();
+      const renameIdx = path.indexOf(' -> ');
+      return renameIdx >= 0 ? path.slice(renameIdx + 4).trim() : path;
+    });
+}
+
+function touchesShipperCriticalPath(path: string): boolean {
+  return SHIPPER_CRITICAL_PATH_PREFIXES.some(
+    critical => path === critical || path.startsWith(`${critical}/`)
+  );
 }
 
 export function dirtyTouchesShipper(
   paths: ReadonlyArray<string>
 ): boolean {
-  return paths.some(path =>
-    SHIPPER_DISPATCHER_PATHS.some(
-      prefix => path === prefix || path.startsWith(`${prefix}/`)
-    )
-  );
+  return paths.some(path => touchesShipperCriticalPath(path));
 }
 
-/** Auto-recover only when drift is branch/behind or non-shipper detritus. */
-export function canAutoRecoverCheckout(state: CheckoutState): boolean {
+/** True when stray edits are safe to stash (no shipper/dispatcher files). */
+export function isRecoverableDetritus(
+  dirtyPaths: ReadonlyArray<string>
+): boolean {
+  if (dirtyPaths.length === 0) return true;
+  return dirtyPaths.every(path => !touchesShipperCriticalPath(path));
+}
+
+/** Whether auto-recovery (stash + reset to origin/main) is allowed. */
+export function canAutoRecoverCheckout(
+  state: CheckoutState,
+  dirtyPaths?: ReadonlyArray<string>
+): boolean {
+  const paths = dirtyPaths ?? state.dirtyPaths ?? [];
   if (classifyCheckout(state) === 'fresh') return false;
   if (!state.dirty) return true;
-  const paths = state.dirtyPaths ?? [];
-  return paths.length > 0 && !dirtyTouchesShipper(paths);
+  return isRecoverableDetritus(paths);
 }
 
 export type CheckoutGateDecision =
@@ -845,4 +866,13 @@ export function decideCheckoutGate(
       : detail,
     notify: true,
   };
+}
+
+export type PrimaryCheckoutGuardVerdict = 'fresh' | 'abort';
+
+export interface PrimaryCheckoutGuardResult {
+  readonly verdict: PrimaryCheckoutGuardVerdict;
+  readonly detail: string;
+  readonly recovered: boolean;
+  readonly dirtyPaths: ReadonlyArray<string>;
 }
