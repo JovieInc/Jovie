@@ -156,7 +156,6 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
           AppShellLeftDrawer(
             isPresented: isShowingDrawer,
             profile: profile,
-            isOffline: isOffline,
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,

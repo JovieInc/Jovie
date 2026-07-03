@@ -288,7 +288,6 @@ private struct AppContentView: View {
         ) {
           DashboardView(
             state: appState.dashboardState,
-            isOffline: appState.isOffline,
             brightnessManager: appState.brightnessManager,
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
             loadAppleWalletProfilePass: {
