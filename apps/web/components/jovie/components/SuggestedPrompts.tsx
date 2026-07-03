@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import {
   Camera,
   Disc3,
@@ -159,7 +160,8 @@ export function SuggestedPrompts({
     resolvedAlbumArtCapability.availability === 'unavailable'
       ? {
           icon: 'Camera',
-          label: 'Draft album-art brief',
+          // eslint-disable-next-line @jovie/canonical-ui-label-casing -- title-case hyphen false positive
+          label: 'Draft Album-art Brief',
           prompt:
             'Draft an album-art brief for my latest release with visual direction, mood, palette, typography, and production notes.',
           accent: 'purple',
@@ -279,9 +281,11 @@ export function SuggestedPrompts({
           const IconComponent = ICON_MAP[suggestion.icon];
 
           return (
-            <button
+            <Button
               key={suggestion.label}
               type='button'
+              variant='tertiary'
+              size='sm'
               onClick={() => {
                 if (
                   !(
@@ -295,7 +299,7 @@ export function SuggestedPrompts({
               disabled={
                 suggestion.label === 'Generate Album Art' && albumArtDisabled
               }
-              className='group system-b-chat-suggested-prompts-flat-button'
+              className='group h-auto w-full justify-start rounded-full px-3 py-2 text-left text-secondary-token hover:bg-surface-0 hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-50'
               aria-label={suggestion.label}
               title={
                 suggestion.label === 'Generate Album Art'
@@ -309,7 +313,7 @@ export function SuggestedPrompts({
                 ) : null}
               </span>
               <span className='min-w-0 truncate'>{suggestion.label}</span>
-            </button>
+            </Button>
           );
         })}
       </div>
