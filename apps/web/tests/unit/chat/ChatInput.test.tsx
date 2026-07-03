@@ -5,6 +5,10 @@ import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  ComposerFocusProvider,
+  useComposerFocus,
+} from '@/components/features/chat/Composer';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import * as largeTextPaste from '@/lib/chat/large-text-paste';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -780,6 +784,39 @@ describe('ChatInput', () => {
       currentValue: 'hello',
     });
     insertSpy.mockRestore();
+  });
+
+  it('registers composer focus with the shell and exits on Escape', async () => {
+    const user = userEvent.setup();
+
+    function ShellFocusProbe() {
+      const { isComposerFocused } = useComposerFocus();
+      return (
+        <div data-testid='shell-focus-state'>
+          {isComposerFocused ? 'focused' : 'idle'}
+        </div>
+      );
+    }
+
+    fastRender(
+      withProviders(
+        <ComposerFocusProvider>
+          <ShellFocusProbe />
+          <ControlledChatInputHarness />
+        </ComposerFocusProvider>
+      )
+    );
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+
+    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('idle');
+    await user.click(textarea);
+    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('focused');
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('idle');
+    expect(textarea).not.toHaveFocus();
   });
 
   it('shows the stop action while streaming even when the draft is empty', async () => {

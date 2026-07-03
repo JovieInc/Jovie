@@ -98,6 +98,24 @@ describe('AppShellFrame', () => {
     expect(rightRail).toHaveClass('sticky', 'top-0');
   });
 
+  it('marks composer focus on the shell frame for chrome retreat styles', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div>Right rail</div>}
+        composerFocusActive
+      />
+    );
+
+    const frame = screen.getByRole('main').closest('[data-app-shell-frame]');
+
+    expect(frame).toHaveAttribute('data-composer-focus', 'true');
+    expect(screen.getByTestId('app-shell-sidebar-mount')).toBeInTheDocument();
+    expect(screen.getByTestId('app-shell-right-rail')).toBeInTheDocument();
+  });
+
   it('renders the shared audio player slot inside the shell frame', () => {
     render(
       <AppShellFrame

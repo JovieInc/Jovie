@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useRegisterComposerFocus } from '@/components/features/chat/Composer';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
 import {
   insertLargeTextAtCaret,
@@ -230,6 +231,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const hasPendingFiles = (pendingFiles?.length ?? 0) > 0;
     const hasChips = (chips?.length ?? 0) > 0;
 
+    const { setComposerFocused } = useRegisterComposerFocus();
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [isViewportNarrow, setIsViewportNarrow] = useState(false);
@@ -540,6 +542,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
+        // SlashCommandMenu owns Escape while the picker is open (capture phase).
+        if (e.key === 'Escape' && picker.state.status === 'closed') {
+          e.preventDefault();
+          internalTextareaRef.current?.blur();
+          setComposerFocused(false);
+          return;
+        }
         // While the picker is open, swallow Enter — SlashCommandMenu owns it.
         if (picker.state.status !== 'closed' && e.key === 'Enter') return;
         if (e.key === 'Enter' && !e.shiftKey && canSend) {
@@ -566,6 +575,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onRemoveLastChip,
         picker.state,
         scheduleTextareaRefocus,
+        setComposerFocused,
       ]
     );
 
@@ -1128,8 +1138,14 @@ function InputRow({
             }}
             onKeyDown={handleKeyDown}
             onPaste={onPaste}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
+            onFocus={() => {
+              setIsFocused(true);
+              setComposerFocused(true);
+            }}
+            onBlur={() => {
+              setIsFocused(false);
+              setComposerFocused(false);
+            }}
             maxLength={MAX_MESSAGE_LENGTH + 100}
             aria-label='Chat Message Input'
             aria-describedby={isNearLimit ? 'char-limit-status' : undefined}

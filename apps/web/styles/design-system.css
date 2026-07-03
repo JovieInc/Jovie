@@ -8215,6 +8215,23 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     color-mix(in oklab, var(--color-border-focus) 42%, transparent);
 }
 
+/* Web composer focus mode — sidebar dims, right rail slides off (desktop only). */
+@media (min-width: 1024px) {
+  :where(
+    [data-app-shell-frame][data-composer-focus="true"]
+      [data-testid="app-shell-sidebar-mount"]
+  ) {
+    opacity: 0.3;
+  }
+
+  :where(
+    [data-app-shell-frame][data-composer-focus="true"]
+      [data-testid="app-shell-right-rail"]
+  ) {
+    transform: translateX(40%);
+  }
+}
+
 :where(.system-b-chat-composer-surface[data-over-limit="true"]) {
   border-color: var(--color-error);
 }

@@ -24,6 +24,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
+import { ComposerFocusProvider } from '@/components/features/chat/Composer';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import {
@@ -266,30 +267,32 @@ function AuthShellWrapperInner({
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
       <PendingShellContext.Provider value={pendingShellContextValue}>
-        <RightPanelProvider>
-          <PreviewPanelProvider
-            key={previewPanelScope}
-            defaultOpen={shouldDefaultOpenPreviewPanel}
-            enabled={previewEnabled}
-          >
-            <RightRailKeyboardHandler />
-            <AuthShell
-              section={config.section}
-              breadcrumbs={config.breadcrumbs}
-              headerBadge={headerBadge}
-              headerAction={headerAction}
-              showMobileTabs={config.showMobileTabs}
-              isTableRoute={config.isTableRoute}
-              isLyricsRoute={config.isLyricsRoute}
-              onSidebarOpenChange={
-                persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-              }
-              sidebarDefaultOpen={sidebarDefaultOpen}
+        <ComposerFocusProvider>
+          <RightPanelProvider>
+            <PreviewPanelProvider
+              key={previewPanelScope}
+              defaultOpen={shouldDefaultOpenPreviewPanel}
+              enabled={previewEnabled}
             >
-              {shellChildren}
-            </AuthShell>
-          </PreviewPanelProvider>
-        </RightPanelProvider>
+              <RightRailKeyboardHandler />
+              <AuthShell
+                section={config.section}
+                breadcrumbs={config.breadcrumbs}
+                headerBadge={headerBadge}
+                headerAction={headerAction}
+                showMobileTabs={config.showMobileTabs}
+                isTableRoute={config.isTableRoute}
+                isLyricsRoute={config.isLyricsRoute}
+                onSidebarOpenChange={
+                  persistSidebarCollapsed ? handleSidebarOpenChange : undefined
+                }
+                sidebarDefaultOpen={sidebarDefaultOpen}
+              >
+                {shellChildren}
+              </AuthShell>
+            </PreviewPanelProvider>
+          </RightPanelProvider>
+        </ComposerFocusProvider>
       </PendingShellContext.Provider>
     </TableMetaContext.Provider>
   );
