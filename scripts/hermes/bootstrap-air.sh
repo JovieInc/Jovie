@@ -243,12 +243,20 @@ mkdir -p \
   "$HERMES_HOME/scripts" \
   "$HERMES_HOME/logs" \
   "$HERMES_HOME/logs/launchd" \
+  "$HERMES_HOME/scripts" \
   "$HERMES_HOME/state"
 chmod 700 "$HERMES_HOME"
 install -m 755 "${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py" \
   "${HERMES_HOME}/scripts/shipper-gated-entrypoint.py"
 ln -sf "$TSX_BIN" "${HERMES_HOME}/bin/tsx"
 ok "Hermes home: $HERMES_HOME (shipper-gated-entrypoint installed)"
+
+# Symlink launchd entrypoints into ~/.hermes/scripts so gates stay addressable
+# even when the primary checkout is temporarily dirty.
+SHIPPER_ENTRYPOINT="${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py"
+chmod +x "$SHIPPER_ENTRYPOINT"
+ln -sf "$SHIPPER_ENTRYPOINT" "${HERMES_HOME}/scripts/shipper-gated-entrypoint.py"
+ok "Linked shipper-gated-entrypoint.py into ~/.hermes/scripts"
 
 # 10. Render ~/.hermes/.env from Doppler
 log "Rendering ~/.hermes/.env"

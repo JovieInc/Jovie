@@ -1,19 +1,12 @@
 /**
- * Minimal Slack incoming-webhook client for Hermes outbound notifications.
+ * Best-effort Slack webhook notifications for Hermes ops jobs.
  */
 
 import { withRetry } from './retry';
 
-function getWebhookUrl(): string | null {
-  return (
-    process.env.HERMES_SLACK_WEBHOOK_URL ??
-    process.env.SLACK_WEBHOOK_URL ??
-    null
-  );
-}
-
 export async function sendSlack(text: string): Promise<boolean> {
-  const webhookUrl = getWebhookUrl();
+  const webhookUrl =
+    process.env.HERMES_SLACK_WEBHOOK_URL ?? process.env.SLACK_WEBHOOK_URL;
   if (!webhookUrl) return false;
   try {
     await withRetry(

@@ -18,6 +18,8 @@
     <dict>
         <key>HERMES_HOME</key>
         <string>{{HOME}}/.hermes</string>
+        <key>HERMES_JOVIE_REPO</key>
+        <string>{{JOVIE_REPO}}</string>
         <key>HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN</key>
         <string>3</string>
         <key>HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS</key>

@@ -62,6 +62,11 @@ import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import {
+  assertPrimaryCheckoutFresh,
+  notifyStaleCheckoutAbort,
+  SHIPPER_CHECKOUT_EVENT,
+} from '../lib/shipper-checkout-guard';
+import {
   journalEnd,
   journalStart,
   planRecovery,
@@ -134,13 +139,26 @@ function loadHermesEnv(): void {
   }
 }
 
-function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
+function run(
+  args: ReadonlyArray<string>,
+  config: ShipperConfig,
+  options: { readonly timeoutMs?: number } = {}
+): string {
   return execFileSync(args[0], args.slice(1), {
     cwd: config.repoRoot,
     encoding: 'utf8',
-    timeout: 30_000,
+    timeout: options.timeoutMs ?? 30_000,
     maxBuffer: 5 * 1024 * 1024,
   });
+}
+
+function gitRunner(
+  config: ShipperConfig
+): (
+  args: ReadonlyArray<string>,
+  options?: { readonly timeoutMs?: number }
+) => string {
+  return (args, options) => run(args, config, options);
 }
 
 function systemCapacity(config: ShipperConfig): CapacitySnapshot {
@@ -1229,6 +1247,41 @@ async function main(): Promise<void> {
   }
   const repo = detectGithubRepo(repoRoot);
   const config = loadShipperConfig(process.env, repoRoot, repo);
+
+  const checkoutGuard = assertPrimaryCheckoutFresh(gitRunner(config), repoRoot, {
+    autoRecover: process.env.HERMES_CODEX_SHIPPER_AUTO_RECOVER !== '0',
+  });
+  if (checkoutGuard.recovered) {
+    logJobEvent({
+      job: JOB,
+      event: 'stale_checkout_recovered',
+      repoRoot,
+      branch: checkoutGuard.snapshot.branch,
+      head: checkoutGuard.snapshot.head,
+    });
+  }
+  if (!checkoutGuard.ok) {
+    logJobEvent({
+      job: JOB,
+      event: SHIPPER_CHECKOUT_EVENT,
+      repoRoot,
+      branch: checkoutGuard.snapshot.branch,
+      head: checkoutGuard.snapshot.head,
+      originMain: checkoutGuard.snapshot.originMain,
+      worktree: checkoutGuard.snapshot.isWorktree,
+      reasons: checkoutGuard.reasons,
+    });
+    await notifyStaleCheckoutAbort({
+      repoRoot,
+      reasons: checkoutGuard.reasons,
+      snapshot: checkoutGuard.snapshot,
+      recovered: false,
+    });
+    console.error(
+      `[${JOB}] ${SHIPPER_CHECKOUT_EVENT}: refusing to dispatch from ${repoRoot}`
+    );
+    process.exit(6);
+  }
 
   await withJobLogging(JOB, async () => {
     const lockResult = await tryWithHeavyJobLock(

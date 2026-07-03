@@ -48,33 +48,23 @@ dangerous_patterns=(
   "chown -R"
 )
 
-# Block checkout/switch in the primary Jovie shipper checkout (#12841).
-# Agents must use isolated worktrees; hijacking ~/Jovie silently runs stale
-# dispatcher code while agent worktrees still fetch origin/main.
-primary_repo="${HERMES_JOVIE_REPO:-}"
-if [ -z "$primary_repo" ]; then
-  for candidate in "${HOME}/Jovie" "${HOME}/jovie"; do
-    if [ -d "$candidate/.git" ]; then
-      primary_repo="$candidate"
-      break
-    fi
-  done
-fi
-if [ -n "$primary_repo" ]; then
-  if echo "$command" | grep -qE '(^|[[:space:]])(git checkout|git switch|gh pr checkout)'; then
-    if echo "$command" | grep -qF "$primary_repo"; then
-      echo "🚨 BLOCKED: git checkout/switch in primary Jovie repo ($primary_repo)"
-      echo "Use an isolated worktree for branch work. Hijacking the shipper checkout runs stale dispatcher code."
+# Block git checkout/switch in the primary Jovie repo — worktrees only.
+# A hijacked ~/Jovie branch silently runs stale shipper dispatcher code (#12841).
+jovie_primary="${HERMES_JOVIE_REPO:-${HOME}/Jovie}"
+if echo "$command" | grep -qE '(^|[;&|[:space:]])(git checkout|git switch|gh pr checkout)'; then
+  if echo "$command" | grep -qE 'jovie-worktrees|/tmp/jovie-worktrees|/private/.*/jovie-worktrees'; then
+    : # worktree paths are allowed
+  elif echo "$command" | grep -qE "(~/Jovie|${HOME}/Jovie|${jovie_primary})"; then
+    echo "🚨 BLOCKED: git checkout/switch in primary Jovie repo"
+    echo "Use an isolated worktree instead: git worktree add <path> -b <branch> origin/main"
+    echo "Command: $command"
+    exit 1
+  elif [[ "$(pwd -P 2>/dev/null)" == "${jovie_primary}" ]] || [[ "$(pwd -P 2>/dev/null)" == "${jovie_primary}/"* ]]; then
+    if [[ -d "${jovie_primary}/.git" ]] && [[ ! -f "${jovie_primary}/.git" ]]; then
+      echo "🚨 BLOCKED: git checkout/switch in primary Jovie repo (cwd=${jovie_primary})"
+      echo "Use an isolated worktree instead: git worktree add <path> -b <branch> origin/main"
       echo "Command: $command"
       exit 1
-    fi
-    if echo "$command" | grep -qE '(^|[[:space:]])(git checkout|git switch)([[:space:]]|$)'; then
-      if [ "$(pwd -P 2>/dev/null)" = "$(cd "$primary_repo" && pwd -P 2>/dev/null)" ]; then
-        echo "🚨 BLOCKED: git checkout/switch while cwd is primary Jovie repo ($primary_repo)"
-        echo "Use an isolated worktree for branch work."
-        echo "Command: $command"
-        exit 1
-      fi
     fi
   fi
 fi

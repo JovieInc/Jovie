@@ -215,6 +215,7 @@ describe('codex issue shipper prompt', () => {
       },
     });
 
+    expect(prompt).toContain('Never run `git checkout`');
     expect(prompt).toContain('Load gstack');
     expect(prompt).toContain('Use gbrain before planning');
     expect(prompt).toContain('Use subagents');

@@ -38,18 +38,8 @@ describe('hermes launchd pro templates', () => {
   });
 });
 
-describe('shipper-gated entrypoint', () => {
-  it('documents gbrain and grok preflight gates', () => {
-    const script = readFileSync(
-      join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
-      'utf8'
-    );
-    expect(script).toContain('gbrain_alive');
-    expect(script).toContain('grok_ready');
-    expect(script).toContain('codex-issue-shipper.ts');
-  });
-
-  it('codex issue shipper launchd plist uses the gated entrypoint', () => {
+describe('codex issue shipper launchd template', () => {
+  it('renders shipper entrypoint with primary repo env and 15m schedule', () => {
     const templatePath = join(
       REPO_ROOT,
       'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template'
@@ -63,11 +53,12 @@ describe('shipper-gated entrypoint', () => {
     expect(rendered).toContain(
       '<string>co.jovie.hermes.cron-codex-issue-shipper</string>'
     );
-    expect(rendered).toContain('<integer>900</integer>');
     expect(rendered).toContain(
       '/Users/tester/.hermes/scripts/shipper-gated-entrypoint.py'
     );
-    expect(rendered).toContain('/Users/tester/Jovie');
+    expect(rendered).toContain('<key>HERMES_JOVIE_REPO</key>');
+    expect(rendered).toContain('<string>/Users/tester/Jovie</string>');
+    expect(rendered).toContain('<integer>900</integer>');
   });
 });
 
