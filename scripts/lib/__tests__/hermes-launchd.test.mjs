@@ -59,6 +59,11 @@ describe('shipper-gated entrypoint', () => {
       '{{JOVIE_REPO}}': '/Users/tester/Jovie',
       '{{NODE_BIN_DIR}}': '/Users/tester/.nvm/versions/node/v22.13.0/bin',
     });
+
+    expect(rendered).toContain(
+      '<string>co.jovie.hermes.cron-codex-issue-shipper</string>'
+    );
+    expect(rendered).toContain('<integer>900</integer>');
     expect(rendered).toContain(
       '/Users/tester/.hermes/scripts/shipper-gated-entrypoint.py'
     );

@@ -728,17 +728,17 @@ export function routeForAgent(
 //
 // The launchd shipper reads its OWN dispatcher code from the primary checkout
 // (~/Jovie HEAD). If some flow leaves that checkout on a PR branch or behind
-// main (JOV-3838: a UI PR branch was found checked out there, so the shipper
-// silently ran ~1h of stale pre-fallback code), the dispatcher regresses with
-// zero alarm. Agents are unaffected because they run in fresh worktrees — only
-// the dispatcher rots. The working tree here should ALWAYS be clean `main` at
-// origin/main; anything else is a hijack we self-heal before dispatching.
+// main (#12841: a PR branch was found checked out there, so the shipper silently
+// ran ~1h of stale pre-fallback code), the dispatcher regresses with zero alarm.
+// Agents are unaffected because they run in fresh worktrees — only the dispatcher
+// rots. Fail closed: refuse to dispatch until the checkout is fresh origin/main.
 
 export interface CheckoutState {
   readonly branch: string;
   readonly headSha: string;
   readonly originMainSha: string;
   readonly dirty: boolean;
+  readonly dirtyPaths?: ReadonlyArray<string>;
 }
 
 export type CheckoutVerdict = 'fresh' | 'stale';
@@ -767,7 +767,14 @@ export const SHIPPER_CRITICAL_PATH_PREFIXES = [
   'scripts/hermes/lib/codex-issue-shipper.ts',
   'scripts/hermes/ship-loop.sh',
   'scripts/hermes/shipper-gated-entrypoint.py',
+  'scripts/hermes/lib/ship-ledger.ts',
+  'scripts/hermes/lib/gbrain.ts',
+  'scripts/hermes/lib/heavy-job-lock.ts',
+  'scripts/hermes/lib/jobs-log.ts',
 ] as const;
+
+/** @deprecated Use SHIPPER_CRITICAL_PATH_PREFIXES */
+export const SHIPPER_DISPATCHER_PATHS = SHIPPER_CRITICAL_PATH_PREFIXES;
 
 export function parseDirtyPaths(porcelain: string): ReadonlyArray<string> {
   return porcelain
@@ -788,6 +795,10 @@ function touchesShipperCriticalPath(path: string): boolean {
   );
 }
 
+export function dirtyTouchesShipper(paths: ReadonlyArray<string>): boolean {
+  return paths.some(path => touchesShipperCriticalPath(path));
+}
+
 /** True when stray edits are safe to stash (no shipper/dispatcher files). */
 export function isRecoverableDetritus(
   dirtyPaths: ReadonlyArray<string>
@@ -799,11 +810,60 @@ export function isRecoverableDetritus(
 /** Whether auto-recovery (stash + reset to origin/main) is allowed. */
 export function canAutoRecoverCheckout(
   state: CheckoutState,
-  dirtyPaths: ReadonlyArray<string>
+  dirtyPaths?: ReadonlyArray<string>
 ): boolean {
+  const paths = dirtyPaths ?? state.dirtyPaths ?? [];
   if (classifyCheckout(state) === 'fresh') return false;
   if (!state.dirty) return true;
-  return isRecoverableDetritus(dirtyPaths);
+  return isRecoverableDetritus(paths);
+}
+
+export type CheckoutGateDecision =
+  | { readonly action: 'proceed' }
+  | {
+      readonly action: 'abort';
+      readonly event: 'stale_checkout_abort' | 'stale_checkout_recovered';
+      readonly detail: string;
+      readonly notify: boolean;
+    };
+
+export function decideCheckoutGate(
+  before: CheckoutState,
+  after: CheckoutState | null,
+  recoveryAttempted: boolean,
+  recoveryFailed: boolean
+): CheckoutGateDecision {
+  if (classifyCheckout(before) === 'fresh') {
+    return { action: 'proceed' };
+  }
+
+  const detail = describeCheckout(before);
+  if (recoveryFailed || !canAutoRecoverCheckout(before)) {
+    return {
+      action: 'abort',
+      event: 'stale_checkout_abort',
+      detail,
+      notify: true,
+    };
+  }
+
+  if (recoveryAttempted && after && classifyCheckout(after) === 'fresh') {
+    return {
+      action: 'abort',
+      event: 'stale_checkout_recovered',
+      detail,
+      notify: false,
+    };
+  }
+
+  return {
+    action: 'abort',
+    event: 'stale_checkout_abort',
+    detail: recoveryAttempted
+      ? `${detail}; recovery left checkout stale`
+      : detail,
+    notify: true,
+  };
 }
 
 export type PrimaryCheckoutGuardVerdict = 'fresh' | 'abort';
