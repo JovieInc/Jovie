@@ -35,22 +35,53 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     // jsdom cannot navigate to a custom scheme; swallow the auto-fire assign.
     Object.defineProperty(globalThis, 'location', {
       configurable: true,
-      value: { href: 'http://localhost/' },
+      value: { href: 'http://localhost/', origin: 'http://localhost:3000' },
     });
   });
 
-  it('renders an Open Jovie button pointing at the jovie:// deep link', () => {
+  it('renders an Open Jovie button pointing at the jovie-local:// deep link on localhost', () => {
     setSearchParams(`code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`);
     render(<NativeReturnPage />);
 
     const link = screen.getByRole('link', { name: 'Open Jovie' });
     expect(link).toHaveAttribute(
       'href',
-      `jovie://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`
+      `jovie-local://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`
     );
   });
 
   it('preserves the deep link without desktop_flow when absent', () => {
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+      'href',
+      `jovie-local://auth/complete?code=${CODE}&state=${STATE}`
+    );
+  });
+
+  it('uses jovie-staging:// on staging.jov.ie', () => {
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: {
+        href: 'https://staging.jov.ie/',
+        origin: 'https://staging.jov.ie',
+      },
+    });
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+      'href',
+      `jovie-staging://auth/complete?code=${CODE}&state=${STATE}`
+    );
+  });
+
+  it('uses jovie:// on production jov.ie', () => {
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: { href: 'https://jov.ie/', origin: 'https://jov.ie' },
+    });
     setSearchParams(`code=${CODE}&state=${STATE}`);
     render(<NativeReturnPage />);
 

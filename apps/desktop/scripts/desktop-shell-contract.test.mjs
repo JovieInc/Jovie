@@ -166,7 +166,7 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   }
 });
 
-test('desktop production bundle declares the jovie auth protocol', async () => {
+test('desktop bundles declare per-env auth URL schemes', async () => {
   const [builderConfig, mainSource, stagingConfig, localConfig] =
     await Promise.all([
       readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
@@ -178,10 +178,18 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
   assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
-  assert.match(mainSource, /if \(APP_ENV !== 'production'\)/);
-  assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
-  assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
-  assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLTypes:/);
+  assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
+  assert.match(mainSource, /const AUTH_RETURN_SCHEME =/);
+  assert.match(mainSource, /setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME\)/);
+  assert.doesNotMatch(
+    mainSource,
+    /if \(APP_ENV !== 'production'\) \{\s*return;\s*\}/
+  );
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {
