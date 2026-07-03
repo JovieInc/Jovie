@@ -174,7 +174,7 @@ private struct DrawerSurfaceButton: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: JovieSpacing.small) {
+      VStack(spacing: JovieSpacing.xSmall) {
         Image(systemName: tab.systemImage)
           .font(.system(size: 14, weight: .semibold))
 
@@ -182,10 +182,11 @@ private struct DrawerSurfaceButton: View {
           .font(JovieFont.body(size: 15, weight: .semibold))
           .lineLimit(1)
           .minimumScaleFactor(0.85)
-          .allowsTightening(true)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: .infinity)
       }
       .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
-      .padding(.horizontal, JovieSpacing.medium)
+      .padding(.horizontal, JovieSpacing.small)
       .padding(.vertical, 11)
       .frame(maxWidth: .infinity)
       .background(

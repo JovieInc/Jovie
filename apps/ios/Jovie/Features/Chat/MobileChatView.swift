@@ -328,7 +328,7 @@ enum MobileChatProseTone {
 
 // MARK: - Inline prose flow (GH-12708 entity chip thumbnails v2)
 
-private enum MobileChatFlowToken: Hashable {
+enum MobileChatFlowToken: Hashable {
   case textWord(String)
   case entity(kind: MobileChatEntityKind, id: String, label: String)
   case skill(id: String, label: String)
