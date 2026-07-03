@@ -38,6 +38,16 @@ describe('SupportPage', () => {
     expect(contactButton).toHaveTextContent('Contact Support');
   });
 
+  it('uses secondary CTA styling on the light support section', () => {
+    render(<SupportPage />);
+
+    const contactButton = screen.getByRole('link', {
+      name: /send email to support team/i,
+    });
+    expect(contactButton).toHaveClass('public-action-secondary');
+    expect(contactButton).not.toHaveClass('public-action-primary');
+  });
+
   it('has proper accessibility attributes', () => {
     render(<SupportPage />);
 
@@ -80,6 +90,15 @@ describe('SupportPage', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveClass('marketing-h1-linear');
+
+    const sectionHeadings = screen.getAllByRole('heading', { level: 2 });
+    expect(sectionHeadings).toHaveLength(3);
+    for (const sectionHeading of sectionHeadings) {
+      expect(sectionHeading).toHaveClass('marketing-h2-linear');
+      expect(sectionHeading).toHaveClass('text-primary-token');
+      expect(sectionHeading).not.toHaveClass('text-2xl');
+      expect(sectionHeading).not.toHaveClass('font-semibold');
+    }
   });
 
   it('renders within a MarketingHero component', () => {

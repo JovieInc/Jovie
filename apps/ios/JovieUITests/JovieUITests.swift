@@ -289,6 +289,7 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
 
+<<<<<<< HEAD
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
       app.staticTexts["@tim"].waitForExistence(timeout: 3),
@@ -298,6 +299,23 @@ final class JovieUITests: XCTestCase {
       app.staticTexts.matching(offlineStatusPredicate).count,
       1,
       "Opening the drawer must not add another Offline status indicator.\n\(app.debugDescription)"
+=======
+    let offlineStatusPredicate = NSPredicate(format: "label == %@", "Offline")
+    XCTAssertEqual(
+      app.staticTexts.matching(offlineStatusPredicate).count,
+      1,
+      "Offline chat should show exactly one status indicator (shell header subtitle).\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
+      "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["@tim"].exists,
+      "Drawer account subtitle should keep the @handle while offline.\n\(app.debugDescription)"
+>>>>>>> origin/main
     )
   }
 

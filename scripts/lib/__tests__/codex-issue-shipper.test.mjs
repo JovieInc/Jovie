@@ -9,7 +9,9 @@ import {
   CODEX_TRUSTED_LABEL,
   canAutoRecoverCheckout,
   classifyCheckout,
+  decideCheckoutGate,
   describeCheckout,
+  dirtyTouchesShipper,
   EPIC_LABEL,
   eligibleCodexIssues,
   finishDispatch,
@@ -222,6 +224,8 @@ describe('codex issue shipper prompt', () => {
       'coderabbit review --agent -c AGENTS.md -t uncommitted'
     );
     expect(prompt).toContain('Closes #<issue-number>');
+    expect(prompt).toContain('Never run `git checkout`');
+    expect(prompt).toContain('HERMES_JOVIE_REPO');
     expect(prompt).toContain('Session model: cheap-model');
     expect(prompt).toContain(
       'Captured slug: ops/codex-issue-shipper/github-123'
@@ -570,6 +574,95 @@ describe('checkout freshness gate', () => {
     expect(d).toContain("on 'pr1'");
     expect(d).toContain('!= origin/main');
     expect(d).toContain('dirty');
+  });
+
+  it('parseDirtyPaths reads porcelain paths', () => {
+    expect(parseDirtyPaths(' M apps/web/README.md\nMM x.ts\n')).toEqual([
+      'apps/web/README.md',
+      'x.ts',
+    ]);
+  });
+
+  it('dirtyTouchesShipper flags dispatcher edits', () => {
+    expect(
+      dirtyTouchesShipper(['scripts/hermes/jobs/codex-issue-shipper.ts'])
+    ).toBe(true);
+    expect(dirtyTouchesShipper(['DESIGN.md'])).toBe(false);
+  });
+
+  it('canAutoRecoverCheckout allows non-shipper detritus only', () => {
+    const fresh = {
+      branch: 'main',
+      headSha: 'abc',
+      originMainSha: 'abc',
+      dirty: false,
+    };
+    expect(
+      canAutoRecoverCheckout({
+        ...fresh,
+        branch: 'pr12780',
+        dirty: true,
+        dirtyPaths: ['DESIGN.md'],
+      })
+    ).toBe(true);
+    expect(
+      canAutoRecoverCheckout({
+        ...fresh,
+        branch: 'pr12780',
+        dirty: true,
+        dirtyPaths: ['scripts/hermes/jobs/codex-issue-shipper.ts'],
+      })
+    ).toBe(false);
+  });
+
+  it('decideCheckoutGate proceeds only from a fresh checkout', () => {
+    const fresh = {
+      branch: 'main',
+      headSha: 'abc',
+      originMainSha: 'abc',
+      dirty: false,
+    };
+    expect(decideCheckoutGate(fresh, null, false, false)).toEqual({
+      action: 'proceed',
+    });
+  });
+
+  it('decideCheckoutGate aborts unrecoverable stale checkouts loudly', () => {
+    const stale = {
+      branch: 'pr12780',
+      headSha: 'old',
+      originMainSha: 'new',
+      dirty: true,
+      dirtyPaths: ['scripts/hermes/lib/codex-issue-shipper.ts'],
+    };
+    expect(decideCheckoutGate(stale, null, false, false)).toEqual({
+      action: 'abort',
+      event: 'stale_checkout_abort',
+      detail: expect.stringContaining("on 'pr12780'"),
+      notify: true,
+    });
+  });
+
+  it('decideCheckoutGate aborts after successful recovery without notifying', () => {
+    const before = {
+      branch: 'pr12780',
+      headSha: 'old',
+      originMainSha: 'new',
+      dirty: true,
+      dirtyPaths: ['DESIGN.md'],
+    };
+    const after = {
+      branch: 'main',
+      headSha: 'new',
+      originMainSha: 'new',
+      dirty: false,
+    };
+    expect(decideCheckoutGate(before, after, true, false)).toEqual({
+      action: 'abort',
+      event: 'stale_checkout_recovered',
+      detail: expect.stringContaining("on 'pr12780'"),
+      notify: false,
+    });
   });
 });
 
