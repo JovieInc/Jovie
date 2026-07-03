@@ -4,6 +4,7 @@ export const CODEX_CLAIM_LABEL = 'codex-in-progress';
 export const CODEX_BLOCKED_LABEL = 'codex-blocked';
 export const HUMAN_REVIEW_LABEL = 'human-review-required';
 export const NO_AUTO_LABEL = 'no-auto';
+export const EPIC_LABEL = 'type:epic';
 
 export interface GithubIssueLabel {
   readonly name: string;
@@ -220,6 +221,13 @@ export function isAlreadyClaimedOrBlocked(issue: GithubIssue): boolean {
   return labels.has(CODEX_CLAIM_LABEL) || labels.has(CODEX_BLOCKED_LABEL);
 }
 
+// Epic pointers (`type:epic`) track child phases and have no code of their own,
+// so the shipper claims them, finds nothing to ship, releases, and re-claims in
+// a loop (see #12729/#12846). Treat epics as never directly dispatchable.
+export function isEpicPointer(issue: GithubIssue): boolean {
+  return labelNames(issue).includes(EPIC_LABEL);
+}
+
 export function isTrustedCodexIssue(issue: GithubIssue): boolean {
   return labelNames(issue).includes(CODEX_TRUSTED_LABEL);
 }
@@ -231,6 +239,7 @@ export function eligibleCodexIssues(
     issue =>
       !isHumanReviewRequired(issue) &&
       !isAlreadyClaimedOrBlocked(issue) &&
+      !isEpicPointer(issue) &&
       !labelNames(issue).includes(NO_AUTO_LABEL)
   );
 }
