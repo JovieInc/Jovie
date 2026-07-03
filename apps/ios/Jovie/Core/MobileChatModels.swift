@@ -67,6 +67,40 @@ struct CachedChatSnapshot: Codable, Equatable, Sendable {
   let cachedAt: Date
 }
 
+/// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
+/// (JOV-3608). Exercises entity mentions (all four kinds), a skill
+/// invocation, and a user-authored turn containing a mention, so UI tests can
+/// assert chips render as label text with no raw `@kind:id[...]` / `/skill:`
+/// wire syntax visible -- the JOV-3608 regression symptom.
+enum MobileChatEntityFixture {
+  static let conversationID = "conv_ui_testing_entity_fixture"
+
+  static let `default`: [MobileChatTimelineItem] = [
+    MobileChatTimelineItem(
+      id: "msg_fixture_user_1",
+      role: .user,
+      content: "What's next for @artist:art_1[Porter Robinson]?",
+      status: .completed,
+      clientTurnId: "turn_fixture_1",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+    MobileChatTimelineItem(
+      id: "msg_fixture_assistant_1",
+      role: .assistant,
+      content: """
+      Your release @release:rel_1[Midnight Drive] is picking up momentum, and \
+      @track:trk_1[Opus] is the standout. Consider /skill:generateAlbumArt for \
+      the next drop, and don't miss @event:evt_1[Coachella 2027].
+      """,
+      status: .completed,
+      clientTurnId: "turn_fixture_1",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+  ]
+}
+
 struct MobileChatTurnRequest: Encodable, Sendable {
   let conversationId: String?
   let clientTurnId: String

@@ -12,6 +12,7 @@ enum LaunchMode: Equatable {
   case uiTestingProfileError
   case uiTestingChat
   case uiTestingChatOffline
+  case uiTestingChatEntityFixture
   case uiTestingSettings
   case uiTestingVenueMode
   case uiTestingQRUnavailable
@@ -30,6 +31,7 @@ enum LaunchMode: Equatable {
          .uiTestingProfileError,
          .uiTestingChat,
          .uiTestingChatOffline,
+         .uiTestingChatEntityFixture,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingQRUnavailable,
@@ -49,7 +51,21 @@ enum LaunchMode: Equatable {
   }
 
   var opensChatOnLaunch: Bool {
-    self == .uiTestingChat || self == .uiTestingChatOffline
+    self == .uiTestingChat || self == .uiTestingChatOffline || self == .uiTestingChatEntityFixture
+  }
+
+  /// When set, `RootView` seeds `ChatRepository` with a deterministic
+  /// fixture timeline for this launch mode instead of hitting the network or
+  /// cache. `nil` for launch modes that don't need seeded chat content.
+  var chatEntityFixture: [MobileChatTimelineItem]? {
+    self == .uiTestingChatEntityFixture ? MobileChatEntityFixture.default : nil
+  }
+
+  /// UI-testing launch modes without live Clerk must not spin up a
+  /// `ChatRepository` backed by `ClerkTokenProvider` -- that crashes on
+  /// `Clerk.shared` when the singleton is unconfigured (auth-callback harness).
+  var needsChatRepository: Bool {
+    usesLiveClerk || opensChatOnLaunch || chatEntityFixture != nil
   }
 
   var opensAudienceOnLaunch: Bool {
@@ -99,6 +115,7 @@ enum LaunchMode: Equatable {
          .uiTestingProfileError,
          .uiTestingChat,
          .uiTestingChatOffline,
+         .uiTestingChatEntityFixture,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingQRUnavailable,
@@ -146,6 +163,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-chat-offline") {
       return .uiTestingChatOffline
+    }
+
+    if arguments.contains("-ui-testing-chat-entity-fixture") {
+      return .uiTestingChatEntityFixture
     }
 
     if arguments.contains("-ui-testing-settings") {

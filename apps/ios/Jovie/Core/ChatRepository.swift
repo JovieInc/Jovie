@@ -17,6 +17,15 @@ final class ChatRepository {
   private let webBaseURL: URL
   private let activityDonator: (any ConversationActivityDonating)?
 
+  /// Set by `seedTimelineForUITesting`. When `true`, network-backed methods
+  /// (`refreshConversations`, and any future live-fetch entry point) no-op
+  /// instead of calling `client` -- the fixture launch mode has no live
+  /// Clerk session, so `ClerkTokenProvider.bearerToken` would hit
+  /// `Clerk.shared`'s unconfigured-singleton fatalError. `MobileChatView`
+  /// unconditionally calls `refreshConversations()` in a `.task` on
+  /// appear, so this can't be solved by the call site alone.
+  private var isFixtureSeeded = false
+
   init(
     client: MobileChatClientProtocol,
     cache: ChatCache,
@@ -36,6 +45,8 @@ final class ChatRepository {
   }
 
   func refreshConversations() async {
+    guard !isFixtureSeeded else { return }
+
     isLoadingConversations = true
     defer { isLoadingConversations = false }
 
@@ -79,6 +90,23 @@ final class ChatRepository {
   func startNewConversation() {
     activeConversationID = nil
     timeline = []
+    lastErrorMessage = nil
+  }
+
+  /// Seeds a deterministic, in-memory timeline for UI-testing launch modes
+  /// only -- never called on `.live`. Bypasses the network client and cache
+  /// entirely so fixture content (e.g. entity/skill chip transcripts for
+  /// JOV-3608) renders without depending on a mocked backend. Callers gate
+  /// this on `LaunchMode`; this method itself performs no gating so it stays
+  /// trivially testable in isolation.
+  func seedTimelineForUITesting(
+    _ timeline: [MobileChatTimelineItem],
+    activeConversationID: String
+  ) {
+    isFixtureSeeded = true
+    self.activeConversationID = activeConversationID
+    self.timeline = timeline
+    isOffline = false
     lastErrorMessage = nil
   }
 

@@ -12,7 +12,7 @@ struct MobileChatContentParserTests {
     let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
 
     #expect(segments.count == 2)
-    #expect(segments[0] == .text("Here are some ideas."))
+    #expect(segments[0] == .text(runs: [.text("Here are some ideas.")]))
 
     guard case let .toolCall(model) = segments[1] else {
       Issue.record("Expected tool call segment")
@@ -33,7 +33,7 @@ struct MobileChatContentParserTests {
     let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
 
     #expect(segments.count == 2)
-    #expect(segments[0] == .text("Working on it"))
+    #expect(segments[0] == .text(runs: [.text("Working on it")]))
     guard case let .toolCall(model) = segments[1] else {
       Issue.record("Expected partial tool call segment")
       return
@@ -63,7 +63,7 @@ struct MobileChatContentParserTests {
     let content = "Just a normal assistant reply."
 
     #expect(
-      MobileChatContentParser.segments(from: content, isStreaming: false) == [.text(content)]
+      MobileChatContentParser.segments(from: content, isStreaming: false) == [.text(runs: [.text(content)])]
     )
     #expect(MobileChatContentParser.displayText(from: content, isStreaming: false) == content)
   }
@@ -77,7 +77,7 @@ struct MobileChatContentParserTests {
     let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
 
     #expect(segments.count == 2)
-    #expect(segments[0] == .text("Here are some ideas."))
+    #expect(segments[0] == .text(runs: [.text("Here are some ideas.")]))
 
     guard case let .toolCall(model) = segments[1] else {
       Issue.record("Expected tool call segment")
@@ -132,12 +132,424 @@ struct MobileChatContentParserTests {
     let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
 
     #expect(segments.count == 2)
-    #expect(segments[0] == .text("Working on it"))
+    #expect(segments[0] == .text(runs: [.text("Working on it")]))
     guard case let .toolCall(model) = segments[1] else {
       Issue.record("Expected partial tool call segment")
       return
     }
     #expect(model.toolName == "createMerch")
     #expect(MobileChatContentParser.displayText(from: content, isStreaming: true) == "Working on it")
+  }
+}
+
+// MARK: - Entity + skill token parsing (JOV-3608)
+
+struct MobileChatEntityTokenParsingTests {
+  @Test func parsesEntityMentionIntoChipRun() {
+    let content = "Check out @release:rel_1[Midnight Drive] today"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .text("Check out "),
+        .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+        .text(" today"),
+      ]),
+    ])
+  }
+
+  @Test func parsesAllFourEntityKinds() {
+    let content =
+      "@release:rel_1[R] @artist:art_1[A] @track:trk_1[T] @event:evt_1[E]"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .entity(kind: .release, id: "rel_1", label: "R"),
+        .text(" "),
+        .entity(kind: .artist, id: "art_1", label: "A"),
+        .text(" "),
+        .entity(kind: .track, id: "trk_1", label: "T"),
+        .text(" "),
+        .entity(kind: .event, id: "evt_1", label: "E"),
+      ]),
+    ])
+  }
+
+  @Test func parsesSkillTokenIntoChipRunWithKnownLabel() {
+    let content = "Try /skill:generateAlbumArt now"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .text("Try "),
+        .skill(id: "generateAlbumArt", label: "Generate album art"),
+        .text(" now"),
+      ]),
+    ])
+  }
+
+  @Test func humanizesUnknownSkillIdAsFallbackLabel() {
+    let content = "/skill:someFutureSkillId"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .skill(id: "someFutureSkillId", label: "Some Future Skill Id"),
+      ]),
+    ])
+  }
+
+  @Test func rendersUnknownEntityKindVerbatimAsText() {
+    let content = "@unknown:x[Y] stays as text"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [.text("@unknown:x[Y] stays as text")]),
+    ])
+  }
+
+  @Test func unescapesBracketsInEntityLabels() {
+    let content = "@track:trk_1[Live at Brooklyn Steel [2026\\]]"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .entity(kind: .track, id: "trk_1", label: "Live at Brooklyn Steel [2026]"),
+      ]),
+    ])
+  }
+
+  @Test func truncatesOversizedEntityLabelWithEllipsisForOneLineChipDisplay() {
+    // Chip runs render inline within one concatenated `Text`, so per-run
+    // `lineLimit` isn't expressible -- oversized labels are truncated at
+    // parse time instead (Visual Contract §3: "~1-line ellipsis").
+    let hugeLabel = String(repeating: "x", count: 10_000)
+    let content = "@release:rel_1[\(hugeLabel)]"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    guard case let .text(runs) = segments[0], case let .entity(_, _, label) = runs[0] else {
+      Issue.record("Expected a single entity run")
+      return
+    }
+
+    #expect(label.count <= 61) // 60-char budget + ellipsis character
+    #expect(label.hasSuffix("…"))
+  }
+
+  @Test func doesNotTruncateShortEntityLabels() {
+    let content = "@release:rel_1[Midnight Drive]"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+      ]),
+    ])
+  }
+
+  @Test func mixedEntityAndSkillTokensParseInOrder() {
+    let content =
+      "hey /skill:generateAlbumArt for @release:rel_1[Midnight Drive] please"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .text("hey "),
+        .skill(id: "generateAlbumArt", label: "Generate album art"),
+        .text(" for "),
+        .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+        .text(" please"),
+      ]),
+    ])
+  }
+
+  @Test func displayTextStripsTokenMarkupAndKeepsOnlyLabels() {
+    let content = "Check out @release:rel_1[Midnight Drive] via /skill:generateAlbumArt"
+
+    let displayText = MobileChatContentParser.displayText(from: content, isStreaming: false)
+
+    #expect(displayText.contains("@release:") == false)
+    #expect(displayText.contains("/skill:") == false)
+    #expect(displayText.contains("Midnight Drive"))
+    #expect(displayText.contains("Generate album art"))
+  }
+
+  @Test func doesNotSuppressPlainAtMentionsDuringStreaming() {
+    // "DM @timwhite" must never be suppressed -- it is not a strict prefix of
+    // a valid `@kind:` token (kind isn't one of the four known entity kinds).
+    let content = "DM @timwhite about the show"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
+
+    #expect(segments == [.text(runs: [.text("DM @timwhite about the show")])])
+  }
+
+  @Test func suppressesStrictPrefixOfEntityTokenWhileStreaming() {
+    // "@release:" alone, with no id/label yet, is a strict prefix of a valid
+    // token -- must be suppressed until more of the stream arrives.
+    let content = "Check out @release:"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
+
+    #expect(segments == [.text(runs: [.text("Check out")])])
+  }
+
+  @Test func suppressesUnclosedEntityLabelWhileStreaming() {
+    let content = "Check out @release:rel_1[Midnight Dri"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
+
+    #expect(segments == [.text(runs: [.text("Check out")])])
+  }
+
+  @Test func suppressesUnclosedEntityLabelRespectingEscapedBracketWhileStreaming() {
+    // The escaped `\]` inside the label must not be mistaken for the closing
+    // bracket -- the token is still open.
+    let content = "@track:trk_1[Live at Brooklyn Steel [2026\\"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
+
+    #expect(segments == [])
+  }
+
+  @Test func doesNotSuppressCompletedTokenFollowedByMoreProseWhileStreaming() {
+    let content = "Check out @release:rel_1[Midnight Drive] and more text after"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
+
+    #expect(segments == [
+      .text(runs: [
+        .text("Check out "),
+        .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+        .text(" and more text after"),
+      ]),
+    ])
+  }
+
+  @Test func rendersUnterminatedTokenVerbatimWhenStreamEnds() {
+    // isStreaming: false means the stream has ended -- an unterminated token
+    // is dead text, not a live prefix, so it renders as-is (web parity).
+    let content = "Check out @release:rel_1[Midnight Dri"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [.text(runs: [.text("Check out @release:rel_1[Midnight Dri")])])
+  }
+
+  @Test func suppressesUnclosedSkillIdWhileStreaming() {
+    let content = "Try /skill:generateAlbum"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: true)
+
+    #expect(segments == [.text(runs: [.text("Try")])])
+  }
+
+  @Test func totalFunctionNeverThrowsOnHostileLabels() {
+    let hostileInputs = [
+      "@release:rel_1[[click](https://evil.example)]",
+      "@artist:art_1[\u{202E}evil reversed text]",
+      String(repeating: "@release:rel_1[a] ", count: 500),
+      "@release:rel_1[" + String(repeating: "x", count: 10_000) + "]",
+      "",
+      "@:[",
+      "@release:[]",
+      "\\\\\\\\\\",
+    ]
+
+    for input in hostileInputs {
+      // Must not crash/throw for any input, streaming or not.
+      _ = MobileChatContentParser.segments(from: input, isStreaming: true)
+      _ = MobileChatContentParser.segments(from: input, isStreaming: false)
+      _ = MobileChatContentParser.displayText(from: input, isStreaming: false)
+    }
+  }
+
+  @Test func roundTripsEntityLabelWithLiteralBackslash() {
+    let content = "@release:rel_1[path\\\\to\\\\thing]"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .entity(kind: .release, id: "rel_1", label: "path\\to\\thing"),
+      ]),
+    ])
+  }
+
+  @Test func adjacentTokensWithoutInterveningTextParseCleanly() {
+    let content = "/skill:generateAlbumArt@release:rel_1[Drive]"
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(segments == [
+      .text(runs: [
+        .skill(id: "generateAlbumArt", label: "Generate album art"),
+        .entity(kind: .release, id: "rel_1", label: "Drive"),
+      ]),
+    ])
+  }
+
+  // MARK: - Memoization (F14)
+
+  @Test func repeatedParseOfIdenticalContentReturnsEqualSegments() {
+    // Exercises the memoized cache-hit path: calling with identical
+    // (content, isStreaming) repeatedly -- as SwiftUI does on every body
+    // re-evaluation while a message streams -- must keep returning the
+    // correct, stable parse rather than a stale or corrupted cached value.
+    let content = "Check out @release:rel_1[Midnight Drive] via /skill:generateAlbumArt"
+
+    let first = MobileChatContentParser.segments(from: content, isStreaming: false)
+    let second = MobileChatContentParser.segments(from: content, isStreaming: false)
+    let third = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(first == second)
+    #expect(second == third)
+    #expect(first == [
+      .text(runs: [
+        .text("Check out "),
+        .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+        .text(" via "),
+        .skill(id: "generateAlbumArt", label: "Generate album art"),
+      ]),
+    ])
+  }
+
+  @Test func cacheKeyDistinguishesStreamingFromCompleteForIdenticalContent() {
+    // Same content, different `isStreaming` -- must not collide in the cache
+    // and return each mode's distinct (correct) parse.
+    let content = "Check out @release:rel_1[Midnight Dri"
+
+    let streaming = MobileChatContentParser.segments(from: content, isStreaming: true)
+    let complete = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(streaming == [.text(runs: [.text("Check out")])])
+    #expect(complete == [.text(runs: [.text(content)])])
+  }
+
+  @Test func cacheDoesNotCollideOnSharedPrefixWithDifferentSuffixes() {
+    // Regression guard for a naive cache keyed only on a content prefix or
+    // hash truncation: two different streaming deltas that share a prefix
+    // must each be parsed (and suppressed) independently.
+    let shorter = "Check out @release:rel_1[Midnight Dri"
+    let longer = "Check out @release:rel_1[Midnight Drive] and more"
+
+    let shorterSegments = MobileChatContentParser.segments(from: shorter, isStreaming: true)
+    let longerSegments = MobileChatContentParser.segments(from: longer, isStreaming: true)
+
+    #expect(shorterSegments == [.text(runs: [.text("Check out")])])
+    #expect(longerSegments == [
+      .text(runs: [
+        .text("Check out "),
+        .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+        .text(" and more"),
+      ]),
+    ])
+  }
+
+  // MARK: - Positional segment identity (F15)
+
+  @Test func segmentIdentityIsStableAcrossRepeatedParsesOfSameContent() {
+    let content = "Check out @release:rel_1[Midnight Drive] today"
+
+    let first = MobileChatContentParser.segments(from: content, isStreaming: false)
+    let second = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(first.map(\.id) == second.map(\.id))
+  }
+
+  @Test func segmentIdentityDiffersForDifferentContent() {
+    // Positional identity must still distinguish genuinely different
+    // content -- guards against an over-eager seed that collapses distinct
+    // segments onto the same SwiftUI identity.
+    let contentA = "@release:rel_1[Midnight Drive]"
+    let contentB = "@artist:art_1[Porter Robinson]"
+
+    let segmentsA = MobileChatContentParser.segments(from: contentA, isStreaming: false)
+    let segmentsB = MobileChatContentParser.segments(from: contentB, isStreaming: false)
+
+    #expect(segmentsA[0].id != segmentsB[0].id)
+  }
+}
+
+// MARK: - Contract-drift breadcrumb (expansion #1)
+
+/// `.serialized`: these tests swap the process-global `Observability`
+/// provider (`useProviderForTesting`/`resetForTesting`). Swift Testing runs
+/// tests within a suite concurrently by default, so without serialization
+/// these races with themselves -- one test's `resetForTesting()` (or another
+/// test's `useProviderForTesting(spy)`) can fire in the middle of a sibling
+/// test's assertion window, making `spy.breadcrumbs` empty nondeterministically.
+@Suite(.serialized)
+struct MobileChatEntityTokenBreadcrumbTests {
+  @Test func reportsBreadcrumbForPatternMatchedButUnmappedEntityKind() {
+    let spy = SpyObservabilityProvider()
+    Observability.useProviderForTesting(spy)
+    defer { Observability.resetForTesting() }
+
+    let content = "@merch:tee_1[Tour Tee] stays as text"
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    // Rendering is unaffected -- still verbatim text (web parity).
+    #expect(segments == [.text(runs: [.text(content)])])
+
+    #expect(spy.breadcrumbs.contains { $0.event == .chatEntityTokenUnmappedKind })
+    #expect(spy.breadcrumbs.first { $0.event == .chatEntityTokenUnmappedKind }?.context["kind"] as? String == "merch")
+  }
+
+  @Test func doesNotReportBreadcrumbForOrdinaryAtMentions() {
+    let spy = SpyObservabilityProvider()
+    Observability.useProviderForTesting(spy)
+    defer { Observability.resetForTesting() }
+
+    let content = "DM @timwhite about the show, no token here"
+    _ = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(spy.breadcrumbs.contains { $0.event == .chatEntityTokenUnmappedKind } == false)
+  }
+
+  @Test func doesNotReportBreadcrumbForKnownEntityKinds() {
+    let spy = SpyObservabilityProvider()
+    Observability.useProviderForTesting(spy)
+    defer { Observability.resetForTesting() }
+
+    let content = "@release:rel_1[Midnight Drive] is out"
+    _ = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(spy.breadcrumbs.contains { $0.event == .chatEntityTokenUnmappedKind } == false)
+  }
+}
+
+private final class SpyObservabilityProvider: ObservabilityProvider {
+  struct Breadcrumb {
+    let event: ObservabilityEvent
+    let level: ObservabilityLevel
+    let context: ObservabilityContext
+  }
+
+  private(set) var breadcrumbs: [Breadcrumb] = []
+
+  func configure(_ configuration: ObservabilityConfiguration) {}
+  func captureError(_ error: Error, event: ObservabilityEvent, context: ObservabilityContext) {}
+  func captureMessage(_ event: ObservabilityEvent, level: ObservabilityLevel, context: ObservabilityContext) {}
+
+  func addBreadcrumb(_ event: ObservabilityEvent, level: ObservabilityLevel, context: ObservabilityContext) {
+    breadcrumbs.append(Breadcrumb(event: event, level: level, context: context))
+  }
+
+  func setUser(id: String) {}
+  func clearUser() {}
+  func setTag(key: String, value: String) {}
+  func startSpan(name: ObservabilityEvent, context: ObservabilityContext) -> ObservabilitySpan {
+    NoopObservabilitySpan()
   }
 }

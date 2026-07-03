@@ -202,6 +202,7 @@ private struct AppContentView: View {
     case .uiTestingAudience,
          .uiTestingReady,
          .uiTestingChat,
+         .uiTestingChatEntityFixture,
          .uiTestingSettings,
          .uiTestingVenueMode:
       return .loaded(.preview)
@@ -342,7 +343,7 @@ private struct AppContentView: View {
         return
       }
 
-      if chatRepository == nil {
+      if chatRepository == nil, appState.launchMode.needsChatRepository {
         let repository = ChatRepository(
           client: MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
@@ -353,7 +354,18 @@ private struct AppContentView: View {
           webBaseURL: appState.configuration.webBaseURL
         )
         chatRepository = repository
-        Task { await repository.bootstrap() }
+
+        if let fixtureTimeline = appState.launchMode.chatEntityFixture {
+          // Deterministic UI-testing fixture (JOV-3608): bypasses the network
+          // client/cache entirely so entity/skill chip rendering can be
+          // asserted without a mocked backend.
+          repository.seedTimelineForUITesting(
+            fixtureTimeline,
+            activeConversationID: MobileChatEntityFixture.conversationID
+          )
+        } else {
+          Task { await repository.bootstrap() }
+        }
       }
 
       await reloadAudienceHighlights(for: activeUserID)
@@ -366,10 +378,16 @@ private struct AppContentView: View {
 
   @MainActor
   private func reloadAudienceHighlights(for userID: String?) async {
+    guard appState.launchMode.usesLiveClerk else {
+      audienceHighlightsState = Self.previewAudienceHighlightsState(for: appState.launchMode)
+      return
+    }
+
     if appState.launchMode == .uiTestingAudience
       || appState.launchMode == .uiTestingReady
       || appState.launchMode == .uiTestingChat
       || appState.launchMode == .uiTestingAuthCallback
+      || appState.launchMode == .uiTestingChatEntityFixture
       || appState.launchMode == .uiTestingSettings
       || appState.launchMode == .uiTestingVenueMode
     {
