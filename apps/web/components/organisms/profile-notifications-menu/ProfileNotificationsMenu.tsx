@@ -1,14 +1,6 @@
 'use client';
 
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -18,6 +10,7 @@ import {
   Switch,
 } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { useUpdateContentPreferencesMutation } from '@/lib/queries/useNotificationStatusQuery';
 import {
@@ -327,45 +320,30 @@ export function ProfileNotificationsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AlertDialog
+      <ConfirmDialog
         open={confirmChannel !== null}
         onOpenChange={nextOpen => {
           if (!nextOpen) {
             closeConfirmDialog();
           }
         }}
-      >
-        <AlertDialogContent className='max-w-md rounded-lg bg-surface-0'>
-          <AlertDialogHeader className='gap-2'>
-            <AlertDialogTitle className='text-base font-semibold text-primary-token'>
-              {confirmChannel
-                ? `Unsubscribe from ${labelForChannel(confirmChannel)}`
-                : 'Unsubscribe'}
-            </AlertDialogTitle>
-            <AlertDialogDescription className='text-sm text-secondary-token'>
-              {confirmChannel
-                ? `You will stop receiving ${labelForChannel(confirmChannel).toLowerCase()} updates from this artist.`
-                : 'You will stop receiving updates from this artist.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className='gap-2 sm:gap-2'>
-            <AlertDialogCancel
-              disabled={isConfirming}
-              className='flex-1 rounded-full bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token sm:flex-none'
-            >
-              Keep
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant='destructive'
-              disabled={isConfirming || confirmChannel === null}
-              className='flex-1 rounded-full sm:flex-none'
-              onClick={() => handleConfirm(onUnsubscribe)}
-            >
-              {isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={
+          confirmChannel
+            ? `Unsubscribe from ${labelForChannel(confirmChannel)}?`
+            : 'Unsubscribe?'
+        }
+        description={
+          confirmChannel
+            ? `You will stop receiving ${labelForChannel(confirmChannel).toLowerCase()} updates from this artist.`
+            : 'You will stop receiving updates from this artist.'
+        }
+        confirmLabel={isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}
+        cancelLabel='Keep'
+        variant='destructive'
+        isLoading={isConfirming}
+        confirmDisabled={confirmChannel === null}
+        onConfirm={() => handleConfirm(onUnsubscribe)}
+      />
     </>
   );
 }

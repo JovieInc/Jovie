@@ -1,18 +1,9 @@
 'use client';
 
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  Button,
-  Input,
-} from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
@@ -37,7 +28,6 @@ export function DataPrivacySection() {
       {
         onSuccess: () => {
           setDeleteDialogOpen(false);
-          // Sign out to clear session cookies, then redirect to home
           signOut({ redirectUrl: '/' });
         },
       }
@@ -54,7 +44,7 @@ export function DataPrivacySection() {
             description='Download a portable copy of your profile, links, contacts, and account settings.'
             action={
               <Button
-                variant='outline'
+                variant='secondary'
                 onClick={handleExport}
                 disabled={exportMutation.isPending}
                 className='w-full shrink-0 sm:w-auto'
@@ -74,7 +64,8 @@ export function DataPrivacySection() {
             description='Permanently remove your account, profile, contacts, and all associated data. This action cannot be undone.'
             action={
               <Button
-                variant='destructive'
+                variant='primary'
+                destructive
                 onClick={() => setDeleteDialogOpen(true)}
                 className='w-full shrink-0 sm:w-auto'
               >
@@ -85,57 +76,37 @@ export function DataPrivacySection() {
         </div>
       </SettingsPanel>
 
-      <AlertDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={open => {
           setDeleteDialogOpen(open);
           if (!open) setConfirmText('');
         }}
+        title='Delete your account?'
+        description='This will permanently delete your account, profile, links, contacts, and all associated data. You will be signed out immediately. This action cannot be undone.'
+        confirmLabel='Permanently Delete Account'
+        cancelLabel='Cancel'
+        variant='destructive'
+        onConfirm={handleDelete}
+        isLoading={deleteMutation.isPending}
+        confirmDisabled={confirmText !== 'DELETE'}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete your account, profile, links,
-              contacts, and all associated data. You will be signed out
-              immediately. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className='py-4'>
-            <label
-              htmlFor='delete-confirm'
-              className='mb-2 block text-app text-secondary-token'
-            >
-              Type <strong>DELETE</strong> to confirm
-            </label>
-            <Input
-              id='delete-confirm'
-              value={confirmText}
-              onChange={e => setConfirmText(e.target.value)}
-              placeholder='DELETE'
-              autoComplete='off'
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                setConfirmText('');
-              }}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <Button
-              variant='destructive'
-              onClick={handleDelete}
-              disabled={confirmText !== 'DELETE' || deleteMutation.isPending}
-            >
-              {deleteMutation.isPending
-                ? 'Deleting...'
-                : 'Permanently Delete Account'}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <div className='py-4'>
+          <label
+            htmlFor='delete-confirm'
+            className='mb-2 block text-app text-secondary-token'
+          >
+            Type <strong>DELETE</strong> to confirm
+          </label>
+          <Input
+            id='delete-confirm'
+            value={confirmText}
+            onChange={e => setConfirmText(e.target.value)}
+            placeholder='DELETE'
+            autoComplete='off'
+          />
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

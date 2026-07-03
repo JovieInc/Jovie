@@ -14,6 +14,10 @@ export { useTabOverflow } from './hooks';
 
 // Avatar
 
+// Confirm Dialog
+export type { ConfirmDialogProps } from './confirm-dialog';
+export { ConfirmDialog } from './confirm-dialog';
+
 // Alert Dialog
 export {
   AlertDialog,

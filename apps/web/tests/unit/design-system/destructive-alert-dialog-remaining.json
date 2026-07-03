@@ -1,0 +1,10 @@
+{
+  "maxRemaining": 5,
+  "remaining": [
+    "components/features/admin/BulkDeleteCreatorDialog.tsx",
+    "components/features/admin/DeleteCreatorDialog.tsx",
+    "components/features/admin/admin-users-table/AdminUsersTableUnified.tsx",
+    "components/features/admin/campaigns/InviteCampaignManager.tsx",
+    "components/organisms/table/molecules/ExportCSVButton.tsx"
+  ]
+}
