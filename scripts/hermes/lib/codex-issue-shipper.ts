@@ -669,3 +669,47 @@ export function finishDispatch(
     { timeoutMs: 2 * 60 * 1000 }
   );
 }
+
+// --- Agent fallback chain ---------------------------------------------------
+//
+// "Auto-retry when models fail": when the primary harness produces neither a
+// PR nor work in the worktree (grok 0.2.77 sometimes dies before writing
+// anything), the dispatch retries with the next harness in the chain instead
+// of burning a claim-release cycle. The deterministic finisher covers the
+// partial-work class; this covers the zero-work class. Claude fallback is
+// subscription-CLI ($0 marginal), per the shipping doctrine.
+
+const SHIPPER_AGENTS: ReadonlyArray<ShipperAgent> = ['claude', 'codex', 'grok'];
+
+export function parseAgentChain(
+  env: NodeJS.ProcessEnv,
+  primary: ShipperAgent
+): ShipperAgent[] {
+  const raw = env.HERMES_CODEX_SHIPPER_AGENT_CHAIN;
+  if (raw) {
+    const parsed = raw
+      .split(',')
+      .map(item => item.trim())
+      .filter((item): item is ShipperAgent =>
+        SHIPPER_AGENTS.includes(item as ShipperAgent)
+      );
+    const deduped = [...new Set(parsed)];
+    if (deduped.length > 0) return deduped;
+  }
+  // Default: grok primaries fall back to claude; other primaries run solo.
+  return primary === 'grok' ? ['grok', 'claude'] : [primary];
+}
+
+/**
+ * The configured models belong to the PRIMARY harness (e.g. grok model ids).
+ * A claude fallback attempt needs claude model names; other agents keep the
+ * configured route untouched.
+ */
+export function routeForAgent(
+  agent: ShipperAgent,
+  route: TaskRoute
+): TaskRoute {
+  if (agent !== 'claude') return route;
+  const session = route.modelProfile === 'escalation' ? 'opus' : 'sonnet';
+  return { ...route, sessionModel: session, fallbackModel: 'sonnet' };
+}

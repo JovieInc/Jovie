@@ -11,6 +11,8 @@ import {
   finishDispatch,
   loadShipperConfig,
   NO_AUTO_LABEL,
+  parseAgentChain,
+  routeForAgent,
   selectTaskRoute,
   shellQuote,
   worktreeHasWork,
@@ -461,5 +463,55 @@ describe('deterministic finisher', () => {
         logPath: '/tmp/agent.log',
       })
     ).toThrow('push rejected');
+  });
+});
+
+describe('agent fallback chain', () => {
+  it('grok primary defaults to a grok->claude chain', () => {
+    expect(parseAgentChain({}, 'grok')).toEqual(['grok', 'claude']);
+  });
+
+  it('non-grok primary runs solo by default', () => {
+    expect(parseAgentChain({}, 'claude')).toEqual(['claude']);
+    expect(parseAgentChain({}, 'codex')).toEqual(['codex']);
+  });
+
+  it('explicit HERMES_CODEX_SHIPPER_AGENT_CHAIN overrides, deduped + filtered', () => {
+    expect(
+      parseAgentChain(
+        { HERMES_CODEX_SHIPPER_AGENT_CHAIN: 'grok, claude, grok, bogus' },
+        'grok'
+      )
+    ).toEqual(['grok', 'claude']);
+  });
+
+  it('empty/garbage chain env falls back to the default', () => {
+    expect(
+      parseAgentChain({ HERMES_CODEX_SHIPPER_AGENT_CHAIN: ' , bogus ' }, 'grok')
+    ).toEqual(['grok', 'claude']);
+  });
+
+  it('routeForAgent rewrites the model only for claude attempts', () => {
+    const grokRoute = {
+      sessionModel: 'grok-composer-2.5-fast',
+      fallbackModel: 'grok-composer-2.5-fast',
+      riskLevel: 'low',
+      modelProfile: 'standard',
+      maxTurns: 120,
+      specialistSubagents: [],
+      reasons: [],
+    };
+    // grok attempt: untouched
+    expect(routeForAgent('grok', grokRoute)).toBe(grokRoute);
+    // claude attempt: sonnet for standard risk
+    const claude = routeForAgent('claude', grokRoute);
+    expect(claude.sessionModel).toBe('sonnet');
+    expect(claude.fallbackModel).toBe('sonnet');
+    // claude attempt on an escalation route: opus
+    const esc = routeForAgent('claude', {
+      ...grokRoute,
+      modelProfile: 'escalation',
+    });
+    expect(esc.sessionModel).toBe('opus');
   });
 });

@@ -46,6 +46,8 @@ import {
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
+  parseAgentChain,
+  routeForAgent,
   type ShipperConfig,
   worktreeHasWork,
 } from '../lib/codex-issue-shipper';
@@ -775,41 +777,89 @@ async function dispatchPlan(
       return;
     }
 
-    const prompt = buildAgentPrompt({
-      issue: dispatch.issue,
-      branchName: dispatch.branchName,
-      baseBranch: 'main',
-      integrationBranch: dispatch.integrationBranch,
-      route: dispatch.route,
-      gbrain,
-      repoRoot: prepared.repoRoot,
-    });
+    const runInWorktree: FinisherRunner = (args, opts) =>
+      execFileSync(args[0], args.slice(1), {
+        cwd: prepared.repoRoot,
+        encoding: 'utf8',
+        timeout: opts?.timeoutMs ?? 30_000,
+        maxBuffer: 5 * 1024 * 1024,
+      });
+    const safeHasWork = (): boolean => {
+      try {
+        return worktreeHasWork(runInWorktree);
+      } catch {
+        return false;
+      }
+    };
 
-    const agentResult = await runAgent(
-      config,
-      dispatch,
-      prompt,
-      prepared.repoRoot
-    );
-    logJobEvent({
-      job: JOB,
-      event: agentResult.ok ? 'agent_succeeded' : 'agent_failed',
-      issue: dispatch.issue.number,
-      status: agentResult.status,
-      signal: agentResult.signal,
-      error: agentResult.error,
-      logPath: agentResult.logPath,
-      promptPath: agentResult.promptPath,
-      gbrainSlug: gbrain.captureSlug,
-    });
+    // Agent fallback chain: an attempt that ends with neither a PR nor work
+    // in the worktree (and wasn't killed by the system) hands the same
+    // dispatch to the next harness instead of burning a claim-release cycle.
+    const chain = parseAgentChain(process.env, config.agent);
+    let agentResult!: AgentRunResult;
+    let pr: { number: number; url: string } | null = null;
+    let isSystemKilled = false;
 
-    // SIGTERM or timeout = system interruption, release claim for retry
-    // Exit 137 (SIGKILL) or 143 (SIGTERM) means the agent was externally killed
-    const isSystemKilled =
-      agentResult.status === 143 ||
-      agentResult.status === 137 ||
-      agentResult.error?.includes('timeout') ||
-      agentResult.error?.includes('killed');
+    for (let attempt = 0; attempt < chain.length; attempt++) {
+      const agent = chain[attempt];
+      const attemptRoute = routeForAgent(agent, dispatch.route);
+      const attemptConfig = { ...config, agent };
+      const attemptDispatch = { ...dispatch, route: attemptRoute };
+      const prompt = buildAgentPrompt({
+        issue: attemptDispatch.issue,
+        branchName: attemptDispatch.branchName,
+        baseBranch: 'main',
+        integrationBranch: attemptDispatch.integrationBranch,
+        route: attemptRoute,
+        gbrain,
+        repoRoot: prepared.repoRoot,
+      });
+
+      agentResult = await runAgent(
+        attemptConfig,
+        attemptDispatch,
+        prompt,
+        prepared.repoRoot
+      );
+      logJobEvent({
+        job: JOB,
+        event: agentResult.ok ? 'agent_succeeded' : 'agent_failed',
+        issue: dispatch.issue.number,
+        agent,
+        attempt: attempt + 1,
+        status: agentResult.status,
+        signal: agentResult.signal,
+        error: agentResult.error,
+        logPath: agentResult.logPath,
+        promptPath: agentResult.promptPath,
+        gbrainSlug: gbrain.captureSlug,
+      });
+
+      // SIGTERM or timeout = system interruption — do not chain, release.
+      // A null exit status means the agent never ran to a decision — a
+      // spawn/infra failure (e.g. a harness binary missing), not a code
+      // verdict. Treat it like a system interruption: release, don't block.
+      isSystemKilled =
+        agentResult.status === 143 ||
+        agentResult.status === 137 ||
+        agentResult.status === null ||
+        Boolean(agentResult.error?.includes('timeout')) ||
+        Boolean(agentResult.error?.includes('killed'));
+      if (isSystemKilled) break;
+
+      pr = findPrForBranch(config, dispatch.branchName);
+      if (pr || safeHasWork()) break;
+
+      if (attempt < chain.length - 1) {
+        logJobEvent({
+          job: JOB,
+          event: 'agent_no_work_fallback',
+          issue: dispatch.issue.number,
+          fromAgent: agent,
+          toAgent: chain[attempt + 1],
+        });
+      }
+    }
 
     if (isSystemKilled) {
       releaseClaimForRetry(
@@ -854,7 +904,7 @@ async function dispatchPlan(
       return;
     }
 
-    let pr = findPrForBranch(config, dispatch.branchName);
+    if (!pr) pr = findPrForBranch(config, dispatch.branchName);
 
     // Deterministic finisher: the agent exited 0 without opening a PR, but
     // may have left real work in the worktree (grok 0.2.77 abandons the
@@ -863,13 +913,6 @@ async function dispatchPlan(
     // Pre-commit hooks gate the commit; any failure falls through to the
     // existing release-for-retry path.
     if (!pr) {
-      const runInWorktree: FinisherRunner = (args, opts) =>
-        execFileSync(args[0], args.slice(1), {
-          cwd: prepared.repoRoot,
-          encoding: 'utf8',
-          timeout: opts?.timeoutMs ?? 30_000,
-          maxBuffer: 5 * 1024 * 1024,
-        });
       try {
         if (worktreeHasWork(runInWorktree)) {
           finishDispatch(runInWorktree, {
