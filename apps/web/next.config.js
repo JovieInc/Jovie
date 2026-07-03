@@ -457,6 +457,8 @@ const nextConfig = {
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
     turbopackFileSystemCacheForDev: true,
+    // Enable auth interrupts for unauthorized()/forbidden() in server components
+    authInterrupts: true,
     // Cache client-side RSC responses to prevent skeleton flashes on navigation.
     // Next.js 15+ defaults dynamic routes to 0s (always re-fetch), which causes
     // unnecessary skeleton loaders on every page switch. Mutations that need
