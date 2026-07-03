@@ -34,10 +34,9 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
   );
-  assert.match(
-    mainSource,
-    /app\.setName\(APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie'\);/
-  );
+  assert.match(mainSource, /function getDesktopAppDisplayName\(\): string/);
+  assert.match(mainSource, /if \(APP_ENV === 'local'\) return 'Jovie Local';/);
+  assert.match(mainSource, /app\.setName\(getDesktopAppDisplayName\(\)\);/);
   assert.match(mainSource, /APP_ENV === 'local'/);
   assert.match(mainSource, /Jovie-Local/);
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
@@ -156,14 +155,21 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
 });
 
 test('desktop production bundle declares the jovie auth protocol', async () => {
-  const builderConfig = await readFile(
-    join(desktopRoot, 'electron-builder.yml'),
-    'utf8'
-  );
+  const [builderConfig, mainSource, stagingConfig, localConfig] =
+    await Promise.all([
+      readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
+      readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
+      readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
+      readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
+    ]);
 
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
   assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
+  assert.match(mainSource, /if \(APP_ENV !== 'production'\)/);
+  assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
+  assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
+  assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {
@@ -277,8 +283,10 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
   assert.match(mainSource, /installDesktopCspWatchdog/);
+  assert.match(mainSource, /function shouldScheduleDesktopAutoUpdate\(\): boolean/);
+  assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
-  assert.match(mainSource, /process\.platform === 'linux'/);
+  assert.match(mainSource, /if \(!shouldScheduleDesktopAutoUpdate\(\)\)/);
   assert.match(mainSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
   assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
