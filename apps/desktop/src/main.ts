@@ -30,6 +30,11 @@ import {
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
 } from './desktop-permissions';
+import {
+  getDesktopAuthReturnProtocol,
+  getDesktopAuthReturnScheme,
+  shouldRecoverSignedOutEntryLoad,
+} from './desktop-auth-return';
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
 import { APP_ENV, APP_URL } from './env';
 import {
@@ -90,7 +95,8 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
+const AUTH_RETURN_SCHEME = getDesktopAuthReturnScheme(APP_ENV);
+const AUTH_RETURN_PROTOCOL = getDesktopAuthReturnProtocol(APP_ENV);
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
@@ -157,13 +163,13 @@ let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 
-function getDesktopAppDisplayName(): string {
-  if (APP_ENV === 'staging') return 'Jovie Staging';
-  if (APP_ENV === 'local') return 'Jovie Local';
-  return 'Jovie';
-}
-
-app.setName(getDesktopAppDisplayName());
+app.setName(
+  APP_ENV === 'staging'
+    ? 'Jovie Staging'
+    : APP_ENV === 'local'
+      ? 'Jovie Local'
+      : 'Jovie'
+);
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -641,6 +647,37 @@ function getRecentAuthCompletionForState(
   return recentAuthCompletion.completion;
 }
 
+function presentMainWindowAuthHandoff(
+  win: BrowserWindow,
+  authUrl: string
+): void {
+  const handoffUrl = buildDesktopAuthHandoffUrl(authUrl);
+  if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
+    authHandoffWindow.close();
+  }
+  mainWindowHiddenForAuthHandoff = false;
+  if (win.webContents.getURL() !== handoffUrl) {
+    void win.loadURL(handoffUrl);
+  }
+  showWindowNow(win);
+}
+
+function maybePresentDesktopAuthHandoff(
+  urlString: string,
+  win?: BrowserWindow
+): boolean {
+  const authUrl = buildDesktopBrowserAuthUrl(urlString);
+  if (!authUrl) return false;
+
+  if (win && !win.isDestroyed() && win === mainWindow) {
+    presentMainWindowAuthHandoff(win, authUrl);
+    return true;
+  }
+
+  showDesktopAuthHandoff(authUrl);
+  return true;
+}
+
 function showDesktopAuthHandoff(authUrl: string): void {
   const handoffUrl = buildDesktopAuthHandoffUrl(authUrl);
   hideMainWindowForAuthHandoff();
@@ -716,12 +753,11 @@ function showDesktopAuthHandoff(authUrl: string): void {
   showWindow(authHandoffWindow);
 }
 
-function maybeShowDesktopAuthHandoff(urlString: string): boolean {
-  const authUrl = buildDesktopBrowserAuthUrl(urlString);
-  if (!authUrl) return false;
-
-  showDesktopAuthHandoff(authUrl);
-  return true;
+function recoverSignedOutEntryAuthHandoff(win: BrowserWindow): void {
+  presentMainWindowAuthHandoff(
+    win,
+    buildCentralDesktopAuthUrl('sign_in', '/app/chat')
+  );
 }
 
 function shouldLoadDesktopAuthRouteInApp(urlString: string): boolean {
@@ -901,9 +937,19 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
         if (
           typeof validatedURL === 'string' &&
-          maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL))
+          maybePresentDesktopAuthHandoff(resolveNavigationUrl(validatedURL), win)
         ) {
           return;
+        }
+
+        if (
+          shouldRecoverSignedOutEntryLoad({
+            validatedUrl: validatedURL,
+            appEntryUrl: APP_ENTRY_URL,
+            resolveNavigationUrl,
+          })
+        ) {
+          recoverSignedOutEntryAuthHandoff(win);
         }
 
         return;
@@ -990,7 +1036,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // dedicated handoff; all other safe URLs open in the system browser.
   win.webContents.on('will-navigate', (event, url) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (maybePresentDesktopAuthHandoff(navigationUrl, win)) {
       event.preventDefault();
       return;
     }
@@ -1015,7 +1061,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
     const navigationUrl = resolveNavigationUrl(url);
-    if (maybeShowDesktopAuthHandoff(navigationUrl)) {
+    if (maybePresentDesktopAuthHandoff(navigationUrl, win)) {
       event.preventDefault();
       return;
     }
@@ -1037,7 +1083,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // navigation guards. Internal targets stay in the app, safe external links
   // open in the system browser, and unsafe protocols are silently dropped.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (maybeShowDesktopAuthHandoff(url)) {
+    if (maybePresentDesktopAuthHandoff(url, win)) {
       return { action: 'deny' };
     }
 
@@ -1075,8 +1121,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
   if (initialAuthUrl) {
-    showDesktopAuthHandoff(initialAuthUrl);
-    void win.loadURL(buildDesktopAuthHandoffUrl(initialAuthUrl));
+    presentMainWindowAuthHandoff(win, initialAuthUrl);
   } else {
     void win.loadURL(initialUrl);
   }
@@ -1406,13 +1451,13 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+    app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME);
 }
 
 if (gotSingleInstanceLock) {
@@ -1452,7 +1497,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (url.startsWith('jovie://auth/complete')) {
+    if (url.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}/complete`)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }

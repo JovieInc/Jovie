@@ -36,6 +36,8 @@ test('desktop window enters the authenticated chat shell instead of the web root
   assert.match(mainSource, /app\.setName\(getDesktopAppDisplayName\(\)\);/);
   assert.match(mainSource, /APP_ENV === 'local'/);
   assert.match(mainSource, /Jovie-Local/);
+  assert.match(mainSource, /'Jovie Local'/);
+  assert.match(mainSource, /getDesktopAuthReturnScheme/);
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
   assert.match(
     mainSource,
@@ -97,8 +99,11 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(
     mainSource,
-    /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
+    /maybePresentDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\), win\)/
   );
+  assert.match(mainSource, /function presentMainWindowAuthHandoff\(/);
+  assert.match(mainSource, /function recoverSignedOutEntryAuthHandoff\(/);
+  assert.match(mainSource, /shouldRecoverSignedOutEntryLoad/);
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
@@ -117,7 +122,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   );
   assert.match(
     mainSource,
-    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(initialAuthUrl\)\);/
+    /presentMainWindowAuthHandoff\(win, initialAuthUrl\);/
   );
   assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
@@ -182,6 +187,20 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(mainSource, /setAsDefaultProtocolClient\('jovie'\)/);
   assert.doesNotMatch(stagingConfig, /CFBundleURLTypes:/);
   assert.doesNotMatch(localConfig, /CFBundleURLTypes:/);
+});
+
+test('desktop staging and local bundles declare per-env auth protocols', async () => {
+  const stagingConfig = await readFile(
+    join(desktopRoot, 'electron-builder.staging.yml'),
+    'utf8'
+  );
+  const localConfig = await readFile(
+    join(desktopRoot, 'electron-builder.local.yml'),
+    'utf8'
+  );
+
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {
