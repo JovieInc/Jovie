@@ -4631,24 +4631,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   gap: var(--space-1);
 }
 
-:where(.system-b-chat-profile-preview-phone-button) {
-  height: var(--space-6);
-  border-radius: var(--radius-md);
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 22%,
-    transparent
-  );
-}
-
-:where(.system-b-chat-profile-preview-phone-button-muted) {
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 14%,
-    transparent
-  );
-}
-
 :where(.system-b-chat-profile-preview-device-icon) {
   position: absolute;
   bottom: var(--space-4);
@@ -4970,34 +4952,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   inset: 0;
   display: grid;
   place-items: center;
-}
-
-:where(.system-b-thread-play-button) {
-  display: grid;
-  width: var(--space-12);
-  height: var(--space-12);
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
-  transition:
-    background-color var(--system-b-duration-fast) var(--system-b-ease),
-    opacity var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-:where(
-  .system-b-thread-video-preview:hover
-    .system-b-thread-play-button[data-interactive="true"]
-) {
-  background: color-mix(
-    in oklab,
-    var(--system-b-primary-bg) 94%,
-    var(--system-b-bg-surface-2)
-  );
-}
-
-:where(.system-b-thread-play-button[data-interactive="false"]) {
-  background: color-mix(in oklab, var(--system-b-primary-bg) 42%, transparent);
 }
 
 :where(.system-b-thread-duration-badge) {
@@ -8600,39 +8554,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   padding-bottom: calc(var(--space-5) + var(--space-0-5));
   color: var(--color-text-tertiary-token);
   font-size: var(--text-xs);
-}
-
-:where(.system-b-chat-composer-icon-button) {
-  border: 1px solid transparent;
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 88%,
-    var(--system-b-bg-surface-0)
-  );
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    border-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle),
-    box-shadow var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-chat-composer-icon-button:not(:disabled):hover),
-:where(.system-b-chat-composer-icon-button[data-state="open"]) {
-  border-color: var(--system-b-app-shell-border);
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--system-b-app-shell-border) 40%, transparent);
-}
-
-:where(.system-b-chat-composer-icon-button[data-active="true"]) {
-  border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-2);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-chat-composer-icon-button:disabled) {
-  color: var(--color-text-quaternary-token);
 }
 
 :where(.system-b-chat-composer-primary-action) {
