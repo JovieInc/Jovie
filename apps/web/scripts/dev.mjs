@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 import { ensureDevNextCache } from './lib/dev-next-cache.mjs';
 
-const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const webRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..'
+);
 const require = createRequire(import.meta.url);
 const nextBin = require.resolve('next/dist/bin/next');
 
