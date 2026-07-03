@@ -299,7 +299,14 @@ PYEOF
 chmod 600 "${HERMES_HOME}/config.yaml"
 ok "Hermes config rendered (secrets stay as env refs)"
 
-# 12. Render launchd plists
+# 12. Install shipper entrypoint to ~/.hermes/scripts (launchd ProgramArguments)
+log "Installing shipper-gated-entrypoint.py"
+mkdir -p "${HERMES_HOME}/scripts"
+install -m 755 "${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py" \
+  "${HERMES_HOME}/scripts/shipper-gated-entrypoint.py"
+ok "shipper-gated-entrypoint.py installed"
+
+# 13. Render launchd plists
 log "Rendering launchd plists"
 mkdir -p "$LAUNCH_AGENTS"
 for tmpl in "${REPO_ROOT}/scripts/hermes/launchd/"*.plist.template; do
@@ -338,7 +345,7 @@ if [[ "$MODE" == "reconfigure" ]]; then
   exit 0
 fi
 
-# 13. Bootstrap launchd units
+# 14. Bootstrap launchd units
 log "Bootstrapping launchd units"
 for plist in "${LAUNCH_AGENTS}"/co.jovie.hermes.*.plist; do
   [[ -f "$plist" ]] || continue

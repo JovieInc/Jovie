@@ -24,11 +24,45 @@ describe('hermes launchd pro templates', () => {
       '{{NODE_BIN_DIR}}': '/Users/tester/.nvm/versions/node/v22.13.0/bin',
     });
 
-    expect(rendered).toContain('<string>co.jovie.hermes.cron-codex-kanban-ship</string>');
+    expect(rendered).toContain(
+      '<string>co.jovie.hermes.cron-codex-kanban-ship</string>'
+    );
     expect(rendered).toContain('<integer>900</integer>');
-    expect(rendered).toContain('/Users/tester/Jovie/scripts/hermes/ship-loop.sh');
-    expect(rendered).toContain('/Users/tester/.hermes/logs/launchd/cron-codex-kanban-ship.log');
+    expect(rendered).toContain(
+      '/Users/tester/Jovie/scripts/hermes/ship-loop.sh'
+    );
+    expect(rendered).toContain(
+      '/Users/tester/.hermes/logs/launchd/cron-codex-kanban-ship.log'
+    );
     expect(rendered).toContain('<key>HERMES_SHIP</key>');
+  });
+});
+
+describe('shipper-gated entrypoint', () => {
+  it('documents gbrain and grok preflight gates', () => {
+    const script = readFileSync(
+      join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
+      'utf8'
+    );
+    expect(script).toContain('gbrain_alive');
+    expect(script).toContain('grok_ready');
+    expect(script).toContain('codex-issue-shipper.ts');
+  });
+
+  it('codex issue shipper launchd plist uses the gated entrypoint', () => {
+    const templatePath = join(
+      REPO_ROOT,
+      'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template'
+    );
+    const rendered = renderTemplate(templatePath, {
+      '{{HOME}}': '/Users/tester',
+      '{{JOVIE_REPO}}': '/Users/tester/Jovie',
+      '{{NODE_BIN_DIR}}': '/Users/tester/.nvm/versions/node/v22.13.0/bin',
+    });
+    expect(rendered).toContain(
+      '/Users/tester/.hermes/scripts/shipper-gated-entrypoint.py'
+    );
+    expect(rendered).toContain('/Users/tester/Jovie');
   });
 });
 
