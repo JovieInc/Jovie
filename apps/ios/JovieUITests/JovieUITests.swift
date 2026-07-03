@@ -283,6 +283,23 @@ final class JovieUITests: XCTestCase {
       "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
+
+    // One canonical shell status indicator — not duplicated in drawer identity rows.
+    XCTAssertEqual(
+      app.staticTexts.matching(NSPredicate(format: "label == %@", "Offline")).count,
+      1,
+      "Offline chat should show exactly one shell status label.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.staticTexts["@tim"].waitForExistence(timeout: 3),
+      "Drawer account header should keep @handle when offline.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.otherElements["shell-drawer-account"].staticTexts["Offline"].exists,
+      "Drawer account header must not replace @handle with Offline.\n\(app.debugDescription)"
+    )
   }
 
   // JOV-3608: entity/skill chat tokens must render as clean label text, with
