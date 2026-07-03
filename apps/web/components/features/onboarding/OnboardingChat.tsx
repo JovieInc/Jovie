@@ -905,7 +905,7 @@ export function OnboardingChat({
   });
 
   const submitText = useCallback(
-    (rawText: string) => {
+    (rawText: string, metadata?: Record<string, unknown>) => {
       const text = composeMessage(chipTray.chips, rawText).trim();
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
@@ -922,7 +922,7 @@ export function OnboardingChat({
           surface: 'start_chat',
         });
       }
-      sendMessage({ text });
+      sendMessage({ text, ...(metadata ? { metadata } : {}) });
       chipTray.clear();
       setHasSentFirst(true);
       setComposerInput('');
@@ -971,7 +971,12 @@ export function OnboardingChat({
   const handleArtistSelect = useCallback(
     (artist: OnboardingArtistSelection) => {
       setSelectedArtist(artist);
-      submitText(formatArtistSelectionMessage(artist));
+      // The Spotify id rides as message metadata (not visible text) so the
+      // server — LLM tools and the deterministic fallback engine alike — can
+      // confirm the exact artist without parsing the display name.
+      submitText(formatArtistSelectionMessage(artist), {
+        spotifyArtistId: artist.id,
+      });
     },
     [formatArtistSelectionMessage, submitText]
   );

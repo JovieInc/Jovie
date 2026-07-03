@@ -106,6 +106,10 @@ export default defineConfig({
             PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',
             NEXT_DISABLE_TOOLBAR: '1',
+            // Arms the onboarding LLM-failure fallback spec. Inert unless a
+            // request also carries x-jovie-e2e-llm-failure; hard-ignored on
+            // production deploys (see onboarding-handler.ts).
+            CHAT_LLM_FAILURE_INJECTION: '1',
             E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
             E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
             ...(useTestAuthBypass
