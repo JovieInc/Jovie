@@ -46,8 +46,10 @@ import {
   type FinisherRunner,
   finishDispatch,
   type GbrainContext,
+  GhEagainBackoff,
   type GithubIssue,
   HUMAN_REVIEW_LABEL,
+  isSpawnEagain,
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
@@ -56,6 +58,7 @@ import {
   parseDirtyPaths,
   routeForAgent,
   type ShipperConfig,
+  SpawnEagainError,
   worktreeHasWork,
 } from '../lib/codex-issue-shipper';
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
@@ -72,6 +75,35 @@ import { sendSlack } from '../lib/slack-client';
 import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'codex-issue-shipper';
+const ghEagainBackoff = new GhEagainBackoff();
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function handleSpawnEagain(
+  err: SpawnEagainError,
+  context: string
+): Promise<void> {
+  const backoff = ghEagainBackoff.record();
+  logJobEvent({
+    job: JOB,
+    event: 'gh_eagain_skip',
+    context,
+    command: err.command,
+    error: err.message,
+    consecutive: backoff.consecutive,
+  });
+  if (backoff.shouldBackoff) {
+    logJobEvent({
+      job: JOB,
+      event: 'gh_eagain_backoff',
+      sleepMs: backoff.sleepMs,
+      consecutive: backoff.consecutive,
+    });
+    await sleep(backoff.sleepMs);
+  }
+}
 
 /**
  * Sentinel file that, when present, pauses the shipper.
@@ -135,12 +167,19 @@ function loadHermesEnv(): void {
 }
 
 function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
-  return execFileSync(args[0], args.slice(1), {
-    cwd: config.repoRoot,
-    encoding: 'utf8',
-    timeout: 30_000,
-    maxBuffer: 5 * 1024 * 1024,
-  });
+  try {
+    return execFileSync(args[0], args.slice(1), {
+      cwd: config.repoRoot,
+      encoding: 'utf8',
+      timeout: 30_000,
+      maxBuffer: 5 * 1024 * 1024,
+    });
+  } catch (err) {
+    if (isSpawnEagain(err)) {
+      throw new SpawnEagainError(shortError(err), args[0] ?? 'unknown');
+    }
+    throw err;
+  }
 }
 
 function systemCapacity(config: ShipperConfig): CapacitySnapshot {
@@ -282,10 +321,17 @@ function cleanupWorktree(config: ShipperConfig, repoRoot: string): void {
 
 function detectRepoRoot(): string {
   if (process.env.HERMES_JOVIE_REPO) return process.env.HERMES_JOVIE_REPO;
-  return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-    timeout: 10_000,
-  }).trim();
+  try {
+    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+      timeout: 10_000,
+    }).trim();
+  } catch (err) {
+    if (isSpawnEagain(err)) {
+      throw new SpawnEagainError(shortError(err), 'git');
+    }
+    throw err;
+  }
 }
 
 /**
@@ -395,15 +441,22 @@ async function notifyStaleCheckoutAbort(
 
 function detectGithubRepo(repoRoot: string): string {
   if (process.env.GH_REPO) return process.env.GH_REPO;
-  return execFileSync(
-    'gh',
-    ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-    {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      timeout: 30_000,
+  try {
+    return execFileSync(
+      'gh',
+      ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 30_000,
+      }
+    ).trim();
+  } catch (err) {
+    if (isSpawnEagain(err)) {
+      throw new SpawnEagainError(shortError(err), 'gh');
     }
-  ).trim();
+    throw err;
+  }
 }
 
 function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
@@ -1201,6 +1254,19 @@ async function dispatchBatch(
 }
 
 async function main(): Promise<void> {
+  try {
+    await runShipper();
+    ghEagainBackoff.reset();
+  } catch (err) {
+    if (err instanceof SpawnEagainError) {
+      await handleSpawnEagain(err, 'shipper');
+      return;
+    }
+    throw err;
+  }
+}
+
+async function runShipper(): Promise<void> {
   loadHermesEnv();
 
   // Pause sentinel: if the operator has touched ~/.hermes/shipping-paused,
@@ -1238,7 +1304,16 @@ async function main(): Promise<void> {
         let controlLabelsEnsured = false;
 
         for (;;) {
-          const issues = listCodexIssues(config);
+          let issues: ReadonlyArray<GithubIssue>;
+          try {
+            issues = listCodexIssues(config);
+          } catch (err) {
+            if (err instanceof SpawnEagainError) {
+              await handleSpawnEagain(err, 'listCodexIssues');
+              return;
+            }
+            throw err;
+          }
           const plans = buildDispatchPlans(issues, config);
           const skippedHuman = issues.filter(issue =>
             labelNames(issue).includes(HUMAN_REVIEW_LABEL)
