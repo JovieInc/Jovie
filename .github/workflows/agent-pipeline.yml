@@ -164,7 +164,7 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) || "$BRANCH" =~ (^|/)jov-[0-9]+ ]]; then
+          if [[ "$BRANCH" =~ ^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/) || "$BRANCH" =~ (^|/)jov-[0-9]+ ]]; then
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> "$GITHUB_OUTPUT"
           else
@@ -202,30 +202,48 @@ jobs:
             exit 0
           fi
 
-          # Get this PR's failing check names (structured JSON output)
-          THIS_PR_FAILS=$(gh pr checks "$PR_NUMBER" --json name,conclusion 2>/dev/null \
-            | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "failure") | .name' | sort -u || echo "")
+          # Terminal required-check failures only — mirror scripts/drain-pr-queue.sh.
+          FAIL_JQ='[
+            .[]
+            | select(
+                ((.bucket // "") | test("^fail$"; "i"))
+                or ((.state // "") | test("^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE)$"; "i"))
+              )
+            | select(((.name // "") | test("advisory|Preview Deploy|Slop Gate"; "i")) | not)
+            | (.name // .workflow // .description // "unnamed check")
+          ]'
+
+          THIS_PR_FAILS=$(gh pr checks "$PR_NUMBER" --required --json name,bucket,state,workflow,description 2>/dev/null \
+            | jq -r "$FAIL_JQ | .[]" | sort -u || echo "")
 
           if [[ -z "$THIS_PR_FAILS" ]]; then
-            echo "No failing checks found for PR #$PR_NUMBER"
+            echo "No terminal required-check failures found for PR #$PR_NUMBER"
             echo "is_systemic=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Sample up to 10 other open agent PRs
-          OTHER_PRS=$(gh pr list --state open --json number,headRefName --limit 20 \
-            | jq -r --arg this "$PR_NUMBER" '.[] | select(.number != ($this | tonumber)) | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("(^|/)jov-[0-9]+"; "i")) | .number' \
-            | head -10)
+          # Inspect open agent PRs (same branch prefixes as drain-pr-queue.sh).
+          OTHER_PRS=$(gh pr list --state open --json number,headRefName --limit 50 \
+            | jq -r --arg this "$PR_NUMBER" '.[] | select(.number != ($this | tonumber)) | select(.headRefName | test("^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/)") or test("(^|/)jov-[0-9]+"; "i")) | .number')
+
+          normalize_check_key() {
+            echo "$1" | sed -E 's/^CI[[:space:]]*\/[[:space:]]*//' | tr '[:upper:]' '[:lower:]'
+          }
 
           SYSTEMIC_CHECKS=""
           for CHECK_NAME in $THIS_PR_FAILS; do
             FAIL_COUNT=1  # count this PR
+            CHECK_KEY=$(normalize_check_key "$CHECK_NAME")
             for OTHER_PR in $OTHER_PRS; do
-              OTHER_STATUS=$(gh pr checks "$OTHER_PR" --json name,conclusion 2>/dev/null \
-                | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "failure") | .name' | grep -Fx "$CHECK_NAME" || true)
-              if [[ -n "$OTHER_STATUS" ]]; then
-                FAIL_COUNT=$((FAIL_COUNT + 1))
-              fi
+              OTHER_FAILS=$(gh pr checks "$OTHER_PR" --required --json name,bucket,state,workflow,description 2>/dev/null \
+                | jq -r "$FAIL_JQ | .[]" || true)
+              for OTHER_FAIL in $OTHER_FAILS; do
+                OTHER_KEY=$(normalize_check_key "$OTHER_FAIL")
+                if [[ "$OTHER_KEY" == "$CHECK_KEY" ]]; then
+                  FAIL_COUNT=$((FAIL_COUNT + 1))
+                  break
+                fi
+              done
             done
             if [[ $FAIL_COUNT -ge 3 ]]; then
               SYSTEMIC_CHECKS="${SYSTEMIC_CHECKS}${CHECK_NAME} (failing on ${FAIL_COUNT} PRs)\n"
@@ -453,7 +471,7 @@ jobs:
 
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "systemic-ci-blocker" "## Systemic CI Blocker Detected
 
-          This PR's CI failures appear to be systemic (same checks failing on 3+ PRs):
+          This PR's CI failures appear to be systemic (same required checks failing on 3+ agent PRs):
 
           \`\`\`
           $SYSTEMIC
@@ -461,7 +479,7 @@ jobs:
 
           **Skipping individual fix attempts.** These failures likely originate on \`main\` and should be fixed there first.
 
-          Run \`/drain\` to fix systemic issues on main and then rebase all PRs."
+          After \`main\` has the fix, \`merge-queue-autoenroll\` (every 20 min) will mechanically rebase behind-base agent PRs and re-enroll them. No manual \`/drain\` is required for stale main-fixed CI."
 
   # ==========================================================================
   # FIX: Apply fixes using Claude agent (CI failure or CodeRabbit review)
@@ -527,9 +545,9 @@ jobs:
 
           **Why:** This workflow no longer checks out or executes PR branch code in a write-privileged context.
 
-          **Requested action:** Run remediation in an unprivileged \`pull_request\` workflow for attempt $ATTEMPT (**trigger:** $TRIGGER_TYPE).
+          **Requested action:** \`agent-remediation.yml\` was triggered by the \`agent-remediation-requested\` label (attempt $ATTEMPT, **trigger:** $TRIGGER_TYPE). That workflow performs a mechanical rebase in a temp clone (no PR code execution) and re-enrolls the PR when it is behind base with stale required-check failures.
 
-          This guardrail prevents untrusted code execution in privileged jobs while keeping remediation traceability."
+          The \`merge-queue-autoenroll\` cron also sweeps the same remediation path every 20 minutes."
       - name: Clean up stale attempt labels
         if: always()
         env:

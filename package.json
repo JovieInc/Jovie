@@ -163,6 +163,8 @@
     "ci:taste-guard:sweep": "node scripts/taste-label-guard.mjs sweep",
     "pr:conflict:dry-run": "node scripts/pr-conflict-handler.mjs --dry-run",
     "pr:conflict:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/pr-conflict-handler.test.mjs",
+    "drain:remediate:dry-run": "node scripts/drain-pr-remediate.mjs --dry-run",
+    "drain:remediate:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/drain-pr-remediate.test.mjs",
     "ci:harness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__",
     "doc:freshness:check": "node scripts/doc-freshness-lint.mjs",
     "doc:freshness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs",

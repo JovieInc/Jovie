@@ -1,0 +1,96 @@
+name: Agent Remediation
+
+# Unprivileged pull_request remediation promised by agent-pipeline.yml.
+# Performs the same mechanical rebase path as merge-queue-autoenroll's drain
+# remediation step, scoped to a single PR when agent-remediation-requested is
+# applied. Does not execute PR branch code — only clones and rebases in a temp dir.
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to remediate'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: agent-remediation-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    name: Mechanical rebase
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'agent-remediation-requested'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "number=${{ inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate same-repo agent PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR="${{ steps.pr.outputs.number }}"
+          IS_FORK=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq '.head.repo.fork // false')
+          SAME_REPO=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq '.head.repo.full_name == .base.repo.full_name')
+          HEAD_REF=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq '.head.ref')
+          IS_DRAFT=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq '.draft')
+
+          if [[ "$IS_FORK" == "true" || "$SAME_REPO" != "true" ]]; then
+            echo "PR #$PR is from a fork or different repo. Refusing remediation."
+            exit 1
+          fi
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            echo "PR #$PR is a draft. Skipping remediation."
+            exit 0
+          fi
+          if [[ ! "$HEAD_REF" =~ ^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/) && ! "$HEAD_REF" =~ (^|/)jov-[0-9]+ ]]; then
+            echo "PR #$PR head $HEAD_REF is not an agent-owned branch. Skipping."
+            exit 0
+          fi
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22.13.1'
+
+      - name: Run drain remediation for PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/drain-pr-remediate.mjs --apply \
+            --repo "${{ github.repository }}" \
+            --pr "${{ steps.pr.outputs.number }}" \
+            --max-rebases 1 \
+            --cooldown-hours 1
+
+      - name: Remove remediation-requested label
+        if: success() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/issues/${{ steps.pr.outputs.number }}/labels/agent-remediation-requested" \
+            --method DELETE || true

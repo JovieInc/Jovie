@@ -175,6 +175,20 @@ class TestDrainPrQueueWiring:
         assert "tim-approved" not in content
         assert "approved:taste" not in content
 
+    def test_merge_queue_autoenroll_runs_drain_remediation(self) -> None:
+        workflow = (
+            _REPO_ROOT / ".github" / "workflows" / "merge-queue-autoenroll.yml"
+        ).read_text(encoding="utf-8")
+        assert "drain-pr-remediate.mjs" in workflow
+        assert "--apply" in workflow
+
+    def test_agent_remediation_workflow_exists(self) -> None:
+        workflow = (
+            _REPO_ROOT / ".github" / "workflows" / "agent-remediation.yml"
+        ).read_text(encoding="utf-8")
+        assert "agent-remediation-requested" in workflow
+        assert "drain-pr-remediate.mjs" in workflow
+
     def test_red_required_checks_block_enqueue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
