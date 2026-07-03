@@ -90,7 +90,13 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
+const AUTH_RETURN_SCHEME =
+  APP_ENV === 'staging'
+    ? 'jovie-staging'
+    : APP_ENV === 'local'
+      ? 'jovie-local'
+      : 'jovie';
+const AUTH_RETURN_PROTOCOL = `${AUTH_RETURN_SCHEME}:`;
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
@@ -807,6 +813,17 @@ function showDesktopLoadFailure(win: BrowserWindow): void {
   void win.loadURL(buildDesktopLoadFailureUrl());
 }
 
+function recoverMainWindowFromBlankNavigation(win: BrowserWindow): void {
+  if (win.isDestroyed() || isAuthHandoffOpen()) return;
+
+  const current = win.webContents.getURL();
+  if (current && current !== 'about:blank') return;
+
+  const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+  void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+  showWindowNow(win);
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
@@ -852,12 +869,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // usable sign-in surface into THIS (main) window, which we know can render.
   const initialVisibilityFallback = setTimeout(() => {
     if (win.isDestroyed() || isAuthHandoffOpen() || win.isVisible()) return;
-    const current = win.webContents.getURL();
-    if (!current || current === 'about:blank') {
-      const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
-      void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
-    }
-    showWindowNow(win);
+    recoverMainWindowFromBlankNavigation(win);
   }, 6000);
 
   win.once('ready-to-show', () => {
@@ -1070,8 +1082,13 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     win.webContents.send(NAV_STATE_CHANNEL, state);
   }
 
+  win.webContents.on('did-navigate', (_event, url) => {
+    if (url === 'about:blank') {
+      recoverMainWindowFromBlankNavigation(win);
+    }
+    sendNavState();
+  });
   win.webContents.on('did-navigate-in-page', sendNavState);
-  win.webContents.on('did-navigate', sendNavState);
 
   const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
   if (initialAuthUrl) {
@@ -1390,13 +1407,9 @@ ipcMain.handle(
 );
 
 function registerAuthReturnProtocol(): void {
-  // Only the canonical production bundle (app.jov.ie) may own jovie:// deep
-  // links. Staging/local shells use separate bundle IDs and must not compete
-  // with the installed production handler — see apps/desktop/BUILDS.md.
-  if (APP_ENV !== 'production') {
-    return;
-  }
-
+  // Each desktop shell registers its own custom scheme so auth deep links
+  // return to the correct installed app (production jovie://, staging
+  // jovie-staging://, local jovie-local://).
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
   };
@@ -1406,13 +1419,13 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+    app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME);
 }
 
 if (gotSingleInstanceLock) {
@@ -1452,7 +1465,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (url.startsWith('jovie://auth/complete')) {
+    if (url.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}/complete`)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }

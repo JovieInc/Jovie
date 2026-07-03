@@ -35,7 +35,16 @@ function NativeReturnContent() {
         ? rawDesktopFlow
         : null;
 
-    return buildElectronAuthCompleteUrl({ code, state, desktopFlow });
+    const origin =
+      typeof globalThis.location !== 'undefined'
+        ? globalThis.location.origin
+        : null;
+    return buildElectronAuthCompleteUrl({
+      code,
+      state,
+      desktopFlow,
+      origin,
+    });
   }, [searchParams]);
 
   useEffect(() => {

@@ -76,4 +76,18 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
 
     expect(screen.queryByRole('link', { name: 'Open Jovie' })).toBeNull();
   });
+
+  it('uses the staging deep-link scheme on staging hosts', () => {
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: { href: 'https://staging.jov.ie/', origin: 'https://staging.jov.ie' },
+    });
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+      'href',
+      `jovie-staging://auth/complete?code=${CODE}&state=${STATE}`
+    );
+  });
 });

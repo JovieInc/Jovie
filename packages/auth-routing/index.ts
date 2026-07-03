@@ -79,9 +79,38 @@ export interface AuthAnalyticsEventPayload {
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
-const ELECTRON_AUTH_COMPLETE_URL = 'jovie://auth/complete';
+const ELECTRON_AUTH_SCHEME_BY_ENV = {
+  production: 'jovie',
+  staging: 'jovie-staging',
+  local: 'jovie-local',
+} as const;
+const ELECTRON_AUTH_COMPLETE_URL = `${ELECTRON_AUTH_SCHEME_BY_ENV.production}://auth/complete`;
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
+
+export type ElectronAuthEnv = keyof typeof ELECTRON_AUTH_SCHEME_BY_ENV;
+
+export function resolveElectronAuthSchemeFromOrigin(origin: string): string {
+  try {
+    const hostname = new URL(origin).hostname;
+    if (hostname === 'staging.jov.ie') {
+      return ELECTRON_AUTH_SCHEME_BY_ENV.staging;
+    }
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return ELECTRON_AUTH_SCHEME_BY_ENV.local;
+    }
+  } catch {
+    // Fall through to production.
+  }
+
+  return ELECTRON_AUTH_SCHEME_BY_ENV.production;
+}
+
+export function resolveElectronAuthSchemeForEnv(
+  env: ElectronAuthEnv
+): string {
+  return ELECTRON_AUTH_SCHEME_BY_ENV[env];
+}
 
 const RETURN_BLOCKED_PREFIXES = [
   '/api',
@@ -352,8 +381,15 @@ export function buildElectronAuthCompleteUrl(input: {
   readonly code: string;
   readonly state: string;
   readonly desktopFlow?: string | null;
+  readonly scheme?: string | null;
+  readonly origin?: string | null;
 }): string {
-  return buildUrlWithCodeAndState(ELECTRON_AUTH_COMPLETE_URL, input);
+  const scheme =
+    input.scheme ??
+    (input.origin ? resolveElectronAuthSchemeFromOrigin(input.origin) : null) ??
+    ELECTRON_AUTH_SCHEME_BY_ENV.production;
+  const baseUrl = `${scheme}://auth/complete`;
+  return buildUrlWithCodeAndState(baseUrl, input);
 }
 
 export function resolveAuthCallback(input: {
