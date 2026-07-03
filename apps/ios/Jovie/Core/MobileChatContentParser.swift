@@ -37,7 +37,6 @@ enum MobileChatProseRun: Equatable, Sendable {
   case skill(id: String, label: String)
 }
 
-/// Structured merch tool output hydrated from `<tool_result>` JSON blocks.
 enum MobileChatMerchArtifact: Equatable, Identifiable, Sendable {
   case productOptions(MobileChatMerchOptionsPayload)
   case designCarousel(MobileChatMerchDesignsPayload)
@@ -199,8 +198,9 @@ enum MobileChatContentParser {
     from content: String,
     isStreaming: Bool
   ) -> [MobileChatRenderableSegment] {
-    let merchArtifacts = parseMerchArtifacts(from: content)
-    let resultStates = parseToolResultStates(from: content)
+    let toolResults = parseToolResults(from: content)
+    let merchArtifacts = toolResults.merchArtifacts
+    let resultStates = toolResults.states
     let sanitized = suppressIncompleteToolMarkup(
       stripToolResultMarkup(from: content),
       isStreaming: isStreaming
@@ -407,8 +407,14 @@ enum MobileChatContentParser {
     return sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private static func parseToolResultStates(from content: String) -> [String: MobileChatToolCallState] {
+  private struct ParsedToolResults {
+    let states: [String: MobileChatToolCallState]
+    let merchArtifacts: [String: MobileChatMerchArtifact]
+  }
+
+  private static func parseToolResults(from content: String) -> ParsedToolResults {
     var states: [String: MobileChatToolCallState] = [:]
+    var merchArtifacts: [String: MobileChatMerchArtifact] = [:]
     let fallbackToolName = extractMostRecentToolName(from: content)
     let patterns = [
       "<tool_result>([\\s\\S]*?)</tool_result>",
@@ -442,10 +448,20 @@ enum MobileChatContentParser {
         guard !trimmedName.isEmpty else { return }
 
         states[trimmedName] = resolveResultState(from: block)
+
+        guard
+          merchArtifactToolNames.contains(trimmedName),
+          let jsonPayload = extractJsonPayload(from: block),
+          let artifact = decodeMerchArtifact(from: jsonPayload)
+        else {
+          return
+        }
+
+        merchArtifacts[trimmedName] = artifact
       }
     }
 
-    return states
+    return ParsedToolResults(states: states, merchArtifacts: merchArtifacts)
   }
 
   private static func extractMostRecentToolName(from content: String) -> String? {
@@ -762,46 +778,6 @@ enum MobileChatContentParser {
     "previewMerchOptions",
   ]
 
-  private static func parseMerchArtifacts(
-    from content: String
-  ) -> [String: MobileChatMerchArtifact] {
-    var artifacts: [String: MobileChatMerchArtifact] = [:]
-    let patterns = [
-      "<tool_result>([\\s\\S]*?)</tool_result>",
-      "<function_result>([\\s\\S]*?)</function_result>",
-    ]
-
-    for pattern in patterns {
-      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-        continue
-      }
-
-      let range = NSRange(content.startIndex..., in: content)
-      regex.enumerateMatches(in: content, range: range) { match, _, _ in
-        guard
-          let match,
-          let blockRange = Range(match.range(at: 1), in: content)
-        else {
-          return
-        }
-
-        let block = String(content[blockRange])
-        let toolName =
-          firstCapture(in: block, pattern: "<name>\\s*([^<]+?)\\s*</name>")
-            ?? extractMostRecentToolName(from: content)
-
-        guard let toolName, merchArtifactToolNames.contains(toolName) else { return }
-
-        guard let jsonPayload = extractJsonPayload(from: block) else { return }
-        guard let artifact = decodeMerchArtifact(from: jsonPayload) else { return }
-
-        artifacts[toolName] = artifact
-      }
-    }
-
-    return artifacts
-  }
-
   private static func extractJsonPayload(from block: String) -> Data? {
     if let tagged = firstCapture(in: block, pattern: "<json>\\s*([\\s\\S]*?)\\s*</json>") {
       return tagged.data(using: .utf8)
@@ -940,8 +916,6 @@ enum MobileChatContentParser {
     }
   }
 
-  /// Strips the model's numbered markdown enumeration once native merch cards
-  /// are hydrated — the JOV-12823 duplicate-prose symptom.
   static func sanitizeMerchEnumerationProse(_ text: String) -> String {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return "" }

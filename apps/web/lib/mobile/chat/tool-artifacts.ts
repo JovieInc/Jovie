@@ -3,8 +3,8 @@ import 'server-only';
 import { isChatMerchGenerationResult } from '@/components/jovie/components/ChatMerchCard';
 import { isChatMerchDesignCarouselResult } from '@/components/jovie/components/ChatMerchDesignCarousel';
 import type { PersistedToolEvent } from '@/lib/chat/tool-events';
+import { getToolUiConfig } from '@/lib/chat/tool-ui-registry';
 
-/** Tool names whose structured outputs iOS hydrates into native merch cards. */
 export const MOBILE_MERCH_ARTIFACT_TOOL_NAMES = new Set([
   'createMerch',
   'previewMerchOptions',
@@ -19,11 +19,6 @@ export function isMobileMerchArtifactOutput(
   );
 }
 
-/**
- * Embeds merch tool outputs into assistant `content` as `<tool_result>` blocks
- * the iOS `MobileChatContentParser` hydrates. Mobile chat streams text only;
- * without this, structured merch data in `toolCalls` never reaches the client.
- */
 export function embedMobileMerchArtifactsInContent(
   content: string,
   toolEvents: readonly PersistedToolEvent[] | undefined
@@ -53,9 +48,6 @@ export function embedMobileMerchArtifactsInContent(
   return `${prefix}${blocks.join('\n')}`;
 }
 
-/**
- * Builds persisted tool events from AI SDK tool results for mobile merch turns.
- */
 export function mobileMerchToolEventsFromResults(
   toolResults: ReadonlyArray<{
     readonly toolName: string;
@@ -65,14 +57,23 @@ export function mobileMerchToolEventsFromResults(
 ): PersistedToolEvent[] {
   return toolResults
     .filter(result => MOBILE_MERCH_ARTIFACT_TOOL_NAMES.has(result.toolName))
-    .map(result => ({
-      toolCallId: result.toolCallId,
-      toolName: result.toolName,
-      state: 'succeeded' as const,
-      output: result.output,
-      summary: null,
-      errorCode: null,
-      errorMessage: null,
-      retryable: false,
-    }));
+    .map(result => {
+      const config = getToolUiConfig(result.toolName);
+      const output =
+        result.output &&
+        typeof result.output === 'object' &&
+        !Array.isArray(result.output)
+          ? (result.output as Record<string, unknown>)
+          : undefined;
+
+      return {
+        schemaVersion: 2 as const,
+        toolCallId: result.toolCallId,
+        toolName: result.toolName,
+        state: 'succeeded' as const,
+        output,
+        retryable: false,
+        uiHint: config.uiHint,
+      };
+    });
 }

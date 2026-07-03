@@ -273,7 +273,11 @@ private struct MobileChatMessageRow: View {
       VStack(alignment: .leading, spacing: JovieSpacing.small) {
         let proseRuns = assistantProseRuns(from: segments)
         if !proseRuns.isEmpty {
-          MobileChatAssistantProseBubble(runs: proseRuns)
+          MobileChatProseText(runs: proseRuns, tone: .onDark)
+            .font(JovieFont.body(size: 16))
+            .padding(.horizontal, JovieSpacing.large)
+            .padding(.vertical, JovieSpacing.medium)
+            .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .frame(maxWidth: 320, alignment: .leading)
         }
 
@@ -333,46 +337,6 @@ private struct ChatComposerView: View {
   }
 }
 
-/// Assistant prose bubble with markdown fallback for plain-text runs.
-private struct MobileChatAssistantProseBubble: View {
-  let runs: [MobileChatProseRun]
-
-  var body: some View {
-    Group {
-      if shouldRenderMarkdown {
-        Text(markdownText)
-          .font(JovieFont.body(size: 16))
-          .foregroundStyle(JovieColor.textPrimary)
-      } else {
-        MobileChatProseText(runs: runs, tone: .onDark)
-          .font(JovieFont.body(size: 16))
-          .foregroundStyle(JovieColor.textPrimary)
-      }
-    }
-    .padding(.horizontal, JovieSpacing.large)
-    .padding(.vertical, JovieSpacing.medium)
-    .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-  }
-
-  private var shouldRenderMarkdown: Bool {
-    runs.allSatisfy { run in
-      if case let .text(text) = run {
-        return text.contains("**") || text.contains("__") || text.contains("* ")
-      }
-      return false
-    }
-  }
-
-  private var markdownText: AttributedString {
-    let joined = runs.compactMap { run -> String? in
-      guard case let .text(text) = run else { return nil }
-      return text
-    }.joined(separator: "\n\n")
-
-    return (try? AttributedString(markdown: joined)) ?? AttributedString(joined)
-  }
-}
-
 /// Surface a `MobileChatProseText` renders on. Drives chip color mixing so
 /// an entity/skill chip stays legible on whichever bubble background it
 /// lands on -- mirrors `EntityChipTone` (`onLight` | `onDark`) on the web.
@@ -385,7 +349,7 @@ enum MobileChatProseTone {
 
 // MARK: - Inline prose flow (GH-12708 entity chip thumbnails v2)
 
-private enum MobileChatFlowToken: Hashable {
+enum MobileChatFlowToken: Hashable {
   case textWord(String)
   case entity(kind: MobileChatEntityKind, id: String, label: String)
   case skill(id: String, label: String)

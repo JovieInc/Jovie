@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { randomUUID } from 'node:crypto';
-import type { UIMessage } from 'ai';
+import type { ToolSet, UIMessage } from 'ai';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
@@ -309,27 +309,28 @@ export async function handleMobileChatTurn(
 
   await markChatTurnStreaming(reservation.turn.id);
 
-  const mobileMerchTools = accountContext.planLimits.booleans
-    .canAccessMerchCreation
-    ? {
-        createMerch: createMerchGenerateTool({
-          profileId,
-          clerkUserId: userId,
-          conversationId: reservation.conversationId,
-          turnId: reservation.turn.id,
-        }),
-        previewMerchOptions: createMerchPreviewTool({
-          profileId,
-          clerkUserId: userId,
-          conversationId: reservation.conversationId,
-          turnId: reservation.turn.id,
-        }),
-        selectMerchDesign: createMerchSelectTool({
-          profileId,
-          clerkUserId: userId,
-        }),
-      }
-    : {};
+  const mobileMerchTools: ToolSet = {
+    ...(accountContext.planLimits.booleans.canAccessMerchCreation
+      ? {
+          createMerch: createMerchGenerateTool({
+            profileId,
+            clerkUserId: userId,
+            conversationId: reservation.conversationId,
+            turnId: reservation.turn.id,
+          }),
+          previewMerchOptions: createMerchPreviewTool({
+            profileId,
+            clerkUserId: userId,
+            conversationId: reservation.conversationId,
+            turnId: reservation.turn.id,
+          }),
+          selectMerchDesign: createMerchSelectTool({
+            profileId,
+            clerkUserId: userId,
+          }),
+        }
+      : {}),
+  };
 
   const { streamResult } = await executeChatTurn({
     uiMessages,
