@@ -277,12 +277,28 @@ final class JovieUITests: XCTestCase {
       $0.textFields["Ask Jovie (offline)"]
     }
 
-    XCTAssertTrue(app.staticTexts["Ask Jovie"].exists)
+    let offlineStatusPredicate = NSPredicate(format: "label == %@", "Offline")
+    XCTAssertEqual(
+      app.staticTexts.matching(offlineStatusPredicate).count,
+      1,
+      "Offline chat should show exactly one status indicator in the shell header.\n\(app.debugDescription)"
+    )
     XCTAssertTrue(
       app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
       "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.staticTexts["@tim"].waitForExistence(timeout: 3),
+      "Drawer account header should keep the @handle while offline.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(offlineStatusPredicate).count,
+      1,
+      "Opening the drawer must not add another Offline status indicator.\n\(app.debugDescription)"
+    )
   }
 
   // JOV-3608: entity/skill chat tokens must render as clean label text, with
