@@ -32,7 +32,9 @@ describe('x402 unit economics', () => {
   it('clears the 50% gross-margin gate at the $0.01 recommended floor', () => {
     const result = evaluateX402UnitEconomics(X402_RECOMMENDED_PRICE_FLOOR_USD);
     expect(result.clearsMarginGate).toBe(true);
-    expect(result.grossMarginRate).toBeGreaterThanOrEqual(X402_MIN_GROSS_MARGIN_RATE);
+    expect(result.grossMarginRate).toBeGreaterThanOrEqual(
+      X402_MIN_GROSS_MARGIN_RATE
+    );
     expect(result.railCostUsd).toBeCloseTo(0.0011, 4);
     expect(result.offRampCostUsd).toBeCloseTo(0.000075, 5);
   });

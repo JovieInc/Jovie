@@ -50,9 +50,7 @@ export function estimateX402RailCostUsd(
   inputs: X402RailCostInputs = DEFAULT_RAIL_INPUTS
 ): number {
   const metering = inputs.aboveCdpFreeTier ? inputs.cdpMeteringPerTxUsd : 0;
-  return (
-    inputs.facilitatorSettlementFeeUsd + inputs.gasPerCallUsd + metering
-  );
+  return inputs.facilitatorSettlementFeeUsd + inputs.gasPerCallUsd + metering;
 }
 
 /**
@@ -104,8 +102,6 @@ export function evaluateX402UnitEconomics(
 export function recommendedFloorClearsMarginGate(
   inputs: X402RailCostInputs = DEFAULT_RAIL_INPUTS
 ): boolean {
-  return evaluateX402UnitEconomics(
-    X402_RECOMMENDED_PRICE_FLOOR_USD,
-    inputs
-  ).clearsMarginGate;
+  return evaluateX402UnitEconomics(X402_RECOMMENDED_PRICE_FLOOR_USD, inputs)
+    .clearsMarginGate;
 }
