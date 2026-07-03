@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Dev server stale `.next` cache guard (GH-12899)**: `node scripts/dev.mjs` now wipes `.next` when app route sources are newer than the compiled manifest, logs the on-disk route count at first compile, and Turbo `dev` restarts when `page.tsx` / `route.ts` / `layout.tsx` inputs change.
 - [internal] **Desktop build clarity (GH-12900)**: Documented the canonical production/staging/local Electron shells (`apps/desktop/BUILDS.md`), restricted `jovie://` URL registration to production only, disabled auto-update on local shells, gated CDP behind `JOVIE_DEV=1`, and added `pnpm run desktop:audit` for `/Applications` hygiene.
 - **iOS chat entity chip thumbnails (GH-12708)**: Inline transcript entity mentions now render as pill chips with a fixed 16×16 thumbnail slot using the shared `AvatarImageCache` loader (no raw `AsyncImage`); unresolved entities keep the accent-dot fallback.
 - [internal] Codex issue shipper now skips `type:epic` pointer issues (they have no code of their own), fixing the claim/find-nothing/release/re-claim loop on epics like #12729. Adds a `skippedEpic` scan counter. (#12846)
