@@ -343,7 +343,7 @@ private struct AppContentView: View {
         return
       }
 
-      if chatRepository == nil {
+      if chatRepository == nil, appState.launchMode.needsChatRepository {
         let repository = ChatRepository(
           client: MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
@@ -378,6 +378,11 @@ private struct AppContentView: View {
 
   @MainActor
   private func reloadAudienceHighlights(for userID: String?) async {
+    guard appState.launchMode.usesLiveClerk else {
+      audienceHighlightsState = Self.previewAudienceHighlightsState(for: appState.launchMode)
+      return
+    }
+
     if appState.launchMode == .uiTestingAudience
       || appState.launchMode == .uiTestingReady
       || appState.launchMode == .uiTestingChat

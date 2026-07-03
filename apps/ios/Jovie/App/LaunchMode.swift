@@ -61,6 +61,13 @@ enum LaunchMode: Equatable {
     self == .uiTestingChatEntityFixture ? MobileChatEntityFixture.default : nil
   }
 
+  /// UI-testing launch modes without live Clerk must not spin up a
+  /// `ChatRepository` backed by `ClerkTokenProvider` -- that crashes on
+  /// `Clerk.shared` when the singleton is unconfigured (auth-callback harness).
+  var needsChatRepository: Bool {
+    usesLiveClerk || opensChatOnLaunch || chatEntityFixture != nil
+  }
+
   var opensAudienceOnLaunch: Bool {
     self == .uiTestingAudience
   }
