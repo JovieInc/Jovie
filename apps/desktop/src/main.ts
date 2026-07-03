@@ -157,7 +157,13 @@ let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 
-app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
+function getDesktopAppDisplayName(): string {
+  if (APP_ENV === 'staging') return 'Jovie Staging';
+  if (APP_ENV === 'local') return 'Jovie Local';
+  return 'Jovie';
+}
+
+app.setName(getDesktopAppDisplayName());
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -1097,7 +1103,7 @@ function refreshApplicationMenu(): void {
 }
 
 function checkForUpdatesFromMenu(): void {
-  if (process.platform === 'linux') {
+  if (!shouldScheduleDesktopAutoUpdate()) {
     return;
   }
 
@@ -1111,8 +1117,18 @@ function checkForUpdatesFromMenu(): void {
   });
 }
 
+function shouldScheduleDesktopAutoUpdate(): boolean {
+  // Local dev shells never auto-update. Production and staging each publish to
+  // their own electron-updater channel; see apps/desktop/BUILDS.md.
+  if (APP_ENV === 'local' || process.platform === 'linux') {
+    return false;
+  }
+
+  return true;
+}
+
 function scheduleDesktopAutoUpdate(): void {
-  if (process.platform === 'linux') {
+  if (!shouldScheduleDesktopAutoUpdate()) {
     return;
   }
 
@@ -1374,6 +1390,13 @@ ipcMain.handle(
 );
 
 function registerAuthReturnProtocol(): void {
+  // Only the canonical production bundle (app.jov.ie) may own jovie:// deep
+  // links. Staging/local shells use separate bundle IDs and must not compete
+  // with the installed production handler — see apps/desktop/BUILDS.md.
+  if (APP_ENV !== 'production') {
+    return;
+  }
+
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
   };

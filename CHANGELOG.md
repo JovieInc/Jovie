@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Desktop build clarity (GH-12900)**: Documented the canonical production/staging/local Electron shells (`apps/desktop/BUILDS.md`), restricted `jovie://` URL registration to production only, disabled auto-update on local shells, gated CDP behind `JOVIE_DEV=1`, and added `pnpm run desktop:audit` for `/Applications` hygiene.
 - **iOS chat entity chip thumbnails (GH-12708)**: Inline transcript entity mentions now render as pill chips with a fixed 16×16 thumbnail slot using the shared `AvatarImageCache` loader (no raw `AsyncImage`); unresolved entities keep the accent-dot fallback.
 - [internal] Codex issue shipper now skips `type:epic` pointer issues (they have no code of their own), fixing the claim/find-nothing/release/re-claim loop on epics like #12729. Adds a `skippedEpic` scan counter. (#12846)
 - [internal] x402 payment-gated artist resources spike (#12750): `docs/spikes/x402-payment-gated-artist-resources.md` (conditional GO — self-hosted Cloudflare Worker template for per-resource pricing; defer managed Monetization Gateway) + reproducible unit-economics model `apps/web/lib/x402-spike/unit-economics.ts`.

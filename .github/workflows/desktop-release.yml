@@ -19,6 +19,7 @@ name: desktop-release
 #   gracefully and produces an unsigned DMG. Auto-update will not work for
 #   unsigned builds; that's by design — they're for sanity checks only.
 # - See apps/desktop/SIGNING.md for one-time setup.
+# - Canonical prod/staging/local shell matrix: apps/desktop/BUILDS.md (GH-12900).
 
 on:
   push:
