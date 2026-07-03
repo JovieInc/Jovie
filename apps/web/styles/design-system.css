@@ -4631,24 +4631,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   gap: var(--space-1);
 }
 
-:where(.system-b-chat-profile-preview-phone-button) {
-  height: var(--space-6);
-  border-radius: var(--radius-md);
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 22%,
-    transparent
-  );
-}
-
-:where(.system-b-chat-profile-preview-phone-button-muted) {
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 14%,
-    transparent
-  );
-}
-
 :where(.system-b-chat-profile-preview-device-icon) {
   position: absolute;
   bottom: var(--space-4);
@@ -4970,34 +4952,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   inset: 0;
   display: grid;
   place-items: center;
-}
-
-:where(.system-b-thread-play-button) {
-  display: grid;
-  width: var(--space-12);
-  height: var(--space-12);
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
-  transition:
-    background-color var(--system-b-duration-fast) var(--system-b-ease),
-    opacity var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-:where(
-  .system-b-thread-video-preview:hover
-    .system-b-thread-play-button[data-interactive="true"]
-) {
-  background: color-mix(
-    in oklab,
-    var(--system-b-primary-bg) 94%,
-    var(--system-b-bg-surface-2)
-  );
-}
-
-:where(.system-b-thread-play-button[data-interactive="false"]) {
-  background: color-mix(in oklab, var(--system-b-primary-bg) 42%, transparent);
 }
 
 :where(.system-b-thread-duration-badge) {
@@ -6240,8 +6194,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 :where(.system-b-library-artwork-shell),
 :where(.system-b-library-status-pill),
 :where(.system-b-library-count-pill),
-:where(.system-b-library-rail-button),
-:where(.system-b-library-filter-section-button),
 :where(.system-b-library-filter-row),
 :where(.system-b-library-kind-pill),
 :where(.system-b-library-provider-link) {
@@ -6250,8 +6202,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 /* Buttons + icon buttons are pill / hover-circle per System B (DESIGN.md:
    App buttons, inputs, controls → 9999px). */
-:where(.system-b-library-action),
-:where(.system-b-library-icon-button) {
+:where(.system-b-library-action) {
   border-radius: var(--radius-full);
 }
 
@@ -6335,7 +6286,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-library-filter-pill),
 :where(.system-b-library-rail-count),
-:where(.system-b-library-clear-button),
 :where(.system-b-library-filter-count),
 :where(.system-b-library-card-count),
 :where(.system-b-library-audio-hint),
@@ -6344,30 +6294,23 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-size: var(--text-2xs);
 }
 
-:where(.system-b-library-rail-button),
 :where(.system-b-library-filter-row),
 :where(.system-b-library-action),
-:where(.system-b-library-icon-button),
 :where(.system-b-library-provider-link) {
   transition-duration: var(--duration-fast);
   transition-property: background-color, border-color, box-shadow, color;
   transition-timing-function: var(--ease-subtle);
 }
 
-:where(.system-b-library-rail-button),
 :where(.system-b-library-filter-row) {
   color: var(--color-text-secondary-token);
   font-size: var(--text-xs);
 }
 
-:where(
-  .system-b-library-rail-button:not(.system-b-library-rail-button--active)
-),
 :where(.system-b-library-filter-row:not(.system-b-library-filter-row--active)) {
   border-color: transparent;
 }
 
-:where(.system-b-library-rail-button--active),
 :where(.system-b-library-filter-row--active) {
   border-color: var(--color-border-default);
   background: var(--system-b-bg-surface-1);
@@ -6375,38 +6318,9 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(
-  .system-b-library-rail-button:not(.system-b-library-rail-button--active):hover
-),
-:where(
   .system-b-library-filter-row:not(.system-b-library-filter-row--active):hover
 ) {
   border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-library-clear-button) {
-  border-radius: var(--radius-xs);
-  transition-duration: var(--duration-fast);
-  transition-property: background-color, color;
-  transition-timing-function: var(--ease-subtle);
-}
-
-:where(.system-b-library-clear-button:hover) {
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-library-filter-section-button) {
-  color: var(--color-text-tertiary-token);
-  font-size: var(--text-2xs);
-  font-weight: var(--font-weight-medium);
-  transition-duration: var(--duration-fast);
-  transition-property: background-color, color;
-  transition-timing-function: var(--ease-subtle);
-}
-
-:where(.system-b-library-filter-section-button:hover) {
   background: var(--system-b-bg-surface-1);
   color: var(--color-text-primary-token);
 }
@@ -6471,12 +6385,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   box-shadow:
     inset 2px 0 0 0 var(--color-border-default),
     inset 0 0 0 1px var(--color-border-subtle);
-}
-
-:where(.system-b-library-card-button) {
-  transition-duration: var(--duration-fast);
-  transition-property: background-color, box-shadow;
-  transition-timing-function: var(--ease-subtle);
 }
 
 :where(.system-b-library-card-status) {
@@ -6646,8 +6554,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 /* Issue #12317 — System B compliance: pill action buttons + borderless
    circular icon buttons. Overrides the shared --radius-md primitive above. */
-:where(.system-b-library-action),
-:where(.system-b-library-icon-button) {
+:where(.system-b-library-action) {
   border-radius: var(--radius-full);
 }
 
@@ -6724,22 +6631,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-weight: var(--font-weight-semibold);
 }
 
-/* Borderless icon buttons; the round hover background reads as a hover-circle. */
-:where(.system-b-library-icon-button) {
-  border-radius: var(--radius-full);
-  color: var(--color-text-tertiary-token);
-}
-
-:where(.system-b-library-icon-button:hover) {
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-library-icon-button--bordered:hover) {
-  border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-2);
-}
-
 :where(.system-b-library-drawer-artwork) {
   border-radius: var(--radius-lg);
 }
@@ -6785,18 +6676,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   background: var(--system-b-bg-surface-1);
 }
 
-:where(.system-b-calendar-icon-button),
-:where(.system-b-calendar-toolbar-button) {
-  border-radius: var(--radius-pill);
-  color: var(--color-text-tertiary-token);
-}
-
-:where(.system-b-calendar-icon-button:hover),
-:where(.system-b-calendar-toolbar-button:hover) {
-  background: var(--system-b-bg-surface-0);
-  color: var(--color-text-primary-token);
-}
-
 :where(.system-b-calendar-panel) {
   border: 1px solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-lg);
@@ -6812,7 +6691,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   border-bottom: 1px solid var(--system-b-app-frame-seam);
 }
 
-:where(.system-b-calendar-toolbar-button),
 :where(.system-b-calendar-detail-section-heading),
 :where(.system-b-calendar-warning-heading),
 :where(.system-b-calendar-error-text),
@@ -8600,39 +8478,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   padding-bottom: calc(var(--space-5) + var(--space-0-5));
   color: var(--color-text-tertiary-token);
   font-size: var(--text-xs);
-}
-
-:where(.system-b-chat-composer-icon-button) {
-  border: 1px solid transparent;
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 88%,
-    var(--system-b-bg-surface-0)
-  );
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    border-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle),
-    box-shadow var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-chat-composer-icon-button:not(:disabled):hover),
-:where(.system-b-chat-composer-icon-button[data-state="open"]) {
-  border-color: var(--system-b-app-shell-border);
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--system-b-app-shell-border) 40%, transparent);
-}
-
-:where(.system-b-chat-composer-icon-button[data-active="true"]) {
-  border-color: var(--color-border-default);
-  background: var(--system-b-bg-surface-2);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-chat-composer-icon-button:disabled) {
-  color: var(--color-text-quaternary-token);
 }
 
 :where(.system-b-chat-composer-primary-action) {

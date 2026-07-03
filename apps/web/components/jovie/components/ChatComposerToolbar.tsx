@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -135,12 +136,15 @@ export function ComposerAttachButton({
   return (
     <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           onMouseDown={onMouseDown}
           disabled={isProcessing || isLoading || isSubmitting || disabled}
           className={cn(
-            'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            'h-9 w-9 shrink-0 border border-transparent bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
+            plusMenuOpen && 'border-subtle bg-surface-1 text-primary-token',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
           aria-label='Attach Files'
@@ -150,7 +154,7 @@ export function ComposerAttachButton({
           ) : (
             <Plus className='h-4 w-4' strokeWidth={2.25} />
           )}
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='start'
@@ -243,8 +247,10 @@ export function ComposerMicButton({
 
   return (
     <SimpleTooltip content={tooltip}>
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
@@ -254,10 +260,11 @@ export function ComposerMicButton({
         data-testid='dictation-toggle'
         data-active={isListening ? 'true' : undefined}
         className={cn(
-          'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full touch-none select-none',
+          'h-9 w-9 shrink-0 touch-none select-none border border-transparent bg-surface-0 hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
           !isSupported
             ? 'text-quaternary-token'
             : !isListening && 'text-tertiary-token',
+          isListening && 'border-default bg-surface-2 text-primary-token',
           'disabled:cursor-not-allowed disabled:opacity-50'
         )}
         aria-label={label}
@@ -268,7 +275,7 @@ export function ComposerMicButton({
         ) : (
           <Mic className='h-4 w-4' strokeWidth={2.25} />
         )}
-      </button>
+      </Button>
     </SimpleTooltip>
   );
 }
