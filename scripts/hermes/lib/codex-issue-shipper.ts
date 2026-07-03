@@ -5,6 +5,12 @@ export const CODEX_BLOCKED_LABEL = 'codex-blocked';
 export const HUMAN_REVIEW_LABEL = 'human-review-required';
 export const NO_AUTO_LABEL = 'no-auto';
 export const EPIC_LABEL = 'type:epic';
+// Issues a human or triage agent has already marked `invalid` (e.g. misrouted
+// foreign-repo issues like the "LYB" body/fitness suite, #12675-#12678) are not
+// real work. Without this skip the shipper re-claims an OPEN `invalid` issue
+// every run — it stays in the claim queue, so it loops forever (69+ comments and
+// ~7 claim/release cycles on #12678). Treat `invalid` as permanent do-not-dispatch.
+export const INVALID_LABEL = 'invalid';
 
 export interface GithubIssueLabel {
   readonly name: string;
@@ -240,6 +246,7 @@ export function eligibleCodexIssues(
       !isHumanReviewRequired(issue) &&
       !isAlreadyClaimedOrBlocked(issue) &&
       !isEpicPointer(issue) &&
+      !labelNames(issue).includes(INVALID_LABEL) &&
       !labelNames(issue).includes(NO_AUTO_LABEL)
   );
 }

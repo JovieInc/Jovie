@@ -13,7 +13,7 @@ import {
   EPIC_LABEL,
   eligibleCodexIssues,
   finishDispatch,
-  isRecoverableDetritus,
+  INVALID_LABEL,
   loadShipperConfig,
   NO_AUTO_LABEL,
   parseAgentChain,
@@ -50,7 +50,7 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters no-auto, claimed, blocked, and epic issues before dispatch', () => {
+  it('filters no-auto, claimed, blocked, epic, and invalid issues before dispatch', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
     const noAuto = issue({
       number: 2,
@@ -69,12 +69,21 @@ describe('codex issue shipper planner', () => {
       number: 5,
       labels: [{ name: 'codex' }, { name: EPIC_LABEL }],
     });
+    // Triaged `invalid` (e.g. misrouted "LYB" foreign-repo issues #12675-#12678):
+    // re-claiming an OPEN invalid issue loops forever (69+ comments on #12678).
+    const invalid = issue({
+      number: 6,
+      labels: [{ name: 'codex' }, { name: INVALID_LABEL }],
+    });
 
     expect(
-      eligibleCodexIssues([ready, noAuto, claimed, blocked, epic])
+      eligibleCodexIssues([ready, noAuto, claimed, blocked, epic, invalid])
     ).toEqual([ready]);
     expect(
-      buildDispatchPlans([ready, noAuto, claimed, blocked, epic], config)
+      buildDispatchPlans(
+        [ready, noAuto, claimed, blocked, epic, invalid],
+        config
+      )
     ).toHaveLength(1);
   });
 
