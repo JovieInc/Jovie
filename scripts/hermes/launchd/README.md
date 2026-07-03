@@ -25,6 +25,24 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-deterministic-tracker.plist.template` | 03:00 daily | Self-improvement clustering |
 | `co.jovie.hermes.cron-free-model-health.plist.template` | 02:00 daily | Free-model rankings refresh |
 
+## Houston (MacBook Pro) units
+
+Coder/shipping loops run on Houston, not Hermes-Air. Pro-only templates live in `pro/` and are installed by `scripts/hermes/bootstrap-pro-launchd.sh` (not `bootstrap-air.sh`).
+
+| File | Schedule | Purpose |
+|---|---|---|
+| `pro/co.jovie.hermes.cron-codex-kanban-ship.plist.template` | every 15 min | Launch `scripts/hermes/ship-loop.sh` → `~/.hermes/scripts/codex-kanban-ship.py` (PAUSE + gbrain gated) |
+
+Install on the Pro:
+
+```bash
+./scripts/hermes/bootstrap-pro-launchd.sh
+launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.cron-codex-kanban-ship
+tail -f ~/.hermes/logs/launchd/cron-codex-kanban-ship.log ~/.hermes/logs/ship-loop.log
+```
+
+Ship outcomes append to `~/.hermes/events/events.jsonl` from `codex-kanban-ship.py`.
+
 ## Logs
 
 Every unit writes stdout/stderr to `~/.hermes/logs/launchd/<label>.log` so failures are diagnosable without `launchctl print`.

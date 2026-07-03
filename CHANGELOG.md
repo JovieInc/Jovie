@@ -15,6 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] Schedule the codex kanban ship loop via Houston launchd (`co.jovie.hermes.cron-codex-kanban-ship`, every 15m) with PAUSE-respecting `scripts/hermes/ship-loop.sh`.
+
 > Connector enrichment turns synced Gmail and Calendar objects into graph facts and calendar suggestions; assistant chat replies surface entity mentions as subdued accent spans that reveal detail cards on hover.
 
 ### Added
