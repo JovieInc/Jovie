@@ -1,0 +1,36 @@
+{
+  "issue": "JovieInc/Jovie#12750",
+  "demoUsername": "lunawaves",
+  "primaryAsset": "mcp-artist",
+  "originBaseUrl": "https://staging.jov.ie",
+  "network": "base-sepolia",
+  "facilitatorUrl": "https://x402.org/facilitator",
+  "assets": [
+    {
+      "kind": "mcp-artist",
+      "label": "Per-artist MCP server",
+      "originPath": "/api/mcp/lunawaves",
+      "protectedPattern": "/api/mcp/lunawaves/*",
+      "suggestedPriceUsd": "$0.01",
+      "mcpSmokeRequest": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "resources/list",
+        "params": {}
+      }
+    },
+    {
+      "kind": "press-kit-drop",
+      "label": "Library press-kit share drop",
+      "originPath": "/drop/{token}",
+      "protectedPattern": "/drop/*",
+      "suggestedPriceUsd": "$0.05"
+    }
+  ],
+  "liveE2eBlockers": [
+    "CLOUDFLARE_ACCOUNT_ID + wrangler deploy (human)",
+    "PAY_TO wallet + base-sepolia test USDC (Circle faucet)",
+    "X402_TEST_PRIVATE_KEY for npm run test:client (human, gitignored)",
+    "Monetization Gateway waitlist for production rules API (#product)"
+  ]
+}

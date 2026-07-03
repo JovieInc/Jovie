@@ -1,0 +1,25 @@
+/**
+ * Example wrangler vars for x402-proxy in front of Jovie staging (GitHub #12750).
+ * Fork from https://github.com/cloudflare/templates/tree/main/x402-proxy-template
+ * and merge these vars. Do not commit secrets — JWT_SECRET via `wrangler secret put`.
+ */
+{
+  "vars": {
+    "PAY_TO": "0x000000000000000000000000000000000000dEaD",
+    "NETWORK": "base-sepolia",
+    "ORIGIN_URL": "https://staging.jov.ie",
+    "FACILITATOR_URL": "https://x402.org/facilitator",
+    "PROTECTED_PATTERNS": [
+      {
+        "pattern": "/api/mcp/lunawaves/*",
+        "price": "$0.01",
+        "description": "Per-artist MCP resources + tools (1h session cookie)"
+      },
+      {
+        "pattern": "/drop/*",
+        "price": "$0.05",
+        "description": "Press-kit share drop download surface"
+      }
+    ]
+  }
+}
