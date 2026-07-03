@@ -193,24 +193,176 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     );
   });
 
-  it('returns 503 when the global chat kill-switch is enabled', async () => {
+  it('serves the scripted fallback when the global chat kill-switch is enabled', async () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production' });
     hoisted.checkGateForUserMock.mockResolvedValue(true);
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+    hoisted.verifyTurnstileTokenMock.mockResolvedValue({ success: true });
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'
     );
     const req = makeRequest({
       mode: 'onboarding',
+      turnstileToken: 'tok',
       messages: [userMessage('hi')],
     });
     const result = await tryHandleAnonymousOnboardingChat(req, 'req-2');
     expect(result).not.toBeNull();
-    expect(result?.status).toBe(503);
-    const body = await result?.json();
-    expect(body.errorCode).toBe('ONBOARDING_CHAT_DISABLED');
-    // Dispatch must NOT have been called when the gate is closed.
+    // The kill switch no longer blocks onboarding — the deterministic script
+    // answers instead (JOV-3806).
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('kill_switch');
+    expect(result?.headers.get('x-onboarding-fallback')).toMatch(/^greet:/);
+    expect(await result?.text()).toContain("I'm Jovie");
+    // The LLM must NOT have been called when the gate is closed.
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('serves the scripted fallback when executeChatTurn throws', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.executeChatTurnMock.mockRejectedValue(
+      new Error('anthropic 529 overloaded')
+    );
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('hi, I want in')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-llm-down');
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('llm_error');
+    expect(result?.headers.get('x-onboarding-fallback')).toMatch(/^greet:/);
+    // Fresh session still gets its cookie even on the fallback path.
+    expect(result?.headers.get('set-cookie')).toContain(
+      'jovie_onboarding_session='
+    );
+    expect(await result?.text()).toContain("I'm Jovie");
+    // The LLM failure still pages.
+    expect(hoisted.captureExceptionMock).toHaveBeenCalled();
+  });
+
+  it('opens the artist picker via fallback on a later turn when the LLM is down', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.executeChatTurnMock.mockRejectedValue(new Error('provider down'));
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [
+        userMessage('hey'),
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          parts: [{ type: 'text', text: 'What are you working on?' }],
+        },
+        userMessage('I am Test Artist'),
+      ],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-picker');
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-onboarding-fallback')).toMatch(
+      /^get_artist:/
+    );
+    const body = await result?.text();
+    expect(body).toContain('open_artist_picker');
+    expect(body).toContain('searchSpotifyArtist');
+  });
+
+  it('honors LLM failure injection only when the server env enables it', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    vi.stubEnv('CHAT_LLM_FAILURE_INJECTION', '1');
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      { mode: 'onboarding', messages: [userMessage('hi')] },
+      '',
+      { 'x-jovie-e2e-llm-failure': '1' }
+    );
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-inject');
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('injected');
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores the injection header when the env flag is not set', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: {
+        toUIMessageStreamResponse: ({
+          headers,
+        }: {
+          headers: Record<string, string>;
+        }) => new Response('ok', { status: 200, headers }),
+      },
+      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      { mode: 'onboarding', messages: [userMessage('hi')] },
+      '',
+      { 'x-jovie-e2e-llm-failure': '1' }
+    );
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-noinject');
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBeNull();
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the injection header on production deploys even with the env flag', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+    vi.stubEnv('CHAT_LLM_FAILURE_INJECTION', '1');
+    hoisted.checkGateForUserMock.mockResolvedValue(false);
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+    hoisted.verifyTurnstileTokenMock.mockResolvedValue({ success: true });
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: {
+        toUIMessageStreamResponse: ({
+          headers,
+        }: {
+          headers: Record<string, string>;
+        }) => new Response('ok', { status: 200, headers }),
+      },
+      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      {
+        mode: 'onboarding',
+        turnstileToken: 'tok',
+        messages: [userMessage('hi')],
+      },
+      '',
+      { 'x-jovie-e2e-llm-failure': '1' }
+    );
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-prod');
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBeNull();
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
   });
 
   it('returns 400 when the messages array is missing', async () => {
