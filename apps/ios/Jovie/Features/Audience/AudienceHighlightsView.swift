@@ -77,9 +77,7 @@ struct AudienceHighlightsView: View {
         spacing: JovieSpacing.medium
       ) {
         ForEach(0..<4, id: \.self) { _ in
-          RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
-            .fill(JovieColor.surface1)
-            .frame(height: 92)
+          skeletonStatTile
         }
       }
       RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
@@ -172,6 +170,26 @@ struct AudienceHighlightsView: View {
     .accessibilityIdentifier("audience-highlights-hero")
   }
 
+  // Mirrors loaded stat tiles (label + value, no hint) so skeleton → loaded
+  // does not jump when highlights paint on a cold first load.
+  private var skeletonStatTile: some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+      RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
+        .fill(JovieColor.surface1)
+        .frame(height: 14)
+      RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
+        .fill(JovieColor.surface1)
+        .frame(height: 24)
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .padding(JovieSpacing.medium)
+    .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
+        .stroke(JovieColor.borderSubtle, lineWidth: 1)
+    }
+  }
+
   private func statTile(_ tile: MobileAudienceHighlightsStatTile) -> some View {
     VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
       Text(tile.label)
@@ -189,7 +207,7 @@ struct AudienceHighlightsView: View {
           .foregroundStyle(JovieColor.textTertiary)
       }
     }
-    .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+    .frame(maxWidth: .infinity, alignment: .topLeading)
     .padding(JovieSpacing.medium)
     .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     .overlay {
