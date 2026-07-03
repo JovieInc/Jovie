@@ -2,10 +2,10 @@
 
 import { Bot, Lock } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { EntityCard } from '@/components/organisms/entity-card';
 import { aiCrawlerAnalyticsToEntityCard } from '@/components/organisms/entity-card/adapters';
-import { UpgradeButton } from '@/components/molecules/UpgradeButton';
-import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { track } from '@/lib/analytics';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
@@ -19,11 +19,24 @@ interface AiCrawlerIntelligenceCardProps {
 function CardSkeleton({ className }: { readonly className?: string }) {
   return (
     <div
-      className={cn('min-h-45 rounded-2xl border border-subtle bg-surface-1 p-4', className)}
+      className={cn(
+        'min-h-45 rounded-2xl border border-subtle bg-surface-1 p-4',
+        className
+      )}
       data-testid='ai-crawler-card-skeleton'
     >
-      <LoadingSkeleton height='h-4' width='w-28' rounded='sm' className='mb-3' />
-      <LoadingSkeleton height='h-8' width='w-20' rounded='sm' className='mb-4' />
+      <LoadingSkeleton
+        height='h-4'
+        width='w-28'
+        rounded='sm'
+        className='mb-3'
+      />
+      <LoadingSkeleton
+        height='h-8'
+        width='w-20'
+        rounded='sm'
+        className='mb-4'
+      />
       <div className='space-y-2'>
         <LoadingSkeleton height='h-3' width='w-full' rounded='sm' />
         <LoadingSkeleton height='h-3' width='w-4/5' rounded='sm' />
@@ -97,7 +110,9 @@ export function AiCrawlerIntelligenceCard({
       >
         <div className='flex items-center gap-2 text-secondary-token'>
           <Bot className='h-4 w-4' aria-hidden='true' />
-          <p className='text-app'>AI crawler analytics temporarily unavailable.</p>
+          <p className='text-app'>
+            AI crawler analytics temporarily unavailable.
+          </p>
         </div>
       </div>
     );
@@ -115,7 +130,9 @@ export function AiCrawlerIntelligenceCard({
         model={model}
         treatment='detailed'
         surface='app'
-        className={cn(showTeaser && 'pointer-events-none select-none blur-[3px]')}
+        className={cn(
+          showTeaser && 'pointer-events-none select-none blur-[3px]'
+        )}
         onClick={
           !showTeaser
             ? () => {

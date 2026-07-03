@@ -7,7 +7,11 @@ export interface AiCrawlerBotDefinition {
 
 export const TRACKED_AI_CRAWLER_BOTS: readonly AiCrawlerBotDefinition[] = [
   { id: 'gptbot', name: 'GPTBot', userAgentPattern: 'GPTBot' },
-  { id: 'chatgpt-user', name: 'ChatGPT-User', userAgentPattern: 'ChatGPT-User' },
+  {
+    id: 'chatgpt-user',
+    name: 'ChatGPT-User',
+    userAgentPattern: 'ChatGPT-User',
+  },
   {
     id: 'claude-web',
     name: 'Claude-Web',

@@ -131,6 +131,7 @@ export {
   type UseAdminSocialLinksQueryOptions,
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
+export { useAiCrawlerAnalyticsQuery } from './useAiCrawlerAnalyticsQuery';
 export { useAlgorithmHealthQuery } from './useAlgorithmHealthQuery';
 export {
   type AppleMusicArtistResult,
@@ -282,7 +283,6 @@ export {
   useToggleVerificationMutation,
 } from './useCreatorVerificationMutation';
 export { useDashboardAnalyticsQuery } from './useDashboardAnalyticsQuery';
-export { useAiCrawlerAnalyticsQuery } from './useAiCrawlerAnalyticsQuery';
 export {
   type DashboardProfile,
   useDashboardProfileQuery,

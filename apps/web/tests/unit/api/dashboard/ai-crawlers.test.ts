@@ -63,7 +63,14 @@ describe('GET /api/dashboard/ai-crawlers', () => {
     hoisted.getAiCrawlerAnalyticsForUserMock.mockResolvedValue({
       totalRequests: 8,
       weeklyRequests: 2,
-      crawlers: [{ id: 'teaser-1', name: 'AI Crawler', requests: 0, previousPeriodRequests: 0 }],
+      crawlers: [
+        {
+          id: 'teaser-1',
+          name: 'AI Crawler',
+          requests: 0,
+          previousPeriodRequests: 0,
+        },
+      ],
       dailyTrend: [],
       syncedAt: null,
       isPro: false,

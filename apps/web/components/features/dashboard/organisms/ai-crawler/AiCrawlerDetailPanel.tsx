@@ -63,7 +63,10 @@ function CrawlerRows({
     return (
       <ul className='min-h-49 space-y-2'>
         {[1, 2, 3, 4].map(index => (
-          <li key={index} className='flex items-center justify-between px-2 py-2'>
+          <li
+            key={index}
+            className='flex items-center justify-between px-2 py-2'
+          >
             <LoadingSkeleton height='h-3' width='w-28' rounded='sm' />
             <LoadingSkeleton height='h-3' width='w-10' rounded='sm' />
           </li>
@@ -75,7 +78,10 @@ function CrawlerRows({
   if (crawlers.length === 0) {
     return (
       <div className='flex min-h-49 flex-col items-center justify-center text-center'>
-        <Bot className='mb-1.5 h-4 w-4 text-quaternary-token' aria-hidden='true' />
+        <Bot
+          className='mb-1.5 h-4 w-4 text-quaternary-token'
+          aria-hidden='true'
+        />
         <p className='text-xs text-tertiary-token'>
           No AI crawler visits recorded yet.
         </p>
@@ -86,7 +92,10 @@ function CrawlerRows({
   const maxRequests = crawlers[0]?.requests ?? 1;
 
   return (
-    <ul className='min-h-49 space-y-2' aria-label='AI crawlers by request count'>
+    <ul
+      className='min-h-49 space-y-2'
+      aria-label='AI crawlers by request count'
+    >
       {crawlers.map((crawler, index) => {
         const widthPct = (crawler.requests / maxRequests) * 100;
         const accentColor = ACCENT_COLORS[index % ACCENT_COLORS.length];
@@ -159,13 +168,14 @@ export function AiCrawlerDetailPanel({
                   Which AI services read your profile and asset pages.
                 </p>
               </div>
-              <DrawerSurfaceCard variant='flat' className='grid grid-cols-2 gap-2 p-2'>
+              <DrawerSurfaceCard
+                variant='flat'
+                className='grid grid-cols-2 gap-2 p-2'
+              >
                 <StatTile
                   label='30-Day Reads'
                   value={
-                    isLoading
-                      ? ''
-                      : (data?.totalRequests ?? 0).toLocaleString()
+                    isLoading ? '' : (data?.totalRequests ?? 0).toLocaleString()
                   }
                 />
                 <StatTile

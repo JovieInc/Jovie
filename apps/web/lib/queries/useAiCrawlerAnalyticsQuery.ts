@@ -1,8 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchWithTimeout } from '@/lib/queries/fetch';
 import { STABLE_CACHE } from '@/lib/queries/cache-strategies';
+import { fetchWithTimeout } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 

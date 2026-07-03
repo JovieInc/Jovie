@@ -23,10 +23,7 @@ export const aiCrawlerAnalyticsSnapshots = pgTable(
     periodDays: integer('period_days').notNull().default(30),
     totalRequests: integer('total_requests').notNull().default(0),
     weeklyRequests: integer('weekly_requests').notNull().default(0),
-    crawlers: jsonb('crawlers')
-      .$type<AiCrawlerStat[]>()
-      .notNull()
-      .default([]),
+    crawlers: jsonb('crawlers').$type<AiCrawlerStat[]>().notNull().default([]),
     dailyTrend: jsonb('daily_trend')
       .$type<AiCrawlerDailyPoint[]>()
       .notNull()

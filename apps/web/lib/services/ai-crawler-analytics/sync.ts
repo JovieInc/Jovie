@@ -8,10 +8,7 @@ import { aiCrawlerAnalyticsSnapshots } from '@/lib/db/schema/ai-crawler-analytic
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
-import {
-  attributeAiCrawlerRows,
-  type ProfileHandleRow,
-} from './attribute';
+import { attributeAiCrawlerRows, type ProfileHandleRow } from './attribute';
 
 const PERIOD_DAYS = 30;
 

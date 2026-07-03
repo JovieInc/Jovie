@@ -1,9 +1,9 @@
+import type { RawAiCrawlerRequestRow } from '@/lib/cloudflare/ai-crawler-analytics-fetch';
 import {
+  type AiCrawlerBotDefinition,
   matchAiCrawlerFromUserAgent,
   TRACKED_AI_CRAWLER_BOTS,
-  type AiCrawlerBotDefinition,
 } from '@/lib/cloudflare/ai-crawler-bots';
-import type { RawAiCrawlerRequestRow } from '@/lib/cloudflare/ai-crawler-analytics-fetch';
 import type {
   AiCrawlerDailyPoint,
   AiCrawlerStat,
@@ -47,14 +47,14 @@ export interface ProfileAiCrawlerAggregate {
 }
 
 interface MutableCrawlerTotals {
-  readonly current: number;
-  readonly previous: number;
+  current: number;
+  previous: number;
 }
 
 interface MutableProfileBucket {
   readonly crawlers: Map<string, MutableCrawlerTotals>;
   readonly daily: Map<string, number>;
-  readonly weekly: number;
+  weekly: number;
   total: number;
 }
 
