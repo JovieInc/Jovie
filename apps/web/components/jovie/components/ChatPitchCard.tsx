@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
@@ -72,14 +73,16 @@ function CopyButton({
   }, [copied]);
 
   return (
-    <button
+    <Button
       type='button'
+      variant='ghost'
+      size='icon'
       onClick={handleCopy}
-      className='system-b-chat-pitch-copy-button focus-ring'
+      className='h-6 w-6 rounded-md focus-ring'
       aria-label={`Copy ${platform} pitch`}
     >
       <CopyToggleIcon copied={copied} size='system-b-chat-pitch-copy-icon' />
-    </button>
+    </Button>
   );
 }
 

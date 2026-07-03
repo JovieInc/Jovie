@@ -8178,25 +8178,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   text-decoration-line: underline;
 }
 
-:where(.system-b-chat-pitch-copy-button) {
-  display: inline-flex;
-  width: var(--space-6);
-  height: var(--space-6);
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  color: var(--color-text-tertiary-token);
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-chat-pitch-copy-button:hover) {
-  background: var(--system-b-bg-surface-2);
-  color: var(--color-text-secondary-token);
-}
-
 :where(.system-b-chat-pitch-copy-icon) {
   width: calc(var(--space-3) + var(--space-0-5));
   height: calc(var(--space-3) + var(--space-0-5));
@@ -8357,37 +8338,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     var(--system-b-bg-surface-0)
   );
   color: var(--color-text-primary-token);
-}
-
-.system-b-copy-link-button {
-  top: 50%;
-  transform: translateY(-50%);
-  border-color: transparent;
-  color: var(--color-text-tertiary-token);
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    border-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-.system-b-copy-link-button:hover {
-  border-color: var(--system-b-app-frame-seam);
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-primary-token);
-}
-
-.system-b-copy-link-button[data-copied="true"] {
-  border-color: color-mix(
-    in oklab,
-    var(--color-success) 32%,
-    var(--system-b-app-frame-seam)
-  );
-  background: color-mix(
-    in oklab,
-    var(--color-success) 10%,
-    var(--system-b-bg-surface-1)
-  );
-  color: var(--color-success);
 }
 
 .system-b-copy-link-icon {
@@ -8843,40 +8793,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   margin-inline: auto;
   flex-direction: column;
   gap: var(--space-1-5);
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button) {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--space-2);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary-token);
-  font-size: 12.5px;
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-  transition:
-    background-color var(--duration-fast) var(--ease-subtle),
-    color var(--duration-fast) var(--ease-subtle);
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button:enabled:hover) {
-  background: var(--surface-0);
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button:disabled) {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-:where(.system-b-chat-suggested-prompts-flat-button:focus-visible) {
-  border-color: var(--color-border-focus);
-  background: var(--surface-0);
-  outline: none;
-  box-shadow: 0 0 0 2px
-    color-mix(in oklab, var(--color-border-focus) 12%, transparent);
 }
 
 :where(.system-b-chat-suggested-prompts-rail-wrapper) {
@@ -9485,32 +9401,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   opacity: 1;
 }
 
-:where(.system-b-chat-copy-button) {
-  display: inline-flex;
-  width: calc(var(--space-6) + var(--space-1));
-  height: calc(var(--space-6) + var(--space-1));
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-tertiary-token);
-  box-shadow: none;
-  transition:
-    background-color var(--duration-subtle) var(--ease-subtle),
-    color var(--duration-subtle) var(--ease-subtle);
-}
-
-:where(.system-b-chat-copy-button:hover),
-:where(.system-b-chat-copy-button:focus-visible) {
-  background: var(--system-b-bg-surface-1);
-  color: var(--color-text-secondary-token);
-}
-
-:where(.system-b-chat-copy-button:focus-visible) {
-  outline: none;
-}
-
 :where(.system-b-chat-copy-icon) {
   width: calc(var(--space-3) + var(--space-0-5));
   height: calc(var(--space-3) + var(--space-0-5));
@@ -9687,39 +9577,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     color-mix(in oklab, black 25%, transparent),
     transparent
   );
-}
-
-:where(.system-b-image-preview-remove-button) {
-  position: absolute;
-  top: var(--space-1-5);
-  right: var(--space-1-5);
-  display: flex;
-  width: var(--space-6);
-  height: var(--space-6);
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in oklab, white 15%, transparent);
-  border-radius: var(--radius-lg);
-  background: color-mix(in oklab, black 55%, transparent);
-  color: white;
-  opacity: 1;
-  transition: opacity var(--duration-fast) var(--ease-subtle);
-}
-
-@media (hover: hover) {
-  :where(.system-b-image-preview-remove-button) {
-    opacity: 0;
-  }
-
-  :where(
-    .system-b-image-preview-item:hover .system-b-image-preview-remove-button
-  ) {
-    opacity: 1;
-  }
-}
-
-:where(.system-b-image-preview-remove-button:focus-visible) {
-  opacity: 1;
 }
 
 :where(.system-b-chat-avatar-upload-state-card) {
