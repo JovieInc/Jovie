@@ -89,6 +89,16 @@ The private operator surface belongs under `/app/admin/ops`. The current `/hud` 
 
 Admin Ops v1 should use compact admin-shell patterns. Feature-specific components live under `apps/web/components/features/admin/agent-os/*`. Components should move to shared workflow organisms only after a second product surface actually reuses them.
 
+## Ovie Swift Menu Bar Is A Launcher, Not A Second Surface
+
+`JovieInc/ovie` is a separate Swift repo (Mac menu-bar app, outside this monorepo) that surfaces the autonomous ship-loop status — pause/resume, in-flight ledger jobs, ship-owner lock — and reads the same `~/.hermes/state/*` files the Jovie web app reads.
+
+- Ovie is a launcher only: no main window, no product UI of its own. `/hud` (→ `/app/admin/ops`, see "Admin Ops Boundary" above) is the canonical ops surface. Ovie's "Open Ovie" menu item hands off to `/hud` via `NSWorkspace.shared.open` (system-browser handoff, no embedded WKWebView).
+- No new Swift design tokens, ever. Ovie's menu uses system chrome only (`Color.green/.yellow/.red/.gray`, system fonts). Jovie theme values (`system-b-tokens.ts`, `design-system.css`) do not get hand-typed into Swift.
+- The repo stays active — do not archive — until its build/deploy issues are resolved and the deployed binary is confirmed working end to end. See open issues on `JovieInc/ovie` for current blockers.
+
+Reference: [GH-12894](https://github.com/JovieInc/Jovie/issues/12894).
+
 ## Trigger Fallback Criteria
 
 Do not install Trigger in this wave. Revisit it only if WDK fails one of these proof points:

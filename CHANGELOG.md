@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Deprecate Ovie Swift menu bar as a second surface (GH-12894)**: Documented in `docs/AGENT_OS_ARCHITECTURE.md` that `JovieInc/ovie` is a launcher only — no Swift design tokens, no product UI of its own. `/hud` (→ `/app/admin/ops`) is the canonical ops surface; verified the redirect already worked with no code change needed. Archiving `JovieInc/ovie` stays deferred until its open build/deploy bugs are fixed and the deployed binary is confirmed working.
 - [internal] **Desktop build clarity (GH-12900)**: Documented the canonical production/staging/local Electron shells (`apps/desktop/BUILDS.md`), restricted `jovie://` URL registration to production only, disabled auto-update on local shells, gated CDP behind `JOVIE_DEV=1`, and added `pnpm run desktop:audit` for `/Applications` hygiene.
 - **iOS chat entity chip thumbnails (GH-12708)**: Inline transcript entity mentions now render as pill chips with a fixed 16×16 thumbnail slot using the shared `AvatarImageCache` loader (no raw `AsyncImage`); unresolved entities keep the accent-dot fallback.
 - [internal] Codex issue shipper now skips `type:epic` pointer issues (they have no code of their own), fixing the claim/find-nothing/release/re-claim loop on epics like #12729. Adds a `skippedEpic` scan counter. (#12846)
