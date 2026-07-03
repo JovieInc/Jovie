@@ -12,6 +12,11 @@ import {
   resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
 import {
+  createMerchGenerateTool,
+  createMerchPreviewTool,
+  createMerchSelectTool,
+} from '@/lib/chat/tools/merch-tools';
+import {
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
   reserveChatTurn,
@@ -35,11 +40,6 @@ import {
   embedMobileMerchArtifactsInContent,
   mobileMerchToolEventsFromResults,
 } from '@/lib/mobile/chat/tool-artifacts';
-import {
-  createMerchGenerateTool,
-  createMerchPreviewTool,
-  createMerchSelectTool,
-} from '@/lib/chat/tools/merch-tools';
 import { checkAiChatRateLimitForPlan } from '@/lib/rate-limit';
 
 function buildUiMessagesFromHistory(
@@ -309,7 +309,8 @@ export async function handleMobileChatTurn(
 
   await markChatTurnStreaming(reservation.turn.id);
 
-  const mobileMerchTools = accountContext.planLimits.booleans.canAccessMerchCreation
+  const mobileMerchTools = accountContext.planLimits.booleans
+    .canAccessMerchCreation
     ? {
         createMerch: createMerchGenerateTool({
           profileId,
