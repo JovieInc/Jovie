@@ -70,7 +70,6 @@ Required environment for manual live evals:
 
 - `JOVIE_RUN_LIVE_EVALS=1`.
 - `AI_GATEWAY_API_KEY`, normally supplied by Doppler through the root `evals:live` script.
-- Optional `BRAINTRUST_API_KEY` for tracing.
 
 Required environment for manual live HTTP evals:
 
