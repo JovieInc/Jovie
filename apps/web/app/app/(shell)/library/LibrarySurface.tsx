@@ -785,18 +785,25 @@ function LibrarySavedViewRow({
   readonly onClick: () => void;
 }) {
   return (
-    <button
-      type='button'
-      onClick={onClick}
-      aria-pressed={active}
+    <Button
+      asChild
+      variant={active ? 'secondary' : 'tertiary'}
+      size='sm'
+      static
       className={cn(
-        'system-b-library-rail-button flex h-7 w-full items-center gap-2 border px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
-        active && 'system-b-library-rail-button--active'
+        'flex h-7 w-full items-center justify-start gap-2 border px-2 transition-colors duration-fast ease-subtle focus-visible:ring-offset-(--linear-app-content-surface)',
+        active
+          ? 'border-default bg-surface-1 text-primary-token'
+          : 'border-transparent text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
       )}
     >
-      <span className='min-w-0 flex-1 truncate text-left'>{label}</span>
-      <span className='system-b-library-rail-count tabular-nums'>{count}</span>
-    </button>
+      <button type='button' onClick={onClick} aria-pressed={active}>
+        <span className='min-w-0 flex-1 truncate text-left'>{label}</span>
+        <span className='system-b-library-rail-count tabular-nums'>
+          {count}
+        </span>
+      </button>
+    </Button>
   );
 }
 
@@ -879,13 +886,15 @@ function LibraryRail({
         <div className='flex items-center justify-between gap-2 border-t border-subtle pb-1 pt-2'>
           <p className='system-b-library-rail-title'>Filters</p>
           {hasActiveFilters(filters) ? (
-            <button
+            <Button
               type='button'
+              variant='tertiary'
+              size='sm'
               onClick={onClearFilters}
-              className='system-b-library-clear-button px-1.5 py-0.5'
+              className='h-auto rounded-xs px-1.5 py-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
             >
               Clear Filters ({activeFilterCount})
-            </button>
+            </Button>
           ) : null}
         </div>
 
@@ -1004,23 +1013,30 @@ function FilterSection({
 
   return (
     <div className='pt-2'>
-      <button
-        id={buttonId}
-        type='button'
-        aria-controls={panelId}
-        aria-expanded={open}
-        onClick={() => setOpen(value => !value)}
-        className='system-b-library-filter-section-button flex h-6 w-full items-center justify-between px-1'
+      <Button
+        asChild
+        variant='tertiary'
+        size='sm'
+        static
+        className='flex h-6 w-full items-center justify-between px-1 font-medium text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
       >
-        <span>{label}</span>
-        <ChevronDown
-          className={cn(
-            'h-3 w-3 transition-transform duration-subtle ease-subtle',
-            !open && '-rotate-90'
-          )}
-          aria-hidden='true'
-        />
-      </button>
+        <button
+          id={buttonId}
+          type='button'
+          aria-controls={panelId}
+          aria-expanded={open}
+          onClick={() => setOpen(value => !value)}
+        >
+          <span>{label}</span>
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 transition-transform duration-subtle ease-subtle',
+              !open && '-rotate-90'
+            )}
+            aria-hidden='true'
+          />
+        </button>
+      </Button>
       {open ? (
         <section
           id={panelId}
@@ -1310,74 +1326,81 @@ const AssetCard = memo(function AssetCard({
           className='system-b-library-card-selected-frame pointer-events-none absolute inset-0'
         />
       ) : null}
-      <button
-        type='button'
-        onClick={onSelect}
-        aria-label={`View ${asset.title}`}
+      <Button
+        asChild
+        variant='tertiary'
+        size='sm'
+        static
         className={cn(
-          'system-b-library-card-button flex h-full w-full flex-col text-left',
+          'flex h-full w-full flex-col items-stretch justify-start rounded-none p-0 text-left transition-colors duration-fast ease-subtle hover:bg-transparent active:bg-transparent',
           LIBRARY_CARD_FOCUS_CLASS
         )}
       >
-        <div
-          className={cn(
-            'system-b-library-card-artwork relative overflow-hidden',
-            getLibraryAspectRatioClass(aspectRatio)
-          )}
+        <button
+          type='button'
+          onClick={onSelect}
+          aria-label={`View ${asset.title}`}
         >
-          <LibraryMediaThumbnail asset={asset} size='card' />
-          <span
+          <div
             className={cn(
-              'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
-              libraryApprovalStatusClasses(asset.approvalStatus)
+              'system-b-library-card-artwork relative overflow-hidden',
+              getLibraryAspectRatioClass(aspectRatio)
             )}
-            data-testid={`library-approval-status-${asset.id}`}
           >
-            {formatLibraryApprovalStatus(asset.approvalStatus)}
-          </span>
-        </div>
-        <div className='min-w-0 p-3'>
-          <div className='flex min-w-0 items-start justify-between gap-2'>
-            <div className='min-w-0'>
-              <h2 className='system-b-library-card-title truncate'>
-                {asset.title}
-              </h2>
-              <p className='system-b-library-card-meta mt-0.5 truncate'>
-                {asset.artist}
-              </p>
-            </div>
-            <span className='system-b-library-card-count shrink-0 tabular-nums'>
-              {getLibraryItemKind(asset) === 'merch'
-                ? (asset.salePriceLabel ?? 'Merch')
-                : formatCompactCount(asset.providerCount)}
+            <LibraryMediaThumbnail asset={asset} size='card' />
+            <span
+              className={cn(
+                'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
+                libraryApprovalStatusClasses(asset.approvalStatus)
+              )}
+              data-testid={`library-approval-status-${asset.id}`}
+            >
+              {formatLibraryApprovalStatus(asset.approvalStatus)}
             </span>
           </div>
-          <div className='system-b-library-card-summary mt-2 flex min-w-0 items-center gap-1.5'>
-            {getLibraryItemKind(asset) === 'merch' ? (
-              <Shirt className='h-3 w-3 shrink-0' />
-            ) : (
-              <Disc3 className='h-3 w-3 shrink-0' />
-            )}
-            <span>{formatLibraryItemType(asset)}</span>
-            {getLibraryItemKind(asset) === 'release' ? (
-              <>
-                <span className='opacity-50'>.</span>
-                <span>{asset.trackCount} Tracks</span>
-              </>
-            ) : null}
-          </div>
-          <div className='mt-3 flex flex-wrap gap-1.5'>
-            {asset.assetKinds.slice(0, 3).map(kind => (
-              <AssetKindPill key={kind} kind={kind} />
-            ))}
-            {asset.assetKinds.length > 3 ? (
-              <span className='system-b-library-card-more-pill inline-flex h-6 items-center px-2'>
-                +{asset.assetKinds.length - 3}
+          <div className='min-w-0 p-3'>
+            <div className='flex min-w-0 items-start justify-between gap-2'>
+              <div className='min-w-0'>
+                <h2 className='system-b-library-card-title truncate'>
+                  {asset.title}
+                </h2>
+                <p className='system-b-library-card-meta mt-0.5 truncate'>
+                  {asset.artist}
+                </p>
+              </div>
+              <span className='system-b-library-card-count shrink-0 tabular-nums'>
+                {getLibraryItemKind(asset) === 'merch'
+                  ? (asset.salePriceLabel ?? 'Merch')
+                  : formatCompactCount(asset.providerCount)}
               </span>
-            ) : null}
+            </div>
+            <div className='system-b-library-card-summary mt-2 flex min-w-0 items-center gap-1.5'>
+              {getLibraryItemKind(asset) === 'merch' ? (
+                <Shirt className='h-3 w-3 shrink-0' />
+              ) : (
+                <Disc3 className='h-3 w-3 shrink-0' />
+              )}
+              <span>{formatLibraryItemType(asset)}</span>
+              {getLibraryItemKind(asset) === 'release' ? (
+                <>
+                  <span className='opacity-50'>.</span>
+                  <span>{asset.trackCount} Tracks</span>
+                </>
+              ) : null}
+            </div>
+            <div className='mt-3 flex flex-wrap gap-1.5'>
+              {asset.assetKinds.slice(0, 3).map(kind => (
+                <AssetKindPill key={kind} kind={kind} />
+              ))}
+              {asset.assetKinds.length > 3 ? (
+                <span className='system-b-library-card-more-pill inline-flex h-6 items-center px-2'>
+                  +{asset.assetKinds.length - 3}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+      </Button>
       {hasPreview ? (
         <button
           type='button'
