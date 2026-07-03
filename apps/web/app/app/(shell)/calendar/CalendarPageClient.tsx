@@ -466,7 +466,7 @@ export function CalendarPageClient() {
                   next.setMonth(cursor.getMonth() - 1);
                   setCursor(startOfMonth(next));
                 }}
-                className='h-7 w-7 text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
+                className='system-b-calendar-action-ghost h-7 w-7 transition-colors duration-subtle ease-subtle'
                 aria-label='Previous Month'
               >
                 <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
@@ -483,7 +483,7 @@ export function CalendarPageClient() {
                   next.setMonth(cursor.getMonth() + 1);
                   setCursor(startOfMonth(next));
                 }}
-                className='h-7 w-7 text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
+                className='system-b-calendar-action-ghost h-7 w-7 transition-colors duration-subtle ease-subtle'
                 aria-label='Next Month'
               >
                 <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
@@ -494,7 +494,7 @@ export function CalendarPageClient() {
               variant='ghost'
               size='sm'
               onClick={() => setCursor(startOfMonth(new Date()))}
-              className='h-7 px-3 font-caption text-2xs text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token'
+              className='system-b-calendar-action-ghost h-7 px-3 font-caption transition-colors duration-subtle ease-subtle'
             >
               Today
             </Button>
