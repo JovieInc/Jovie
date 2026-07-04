@@ -32,6 +32,7 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
 import type { PublicRelease } from './releases/types';
+import { usePacEvents } from './usePacEvents';
 
 interface ProfileHomeRailProps {
   readonly artist: Artist;
@@ -175,6 +176,13 @@ export function ProfileHomeRail({
   merchCards = [],
   releases = [],
 }: Readonly<ProfileHomeRailProps>) {
+  // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
+  // visible, once per state per session, keyed to the visitor's variant.
+  const { exposureRef } = usePacEvents({
+    profileId: artist.id,
+    assignment: profilePacAssignment,
+    enabled: renderMode !== 'preview',
+  });
   // Re-evaluate visibility at the release boundary so the rail's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
   // page was served from a stale ISR cache.
@@ -329,6 +337,7 @@ export function ProfileHomeRail({
 
   return (
     <div
+      ref={exposureRef}
       className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
     >

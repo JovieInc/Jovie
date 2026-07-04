@@ -17,7 +17,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 - [internal] **Settings sidebar nav-row guard promoted to error + parity test (GH-12025)**: `sidebar-nav-row-ratchet.test.ts` flips `WARN_ONLY` off now that the hand-rolled nav-row baseline is 0, the settings row class derivation is extracted to `getSettingsSidebarRowClassName()` in `SettingsPolished.tsx`, and a settings-vs-shell parity test locks row padding/density/active/hover to the canonical `getSidebarNavRowClassName()` chrome.
+=======
+- **Release rows show stacked provider logos (GH-11493)**: Library table rows and shell release rows now render overlapping DSP avatars with a "+N more" chip and a hover popover listing every provider, replacing the bare provider-count number. The shell row's avatar stack also now reflects the release's full provider coverage instead of capping at four hardcoded majors.
+>>>>>>> origin/main
 - [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
 =======
 =======
