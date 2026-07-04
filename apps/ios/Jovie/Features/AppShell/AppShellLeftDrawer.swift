@@ -5,6 +5,15 @@ enum JovieMotion {
   static let cinematic = Animation.timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)
 }
 
+enum AppShellDrawerSurfaceLayout {
+  static let labelMinimumScaleFactor: CGFloat = 0.85
+  static let maxSingleLineSurfaceButtonHeight: CGFloat = 56
+
+  static var longestSurfaceTitle: String {
+    AppShellTab.audience.title
+  }
+}
+
 enum AppShellDrawerThreadsFilter {
   static func filtered(
     conversations: [MobileConversationSummary],
@@ -182,7 +191,7 @@ private struct DrawerSurfaceButton: View {
         Text(tab.title)
           .font(JovieFont.body(size: 15, weight: .semibold))
           .lineLimit(1)
-          .minimumScaleFactor(0.85)
+          .minimumScaleFactor(AppShellDrawerSurfaceLayout.labelMinimumScaleFactor)
           .multilineTextAlignment(.center)
           .frame(maxWidth: .infinity)
       }
