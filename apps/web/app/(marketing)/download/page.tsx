@@ -257,9 +257,13 @@ export default function DownloadPage() {
                         {platform.action}
                       </a>
                     ) : (
-                      <div className='system-b-download-platform-inactive'>
+                      <button
+                        type='button'
+                        disabled
+                        className='system-b-download-platform-inactive'
+                      >
                         {platform.action}
-                      </div>
+                      </button>
                     )}
                   </div>
                 );
