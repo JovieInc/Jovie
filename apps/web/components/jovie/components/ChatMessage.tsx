@@ -11,6 +11,7 @@ import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
 import { AssistantMessageText } from './AssistantMessageText';
+import { ChatFeedbackControl } from './ChatFeedbackControl';
 import { ChatStepLimitAffordance } from './ChatStepLimitAffordance';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
@@ -31,6 +32,16 @@ interface ChatMessageProps {
   readonly skipEntrance?: boolean;
   /** Show the inline continue affordance after a tool-step cap stop. */
   readonly toolStepCapExhausted?: boolean;
+  /** Persisted chat turn id — enables model attribution for feedback votes. */
+  readonly turnId?: string;
+  /** Conversation id for feedback rows. */
+  readonly conversationId?: string;
+  /**
+   * Render 👍/👎 feedback controls on assistant messages and tool results.
+   * Enabled on the authenticated app chat surface; off for onboarding and
+   * other anonymous embeds where votes cannot be attributed to a user.
+   */
+  readonly enableFeedback?: boolean;
   /**
    * Render generic app tool cards/status rows. Callers with surface-specific
    * tool cards can opt out and render their own tool UI beside the message.
@@ -52,7 +63,10 @@ function areChatMessagePropsEqual(
     previous.profileId === next.profileId &&
     previous.skipEntrance === next.skipEntrance &&
     previous.renderTools === next.renderTools &&
-    previous.toolStepCapExhausted === next.toolStepCapExhausted
+    previous.toolStepCapExhausted === next.toolStepCapExhausted &&
+    previous.turnId === next.turnId &&
+    previous.conversationId === next.conversationId &&
+    previous.enableFeedback === next.enableFeedback
   );
 }
 
@@ -66,6 +80,9 @@ export const ChatMessage = memo(function ChatMessage({
   skipEntrance,
   renderTools = true,
   toolStepCapExhausted = false,
+  turnId,
+  conversationId,
+  enableFeedback = false,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess: fallbackCopySuccess } = useClipboard();
@@ -218,6 +235,11 @@ export const ChatMessage = memo(function ChatMessage({
                   profileId={profileId}
                   variant='chat'
                   hasMessageText={Boolean(messageText)}
+                  feedback={
+                    enableFeedback && !isStreaming
+                      ? { messageId: id, turnId, conversationId }
+                      : undefined
+                  }
                 />
               ) : null}
 
@@ -236,26 +258,36 @@ export const ChatMessage = memo(function ChatMessage({
               style={isStreaming ? { pointerEvents: 'none' } : undefined}
             >
               {!isStreaming ? (
-                <SimpleTooltip
-                  content={isCopySuccess ? 'Copied!' : 'Copy response'}
-                >
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='icon'
-                    onClick={handleCopyMessage}
-                    className='h-7 w-7 shadow-none'
-                    aria-label={
-                      isCopySuccess ? 'Copied to clipboard' : 'Copy message'
-                    }
+                <>
+                  <SimpleTooltip
+                    content={isCopySuccess ? 'Copied!' : 'Copy response'}
                   >
-                    {isCopySuccess ? (
-                      <Check className='system-b-chat-copy-icon' />
-                    ) : (
-                      <Copy className='system-b-chat-copy-icon' />
-                    )}
-                  </Button>
-                </SimpleTooltip>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='icon'
+                      onClick={handleCopyMessage}
+                      className='h-7 w-7 shadow-none'
+                      aria-label={
+                        isCopySuccess ? 'Copied to clipboard' : 'Copy message'
+                      }
+                    >
+                      {isCopySuccess ? (
+                        <Check className='system-b-chat-copy-icon' />
+                      ) : (
+                        <Copy className='system-b-chat-copy-icon' />
+                      )}
+                    </Button>
+                  </SimpleTooltip>
+                  {enableFeedback ? (
+                    <ChatFeedbackControl
+                      messageId={id}
+                      turnId={turnId}
+                      conversationId={conversationId}
+                      excerpt={messageText}
+                    />
+                  ) : null}
+                </>
               ) : null}
             </div>
           ) : null}
