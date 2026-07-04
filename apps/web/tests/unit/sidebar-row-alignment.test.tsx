@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getSettingsSidebarRowClassName } from '@/components/features/dashboard/organisms/SettingsPolished';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { SidebarGroupLabel } from '@/components/organisms/sidebar/group';
 import {
@@ -8,7 +9,6 @@ import {
   SidebarHeader,
   SidebarSeparator,
 } from '@/components/organisms/sidebar/layout';
-import { getSettingsSidebarRowClassName } from '@/components/features/dashboard/organisms/SettingsPolished';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,

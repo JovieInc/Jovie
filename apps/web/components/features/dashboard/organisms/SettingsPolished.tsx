@@ -98,8 +98,7 @@ function getFocusedSettingsHref(sectionId: string): string {
 export function getSettingsSidebarRowClassName(isActive: boolean): string {
   return getSidebarNavRowClassName({
     active: isActive,
-    className:
-      'grid-cols-[minmax(0,1fr)] before:hidden after:hidden text-left',
+    className: 'grid-cols-[minmax(0,1fr)] before:hidden after:hidden text-left',
   });
 }
 
