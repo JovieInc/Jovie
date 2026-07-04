@@ -291,6 +291,8 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain('Load gstack');
     expect(prompt).toContain('Use gbrain before planning');
     expect(prompt).toContain('Use subagents');
+    expect(prompt).toContain('Keep progress file-backed');
+    expect(prompt).toContain('agent-run-artifact');
     expect(prompt).toContain('/qa');
     expect(prompt).toContain('/ship');
     expect(prompt).toContain(
@@ -592,6 +594,7 @@ describe('deterministic finisher', () => {
       branchName: 'codex/gh-12721-x',
       issue,
       logPath: '/tmp/agent.log',
+      statePath: '/tmp/agent.state.json',
     });
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
     expect(cmds).toEqual([
@@ -614,6 +617,21 @@ describe('deterministic finisher', () => {
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      'Dispatch state: `/tmp/agent.state.json`'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      'Verification evidence:'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '<!-- agent-run-artifact'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '"source": "hermes"'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '"status": "queued"'
+    );
   });
 
   it('finishDispatch skips commit when work is already committed', () => {
@@ -670,7 +688,7 @@ describe('agent fallback chain', () => {
     ).toEqual(['grok', 'claude']);
   });
 
-  it('routeForAgent rewrites the model only for claude attempts', () => {
+  it('routeForAgent rewrites only the fallback model for claude attempts', () => {
     const grokRoute = {
       sessionModel: 'grok-composer-2.5-fast',
       fallbackModel: 'grok-composer-2.5-fast',
@@ -693,7 +711,7 @@ describe('agent fallback chain', () => {
     };
     // grok attempt: untouched
     expect(routeForAgent('grok', grokRoute)).toBe(grokRoute);
-    // claude attempt: sonnet for standard risk
+    // claude attempt: route through Claude's model family.
     const claude = routeForAgent('claude', grokRoute);
     expect(claude.sessionModel).toBe('sonnet');
     expect(claude.fallbackModel).toBe('sonnet');
