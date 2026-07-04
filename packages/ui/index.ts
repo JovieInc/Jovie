@@ -261,6 +261,9 @@ export {
 // Tooltip Shortcut (helper for label + keyboard shortcut pattern)
 export type { TooltipShortcutProps } from './atoms/tooltip-shortcut';
 export { TooltipShortcut } from './atoms/tooltip-shortcut';
+// Confirm Dialog
+export type { ConfirmDialogProps } from './confirm-dialog';
+export { ConfirmDialog } from './confirm-dialog';
 export {
   CHECKBOX_RADIO_ITEM_BASE,
   contextMenuContentClasses,
