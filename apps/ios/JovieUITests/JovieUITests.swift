@@ -324,6 +324,15 @@ final class JovieUITests: XCTestCase {
       "Offline chat should show exactly one status indicator in the shell header.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
+      app.staticTexts["Offline"].exists,
+      "Shell header did not show the canonical offline status.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(NSPredicate(format: "label == %@", "Offline")).count,
+      1,
+      "Offline chat launch showed more than one standalone offline status indicator.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
       app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
       "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
     )
@@ -342,6 +351,10 @@ final class JovieUITests: XCTestCase {
       app.staticTexts.matching(offlineStatusPredicate).count,
       1,
       "Opening the drawer must not add another Offline status indicator.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["shell-drawer-account"].staticTexts["Offline"].exists,
+      "Drawer account header showed a redundant offline status.\n\(app.debugDescription)"
     )
   }
 
