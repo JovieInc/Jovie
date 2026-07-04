@@ -864,8 +864,7 @@ export function routeForAgent(
   route: TaskRoute
 ): TaskRoute {
   if (agent !== 'claude') return route;
-  const session = route.modelProfile === 'escalation' ? 'opus' : 'sonnet';
-  return { ...route, sessionModel: session, fallbackModel: 'sonnet' };
+  return { ...route, fallbackModel: 'sonnet' };
 }
 
 // --- Checkout freshness gate ------------------------------------------------
