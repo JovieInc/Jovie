@@ -10,12 +10,12 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { formatPercent, formatUsd } from '@/lib/admin/format';
 import type {
   FounderFunnelData,
   FounderFunnelStage,
   FounderFunnelTimeRange,
 } from '@/lib/admin/founder-funnel';
-import { formatPercent, formatUsd } from '@/lib/admin/format';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { cn } from '@/lib/utils';
 
@@ -127,7 +127,9 @@ function StageConnector({
           isBiggestLeak ? 'text-error' : 'text-tertiary-token'
         )}
       >
-        {stage.conversionRate === null ? '—' : formatPercent(stage.conversionRate)}
+        {stage.conversionRate === null
+          ? '—'
+          : formatPercent(stage.conversionRate)}
       </span>
       <span
         className={cn(
@@ -166,9 +168,7 @@ function FunnelStageTile({
       <p
         className={cn(
           'mt-1 text-xs',
-          isBiggestLeak
-            ? 'font-medium text-error'
-            : 'text-tertiary-token'
+          isBiggestLeak ? 'font-medium text-error' : 'text-tertiary-token'
         )}
       >
         {isBiggestLeak && stage.dropOff !== null
@@ -300,9 +300,7 @@ export function FounderConversionHud({
               <FunnelFlow funnel={funnel} />
             </>
           ) : funnelQuery.isError ? (
-            <p className='text-xs text-error'>
-              Failed to load funnel data
-            </p>
+            <p className='text-xs text-error'>Failed to load funnel data</p>
           ) : (
             <FunnelFlowSkeleton />
           )}
