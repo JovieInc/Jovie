@@ -15,8 +15,10 @@
  */
 import 'server-only';
 import type { ProfileAlertOptInVariant } from './contracts';
+import type { ProfilePacAssignment } from './profile-pac';
 import {
   getProfileAlertOptInVariantValue,
+  getProfilePacAssignmentValue,
   getStatsigGateValue,
 } from './statsig';
 
@@ -32,6 +34,12 @@ export async function getProfileAlertOptInVariant(
   stableId: string | null
 ): Promise<ProfileAlertOptInVariant> {
   return getProfileAlertOptInVariantValue(stableId);
+}
+
+export async function getProfilePacAssignment(
+  stableId: string | null
+): Promise<ProfilePacAssignment> {
+  return getProfilePacAssignmentValue(stableId);
 }
 
 /**

@@ -20,6 +20,11 @@ import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+  type ProfilePacS2Slot,
+} from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
@@ -42,6 +47,7 @@ interface ProfileHomeRailProps {
   readonly onPlayClick?: () => void;
   readonly onAlertsClick?: (context: NotificationSourceContext) => void;
   readonly isSubscribed?: boolean;
+  readonly profilePacAssignment?: ProfilePacAssignment;
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
@@ -124,6 +130,36 @@ function HomeAlertsCard({
   );
 }
 
+function getS2OrderedItems({
+  assignedSlot,
+  merchItems,
+  showItems,
+}: Readonly<{
+  assignedSlot: ProfilePacS2Slot;
+  merchItems: readonly EntityCardModel[];
+  showItems: readonly EntityCardModel[];
+}>) {
+  const slotBuckets: Record<ProfilePacS2Slot, readonly EntityCardModel[]> = {
+    merch: merchItems,
+    tip: [],
+    tickets: showItems,
+    rsvp: showItems,
+  };
+  const preferredItems = slotBuckets[assignedSlot];
+  const fallbackItems =
+    assignedSlot === 'tickets' || assignedSlot === 'rsvp'
+      ? merchItems
+      : showItems;
+
+  return preferredItems.length > 0
+    ? [...preferredItems, ...fallbackItems]
+    : [...merchItems, ...showItems];
+}
+
+export const __profileHomeRailTestUtils = {
+  getS2OrderedItems,
+};
+
 export function ProfileHomeRail({
   artist,
   latestRelease,
@@ -133,6 +169,7 @@ export function ProfileHomeRail({
   renderMode = 'interactive',
   onAlertsClick,
   isSubscribed = false,
+  profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
   viewerLocation,
   resolveNearbyTour = true,
   merchCards = [],
@@ -166,7 +203,10 @@ export function ProfileHomeRail({
   // One ordered card list — featured item first, then the rest. No stacked
   // sections: a single carousel is the profile home surface.
   const carouselItems = useMemo<EntityCardModel[]>(() => {
-    const items: EntityCardModel[] = [];
+    const featuredItems: EntityCardModel[] = [];
+    const releaseItems: EntityCardModel[] = [];
+    const merchItems: EntityCardModel[] = [];
+    const showItems: EntityCardModel[] = [];
 
     // Featured: the latest release when it's visible per profile settings.
     const hasFeaturedRelease = Boolean(
@@ -181,7 +221,7 @@ export function ProfileHomeRail({
           null);
 
     if (hasFeaturedRelease && latestRelease) {
-      items.push(
+      featuredItems.push(
         releaseToEntityCard(
           {
             id: featuredReleaseId ?? undefined,
@@ -197,7 +237,7 @@ export function ProfileHomeRail({
     } else if (upcomingTourDates.length === 0 && featuredPlaylistFallback) {
       // Fallback feature when there's no release or upcoming show: the
       // artist's confirmed "This Is" playlist, as a music card.
-      items.push({
+      featuredItems.push({
         id: `playlist-${featuredPlaylistFallback.playlistId}`,
         kind: 'music',
         href: featuredPlaylistFallback.url,
@@ -219,12 +259,14 @@ export function ProfileHomeRail({
       if (release.slug === '' || release.slug === featuredReleaseSlug) {
         continue;
       }
-      items.push(releaseToEntityCard(release, { handle: artist.handle, now }));
+      releaseItems.push(
+        releaseToEntityCard(release, { handle: artist.handle, now })
+      );
     }
 
     // Shoppable merch (revenue) next.
     for (const card of merchCards) {
-      items.push(merchToEntityCard(card, { handle: artist.handle }));
+      merchItems.push(merchToEntityCard(card, { handle: artist.handle }));
     }
 
     // Upcoming shows, nearest-to-viewer first when geo resolved.
@@ -232,7 +274,7 @@ export function ProfileHomeRail({
       a.id === nearbyTourDateId ? -1 : b.id === nearbyTourDateId ? 1 : 0
     );
     for (const show of shows) {
-      items.push(
+      showItems.push(
         showToEntityCard({
           id: show.id,
           title: show.title,
@@ -244,7 +286,15 @@ export function ProfileHomeRail({
       );
     }
 
-    return items;
+    return [
+      ...featuredItems,
+      ...getS2OrderedItems({
+        assignedSlot: profilePacAssignment.s2Slot,
+        merchItems,
+        showItems,
+      }),
+      ...releaseItems,
+    ];
   }, [
     artist.handle,
     featuredPlaylistFallback,
@@ -252,6 +302,7 @@ export function ProfileHomeRail({
     merchCards,
     nearbyTourDateId,
     now,
+    profilePacAssignment.s2Slot,
     releases,
     releaseVisibility?.show,
     upcomingTourDates,
