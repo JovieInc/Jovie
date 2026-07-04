@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import React from 'react';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import { cn } from '@/lib/utils';
 
 interface OnboardingNameStepProps {
@@ -63,8 +63,8 @@ export function OnboardingNameStep({
 
           <Button
             type='submit'
-            size='lg'
-            className='w-full'
+            className={AUTH_CLASSES.authCta}
+            static
             disabled={!isValid || isTransitioning || isSubmitting}
           >
             {isSubmitting ? 'Submitting…' : 'Continue'}

@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AuthLinkPreviewCard } from '@/features/auth';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 
 interface OnboardingCompleteStepProps {
   readonly title: string;
@@ -76,9 +76,9 @@ export function OnboardingCompleteStep({
 
         <div className={FORM_LAYOUT.formInner}>
           <Button
-            size='lg'
-            className='w-full'
             onClick={onGoToDashboard}
+            className={AUTH_CLASSES.authCta}
+            static
             disabled={isSpotifyImportInProgress}
             aria-busy={isSpotifyImportInProgress}
           >
@@ -88,10 +88,10 @@ export function OnboardingCompleteStep({
           </Button>
 
           <Button
-            variant='secondary'
-            size='lg'
-            className='w-full'
             onClick={onCopyLink}
+            variant='secondary'
+            className={AUTH_CLASSES.authCta}
+            static
           >
             Copy Link
           </Button>

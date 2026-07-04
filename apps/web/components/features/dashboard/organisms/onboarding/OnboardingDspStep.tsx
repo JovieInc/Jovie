@@ -1,9 +1,9 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useReducer, useRef } from 'react';
-import { Button } from '@jovie/ui';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useSpotifyConnect } from '@/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect';
@@ -12,7 +12,7 @@ import {
   type ReleasesEmptyStateAction,
   type ReleasesEmptyStateState,
 } from '@/features/dashboard/organisms/release-provider-matrix/releases-empty-state/types';
-import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_CLASSES, AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { env } from '@/lib/env-client';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
@@ -227,10 +227,10 @@ export function OnboardingDspStep({
             )}
 
             <Button
-              variant='secondary'
-              size='lg'
-              className='w-full'
               onClick={onSkip}
+              variant='secondary'
+              className={AUTH_CLASSES.authCta}
+              static
               disabled={isTransitioning}
             >
               Skip for now

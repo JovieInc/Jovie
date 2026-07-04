@@ -13,6 +13,7 @@ import {
   isSessionExists,
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
+import { AUTH_CLASSES } from '@/lib/auth/constants';
 import type { AuthShellMode } from './AuthShell';
 
 /**
@@ -272,8 +273,8 @@ export function EmailCodeAuthForm({
         <FormError id='auth-email-code-error' message={errorMessage} />
         <Button
           type='submit'
-          size='lg'
-          className='w-full'
+          className={AUTH_CLASSES.authCta}
+          static
           disabled={isPending || code.length < 6}
         >
           {isPending ? 'Verifying…' : 'Verify Code'}
@@ -310,8 +311,8 @@ export function EmailCodeAuthForm({
       <FormError message={errorMessage} />
       <Button
         type='submit'
-        size='lg'
-        className='w-full'
+        className={AUTH_CLASSES.authCta}
+        static
         disabled={isPending || !isReady || emailAddress.trim().length === 0}
       >
         {isPending

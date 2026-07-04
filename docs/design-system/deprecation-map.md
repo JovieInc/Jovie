@@ -28,9 +28,9 @@ This file tracks legacy implementations that should not be used for new work and
 
 | Legacy item | Status | Replacement | Notes |
 | --- | --- | --- | --- |
-| `AuthButton.tsx` (`features/auth/atoms`) | Removed | `Button` from `@jovie/ui` with `size='lg'` + `className='w-full'` | Migrated in #12013; parallel CVA and built-in haptic feedback retired. `primaryLight`/`oauthPrimary`/`link` variants had no remaining usages |
 | `AuthFormContainer.tsx` mobile header duplication | Constrained | `AuthLayout.tsx` contract | Reduced to form-frame responsibilities only |
 | `AuthBranding.tsx` shell spacing ownership | Constrained | auth shell contract | Preserve branding aesthetic, but keep shell spacing in `AuthLayout` |
+| `apps/web/components/features/auth/atoms/AuthButton.tsx` | Removed | `@jovie/ui` `Button` + `AUTH_CLASSES.authCta` + `static` | Migrated in #12013. Variant map: default/`primary` → `primary`; `secondary` → `secondary` (`primaryLight`/`oauthPrimary`/`link` had no remaining usages). Parallel CVA and built-in haptic feedback retired; press feedback stays opacity-only via the overlay + `static` |
 
 ## Internal route-entrypoint drift
 

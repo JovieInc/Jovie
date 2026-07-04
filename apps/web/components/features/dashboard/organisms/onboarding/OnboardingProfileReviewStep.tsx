@@ -11,7 +11,7 @@ import {
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
-import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_CLASSES, AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
 import { cn } from '@/lib/utils';
@@ -467,9 +467,9 @@ export function OnboardingProfileReviewStep({
             {/* CTA */}
             <div className={FORM_LAYOUT.formInner}>
               <Button
-                size='lg'
-                className='w-full'
                 onClick={handleContinue}
+                className={AUTH_CLASSES.authCta}
+                static
                 disabled={
                   isSaving ||
                   !minTimeElapsed ||
