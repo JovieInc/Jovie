@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  LoadingSkeleton as UILoadingSkeleton,
-  Skeleton,
-} from '@jovie/ui';
+import { Skeleton, LoadingSkeleton as UILoadingSkeleton } from '@jovie/ui';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';

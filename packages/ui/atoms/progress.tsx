@@ -84,7 +84,11 @@ export function ProgressBar({
         )}
       >
         <div
-          data-state={indeterminate || !hasDeterminateValue ? 'indeterminate' : 'determinate'}
+          data-state={
+            indeterminate || !hasDeterminateValue
+              ? 'indeterminate'
+              : 'determinate'
+          }
           className={cn(
             'h-full rounded-full bg-accent transition-[width] duration-subtle ease-out motion-reduce:transition-none',
             (indeterminate || !hasDeterminateValue) &&

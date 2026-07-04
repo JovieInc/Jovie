@@ -21,7 +21,9 @@ describe('ProgressBar', () => {
 
     const bar = screen.getByRole('progressbar');
     expect(bar).not.toHaveAttribute('aria-valuenow');
-    expect(bar.querySelector('[data-state="indeterminate"]')).toBeInTheDocument();
+    expect(
+      bar.querySelector('[data-state="indeterminate"]')
+    ).toBeInTheDocument();
   });
 
   it('supports custom label slot via children', () => {
