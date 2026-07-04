@@ -13,8 +13,8 @@ vi.mock('@/lib/redis', () => ({
 }));
 
 import {
-  humanizePrTitle,
   humanizedPrTitleCacheKey,
+  humanizePrTitle,
 } from '@/lib/hud/humanize-pr-title';
 
 interface RedisStub {
