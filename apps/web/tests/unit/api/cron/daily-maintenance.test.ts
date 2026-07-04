@@ -7,6 +7,8 @@ const mockCleanupOrphanedPhotos = vi.hoisted(() => vi.fn());
 const mockCleanupSmsIntents = vi.hoisted(() => vi.fn());
 const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
+const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
+const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/analytics/data-retention', () => ({
   runDataRetentionCleanup: mockRunDataRetentionCleanup,
@@ -47,6 +49,14 @@ vi.mock('@/lib/discography/re-enrich', () => ({
   sweepUnderEnrichedProfilesForCron: mockSweepUnderEnrichedProfilesForCron,
 }));
 
+vi.mock('@/lib/onboarding/script-aggregation', () => ({
+  runOnboardingScriptAggregation: mockRunOnboardingScriptAggregation,
+}));
+
+vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
+  syncAiCrawlerAnalyticsCron: mockSyncAiCrawlerAnalyticsCron,
+}));
+
 describe('GET /api/cron/daily-maintenance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -81,6 +91,18 @@ describe('GET /api/cron/daily-maintenance', () => {
       totalLinksDiscovered: 4,
       errors: [],
       hasMoreProfiles: true,
+    });
+    mockRunOnboardingScriptAggregation.mockResolvedValue({
+      syncedSeeds: 2,
+      updatedStats: 3,
+      candidatesInserted: 0,
+      promoted: 0,
+      retired: 0,
+    });
+    mockSyncAiCrawlerAnalyticsCron.mockResolvedValue({
+      success: true,
+      zonesProcessed: 1,
+      samplesInserted: 2,
     });
   });
 
@@ -124,6 +146,22 @@ describe('GET /api/cron/daily-maintenance', () => {
       hasMoreProfiles: true,
     });
     expect(mockSweepUnderEnrichedProfilesForCron).toHaveBeenCalledTimes(1);
+    expect(data.results.onboardingScriptAggregation.success).toBe(true);
+    expect(data.results.onboardingScriptAggregation.data).toEqual({
+      syncedSeeds: 2,
+      updatedStats: 3,
+      candidatesInserted: 0,
+      promoted: 0,
+      retired: 0,
+    });
+    expect(mockRunOnboardingScriptAggregation).toHaveBeenCalledTimes(1);
+    expect(data.results.aiCrawlerAnalytics.success).toBe(true);
+    expect(data.results.aiCrawlerAnalytics.data).toEqual({
+      success: true,
+      zonesProcessed: 1,
+      samplesInserted: 2,
+    });
+    expect(mockSyncAiCrawlerAnalyticsCron).toHaveBeenCalledTimes(1);
     expect(data.results.dataRetention.success).toBe(true);
   });
 });
