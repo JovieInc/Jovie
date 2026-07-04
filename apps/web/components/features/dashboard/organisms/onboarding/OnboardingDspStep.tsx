@@ -3,9 +3,9 @@
 import { Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useReducer, useRef } from 'react';
+import { Button } from '@jovie/ui';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { AuthButton } from '@/features/auth';
 import { useSpotifyConnect } from '@/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect';
 import {
   initialState,
@@ -226,13 +226,15 @@ export function OnboardingDspStep({
               </p>
             )}
 
-            <AuthButton
-              onClick={onSkip}
+            <Button
               variant='secondary'
+              size='lg'
+              className='w-full'
+              onClick={onSkip}
               disabled={isTransitioning}
             >
               Skip for now
-            </AuthButton>
+            </Button>
           </div>
         </ContentSurfaceCard>
 
