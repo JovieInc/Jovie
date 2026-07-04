@@ -57,3 +57,17 @@ struct AppShellDrawerThreadsFilterTests {
     #expect(filtered.map(\.id) == ["conv-3"])
   }
 }
+
+struct AppShellDrawerSurfaceLayoutTests {
+  @Test func longestSurfaceTitleIsAudience() {
+    #expect(AppShellDrawerSurfaceLayout.longestSurfaceTitle == "Audience")
+  }
+
+  @Test func surfaceLabelUsesMinimumScaleGuard() {
+    #expect(AppShellDrawerSurfaceLayout.labelMinimumScaleFactor == 0.85)
+  }
+
+  @Test func singleLineSurfaceButtonsStayWithinHeightBudget() {
+    #expect(AppShellDrawerSurfaceLayout.maxSingleLineSurfaceButtonHeight == 56)
+  }
+}
