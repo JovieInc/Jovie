@@ -359,9 +359,10 @@ export function isUiUxDesignIssue(issue: GithubIssue): boolean {
 }
 
 export function isTrackerOrDependencyGated(issue: GithubIssue): boolean {
-  const labels = labelNames(issue).map(label => label.toLowerCase());
-  if (labels.includes(TYPE_EPIC_LABEL)) return true;
-  return DEPENDENCY_GATED_TRACKER_PATTERN.test(issueText(issue));
+  return (
+    isEpicPointer(issue) ||
+    DEPENDENCY_GATED_TRACKER_PATTERN.test(issueText(issue))
+  );
 }
 
 export function eligibleCodexIssues(
