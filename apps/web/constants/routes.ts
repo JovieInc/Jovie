@@ -123,6 +123,7 @@ export const APP_ROUTES = {
   HUD: '/hud',
   /** Token-only TV/wallboard view of the Ops HUD. */
   HUD_TV: '/hud-tv',
+  HUD_WIKI: '/hud/wiki' as const,
 
   // Marketing
   HOME: '/',
@@ -253,6 +254,9 @@ export function buildLibraryViewRoute(
 
   return `${APP_ROUTES.LIBRARY}?view=${encodeURIComponent(view)}`;
 }
+
+export const buildWikiPageHref = (slug: string) =>
+  `${APP_ROUTES.HUD_WIKI}/${encodeURIComponent(slug)}` as const;
 
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {
   return (
