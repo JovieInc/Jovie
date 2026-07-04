@@ -91,6 +91,13 @@ export const chatTurns = pgTable(
     clientTurnId: text('client_turn_id').notNull(),
     status: chatTurnStatusEnum('status').notNull().default('reserved'),
     source: text('source').notNull().default('typed'),
+    /**
+     * Resolved model id (`anthropic/...`) that produced this turn's
+     * assistant output. Recorded when the turn starts streaming so 👍/👎
+     * feedback rows can attribute votes to the producing model (JOV #11460,
+     * feeds the per-workflow model A/B bake-off). Null on pre-feature turns.
+     */
+    model: text('model'),
     toolIntent: text('tool_intent'),
     errorCode: text('error_code'),
     errorMessage: text('error_message'),

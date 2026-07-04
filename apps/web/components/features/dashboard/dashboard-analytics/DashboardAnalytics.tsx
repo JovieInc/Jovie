@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
 import { DashboardRefreshButton } from '@/features/dashboard/molecules/DashboardRefreshButton';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import {
@@ -18,7 +19,7 @@ import {
 import { usePlanGate } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
 import { cn } from '@/lib/utils';
-import { RangeToggle } from './RangeToggle';
+import { ANALYTICS_PAGE_RANGES } from './types';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
 const numberFormatter = new Intl.NumberFormat();
@@ -260,9 +261,11 @@ export function DashboardAnalytics() {
               });
             }}
           />
-          <RangeToggle
+          <TimeRangeSelector
+            variant='tabs'
             value={range}
-            onChange={setRange}
+            onValueChange={setRange}
+            ranges={ANALYTICS_PAGE_RANGES}
             tabsBaseId={rangeTabsBaseId}
             panelId={rangePanelId}
             maxRetentionDays={analyticsRetentionDays ?? undefined}
