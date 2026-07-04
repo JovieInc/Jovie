@@ -8,6 +8,7 @@ import {
   SidebarHeader,
   SidebarSeparator,
 } from '@/components/organisms/sidebar/layout';
+import { getSettingsSidebarRowClassName } from '@/components/features/dashboard/organisms/SettingsPolished';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
@@ -138,6 +139,46 @@ describe('Sidebar row alignment', () => {
     expect(header?.getAttribute('class')).toContain('px-2.5');
     expect(content?.getAttribute('class')).toContain('px-0');
     expect(separator?.getAttribute('class')).toContain('mx-2.5');
+  });
+
+  it('keeps settings sidebar rows byte-identical to shell nav-row chrome', () => {
+    // Settings-vs-shell parity (#12025): the settings sidebar must derive its
+    // rows from the canonical shell helper. Its only allowed divergence is
+    // structural — no icon column (single-column grid) and hidden icon guide
+    // lines — never padding/density/active/hover treatment.
+    const settingsRow = getSettingsSidebarRowClassName(false);
+    const settingsActiveRow = getSettingsSidebarRowClassName(true);
+    const shellRow = getSidebarNavRowClassName({});
+
+    // Same density, radius, and hover chrome as the shell sidebar.
+    for (const token of [
+      'h-7',
+      'px-2.5',
+      'rounded-full',
+      'text-xs',
+      'font-normal',
+      'hover:bg-sidebar-accent',
+      'text-sidebar-muted/80',
+    ]) {
+      expect(
+        settingsRow,
+        `settings row missing shell token ${token}`
+      ).toContain(token);
+      expect(shellRow, `shell row missing token ${token}`).toContain(token);
+    }
+
+    // Same active treatment as the shell sidebar.
+    expect(settingsActiveRow).toContain('bg-sidebar-accent-active');
+    expect(settingsActiveRow).toContain('text-primary-token');
+    expect(settingsActiveRow).toContain('font-medium');
+
+    // Allowed structural divergence: icon-less single-column grid with the
+    // icon guide lines hidden. `cn()` runs tailwind-merge, so the settings
+    // override must fully replace the shell's icon-column grid template.
+    expect(settingsRow).toContain('grid-cols-[minmax(0,1fr)]');
+    expect(settingsRow).toContain('before:hidden');
+    expect(settingsRow).toContain('after:hidden');
+    expect(settingsRow).not.toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
   });
 
   it('shares the shell nav row and icon chrome helpers', () => {
