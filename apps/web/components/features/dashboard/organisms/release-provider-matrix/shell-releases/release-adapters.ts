@@ -3,8 +3,15 @@ import type {
   DspStatus,
 } from '@/components/shell/DspAvatarStack';
 import type { ReleaseStatus } from '@/components/shell/StatusBadge';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { DSP_CONFIGS } from '@/lib/dsp-registry';
+
+/**
+ * Neutral fallback avatar color for providers missing from both registries.
+ * Points at a System B text token so no raw hex leaks into this adapter.
+ */
+const FALLBACK_DSP_COLOR = 'var(--linear-text-quaternary)';
 
 /**
  * Major DSPs surfaced in the shell-v1 release row's stacked avatars. Order
@@ -52,10 +59,16 @@ const SHELL_DSP_META: ReadonlyArray<{
 ];
 
 /**
- * Map production `release.providers[]` -> shell `DspAvatarItem[]`. Each major
- * DSP is rendered: links present -> live, links absent -> missing. We
- * intentionally drop the `pending`/`error` states because production has no
- * sync-state per provider here (see ProviderStatusDot for the cell-level
+ * Map production `release.providers[]` -> shell `DspAvatarItem[]`.
+ *
+ * The four major DSPs (Spotify / Apple Music / YouTube Music / TIDAL) always
+ * render as anchors: links present -> live, links absent -> missing. Every
+ * OTHER provider the release actually has a link for is appended as `live`,
+ * so the avatar stack + popover reflect the release's full provider coverage
+ * instead of capping at the four hardcoded majors (JovieInc/Jovie#11493).
+ *
+ * We intentionally drop the `pending`/`error` states because production has
+ * no sync-state per provider here (see ProviderStatusDot for the cell-level
  * sync indicator that lives in the legacy matrix).
  */
 export function releaseToDspItems(release: ReleaseViewModel): DspAvatarItem[] {
@@ -66,7 +79,10 @@ export function releaseToDspItems(release: ReleaseViewModel): DspAvatarItem[] {
   for (const p of release.providers) {
     providersByKey.set(p.key, p);
   }
-  return SHELL_DSP_META.map(
+
+  const majorKeys = new Set<string>(SHELL_DSP_META.map(m => m.providerKey));
+
+  const majors = SHELL_DSP_META.map(
     meta =>
       ({
         id: meta.id,
@@ -82,6 +98,23 @@ export function releaseToDspItems(release: ReleaseViewModel): DspAvatarItem[] {
         status: DspStatus;
       }
   );
+
+  const rest: DspAvatarItem[] = release.providers
+    .filter(p => !majorKeys.has(p.key))
+    .map(p => {
+      const config = DSP_CONFIGS[p.key];
+      const label = config?.name ?? p.label;
+      return {
+        id: p.key,
+        label,
+        glyph: label.charAt(0).toUpperCase(),
+        color:
+          config?.color ?? PROVIDER_CONFIG[p.key]?.accent ?? FALLBACK_DSP_COLOR,
+        status: 'live' as const,
+      };
+    });
+
+  return [...majors, ...rest];
 }
 
 /**
