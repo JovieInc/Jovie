@@ -255,7 +255,8 @@ export function buildLibraryViewRoute(
   return `${APP_ROUTES.LIBRARY}?view=${encodeURIComponent(view)}`;
 }
 
-export const buildWikiPageHref = (slug: string) => `${APP_ROUTES.HUD_WIKI}/${encodeURIComponent(slug)}` as const;
+export const buildWikiPageHref = (slug: string) =>
+  `${APP_ROUTES.HUD_WIKI}/${encodeURIComponent(slug)}` as const;
 
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {
   return (

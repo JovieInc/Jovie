@@ -1,11 +1,16 @@
-import type { GbrainPage } from './gbrain-client';
-
 export interface NamespaceGroup {
   namespace: string;
-  pages: { slug: string; title: string; updated_at?: string; tags?: string[] }[];
+  pages: {
+    slug: string;
+    title: string;
+    updated_at?: string;
+    tags?: string[];
+  }[];
 }
 
-export function groupByNamespace(pages: { slug: string; title: string; updated_at?: string; tags?: string[] }[]): NamespaceGroup[] {
+export function groupByNamespace(
+  pages: { slug: string; title: string; updated_at?: string; tags?: string[] }[]
+): NamespaceGroup[] {
   const groups = new Map<string, NamespaceGroup>();
 
   for (const page of pages) {
@@ -17,5 +22,7 @@ export function groupByNamespace(pages: { slug: string; title: string; updated_a
     groups.get(namespace)!.pages.push(page);
   }
 
-  return Array.from(groups.values()).sort((a, b) => a.namespace.localeCompare(b.namespace));
+  return Array.from(groups.values()).sort((a, b) =>
+    a.namespace.localeCompare(b.namespace)
+  );
 }

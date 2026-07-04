@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation';
-import { getCurrentAdminPageAccess, redirectToLogin } from '@/lib/getCurrentAdminPageAccess';
-import { getPage } from '@/lib/wiki/gbrain-client';
-import { titleFromSlug } from '@/lib/wiki/format';
 import { WikiPageArticle } from '@/components/features/admin/wiki/WikiPageArticle';
+import {
+  getCurrentAdminPageAccess,
+  redirectToLogin,
+} from '@/lib/getCurrentAdminPageAccess';
+import { getPage } from '@/lib/wiki/gbrain-client';
 
 interface Props {
   params: Promise<{ slug: string[] }>;
@@ -19,7 +21,7 @@ export default async function WikiPageView({ params }: Props) {
   if (!page || !page.compiled_truth) notFound();
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className='mx-auto max-w-4xl px-4 py-8'>
       <WikiPageArticle page={page} />
     </div>
   );
