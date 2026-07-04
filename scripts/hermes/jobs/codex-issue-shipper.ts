@@ -50,7 +50,6 @@ import {
   GhEagainBackoff,
   type GithubIssue,
   HUMAN_REVIEW_LABEL,
-  isSpawnEagain,
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
@@ -73,6 +72,11 @@ import {
   SHIP_OWNER_LOCK,
 } from '../lib/ship-ledger';
 import { sendSlack } from '../lib/slack-client';
+import {
+  isSpawnResourceUnavailable,
+  SpawnResourceGuard,
+  SpawnResourceUnavailableError,
+} from '../lib/spawn-resource';
 import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'codex-issue-shipper';
@@ -105,6 +109,10 @@ async function handleSpawnEagain(
     await sleep(backoff.sleepMs);
   }
 }
+
+const spawnResourceGuard = new SpawnResourceGuard({
+  onEvent: entry => logJobEvent({ job: JOB, ...entry }),
+});
 
 /**
  * Sentinel file that, when present, pauses the shipper.
@@ -169,15 +177,18 @@ function loadHermesEnv(): void {
 
 function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
   try {
-    return execFileSync(args[0], args.slice(1), {
+    const result = execFileSync(args[0], args.slice(1), {
       cwd: config.repoRoot,
       encoding: 'utf8',
       timeout: 30_000,
       maxBuffer: 5 * 1024 * 1024,
     });
+    spawnResourceGuard.recordSuccess();
+    return result;
   } catch (err) {
-    if (isSpawnEagain(err)) {
-      throw new SpawnEagainError(shortError(err), args[0] ?? 'unknown');
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure(args[0], err);
+      throw new SpawnResourceUnavailableError(args[0], err);
     }
     throw err;
   }
@@ -250,7 +261,7 @@ function spawnSyncSafe(
   command: string,
   args: ReadonlyArray<string>,
   cwd: string
-): { readonly status: number | null } {
+): { readonly status: number | null; readonly resourceUnavailable: boolean } {
   try {
     const result = execFileSync(command, args, {
       cwd,
@@ -259,13 +270,18 @@ function spawnSyncSafe(
       stdio: 'ignore',
     });
     void result;
-    return { status: 0 };
+    spawnResourceGuard.recordSuccess();
+    return { status: 0, resourceUnavailable: false };
   } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure(command, err);
+      return { status: null, resourceUnavailable: true };
+    }
     const status =
       typeof (err as { status?: unknown }).status === 'number'
         ? ((err as { status: number }).status ?? 1)
         : 1;
-    return { status };
+    return { status, resourceUnavailable: false };
   }
 }
 
@@ -320,16 +336,19 @@ function cleanupWorktree(config: ShipperConfig, repoRoot: string): void {
   }
 }
 
-function detectRepoRoot(): string {
+function detectRepoRoot(): string | null {
   if (process.env.HERMES_JOVIE_REPO) return process.env.HERMES_JOVIE_REPO;
   try {
-    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
       encoding: 'utf8',
       timeout: 10_000,
     }).trim();
+    spawnResourceGuard.recordSuccess();
+    return root;
   } catch (err) {
-    if (isSpawnEagain(err)) {
-      throw new SpawnEagainError(shortError(err), 'git');
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure('git', err);
+      return null;
     }
     throw err;
   }
@@ -440,10 +459,10 @@ async function notifyStaleCheckoutAbort(
   await Promise.all([sendTelegram(message), sendSlack(message)]);
 }
 
-function detectGithubRepo(repoRoot: string): string {
+function detectGithubRepo(repoRoot: string): string | null {
   if (process.env.GH_REPO) return process.env.GH_REPO;
   try {
-    return execFileSync(
+    const repo = execFileSync(
       'gh',
       ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
       {
@@ -452,35 +471,63 @@ function detectGithubRepo(repoRoot: string): string {
         timeout: 30_000,
       }
     ).trim();
+    spawnResourceGuard.recordSuccess();
+    return repo;
   } catch (err) {
-    if (isSpawnEagain(err)) {
-      throw new SpawnEagainError(shortError(err), 'gh');
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure('gh', err);
+      return null;
     }
     throw err;
   }
 }
 
-function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
+interface ListCodexIssuesResult {
+  readonly issues: ReadonlyArray<GithubIssue>;
+  readonly resourceUnavailable: boolean;
+}
+
+function listCodexIssues(config: ShipperConfig): ListCodexIssuesResult {
   // Fixed: gh CLI does not support --page; use single fetch with max limit
   const fetchLimit = Math.min(100, config.issueFetchLimit || 100);
-  const raw = run(
-    [
-      'gh',
-      'issue',
-      'list',
-      '--repo',
-      config.repo,
-      '--state',
-      'open',
-      '--limit',
-      String(fetchLimit),
-      '--json',
-      'number,title,body,url,updatedAt,labels',
-    ],
-    config
-  );
-  const issues = JSON.parse(raw) as GithubIssue[];
-  return issues.slice(0, config.issueFetchLimit || 100);
+  try {
+    const raw = run(
+      [
+        'gh',
+        'issue',
+        'list',
+        '--repo',
+        config.repo,
+        '--state',
+        'open',
+        '--limit',
+        String(fetchLimit),
+        '--json',
+        'number,title,body,url,updatedAt,labels',
+      ],
+      config
+    );
+    const issues = JSON.parse(raw) as GithubIssue[];
+    return {
+      issues: issues.slice(0, config.issueFetchLimit || 100),
+      resourceUnavailable: false,
+    };
+  } catch (err) {
+    if (err instanceof SpawnResourceUnavailableError) {
+      return { issues: [], resourceUnavailable: true };
+    }
+    throw err;
+  }
+}
+
+async function handleSpawnResourcePressure(context: string): Promise<void> {
+  await spawnResourceGuard.maybeBackoff();
+  logJobEvent({
+    job: JOB,
+    event: 'spawn_resource_skip',
+    context,
+    consecutive: spawnResourceGuard.consecutiveFailures,
+  });
 }
 
 function ensureLabel(
@@ -1278,6 +1325,10 @@ async function runShipper(): Promise<void> {
   }
 
   const repoRoot = detectRepoRoot();
+  if (!repoRoot) {
+    await handleSpawnResourcePressure('detect_repo_root');
+    return;
+  }
   // JOV-3838 / #12841: fail-closed when the primary checkout is hijacked off
   // fresh main. Skipped in dry-run so dev/CI worktrees are never reset.
   if (process.env.HERMES_CODEX_SHIPPER_DRY_RUN !== '1') {
@@ -1295,6 +1346,10 @@ async function runShipper(): Promise<void> {
     }
   }
   const repo = detectGithubRepo(repoRoot);
+  if (!repo) {
+    await handleSpawnResourcePressure('detect_github_repo');
+    return;
+  }
   const config = loadShipperConfig(process.env, repoRoot, repo);
 
   await withJobLogging(JOB, async () => {
@@ -1305,16 +1360,12 @@ async function runShipper(): Promise<void> {
         let controlLabelsEnsured = false;
 
         for (;;) {
-          let issues: ReadonlyArray<GithubIssue>;
-          try {
-            issues = listCodexIssues(config);
-          } catch (err) {
-            if (err instanceof SpawnEagainError) {
-              await handleSpawnEagain(err, 'listCodexIssues');
-              return;
-            }
-            throw err;
+          const listed = listCodexIssues(config);
+          if (listed.resourceUnavailable) {
+            await handleSpawnResourcePressure('list_codex_issues');
+            return;
           }
+          const issues = listed.issues;
           const plans = buildDispatchPlans(issues, config);
           const skippedHuman = issues.filter(issue =>
             labelNames(issue).includes(HUMAN_REVIEW_LABEL)
@@ -1397,6 +1448,16 @@ async function runShipper(): Promise<void> {
 }
 
 void main().catch(err => {
+  if (err instanceof SpawnResourceUnavailableError) {
+    logJobEvent({
+      job: JOB,
+      event: 'spawn_resource_skip',
+      context: 'main_uncaught',
+      command: err.command,
+      error: err.message,
+    });
+    return;
+  }
   logJobEvent({
     job: JOB,
     event: 'fatal',
