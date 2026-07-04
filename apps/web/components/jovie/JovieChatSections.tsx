@@ -151,6 +151,8 @@ interface ChatThreadMessage {
   readonly status?: string;
   readonly parts: MessagePart[];
   readonly toolStepCapExhausted?: boolean;
+  /** Persisted chat turn id — enables 👍/👎 model attribution (JOV #11460). */
+  readonly turnId?: string;
 }
 
 interface ChatThreadMessagesProps {
@@ -170,6 +172,8 @@ interface ChatThreadMessagesProps {
   readonly inlineChatError: ReactNode;
   readonly isStuckToBottom: boolean;
   readonly onScrollToBottom: () => void;
+  /** Conversation id for 👍/👎 feedback attribution. */
+  readonly conversationId?: string | null;
 }
 
 export function ChatThreadMessages({
@@ -189,6 +193,7 @@ export function ChatThreadMessages({
   inlineChatError,
   isStuckToBottom,
   onScrollToBottom,
+  conversationId,
 }: ChatThreadMessagesProps) {
   return (
     <div>
@@ -231,6 +236,9 @@ export function ChatThreadMessages({
                     profileId={profileId}
                     skipEntrance={knownMessageIds.has(message.id)}
                     toolStepCapExhausted={message.toolStepCapExhausted}
+                    turnId={message.turnId}
+                    conversationId={conversationId ?? undefined}
+                    enableFeedback
                   />
                 </div>
               </div>
@@ -260,6 +268,9 @@ export function ChatThreadMessages({
                   profileId={profileId}
                   skipEntrance={knownMessageIds.has(message.id)}
                   toolStepCapExhausted={message.toolStepCapExhausted}
+                  turnId={message.turnId}
+                  conversationId={conversationId ?? undefined}
+                  enableFeedback
                 />
               </div>
             );
