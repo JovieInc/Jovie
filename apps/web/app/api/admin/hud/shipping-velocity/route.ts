@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { medianNumber } from '@/lib/hud/number-series';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
@@ -159,16 +160,66 @@ async function fetchPullRequestsFromGitHub(
   return nodes;
 }
 
-function medianHours(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 0) {
-    const low = sorted[mid - 1];
-    const high = sorted[mid];
-    if (low !== undefined && high !== undefined) return (low + high) / 2;
+function incrementBucket(
+  buckets: Map<string, DailyBucket>,
+  date: string,
+  field: 'opened' | 'merged' | 'closed'
+): void {
+  const bucket = buckets.get(date);
+  if (!bucket) return;
+  bucket[field] += 1;
+}
+
+function hoursBetween(startIso: string, endIso: string): number | null {
+  const hours =
+    (new Date(endIso).getTime() - new Date(startIso).getTime()) / 3_600_000;
+  return Number.isFinite(hours) && hours >= 0 ? hours : null;
+}
+
+function appendMergeHours(
+  mergeHoursByDate: Map<string, number[]>,
+  date: string,
+  hoursToMerge: number | null
+): void {
+  if (hoursToMerge === null) return;
+  const hours = mergeHoursByDate.get(date) ?? [];
+  hours.push(hoursToMerge);
+  mergeHoursByDate.set(date, hours);
+}
+
+function countMergedPr(
+  node: GitHubPrNode,
+  buckets: Map<string, DailyBucket>,
+  mergeHoursByDate: Map<string, number[]>
+): void {
+  if (!node.merged || !node.mergedAt) return;
+  const mergedDate = toDateString(node.mergedAt);
+  incrementBucket(buckets, mergedDate, 'merged');
+  appendMergeHours(
+    mergeHoursByDate,
+    mergedDate,
+    hoursBetween(node.createdAt, node.mergedAt)
+  );
+}
+
+function countClosedPr(
+  node: GitHubPrNode,
+  buckets: Map<string, DailyBucket>
+): void {
+  if (node.merged || node.state !== 'CLOSED' || !node.closedAt) return;
+  incrementBucket(buckets, toDateString(node.closedAt), 'closed');
+}
+
+function finalizeMergeP50(
+  buckets: Map<string, DailyBucket>,
+  mergeHoursByDate: Map<string, number[]>
+): void {
+  for (const [date, hours] of mergeHoursByDate) {
+    const bucket = buckets.get(date);
+    if (bucket) {
+      bucket.mergeP50Hours = medianNumber(hours);
+    }
   }
-  return sorted[mid] ?? null;
 }
 
 function computeBuckets(nodes: GitHubPrNode[], days: number): DailyBucket[] {
@@ -176,102 +227,100 @@ function computeBuckets(nodes: GitHubPrNode[], days: number): DailyBucket[] {
   const mergeHoursByDate = new Map<string, number[]>();
 
   for (const node of nodes) {
-    // Count by createdAt date (opened)
-    const openedDate = toDateString(node.createdAt);
-    const openedBucket = buckets.get(openedDate);
-    if (openedBucket) {
-      openedBucket.opened += 1;
-    }
-
-    // Count merged PRs by mergedAt date
-    if (node.merged && node.mergedAt) {
-      const mergedDate = toDateString(node.mergedAt);
-      const mergedBucket = buckets.get(mergedDate);
-      if (mergedBucket) {
-        mergedBucket.merged += 1;
-        const hoursToMerge =
-          (new Date(node.mergedAt).getTime() -
-            new Date(node.createdAt).getTime()) /
-          3_600_000;
-        if (Number.isFinite(hoursToMerge) && hoursToMerge >= 0) {
-          const hours = mergeHoursByDate.get(mergedDate) ?? [];
-          hours.push(hoursToMerge);
-          mergeHoursByDate.set(mergedDate, hours);
-        }
-      }
-    }
-
-    // Count closed-without-merge PRs by closedAt date
-    if (!node.merged && node.state === 'CLOSED' && node.closedAt) {
-      const closedDate = toDateString(node.closedAt);
-      const closedBucket = buckets.get(closedDate);
-      if (closedBucket) {
-        closedBucket.closed += 1;
-      }
-    }
+    incrementBucket(buckets, toDateString(node.createdAt), 'opened');
+    countMergedPr(node, buckets, mergeHoursByDate);
+    countClosedPr(node, buckets);
   }
 
-  for (const [date, hours] of mergeHoursByDate) {
-    const bucket = buckets.get(date);
-    if (bucket) {
-      bucket.mergeP50Hours = medianHours(hours);
-    }
-  }
-
+  finalizeMergeP50(buckets, mergeHoursByDate);
   return Array.from(buckets.values());
+}
+
+function parseRange(request: Request): ValidRange {
+  const { searchParams } = new URL(request.url);
+  const rawRange = searchParams.get('range') ?? '7d';
+  if (rawRange === '30d' || rawRange === '1y') return rawRange;
+  return '7d';
+}
+
+async function authorizeAdmin(): Promise<Response | null> {
+  const entitlements = await getCurrentUserEntitlements();
+  if (!entitlements.isAuthenticated) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+  if (!entitlements.isAdmin) {
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403, headers: NO_STORE_HEADERS }
+    );
+  }
+  return null;
+}
+
+async function readCachedVelocity(
+  redis: ReturnType<typeof getRedis>,
+  cacheKey: string
+): Promise<ShippingVelocityResponse | null> {
+  if (!redis) return null;
+  try {
+    return (await redis.get<ShippingVelocityResponse>(cacheKey)) ?? null;
+  } catch (redisError) {
+    logger.error('[hud/shipping-velocity] Redis get failed', redisError);
+    return null;
+  }
+}
+
+async function cacheVelocity(
+  redis: ReturnType<typeof getRedis>,
+  cacheKey: string,
+  result: ShippingVelocityResponse
+): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.set(cacheKey, result, { ex: 20 * 60 });
+  } catch (redisError) {
+    logger.error('[hud/shipping-velocity] Redis set failed', redisError);
+  }
+}
+
+function emptyVelocityResponse(
+  days: number,
+  range: ValidRange
+): ShippingVelocityResponse {
+  return {
+    data: Array.from(buildEmptyBuckets(days).values()),
+    range,
+    cachedAt: new Date().toISOString(),
+  };
 }
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const entitlements = await getCurrentUserEntitlements();
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-    if (!entitlements.isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
+    const authResponse = await authorizeAdmin();
+    if (authResponse) return authResponse;
 
-    const { searchParams } = new URL(request.url);
-    const rawRange = searchParams.get('range') ?? '7d';
-    const range: ValidRange =
-      rawRange === '30d' ? '30d' : rawRange === '1y' ? '1y' : '7d';
+    const range = parseRange(request);
     const days = RANGE_DAYS[range] ?? 7;
 
-    // Try Redis cache first
     const redis = getRedis();
     const cacheKey = `hud:shipping-velocity:${range}`;
-
-    if (redis) {
-      try {
-        const cached = await redis.get<ShippingVelocityResponse>(cacheKey);
-        if (cached) {
-          return NextResponse.json(cached, {
-            status: 200,
-            headers: NO_STORE_HEADERS,
-          });
-        }
-      } catch (redisError) {
-        logger.error('[hud/shipping-velocity] Redis get failed', redisError);
-      }
+    const cached = await readCachedVelocity(redis, cacheKey);
+    if (cached) {
+      return NextResponse.json(cached, {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      });
     }
 
-    // Check GitHub token
     const token = env.HUD_GITHUB_TOKEN;
     const owner = env.HUD_GITHUB_OWNER;
     const repo = env.HUD_GITHUB_REPO;
 
     if (!token || !owner || !repo) {
-      const emptyResponse: ShippingVelocityResponse = {
-        data: Array.from(buildEmptyBuckets(days).values()),
-        range,
-        cachedAt: new Date().toISOString(),
-      };
+      const emptyResponse = emptyVelocityResponse(days, range);
       return NextResponse.json(emptyResponse, {
         status: 200,
         headers: NO_STORE_HEADERS,
@@ -297,14 +346,7 @@ export async function GET(request: Request): Promise<Response> {
       cachedAt: new Date().toISOString(),
     };
 
-    // Cache for 20 minutes
-    if (redis) {
-      try {
-        await redis.set(cacheKey, result, { ex: 20 * 60 });
-      } catch (redisError) {
-        logger.error('[hud/shipping-velocity] Redis set failed', redisError);
-      }
-    }
+    await cacheVelocity(redis, cacheKey, result);
 
     return NextResponse.json(result, {
       status: 200,

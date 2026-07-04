@@ -9,6 +9,7 @@ import {
 } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
+import { cn } from '@/lib/utils';
 import type { HudMetrics } from '@/types/hud';
 import type {
   HudShipperState,
@@ -43,17 +44,18 @@ function StatusPill({
   tone,
 }: Readonly<{ readonly label: string; readonly tone: HudTone }>) {
   const accent = getAccentCssVars(HUD_TONE_ACCENT[tone]);
+  const color =
+    tone === 'neutral' ? 'var(--color-text-secondary-token)' : accent.solid;
 
   return (
     <span
-      className='inline-flex items-center rounded-full border px-2.5 py-0.5 text-2xs font-medium leading-none'
+      className={cn(
+        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-2xs font-medium leading-none'
+      )}
       style={{
         borderColor: `color-mix(in oklab, ${accent.solid} 26%, var(--linear-app-frame-seam))`,
         backgroundColor: accent.subtle,
-        color:
-          tone === 'neutral'
-            ? 'var(--color-text-secondary-token)'
-            : accent.solid,
+        color,
       }}
     >
       {label}
@@ -67,6 +69,26 @@ interface HealthEntry {
   readonly tone: HudTone;
 }
 
+function shipperHealth(
+  shipper: HudShipperStatusPayload | undefined
+): Pick<HealthEntry, 'label' | 'tone'> {
+  if (shipper === undefined || shipper.availability === 'unavailable') {
+    return {
+      label: shipper === undefined ? '—' : 'No signal',
+      tone: 'neutral',
+    };
+  }
+  return {
+    label: shipperLabel(shipper.state),
+    tone: shipperTone(shipper.state),
+  };
+}
+
+function ledgerTone(quarantine: HudMetrics['testing']['quarantine']): HudTone {
+  if (!quarantine.isValid) return 'bad';
+  return quarantine.withinRetryBudget ? 'good' : 'warning';
+}
+
 function buildHealthEntries(
   metrics: HudMetrics,
   shipper: HudShipperStatusPayload | undefined
@@ -74,20 +96,12 @@ function buildHealthEntries(
   const quarantine = metrics.testing.quarantine;
   const jobsRunning =
     metrics.aiOps.counts.running + (shipper?.inFlightCount ?? 0);
+  const shipperStatus = shipperHealth(shipper);
 
   return [
     {
       name: 'Shipper',
-      label:
-        shipper === undefined
-          ? '—'
-          : shipper.availability === 'unavailable'
-            ? 'No signal'
-            : shipperLabel(shipper.state),
-      tone:
-        shipper === undefined || shipper.availability === 'unavailable'
-          ? 'neutral'
-          : shipperTone(shipper.state),
+      ...shipperStatus,
     },
     // No gbrain health source is wired into the HUD yet — render an honest
     // neutral pill rather than a fabricated status. Wire when a source lands.
@@ -102,11 +116,7 @@ function buildHealthEntries(
       label: quarantine.isValid
         ? `Valid | ${quarantine.activeCount.toLocaleString('en-US')} quarantined`
         : 'Invalid',
-      tone: quarantine.isValid
-        ? quarantine.withinRetryBudget
-          ? 'good'
-          : 'warning'
-        : 'bad',
+      tone: ledgerTone(quarantine),
     },
     {
       name: 'Jobs',

@@ -1,11 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import type {
   DailyBucket,
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { medianNumber } from '@/lib/hud/number-series';
 import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
 import type { HudTone } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
@@ -29,18 +31,6 @@ function formatHours(hours: number | null): string {
   if (hours < 1) return `${Math.round(hours * 60)}m`;
   if (hours >= 48) return `${(hours / 24).toFixed(1)}d`;
   return `${hours.toFixed(1)}h`;
-}
-
-function median(values: readonly number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 0) {
-    const low = sorted[mid - 1];
-    const high = sorted[mid];
-    if (low !== undefined && high !== undefined) return (low + high) / 2;
-  }
-  return sorted[mid] ?? null;
 }
 
 function deltaPercent(current: number, prior: number): number | null {
@@ -120,16 +110,14 @@ function DeltaLine({
 }>) {
   if (deltaPct === null) {
     return (
-      <span className='text-2xs text-tertiary-token'>
-        {'—'} vs prior 7d
-      </span>
+      <span className='text-2xs text-tertiary-token'>{'—'} vs prior 7d</span>
     );
   }
   const isFlat = Math.abs(deltaPct) < 0.05;
   const isGood = goodDirection === 'up' ? deltaPct > 0 : deltaPct < 0;
-  const tone: HudTone = isFlat ? 'neutral' : isGood ? 'good' : 'bad';
+  const tone: HudTone = getDeltaTone(isFlat, isGood);
   const accent = getAccentCssVars(HUD_TONE_ACCENT[tone]);
-  const arrow = isFlat ? '→' : deltaPct > 0 ? '↑' : '↓';
+  const arrow = getDeltaArrow(isFlat, deltaPct);
 
   return (
     <span
@@ -143,6 +131,45 @@ function DeltaLine({
     >
       {arrow} {Math.abs(deltaPct).toFixed(1)}% vs prior 7d
     </span>
+  );
+}
+
+function getDeltaTone(isFlat: boolean, isGood: boolean): HudTone {
+  if (isFlat) return 'neutral';
+  return isGood ? 'good' : 'bad';
+}
+
+function getDeltaArrow(isFlat: boolean, deltaPct: number): string {
+  if (isFlat) return '→';
+  return deltaPct > 0 ? '↑' : '↓';
+}
+
+function MetricSubtitle({
+  children,
+}: Readonly<{ readonly children: ReactNode }>) {
+  return <div className='grid gap-1'>{children}</div>;
+}
+
+function KpiMetricCard({
+  label,
+  value,
+  subtitle,
+  testId,
+}: Readonly<{
+  readonly label: string;
+  readonly value: string;
+  readonly subtitle: ReactNode;
+  readonly testId: string;
+}>) {
+  return (
+    <ContentMetricCard
+      label={label}
+      value={value}
+      subtitle={subtitle}
+      className={KPI_TILE_CLASS}
+      valueClassName={KPI_VALUE_CLASS}
+      data-testid={testId}
+    />
   );
 }
 
@@ -171,90 +198,89 @@ export function HudKpiSubgrid({
   const mergedLast7 = sumMerged(last7);
   const velocityDelta = deltaPercent(mergedLast7, sumMerged(prior7));
 
-  const mergeTimeLast7 = median(mergeP50Values(last7));
-  const mergeTimePrior7 = median(mergeP50Values(prior7));
+  const mergeTimeLast7 = medianNumber(mergeP50Values(last7));
+  const mergeTimePrior7 = medianNumber(mergeP50Values(prior7));
   const mergeTimeDelta =
     mergeTimeLast7 !== null && mergeTimePrior7 !== null
       ? deltaPercent(mergeTimeLast7, mergeTimePrior7)
       : null;
-
   const cashAvailable = isHudMetricValueAvailable(metrics.sources.mercury);
+  const cards: Array<{
+    label: string;
+    value: string;
+    subtitle: ReactNode;
+    testId: string;
+  }> = [
+    {
+      label: 'Ship velocity',
+      value: hasVelocityData ? mergedLast7.toLocaleString('en-US') : '—',
+      subtitle: (
+        <MetricSubtitle>
+          <span>PRs merged, last 7d</span>
+          <DeltaLine deltaPct={velocityDelta} goodDirection='up' />
+          <Sparkline values={buckets.map(bucket => bucket.merged)} />
+        </MetricSubtitle>
+      ),
+      testId: 'hud-kpi-ship-velocity',
+    },
+    {
+      label: 'PR merge time',
+      value: hasVelocityData ? formatHours(mergeTimeLast7) : '—',
+      subtitle: (
+        <MetricSubtitle>
+          <span>P50, last 7d</span>
+          <DeltaLine deltaPct={mergeTimeDelta} goodDirection='down' />
+          <Sparkline values={mergeP50Values(buckets)} />
+        </MetricSubtitle>
+      ),
+      testId: 'hud-kpi-merge-time',
+    },
+    {
+      label: 'Cash',
+      value: cashAvailable ? formatUsd(metrics.overview.balanceUsd) : '—',
+      subtitle: (
+        <MetricSubtitle>
+          <span className='tabular-nums'>
+            {cashAvailable
+              ? `Burn ${formatUsd(metrics.overview.burnRateUsd)} / 30d`
+              : 'Mercury data unavailable'}
+          </span>
+          {cashAvailable && metrics.overview.runwayMonths !== null ? (
+            <span className='tabular-nums'>
+              Runway {metrics.overview.runwayMonths.toFixed(1)} mo
+            </span>
+          ) : null}
+        </MetricSubtitle>
+      ),
+      testId: 'hud-kpi-cash',
+    },
+    {
+      label: 'Active agents',
+      value: metrics.aiOps.counts.running.toLocaleString('en-US'),
+      subtitle: (
+        <MetricSubtitle>
+          <span className='tabular-nums'>
+            Queued {metrics.aiOps.counts.queued.toLocaleString('en-US')} |
+            Review {metrics.aiOps.counts.review.toLocaleString('en-US')}
+          </span>
+          <span className='tabular-nums'>
+            {metrics.aiOps.mergeQueue.openAgentPrs} /{' '}
+            {metrics.aiOps.mergeQueue.openAgentPrThreshold} agent PRs open
+          </span>
+        </MetricSubtitle>
+      ),
+      testId: 'hud-kpi-active-agents',
+    },
+  ];
 
   return (
     <div
       className='grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4'
       data-testid='hud-kpi-subgrid'
     >
-      <ContentMetricCard
-        label='Ship velocity'
-        value={hasVelocityData ? mergedLast7.toLocaleString('en-US') : '—'}
-        subtitle={
-          <div className='grid gap-1'>
-            <span>PRs merged, last 7d</span>
-            <DeltaLine deltaPct={velocityDelta} goodDirection='up' />
-            <Sparkline values={buckets.map(bucket => bucket.merged)} />
-          </div>
-        }
-        className={KPI_TILE_CLASS}
-        valueClassName={KPI_VALUE_CLASS}
-        data-testid='hud-kpi-ship-velocity'
-      />
-      <ContentMetricCard
-        label='PR merge time'
-        value={hasVelocityData ? formatHours(mergeTimeLast7) : '—'}
-        subtitle={
-          <div className='grid gap-1'>
-            <span>P50, last 7d</span>
-            <DeltaLine deltaPct={mergeTimeDelta} goodDirection='down' />
-            <Sparkline values={mergeP50Values(buckets)} />
-          </div>
-        }
-        className={KPI_TILE_CLASS}
-        valueClassName={KPI_VALUE_CLASS}
-        data-testid='hud-kpi-merge-time'
-      />
-      <ContentMetricCard
-        label='Cash'
-        value={
-          cashAvailable ? formatUsd(metrics.overview.balanceUsd) : '—'
-        }
-        subtitle={
-          <div className='grid gap-1'>
-            <span className='tabular-nums'>
-              {cashAvailable
-                ? `Burn ${formatUsd(metrics.overview.burnRateUsd)} / 30d`
-                : 'Mercury data unavailable'}
-            </span>
-            {cashAvailable && metrics.overview.runwayMonths !== null ? (
-              <span className='tabular-nums'>
-                Runway {metrics.overview.runwayMonths.toFixed(1)} mo
-              </span>
-            ) : null}
-          </div>
-        }
-        className={KPI_TILE_CLASS}
-        valueClassName={KPI_VALUE_CLASS}
-        data-testid='hud-kpi-cash'
-      />
-      <ContentMetricCard
-        label='Active agents'
-        value={metrics.aiOps.counts.running.toLocaleString('en-US')}
-        subtitle={
-          <div className='grid gap-1'>
-            <span className='tabular-nums'>
-              Queued {metrics.aiOps.counts.queued.toLocaleString('en-US')} |
-              Review {metrics.aiOps.counts.review.toLocaleString('en-US')}
-            </span>
-            <span className='tabular-nums'>
-              {metrics.aiOps.mergeQueue.openAgentPrs} /{' '}
-              {metrics.aiOps.mergeQueue.openAgentPrThreshold} agent PRs open
-            </span>
-          </div>
-        }
-        className={KPI_TILE_CLASS}
-        valueClassName={KPI_VALUE_CLASS}
-        data-testid='hud-kpi-active-agents'
-      />
+      {cards.map(card => (
+        <KpiMetricCard key={card.testId} {...card} />
+      ))}
     </div>
   );
 }
