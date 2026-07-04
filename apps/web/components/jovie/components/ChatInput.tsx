@@ -831,6 +831,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       onSend={handleSendClick}
                       onStop={onStop}
                       setIsFocused={setIsFocused}
+                      setComposerFocused={setComposerFocused}
                       chips={chips}
                       onRemoveChipAt={onRemoveChipAt}
                       isPickerOpen={isPickerOpen}
@@ -927,6 +928,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onSend={handleSendClick}
                   onStop={onStop}
                   setIsFocused={setIsFocused}
+                  setComposerFocused={setComposerFocused}
                   chips={chips}
                   onRemoveChipAt={onRemoveChipAt}
                   hasBorderTop={
@@ -1001,6 +1003,7 @@ interface InputRowProps {
   readonly onSend: () => void;
   readonly onStop?: () => void;
   readonly setIsFocused: (focused: boolean) => void;
+  readonly setComposerFocused: (focused: boolean) => void;
   readonly chips?: readonly import('../hooks/useChipTray').TrayChip[];
   readonly onRemoveChipAt?: (index: number) => void;
   /** Add hairline divider above the input (when picker sits above it). */
@@ -1049,6 +1052,7 @@ function InputRow({
   onSend,
   onStop,
   setIsFocused,
+  setComposerFocused,
   chips,
   onRemoveChipAt,
   hasBorderTop = false,

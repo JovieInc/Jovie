@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
+import { ComposerFocusProvider } from '@/components/features/chat/Composer';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
 import { APP_ROUTES } from '@/constants/routes';
@@ -24,7 +25,6 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
-import { ComposerFocusProvider } from '@/components/features/chat/Composer';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import {

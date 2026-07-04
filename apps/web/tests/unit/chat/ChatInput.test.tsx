@@ -813,7 +813,9 @@ describe('ChatInput', () => {
 
     expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('idle');
     await user.click(textarea);
-    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('focused');
+    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent(
+      'focused'
+    );
     await user.keyboard('{Escape}');
     expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('idle');
     expect(textarea).not.toHaveFocus();

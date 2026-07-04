@@ -17,10 +17,11 @@ interface ComposerFocusDispatch {
   readonly setComposerFocused: (focused: boolean) => void;
 }
 
-const ComposerFocusStateContext = createContext<ComposerFocusState | null>(null);
-const ComposerFocusDispatchContext = createContext<ComposerFocusDispatch | null>(
+const ComposerFocusStateContext = createContext<ComposerFocusState | null>(
   null
 );
+const ComposerFocusDispatchContext =
+  createContext<ComposerFocusDispatch | null>(null);
 
 export function ComposerFocusProvider({
   children,
@@ -33,10 +34,7 @@ export function ComposerFocusProvider({
     setIsComposerFocused(focused);
   }, []);
 
-  const state = useMemo(
-    () => ({ isComposerFocused }),
-    [isComposerFocused]
-  );
+  const state = useMemo(() => ({ isComposerFocused }), [isComposerFocused]);
   const dispatch = useMemo(
     () => ({ setComposerFocused }),
     [setComposerFocused]
