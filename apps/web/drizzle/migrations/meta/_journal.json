@@ -491,6 +491,13 @@
       "when": 1783000000000,
       "tag": "0068_public_profile_capture_dismissals",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1783000050000,
+      "tag": "0069_chat_message_feedback",
+      "breakpoints": true
     }
   ]
 }
