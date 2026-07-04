@@ -6,6 +6,7 @@ import {
   EMPTY_WHAT_SHIPPED_RESPONSE,
   readWhatShippedFromDisk,
 } from '@/lib/hud/what-shipped';
+import { readWhatShippedFromGitHub } from '@/lib/hud/what-shipped-github';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -24,7 +25,14 @@ export async function GET(request: NextRequest): Promise<Response> {
       );
     }
 
-    const payload = await readWhatShippedFromDisk();
+    // Primary source: the sidecar-written local JSON cache (dev machine).
+    // Fallback: recently merged PRs from GitHub with server-side humanized
+    // titles, so the feed works wherever the web app is deployed.
+    const diskPayload = await readWhatShippedFromDisk();
+    const payload = diskPayload.available
+      ? diskPayload
+      : await readWhatShippedFromGitHub();
+
     return NextResponse.json(payload, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('[ops/what-shipped] Failed to read what shipped feed', error);
