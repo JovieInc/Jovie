@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **iOS write-configuration resilience (GH-11003)**: Rewrote `apps/ios/scripts/write-configuration.sh` to use `/usr/bin/plutil` (always present on macOS) instead of `python3`, preventing failures when a broken Homebrew interpreter (e.g. pyexpat/libexpat symbol mismatch with python@3.14) is first on PATH. Adds a `TARGET_PLIST` env override for testability and four regression tests (`write-configuration.test.mjs`) run in `ios-ci.yml`.
 - **Smoother icon transitions (GH-11472)**: Copy buttons and the mobile menu now morph between states with a soft, interruptible animation instead of snapping. Adds shared animation primitives (`lib/animation/motion-primitives.ts` + `AnimatedIconSwap`) for icon swaps, staggered entrances, and layered depth shadows.
 - [internal] **Tool discovery skill (GH-13124)**: New `.claude/skills/tool-discovery/SKILL.md` — when a link/tool is shared without context, the agent searches GitHub (`gh search repos`) and the web for docs/pricing/reviews and returns a structured evaluation instead of asking for manual research or a gated unlock action.
 - [internal] **Ovie HUD auto-reload (GH-12988)**: Electron now polls `/api/health/build-info` every 60 seconds and reloads `/hud` windows when the deployed commit/build fingerprint changes, with no-store build-info responses so running operator shells pick up new HUD deploys without a manual restart.
