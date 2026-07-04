@@ -556,6 +556,7 @@ const ProvidersCell = memo(function ProvidersCell({
   if (items.length === 0) {
     return (
       <span
+        role='img'
         aria-label='No providers'
         className='system-b-library-meta-text text-quaternary-token'
       >
