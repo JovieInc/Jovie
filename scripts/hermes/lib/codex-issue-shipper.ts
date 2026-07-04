@@ -1009,6 +1009,92 @@ export function routeForAgent(
   };
 }
 
+// --- Retry escalation -------------------------------------------------------
+//
+// releaseClaimForRetry re-opens a failed issue to the dispatchable pool with no
+// attempt cap, so a task that reliably times out or exits-0-without-a-PR
+// re-spawns a full coding agent every tick — an infinite retry loop that burns
+// token budget with no human ever notified (#13126). Same failure shape as the
+// epic-pointer (#12729) and invalid-misroute (LYB) loops, generalized to "any
+// task that keeps failing the same way".
+//
+// The shipper already posts a stable release comment on every retry, so
+// counting those (durable, human-visible, no new state file) caps the loop:
+// after MAX_RETRY_RELEASES failures we escalate to codex-blocked (which
+// eligibleCodexIssues excludes from dispatch) with a diagnostic instead of
+// releasing again. Historical retries already on the issue count, so tasks
+// currently stuck in the loop escalate on the next tick.
+
+// ponytail: fixed 3-strike cap — env-tunable only if a real need appears.
+export const MAX_RETRY_RELEASES = 3;
+
+/**
+ * Canonical first line of every release-for-retry comment. The shipper job
+ * emits this AND counts it — one exported constant so a reword can't drift the
+ * emitter out of sync with the counter (which would silently un-cap the loop).
+ */
+export const RETRY_RELEASE_COMMENT_HEADER =
+  'Jovie agent (codex issue shipper) released this issue for retry.';
+
+export interface IssueComment {
+  readonly body: string;
+  /**
+   * gh `viewerDidAuthor` — true when the shipper's own gh identity authored the
+   * comment. JovieInc/Jovie is a public repo, so issue comments are
+   * attacker-writable; only the bot's own release comments are trusted markers,
+   * else anyone could forge two comments to force premature escalation.
+   */
+  readonly viewerDidAuthor?: boolean;
+}
+
+/**
+ * How many times the shipper itself has released this issue for retry. Counts
+ * only comments the shipper authored (`viewerDidAuthor`) that carry the
+ * canonical header — forged or look-alike comments from others do not count.
+ */
+export function countRetryReleases(
+  comments: ReadonlyArray<IssueComment>
+): number {
+  return comments.filter(
+    comment =>
+      comment.viewerDidAuthor === true &&
+      comment.body.includes(RETRY_RELEASE_COMMENT_HEADER)
+  ).length;
+}
+
+/**
+ * True when this failure should escalate (mark blocked) instead of releasing.
+ * `priorReleases` is the count of release-for-retry comments already on the
+ * issue; this failure would add one more, so we escalate once that total would
+ * reach `max`. Default 3: attempts 1 and 2 release, the 3rd failure escalates —
+ * three agent runs, then a human decision.
+ */
+export function shouldEscalateRetry(
+  priorReleases: number,
+  max = MAX_RETRY_RELEASES
+): boolean {
+  return priorReleases + 1 >= max;
+}
+
+/** Diagnostic posted when a task is escalated instead of retried again. */
+export function buildRetryEscalationReason(
+  priorReleases: number,
+  latestReason: string
+): string {
+  const attempts = priorReleases + 1;
+  return [
+    `Escalated after ${attempts} automated retry attempts — pausing retries (#13126).`,
+    '',
+    'This task failed the same automated path repeatedly, so re-dispatching it',
+    'only burns token budget. Flagging as a possible systemic issue that needs',
+    'manual investigation. The prior retry comments on this issue record what',
+    'was tried and what was observed each time.',
+    '',
+    'Latest failure:',
+    latestReason,
+  ].join('\n');
+}
+
 // --- Checkout freshness gate ------------------------------------------------
 //
 // The launchd shipper reads its OWN dispatcher code from the primary checkout
