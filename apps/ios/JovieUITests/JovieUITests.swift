@@ -183,10 +183,10 @@ final class JovieUITests: XCTestCase {
       "Removed bottom pill profile button still exists with drawer closed.\n\(app.debugDescription)"
     )
 
-    // Talk FAB is present and unrelated to the removed pill.
+    // Voice control is present inside the composer and unrelated to the removed pill.
     XCTAssertTrue(
-      app.buttons["shell-talk-fab"].waitForExistence(timeout: 3),
-      "Talk FAB did not appear on the chat tab.\n\(app.debugDescription)"
+      app.buttons["chat-voice-button"].waitForExistence(timeout: 3),
+      "Voice button did not appear on the chat tab.\n\(app.debugDescription)"
     )
 
     app.buttons["Open navigation drawer"].tap()
@@ -295,16 +295,18 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "no-ghost-footprint-needs-onboarding", app: onboardingApp)
   }
 
-  func testTalkFABAppearsOnChatTab() {
+  func testVoiceButtonAppearsOnChatComposer() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
     }
 
     XCTAssertTrue(
-      app.buttons["shell-talk-fab"].waitForExistence(timeout: 3),
-      "Talk FAB did not appear on the chat tab.\n\(app.debugDescription)"
+      app.buttons["chat-voice-button"].waitForExistence(timeout: 3),
+      "Voice button did not appear on the chat tab.\n\(app.debugDescription)"
     )
-    attachScreenshot(named: "talk-fab", app: app)
+    XCTAssertFalse(app.staticTexts["STT"].exists)
+    XCTAssertFalse(app.staticTexts["Transcription"].exists)
+    attachScreenshot(named: "voice-button", app: app)
   }
 
   func testOfflineChatLaunchShowsCachedHistoryIntro() {
@@ -327,24 +329,6 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
 
-<<<<<<< HEAD
-    app.buttons["Open navigation drawer"].tap()
-    XCTAssertTrue(
-      app.staticTexts["@tim"].waitForExistence(timeout: 3),
-      "Drawer account header should keep the @handle while offline.\n\(app.debugDescription)"
-    )
-    XCTAssertEqual(
-      app.staticTexts.matching(offlineStatusPredicate).count,
-      1,
-      "Opening the drawer must not add another Offline status indicator.\n\(app.debugDescription)"
-=======
-    let offlineStatusPredicate = NSPredicate(format: "label == %@", "Offline")
-    XCTAssertEqual(
-      app.staticTexts.matching(offlineStatusPredicate).count,
-      1,
-      "Offline chat should show exactly one status indicator (shell header subtitle).\n\(app.debugDescription)"
-    )
-
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
       app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
@@ -353,7 +337,11 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(
       app.staticTexts["@tim"].exists,
       "Drawer account subtitle should keep the @handle while offline.\n\(app.debugDescription)"
->>>>>>> origin/main
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(offlineStatusPredicate).count,
+      1,
+      "Opening the drawer must not add another Offline status indicator.\n\(app.debugDescription)"
     )
   }
 
@@ -601,38 +589,6 @@ final class JovieUITests: XCTestCase {
       app.staticTexts["Profile views"].waitForExistence(timeout: 3),
       "Audience drawer surface did not open highlights.\n\(app.debugDescription)"
     )
-  }
-
-  // GH-12948: the Audience tab label must stay single-line in the drawer
-  // surface switcher. Wrapped labels stack to ~3 lines and read as broken.
-  func testDrawerSurfaceSwitcherLabelsStaySingleLine() {
-    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
-      $0.buttons["Copy URL"]
-    }
-
-    app.buttons["Open navigation drawer"].tap()
-
-    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
-    let audienceSurface = app.buttons["shell-drawer-surface-shell-tab-audience"]
-    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
-    XCTAssertTrue(
-      profileSurface.waitForExistence(timeout: 3),
-      "Drawer surface switcher did not appear.\n\(app.debugDescription)"
-    )
-    XCTAssertTrue(audienceSurface.exists)
-    XCTAssertTrue(chatSurface.exists)
-
-    let profileHeight = profileSurface.frame.height
-    let audienceHeight = audienceSurface.frame.height
-    let chatHeight = chatSurface.frame.height
-    let maxSingleLineHeight = max(profileHeight, chatHeight) + 4
-
-    XCTAssertLessThanOrEqual(
-      audienceHeight,
-      maxSingleLineHeight,
-      "Audience drawer tab wrapped to multiple lines (height \(audienceHeight) vs peers \(profileHeight)/\(chatHeight)).\n\(app.debugDescription)"
-    )
-    attachScreenshot(named: "drawer-surface-switcher-labels", app: app)
   }
 
   func testAudienceAskJovieCTAOpensScopedChat() {

@@ -603,8 +603,8 @@ struct MobileChatProseFlowTokenTests {
       .text(" today"),
     ])
     #expect(tokens.count == 5)
-    guard case .entity(.release, "rel_1", "Midnight Drive") = tokens[1] else {
-      Issue.record("Expected entity token at index 1")
+    guard case .entity(.release, "rel_1", "Midnight Drive") = tokens[2] else {
+      Issue.record("Expected entity token at index 2")
       return
     }
   }

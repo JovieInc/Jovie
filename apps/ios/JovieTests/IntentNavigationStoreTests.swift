@@ -19,8 +19,8 @@ struct IntentNavigationStoreTests {
     let store = IntentNavigationStore()
 
     store.submit(.openChat)
-    store.submit(.sendMessage(text: "hi", autoSend: true))
+    store.submit(.startVoiceCapture)
 
-    #expect(store.consume() == .sendMessage(text: "hi", autoSend: true))
+    #expect(store.consume() == .startVoiceCapture)
   }
 }

@@ -29,6 +29,8 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case chatFirstTokenTimeout = "chat_first_token_timeout"
   case profileImportFailed = "profile_import_failed"
   case chatEntityTokenUnmappedKind = "chat_entity_token_unmapped_kind"
+  case voiceCaptureStarted = "voice_capture_started"
+  case voiceTranscriptionCompleted = "voice_transcription_completed"
 }
 
 struct ObservabilityConfiguration: Equatable {

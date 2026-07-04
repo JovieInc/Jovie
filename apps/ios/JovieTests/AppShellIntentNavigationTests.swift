@@ -62,6 +62,26 @@ struct AppShellIntentNavigationTests {
     #expect(state.pendingRequest == nil)
   }
 
+  @Test func startVoiceCaptureSelectsChatTabAndQueuesCapture() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .profile,
+      chatDraft: "keep draft",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .startVoiceCapture
+    )
+
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      state: &state
+    )
+
+    #expect(state.selectedTab == .chat)
+    #expect(state.chatDraft == "keep draft")
+    #expect(state.shouldStartVoiceCapture)
+    #expect(state.pendingRequest == nil)
+  }
+
   @Test func sendMessageWithoutAutoSendPrefillsDraft() {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,
@@ -117,6 +137,27 @@ struct AppShellIntentNavigationTests {
     )
     #expect(state.selectedTab == .profile)
     #expect(state.chatDraft == "existing draft")
+    #expect(state.pendingRequest == nil)
+  }
+
+  @Test func startVoiceCaptureWhenChatDisabledConsumesWithoutStartingCapture() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .profile,
+      chatDraft: "existing draft",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .startVoiceCapture
+    )
+
+    #expect(
+      AppShellIntentNavigation.applyPendingRequest(
+        chatEnabled: false,
+        state: &state
+      ) == true
+    )
+    #expect(state.selectedTab == .profile)
+    #expect(state.chatDraft == "existing draft")
+    #expect(state.shouldStartVoiceCapture == false)
     #expect(state.pendingRequest == nil)
   }
 

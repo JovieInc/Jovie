@@ -10,11 +10,13 @@ enum MobileChatKeyboardPolicy {
 struct MobileChatView: View {
   @Bindable var repository: ChatRepository
   @Binding var draft: String
+  @Binding var voiceCaptureTrigger: Int
   let webBaseURL: URL
 
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
+  @State private var voiceCaptureService = VoiceCaptureService()
 
   var body: some View {
     ZStack {
@@ -34,6 +36,10 @@ struct MobileChatView: View {
     .accessibilityIdentifier("mobile-chat")
     .task {
       await repository.refreshConversations()
+    }
+    .task(id: voiceCaptureTrigger) {
+      guard voiceCaptureTrigger > 0 else { return }
+      await startVoiceCapture()
     }
   }
 
@@ -130,6 +136,7 @@ struct MobileChatView: View {
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
         isOffline: repository.isOffline,
+        voiceCaptureService: voiceCaptureService,
         onSend: {
           let text = draft
           draft = ""
@@ -142,6 +149,15 @@ struct MobileChatView: View {
         },
         onDraftEdited: {
           userEditedSinceSend = true
+        },
+        onVoiceStart: {
+          await startVoiceCapture()
+        },
+        onVoiceFinish: {
+          await finishVoiceCapture()
+        },
+        onVoiceCancel: {
+          voiceCaptureService.cancel()
         }
       )
       .padding(.horizontal, JovieSpacing.large)
@@ -192,6 +208,27 @@ struct MobileChatView: View {
       .padding(.horizontal, JovieSpacing.xLarge)
 
       Spacer(minLength: 48)
+    }
+  }
+
+  private func startVoiceCapture() async {
+    guard !repository.isSending else { return }
+    isComposerFocused = false
+    do {
+      try await voiceCaptureService.start()
+    } catch {
+      voiceCaptureService.cancel()
+    }
+  }
+
+  private func finishVoiceCapture() async {
+    do {
+      let result = try await voiceCaptureService.finish()
+      userEditedSinceSend = false
+      draft = ""
+      await repository.send(text: result.transcript)
+    } catch {
+      voiceCaptureService.cancel()
     }
   }
 }
@@ -319,9 +356,13 @@ private struct ChatComposerView: View {
   @FocusState.Binding var isComposerFocused: Bool
   let isSending: Bool
   let isOffline: Bool
+  @Bindable var voiceCaptureService: VoiceCaptureService
   let onSend: () -> Void
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
   let onDraftEdited: () -> Void
+  let onVoiceStart: () async -> Void
+  let onVoiceFinish: () async -> Void
+  let onVoiceCancel: () -> Void
 
   var body: some View {
     ChatComposerBar(
@@ -330,6 +371,10 @@ private struct ChatComposerView: View {
       placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
       isSending: isSending,
       isPlusEnabled: !isSending,
+      voiceCaptureService: voiceCaptureService,
+      onVoiceStart: onVoiceStart,
+      onVoiceFinish: onVoiceFinish,
+      onVoiceCancel: onVoiceCancel,
       onSend: onSend,
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
