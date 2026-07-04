@@ -2,7 +2,6 @@
 
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
-import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   DrawerStatGrid,
   DrawerSurfaceCard,
@@ -13,6 +12,7 @@ import {
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatAnalyticsStageRate } from '@/lib/utils/analytics-growth';
@@ -32,15 +32,7 @@ export function calculateConversionRate(
   return formatAnalyticsStageRate(current, previous);
 }
 
-interface RangeOption {
-  value: AnalyticsRange;
-  label: string;
-}
-
-const RANGE_OPTIONS: RangeOption[] = [
-  { value: '7d', label: '7D' }, // ui-casing-allow: compact range pill
-  { value: '30d', label: '30D' }, // ui-casing-allow: compact range pill
-];
+const RANGE_VALUES: readonly AnalyticsRange[] = ['7d', '30d'];
 
 export type AnalyticsTab = 'cities' | 'countries' | 'sources' | 'links';
 
@@ -312,14 +304,13 @@ export function AnalyticsSidebarView({
                 </p>
               </div>
               {showRangeControl ? (
-                <AppSegmentControl
+                <TimeRangeSelector
                   value={range}
                   onValueChange={onRangeChange}
-                  options={RANGE_OPTIONS}
-                  size='sm'
+                  ranges={RANGE_VALUES}
                   className='w-full'
                   triggerClassName='flex-1'
-                  aria-label='Analytics Time Range'
+                  ariaLabel='Analytics Time Range'
                 />
               ) : (
                 <div aria-hidden='true' className='h-7 invisible' />
