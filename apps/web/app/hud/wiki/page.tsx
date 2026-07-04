@@ -5,7 +5,7 @@ import { WikiUnavailableNotice } from '@/components/features/admin/wiki/WikiUnav
 import {
   getCurrentAdminPageAccess,
   redirectToLogin,
-} from '@/lib/getCurrentAdminPageAccess';
+} from '@/lib/admin/page-access';
 import { listPages, searchPages } from '@/lib/wiki/gbrain-client';
 import { groupByNamespace } from '@/lib/wiki/namespace';
 

@@ -3,7 +3,7 @@ import { WikiPageArticle } from '@/components/features/admin/wiki/WikiPageArticl
 import {
   getCurrentAdminPageAccess,
   redirectToLogin,
-} from '@/lib/getCurrentAdminPageAccess';
+} from '@/lib/admin/page-access';
 import { getPage } from '@/lib/wiki/gbrain-client';
 
 interface Props {

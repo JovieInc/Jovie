@@ -1,4 +1,4 @@
-import { env } from '@/env-server-schema';
+import { env } from '@/lib/env-server';
 
 interface McpRequest {
   jsonrpc: '2.0';
