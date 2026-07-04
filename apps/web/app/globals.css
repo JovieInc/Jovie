@@ -839,6 +839,7 @@ body {
     /* Discrete breakpoints matching Linear.app (verified 2026-03-23):
        375px: 38px/1.1  |  768px: 56px/1.08  |  1280px+: 64px/1.06
        Linear caps at 64px — never goes to 76px at any viewport width */
+    font-family: var(--font-display);
     font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
