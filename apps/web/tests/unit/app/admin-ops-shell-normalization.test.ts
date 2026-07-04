@@ -17,15 +17,14 @@ const TIM_ACTION_REQUIRED_SECTION = join(
   TEST_DIR,
   '../../../components/features/admin/TimActionRequiredSection.tsx'
 );
+const WHAT_SHIPPED = join(
+  TEST_DIR,
+  '../../../components/features/admin/WhatShipped.tsx'
+);
 
 const OPERATIONAL_CONTROL_PANEL = join(
   TEST_DIR,
   '../../../components/features/admin/OperationalControlPanel.tsx'
-);
-
-const WHAT_SHIPPED = join(
-  TEST_DIR,
-  '../../../components/features/admin/WhatShipped.tsx'
 );
 
 const OPS_COMPONENT_FILES = [
@@ -77,16 +76,23 @@ describe('admin ops shell normalization', () => {
     );
   });
 
-  it('mounts WhatShipped as the first HUD card in shell and kiosk modes', () => {
-    const source = readSource(HUD_DASHBOARD_CLIENT);
+  it('mounts WhatShipped as the first HUD card', () => {
+    const hudSource = readSource(HUD_DASHBOARD_CLIENT);
 
-    expect(source).toContain(
-      "import { WhatShipped } from '@/components/features/admin/WhatShipped';"
+    expect(hudSource).toContain('import { WhatShipped }');
+    expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
+    expect(hudSource.indexOf('<WhatShipped')).toBeLessThan(
+      hudSource.indexOf('<TimActionRequiredSection')
     );
-    expect(source.indexOf('<WhatShipped />')).toBeGreaterThan(-1);
-    expect(source.indexOf('<WhatShipped />')).toBeLessThan(
-      source.indexOf('<TimActionRequiredSection />')
+  });
+
+  it('uses the shared shell row frame for what shipped rows', () => {
+    const whatShippedSource = readSource(WHAT_SHIPPED);
+
+    expect(whatShippedSource).toContain(
+      "import { ShellListRowFrame } from '@/components/organisms/table';"
     );
+    expect(whatShippedSource).toContain('<ShellListRowFrame');
   });
 
   it('normalizes admin ops list rows onto the shared shell row frame', () => {

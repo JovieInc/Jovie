@@ -4,80 +4,101 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ShellListRowFrame } from '@/components/organisms/table';
+import type { WhatShippedResponse } from '@/lib/hud/what-shipped';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
-import type {
-  WhatShippedItem,
-  WhatShippedResponse,
-} from '@/types/what-shipped';
 
-const WHAT_SHIPPED_QUERY_KEY = ['ops', 'what-shipped'] as const;
 const WHAT_SHIPPED_POLL_MS = 60_000;
-const WHAT_SHIPPED_GC_MS = WHAT_SHIPPED_POLL_MS * 2;
-const SKELETON_ROW_COUNT = 4;
-const EMPTY_STATE_MESSAGE = 'Nothing shipped in the last few hours';
+const WHAT_SHIPPED_QUERY_GC_MS = WHAT_SHIPPED_POLL_MS * 2;
+const SKELETON_ROW_KEYS = [
+  'what-shipped-skel-1',
+  'what-shipped-skel-2',
+] as const;
+
+const EMPTY_MESSAGE = 'nothing shipped in the last few hours';
 
 async function fetchWhatShipped(
+  kioskToken: string | null,
   signal: AbortSignal
 ): Promise<WhatShippedResponse> {
-  const response = await fetch('/api/ops/what-shipped', { signal });
+  const url = new URL('/api/ops/what-shipped', globalThis.location.origin);
+  if (kioskToken) {
+    url.searchParams.set('kiosk', kioskToken);
+  }
+
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     throw new Error(`What shipped fetch failed (${response.status})`);
   }
+
   return response.json() as Promise<WhatShippedResponse>;
+}
+
+interface WhatShippedRowProps {
+  readonly title: string;
+  readonly number: number;
+  readonly mergedAt: string;
+  readonly url: string;
+}
+
+function WhatShippedRow({
+  title,
+  number,
+  mergedAt,
+  url,
+}: Readonly<WhatShippedRowProps>) {
+  return (
+    <ShellListRowFrame className='flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
+      <div className='min-w-0 flex-1'>
+        <a
+          href={url}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='group flex items-center gap-1.5'
+        >
+          <p className='truncate text-app font-medium text-primary-token transition-colors group-hover:text-accent'>
+            {title}
+          </p>
+          <ExternalLink
+            className='h-3 w-3 shrink-0 text-tertiary-token opacity-0 transition-opacity group-hover:opacity-100'
+            aria-hidden='true'
+          />
+        </a>
+      </div>
+      <span className='shrink-0 text-2xs tabular-nums text-tertiary-token'>
+        #{number}
+      </span>
+      <span className='shrink-0 text-2xs tabular-nums text-tertiary-token'>
+        {formatTimeAgo(mergedAt)}
+      </span>
+    </ShellListRowFrame>
+  );
 }
 
 function WhatShippedSkeleton() {
   return (
-    <div className='grid gap-2' data-testid='what-shipped-skeleton'>
-      {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+    <div className='grid gap-2' aria-hidden='true'>
+      {SKELETON_ROW_KEYS.map(key => (
         <div
-          key={index}
-          className='h-14 animate-pulse rounded-xl border border-subtle bg-surface-0'
-          aria-hidden='true'
+          key={key}
+          className='h-13 animate-pulse rounded-xl border border-subtle bg-surface-0'
         />
       ))}
     </div>
   );
 }
 
-function WhatShippedRow({
-  item,
-}: Readonly<{ readonly item: WhatShippedItem }>) {
-  return (
-    <ShellListRowFrame className='flex items-start justify-between gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
-      <div className='min-w-0 flex-1'>
-        <a
-          href={item.url}
-          target='_blank'
-          rel='noopener noreferrer'
-          className='group flex items-start gap-1.5'
-        >
-          <p className='line-clamp-2 text-app font-semibold text-primary-token transition-colors group-hover:text-accent-blue'>
-            {item.title}
-          </p>
-          <ExternalLink
-            className='mt-0.5 h-3 w-3 shrink-0 text-tertiary-token opacity-0 transition-opacity group-hover:opacity-100'
-            aria-hidden='true'
-          />
-        </a>
-        <p className='mt-1 text-2xs text-tertiary-token'>#{item.number}</p>
-      </div>
-      <p className='shrink-0 text-2xs tabular-nums text-tertiary-token'>
-        {formatTimeAgo(item.merged_at)}
-      </p>
-    </ShellListRowFrame>
-  );
+export interface WhatShippedProps {
+  readonly kioskToken?: string | null;
 }
 
-export function WhatShipped() {
+export function WhatShipped({ kioskToken = null }: Readonly<WhatShippedProps>) {
   const { data, isLoading, isError } = useQuery<WhatShippedResponse>({
-    queryKey: WHAT_SHIPPED_QUERY_KEY,
-    queryFn: ({ signal }) => fetchWhatShipped(signal),
+    queryKey: ['ops', 'what-shipped', kioskToken],
+    queryFn: ({ signal }) => fetchWhatShipped(kioskToken, signal),
     staleTime: WHAT_SHIPPED_POLL_MS,
-    gcTime: WHAT_SHIPPED_GC_MS,
+    gcTime: WHAT_SHIPPED_QUERY_GC_MS,
     refetchInterval: WHAT_SHIPPED_POLL_MS,
     refetchIntervalInBackground: false,
-    refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
 
@@ -104,24 +125,24 @@ export function WhatShipped() {
 
         {isLoading ? (
           <WhatShippedSkeleton />
-        ) : isError ? (
-          <p
-            className='min-h-14 text-app leading-5 text-secondary-token'
-            data-testid='what-shipped-error'
-          >
-            Could not load the shipping feed.
-          </p>
         ) : showEmpty ? (
-          <p
-            className='min-h-14 text-app leading-5 text-secondary-token'
-            data-testid='what-shipped-empty'
-          >
-            {EMPTY_STATE_MESSAGE}
+          <p className='min-h-13 text-app leading-6 text-secondary-token'>
+            {EMPTY_MESSAGE}
+          </p>
+        ) : isError ? (
+          <p className='min-h-13 text-app leading-6 text-secondary-token'>
+            {EMPTY_MESSAGE}
           </p>
         ) : (
-          <div className='grid gap-2' data-testid='what-shipped-list'>
+          <div className='grid gap-2'>
             {items.map(item => (
-              <WhatShippedRow key={item.number} item={item} />
+              <WhatShippedRow
+                key={item.number}
+                title={item.title}
+                number={item.number}
+                mergedAt={item.merged_at}
+                url={item.url}
+              />
             ))}
           </div>
         )}

@@ -787,7 +787,7 @@ export function HudDashboardClient({
   if (isShell) {
     return (
       <div className={outerClass}>
-        <WhatShipped />
+        <WhatShipped kioskToken={kioskToken} />
         <TimActionRequiredSection />
         <HudKpiSubgrid metrics={metrics} />
         <HudSystemHealthStrip metrics={metrics} />
@@ -940,7 +940,7 @@ export function HudDashboardClient({
         </ContentSurfaceCard>
       ) : null}
 
-      <WhatShipped />
+      <WhatShipped kioskToken={kioskToken} />
 
       {/* Tim Action Required — personal manual items, surfaces above everything else */}
       {/* ContentSurfaceCard is rendered by TimActionRequiredSection itself so it can self-hide */}
