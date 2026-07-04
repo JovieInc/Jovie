@@ -74,7 +74,7 @@ export const CANONICAL_METRICS: Record<
     definition:
       'Distinct non-bot audience members/fingerprints active in the selected range.',
     source:
-      "audience_members: COUNT(*) WHERE creator_profile_id = :profileId AND last_seen_at >= :startDate AND NOT (tags @> '[\"bot\"]')",
+      'audience_members: COUNT(*) WHERE creator_profile_id = :profileId AND last_seen_at >= :startDate AND NOT (tags @> \'["bot"]\')',
     valueType: 'count',
     unit: 'people',
   },

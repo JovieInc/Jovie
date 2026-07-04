@@ -19,10 +19,9 @@ describe('CANONICAL_METRICS', () => {
       expect(def.definition, `${key}.definition`).toBeTruthy();
       expect(def.source, `${key}.source`).toBeTruthy();
       expect(['count', 'rate'], `${key}.valueType`).toContain(def.valueType);
-      expect(
-        ['views', 'people', 'clicks', 'percent'],
-        `${key}.unit`
-      ).toContain(def.unit);
+      expect(['views', 'people', 'clicks', 'percent'], `${key}.unit`).toContain(
+        def.unit
+      );
     }
   });
 
@@ -78,8 +77,7 @@ describe('computeCaptureRate', () => {
       [7, 9],
       [0, 100],
     ]) {
-      const legacy =
-        unique > 0 ? Math.round((subs / unique) * 1000) / 10 : 0;
+      const legacy = unique > 0 ? Math.round((subs / unique) * 1000) / 10 : 0;
       expect(computeCaptureRate(subs, unique)).toBe(legacy);
     }
   });
