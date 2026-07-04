@@ -18,6 +18,8 @@ interface AppShellFrameProps {
   readonly contentClassName?: string;
   readonly containerClassName?: string;
   readonly variant?: AppShellFrameVariant;
+  /** When true (desktop), sidebar dims and right rail slides partially off-screen. */
+  readonly composerFocusActive?: boolean;
 }
 
 /**
@@ -42,6 +44,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   // DemoShell, future surfaces) match the current production state. AuthShell
   // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
   variant = 'legacy',
+  composerFocusActive = false,
 }: Readonly<AppShellFrameProps>) {
   const isShellChatV1 = variant === 'shellChatV1';
 
@@ -49,6 +52,7 @@ export const AppShellFrame = memo(function AppShellFrame({
     <div
       data-app-shell-frame='true'
       data-shell-design={variant}
+      data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
         'relative flex h-full w-full flex-col overflow-hidden',
         isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
@@ -66,7 +70,12 @@ export const AppShellFrame = memo(function AppShellFrame({
             'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
         )}
       >
-        {sidebar}
+        <div
+          data-testid='app-shell-sidebar-mount'
+          className='transition-opacity duration-cinematic ease-cinematic motion-reduce:transition-none'
+        >
+          {sidebar}
+        </div>
 
         <main
           id='main-content'
