@@ -107,6 +107,17 @@ async function openSubscribeFlow(page: Page) {
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
+
+  // If the flow defaulted to SMS (Pro creator, smsEnabled=true), switch to email.
+  // The "Use Email" button is visible only when channel='sms'.
+  const useEmailBtn = flow.getByRole('button', { name: 'Use Email' });
+  if (await useEmailBtn.isVisible().catch(() => false)) {
+    await useEmailBtn.click();
+    await flow
+      .locator('[data-testid="mobile-email-input"][type="email"]:visible')
+      .first()
+      .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.QUICK });
+  }
 }
 
 async function setupProfileSubscribePage(
