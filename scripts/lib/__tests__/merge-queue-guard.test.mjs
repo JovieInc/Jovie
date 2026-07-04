@@ -13,6 +13,7 @@ import {
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
   requiredStatusDecision,
+  uiFastTrackPolicy,
   validateAggregateRequiredChecks,
   validateLiveMergeQueueRuleset,
   validateMergeQueueRepoConfig,
@@ -25,6 +26,28 @@ const greenStatuses = [
   { name: 'Migration Guard', conclusion: 'SUCCESS' },
   { name: 'Fork PR Gate', state: 'SUCCESS' },
 ];
+
+function buildUiFastTrackBody({
+  checks = null,
+  heading = true,
+  screenshots = true,
+  why = true,
+} = {}) {
+  return [
+    heading ? '## Fast-track UI eligibility' : null,
+    why ? 'Why eligible: UI-only visual token/layout fix.' : null,
+    screenshots
+      ? 'Before: ![before](https://github.com/user-attachments/assets/before.png)'
+      : null,
+    screenshots
+      ? 'After: ![after](https://github.com/user-attachments/assets/after.png)'
+      : null,
+    checks ??
+      'Checks run: pnpm --filter @jovie/web run typecheck -- --pretty false; pnpm biome check --write apps/web/components/features/profile/ProfileHeader.tsx; vitest ProfileHeader.test.tsx',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
 describe('merge queue pre-queue freshness', () => {
   it('waits for CI after a stale head is rebased and pushed', () => {
@@ -168,6 +191,149 @@ describe('fast-track policy', () => {
 
     expect(policy.removeFast).toBe(false);
     expect(policy.allowed).toBe(true);
+  });
+
+  it('does not trust generated PR prose for emergency fast-track classification', () => {
+    const policy = fastTrackPolicy({
+      headRefName: 'codex/jov-123-normal-work',
+      labels: [{ name: 'fast' }],
+      title: 'Hotfix sev0 production incident',
+      body: 'Emergency hotfix requested.',
+    });
+
+    expect(policy.removeFast).toBe(true);
+    expect(policy.allowed).toBe(false);
+  });
+
+  it('permits generated UI fast-track when labels, files, screenshots, checks, and audit trail are present', () => {
+    const policy = fastTrackPolicy({
+      headRefName: 'codex/jov-3894-text-token-fix',
+      labels: [{ name: 'fast' }, { name: 'ui' }, { name: 'fast-track-ui' }],
+      title: 'fix(ui): reduce oversized title token',
+      changedFiles: [
+        'apps/web/components/features/profile/ProfileHeader.tsx',
+        'apps/web/tests/unit/profile/ProfileHeader.test.tsx',
+      ],
+      body: buildUiFastTrackBody(),
+    });
+
+    expect(policy.allowed).toBe(true);
+    expect(policy.removeFast).toBe(false);
+    expect(policy.uiFastTrack.eligible).toBe(true);
+  });
+
+  it.each([
+    [
+      'screenshot evidence',
+      {
+        checks: 'Checks run: typecheck; biome; affected component test.',
+        screenshots: false,
+      },
+      'missing before/after screenshot evidence in PR body',
+    ],
+    [
+      'typecheck evidence',
+      { checks: 'Checks run: biome; affected component test.' },
+      'missing narrow typecheck evidence in PR body',
+    ],
+    [
+      'lint evidence',
+      { checks: 'Checks run: typecheck; affected component test.' },
+      'missing narrow lint/Biome evidence in PR body',
+    ],
+    [
+      'eligibility audit trail',
+      { why: false },
+      'missing fast-track UI eligibility audit trail in PR body',
+    ],
+  ])('denies UI fast-track when %s is missing', (_name, bodyOptions, blocker) => {
+    const policy = uiFastTrackPolicy({
+      headRefName: 'codex/jov-3894-text-token-fix',
+      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
+      body: buildUiFastTrackBody(bodyOptions),
+    });
+
+    expect(policy.eligible).toBe(false);
+    expect(policy.blockers).toContain(blocker);
+  });
+
+  it('ignores negated evidence claims in the fast-track UI section', () => {
+    const policy = uiFastTrackPolicy({
+      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
+      body: [
+        '## Fast-track UI eligibility',
+        'Why eligible: UI-only visual token/layout fix.',
+        'Before: ![before](https://github.com/user-attachments/assets/before.png)',
+        'After: ![after](https://github.com/user-attachments/assets/after.png)',
+        'Checks run: typecheck not run; biome missing; no affected component test.',
+      ].join('\n'),
+    });
+
+    expect(policy.eligible).toBe(false);
+    expect(policy.blockers).toEqual(
+      expect.arrayContaining([
+        'missing narrow typecheck evidence in PR body',
+        'missing narrow lint/Biome evidence in PR body',
+      ])
+    );
+  });
+
+  it('denies UI fast-track when changed files are unavailable', () => {
+    const policy = uiFastTrackPolicy({
+      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      body: buildUiFastTrackBody({
+        checks: 'Checks run: typecheck; biome; affected component test.',
+      }),
+    });
+
+    expect(policy.eligible).toBe(false);
+    expect(policy.blockers).toContain(
+      'changed files are required to classify UI-only fast-track'
+    );
+  });
+
+  it('warns but does not block when affected test evidence is absent', () => {
+    const policy = uiFastTrackPolicy({
+      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
+      body: buildUiFastTrackBody({
+        checks: 'Checks run: typecheck; biome.',
+      }),
+    });
+
+    expect(policy.eligible).toBe(true);
+    expect(policy.warnings).toContain(
+      'no affected component/test evidence found; PR body must explain if none exists'
+    );
+  });
+
+  it('denies UI fast-track for API, auth, billing, DB, security, infra, and routing paths', () => {
+    const policy = uiFastTrackPolicy({
+      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      changedFiles: [
+        'apps/web/app/api/profile/route.ts',
+        'apps/web/lib/entitlements/server.ts',
+        'apps/web/drizzle/migrations/0099_add_billing.sql',
+        '.github/workflows/ci.yml',
+        'apps/web/lib/security/csp.ts',
+      ],
+      body: buildUiFastTrackBody({
+        checks: 'Checks run: typecheck; biome; affected component test.',
+      }),
+    });
+
+    expect(policy.eligible).toBe(false);
+    expect(policy.blockers).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('API route or server write path'),
+        expect.stringContaining('entitlements or access control'),
+        expect.stringContaining('database schema or migration'),
+        expect.stringContaining('infra, cron, CI, or routing behavior'),
+        expect.stringContaining('security, CSP, or secret handling'),
+      ])
+    );
   });
 });
 

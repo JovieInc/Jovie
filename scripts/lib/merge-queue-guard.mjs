@@ -1,5 +1,7 @@
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
+export const FAST_TRACK_UI_LABEL = 'fast-track-ui';
+export const UI_LABEL = 'ui';
 export const NEEDS_CONFLICT_RESOLUTION_LABEL = 'needs-conflict-resolution';
 
 export const REQUIRED_MERGE_STATUSES = [
@@ -111,6 +113,64 @@ const HOT_FILE_PATTERNS = [
   /^skills-lock\.json$/,
 ];
 
+const UI_FAST_TRACK_INELIGIBLE_FILE_PATTERNS = [
+  {
+    reason: 'auth or identity surface',
+    pattern:
+      /(^|\/)(auth|clerk|proxy|proxy-state|middleware)(\/|\.|-)|^proxy\.(ts|js|mjs)$/,
+  },
+  {
+    reason: 'billing or payment surface',
+    pattern: /(^|\/)(stripe|billing|payment|checkout|subscription)(\/|\.|-)/,
+  },
+  {
+    reason: 'database schema or migration',
+    pattern:
+      /(^|\/)(drizzle\/migrations|migrations|schema|schemas)(\/|$)|(^|\/)(schema|db-schema)\.(ts|tsx|js|mjs|sql|json)$/,
+  },
+  {
+    reason: 'API route or server write path',
+    pattern:
+      /^apps\/web\/app\/api\/|(^|\/)(route|actions|server-actions|mutation|write|persistence)\.(ts|tsx|js|mjs)$/,
+  },
+  {
+    reason: 'entitlements or access control',
+    pattern: /(^|\/)(entitlements|permissions|access-control)(\/|\.|-)/,
+  },
+  {
+    reason: 'security, CSP, or secret handling',
+    pattern:
+      /(^|\/)(security|csp|content-security-policy|secrets?)(\/|\.|-)|(^|\/)(gitleaks|trufflehog|codeql|scorecard)(\/|\.|-)/,
+  },
+  {
+    reason: 'infra, cron, CI, or routing behavior',
+    pattern:
+      /^\.github\/|^scripts\/|^infra\/|^vercel\.json$|(^|\/)(cron|routing|router|rewrite|redirect|proxy)(\/|\.|-)/,
+  },
+  {
+    reason: 'package or toolchain manifest',
+    pattern:
+      /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|biome\.json|tsconfig\.json|vitest\.config\.)/,
+  },
+];
+
+const UI_FAST_TRACK_ELIGIBLE_FILE_PATTERNS = [
+  /^apps\/web\/components\/.*\.(css|ts|tsx|js|jsx)$/,
+  /^apps\/web\/app\/(?!api\/).*\.(css|ts|tsx|js|jsx|mdx)$/,
+  /^apps\/web\/styles\/.*\.(css|ts|tsx|js|jsx)$/,
+  /^apps\/web\/public\/.*\.(png|jpg|jpeg|webp|gif|svg)$/,
+  /^apps\/web\/tests\/.*\.(test|spec)\.(ts|tsx|js|jsx)$/,
+  /^docs\/design-system\/.*\.(md|mdx|png|jpg|jpeg|webp|gif)$/,
+  /^DESIGN\.md$/,
+];
+
+const SCREENSHOT_EVIDENCE_RE =
+  /!\[[^\]]*](?:\([^)]+\))|<img\b|https?:\/\/\S+(?:\.png|\.jpe?g|\.gif|\.webp)|github\.com\/user-attachments\/assets\/|user-images\.githubusercontent\.com\//i;
+
+const CHECK_EVIDENCE_RE = /\b(typecheck|pnpm\s+[^`\n]*typecheck)\b/i;
+const LINT_EVIDENCE_RE = /\b(biome|lint)\b/i;
+const AFFECTED_TEST_EVIDENCE_RE = /\b(vitest|test|spec|affected component)\b/i;
+
 const KEYWORD_HOT_KEYS = [
   {
     key: 'hot:ratchet-baseline',
@@ -160,10 +220,146 @@ export function isEmergencyFastTrack(pr) {
   );
   if ([...EMERGENCY_LABELS].some(label => labels.has(label))) return true;
   if (/^hotfix\//i.test(pr.headRefName ?? '')) return true;
-  const text = `${pr.title ?? ''}\n${pr.body ?? ''}`;
-  return /\b(emergency|hotfix|incident|production outage|sev[ -]?[012])\b/i.test(
-    text
+  return false;
+}
+
+function normalizePath(file = '') {
+  return file.replace(/^\.\//, '');
+}
+
+function fileMatchesAny(file, entries) {
+  const normalized = normalizePath(file);
+  return (
+    entries.find(entry => {
+      const pattern = entry instanceof RegExp ? entry : entry.pattern;
+      return pattern.test(normalized);
+    }) ?? null
   );
+}
+
+function extractUiFastTrackSection(body = '') {
+  const lines = body.split('\n');
+  const start = lines.findIndex(line =>
+    /^##\s+Fast-track UI eligibility\s*$/i.test(line.trim())
+  );
+  if (start < 0) return '';
+  const sectionLines = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^##\s+/.test(line.trim())) break;
+    sectionLines.push(line);
+  }
+  return sectionLines.join('\n');
+}
+
+function isNegatedEvidenceLine(line = '') {
+  return /\b(no|not|without|missing|skipped|did not|not run|none)\b/i.test(
+    line
+  );
+}
+
+function sectionHasLine(section, predicate) {
+  return section
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .filter(line => !isNegatedEvidenceLine(line))
+    .some(predicate);
+}
+
+function hasUiFastTrackEvidence(body = '') {
+  const section = extractUiFastTrackSection(body);
+  const beforeScreenshot = sectionHasLine(
+    section,
+    line => /\bbefore\b/i.test(line) && SCREENSHOT_EVIDENCE_RE.test(line)
+  );
+  const afterScreenshot = sectionHasLine(
+    section,
+    line => /\bafter\b/i.test(line) && SCREENSHOT_EVIDENCE_RE.test(line)
+  );
+
+  return {
+    screenshot: beforeScreenshot && afterScreenshot,
+    typecheck: sectionHasLine(section, line => CHECK_EVIDENCE_RE.test(line)),
+    lint: sectionHasLine(section, line => LINT_EVIDENCE_RE.test(line)),
+    affectedTest: sectionHasLine(section, line =>
+      AFFECTED_TEST_EVIDENCE_RE.test(line)
+    ),
+    auditTrail:
+      section.length > 0 &&
+      sectionHasLine(section, line =>
+        /\bwhy eligible\b|\beligible because\b/i.test(line)
+      ) &&
+      sectionHasLine(section, line =>
+        /\bchecks? run\b|\bverification\b/i.test(line)
+      ),
+  };
+}
+
+export function uiFastTrackPolicy(pr) {
+  const labels = new Set(
+    normalizeLabelNames(pr.labels).map(label => label.toLowerCase())
+  );
+  const changedFiles = (pr.changedFiles ?? pr.files ?? []).map(normalizePath);
+  const blockers = [];
+  const warnings = [];
+
+  if (!labels.has(UI_LABEL)) {
+    blockers.push(`missing required label: ${UI_LABEL}`);
+  }
+  if (!labels.has(FAST_TRACK_UI_LABEL)) {
+    blockers.push(`missing required label: ${FAST_TRACK_UI_LABEL}`);
+  }
+
+  if (changedFiles.length === 0) {
+    blockers.push('changed files are required to classify UI-only fast-track');
+  }
+
+  for (const file of changedFiles) {
+    const ineligible = fileMatchesAny(
+      file,
+      UI_FAST_TRACK_INELIGIBLE_FILE_PATTERNS
+    );
+    if (ineligible) {
+      blockers.push(`${file}: ${ineligible.reason}`);
+      continue;
+    }
+    if (!fileMatchesAny(file, UI_FAST_TRACK_ELIGIBLE_FILE_PATTERNS)) {
+      blockers.push(`${file}: not an allowed UI-only visual path`);
+    }
+  }
+
+  const evidence = hasUiFastTrackEvidence(pr.body ?? '');
+  if (!evidence.screenshot) {
+    blockers.push('missing before/after screenshot evidence in PR body');
+  }
+  if (!evidence.typecheck) {
+    blockers.push('missing narrow typecheck evidence in PR body');
+  }
+  if (!evidence.lint) {
+    blockers.push('missing narrow lint/Biome evidence in PR body');
+  }
+  if (!evidence.affectedTest) {
+    warnings.push(
+      'no affected component/test evidence found; PR body must explain if none exists'
+    );
+  }
+  if (!evidence.auditTrail) {
+    blockers.push('missing fast-track UI eligibility audit trail in PR body');
+  }
+
+  return {
+    requested: labels.has(FAST_TRACK_UI_LABEL),
+    eligible: blockers.length === 0,
+    blockers,
+    warnings,
+    labels: {
+      hasUi: labels.has(UI_LABEL),
+      hasFastTrackUi: labels.has(FAST_TRACK_UI_LABEL),
+      hasFast: labels.has(FAST_TRACK_LABEL),
+    },
+    evidence,
+    changedFiles,
+  };
 }
 
 export function fastTrackPolicy(pr) {
@@ -171,15 +367,20 @@ export function fastTrackPolicy(pr) {
   const hasFast = labels.has(FAST_TRACK_LABEL);
   const generated = isAutonomousBranch(pr.headRefName ?? '');
   const emergency = isEmergencyFastTrack(pr);
+  const uiFastTrack = uiFastTrackPolicy(pr);
+  const allowedFastTrack = emergency || uiFastTrack.eligible;
   return {
     hasFast,
     generated,
     emergency,
-    allowed: !hasFast || !generated || emergency,
-    removeFast: hasFast && generated && !emergency,
+    uiFastTrack,
+    allowed: !hasFast || !generated || allowedFastTrack,
+    removeFast: hasFast && generated && !allowedFastTrack,
     reason:
-      hasFast && generated && !emergency
-        ? 'ordinary generated PRs may not use fast-track without emergency/hotfix classification'
+      hasFast && generated && !allowedFastTrack
+        ? uiFastTrack.requested
+          ? `UI fast-track denied: ${uiFastTrack.blockers.join('; ')}`
+          : 'ordinary generated PRs may not use fast-track without emergency/hotfix classification'
         : '',
   };
 }
