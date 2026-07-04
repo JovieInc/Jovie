@@ -50,4 +50,18 @@ describe('admin payload parsers', () => {
       'nextFeatured must be "true" or "false"'
     );
   });
+
+  it('rejects malformed multipart form-data as a validation error', async () => {
+    const request = new NextRequest('http://localhost/admin/verify', {
+      method: 'POST',
+      headers: {
+        'content-type': 'multipart/form-data; boundary=vitest-boundary',
+      },
+      body: 'not a multipart payload',
+    });
+
+    await expect(parseToggleVerifyPayload(request)).rejects.toThrow(
+      'Invalid form data in request body'
+    );
+  });
 });

@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/images/upload/route';
+import { malformedMultipartRequest } from '@/tests/helpers/malformed-multipart-request';
 
 // Hoist mocks before they're used
 const {
@@ -370,6 +371,22 @@ describe('/api/images/upload', () => {
       'No file provided. Please select an image to upload.'
     );
     expect(data.code).toBe('NO_FILE');
+  });
+
+  it('should reject malformed multipart bodies as a client error', async () => {
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+
+    const response = await POST(
+      malformedMultipartRequest('/api/images/upload')
+    );
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data).toEqual({
+      error: 'Invalid form data. Please retry the upload.',
+      code: 'INVALID_CONTENT_TYPE',
+    });
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it('should reject non-image files', async () => {

@@ -19,6 +19,7 @@ export {
 } from './constants';
 
 export { errorResponse, extractPgError } from './error-response';
+export { parseImageFormData } from './form-data';
 export {
   fileToBuffer,
   getImageBufferMetadata,

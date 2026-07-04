@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
+import { isFormDataParseError } from '@/lib/http/parse-form-data';
 
 /**
  * Configuration for creating an admin route handler
@@ -44,6 +45,11 @@ function wantsJsonResponse(request: NextRequest): boolean {
  */
 async function resolveEntitlements() {
   return getCurrentUserEntitlements();
+}
+
+function redirectToAdminCreators(request: NextRequest): NextResponse {
+  const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);
+  return NextResponse.redirect(redirectUrl);
 }
 
 /**
@@ -135,9 +141,26 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
         return NextResponse.json(response);
       }
 
-      const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);
-      return NextResponse.redirect(redirectUrl);
+      return redirectToAdminCreators(request);
     } catch (error) {
+      if (isFormDataParseError(error)) {
+        await captureWarning(
+          `[admin/route-factory] Invalid form data for ${config.actionName}`,
+          {
+            route: config.errorContext.route,
+            action: config.errorContext.action,
+            adminEmail: entitlements.email,
+            error: error.message,
+          }
+        );
+
+        if (wantsJson) {
+          return buildAdminErrorJsonResponse(error, config);
+        }
+
+        return redirectToAdminCreators(request);
+      }
+
       // Track error in Sentry
       await captureCriticalError(
         `Admin action failed: ${config.actionName}`,
@@ -155,8 +178,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
         return buildAdminErrorJsonResponse(error, config);
       }
 
-      const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);
-      return NextResponse.redirect(redirectUrl);
+      return redirectToAdminCreators(request);
     }
   };
 }

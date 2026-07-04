@@ -64,6 +64,77 @@ describe('admin creator toggle routes', () => {
     expect(adminActionsMock.toggleCreatorVerifiedAction).not.toHaveBeenCalled();
   });
 
+  it('returns 400 json without critical capture for malformed multipart', async () => {
+    entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
+      isAdmin: true,
+      userId: 'admin_1',
+      email: 'admin@jov.ie',
+      isAuthenticated: true,
+    });
+
+    const { POST } = await import(
+      '@/app/app/(shell)/admin/creators/toggle-verify/route'
+    );
+
+    const request = new NextRequest(
+      'http://localhost/app/admin/creators/toggle-verify',
+      {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'multipart/form-data; boundary=vitest-boundary',
+        },
+        body: 'not a multipart payload',
+      }
+    );
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data).toEqual({
+      success: false,
+      error: 'Invalid form data in request body',
+    });
+    expect(errorTrackingMock.captureWarning).toHaveBeenCalledOnce();
+    expect(errorTrackingMock.captureCriticalError).not.toHaveBeenCalled();
+    expect(adminActionsMock.toggleCreatorVerifiedAction).not.toHaveBeenCalled();
+  });
+
+  it('redirects non-json clients for malformed multipart without critical capture', async () => {
+    entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
+      isAdmin: true,
+      userId: 'admin_1',
+      email: 'admin@jov.ie',
+      isAuthenticated: true,
+    });
+
+    const { POST } = await import(
+      '@/app/app/(shell)/admin/creators/toggle-verify/route'
+    );
+
+    const request = new NextRequest(
+      'http://localhost/app/admin/creators/toggle-verify',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'multipart/form-data; boundary=vitest-boundary',
+        },
+        body: 'not a multipart payload',
+      }
+    );
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      `http://localhost${APP_ROUTES.ADMIN_CREATORS}`
+    );
+    expect(errorTrackingMock.captureWarning).toHaveBeenCalledOnce();
+    expect(errorTrackingMock.captureCriticalError).not.toHaveBeenCalled();
+    expect(adminActionsMock.toggleCreatorVerifiedAction).not.toHaveBeenCalled();
+  });
+
   it('returns success json for verify route', async () => {
     entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
       isAdmin: true,

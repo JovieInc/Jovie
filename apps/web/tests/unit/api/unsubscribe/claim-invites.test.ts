@@ -19,6 +19,7 @@ vi.mock('@/lib/error-tracking', () => ({
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     error: vi.fn(),
+    warn: vi.fn(),
     info: vi.fn(),
   },
 }));
@@ -84,5 +85,27 @@ describe('POST /api/unsubscribe/claim-invites', () => {
       })
     );
     expect(html).toContain('You&#039;ve been unsubscribed');
+  });
+
+  it('returns a 400 page for malformed multipart bodies', async () => {
+    const { POST } = await import('@/app/api/unsubscribe/claim-invites/route');
+    const request = new NextRequest(
+      'http://localhost/api/unsubscribe/claim-invites?token=valid-token',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'multipart/form-data; boundary=vitest-boundary',
+        },
+        body: 'not a multipart payload',
+      }
+    );
+
+    const response = await POST(request);
+    const html = await response.text();
+
+    expect(response.status).toBe(400);
+    expect(html).toContain('Invalid request. Please try again.');
+    expect(mockVerifyUnsubscribeToken).not.toHaveBeenCalled();
+    expect(mockAddSuppression).not.toHaveBeenCalled();
   });
 });

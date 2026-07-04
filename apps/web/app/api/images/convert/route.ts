@@ -11,6 +11,7 @@ import {
   UPLOAD_ERROR_CODES,
 } from '../upload/lib/constants';
 import { errorResponse } from '../upload/lib/error-response';
+import { parseImageFormData } from '../upload/lib/form-data';
 import {
   canProcessMimeTypeWithSharp,
   convertImageBufferToJpeg,
@@ -45,7 +46,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const formData = await request.formData();
+  const formData = await parseImageFormData(
+    request,
+    'Invalid form data. Please try converting again.'
+  );
+  if (formData instanceof NextResponse) {
+    return formData;
+  }
+
   const file = formData.get('file');
   if (!(file instanceof File)) {
     return errorResponse(

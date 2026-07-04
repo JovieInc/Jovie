@@ -15,6 +15,7 @@ import { logger } from '@/lib/utils/logger';
 import { imageUploadSchema } from '@/lib/validation/schemas';
 import { UPLOAD_ERROR_CODES } from './constants';
 import { errorResponse } from './error-response';
+import { parseImageFormData } from './form-data';
 import { canProcessMimeTypeWithSharp, fileToBuffer } from './image-processing';
 
 const PHOTO_UPLOAD_TYPES = ['avatar', 'press'] as const;
@@ -40,7 +41,14 @@ export async function validateUploadedFile(
     );
   }
 
-  const formData = await request.formData();
+  const formData = await parseImageFormData(
+    request,
+    'Invalid form data. Please retry the upload.'
+  );
+  if (formData instanceof NextResponse) {
+    return formData;
+  }
+
   const file = formData.get('file') as File | null;
   const rawPhotoType = formData.get('photoType');
   const photoType =

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyUnsubscribeToken } from '@/lib/email/unsubscribe-token';
 import { escapeHtml } from '@/lib/email/utils';
 import { captureError } from '@/lib/error-tracking';
+import {
+  isFormDataParseError,
+  parseFormDataBody,
+} from '@/lib/http/parse-form-data';
 import { addSuppression } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
@@ -65,7 +69,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
+    const formData = await parseFormDataBody(request);
     const tokenFromQuery = request.nextUrl.searchParams.get('token');
     const tokenFromBody = formData.get('token');
     const token =
@@ -148,6 +152,24 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
+    if (isFormDataParseError(error)) {
+      logger.warn('Malformed form data for unsubscribe claim-invites', {
+        error: error.message,
+      });
+
+      return new NextResponse(
+        renderHtmlPage({
+          title: 'Error',
+          message: 'Invalid request. Please try again.',
+          success: false,
+        }),
+        {
+          status: 400,
+          headers: { ...NO_STORE_HEADERS, 'Content-Type': 'text/html' },
+        }
+      );
+    }
+
     logger.error('Error processing unsubscribe request', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });

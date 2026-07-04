@@ -1,4 +1,5 @@
 import { type NextRequest } from 'next/server';
+import { parseFormDataBody } from '@/lib/http/parse-form-data';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -58,7 +59,7 @@ async function parseRequestBody<T>(
     return parseJson(json);
   }
 
-  const formData = await request.formData();
+  const formData = await parseFormDataBody(request);
   return parseFormData(formData);
 }
 
