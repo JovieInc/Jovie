@@ -554,13 +554,15 @@ export function buildGbrainQuery(issue: GithubIssue): string {
 }
 
 export function gbrainContextBlocker(context: GbrainContext): string | null {
+  // Only block on query failures — the query is the actual coordination gate
+  // (checks ownership/existing work). Capture failures are audit-log writes;
+  // a write failure is non-blocking when gbrain is alive and queries succeed.
+  // Capture can fail under system memory pressure (OOM kills bun) without
+  // affecting gbrain reachability or the coordination data we actually need.
   const failures = context.queryResult
     .split('\n')
     .map(line => line.trim())
-    .filter(line => /^gbrain (query|capture) failed:/i.test(line));
-  if (context.captureSlug.includes('(capture failed)')) {
-    failures.push(`gbrain capture failed for ${context.captureSlug}`);
-  }
+    .filter(line => /^gbrain query failed:/i.test(line));
   if (failures.length === 0) return null;
   return [
     'system-blocker: gbrain coordination preflight failed, so no coding agent may start.',
