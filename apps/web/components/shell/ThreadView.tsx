@@ -108,7 +108,7 @@ export function ThreadView({
             )}
           </header>
 
-          <div className='mt-8 space-y-4 text-app leading-relaxed'>
+          <div className='mt-8 space-y-2.5 text-app leading-relaxed'>
             {children}
           </div>
         </div>
