@@ -20,9 +20,7 @@ describe('marketing static flags', () => {
     ]);
 
     const defaultOnFlags = Object.entries(FEATURE_FLAGS)
-      .filter(
-        ([key]) => !invertedV1DesignFlags.has(key)
-      )
+      .filter(([key]) => !invertedV1DesignFlags.has(key))
       .map(([, value]) => value);
 
     expect(defaultOnFlags.every(Boolean)).toBe(true);
@@ -77,6 +75,5 @@ describe('marketing static flags', () => {
 
     expect(FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER).toBe(true);
   });
-
 
 });
