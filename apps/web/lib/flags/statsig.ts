@@ -12,6 +12,11 @@ import {
   type SubscribeCTAVariant,
   type TeleprompterShowcaseVariant,
 } from './contracts';
+import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+  parseProfilePacAssignment,
+} from './profile-pac';
 
 let statsigInitialized = false;
 let statsigClient: Statsig | null = null;
@@ -237,6 +242,19 @@ export async function getProfileAlertOptInVariantValue(
     return variant;
   }
   return 'button';
+}
+
+export async function getProfilePacAssignmentValue(
+  stableId: string | null
+): Promise<ProfilePacAssignment> {
+  const config = await getExperiment(
+    stableId,
+    LEGACY_STATSIG_GATE_KEYS.PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT
+  );
+  if (Object.keys(config).length === 0) {
+    return DEFAULT_PROFILE_PAC_ASSIGNMENT;
+  }
+  return parseProfilePacAssignment(config);
 }
 
 export async function getSubscribeCTAVariantValue(

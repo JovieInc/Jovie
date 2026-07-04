@@ -4,6 +4,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   IOS_APPLE_MUSIC_PRIORITY: 'feature_ios_apple_music_priority',
   SUBSCRIBE_CTA_EXPERIMENT: 'experiment_subscribe_cta_variant',
   PROFILE_ALERT_OPTIN_EXPERIMENT: 'profile_alert_optin_cta_variant',
+  PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT: 'profile_pac_variant_slots',
   SPOTIFY_OAUTH: 'feature_spotify_oauth',
   STRIPE_CONNECT_ENABLED: 'stripe-connect-enabled',
   SHOW_EXAMPLE_PROFILES_CAROUSEL: 'show_example_profiles_carousel',

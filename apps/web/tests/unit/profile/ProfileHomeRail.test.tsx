@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
+import type { EntityCardModel } from '@/components/organisms/entity-card';
+import {
+  __profileHomeRailTestUtils,
+  ProfileHomeRail,
+} from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import type { Artist } from '@/types/db';
@@ -54,6 +58,66 @@ function makePublicRelease(
 }
 
 describe('ProfileHomeRail', () => {
+  it('orders approved S2 cards by PAC slot without duplicating ticket and RSVP buckets', () => {
+    const merchCard = {
+      id: 'merch-1',
+      kind: 'merch',
+      imageAlt: 'Merch',
+      title: 'Tour Tee',
+    } satisfies EntityCardModel;
+    const showCard = {
+      id: 'show-1',
+      kind: 'show',
+      imageAlt: 'Show',
+      title: 'The Novo',
+    } satisfies EntityCardModel;
+
+    expect(
+      __profileHomeRailTestUtils
+        .getS2OrderedItems({
+          assignedSlot: 'tickets',
+          merchItems: [merchCard],
+          showItems: [showCard],
+        })
+        .map(item => item.id)
+    ).toEqual(['show-1', 'merch-1']);
+
+    expect(
+      __profileHomeRailTestUtils
+        .getS2OrderedItems({
+          assignedSlot: 'rsvp',
+          merchItems: [merchCard],
+          showItems: [showCard],
+        })
+        .map(item => item.id)
+    ).toEqual(['show-1', 'merch-1']);
+  });
+
+  it('falls back to existing merch and show order when the assigned S2 slot is unavailable', () => {
+    const merchCard = {
+      id: 'merch-1',
+      kind: 'merch',
+      imageAlt: 'Merch',
+      title: 'Tour Tee',
+    } satisfies EntityCardModel;
+    const showCard = {
+      id: 'show-1',
+      kind: 'show',
+      imageAlt: 'Show',
+      title: 'The Novo',
+    } satisfies EntityCardModel;
+
+    expect(
+      __profileHomeRailTestUtils
+        .getS2OrderedItems({
+          assignedSlot: 'tip',
+          merchItems: [merchCard],
+          showItems: [showCard],
+        })
+        .map(item => item.id)
+    ).toEqual(['merch-1', 'show-1']);
+  });
+
   it('renders alerts above content cards in the home rail DOM order (JOV-11084)', () => {
     render(
       <ProfileHomeRail
