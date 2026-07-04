@@ -15,9 +15,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 - [internal] **Computed-contrast gate (GH-12012)**: `scripts/lint-contrast-computed.ts` + `contrast-pairs.config.json` resolve design-token pairs (hex/rgb/lch/oklch, `var()` chains, light+dark themes) via `lib/a11y-gates/contrast-engine.ts` and fail CI when a pair drops below WCAG AA; enforced by `tests/unit/design-system/computed-contrast.test.ts` (Unit Tests merge gate) and chained into `lint:contrast-ratchet` after the regex pre-filter.
 - [internal] **Touch-target ratchet (GH-12012)**: `scripts/lint-touch-target.ts` counts interactive elements with explicit sub-44px heights (WCAG 2.5.5; baseline 224, ratchet only goes down); enforced by `tests/unit/design-system/touch-target-ratchet.test.ts`.
 - [internal] **Reduced motion zeroes ALL duration tokens (GH-12012)**: `--motion-reveal-*` (globals.css), `--clerk-motion-duration` (theme.css), and `--linear-duration-*` (linear-tokens.css) are now zeroed under `prefers-reduced-motion`; `tests/unit/design-system/reduced-motion-tokens.test.ts` guards every current and future literal duration token.
+=======
+- [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
+>>>>>>> origin/main
 - [internal] **Tool discovery skill (GH-13124)**: New `.claude/skills/tool-discovery/SKILL.md` — when a link/tool is shared without context, the agent searches GitHub (`gh search repos`) and the web for docs/pricing/reviews and returns a structured evaluation instead of asking for manual research or a gated unlock action.
 - [internal] **Ovie HUD auto-reload (GH-12988)**: Electron now polls `/api/health/build-info` every 60 seconds and reloads `/hud` windows when the deployed commit/build fingerprint changes, with no-store build-info responses so running operator shells pick up new HUD deploys without a manual restart.
 - [internal] **Mobile bottom nav derives from canonical config (GH-12644)**: `mobilePrimaryNavigation` no longer defines its own `mobileHome` item; it references the shared `newThreadNavItem` used by desktop nav directly, so mobile can no longer drift from desktop. Adds a regression test asserting every mobile nav item traces back to a canonical desktop nav item.
