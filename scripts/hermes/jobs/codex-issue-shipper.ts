@@ -41,9 +41,6 @@ import {
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   type DispatchPlan,
-  describeCheckout,
-  parseDirtyPaths,
-  planCheckoutGate,
   EPIC_LABEL,
   type FinisherRunner,
   finishDispatch,
@@ -54,8 +51,9 @@ import {
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
-  type PrimaryCheckoutGuardResult,
   parseAgentChain,
+  parseDirtyPaths,
+  planCheckoutGate,
   routeForAgent,
   type ShipperConfig,
   SpawnEagainError,
@@ -72,13 +70,11 @@ import {
   readJournal,
   SHIP_OWNER_LOCK,
 } from '../lib/ship-ledger';
-import { sendSlack } from '../lib/slack-client';
 import {
   isSpawnResourceUnavailable,
   SpawnResourceGuard,
   SpawnResourceUnavailableError,
 } from '../lib/spawn-resource';
-import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'codex-issue-shipper';
 const ghEagainBackoff = new GhEagainBackoff();
@@ -385,7 +381,7 @@ async function gatePrimaryCheckout(repoRoot: string): Promise<boolean> {
     logJobEvent({
       job: JOB,
       event: 'stale_checkout_abort',
-      detail,
+      detail: `checkout inspection failed: ${shortError(err)}`,
       recovered: false,
       dirtyPaths,
     });
@@ -400,12 +396,7 @@ async function gatePrimaryCheckout(repoRoot: string): Promise<boolean> {
   if (plan.attemptRecovery) {
     try {
       if (state.dirty) {
-        git([
-          'stash',
-          'push',
-          '-m',
-          buildRecoveryStashMessage(plan.detail),
-        ]);
+        git(['stash', 'push', '-m', buildRecoveryStashMessage(plan.detail)]);
       }
       git(['checkout', 'main']);
       git(['reset', '--hard', 'origin/main']);

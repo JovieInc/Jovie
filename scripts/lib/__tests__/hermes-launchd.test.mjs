@@ -86,8 +86,10 @@ describe('shipper-gated entrypoint', () => {
       join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
       'utf8'
     );
+    expect(script).toContain('pause_active');
     expect(script).toContain('gbrain_alive');
-    expect(script).toContain('grok_ready');
+    expect(script).toContain('grok_alive');
+    expect(script).toContain('checkout_gate');
     expect(script).toContain('codex-issue-shipper.ts');
   });
 
