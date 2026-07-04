@@ -347,8 +347,12 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Cancel your subscription?')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Keep Subscription')).toBeInTheDocument();
-    expect(screen.getByText('Yes, Cancel')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Keep Subscription' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Cancel Subscription' })
+    ).toBeInTheDocument();
   });
 
   it('renders partial UI when pricing fails but billing succeeds', async () => {
