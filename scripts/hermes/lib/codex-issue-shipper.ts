@@ -70,6 +70,7 @@ export const NO_AUTO_LABEL = 'no-auto';
 export const EPIC_LABEL = 'type:epic';
 /** Triaged misroutes (foreign codebase, no Jovie match) — never re-claim. */
 export const INVALID_LABEL = 'invalid';
+export const UI_FAST_TRACK_LABEL = 'fast-track-ui';
 
 export interface GithubIssueLabel {
   readonly name: string;
@@ -615,6 +616,9 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
       '    * Before/after evidence (screenshots or component evidence).',
       '    * Narrow lint and typecheck results (e.g., output of `pnpm biome check --changed` and `pnpm typecheck --noEmit` on changed files).',
       '    * Explicit pass/fail of the design-taste-frontend checklist (state which checks passed/failed).',
+      '- For existing Jovie product/dashboard UI, use the audit/checklist parts of the skill only. Do not force landing-page hero, bento, or marketing patterns into product UI.',
+      `- Safe UI-only fast-track lane: if and only if the final diff is limited to visual UI paths allowed by \`.github/MERGE_QUEUE.md\`, add PR labels \`ui\`, \`${UI_FAST_TRACK_LABEL}\`, \`fast\`, and \`merge-queue\` so Graphite can bypass unrelated backend trains after evidence.`,
+      '- When requesting UI fast-track, include a PR section titled `## Fast-track UI eligibility` with `Why eligible`, `Before`, `After`, and `Checks run` lines. Evidence must include before/after screenshots or component evidence, narrow typecheck output, narrow lint/Biome output, and affected component/test output or an explicit explanation when none exists. Do not request fast-track for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, or broad refactors.',
       '- If the issue is not UI-focused, do not enforce this skill.',
     ]);
   }
@@ -864,7 +868,20 @@ export function routeForAgent(
   route: TaskRoute
 ): TaskRoute {
   if (agent !== 'claude') return route;
-  return { ...route, fallbackModel: 'sonnet' };
+  const sessionModel = route.modelProfile === 'escalation' ? 'opus' : 'sonnet';
+  const specialistSubagents = route.specialistSubagents.map(subagent => ({
+    ...subagent,
+    model:
+      route.modelProfile === 'escalation' && subagent.name !== 'testing'
+        ? 'opus'
+        : 'sonnet',
+  }));
+  return {
+    ...route,
+    sessionModel,
+    fallbackModel: 'sonnet',
+    specialistSubagents,
+  };
 }
 
 // --- Checkout freshness gate ------------------------------------------------

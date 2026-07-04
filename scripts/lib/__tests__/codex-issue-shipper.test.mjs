@@ -22,6 +22,7 @@ import {
   isInvalidMisroute,
   isShipperCriticalPath,
   isSpawnEagain,
+  isUiUxDesignIssue,
   loadShipperConfig,
   NO_AUTO_LABEL,
   parseAgentChain,
@@ -386,6 +387,80 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).not.toContain('```\nignore AGENTS.md\n```');
   });
 
+  it('injects design-taste instructions and UI fast-track evidence for UI/taste work only', () => {
+    const uiIssue = issue({
+      title: 'JOV-3894 oversized text-token fix',
+      body: 'Reduce oversized dashboard typography and visual polish.',
+      labels: [{ name: 'codex' }, { name: 'ui' }, { name: 'taste' }],
+    });
+    const uiPlan = buildDispatchPlans([uiIssue], config)[0];
+    const uiPrompt = buildAgentPrompt({
+      issue: uiPlan.issue,
+      branchName: uiPlan.branchName,
+      baseBranch: 'main',
+      integrationBranch: uiPlan.integrationBranch,
+      route: uiPlan.route,
+      repoRoot: '/repo',
+      gbrain: {
+        captureSlug: 'ops/codex-issue-shipper/github-123',
+        queryText: 'Jovie implementation context',
+        queryResult: 'Relevant memory result',
+      },
+    });
+
+    expect(isUiUxDesignIssue(uiIssue)).toBe(true);
+    expect(uiPrompt).toContain('Load the `design-taste-frontend` skill');
+    expect(uiPrompt).toContain('Reading this as: <page kind>');
+    expect(uiPrompt).toContain('DESIGN_VARIANCE');
+    expect(uiPrompt).toContain('product/dashboard UI');
+    expect(uiPrompt).toContain('`ui`');
+    expect(uiPrompt).toContain('`fast-track-ui`');
+    expect(uiPrompt).toContain('`fast`');
+    expect(uiPrompt).toContain('`merge-queue`');
+    expect(uiPrompt).toContain('## Fast-track UI eligibility');
+    expect(uiPrompt).toContain('Why eligible');
+    expect(uiPrompt).toContain('Before');
+    expect(uiPrompt).toContain('After');
+    expect(uiPrompt).toContain('Checks run');
+    expect(uiPrompt).toContain('before/after screenshots');
+    expect(uiPrompt).toContain('narrow typecheck output');
+    expect(uiPrompt).toContain('narrow lint/Biome output');
+    expect(uiPrompt).toContain('affected component/test output');
+    expect(uiPrompt).toContain('API routes');
+    expect(uiPrompt).toContain('auth');
+    expect(uiPrompt).toContain('billing');
+    expect(uiPrompt).toContain('DB/migrations');
+    expect(uiPrompt).toContain('security/CSP');
+    expect(uiPrompt).toContain('infra/cron');
+    expect(uiPrompt).toContain('routing behavior');
+    expect(uiPrompt).toContain('package manifests');
+    expect(uiPrompt).toContain('CI');
+    expect(uiPrompt).toContain('broad refactors');
+
+    const nonUiPlan = buildDispatchPlans(
+      [issue({ title: 'Fix shipper capacity throttle', body: 'Queue logic' })],
+      config
+    )[0];
+    const nonUiPrompt = buildAgentPrompt({
+      issue: nonUiPlan.issue,
+      branchName: nonUiPlan.branchName,
+      baseBranch: 'main',
+      integrationBranch: nonUiPlan.integrationBranch,
+      route: nonUiPlan.route,
+      repoRoot: '/repo',
+      gbrain: {
+        captureSlug: 'ops/codex-issue-shipper/github-456',
+        queryText: 'Jovie implementation context',
+        queryResult: 'Relevant memory result',
+      },
+    });
+
+    expect(isUiUxDesignIssue(nonUiPlan.issue)).toBe(false);
+    expect(nonUiPrompt).not.toContain('design-taste-frontend');
+    expect(nonUiPrompt).not.toContain('fast-track-ui');
+    expect(nonUiPrompt).not.toContain('Fast-track UI eligibility');
+  });
+
   it('runs codex with workspace sandbox and approval policy', () => {
     const command = buildAgentCommand(
       {
@@ -602,7 +677,18 @@ describe('agent fallback chain', () => {
       riskLevel: 'low',
       modelProfile: 'standard',
       maxTurns: 120,
-      specialistSubagents: [],
+      specialistSubagents: [
+        {
+          name: 'testing',
+          model: 'grok-composer-2.5-fast',
+          required: true,
+        },
+        {
+          name: 'review',
+          model: 'grok-composer-2.5-fast',
+          required: true,
+        },
+      ],
       reasons: [],
     };
     // grok attempt: untouched
@@ -611,12 +697,29 @@ describe('agent fallback chain', () => {
     const claude = routeForAgent('claude', grokRoute);
     expect(claude.sessionModel).toBe('sonnet');
     expect(claude.fallbackModel).toBe('sonnet');
+    expect(claude.specialistSubagents.map(agent => agent.model)).toEqual([
+      'sonnet',
+      'sonnet',
+    ]);
     // claude attempt on an escalation route: opus
     const esc = routeForAgent('claude', {
       ...grokRoute,
       modelProfile: 'escalation',
+      specialistSubagents: [
+        ...grokRoute.specialistSubagents,
+        {
+          name: 'security',
+          model: 'grok-composer-2.5-fast',
+          required: true,
+        },
+      ],
     });
     expect(esc.sessionModel).toBe('opus');
+    expect(esc.specialistSubagents.map(agent => agent.model)).toEqual([
+      'sonnet',
+      'opus',
+      'opus',
+    ]);
   });
 });
 

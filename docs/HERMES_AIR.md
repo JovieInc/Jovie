@@ -202,6 +202,18 @@ The job watches open GitHub issues labeled `codex`. Empty runs only call GitHub,
 
 Only one shipper run may own the queue at a time. A new cron invocation takes a non-blocking singleton lock check; if another shipper is still active, the new invocation logs `singleton_active_skip` and exits. The active run keeps draining the queue in batches until no eligible issues remain, the machine is under too much pressure to launch another agent, or all remaining issues are blocked or human-gated.
 
+UI/UX, design, taste, token, and visual-polish issues get an additional coder prompt block that loads `design-taste-frontend`, requires the design-read statement, dials, before/after evidence, narrow checks, and the checklist pass/fail in the PR body. For existing product/dashboard UI, agents use the skill's audit/checklist portions only; they must not force landing-page patterns into product UI.
+
+Restore the external design skill in a fresh worktree only after confirming the
+reviewed upstream commit. The required headless install command is intentionally
+guarded so mutable upstream instructions cannot be installed silently:
+
+```bash
+test "$(git ls-remote https://github.com/Leonxlnx/taste-skill.git HEAD | awk '{print $1}')" = "06d6028b5c623016c59ce8536f578e5a1127b499" && DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 npx --yes skills add https://github.com/Leonxlnx/taste-skill --skill "design-taste-frontend" -y
+```
+
+Safe UI-only fixes can use the guarded Graphite UI fast lane from JOV-3895 only when the diff stays inside the allowed visual UI paths in `.github/MERGE_QUEUE.md`. The PR must carry `ui`, `fast-track-ui`, `fast`, and `merge-queue`, plus a `## Fast-track UI eligibility` section with `Why eligible`, `Before`, `After`, and `Checks run` evidence. The merge-queue guard fails closed for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, and broad refactors.
+
 Config variables:
 
 | Variable | Default | Purpose | Update path |
