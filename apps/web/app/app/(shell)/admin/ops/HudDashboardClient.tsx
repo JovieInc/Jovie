@@ -22,6 +22,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
+import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
+import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
@@ -787,6 +789,8 @@ export function HudDashboardClient({
       <div className={outerClass}>
         <WhatShipped />
         <TimActionRequiredSection />
+        <HudKpiSubgrid metrics={metrics} />
+        <HudSystemHealthStrip metrics={metrics} />
         <DesignProposalReviewPanel />
 
         <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
