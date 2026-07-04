@@ -13,6 +13,7 @@ import {
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatAnalyticsStageRate } from '@/lib/utils/analytics-growth';
@@ -279,7 +280,11 @@ export function AnalyticsSidebarView({
 }: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
   const stages = [
-    { label: 'Profile Views', value: data?.profile_views ?? 0 },
+    {
+      label: CANONICAL_METRICS.profile_views.label,
+      value: data?.profile_views ?? 0,
+    },
+    // Display aliases for CANONICAL_METRICS.unique_users / .subscribers
     { label: 'Fans', value: data?.unique_users ?? 0 },
     { label: 'Subscribed Fans', value: data?.subscribers ?? 0 },
   ];

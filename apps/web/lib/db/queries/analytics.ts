@@ -1,4 +1,5 @@
 import { sql as drizzleSql } from 'drizzle-orm';
+import { computeCaptureRate } from '@/lib/analytics/metrics';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
@@ -297,10 +298,8 @@ export async function getUserDashboardAnalytics(
 
     const uniqueUsers = Number(aggregates?.unique_users ?? 0);
 
-    // Calculate capture rate: (subscribers / unique_users) * 100
-    // Only calculate if we have unique users to avoid division by zero
-    const captureRate =
-      uniqueUsers > 0 ? Math.round((subscribers / uniqueUsers) * 1000) / 10 : 0;
+    // Canonical capture rate derivation — see lib/analytics/metrics.ts.
+    const captureRate = computeCaptureRate(subscribers, uniqueUsers);
 
     return {
       ...base,

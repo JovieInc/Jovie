@@ -10,6 +10,7 @@ import {
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -130,9 +131,10 @@ export function ProfileSmartLinkAnalytics({
           >
             <div className='grid grid-cols-2 gap-3'>
               <AnalyticsMetric
-                label='Profile Views'
+                label={CANONICAL_METRICS.profile_views.label}
                 value={numberFormatter.format(profileViews)}
               />
+              {/* Display alias for CANONICAL_METRICS.total_clicks */}
               <AnalyticsMetric
                 label='Link Clicks'
                 value={numberFormatter.format(totalClicks)}

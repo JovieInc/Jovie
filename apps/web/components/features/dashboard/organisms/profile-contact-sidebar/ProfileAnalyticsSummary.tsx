@@ -10,6 +10,7 @@ import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { DrawerButton, DrawerEmptyState } from '@/components/molecules/drawer';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
+import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -70,9 +71,10 @@ export function ProfileAnalyticsSummary() {
       )}
     >
       <DrawerPropertyRow
-        label='Profile Views'
+        label={CANONICAL_METRICS.profile_views.label}
         value={numberFormatter.format(profileViews)}
       />
+      {/* Display alias for CANONICAL_METRICS.total_clicks */}
       <DrawerPropertyRow
         label='Link Clicks'
         value={numberFormatter.format(totalClicks)}
