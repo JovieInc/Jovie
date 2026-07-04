@@ -2,12 +2,14 @@
 
 import {
   isServer,
+  MutationCache,
   QueryClient,
   type QueryClientConfig,
   QueryClientProvider,
 } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
 import { type ReactNode, useEffect, useState } from 'react';
+import { getFeedbackErrorMessage, toast } from '@/components/feedback';
 import { isDevChromeDisabledClient } from '@/lib/demo-recording';
 
 declare global {
@@ -93,15 +95,38 @@ const createQueryClientConfig = (): QueryClientConfig => ({
 // Server: new client per request (handled by server.ts)
 let browserQueryClient: QueryClient | undefined;
 
+/**
+ * Canonical API-error feedback fallback (JOV feedback system).
+ *
+ * Any mutation that fails without its own onError handler surfaces a
+ * canonical error toast. Mutations that define onError own their own
+ * feedback and are skipped, so this never double-toasts.
+ */
+function createMutationCache(): MutationCache {
+  return new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      if (mutation.options.onError) return;
+      toast.error(getFeedbackErrorMessage(error));
+    },
+  });
+}
+
+function createClient(): QueryClient {
+  return new QueryClient({
+    ...createQueryClientConfig(),
+    mutationCache: createMutationCache(),
+  });
+}
+
 function getQueryClient(): QueryClient {
   if (isServer) {
     // Server: always create new client (prevents cross-request data leakage)
-    return new QueryClient(createQueryClientConfig());
+    return createClient();
   }
 
   // Browser: reuse singleton for cache persistence across navigations
   if (!browserQueryClient) {
-    browserQueryClient = new QueryClient(createQueryClientConfig());
+    browserQueryClient = createClient();
   }
   return browserQueryClient;
 }

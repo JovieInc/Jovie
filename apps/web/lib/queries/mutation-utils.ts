@@ -6,7 +6,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { FetchError } from './fetch';
 
 /**

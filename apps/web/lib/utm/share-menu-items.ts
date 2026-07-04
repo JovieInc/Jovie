@@ -8,9 +8,9 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Link2, Mail, Music2, Share2 } from 'lucide-react';
 import React from 'react';
-import { toast } from 'sonner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
+import { toast } from '@/components/feedback';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { captureError } from '@/lib/error-tracking';

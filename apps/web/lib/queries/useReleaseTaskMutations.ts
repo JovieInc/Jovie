@@ -1,13 +1,13 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import {
   addReleaseTask,
   deleteReleaseTask,
   instantiateReleaseTasks,
   updateReleaseTask,
 } from '@/app/app/(shell)/dashboard/releases/task-actions';
+import { toast } from '@/components/feedback';
 import { captureError } from '@/lib/error-tracking';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { queryKeys } from './keys';

@@ -32,7 +32,7 @@ vi.mock('@sentry/nextjs', async importOriginal => {
 
 import * as Sentry from '@sentry/nextjs';
 // Import the mocked modules for assertions
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 
 describe('mutation-utils', () => {
   beforeEach(() => {

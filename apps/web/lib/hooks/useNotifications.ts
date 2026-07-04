@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { type ExternalToast, toast as sonnerToast } from 'sonner';
+import {
+  type ToastOptions as FeedbackToastOptions,
+  toast as feedbackToast,
+  TOAST_DURATIONS,
+} from '@/components/feedback';
 
 /**
  * Standard toast messages for consistent UX across the application
@@ -55,28 +59,17 @@ export const TOAST_MESSAGES = {
 } as const;
 
 /**
- * Duration presets for different toast types (in milliseconds)
+ * Duration presets re-exported from the canonical feedback system so
+ * existing imports keep working.
  */
-export const TOAST_DURATIONS = {
-  /** Quick confirmation (2s) - for instant actions like copy */
-  SHORT: 2000,
-  /** Standard duration (4s) - for success messages */
-  DEFAULT: 4000,
-  /** Medium duration (5s) - for warnings */
-  MEDIUM: 5000,
-  /** Longer duration (6s) - for errors that need reading */
-  LONG: 6000,
-  /** Extended duration (8s) - for action toasts (undo, retry) */
-  ACTION: 8000,
-  /** Persistent until dismissed - for loading states */
-  PERSISTENT: Infinity,
-} as const;
+export { TOAST_DURATIONS } from '@/components/feedback';
 
 /**
- * Options for toast notifications (extends Sonner's ExternalToast)
+ * Options for toast notifications (extends the canonical feedback
+ * system's ToastOptions)
  */
-export interface ToastOptions extends ExternalToast {
-  // All options inherited from ExternalToast
+export interface ToastOptions extends FeedbackToastOptions {
+  // All options inherited from the canonical feedback ToastOptions
 }
 
 /**
@@ -97,7 +90,7 @@ export interface PromiseToastOptions<T> {
 }
 
 /**
- * World-class notification hook powered by Sonner
+ * World-class notification hook powered by the canonical feedback system
  *
  * Provides a comprehensive API for toast notifications with:
  * - Convenience methods for common patterns (success, error, warning, info)
@@ -144,7 +137,7 @@ export function useNotifications() {
   // Success toast - short duration for quick confirmation
   const success = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return sonnerToast.success(message, {
+      return feedbackToast.success(message, {
         duration: TOAST_DURATIONS.DEFAULT,
         ...options,
       });
@@ -155,7 +148,7 @@ export function useNotifications() {
   // Error toast - longer duration for reading
   const error = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return sonnerToast.error(message, {
+      return feedbackToast.error(message, {
         duration: TOAST_DURATIONS.LONG,
         ...options,
       });
@@ -166,7 +159,7 @@ export function useNotifications() {
   // Warning toast - medium duration
   const warning = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return sonnerToast.warning(message, {
+      return feedbackToast.warning(message, {
         duration: TOAST_DURATIONS.MEDIUM,
         ...options,
       });
@@ -177,7 +170,7 @@ export function useNotifications() {
   // Info toast - standard duration
   const info = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return sonnerToast.info(message, {
+      return feedbackToast.info(message, {
         duration: TOAST_DURATIONS.DEFAULT,
         ...options,
       });
@@ -188,7 +181,7 @@ export function useNotifications() {
   // Loading toast - persists until dismissed
   const loading = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return sonnerToast.loading(message, {
+      return feedbackToast.loading(message, {
         duration: TOAST_DURATIONS.PERSISTENT,
         ...options,
       });
@@ -198,7 +191,7 @@ export function useNotifications() {
 
   // Dismiss a specific toast or all toasts
   const dismiss = useCallback((toastId?: string | number): void => {
-    sonnerToast.dismiss(toastId);
+    feedbackToast.dismiss(toastId);
   }, []);
 
   // Undo action toast
@@ -209,7 +202,7 @@ export function useNotifications() {
       options?: ActionToastOptions
     ): string | number => {
       const { actionLabel, ...toastOptions } = options ?? {};
-      return sonnerToast(message, {
+      return feedbackToast(message, {
         duration: TOAST_DURATIONS.ACTION,
         action: {
           label: actionLabel ?? 'Undo',
@@ -229,7 +222,7 @@ export function useNotifications() {
       options?: ActionToastOptions
     ): string | number => {
       const { actionLabel, ...toastOptions } = options ?? {};
-      return sonnerToast.error(message, {
+      return feedbackToast.error(message, {
         duration: TOAST_DURATIONS.ACTION,
         action: {
           label: actionLabel ?? 'Retry',
@@ -244,7 +237,7 @@ export function useNotifications() {
   // Promise toast - shows loading → success/error
   const promiseToast = useCallback(
     <T>(promise: Promise<T>, options?: PromiseToastOptions<T>): Promise<T> => {
-      sonnerToast.promise(promise, {
+      feedbackToast.promise(promise, {
         loading: options?.loading ?? TOAST_MESSAGES.PROCESSING,
         success: options?.success ?? TOAST_MESSAGES.SAVE_SUCCESS,
         error: options?.error ?? TOAST_MESSAGES.GENERIC_ERROR,
@@ -415,7 +408,7 @@ export function useNotifications() {
       handleError,
 
       // Direct access to toast for advanced use cases
-      toast: sonnerToast,
+      toast: feedbackToast,
 
       // Message constants for custom usage
       messages: TOAST_MESSAGES,
@@ -447,13 +440,13 @@ export function useNotifications() {
 }
 
 /**
- * Re-export toast for direct usage without the hook
+ * Re-export the canonical toast for direct usage without the hook
  * Use this when you don't need the convenience methods
  *
  * @example
  * ```tsx
  * import { toast } from '@/lib/hooks/useNotifications';
- * sonnerToast.success('Done!');
+ * toast.success('Done!');
  * ```
  */
-export { toast } from 'sonner';
+export { toast } from '@/components/feedback';

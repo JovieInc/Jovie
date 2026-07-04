@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { APP_ROUTES } from '@/constants/routes';
 import { dispatchMoveRemixNearLAShow } from '@/lib/release-planning/demo-events';
 import { laShowFriday } from '@/lib/release-planning/demo-plan';

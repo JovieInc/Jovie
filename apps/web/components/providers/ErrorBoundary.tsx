@@ -1,7 +1,7 @@
 'use client';
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import {
   captureErrorInSentry,
   getUserFriendlyErrorMessage,

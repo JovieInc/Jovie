@@ -80,8 +80,8 @@ vi.mock('@/lib/utils', () => ({
   },
 }));
 
-import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { toast } from '@/components/feedback';
 import { useLinksPersistence } from '@/features/dashboard/organisms/links/hooks/useLinksPersistence';
 import type { LinkItem } from '@/features/dashboard/organisms/links/types';
 

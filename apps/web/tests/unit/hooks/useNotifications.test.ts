@@ -15,6 +15,7 @@ const { mockToast } = vi.hoisted(() => ({
 
 vi.mock('sonner', () => ({ toast: mockToast }));
 
+import { toast as canonicalToast } from '@/components/feedback';
 import {
   TOAST_DURATIONS,
   TOAST_MESSAGES,
@@ -603,10 +604,10 @@ describe('useNotifications', () => {
       expect(result.current.durations).toBe(TOAST_DURATIONS);
     });
 
-    it('should expose the raw sonner toast for advanced use', () => {
+    it('should expose the canonical feedback toast for advanced use', () => {
       const { result } = renderHook(() => useNotifications());
 
-      expect(result.current.toast).toBe(mockToast);
+      expect(result.current.toast).toBe(canonicalToast);
     });
   });
 });
