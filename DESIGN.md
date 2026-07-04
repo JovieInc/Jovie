@@ -203,6 +203,18 @@ The example above says one thing three times. Jovie should say it once.
 - Hover feedback should stay visual, not positional. Prefer color, border, or shadow changes. Do not make the interface jump on hover unless the motion communicates direct manipulation.
 - Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
 
+### Ovie Ops Cockpit Guardrail
+
+Ovie UI/UX work must use the make-interfaces-better path: load gstack `/design-review`, load `design-taste-frontend` where available, and run the checklist in `docs/ovie-design-guardrails.md`.
+
+Before changing Ovie UI, include the Design Read line:
+
+`Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>`
+
+Ovie should read as a macOS ops cockpit: dense but calm, fast, native-feeling, and focused on operator decisions. Do not import landing-page patterns, decorative AI-dashboard chrome, oversized hero/card structures, or motion that makes controls jump.
+
+Ovie UI PRs require before/after screenshots or component evidence and explicit pass/fail for hierarchy, spacing, typography scale, visual density, interaction states, contrast, macOS-native affordances, and no layout jank.
+
 ---
 
 ## Subtraction Principle

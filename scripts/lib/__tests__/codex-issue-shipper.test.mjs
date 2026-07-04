@@ -20,6 +20,7 @@ import {
   INVALID_LABEL,
   isAlreadyClaimedOrBlocked,
   isInvalidMisroute,
+  isOvieUiUxDesignIssue,
   isShipperCriticalPath,
   isSpawnEagain,
   isUiUxDesignIssue,
@@ -54,6 +55,25 @@ function issue(overrides = {}) {
     labels: [{ name: 'codex' }, { name: CODEX_TRUSTED_LABEL }],
     ...overrides,
   };
+}
+
+function buildPromptForIssue(overrides = {}) {
+  const plan = buildDispatchPlans([issue(overrides)], config)[0];
+  const prompt = buildAgentPrompt({
+    issue: plan.issue,
+    branchName: plan.branchName,
+    baseBranch: 'main',
+    integrationBranch: plan.integrationBranch,
+    route: plan.route,
+    repoRoot: '/repo',
+    gbrain: {
+      captureSlug: 'ops/codex-issue-shipper/github-123',
+      queryText: 'Jovie implementation context',
+      queryResult: 'Relevant memory result',
+    },
+  });
+
+  return { plan, prompt };
 }
 
 describe('spawn EAGAIN recovery helpers', () => {
@@ -291,6 +311,8 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain('Load gstack');
     expect(prompt).toContain('Use gbrain before planning');
     expect(prompt).toContain('Use subagents');
+    expect(prompt).toContain('Keep progress file-backed');
+    expect(prompt).toContain('agent-run-artifact');
     expect(prompt).toContain('/qa');
     expect(prompt).toContain('/ship');
     expect(prompt).toContain(
@@ -303,6 +325,70 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain(
       'Captured slug: ops/codex-issue-shipper/github-123'
     );
+  });
+
+  it('adds Ovie-specific make-interfaces-better guardrails to Ovie UX prompts', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Ovie UX guardrail: require design review standards',
+      body: 'Update Ovie interface review routing.',
+      labels: [
+        { name: 'codex' },
+        { name: CODEX_TRUSTED_LABEL },
+        { name: 'area:ui' },
+      ],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(true);
+    expect(prompt).toContain('## Ovie UX Guardrail (JOV-3897)');
+    expect(prompt).toContain('make-interfaces-better/design-review');
+    expect(prompt).toContain('macOS ops cockpit');
+    expect(prompt).toContain('before/after screenshots or component evidence');
+    expect(prompt).toContain('macOS-native affordances');
+    expect(prompt).toContain('no layout jank');
+    expect(prompt).toContain('docs/ovie-design-guardrails.md');
+  });
+
+  it('adds Ovie UX guardrails when Ovie is label-only and the body is empty', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Require interface review standards',
+      body: '',
+      labels: [
+        { name: 'codex' },
+        { name: CODEX_TRUSTED_LABEL },
+        { name: 'area:ovie' },
+        { name: 'area:ui' },
+      ],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(true);
+    expect(prompt).toContain('## Ovie UX Guardrail (JOV-3897)');
+  });
+
+  it('does not add Ovie guardrails to non-Ovie UI prompts', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Improve dashboard interface spacing',
+      body: 'Polish the dashboard layout.',
+      labels: [
+        { name: 'codex' },
+        { name: CODEX_TRUSTED_LABEL },
+        { name: 'area:ui' },
+      ],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(false);
+    expect(prompt).toContain('## UI/UX Design Skill Instructions');
+    expect(prompt).not.toContain('## Ovie UX Guardrail (JOV-3897)');
+  });
+
+  it('does not add Ovie UX guardrails to non-UI Ovie prompts', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Ovie shipper retry logs',
+      body: 'Improve retry diagnostics for automation.',
+      labels: [{ name: 'codex' }, { name: CODEX_TRUSTED_LABEL }],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(false);
+    expect(prompt).not.toContain('## Ovie UX Guardrail (JOV-3897)');
   });
 
   it('captures issue body and labels for gbrain', () => {
@@ -592,6 +678,7 @@ describe('deterministic finisher', () => {
       branchName: 'codex/gh-12721-x',
       issue,
       logPath: '/tmp/agent.log',
+      statePath: '/tmp/agent.state.json',
     });
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
     expect(cmds).toEqual([
@@ -614,6 +701,21 @@ describe('deterministic finisher', () => {
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      'Dispatch state: `/tmp/agent.state.json`'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      'Verification evidence:'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '<!-- agent-run-artifact'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '"source": "hermes"'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '"status": "queued"'
+    );
   });
 
   it('finishDispatch skips commit when work is already committed', () => {
@@ -670,7 +772,7 @@ describe('agent fallback chain', () => {
     ).toEqual(['grok', 'claude']);
   });
 
-  it('routeForAgent rewrites the model only for claude attempts', () => {
+  it('routeForAgent rewrites only the fallback model for claude attempts', () => {
     const grokRoute = {
       sessionModel: 'grok-composer-2.5-fast',
       fallbackModel: 'grok-composer-2.5-fast',
@@ -693,7 +795,7 @@ describe('agent fallback chain', () => {
     };
     // grok attempt: untouched
     expect(routeForAgent('grok', grokRoute)).toBe(grokRoute);
-    // claude attempt: sonnet for standard risk
+    // claude attempt: route through Claude's model family.
     const claude = routeForAgent('claude', grokRoute);
     expect(claude.sessionModel).toBe('sonnet');
     expect(claude.fallbackModel).toBe('sonnet');
