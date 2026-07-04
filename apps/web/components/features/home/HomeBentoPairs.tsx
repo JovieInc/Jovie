@@ -81,9 +81,9 @@ export function HomeBentoPairs() {
 
 function BentoCardView({ card }: { readonly card: BentoCard }) {
   return (
-    <article className='flex flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white dark:bg-white shadow-[0_18px_70px_-56px_rgba(0,0,0,0.45)]'>
+    <article className='flex flex-col'>
       <div
-        className='relative h-80 overflow-hidden border-b border-black/[0.06]'
+        className='relative h-80 overflow-hidden'
         style={{
           background:
             'radial-gradient(120% 80% at 50% 0%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 60%), linear-gradient(180deg, #ffffff, #f6f6f7)',
@@ -166,7 +166,7 @@ function TourPreview() {
         {cities.map(c => (
           <li
             key={c.city}
-            className='flex items-center justify-between rounded-lg border border-black/[0.08] bg-white dark:bg-white px-3 py-2 font-[var(--marketing-font-body)] text-xs text-black dark:text-black shadow-[0_10px_32px_-28px_rgba(0,0,0,0.55)]'
+            className='flex items-center justify-between px-3 py-2 font-[var(--marketing-font-body)] text-xs text-black dark:text-black'
           >
             <span>{c.city}</span>
             <span className='text-black/45 dark:text-black/45'>{c.date}</span>
