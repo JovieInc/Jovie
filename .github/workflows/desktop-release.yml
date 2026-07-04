@@ -26,7 +26,7 @@ on:
     branches: [main]
     paths:
       - "VERSION"
-      - ".github/workflows/desktop-release.yml"  # explicit handling for desktop auth allowlist fixes (e.g. 9870/9812 Clerk wildcard; JOV-3835 CSP-watchdog blank-window fix)
+      - ".github/workflows/desktop-release.yml"  # explicit handling for desktop auth allowlist/scheme fixes (e.g. 9870/9812 Clerk wildcard; JOV-3835 CSP-watchdog blank-window fix; GH-12822 per-env callback schemes)
   workflow_dispatch:
     inputs:
       environment:

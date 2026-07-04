@@ -21,6 +21,10 @@ export const AUTH_ANALYTICS_EVENTS = [
 export type AuthAnalyticsEventName = (typeof AUTH_ANALYTICS_EVENTS)[number];
 
 export type NativeAuthClient = Exclude<AuthClient, 'web'>;
+export type ElectronAuthCompleteProtocol =
+  | 'jovie'
+  | 'jovie-staging'
+  | 'jovie-local';
 export type NavigationDisposition =
   | 'internal'
   | 'external'
@@ -79,7 +83,7 @@ export interface AuthAnalyticsEventPayload {
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
-const ELECTRON_AUTH_COMPLETE_URL = 'jovie://auth/complete';
+const DEFAULT_ELECTRON_AUTH_COMPLETE_PROTOCOL = 'jovie';
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 
@@ -348,12 +352,40 @@ export function buildIosUniversalAuthCompleteUrl(input: {
   );
 }
 
+export function getElectronAuthCompleteProtocolForOrigin(
+  origin: string
+): ElectronAuthCompleteProtocol {
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    return DEFAULT_ELECTRON_AUTH_COMPLETE_PROTOCOL;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  if (hostname === 'staging.jov.ie') return 'jovie-staging';
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname.endsWith('.localhost')
+  ) {
+    return 'jovie-local';
+  }
+
+  return DEFAULT_ELECTRON_AUTH_COMPLETE_PROTOCOL;
+}
+
 export function buildElectronAuthCompleteUrl(input: {
   readonly code: string;
   readonly state: string;
   readonly desktopFlow?: string | null;
+  readonly protocol?: ElectronAuthCompleteProtocol;
 }): string {
-  return buildUrlWithCodeAndState(ELECTRON_AUTH_COMPLETE_URL, input);
+  return buildUrlWithCodeAndState(
+    `${input.protocol ?? DEFAULT_ELECTRON_AUTH_COMPLETE_PROTOCOL}://auth/complete`,
+    input
+  );
 }
 
 export function resolveAuthCallback(input: {

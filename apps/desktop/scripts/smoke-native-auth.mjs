@@ -14,17 +14,34 @@ const SMOKE_CLIENT_IP =
 const CLEAR_ELECTRON_AUTH_ON_START =
   process.env.SMOKE_CLEAR_ELECTRON_AUTH === '1';
 const SKIP_START_SIGN_OUT = process.env.SMOKE_SKIP_START_SIGNOUT === '1';
+const NATIVE_AUTH_CALLBACK_SCHEME = getNativeAuthSchemeForBaseUrl(BASE_URL);
 const REQUEST_TIMEOUT_MS = parsePositiveInteger(
   process.env.SMOKE_REQUEST_TIMEOUT_MS,
   180_000
 );
 const SMOKE_AUTH_EVIDENCE_KEY = 'jovie.desktopAuth.smokeAuthEvidence';
+const NATIVE_AUTH_CALLBACK_PREFIX = `${NATIVE_AUTH_CALLBACK_SCHEME}://auth/complete?`;
 
 let playwrightChromium;
 
 function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getNativeAuthSchemeForBaseUrl(baseUrl) {
+  const hostname = new URL(baseUrl).hostname.toLowerCase();
+  if (hostname === 'jov.ie') return 'jovie';
+  if (hostname === 'staging.jov.ie') return 'jovie-staging';
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname.endsWith('.localhost')
+  ) {
+    return 'jovie-local';
+  }
+  return 'jovie';
 }
 
 function sleep(ms) {
@@ -663,7 +680,7 @@ async function requestRedirect(page, targetUrl, label) {
 
 async function requestNativeCallbackRedirect(page, callbackPath, label) {
   const redirectUrl = await requestRedirect(page, callbackPath, label);
-  if (redirectUrl.startsWith('jovie://auth/complete?')) {
+  if (redirectUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) {
     return redirectUrl;
   }
 
@@ -694,7 +711,7 @@ function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
 
     function onRequest(request) {
       const requestUrl = request.url();
-      if (!requestUrl.startsWith('jovie://auth/complete?')) return;
+      if (!requestUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) return;
       clearTimeout(timeoutId);
       page.off('request', onRequest);
       resolve(requestUrl);
@@ -713,7 +730,7 @@ function waitForNativeRedirectResponse(page, label, timeout = 60_000) {
 
     function onResponse(response) {
       const location = response.headers().location;
-      if (!location?.startsWith('jovie://auth/complete?')) return;
+      if (!location?.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) return;
       clearTimeout(timeoutId);
       page.off('response', onResponse);
       resolve(location);
@@ -780,8 +797,8 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
 async function requestNativeCallback(page, authUrl, email) {
   const authCallbackUrl = await requestRedirect(page, authUrl, 'auth start');
   const parsedAuthCallback = new URL(authCallbackUrl);
-  if (parsedAuthCallback.protocol === 'jovie:') {
-    if (!authCallbackUrl.startsWith('jovie://auth/complete?')) {
+  if (authCallbackUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) {
+    if (parsedAuthCallback.protocol !== `${NATIVE_AUTH_CALLBACK_SCHEME}:`) {
       throw new Error(
         `Auth start did not return the Electron app callback: ${authCallbackUrl}`
       );
