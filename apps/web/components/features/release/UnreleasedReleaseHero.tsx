@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import {
+  SMART_LINK_HERO_TITLE_CLASS,
   SMART_LINK_MENU_ICON_CLASS,
   SMART_LINK_MENU_ITEM_CLASS,
   SmartLinkShell,
@@ -83,9 +84,7 @@ export function UnreleasedReleaseHero({
         returnLabel={`Back to ${artist.name}`}
         heroOverlay={
           <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-            <h1 className='text-3xl font-semibold leading-[1.06] tracking-tighter text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
-              {release.title}
-            </h1>
+            <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
             <Link
               href={`/${artist.handle}`}
               className='mt-1 block text-sm font-book text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'

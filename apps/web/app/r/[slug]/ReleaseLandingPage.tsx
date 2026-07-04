@@ -24,6 +24,7 @@ import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview'
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import {
+  SMART_LINK_HERO_TITLE_CLASS,
   SMART_LINK_MENU_ICON_CLASS,
   SMART_LINK_MENU_ITEM_CLASS,
   SmartLinkShell,
@@ -390,9 +391,7 @@ export function ReleaseLandingPage({
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
           <div className='min-w-0 flex-1'>
-            <h1 className='text-[28px] font-semibold leading-[1.06] tracking-tighter text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
-              {release.title}
-            </h1>
+            <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
             <SmartLinkArtistLine
               artist={artist}
               featuredArtists={featuredArtists}
