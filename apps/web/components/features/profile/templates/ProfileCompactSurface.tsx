@@ -29,6 +29,10 @@ import { track } from '@/lib/analytics';
 import { Mark } from '@/lib/brand/primitives';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+} from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
@@ -148,6 +152,7 @@ interface ProfileCompactSurfaceProps {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  readonly profilePacAssignment?: ProfilePacAssignment;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -240,6 +245,7 @@ export function ProfileCompactSurface({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   alertOptInVariant = 'button',
+  profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -745,6 +751,7 @@ export function ProfileCompactSurface({
                 onPlayClick={onPlayClick}
                 onAlertsClick={openNotifications}
                 isSubscribed={homeAlertsSubscribed}
+                profilePacAssignment={profilePacAssignment}
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
                 merchCards={merchCards}

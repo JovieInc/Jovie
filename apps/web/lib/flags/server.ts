@@ -19,9 +19,11 @@ import {
   parseAppFlagOverrides,
 } from './overrides';
 import { getFlagOverrideMap } from './overrides-store.server';
+import type { ProfilePacAssignment } from './profile-pac';
 import {
   APP_FLAG_REGISTRY,
   PROFILE_ALERT_OPTIN_VARIANT_FLAG,
+  PROFILE_PAC_VARIANT_SLOTS_FLAG,
   SUBSCRIBE_CTA_VARIANT_FLAG,
   TELEPROMPTER_SHOWCASE_VARIANT_FLAG,
 } from './registry';
@@ -159,6 +161,16 @@ export async function getProfileAlertOptInVariant(
   stableId: string | null
 ): Promise<ProfileAlertOptInVariant> {
   return PROFILE_ALERT_OPTIN_VARIANT_FLAG.run({
+    identify: {
+      userId: stableId,
+    },
+  });
+}
+
+export async function getProfilePacAssignment(
+  stableId: string | null
+): Promise<ProfilePacAssignment> {
+  return PROFILE_PAC_VARIANT_SLOTS_FLAG.run({
     identify: {
       userId: stableId,
     },
