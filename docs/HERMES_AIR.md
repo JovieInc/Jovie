@@ -198,7 +198,7 @@ HERMES_CODEX_SHIPPER_DRY_RUN=1 tsx scripts/hermes/jobs/codex-issue-shipper.ts
 tsx scripts/hermes/jobs/codex-issue-shipper.ts
 ```
 
-The job watches open GitHub issues labeled `codex`. Empty runs only call GitHub, write a JSONL event, and exit. No gbrain query, model call, subagent, or CodeRabbit review starts until an eligible issue exists.
+The job watches open GitHub issues and filters out hard-skip labels (`no-auto`, `invalid`, `type:epic`, `human-review-required`, already-claimed, or blocked). Empty runs only call GitHub, write a JSONL event, and exit. No gbrain query, model call, subagent, or CodeRabbit review starts until an eligible issue exists.
 
 Only one shipper run may own the queue at a time. A new cron invocation takes a non-blocking singleton lock check; if another shipper is still active, the new invocation logs `singleton_active_skip` and exits. The active run keeps draining the queue in batches until no eligible issues remain, the machine is under too much pressure to launch another agent, or all remaining issues are blocked or human-gated.
 
