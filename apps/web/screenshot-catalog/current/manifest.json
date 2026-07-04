@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-04T08:46:31.849Z",
-    "gitSha": "0c87ead4f63fda9c8d15ac1d8e33695b2923f17d",
+    "capturedAt": "2026-07-04T10:04:25.230Z",
+    "gitSha": "ca9aa7c74e896452bbd66ad54eb47899ce452576",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-04T08:49:35.046Z",
-    "gitSha": "0c87ead4f63fda9c8d15ac1d8e33695b2923f17d",
+    "capturedAt": "2026-07-04T10:07:28.654Z",
+    "gitSha": "ca9aa7c74e896452bbd66ad54eb47899ce452576",
     "imagePath": "artist-profile-reactivation-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-04T08:49:59.381Z",
-    "gitSha": "0c87ead4f63fda9c8d15ac1d8e33695b2923f17d",
+    "capturedAt": "2026-07-04T10:07:53.070Z",
+    "gitSha": "ca9aa7c74e896452bbd66ad54eb47899ce452576",
     "imagePath": "artist-profile-monetization-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-04T08:50:24.104Z",
-    "gitSha": "0c87ead4f63fda9c8d15ac1d8e33695b2923f17d",
+    "capturedAt": "2026-07-04T10:08:17.856Z",
+    "gitSha": "ca9aa7c74e896452bbd66ad54eb47899ce452576",
     "imagePath": "artist-profile-power-features-section-desktop.png"
   },
   {
@@ -608,8 +608,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-07-04T08:59:03.411Z",
-    "gitSha": "0c87ead4f63fda9c8d15ac1d8e33695b2923f17d",
+    "capturedAt": "2026-07-04T10:16:57.721Z",
+    "gitSha": "ca9aa7c74e896452bbd66ad54eb47899ce452576",
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"
   },
