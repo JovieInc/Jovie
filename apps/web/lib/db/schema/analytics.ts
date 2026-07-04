@@ -145,6 +145,31 @@ export const audienceReferrers = pgTable(
   })
 );
 
+export const publicProfileCaptureDismissals = pgTable(
+  'public_profile_capture_dismissals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    audienceId: text('audience_id').notNull(),
+    sessionCount: integer('session_count').default(0).notNull(),
+    source: text('source'),
+    dismissedAt: timestamp('dismissed_at').defaultNow().notNull(),
+    nextEligibleAt: timestamp('next_eligible_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    profileAudienceUnique: uniqueIndex(
+      'public_profile_capture_dismissals_profile_audience_unique'
+    ).on(table.creatorProfileId, table.audienceId),
+    profileNextEligibleIdx: index(
+      'public_profile_capture_dismissals_profile_next_eligible_idx'
+    ).on(table.creatorProfileId, table.nextEligibleAt),
+  })
+);
+
 // Normalized audience action history (replaces JSONB latest_actions)
 export const audienceActions = pgTable(
   'audience_actions',

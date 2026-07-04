@@ -1,11 +1,7 @@
-const EMAIL_REGEX =
-  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/; // NOSONAR (S5852) - ReDoS bounded by EMAIL_MAX_LENGTH = 254 check applied before this regex
+import { getNotificationCaptureError } from '@/lib/validation/schemas/notifications';
 
 const EMAIL_MAX_LENGTH = 254;
 const PHONE_MAX_LENGTH = 32;
-
-/** Matches whitespace and C0/C1 control characters using Unicode property escapes */
-const CONTROL_OR_SPACE_REGEX = /[\s\p{Cc}]/gu;
 
 export function normalizeSubscriptionEmail(
   raw: string | null | undefined
@@ -14,8 +10,9 @@ export function normalizeSubscriptionEmail(
   const trimmed = raw.trim();
   if (!trimmed) return null;
   if (trimmed.length > EMAIL_MAX_LENGTH) return null;
-  if (CONTROL_OR_SPACE_REGEX.test(trimmed)) return null;
-  if (!EMAIL_REGEX.test(trimmed)) return null;
+  if (getNotificationCaptureError({ channel: 'email', value: trimmed })) {
+    return null;
+  }
   return trimmed.toLowerCase();
 }
 
