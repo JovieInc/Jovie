@@ -24,6 +24,8 @@ import { Mark } from '@/lib/brand/primitives';
 export const SMART_LINK_MENU_ITEM_CLASS =
   'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
 export const SMART_LINK_MENU_ICON_CLASS = 'h-4 w-4 text-white/40';
+export const SMART_LINK_HERO_TITLE_CLASS =
+  'text-2xl font-semibold leading-[1.08] tracking-tight text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]';
 
 /** Hook for the share action used across all smart link pages */
 export function useSmartLinkShare(

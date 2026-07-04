@@ -98,6 +98,8 @@ vi.mock('@/features/release/SmartLinkProviderButton', () => ({
 const shareSpy = vi.fn();
 
 vi.mock('@/features/release/SmartLinkShell', () => ({
+  SMART_LINK_HERO_TITLE_CLASS:
+    'text-2xl font-semibold leading-[1.08] tracking-tight text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]',
   SmartLinkShell: ({
     children,
     heroOverlay,
@@ -185,6 +187,14 @@ describe('@critical ReleaseLandingPage', () => {
     render(<ReleaseLandingPage {...defaultProps} />);
     expect(screen.getByText('Midnight Drive')).toBeDefined();
     expect(screen.getByText('Tim White')).toBeDefined();
+  });
+
+  it('uses the shared compact smart-link hero title class', () => {
+    render(<ReleaseLandingPage {...defaultProps} />);
+
+    const title = screen.getByRole('heading', { name: 'Midnight Drive' });
+    expect(title).toHaveClass('text-2xl', 'tracking-tight');
+    expect(title).not.toHaveClass('text-[28px]', 'text-3xl', 'text-4xl');
   });
 
   it('renders provider buttons for each provider with a URL', () => {
