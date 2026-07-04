@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import {
   MarketingContainer,
-  MarketingHero,
+  MarketingHeroLayout,
   MarketingPageShell,
 } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
@@ -24,7 +24,7 @@ function TipsHero() {
   return (
     <section className='relative overflow-hidden'>
       <div className='hero-glow pointer-events-none absolute inset-0' />
-      <MarketingHero variant='centered' className='items-start text-left'>
+      <MarketingHeroLayout variant='centered' className='items-start text-left'>
         <p className='marketing-kicker'>Pay</p>
         <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
           Turn every payment into a fan.
@@ -42,7 +42,7 @@ function TipsHero() {
         <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
           Free forever. No credit card required.
         </p>
-      </MarketingHero>
+      </MarketingHeroLayout>
     </section>
   );
 }
