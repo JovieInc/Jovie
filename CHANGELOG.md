@@ -17,6 +17,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 - [internal] **Computed-contrast gate (GH-12012)**: `scripts/lint-contrast-computed.ts` + `contrast-pairs.config.json` resolve design-token pairs (hex/rgb/lch/oklch, `var()` chains, light+dark themes) via `lib/a11y-gates/contrast-engine.ts` and fail CI when a pair drops below WCAG AA; enforced by `tests/unit/design-system/computed-contrast.test.ts` (Unit Tests merge gate) and chained into `lint:contrast-ratchet` after the regex pre-filter.
 - [internal] **Touch-target ratchet (GH-12012)**: `scripts/lint-touch-target.ts` counts interactive elements with explicit sub-44px heights (WCAG 2.5.5; baseline 224, ratchet only goes down); enforced by `tests/unit/design-system/touch-target-ratchet.test.ts`.
 - [internal] **Reduced motion zeroes ALL duration tokens (GH-12012)**: `--motion-reveal-*` (globals.css), `--clerk-motion-duration` (theme.css), and `--linear-duration-*` (linear-tokens.css) are now zeroed under `prefers-reduced-motion`; `tests/unit/design-system/reduced-motion-tokens.test.ts` guards every current and future literal duration token.
@@ -24,6 +25,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
 >>>>>>> origin/main
 =======
+=======
+- [internal] **iOS write-configuration resilience (GH-11003)**: Rewrote `apps/ios/scripts/write-configuration.sh` to use `/usr/bin/plutil` (always present on macOS) instead of `python3`, preventing failures when a broken Homebrew interpreter (e.g. pyexpat/libexpat symbol mismatch with python@3.14) is first on PATH. Adds a `TARGET_PLIST` env override for testability and four regression tests (`write-configuration.test.mjs`) run in `ios-ci.yml`.
+>>>>>>> origin/main
 - **Smoother icon transitions (GH-11472)**: Copy buttons and the mobile menu now morph between states with a soft, interruptible animation instead of snapping. Adds shared animation primitives (`lib/animation/motion-primitives.ts` + `AnimatedIconSwap`) for icon swaps, staggered entrances, and layered depth shadows.
 >>>>>>> origin/main
 - [internal] **Tool discovery skill (GH-13124)**: New `.claude/skills/tool-discovery/SKILL.md` — when a link/tool is shared without context, the agent searches GitHub (`gh search repos`) and the web for docs/pricing/reviews and returns a structured evaluation instead of asking for manual research or a gated unlock action.
