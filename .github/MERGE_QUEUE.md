@@ -13,12 +13,28 @@
    - If a PR is later hard-gated with `needs-human`, `hold`, or `gated`, remove
      `merge-queue` so it stops occupying Graphite queue slots.
    - `fast` is not a general priority label. Use it only for PRs explicitly
-     classified as emergency/hotfix/incident; ordinary generated branches with
-     `fast` are gated for human review by the merge-queue guard.
+     classified as emergency/hotfix/incident, or for the guarded UI fast lane
+     below. Ordinary generated branches with `fast` are gated for human review
+     by the merge-queue guard.
 3. Graphite enqueues the PR, rebases it on `main`, waits for the required checks, and squash-merges.
 4. `linear-sync-on-merge.yml` transitions the Linear issue to `Done` on merge as before.
 
 Do **not** use `gh pr merge --auto` to merge to `main` — with the native queue retired it merges directly and **bypasses Graphite**. Use the label.
+
+## Guarded UI fast lane
+
+Small visual-only PRs can use Graphite fast-track without waiting behind
+unrelated backend trains when all of the following are true: labels `ui`,
+`fast-track-ui`, `fast`, and `merge-queue`; changed files limited to UI visual
+surfaces, design docs/assets, or the directly affected UI test; PR body
+before/after screenshots plus an eligibility/checks audit trail; narrow
+typecheck, Biome/lint, and affected component/test evidence when one exists.
+
+The fast lane fails closed for auth, billing, DB/migrations, API routes,
+entitlements, data writes, security/CSP, infra/cron, routing behavior, package
+manifests, CI, and broad refactors. Repo-side classification lives in
+`scripts/lib/merge-queue-guard.mjs` (`uiFastTrackPolicy`), and the regression
+coverage is in `scripts/lib/__tests__/merge-queue-guard.test.mjs`.
 
 ## Verified configuration (2026-06-20, JOV-3291 / #11175)
 
