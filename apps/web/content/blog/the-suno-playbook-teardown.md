@@ -30,7 +30,7 @@ Here's the playbook as written. And here's what actually happens at each step.
 
 **Why it breaks:** This step works fine. Claude is good at ideation. Suno is good at generation. This is genuinely automated and genuinely free-ish. But it's also exactly what 200,000 other people did last quarter. Commodity inputs produce commodity outputs.
 
-**The unlock:** Concept is a commodity. *Identity* is not. A track titled "Deep Focus — Study Session 6" and a track by Burial both deliver ambient sound for concentration, but one of them builds a career.
+**The real gap:** Concept is a commodity. *Identity* is not. A track titled "Deep Focus — Study Session 6" and a track by Burial both deliver ambient sound for concentration, but one of them builds a career.
 
 ## Step 3 — Produce tracks in Suno
 
@@ -46,7 +46,7 @@ DSP agreements are also evolving. Streaming services have introduced minimum qua
 
 **The noob move:** Use Midjourney for cover art, bulk-generate ISRCs, and paste in keyword-stuffed titles to game algorithmic search.
 
-**Why it breaks:** Metadata spam is how you get a catalog strike. Streaming platforms and distributors actively remove keyword-stuffed titles and AI-generated art that's clearly mass-produced. More importantly, the entire *reason* visual identity matters is that it tells a listener in 0.3 seconds whether you're real or a content farm. AI-farmed cover art looks like AI-farmed cover art.
+**Why it breaks:** Metadata spam is how you get a catalog strike. Streaming platforms and distributors actively remove keyword-stuffed titles and AI-generated art that's clearly mass-produced. The entire *reason* visual identity matters is that it tells a listener in 0.3 seconds whether you're real or a content farm. AI-farmed cover art looks like AI-farmed cover art.
 
 **What actually moves the needle:** A coherent visual identity anchored to a real persona. Art, title, and artist name that feel like they belong together. That's not an AI problem, it's a taste problem — and taste compounds.
 
@@ -74,7 +74,7 @@ Most people skip every one of those steps, post one TikTok, get 400 streams, and
 
 **The noob move:** Repeat steps 1–6 faster. Release more. More niches. More volume.
 
-**Why it breaks:** The economics only work at scale if the per-track royalty math holds, and the per-track royalty math requires engagement quality, not just catalog size. Scaling a catalog of low-engagement tracks just accelerates the quality-score decay described in Step 3. You're not scaling a business; you're scaling a problem.
+**Why it breaks:** The economics only work at scale if the per-track royalty math holds, and the per-track royalty math requires engagement quality, not catalog volume. Scaling a catalog of low-engagement tracks just accelerates the quality-score decay described in Step 3. You're not scaling a business; you're scaling a problem.
 
 The artists who built sustainable income from AI-augmented music — and there are real ones — didn't scale by adding tracks. They scaled by deepening the loop: release → fan capture → retarget the warm audience on the next release. The catalog grows, but so does the audience that actually responds to it.
 
