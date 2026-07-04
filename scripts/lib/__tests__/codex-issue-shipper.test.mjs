@@ -18,7 +18,6 @@ import {
   GH_EAGAIN_BACKOFF_THRESHOLD,
   GhEagainBackoff,
   isAlreadyClaimedOrBlocked,
-  isInvalidMisroute,
   isShipperCriticalPath,
   isSpawnEagain,
   isUiUxDesignIssue,
