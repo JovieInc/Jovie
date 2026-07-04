@@ -63,7 +63,7 @@ function generateUuid(): string {
   } catch {
     // Fall through to the non-crypto fallback below.
   }
-  const suffix = Math.random().toString(36).slice(2, 12);
+  const suffix = Math.random().toString(36).slice(2, 12); // NOSONAR (S2245) - Non-security use: fallback session-ID suffix when crypto.randomUUID is unavailable
   return `${Date.now().toString(36)}-${suffix}`;
 }
 
@@ -188,7 +188,7 @@ export function createPacPlayMilestoneTracker(
     accumulatedMs + (playingSince === null ? 0 : nowFn() - playingSince);
 
   const checkMilestone = () => {
-    if (milestoneFired || currentPlayedMs() < PLAY_MILESTONE_MS) return;
+    if (milestoneFired || currentPlayedMs() <= PLAY_MILESTONE_MS) return;
     milestoneFired = true;
     emit('pac_play_30s', { played_ms: currentPlayedMs() });
   };
