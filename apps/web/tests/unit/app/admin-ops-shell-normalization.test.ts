@@ -27,11 +27,6 @@ const OPERATIONAL_CONTROL_PANEL = join(
   '../../../components/features/admin/OperationalControlPanel.tsx'
 );
 
-const WHAT_SHIPPED = join(
-  TEST_DIR,
-  '../../../components/features/admin/WhatShipped.tsx'
-);
-
 const OPS_COMPONENT_FILES = [
   OPS_PAGE,
   HUD_DASHBOARD_CLIENT,
