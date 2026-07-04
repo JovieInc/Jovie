@@ -1026,7 +1026,8 @@ export function ChatEntityRightPanelHost({
   profileContext,
   threadTitle,
 }: Readonly<ChatEntityRightPanelHostProps>) {
-  const { open: openPreviewPanel } = usePreviewPanelState();
+  const { open: openPreviewPanel, isOpen: isPreviewPanelOpen } =
+    usePreviewPanelState();
   const { target, contextTargets, close, dismissContext } =
     useChatEntityPanel();
   // Nullable so the host also renders outside a QueryClientProvider (tests).
@@ -1089,13 +1090,18 @@ export function ChatEntityRightPanelHost({
       }
     }
 
-    const liveProfilePreview = enablePreviewPanel ? (
-      <ErrorBoundary fallback={null}>
-        <div className='system-b-chat-profile-preview-card'>
-          <ProfileContactSidebar />
-        </div>
-      </ErrorBoundary>
-    ) : null;
+    // Only render the profile preview card when the preview panel is actually
+    // open. A closed RightDrawer collapses to zero width *inside* the card, so
+    // keeping this wrapper mounted registers a non-null right panel and leaves
+    // a ghost empty card + reserved rail width in the app shell (#12134).
+    const liveProfilePreview =
+      enablePreviewPanel && isPreviewPanelOpen ? (
+        <ErrorBoundary fallback={null}>
+          <div className='system-b-chat-profile-preview-card'>
+            <ProfileContactSidebar />
+          </div>
+        </ErrorBoundary>
+      ) : null;
 
     if (contextCards && entityPanel) {
       return (
@@ -1165,6 +1171,7 @@ export function ChatEntityRightPanelHost({
     enableChatEntityPanels,
     enablePreviewPanel,
     handleOpenProfilePreview,
+    isPreviewPanelOpen,
     profileId,
     profileSpotifyArtistId,
     profileContext,
