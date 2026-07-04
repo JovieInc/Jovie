@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import {
+  AdminFounderHudSection,
+  AdminFounderHudSectionSkeleton,
   AdminHeroMetrics,
   AdminHeroMetricsSkeleton,
   AdminKpiSection,
@@ -34,6 +36,10 @@ export default function AdminOverviewPage() {
         </Suspense>
       }
     >
+      <Suspense fallback={<AdminFounderHudSectionSkeleton />}>
+        <AdminFounderHudSection />
+      </Suspense>
+
       <Suspense fallback={<AdminScoreboardSectionSkeleton />}>
         <AdminScoreboardSection />
       </Suspense>
