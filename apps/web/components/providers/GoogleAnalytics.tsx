@@ -8,7 +8,6 @@ import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 import {
   applyGoogleConsentMode,
-  buildGoogleAnalyticsConfigScript,
   consentToGoogleConsentMode,
   isCookieBannerRequiredFromClient,
   isValidGaMeasurementId,
@@ -24,6 +23,11 @@ function isConsentPayload(value: unknown): value is Consent {
   );
 }
 
+type AnalyticsWindow = Window & {
+  dataLayer?: unknown[][];
+  gtag?: (...args: unknown[]) => void;
+};
+
 export function GoogleAnalytics() {
   const measurementId = publicEnv.NEXT_PUBLIC_GA_MEASUREMENT_ID;
   const isPassive = env.IS_TEST || env.IS_E2E;
@@ -33,6 +37,16 @@ export function GoogleAnalytics() {
   useEffect(() => {
     if (skip) return;
     if (globalThis.window === undefined) return;
+
+    const analyticsWindow = globalThis.window as AnalyticsWindow;
+    const gtag =
+      analyticsWindow.gtag ??
+      ((...args: unknown[]) => {
+        analyticsWindow.dataLayer = analyticsWindow.dataLayer ?? [];
+        analyticsWindow.dataLayer.push(args);
+      });
+    gtag('js', new Date());
+    gtag('config', measurementId);
 
     const syncConsent = (value: unknown) => {
       if (!isConsentPayload(value)) return;
@@ -61,20 +75,15 @@ export function GoogleAnalytics() {
       globalThis.removeEventListener('jvconsent:ready', onReady);
       unsubConsent?.();
     };
-  }, [skip]);
+  }, [measurementId, skip]);
 
   if (skip) return null;
 
   return (
-    <>
-      <Script
-        id='ga-gtag-loader'
-        src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
-        strategy='afterInteractive'
-      />
-      <Script id='ga-config' strategy='afterInteractive'>
-        {buildGoogleAnalyticsConfigScript(measurementId)}
-      </Script>
-    </>
+    <Script
+      id='ga-gtag-loader'
+      src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
+      strategy='afterInteractive'
+    />
   );
 }

@@ -10,18 +10,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@jovie/ui';
+import type { ReactNode } from 'react';
 import { useRef, useState } from 'react';
 
 export interface ConfirmDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: string;
-  readonly description: string;
+  readonly description?: string;
+  readonly body?: ReactNode;
+  readonly children?: ReactNode;
   readonly confirmLabel?: string;
   readonly cancelLabel?: string;
   readonly variant?: 'default' | 'destructive';
   readonly onConfirm: () => void | Promise<void>;
+  readonly onCancel?: () => void;
   readonly isLoading?: boolean;
+  readonly confirmDisabled?: boolean;
 }
 
 /**
@@ -48,11 +53,15 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
+  body,
+  children,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'default',
   onConfirm,
+  onCancel,
   isLoading = false,
+  confirmDisabled = false,
 }: ConfirmDialogProps) {
   const [isPending, setIsPending] = useState(false);
   const handlingRef = useRef(false);
@@ -77,15 +86,18 @@ export function ConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
+          {description ? (
+            <AlertDialogDescription>{description}</AlertDialogDescription>
+          ) : null}
         </AlertDialogHeader>
+        {body ?? children}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>
+          <AlertDialogCancel disabled={loading} onClick={onCancel}>
             {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={loading}
+            disabled={loading || confirmDisabled}
             variant={variant === 'destructive' ? 'destructive' : 'primary'}
           >
             {loading ? 'Please wait...' : confirmLabel}
