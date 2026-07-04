@@ -31,7 +31,7 @@ const inter = localFont({
 const satoshi = localFont({
   src: '../public/fonts/Satoshi-Latin.woff2',
   variable: '--font-satoshi',
-  display: 'optional',
+  display: 'swap',
   weight: '300 900',
 });
 
