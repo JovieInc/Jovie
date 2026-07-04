@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, waitFor } from '@testing-library/react';
 import {
   afterEach,
   beforeAll,
@@ -73,17 +73,18 @@ describe('GoogleAnalytics', () => {
     cleanup();
   });
 
-  it('renders gtag loader and config scripts', () => {
+  it('renders gtag loader and configures analytics on the client', async () => {
     const { container } = render(<GoogleAnalytics />);
     const scripts = getScripts(container);
 
-    expect(scripts).toHaveLength(2);
+    expect(scripts).toHaveLength(1);
     expect(scripts[0]?.id).toBe('ga-gtag-loader');
     expect(scripts[0]?.getAttribute('src')).toBe(
       'https://www.googletagmanager.com/gtag/js?id=G-TMY7Z8HK47'
     );
-    expect(scripts[1]?.id).toBe('ga-config');
-    expect(scripts[1]?.textContent).toContain("gtag('config', 'G-TMY7Z8HK47')");
+    await waitFor(() => {
+      expect(globalThis.gtag).toHaveBeenCalledWith('config', 'G-TMY7Z8HK47');
+    });
   });
 
   it('returns null when measurement ID is missing', () => {

@@ -100,6 +100,7 @@ vi.mock('@/lib/tracking/fire-subscribe-event', () => ({
 }));
 
 // Import once after all mocks are set up
+import { db } from '@/lib/db';
 import {
   getNotificationStatusDomain,
   subscribeToNotificationsDomain,
@@ -109,6 +110,10 @@ import {
 describe('notifications/domain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(db.limit).mockReset();
+    vi.mocked(db.limit).mockResolvedValue([]);
+    vi.mocked(db.execute).mockReset();
+    vi.mocked(db.execute).mockResolvedValue(undefined);
   });
 
   describe('subscribeToNotificationsDomain', () => {

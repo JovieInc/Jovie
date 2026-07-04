@@ -7,6 +7,14 @@
         "skipAudits": ["font-size"],
         "chromeFlags": "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
       },
+      "puppeteerLaunchOptions": {
+        "args": [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage"
+        ],
+        "protocolTimeout": 120000
+      },
       "url": ["http://localhost:3200/"]
     },
     "assert": {

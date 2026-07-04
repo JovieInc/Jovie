@@ -348,7 +348,9 @@ describe('BillingDashboard', () => {
     });
 
     expect(screen.getByText('Keep Subscription')).toBeInTheDocument();
-    expect(screen.getByText('Yes, Cancel')).toBeInTheDocument();
+    expect(screen.getByTestId('alert-dialog-action')).toHaveTextContent(
+      'Cancel Subscription'
+    );
   });
 
   it('renders partial UI when pricing fails but billing succeeds', async () => {
