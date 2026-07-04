@@ -26,6 +26,127 @@ export const notificationChannelSchema = z.enum(['email', 'sms']);
  */
 export type NotificationChannel = z.infer<typeof notificationChannelSchema>;
 
+const EMAIL_MAX_LENGTH = 254;
+const PHONE_MAX_LENGTH = 32;
+const EMAIL_REGEX =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/; // NOSONAR (S5852) - bounded by EMAIL_MAX_LENGTH before regex use
+const CONTROL_OR_SPACE_REGEX = /[\s\p{Cc}]/gu;
+const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
+
+export const NOTIFICATION_CAPTURE_ERROR_MESSAGES = {
+  emailRequired: 'Email address is required.',
+  emailTooLong: 'Email address must be 254 characters or fewer.',
+  emailNoSpaces: 'Email address cannot contain spaces or control characters.',
+  emailFormat:
+    'Email address must include a local part, @, domain, and top-level domain.',
+  phoneRequired: 'Phone number is required.',
+  phoneTooLong: 'Phone number must be 32 characters or fewer.',
+  phoneFormat: 'Phone number must be a valid US or Canadian number.',
+  smsCountry: 'SMS notifications are available in the US and Canada only.',
+} as const;
+
+export const notificationCaptureSchema = z
+  .object({
+    channel: notificationChannelSchema.extract(['email', 'sms']),
+    value: z.string(),
+    country_code: z
+      .string()
+      .length(2)
+      .regex(/^[a-zA-Z]{2}$/)
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.channel === 'email') {
+      const trimmed = data.value.trim();
+
+      if (!trimmed) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailRequired,
+          path: ['value'],
+        });
+        return;
+      }
+
+      if (trimmed.length > EMAIL_MAX_LENGTH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailTooLong,
+          path: ['value'],
+        });
+        return;
+      }
+
+      if (CONTROL_OR_SPACE_REGEX.test(trimmed)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailNoSpaces,
+          path: ['value'],
+        });
+        return;
+      }
+
+      if (!EMAIL_REGEX.test(trimmed)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailFormat,
+          path: ['value'],
+        });
+      }
+      return;
+    }
+
+    const countryCode = data.country_code?.toUpperCase();
+    if (countryCode !== 'US' && countryCode !== 'CA') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.smsCountry,
+        path: ['country_code'],
+      });
+      return;
+    }
+
+    const trimmed = data.value.trim();
+    if (!trimmed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.phoneRequired,
+        path: ['value'],
+      });
+      return;
+    }
+
+    if (trimmed.length > PHONE_MAX_LENGTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.phoneTooLong,
+        path: ['value'],
+      });
+      return;
+    }
+
+    if (!E164_PHONE_REGEX.test(trimmed)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: NOTIFICATION_CAPTURE_ERROR_MESSAGES.phoneFormat,
+        path: ['value'],
+      });
+    }
+  });
+
+export type NotificationCaptureInput = z.infer<
+  typeof notificationCaptureSchema
+>;
+
+export function getNotificationCaptureError(
+  input: NotificationCaptureInput
+): string | null {
+  const parsed = notificationCaptureSchema.safeParse(input);
+  return parsed.success
+    ? null
+    : (parsed.error.issues[0]?.message ?? 'Invalid notification contact.');
+}
+
 // =============================================================================
 // Notification Unsubscribe Method Type
 // =============================================================================
@@ -74,21 +195,28 @@ export const subscribeSchema = z
     source_context: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.channel === 'email' && !data.email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Email is required for email notifications.',
-        path: ['email'],
-      });
+    const capturePath =
+      data.channel === 'email'
+        ? 'email'
+        : data.country_code?.toUpperCase() !== 'US' &&
+            data.country_code?.toUpperCase() !== 'CA'
+          ? 'country_code'
+          : 'phone';
+    const contactError = getNotificationCaptureError({
+      channel: data.channel,
+      value: data.channel === 'email' ? (data.email ?? '') : (data.phone ?? ''),
+      country_code: data.country_code,
+    });
+
+    if (!contactError) {
+      return;
     }
 
-    if (data.channel === 'sms' && !data.phone) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Phone number is required for SMS notifications.',
-        path: ['phone'],
-      });
-    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: contactError,
+      path: [capturePath],
+    });
   });
 
 /**

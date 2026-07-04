@@ -6,7 +6,9 @@ import {
   Check,
   ChevronLeft,
   Mail,
+  MessageCircle,
   Music2,
+  Send,
   Shirt,
   X,
 } from 'lucide-react';
@@ -20,12 +22,17 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
+import {
+  type CountryOption,
+  CountrySelector,
+} from '@/features/profile/notifications';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 
 export type ProfileMobileNotificationsFlowStep =
   | 'email'
+  | 'capture_success'
   | 'otp'
   | 'name'
   | 'birthday'
@@ -38,9 +45,12 @@ interface ProfileMobileNotificationsFlowProps {
   readonly portalContainer?: HTMLElement | null;
   readonly artistName: string;
   readonly channel?: 'email' | 'sms';
+  readonly country: CountryOption;
   readonly step: ProfileMobileNotificationsFlowStep;
   readonly accentHex?: string | null;
   readonly emailInput: string;
+  readonly phoneInput: string;
+  readonly successContactEcho?: string | null;
   readonly otpCode: string;
   readonly nameInput: string;
   readonly birthdayInput: string;
@@ -52,6 +62,7 @@ interface ProfileMobileNotificationsFlowProps {
   readonly birthdayHintShown: boolean;
   readonly resendCooldownEnd: number;
   readonly isResending: boolean;
+  readonly isCountryOpen: boolean;
   readonly contentPrefs: Record<NotificationContentType, boolean>;
   readonly canEditPreferences?: boolean;
   readonly canGoBackFromPreferences?: boolean;
@@ -60,8 +71,13 @@ interface ProfileMobileNotificationsFlowProps {
   readonly showArtistEmailSection?: boolean;
   readonly onClose: () => void;
   readonly onBack: () => void;
+  readonly onChannelChange: (channel: 'email' | 'sms') => void;
+  readonly onCountryOpenChange: (open: boolean) => void;
+  readonly onCountrySelect: (country: CountryOption) => void;
   readonly onEmailChange: (value: string) => void;
+  readonly onPhoneChange: (value: string) => void;
   readonly onEmailSubmit: () => void;
+  readonly onDismissCapture?: () => void;
   readonly onOtpChange: (value: string) => void;
   readonly onOtpComplete: (value: string) => void;
   readonly onOtpSubmit: () => void;
@@ -76,9 +92,12 @@ interface ProfileMobileNotificationsFlowProps {
 }
 
 const FLOW_TRANSITION = {
-  duration: 0.22,
+  duration: 0.42,
   ease: [0.22, 1, 0.36, 1] as const,
 };
+
+const CAPTURE_CONSENT_COPY =
+  'By submitting, you agree to receive updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.';
 
 const MONTH_OPTIONS = [
   'January',
@@ -154,7 +173,7 @@ function ScreenShell({
   /**
    * `compact` vertically centers the title + field + CTA as one balanced group
    * instead of stretching the field region and pinning the footer to the bottom.
-   * Used for short single-field steps (e.g. Email Alerts) so the field and CTA
+   * Used for short single-field steps so the field and CTA
    * read as one unit with no dead vertical space (JOV-3555).
    */
   compact = false,
@@ -310,6 +329,76 @@ function LabeledInput({
   );
 }
 
+function InlineCaptureField({
+  channel,
+  country,
+  isCountryOpen,
+  value,
+  placeholder,
+  isSubmitting,
+  onCountryOpenChange,
+  onCountrySelect,
+  onValueChange,
+  onSubmit,
+}: Readonly<{
+  channel: 'email' | 'sms';
+  country: CountryOption;
+  isCountryOpen: boolean;
+  value: string;
+  placeholder: string;
+  isSubmitting: boolean;
+  onCountryOpenChange: (open: boolean) => void;
+  onCountrySelect: (country: CountryOption) => void;
+  onValueChange: (value: string) => void;
+  onSubmit: () => void;
+}>) {
+  return (
+    <div className='rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.035] p-1.5'>
+      <div className='flex min-h-13 items-center gap-1'>
+        {channel === 'sms' ? (
+          <CountrySelector
+            country={country}
+            isOpen={isCountryOpen}
+            onOpenChange={onCountryOpenChange}
+            onSelect={onCountrySelect}
+          />
+        ) : (
+          <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
+            <Mail className='size-4.5' />
+          </span>
+        )}
+        <input
+          data-testid='mobile-email-input'
+          type={channel === 'sms' ? 'tel' : 'email'}
+          inputMode={channel === 'sms' ? 'tel' : 'email'}
+          autoComplete={channel === 'sms' ? 'tel' : 'email'}
+          value={value}
+          placeholder={placeholder}
+          onChange={event => onValueChange(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onSubmit();
+            }
+          }}
+          disabled={isSubmitting}
+          aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
+          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        />
+        <button
+          type='button'
+          onClick={onSubmit}
+          disabled={isSubmitting}
+          className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
+          aria-label='Submit'
+        >
+          <Send className='size-4' />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function BirthdaySelectors({
   value,
   onChange,
@@ -402,9 +491,12 @@ export function ProfileMobileNotificationsFlow({
   portalContainer,
   artistName,
   channel = 'email',
+  country,
   step,
   accentHex = '#8b5cf6',
   emailInput,
+  phoneInput,
+  successContactEcho = null,
   otpCode,
   nameInput,
   birthdayInput,
@@ -416,6 +508,7 @@ export function ProfileMobileNotificationsFlow({
   birthdayHintShown,
   resendCooldownEnd,
   isResending,
+  isCountryOpen,
   contentPrefs,
   canEditPreferences = false,
   canGoBackFromPreferences = false,
@@ -423,8 +516,13 @@ export function ProfileMobileNotificationsFlow({
   showArtistEmailSection = false,
   onClose,
   onBack,
+  onChannelChange,
+  onCountryOpenChange,
+  onCountrySelect,
   onEmailChange,
+  onPhoneChange,
   onEmailSubmit,
+  onDismissCapture,
   onOtpChange,
   onOtpComplete,
   onOtpSubmit,
@@ -527,41 +625,95 @@ export function ProfileMobileNotificationsFlow({
 
   const screen = (() => {
     if (step === 'email') {
+      const isSms = channel === 'sms';
+      const fieldValue = isSms ? phoneInput : emailInput;
       return (
         <ScreenShell
           compact
-          title={channel === 'sms' ? 'Text Alerts' : 'Email Alerts'}
-          body={`${artistName} alerts.`}
+          title='Get Updates'
+          body={`${artistName}: music, shows, merch.`}
           footer={
-            <div className='space-y-3'>
+            <div className='min-h-27 space-y-3'>
               {error ? (
                 <p className='text-sm text-red-400' role='alert'>
                   {error}
                 </p>
               ) : null}
-              <PrimaryButton onClick={onEmailSubmit} disabled={isSubmitting}>
-                Continue
-              </PrimaryButton>
+              <p className='text-xs leading-4 text-white/42'>
+                {CAPTURE_CONSENT_COPY}
+              </p>
+              <div className='flex items-center justify-between gap-3'>
+                <button
+                  type='button'
+                  onClick={() => onChannelChange(isSms ? 'email' : 'sms')}
+                  disabled={isSubmitting}
+                  className='inline-flex h-9 items-center gap-1.5 rounded-full px-1 text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  {isSms ? (
+                    <Mail className='size-3.5' />
+                  ) : (
+                    <MessageCircle className='size-3.5' />
+                  )}
+                  {isSms ? 'Use Email' : 'Use SMS'}
+                </button>
+                {onDismissCapture ? (
+                  <button
+                    type='button'
+                    onClick={onDismissCapture}
+                    disabled={isSubmitting}
+                    className='inline-flex h-9 items-center rounded-full px-1 text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
+                  >
+                    Not Now
+                  </button>
+                ) : null}
+              </div>
             </div>
           }
         >
-          <LabeledInput
-            label={channel === 'sms' ? 'Phone number' : 'Email address'}
-            value={emailInput}
-            placeholder={channel === 'sms' ? '(555) 123-4567' : 'you@email.com'}
-            type={channel === 'sms' ? 'tel' : 'email'}
-            inputMode={channel === 'sms' ? 'tel' : 'email'}
-            autoComplete={channel === 'sms' ? 'tel' : 'email'}
-            onChange={onEmailChange}
-            onKeyDown={event => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onEmailSubmit();
-              }
-            }}
-            disabled={isSubmitting}
-            testId='mobile-email-input'
+          <InlineCaptureField
+            channel={channel}
+            country={country}
+            isCountryOpen={isCountryOpen}
+            value={fieldValue}
+            placeholder={isSms ? '555 123 4567' : 'you@email.com'}
+            isSubmitting={isSubmitting}
+            onCountryOpenChange={onCountryOpenChange}
+            onCountrySelect={onCountrySelect}
+            onValueChange={isSms ? onPhoneChange : onEmailChange}
+            onSubmit={onEmailSubmit}
           />
+        </ScreenShell>
+      );
+    }
+
+    if (step === 'capture_success') {
+      return (
+        <ScreenShell
+          compact
+          title='You’re On The List'
+          body={
+            successContactEcho
+              ? `Updates are on for ${successContactEcho}.`
+              : `${artistName} updates are on.`
+          }
+          footer={
+            <p className='min-h-10 text-sm text-white/46'>
+              Setting up your preferences...
+            </p>
+          }
+        >
+          <div className='flex min-h-28 items-center justify-center'>
+            <div
+              className='flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] shadow-[0_20px_44px_rgba(0,0,0,0.28)]'
+              style={
+                {
+                  boxShadow: `0 20px 44px rgba(0,0,0,0.28), inset 0 0 0 1px ${accentHex}55`,
+                } as CSSProperties
+              }
+            >
+              <Check className='h-9 w-9 dark:text-white' />
+            </div>
+          </div>
         </ScreenShell>
       );
     }

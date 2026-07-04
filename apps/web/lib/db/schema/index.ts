@@ -82,6 +82,7 @@ export {
   type NewTip,
   type NotificationSubscription,
   notificationSubscriptions,
+  publicProfileCaptureDismissals,
   selectAudienceBlockSchema,
   selectClickEventSchema,
   selectNotificationSubscriptionSchema,
