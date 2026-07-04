@@ -16,7 +16,6 @@ import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 import {
-  buildGoogleConsentInitScript,
   isValidGaMeasurementId,
   shouldMountGoogleAnalytics,
 } from '@/lib/tracking/google-consent-mode';
@@ -252,13 +251,10 @@ export default async function RootLayout({
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
         <script src='/theme-init.js' />
         {shouldMountGa && isValidGaMeasurementId(gaMeasurementId) ? (
-          <script
-            id='ga-consent-init'
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: script body is generated from a validated GA measurement ID.
-            dangerouslySetInnerHTML={{
-              __html: buildGoogleConsentInitScript(gaMeasurementId),
-            }}
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before the GA loader so consent defaults are queued before gtag.js executes. */}
+            <script id='ga-consent-init' src='/ga-consent-init.js' />
+          </>
         ) : null}
       </head>
       <body className={bodyClassName}>
