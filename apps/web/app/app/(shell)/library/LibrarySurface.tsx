@@ -798,7 +798,7 @@ function LibrarySavedViewRow({
       )}
     >
       <button type='button' onClick={onClick} aria-pressed={active}>
-        <span className='min-w-0 flex-1 truncate text-left'>{label}</span>
+        <span className='min-w-0 flex-1 truncate text-left'>{label || 'Untitled'}</span>
         <span className='system-b-library-rail-count tabular-nums'>
           {count}
         </span>

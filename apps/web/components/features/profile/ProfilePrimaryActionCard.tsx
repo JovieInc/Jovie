@@ -554,7 +554,7 @@ function ActionCardShell({
   if (onClick) {
     return (
       <button type='button' onClick={onClick} {...sharedProps}>
-        {children}
+        {children || 'Submit'}
       </button>
     );
   }

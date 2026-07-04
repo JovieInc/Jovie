@@ -109,7 +109,7 @@ function EntityCtaControl({
 
   return (
     <button type='button' onClick={cta.onClick} className={className}>
-      {cta.label}
+      {cta?.label || 'Action'}
     </button>
   );
 }
