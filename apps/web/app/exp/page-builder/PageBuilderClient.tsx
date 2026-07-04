@@ -50,7 +50,7 @@ type StudioMode = 'pages' | 'sections' | 'product' | 'screenshots';
  * without configuring anything.
  */
 const DEFAULT_BODY: readonly string[] = [
-  'marketing-hero-centered',
+  'marketing-hero',
   'home-trust-default',
   'feature-card-grid-3up',
   'testimonial-card-3up',
