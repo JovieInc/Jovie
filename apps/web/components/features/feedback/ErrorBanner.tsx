@@ -102,7 +102,7 @@ export function ErrorBanner({
           'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
         )}
       >
-        {action.label}
+        {action.label || 'Action'}
       </button>
     );
   };

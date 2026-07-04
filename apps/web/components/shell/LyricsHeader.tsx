@@ -41,7 +41,7 @@ export function LyricsHeader({
           onClick={onArtistClick}
           className='inline-flex items-center no-underline hover:underline focus-visible:underline underline-offset-2 decoration-dotted text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-subtle truncate'
         >
-          {track.artist}
+          {track.artist || 'Unknown artist'}
         </button>
       ) : (
         <span className='text-tertiary-token truncate'>{track.artist}</span>

@@ -84,7 +84,7 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
           : 'text-tertiary-token hover:bg-surface-1 hover:text-secondary-token'
       )}
     >
-      {label}
+      {label || 'Column'}
     </button>
   );
 });
