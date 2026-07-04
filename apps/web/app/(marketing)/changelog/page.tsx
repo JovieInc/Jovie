@@ -3,7 +3,10 @@ import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHeroLayout } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroLayout,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   type ChangelogRelease,

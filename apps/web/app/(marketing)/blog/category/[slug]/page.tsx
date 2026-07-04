@@ -1,5 +1,8 @@
 import { notFound } from 'next/navigation';
-import { MarketingContainer, MarketingHeroLayout } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroLayout,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getCategoryBySlug } from '@/lib/blog/categories';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';

@@ -1,4 +1,7 @@
-import { MarketingContainer, MarketingHeroLayout } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroLayout,
+} from '@/components/marketing';
 import { BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
