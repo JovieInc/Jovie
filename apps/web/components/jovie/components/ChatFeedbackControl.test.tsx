@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatFeedbackControl } from './ChatFeedbackControl';
@@ -12,6 +13,10 @@ function mockFetchOk() {
   return fetchMock;
 }
 
+function renderWithProvider(ui: React.ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
+
 describe('ChatFeedbackControl', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
@@ -23,7 +28,7 @@ describe('ChatFeedbackControl', () => {
   });
 
   it('renders thumbs up and thumbs down controls', () => {
-    render(<ChatFeedbackControl messageId='msg-1' />);
+    renderWithProvider(<ChatFeedbackControl messageId='msg-1' />);
 
     expect(screen.getByTestId('chat-feedback-control')).toBeInTheDocument();
     expect(
@@ -37,7 +42,7 @@ describe('ChatFeedbackControl', () => {
   it('posts an up vote with full attribution payload', async () => {
     const fetchMock = mockFetchOk();
 
-    render(
+    renderWithProvider(
       <ChatFeedbackControl
         messageId='msg-1'
         turnId='123e4567-e89b-42d3-a456-426614174000'
@@ -72,7 +77,7 @@ describe('ChatFeedbackControl', () => {
   it('undoes the vote when the active vote is clicked again', async () => {
     const fetchMock = mockFetchOk();
 
-    render(<ChatFeedbackControl messageId='msg-2' />);
+    renderWithProvider(<ChatFeedbackControl messageId='msg-2' />);
 
     const downButton = screen.getByRole('button', { name: 'Bad response' });
     fireEvent.click(downButton);
@@ -93,7 +98,7 @@ describe('ChatFeedbackControl', () => {
   it('switches the vote when the other thumb is clicked', async () => {
     const fetchMock = mockFetchOk();
 
-    render(<ChatFeedbackControl messageId='msg-3' />);
+    renderWithProvider(<ChatFeedbackControl messageId='msg-3' />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Good response' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -114,7 +119,7 @@ describe('ChatFeedbackControl', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<ChatFeedbackControl messageId='msg-4' />);
+    renderWithProvider(<ChatFeedbackControl messageId='msg-4' />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Good response' }));
 

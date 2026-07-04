@@ -32,7 +32,7 @@ interface ChatMessageProps {
   readonly skipEntrance?: boolean;
   /** Show the inline continue affordance after a tool-step cap stop. */
   readonly toolStepCapExhausted?: boolean;
-  /** Persisted chat turn id — enables 👍/👎 model attribution (JOV #11460). */
+  /** Persisted chat turn id — enables model attribution for feedback votes. */
   readonly turnId?: string;
   /** Conversation id for feedback rows. */
   readonly conversationId?: string;
