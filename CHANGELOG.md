@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Ovie HUD auto-reload (GH-12988)**: Electron now polls `/api/health/build-info` every 60 seconds and reloads `/hud` windows when the deployed commit/build fingerprint changes, with no-store build-info responses so running operator shells pick up new HUD deploys without a manual restart.
 - [internal] **Mobile bottom nav derives from canonical config (GH-12644)**: `mobilePrimaryNavigation` no longer defines its own `mobileHome` item; it references the shared `newThreadNavItem` used by desktop nav directly, so mobile can no longer drift from desktop. Adds a regression test asserting every mobile nav item traces back to a canonical desktop nav item.
 - [internal] **Desktop auth return schemes (GH-12927)**: legacy per-environment deep-link aliases now map to the current auth-return handler so desktop shells can return from browser auth consistently while the main release path stamps the next DMG version.
 - [internal] **Desktop dir-only fuse builds (JOV-3835)**: dir-target Electron test builds disable only the embedded asar-integrity fuse so local/staging packaged apps boot instead of rendering a blank window; main release stamping will publish the next signed DMG.
