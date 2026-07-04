@@ -1,9 +1,6 @@
-import { notFound } from 'next/navigation';
+import { forbidden, notFound, unauthorized } from 'next/navigation';
 import { WikiPageArticle } from '@/components/features/admin/wiki/WikiPageArticle';
-import {
-  getCurrentAdminPageAccess,
-  redirectToLogin,
-} from '@/lib/admin/page-access';
+import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getPage } from '@/lib/wiki/gbrain-client';
 
 interface Props {
@@ -12,7 +9,8 @@ interface Props {
 
 export default async function WikiPageView({ params }: Props) {
   const access = await getCurrentAdminPageAccess();
-  if (!access.isAdmin) redirectToLogin();
+  if (!access.isAuthenticated) unauthorized();
+  if (!access.hasAdminRole) forbidden();
 
   const { slug: slugParts } = await params;
   const slug = slugParts.join('/');

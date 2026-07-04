@@ -1,11 +1,9 @@
+import { forbidden, unauthorized } from 'next/navigation';
 import { WikiNamespaceSection } from '@/components/features/admin/wiki/WikiNamespaceSection';
 import { WikiSearchForm } from '@/components/features/admin/wiki/WikiSearchForm';
 import { WikiSearchResults } from '@/components/features/admin/wiki/WikiSearchResults';
 import { WikiUnavailableNotice } from '@/components/features/admin/wiki/WikiUnavailableNotice';
-import {
-  getCurrentAdminPageAccess,
-  redirectToLogin,
-} from '@/lib/admin/page-access';
+import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { listPages, searchPages } from '@/lib/wiki/gbrain-client';
 import { groupByNamespace } from '@/lib/wiki/namespace';
 
@@ -15,7 +13,8 @@ interface Props {
 
 export default async function WikiIndexPage({ searchParams }: Props) {
   const access = await getCurrentAdminPageAccess();
-  if (!access.isAdmin) redirectToLogin();
+  if (!access.isAuthenticated) unauthorized();
+  if (!access.hasAdminRole) forbidden();
 
   const { q } = await searchParams;
   const hasQuery = typeof q === 'string' && q.trim().length > 0;
