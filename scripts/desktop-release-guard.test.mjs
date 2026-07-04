@@ -62,6 +62,16 @@ test('passes when desktop changes include a VERSION bump', () => {
   assert.deepEqual(result.releaseHandlingFiles, ['VERSION']);
 });
 
+test('passes when desktop changes include unreleased changelog notes', () => {
+  const result = evaluateDesktopReleaseGuard([
+    'apps/desktop/src/main.ts',
+    'CHANGELOG.md',
+  ]);
+
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.releaseHandlingFiles, ['CHANGELOG.md']);
+});
+
 test('passes when desktop changes include explicit release workflow handling', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',

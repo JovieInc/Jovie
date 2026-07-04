@@ -193,6 +193,18 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(mainSource, /:\s*'jovie';/);
   assert.match(
     mainSource,
+    /function isAuthReturnDeepLinkCandidate\(urlString: string\): boolean/
+  );
+  assert.match(
+    mainSource,
+    /isAuthReturnDeepLinkCandidate\(arg\) && !parseDesktopAuthReturnDeepLink\(arg\)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /startsWith\(`\$\{AUTH_RETURN_PROTOCOL\}\/\/\$\{AUTH_RETURN_HOST\}`\)/
+  );
+  assert.match(
+    mainSource,
     /app\.setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME/
   );
   assert.match(stagingConfig, /CFBundleURLTypes:/);
