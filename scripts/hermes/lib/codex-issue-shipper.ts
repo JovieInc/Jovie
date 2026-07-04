@@ -353,6 +353,15 @@ export function isUiUxDesignIssue(issue: GithubIssue): boolean {
   return keywords.some(k => text.includes(k));
 }
 
+export function isOvieIssue(issue: GithubIssue): boolean {
+  const text = issueText(issue).toLowerCase();
+  return /\bovie\b/.test(text) || labelNames(issue).includes('area:ovie');
+}
+
+export function isOvieUiUxDesignIssue(issue: GithubIssue): boolean {
+  return isOvieIssue(issue) && isUiUxDesignIssue(issue);
+}
+
 export function eligibleCodexIssues(
   issues: ReadonlyArray<GithubIssue>
 ): ReadonlyArray<GithubIssue> {
@@ -622,6 +631,19 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
       `- Safe UI-only fast-track lane: if and only if the final diff is limited to visual UI paths allowed by \`.github/MERGE_QUEUE.md\`, add PR labels \`ui\`, \`${UI_FAST_TRACK_LABEL}\`, \`fast\`, and \`merge-queue\` so Graphite can bypass unrelated backend trains after evidence.`,
       '- When requesting UI fast-track, include a PR section titled `## Fast-track UI eligibility` with `Why eligible`, `Before`, `After`, and `Checks run` lines. Evidence must include before/after screenshots or component evidence, narrow typecheck output, narrow lint/Biome output, and affected component/test output or an explicit explanation when none exists. Do not request fast-track for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, or broad refactors.',
       '- If the issue is not UI-focused, do not enforce this skill.',
+    ]);
+  }
+
+  if (isOvieUiUxDesignIssue(input.issue)) {
+    result = result.concat([
+      '',
+      '## Ovie UX Guardrail (JOV-3897)',
+      '- Treat Ovie as a consumer of the make-interfaces-better/design-review guardrail: load `/design-review` for visual QA and `design-taste-frontend` where available.',
+      "- Start every Ovie UI change with this one-line Design Read: 'Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>'.",
+      '- Adapt the guardrail to Ovie as a macOS ops cockpit: dense but calm, fast, native-feeling, no AI-slop decoration, and no random web landing-page patterns.',
+      '- Ovie UI PRs need before/after screenshots or component evidence, plus explicit pass/fail for hierarchy, spacing, typography scale, visual density, interaction states, contrast, macOS-native affordances, and no layout jank.',
+      '- If the local Ovie repo is dirty, inspect and preserve that state before editing it; do not overwrite unrelated uncommitted Ovie work.',
+      '- Reference `docs/ovie-design-guardrails.md` and `DESIGN.md` in the PR body when the change touches Ovie UI/UX.',
     ]);
   }
 
