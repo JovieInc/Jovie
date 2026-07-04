@@ -47,6 +47,7 @@ import {
   type GbrainContext,
   GhEagainBackoff,
   type GithubIssue,
+  gbrainContextBlocker,
   HUMAN_REVIEW_LABEL,
   labelNames,
   loadShipperConfig,
@@ -1021,6 +1022,19 @@ async function dispatchPlan(
   config: ShipperConfig,
   plan: DispatchPlan
 ): Promise<void> {
+  const gbrain = collectGbrainContext(plan);
+  const gbrainBlocker = gbrainContextBlocker(gbrain);
+  if (gbrainBlocker) {
+    markBlocked(config, plan, gbrainBlocker);
+    logJobEvent({
+      job: JOB,
+      event: 'gbrain_coordination_blocked',
+      issue: plan.issue.number,
+      error: gbrainBlocker,
+    });
+    return;
+  }
+
   const prepared = prepareWorktree(config, plan);
   const dispatch = prepared.plan;
   try {
@@ -1034,21 +1048,6 @@ async function dispatchPlan(
       pid: process.pid,
       startedAt: new Date().toISOString(),
     });
-
-    let gbrain: GbrainContext;
-    try {
-      gbrain = collectGbrainContext(dispatch);
-    } catch (err) {
-      const reason = `GBrain capture failed, so no coding agent was started.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``;
-      releaseClaimForRetry(config, dispatch, reason);
-      logJobEvent({
-        job: JOB,
-        event: 'gbrain_failed',
-        issue: dispatch.issue.number,
-        error: shortError(err),
-      });
-      return;
-    }
 
     const runInWorktree: FinisherRunner = (args, opts) =>
       execFileSync(args[0], args.slice(1), {

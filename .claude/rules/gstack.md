@@ -68,6 +68,8 @@ Key routing rules:
 
 For cross-session recall and prior-art lookup, consult gbrain via MCP **only when the question touches durable founder/strategic context**. Do not ritually query for purely local code questions.
 
+Exception: the Agent Coordination Preflight in `AGENTS.md` is mandatory for every task. That org-chart/existing-work check is a coordination gate, not optional durable-context lookup. If gbrain is unreachable during the coordination gate, stop and alert with a `system-blocker`.
+
 Conditional triggers:
 - Decisions involving people, companies, customers, fundraising, pricing, or competitive positioning
 - Repeated strategic questions ("did we already decide X?")

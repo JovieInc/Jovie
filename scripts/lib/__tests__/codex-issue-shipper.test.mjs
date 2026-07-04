@@ -4,6 +4,7 @@ import {
   buildAgentPrompt,
   buildDispatchPlans,
   buildGbrainCaptureText,
+  buildGbrainQuery,
   buildRecoveryStashMessage,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
@@ -17,6 +18,7 @@ import {
   GH_EAGAIN_BACKOFF_MS,
   GH_EAGAIN_BACKOFF_THRESHOLD,
   GhEagainBackoff,
+  gbrainContextBlocker,
   INVALID_LABEL,
   isAlreadyClaimedOrBlocked,
   isInvalidMisroute,
@@ -310,6 +312,11 @@ describe('codex issue shipper prompt', () => {
 
     expect(prompt).toContain('Load gstack');
     expect(prompt).toContain('Use gbrain before planning');
+    expect(prompt).toContain('gbrain:agent-org-chart');
+    expect(prompt).toContain('shared-skills/coordination-basics/SKILL.md');
+    expect(prompt).toContain('existing work/ownership');
+    expect(prompt).toContain('delegate via the coordination inbox');
+    expect(prompt).toContain('system-blocker');
     expect(prompt).toContain('Use subagents');
     expect(prompt).toContain('Keep progress file-backed');
     expect(prompt).toContain('agent-run-artifact');
@@ -325,6 +332,49 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain(
       'Captured slug: ops/codex-issue-shipper/github-123'
     );
+  });
+
+  it('queries gbrain for agent ownership and existing work context', () => {
+    const query = buildGbrainQuery(
+      issue({
+        number: 12962,
+        title: 'Agent Coordination Policy',
+        labels: [{ name: 'codex' }, { name: 'area:ops' }],
+      })
+    );
+
+    expect(query).toContain('agent ownership');
+    expect(query).toContain('existing work');
+    expect(query).toContain('#12962');
+    expect(query).toContain('Agent Coordination Policy');
+    expect(query).toContain('area:ops');
+  });
+
+  it('blocks agent launch when gbrain context collection failed', () => {
+    expect(
+      gbrainContextBlocker({
+        captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
+        queryText: 'Jovie implementation context',
+        queryResult:
+          'gbrain query failed: connect ECONNREFUSED 127.0.0.1:7801\n\ngbrain capture failed: Page not found',
+      })
+    ).toContain('system-blocker');
+
+    expect(
+      gbrainContextBlocker({
+        captureSlug: 'ops/codex-issue-shipper/github-12962',
+        queryText: 'Jovie implementation context',
+        queryResult: 'No results.',
+      })
+    ).toBeNull();
+
+    expect(
+      gbrainContextBlocker({
+        captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
+        queryText: 'Jovie implementation context',
+        queryResult: 'No results.',
+      })
+    ).toContain('system-blocker');
   });
 
   it('adds Ovie-specific make-interfaces-better guardrails to Ovie UX prompts', () => {
