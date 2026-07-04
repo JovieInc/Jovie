@@ -361,8 +361,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <span className='hidden w-28 shrink-0 lg:block' aria-hidden='true' />
       )}
 
-      <div className='hidden w-20 shrink-0 justify-start md:inline-flex'>
-        <DspAvatarStack dsps={dspItems} />
+      <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
+        <DspAvatarStack dsps={dspItems} maxVisible={3} />
       </div>
 
       <SmartLinkCell

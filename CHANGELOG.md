@@ -18,10 +18,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 - [internal] **Computed-contrast gate (GH-12012)**: `scripts/lint-contrast-computed.ts` + `contrast-pairs.config.json` resolve design-token pairs (hex/rgb/lch/oklch, `var()` chains, light+dark themes) via `lib/a11y-gates/contrast-engine.ts` and fail CI when a pair drops below WCAG AA; enforced by `tests/unit/design-system/computed-contrast.test.ts` (Unit Tests merge gate) and chained into `lint:contrast-ratchet` after the regex pre-filter.
 - [internal] **Touch-target ratchet (GH-12012)**: `scripts/lint-touch-target.ts` counts interactive elements with explicit sub-44px heights (WCAG 2.5.5; baseline 224, ratchet only goes down); enforced by `tests/unit/design-system/touch-target-ratchet.test.ts`.
 - [internal] **Reduced motion zeroes ALL duration tokens (GH-12012)**: `--motion-reveal-*` (globals.css), `--clerk-motion-duration` (theme.css), and `--linear-duration-*` (linear-tokens.css) are now zeroed under `prefers-reduced-motion`; `tests/unit/design-system/reduced-motion-tokens.test.ts` guards every current and future literal duration token.
 =======
+- [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
+>>>>>>> origin/main
+=======
+- **Release rows show stacked provider logos (GH-11493)**: Library table rows and shell release rows now render overlapping DSP avatars with a "+N more" chip and a hover popover listing every provider, replacing the bare provider-count number. The shell row's avatar stack also now reflects the release's full provider coverage instead of capping at four hardcoded majors.
 - [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
 >>>>>>> origin/main
 =======

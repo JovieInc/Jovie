@@ -230,6 +230,36 @@ export async function getExperiment(
   }
 }
 
+/**
+ * Logs a custom event to Statsig, keyed to the given stable user id.
+ *
+ * Used by the PAC instrumentation sink (`/api/profile/pac-event`) so
+ * variant-keyed arm metrics (exposures, captures, dismissals, conversions)
+ * land where the experiment auto-promotion loop reads them. Fail-safe:
+ * errors are logged and swallowed — event logging must never break a
+ * request path.
+ */
+export async function logStatsigEvent(
+  userId: string | null,
+  eventName: string,
+  value?: string | number,
+  metadata?: Record<string, string>
+): Promise<void> {
+  if (isE2ERuntime) return;
+
+  await initializeStatsig();
+  if (!statsigInitialized) return;
+
+  try {
+    const statsig = statsigClient;
+    if (!statsig) return;
+
+    statsig.logEvent(getStatsigUser(userId), eventName, value, metadata);
+  } catch (error) {
+    logger.warn(`[Statsig] Failed to log event ${eventName}`, error, 'Statsig');
+  }
+}
+
 export async function getProfileAlertOptInVariantValue(
   stableId: string | null
 ): Promise<ProfileAlertOptInVariant> {
