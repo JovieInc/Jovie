@@ -96,6 +96,7 @@ import {
   type ChatTurnSource,
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
+  recordChatTurnModel,
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
@@ -600,11 +601,14 @@ function buildChatTurnMetadata(input: {
   readonly turnId: string;
   readonly requestId: string;
   readonly toolStepCapExhausted?: boolean;
+  /** Resolved model id that produced the turn (feedback attribution). */
+  readonly model?: string;
 }) {
   return {
     conversationId: input.conversationId,
     turnId: input.turnId,
     requestId: input.requestId,
+    ...(input.model ? { model: input.model } : {}),
     ...(input.toolStepCapExhausted
       ? { toolStepCapExhausted: true as const }
       : {}),
@@ -2808,6 +2812,25 @@ export async function POST(req: Request) {
       onStreamError: persistStreamFailure,
     });
 
+    // Record the producing model on the turn row (fire-and-forget) so 👍/👎
+    // feedback votes can attribute this output to a model server-side, even
+    // when the vote arrives after a page reload (JOV #11460).
+    if (reservedTurn) {
+      recordChatTurnModel(reservedTurn.turnId, turn.selectedModel).catch(
+        error => {
+          Sentry.addBreadcrumb({
+            category: 'ai-chat',
+            message: 'chat_turn_model_record_failed',
+            level: 'warning',
+            data: {
+              turnId: reservedTurn.turnId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+        }
+      );
+    }
+
     return turn.streamResult.toUIMessageStreamResponse({
       headers: {
         ...corsHeaders,
@@ -2825,6 +2848,7 @@ export async function POST(req: Request) {
               conversationId: reservedTurn.conversationId,
               turnId: reservedTurn.turnId,
               requestId,
+              model: turn.selectedModel,
               toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,
