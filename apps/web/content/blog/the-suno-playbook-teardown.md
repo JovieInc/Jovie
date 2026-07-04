@@ -46,13 +46,13 @@ DSP agreements are also evolving. Streaming services have introduced minimum qua
 
 **The noob move:** Use Midjourney for cover art, bulk-generate ISRCs, and paste in keyword-stuffed titles to game algorithmic search.
 
-**Why it breaks:** Metadata spam is how you get a catalog strike. Spotify, Apple Music, and DistroKid all actively remove keyword-stuffed titles and AI-generated art that's clearly mass-produced. More importantly, the entire *reason* visual identity matters is that it tells a listener in 0.3 seconds whether you're real or a content farm. AI-farmed cover art looks like AI-farmed cover art.
+**Why it breaks:** Metadata spam is how you get a catalog strike. Streaming platforms and distributors actively remove keyword-stuffed titles and AI-generated art that's clearly mass-produced. More importantly, the entire *reason* visual identity matters is that it tells a listener in 0.3 seconds whether you're real or a content farm. AI-farmed cover art looks like AI-farmed cover art.
 
 **What actually moves the needle:** A coherent visual identity anchored to a real persona. Art, title, and artist name that feel like they belong together. That's not an AI problem, it's a taste problem — and taste compounds.
 
 ## Step 5 — Distribute
 
-**The noob move:** Upload to DistroKid or TuneCore, hit distribute on all platforms, and wait.
+**The noob move:** Upload to a major distributor, hit distribute on all platforms, and wait.
 
 **Why it breaks:** Distribution is solved. It costs $20/year. Everyone has it. The fact that your music is on Spotify does not mean anyone will ever hear it. There are 100 million tracks on Spotify. Distribution is the floor, not the ceiling.
 
@@ -62,7 +62,7 @@ This is the point in the playbook where the advice runs out. "Hit distribute" an
 
 ## Step 6 — Drive streams
 
-**The noob move:** Submit to SubmitHub playlists, post a TikTok, buy a small promo package, and cross your fingers.
+**The noob move:** Submit to playlist curators, post a TikTok, buy a small promo package, and cross your fingers.
 
 **Why it breaks:** This is where the playbook quietly assumes the hardest part. "Drive streams" is doing enormous load-bearing work in a one-sentence bullet. Organic stream growth on an unknown artist without an existing audience requires: editorial pitch six weeks before release, playlist curator outreach, social content seeding in the 2–3 weeks pre-drop, paid social targeting against a look-alike audience, influencer sync, and cross-platform coordination timed to the moment of release to spike the algorithm signals within the first 72 hours.
 
