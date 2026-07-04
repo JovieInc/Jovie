@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Desktop auth return schemes (GH-12927)**: legacy per-environment deep-link aliases now map to the current auth-return handler so desktop shells can return from browser auth consistently while the main release path stamps the next DMG version.
 - [internal] **Codex issue shipper stale-checkout fail-closed gate (GH-12841)**: primary `~/Jovie` checkout must be clean `main` at `origin/main` before dispatch; unsafe drift logs `stale_checkout_abort` + Telegram/Slack and refuses to ship; safe detritus auto-heals for the next launchd tick; adds `shipper-gated-entrypoint.py` (gbrain/grok preflight) and blocks `git checkout` in the primary repo from agent bash hooks.
 - [internal] **Dev server stale `.next` cache guard (GH-12899)**: `node scripts/dev.mjs` now wipes `.next` when app route sources are newer than the compiled manifest, logs the on-disk route count at first compile, and Turbo `dev` restarts when `page.tsx` / `route.ts` / `layout.tsx` inputs change.
 - [internal] **Dev server resource hygiene (GH-12902)**: `pnpm dev` now starts web-only fast dev instead of all workspace Next.js servers; use `pnpm run dev:all` for the full turbo dev matrix. Added `pnpm run dev:cleanup` / `dev:cleanup:force` to report or terminate stale `next dev` / `turbo dev` processes (default threshold: 4h).
