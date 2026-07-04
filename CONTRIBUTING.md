@@ -1,5 +1,7 @@
 # Contributing to Jovie
 
+> **Internal team only.** This repository is proprietary and confidential (© Jovie Technology Inc.). It is public only to use GitHub Actions CI minutes. External contributions are not accepted.
+
 ## ⚠️ CRITICAL: BRANCH PROTECTION RULES
 
 ### **NEVER PUSH TO MAIN OR PRODUCTION**
@@ -10,18 +12,9 @@
 - If the pipeline is stuck, fix issues on your feature branch or `main` and let CI handle the rest
 - Direct pushes to protected branches will be rejected and can break the pipeline
 
-## Contributor License Agreement (CLA)
+## Ownership
 
-By submitting a pull request to this repository, you agree that:
-
-1. Your contributions are your original work (or you have the right to submit them)
-2. You grant Jovie Technology Inc. a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use, reproduce, modify, distribute, and sublicense your contributions as part of the Jovie platform
-3. You understand that your contributions may be used in a proprietary product
-4. You have the legal authority to grant these rights
-
-If you are contributing on behalf of your employer, you confirm that your employer has authorized you to make the contribution under these terms.
-
-For significant contributions, we may ask you to sign a formal CLA document.
+All contributions to this repository are work product of Jovie Technology Inc. (or are made by contractors/employees under an existing agreement). No external CLA is required because external contributions are not accepted.
 
 ### **Branch Protection**
 
@@ -72,7 +65,7 @@ For significant contributions, we may ask you to sign a formal CLA document.
    git add .
    git commit -m "feat: add new artist profile customization options"
    ```
-2. Push to your fork:
+2. Push your branch:
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -341,12 +334,11 @@ SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
 - Open an issue on GitHub
 - Contact the maintainers
 
-## Community Guidelines
+## Team Guidelines
 
-- Be respectful and inclusive
-- Help others learn and grow
-- Follow the established patterns
-- Contribute to documentation
-- Report bugs and security issues
+- Follow the established patterns and code style
+- Keep changes focused and reviewable (one PR per concern)
+- Contribute to documentation when you change behaviour
+- Report security issues via the process in [SECURITY.md](SECURITY.md)
 
-Thank you for contributing to Jovie! 🎵
+Thank you for contributing to Jovie.
