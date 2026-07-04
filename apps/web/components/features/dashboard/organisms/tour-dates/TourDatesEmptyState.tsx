@@ -2,8 +2,8 @@
 
 import { Button, Input } from '@jovie/ui';
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
+import { toast } from '@/components/feedback';
 import {
   useConnectBandsintownMutation,
   useSaveBandsintownApiKeyMutation,

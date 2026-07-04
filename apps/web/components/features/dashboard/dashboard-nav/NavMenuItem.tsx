@@ -17,7 +17,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import {
   SidebarMenuBadge,
   SidebarMenuButton,

@@ -3,7 +3,7 @@
 import { Button, Textarea } from '@jovie/ui';
 import { Loader2, Upload } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useQueueLeadUrlsMutation } from '@/lib/queries';

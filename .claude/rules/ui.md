@@ -205,7 +205,7 @@ This is the subtraction principle applied specifically to container boundaries. 
 - The Biome rule `noRestrictedGlobals` (level: error) catches bare calls; `pnpm --filter web lint:no-native-dialogs` catches `globalThis.X` / `window.X` forms — both run in CI.
 - Canonical replacements:
   - **Confirmations (irreversible actions)** → `<ConfirmDialog>` from `@/components/molecules/ConfirmDialog`
-  - **Notifications / async errors** → `toast.error()` / `toast.success()` from `sonner`
+  - **Notifications / async errors** → `toast.error()` / `toast.success()` from `@/components/feedback` (canonical feedback system; never import `sonner` directly)
   - **Reversible actions** → optimistic update + undo-toast (pattern not yet codified — file a Linear ticket if you need this)
 - See `DESIGN.md` → "Confirmations & Destructive Actions" for the full decision rule and copy guidance.
 - Storybook stories (`*.stories.tsx`) and CLI scripts (`apps/web/scripts/**`) are exempted via the Biome override; they may use `alert()` for handler-fired signals.

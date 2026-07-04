@@ -2,7 +2,7 @@
 
 import { Check, Copy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { cn } from '@/lib/utils';
 
 export interface CopyableFieldProps {

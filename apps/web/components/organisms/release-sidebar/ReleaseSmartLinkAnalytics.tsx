@@ -3,7 +3,7 @@
 import { CommonDropdown } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerInlineIconButton,

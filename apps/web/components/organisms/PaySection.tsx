@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { PaySelector } from '@/components/molecules/PaySelector';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';

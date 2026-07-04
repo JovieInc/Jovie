@@ -16,9 +16,9 @@ import {
   useCallback,
   useMemo,
 } from 'react';
-import { toast } from 'sonner';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
+import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import { AgentPulse } from '@/components/shell/AgentPulse';

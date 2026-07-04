@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import {
   DEMO_PROVIDER_CONFIG,
   DEMO_RELEASE_VIEW_MODELS,
 } from '@/components/features/demo/mock-release-data';
+import { toast } from '@/components/feedback';
 import { ReleaseTable } from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 

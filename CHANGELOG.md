@@ -15,6 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- Toasts and banners now share one canonical feedback system: confirmations and errors appear bottom-right and dismiss on their own, while system status stays pinned at the top until you dismiss it. (GH-12885)
+- [internal] **Canonical feedback system (GH-12885)**: new `@/components/feedback` module (arity-preserving toast wrapper over sonner + `Banner`/`BannerViewport`/`FeedbackProvider`); all 124 direct `sonner` imports migrated to the canonical module; explicit 4s auto-dismiss default, max 3 stacked toasts, safe-area-aware bottom-right offset; unhandled TanStack mutation errors now surface a canonical error toast via a `MutationCache` fallback.
 - [internal] **CI control-plane characterization (montevideo-v2)**: Locks merge-gate set, risk smoke/preview contracts, and required-check aggregates via `pnpm ci:control:test` (Structural Contract). Adds `scripts/lib/ci-control-plane.mjs`, `print-contract` CLI, deterministic metrics evaluation window, and forbidden pins for all harness merge-gate job names.
 
 - [internal] **IRPAA cohort baseline + lift tracking (GH-12141)**: adds `artist_revenue_cohorts` (cohort tag `jovie_active`/`control` + immutable 30-day pre-Jovie revenue baseline, auto-assigned on first automation outcome), versioned dollarization weights (`lib/metrics/revenue-lift-weights.ts`), per-artist rolling revenue signal + lift rows (`lib/metrics/artist-revenue-cohorts.ts`), and the canonical `getIRPAA(window)` North Star rollup (`lib/metrics/irpaa.ts`). All proxy terms labeled with weights version + validation date.

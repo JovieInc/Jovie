@@ -18,11 +18,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { toast } from 'sonner';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
+import { toast } from '@/components/feedback';
 import {
   DrawerAsyncToggle,
   DrawerCardActionBar,

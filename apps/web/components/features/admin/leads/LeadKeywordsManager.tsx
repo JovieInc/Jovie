@@ -4,7 +4,7 @@ import { Badge, Button, Switch, Textarea } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {

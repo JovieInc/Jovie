@@ -8,8 +8,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { toast } from '@/components/feedback';
 import { usePollingManager } from '@/lib/hooks/usePollingManager';
 import {
   useAcceptSuggestionMutation,

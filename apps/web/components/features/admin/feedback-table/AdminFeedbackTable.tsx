@@ -3,9 +3,9 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { toast } from '@/components/feedback';
 import {
   DrawerCardActionBar,
   DrawerPropertyRow,

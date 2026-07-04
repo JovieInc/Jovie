@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2, Plus, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import {
   PageToolbar,
   PageToolbarActionButton,

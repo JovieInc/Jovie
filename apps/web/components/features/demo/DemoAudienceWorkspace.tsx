@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { DashboardAudienceWorkspace } from '@/features/dashboard/organisms/DashboardAudienceWorkspace';
 import {

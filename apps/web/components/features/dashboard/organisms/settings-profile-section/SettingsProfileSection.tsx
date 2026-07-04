@@ -3,7 +3,7 @@
 import { Input } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';

@@ -2,8 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import { useCallback, useMemo, useState, useTransition } from 'react';
-import { toast } from 'sonner';
 import { addCatalogTaskToRelease } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
+import { toast } from '@/components/feedback';
 import {
   Dialog,
   DialogActions,

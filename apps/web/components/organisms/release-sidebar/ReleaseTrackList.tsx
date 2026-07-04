@@ -2,7 +2,7 @@
 
 import { ChevronRight, Pause, Play } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { DrawerEmptyState } from '@/components/molecules/drawer';
 import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import { useReleaseTracksQuery } from '@/lib/queries';

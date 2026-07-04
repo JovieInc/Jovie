@@ -6,8 +6,8 @@ import { type OnChangeFn, type SortingState } from '@tanstack/react-table';
 import { Copy, Download, ExternalLink, Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
-import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
+import { toast } from '@/components/feedback';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {

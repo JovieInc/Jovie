@@ -2,7 +2,7 @@
 
 import { Copy } from 'lucide-react';
 import { useCallback } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerActionRow,

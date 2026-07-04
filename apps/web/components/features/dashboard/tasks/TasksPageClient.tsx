@@ -31,7 +31,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
@@ -44,6 +43,7 @@ import {
   TaskListRow,
 } from '@/components/features/dashboard/tasks/TaskListRow';
 import { TaskRowActionMenu } from '@/components/features/dashboard/tasks/TaskRowActionMenu';
+import { toast } from '@/components/feedback';
 import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,

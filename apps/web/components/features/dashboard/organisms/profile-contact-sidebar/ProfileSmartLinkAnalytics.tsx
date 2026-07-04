@@ -2,7 +2,7 @@
 
 import { Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import {
   DrawerEmptyState,
   DrawerInlineIconButton,

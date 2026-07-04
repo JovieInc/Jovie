@@ -2,7 +2,7 @@
 
 import { Contact, ExternalLink, QrCode, Wallet } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';

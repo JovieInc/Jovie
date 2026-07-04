@@ -10,7 +10,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer/DrawerInlineIconButton';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';

@@ -2,7 +2,7 @@
 
 import { Copy } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 
 /**
  * Generate a short reference ID for errors without a Next.js digest.

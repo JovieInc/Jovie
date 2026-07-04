@@ -10,9 +10,9 @@ import {
 import { Check, ChevronDown, Loader2, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { toast } from 'sonner';
 import { switchActiveProfile } from '@/app/app/(shell)/dashboard/actions/switch-profile';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { toast } from '@/components/feedback';
 import { Avatar } from '@/components/molecules/Avatar';
 import { cn } from '@/lib/utils';
 import { CreateProfileDialog } from './CreateProfileDialog';
