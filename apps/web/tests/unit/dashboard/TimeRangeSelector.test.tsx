@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
 
@@ -79,7 +80,8 @@ describe('TimeRangeSelector (menu variant)', () => {
     ).toHaveTextContent('Last 30 Days');
   });
 
-  it('locks plan-gated ranges in the dropdown', () => {
+  it('locks plan-gated ranges in the dropdown', async () => {
+    const user = userEvent.setup();
     render(
       <TimeRangeSelector
         variant='menu'
@@ -90,7 +92,7 @@ describe('TimeRangeSelector (menu variant)', () => {
       />
     );
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Analytics Time Range' })
     );
 

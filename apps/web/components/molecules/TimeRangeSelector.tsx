@@ -68,7 +68,8 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
 }: TimeRangeSelectorProps<T>) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const isLocked = (range: T): boolean => lockedRanges?.includes(range) ?? false;
+  const isLocked = (range: T): boolean =>
+    lockedRanges?.includes(range) ?? false;
   const isDisabled = (range: T): boolean =>
     isLocked(range) || isRangeBeyondRetention(range, maxRetentionDays);
 
