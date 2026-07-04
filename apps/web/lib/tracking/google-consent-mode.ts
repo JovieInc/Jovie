@@ -129,8 +129,8 @@ export function applyGoogleConsentMode(state: GoogleConsentModeState): void {
   analyticsWindow?.gtag?.('consent', 'update', state);
 }
 
-export function buildGoogleConsentInitScript(measurementId: string): string {
-  if (!isValidGaMeasurementId(measurementId)) {
+export function buildGoogleConsentInitScript(measurementId?: string): string {
+  if (measurementId !== undefined && !isValidGaMeasurementId(measurementId)) {
     throw new Error('Invalid GA measurement ID');
   }
 

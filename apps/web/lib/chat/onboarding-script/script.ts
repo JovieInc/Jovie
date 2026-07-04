@@ -25,6 +25,19 @@ export type ScriptStepId =
   | 'done'
   | 'stream_error';
 
+export const SCRIPT_STEP_IDS = [
+  'greet',
+  'get_artist',
+  'confirm_artist',
+  'confirm_artist_no_data',
+  'handle',
+  'ask_audience',
+  'instant_access',
+  'waitlist',
+  'done',
+  'stream_error',
+] as const satisfies readonly ScriptStepId[];
+
 export interface ScriptLine {
   readonly key: `${ScriptStepId}:${string}`;
   readonly stepId: ScriptStepId;
@@ -34,6 +47,18 @@ export interface ScriptLine {
 
 function line(stepId: ScriptStepId, variant: string, text: string): ScriptLine {
   return { key: `${stepId}:${variant}`, stepId, variant, text };
+}
+
+export function isScriptStepId(value: string): value is ScriptStepId {
+  return SCRIPT_STEP_IDS.includes(value as ScriptStepId);
+}
+
+export function hashSessionId(sessionId: string): number {
+  let hash = 0;
+  for (let i = 0; i < sessionId.length; i += 1) {
+    hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
+  }
+  return hash;
 }
 
 export const SCRIPT_LINES: readonly ScriptLine[] = [
@@ -128,10 +153,7 @@ export function pickLine(stepId: ScriptStepId, sessionId: string): ScriptLine {
   if (candidates.length === 0) {
     throw new Error(`No script lines defined for step ${stepId}`);
   }
-  let hash = 0;
-  for (let i = 0; i < sessionId.length; i += 1) {
-    hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
-  }
+  const hash = hashSessionId(sessionId);
   const picked = candidates[hash % candidates.length];
   if (!picked) {
     throw new Error(`Variant pick failed for step ${stepId}`);

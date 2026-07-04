@@ -36,6 +36,26 @@ export const OFFRAMP_RATE_WORST_CASE = 0.015;
  */
 export const MAX_RAIL_OVERHEAD = 0.5;
 
+export const X402_MIN_GROSS_MARGIN_RATE = 1 - MAX_RAIL_OVERHEAD;
+export const X402_RECOMMENDED_PRICE_FLOOR_USD = 0.01;
+
+type LegacyRailCostOptions = {
+  readonly facilitatorSettlementFeeUsd?: number;
+  readonly gasPerCallUsd?: number;
+  readonly cdpMeteringPerTxUsd?: number;
+  readonly aboveCdpFreeTier?: boolean;
+  readonly offRampFeeRate?: number;
+};
+
+type LegacyUnitEconomicsResult = {
+  readonly priceUsd: number;
+  readonly railCostUsd: number;
+  readonly offRampCostUsd: number;
+  readonly totalRailCostUsd: number;
+  readonly grossMarginRate: number;
+  readonly clearsMarginGate: boolean;
+};
+
 /**
  * Fixed per-call rail cost (independent of price): gas + settlement fee, plus CDP
  * metering once monthly volume clears the free tier. Off-ramp is percentage-based
@@ -47,6 +67,18 @@ export function perCallRailFeeUsd(monthlyVolume: number): number {
       ? CDP_METERED_FEE_PER_CALL_USD
       : 0;
   return BASE_GAS_PER_CALL_USD + CDP_SETTLEMENT_FEE_USD + metered;
+}
+
+export function estimateX402RailCostUsd(
+  options: LegacyRailCostOptions = {}
+): number {
+  const gasPerCallUsd = options.gasPerCallUsd ?? BASE_GAS_PER_CALL_USD;
+  const settlementFeeUsd =
+    options.facilitatorSettlementFeeUsd ?? CDP_SETTLEMENT_FEE_USD;
+  const cdpMeteringPerTxUsd =
+    options.cdpMeteringPerTxUsd ?? CDP_METERED_FEE_PER_CALL_USD;
+  const metered = options.aboveCdpFreeTier ?? true;
+  return gasPerCallUsd + settlementFeeUsd + (metered ? cdpMeteringPerTxUsd : 0);
 }
 
 /**
@@ -75,6 +107,40 @@ export function minViablePriceUsd(
   const budget = maxRailOverhead - offRampRate;
   if (budget <= 0) return Number.POSITIVE_INFINITY;
   return perCallRailFeeUsd(monthlyVolume) / budget;
+}
+
+export function minimumViableX402PriceUsd(
+  options: LegacyRailCostOptions = {}
+): number {
+  const offRampRate = options.offRampFeeRate ?? 0.0075;
+  const budget = MAX_RAIL_OVERHEAD - offRampRate;
+  if (budget <= 0) return Number.POSITIVE_INFINITY;
+  return estimateX402RailCostUsd(options) / budget;
+}
+
+export function evaluateX402UnitEconomics(
+  priceUsd: number,
+  options: LegacyRailCostOptions = {}
+): LegacyUnitEconomicsResult {
+  const railCostUsd = estimateX402RailCostUsd(options);
+  const offRampRate = options.offRampFeeRate ?? 0.0075;
+  const offRampCostUsd = Math.max(priceUsd, 0) * offRampRate;
+  const totalRailCostUsd = railCostUsd + offRampCostUsd;
+  const grossMarginRate =
+    priceUsd > 0 ? 1 - totalRailCostUsd / priceUsd : Number.NEGATIVE_INFINITY;
+  return {
+    priceUsd,
+    railCostUsd,
+    offRampCostUsd,
+    totalRailCostUsd,
+    grossMarginRate,
+    clearsMarginGate: grossMarginRate >= X402_MIN_GROSS_MARGIN_RATE,
+  };
+}
+
+export function recommendedFloorClearsMarginGate(): boolean {
+  return evaluateX402UnitEconomics(X402_RECOMMENDED_PRICE_FLOOR_USD)
+    .clearsMarginGate;
 }
 
 /** Does this price clear the rail-overhead gate at the given volume? */
