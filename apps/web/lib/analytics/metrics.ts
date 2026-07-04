@@ -8,7 +8,7 @@
  * dates) consume from this layer; no surface computes its own aggregates or
  * derived rates.
  *
- * Rules enforced by `tests/unit/analytics/metrics-layer-guard.test.ts`:
+ * Rules enforced by `tests/unit/analytics-metrics-layer-guard.test.ts`:
  * - Raw SQL aggregates over analytics event tables (`click_events`,
  *   `daily_profile_views`, `notification_subscriptions`) may not be added
  *   outside the baselined query files.
