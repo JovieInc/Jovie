@@ -274,6 +274,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     releaseDate: r.releaseDate,
     artworkUrl: r.artworkUrl,
     artistNames: r.artistNames,
+    previewUrl: r.primaryPreviewUrl ?? null,
   }));
 
   // Generate structured data for SEO (after tour dates resolve)

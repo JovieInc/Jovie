@@ -30,6 +30,7 @@ import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-p
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
+import { ProfilePacCard, type ProfilePacRelease } from './pac/ProfilePacCard';
 import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
 import type { PublicRelease } from './releases/types';
 import { usePacEvents } from './usePacEvents';
@@ -53,6 +54,7 @@ interface ProfileHomeRailProps {
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly releases?: readonly PublicRelease[];
+  readonly hasTip?: boolean;
 }
 
 function getUpcomingTourDates(
@@ -175,6 +177,7 @@ export function ProfileHomeRail({
   resolveNearbyTour = true,
   merchCards = [],
   releases = [],
+  hasTip = false,
 }: Readonly<ProfileHomeRailProps>) {
   // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
@@ -318,6 +321,36 @@ export function ProfileHomeRail({
 
   const isLowContentHome = carouselItems.length === 0;
 
+  // Primary Action Card subject: the visible latest release (preferred) or
+  // the newest catalog release. Preview URL comes from the lite releases
+  // payload; when absent the PAC degrades to a link-out (no inline play).
+  const pacRelease = useMemo<ProfilePacRelease | null>(() => {
+    if (releaseVisibility?.show && latestRelease) {
+      const catalogMatch = releases.find(
+        release => release.slug === latestRelease.slug
+      );
+      return {
+        title: latestRelease.title,
+        slug: latestRelease.slug,
+        artworkUrl: latestRelease.artworkUrl,
+        previewUrl: catalogMatch?.previewUrl ?? null,
+      };
+    }
+    const newest = releases.find(release => release.slug !== '');
+    if (!newest) return null;
+    return {
+      title: newest.title,
+      slug: newest.slug,
+      artworkUrl: newest.artworkUrl,
+      previewUrl: newest.previewUrl ?? null,
+    };
+  }, [latestRelease, releases, releaseVisibility?.show]);
+
+  const pacNextShow =
+    upcomingTourDates.find(show => show.id === nearbyTourDateId) ??
+    upcomingTourDates[0] ??
+    null;
+
   const alertsCard = isSubscribed ? null : (
     <HomeAlertsCard
       artist={artist}
@@ -341,6 +374,16 @@ export function ProfileHomeRail({
       className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
     >
+      <ProfilePacCard
+        artist={artist}
+        release={pacRelease}
+        merchCard={merchCards[0] ?? null}
+        nextShow={pacNextShow}
+        hasTip={hasTip}
+        assignment={profilePacAssignment}
+        isSubscribed={isSubscribed}
+        renderMode={renderMode}
+      />
       {alertsCard}
       <ReleaseCatalogCarousel
         items={carouselItems}
