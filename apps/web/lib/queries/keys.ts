@@ -349,6 +349,12 @@ export const queryKeys = {
       [...queryKeys.opportunityInbox.all, 'pending-cards'] as const,
   },
 
+  // Plan usage (header usage pill + limits popover)
+  usage: {
+    all: ['usage'] as const,
+    summary: () => [...queryKeys.usage.all, 'summary'] as const,
+  },
+
   // Audience infinite scroll
   audience: {
     all: ['audience'] as const,

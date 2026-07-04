@@ -247,6 +247,12 @@ export {
   chatUsageQueryOptions,
   useChatUsageQuery,
 } from './useChatUsageQuery';
+// Plan usage summary (header usage pill + limits popover)
+export {
+  type UsageSummaryData,
+  usageSummaryQueryOptions,
+  useUsageSummaryQuery,
+} from './useUsageSummaryQuery';
 // Confirm chat edit mutation
 export {
   type ConfirmChatEditInput,
