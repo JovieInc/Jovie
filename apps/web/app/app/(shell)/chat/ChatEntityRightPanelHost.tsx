@@ -1093,7 +1093,7 @@ export function ChatEntityRightPanelHost({
     // Only render the profile preview card when the preview panel is actually
     // open. A closed RightDrawer collapses to zero width *inside* the card, so
     // keeping this wrapper mounted registers a non-null right panel and leaves
-    // a ghost empty card + reserved rail width in the app shell (#12134).
+    // a ghost empty card + reserved rail width in the app shell (gh-12134).
     const liveProfilePreview =
       enablePreviewPanel && isPreviewPanelOpen ? (
         <ErrorBoundary fallback={null}>
