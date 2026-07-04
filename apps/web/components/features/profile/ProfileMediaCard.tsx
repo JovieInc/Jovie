@@ -278,7 +278,7 @@ function CardAction({
             fill={action.icon === 'Play' ? 'currentColor' : 'none'}
           />
         ) : null}
-        <span className='truncate'>{action.label}</span>
+        <span className='truncate'>{action.label || 'Open'}</span>
       </span>
       {action.showChevron ? (
         <ChevronRight

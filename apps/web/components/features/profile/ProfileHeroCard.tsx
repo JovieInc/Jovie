@@ -228,7 +228,7 @@ export function ArtistHero({
                       {primaryActionKind === 'tickets' ? (
                         <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
                       ) : null}
-                      {primaryAction.label}
+                      {primaryAction.label || 'Open'}
                     </>
                   );
                   const label = primaryAction.ariaLabel ?? primaryAction.label;
