@@ -11,6 +11,13 @@ export const X402_MIN_GROSS_MARGIN_RATE = 0.5;
 /** Recommended price floor for artist resources (USD). */
 export const X402_RECOMMENDED_PRICE_FLOOR_USD = 0.01;
 
+export const BASE_GAS_PER_CALL_USD = 0.0001;
+export const CDP_FREE_TIER_TX_PER_MONTH = 1_000;
+export const CDP_METERED_FEE_PER_CALL_USD = 0.001;
+export const OFFRAMP_RATE_WORST_CASE = 0.015;
+export const MAX_RAIL_OVERHEAD = 1 - X402_MIN_GROSS_MARGIN_RATE;
+export const TEMPLATE_PRICE_POINTS_USD = [0.01, 0.05, 0.1, 0.25] as const;
+
 export interface X402RailCostInputs {
   /** Facilitator settlement fee per transaction (USD). Base/CDP: $0 at time of spike. */
   readonly facilitatorSettlementFeeUsd: number;
@@ -37,8 +44,8 @@ export interface X402UnitEconomicsResult {
 
 const DEFAULT_RAIL_INPUTS: X402RailCostInputs = {
   facilitatorSettlementFeeUsd: 0,
-  gasPerCallUsd: 0.0001,
-  cdpMeteringPerTxUsd: 0.001,
+  gasPerCallUsd: BASE_GAS_PER_CALL_USD,
+  cdpMeteringPerTxUsd: CDP_METERED_FEE_PER_CALL_USD,
   aboveCdpFreeTier: true,
   offRampFeeRate: 0.0075,
 };
@@ -104,4 +111,48 @@ export function recommendedFloorClearsMarginGate(
 ): boolean {
   return evaluateX402UnitEconomics(X402_RECOMMENDED_PRICE_FLOOR_USD, inputs)
     .clearsMarginGate;
+}
+
+export function perCallRailFeeUsd(monthlyTransactions: number): number {
+  return estimateX402RailCostUsd({
+    ...DEFAULT_RAIL_INPUTS,
+    aboveCdpFreeTier: monthlyTransactions > CDP_FREE_TIER_TX_PER_MONTH,
+    offRampFeeRate: OFFRAMP_RATE_WORST_CASE,
+  });
+}
+
+export function railOverheadRatio(
+  priceUsd: number,
+  monthlyTransactions: number,
+  offRampRate: number = OFFRAMP_RATE_WORST_CASE
+): number {
+  if (priceUsd <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return offRampRate + perCallRailFeeUsd(monthlyTransactions) / priceUsd;
+}
+
+export function minViablePriceUsd(
+  monthlyTransactions: number,
+  offRampRate: number = OFFRAMP_RATE_WORST_CASE,
+  maxRailOverhead: number = MAX_RAIL_OVERHEAD
+): number {
+  const denominator = maxRailOverhead - offRampRate;
+  if (denominator <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return perCallRailFeeUsd(monthlyTransactions) / denominator;
+}
+
+export function clearsRailGate(
+  priceUsd: number,
+  monthlyTransactions: number,
+  offRampRate: number = OFFRAMP_RATE_WORST_CASE
+): boolean {
+  return (
+    railOverheadRatio(priceUsd, monthlyTransactions, offRampRate) <=
+    MAX_RAIL_OVERHEAD
+  );
 }
