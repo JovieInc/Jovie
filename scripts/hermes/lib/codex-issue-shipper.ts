@@ -544,13 +544,30 @@ export function buildGbrainCaptureText(issue: GithubIssue): string {
 
 export function buildGbrainQuery(issue: GithubIssue): string {
   return [
-    'Jovie implementation context for GitHub issue',
+    'Jovie implementation context, agent ownership, and existing work for GitHub issue',
     `#${issue.number}`,
     issue.title,
     labelNames(issue).join(' '),
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+export function gbrainContextBlocker(context: GbrainContext): string | null {
+  const failures = context.queryResult
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => /^gbrain (query|capture) failed:/i.test(line));
+  if (context.captureSlug.includes('(capture failed)')) {
+    failures.push(`gbrain capture failed for ${context.captureSlug}`);
+  }
+  if (failures.length === 0) return null;
+  return [
+    'system-blocker: gbrain coordination preflight failed, so no coding agent may start.',
+    '',
+    'Failure evidence:',
+    ...failures.map(failure => `- ${failure}`),
+  ].join('\n');
 }
 
 export function shellQuote(value: string): string {
@@ -599,7 +616,8 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
     '## Hard Requirements',
     '- Set `JOVIE_AGENT_PROFILE=coder` before editing files.',
     '- Read `AGENTS.md` and the scoped rules for any files you touch.',
-    '- Use gbrain before planning. Start with the gbrain context below, then run a targeted `gbrain query` if the first results are not enough.',
+    '- Use gbrain before planning: fetch `gbrain:agent-org-chart` when available, check `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted `gbrain query` for existing work/ownership if the context below is not enough.',
+    '- If another agent owns the area, delegate via the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`.',
     '- Use gstack workflows. For complex work run `/autoplan`; for bugs run `/investigate`; before shipping run exhaustive `/qa`; for PR creation use `/ship`.',
     '- Use subagents. At minimum dispatch testing and review subagents. Add security, performance, architecture, or design subagents when the risk profile calls for them.',
     '- Keep progress file-backed: do not rely on chat-only handoff. Put the current state, blockers, and verification evidence in the PR body or GitHub issue comment, and preserve generated prompt/log/state artifact paths when available.',
