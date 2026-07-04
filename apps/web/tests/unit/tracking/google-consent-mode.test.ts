@@ -141,4 +141,10 @@ describe('google-consent-mode', () => {
       "gtag('config', 'G-TMY7Z8HK47')"
     );
   });
+
+  it('builds a measurement-independent consent init script for the CSP-safe route', () => {
+    expect(buildGoogleConsentInitScript()).toContain(
+      "gtag('consent', 'default'"
+    );
+  });
 });
