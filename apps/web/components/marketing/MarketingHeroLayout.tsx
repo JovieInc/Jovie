@@ -7,12 +7,11 @@ export interface MarketingHeroLayoutProps {
 }
 
 /**
- * Hero section layout primitive.
- *
- * @deprecated Prefer the canonical content-driven `MarketingHero`
- * (`components/marketing/MarketingHero.tsx`) for landing-page heroes.
- * This layout shell remains for content-heavy page sections — blog,
+ * Hero section layout primitive for content-heavy page sections — blog,
  * changelog, support, compare — that are not marketing heroes.
+ *
+ * For landing-page heroes, prefer the canonical content-driven `MarketingHero`
+ * (`components/marketing/MarketingHero.tsx`).
  *
  * - `centered`: single column, text centered, constrained to page width
  * - `left`: single column, text left-aligned, constrained to page width
