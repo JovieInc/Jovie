@@ -17,8 +17,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 - **Profile pages no longer squash the hero image or stretch cards (GH-11899)**: The profile hero now keeps its intended crop with a 240px minimum height at every screen size, and profile cards render in fixed shapes with the action button always anchored at the bottom.
 - [internal] **Profile composition layer (GH-11899)**: New `apps/web/lib/profile/composition.ts` + `--aspect-hero` / `--aspect-card-standard` theme tokens codify the deterministic profile rules (hero 16/7 crop + 240px floor; card shapes compact 1:1 / standard 4:5 / wide 16:9; CTA footer outside the clipped text zone). `EntityCard` gains an opt-in `shape` prop consumed by the profile carousel; hero/skeleton/desktop-cover/media-card instances adopt the tokens; arbitrary-values ratchet lowered. Root-cause fix for GH-8290 (hero squish) and GH-8443 (card height).
+=======
+- **Release rows show stacked provider logos (GH-11493)**: Library table rows and shell release rows now render overlapping DSP avatars with a "+N more" chip and a hover popover listing every provider, replacing the bare provider-count number. The shell row's avatar stack also now reflects the release's full provider coverage instead of capping at four hardcoded majors.
+>>>>>>> origin/main
 - [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
 =======
 =======

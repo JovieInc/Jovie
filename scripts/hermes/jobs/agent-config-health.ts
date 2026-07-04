@@ -15,6 +15,7 @@ import { pathToFileURL } from 'node:url';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import { sendTelegram } from '../lib/telegram-client';
+import { formatTimBrief } from '../lib/tim-brief';
 
 const JOB = 'agent-config-health';
 const VERCEL_AI_GATEWAY_URL = 'https://ai-gateway.vercel.sh';
@@ -325,6 +326,27 @@ function formatFinding(finding: ConfigFinding): string {
   return `${finding.file}:${finding.path} ${finding.code}`;
 }
 
+/**
+ * Telegram-facing brief for Tim (GH #13123) — plain-English problem/action
+ * per finding, codes/paths pushed to a footnoted Refs line instead of
+ * inline jargon. `formatFinding` above stays technical for logs/stdout.
+ */
+export function buildAgentConfigHealthBrief(
+  errors: ReadonlyArray<ConfigFinding>
+): string {
+  return formatTimBrief(
+    errors.map(finding => ({
+      problem: finding.message,
+      action: `Reply "do this" and Hermes fixes the ${finding.file} config, or reply Skip if it's intentional.`,
+      defaultAction: 'Left as-is — the config stays unchanged until you reply.',
+      ref: `${finding.code} (${finding.path})`,
+    })),
+    {
+      title: `Hermes agent config: ${errors.length} issue${errors.length === 1 ? '' : 's'} ${errors.length === 1 ? 'needs' : 'need'} a look`,
+    }
+  );
+}
+
 export async function runAgentConfigHealth(options?: {
   readonly hermesConfigPath?: string;
   readonly openClawConfigPath?: string;
@@ -355,13 +377,7 @@ export async function runAgentConfigHealth(options?: {
   });
 
   if (errors.length > 0 && options?.notify !== false) {
-    const details = errors
-      .slice(0, 8)
-      .map(finding => `- ${formatFinding(finding)}`)
-      .join('\n');
-    await sendTelegram(
-      `Hermes/OpenClaw agent config health failed (${errors.length} error${errors.length === 1 ? '' : 's'}).\n${details}\nRun: tsx scripts/hermes/jobs/agent-config-health.ts`
-    );
+    await sendTelegram(buildAgentConfigHealthBrief(errors));
   }
 
   return {
