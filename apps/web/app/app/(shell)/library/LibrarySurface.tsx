@@ -87,6 +87,10 @@ import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
+import {
+  type DspAvatarItem,
+  DspAvatarStack,
+} from '@/components/shell/DspAvatarStack';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { APP_ROUTES } from '@/constants/routes';
@@ -94,6 +98,7 @@ import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import {
   formatLibraryApprovalStatus,
@@ -514,16 +519,53 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
   );
 });
 
+/**
+ * Neutral fallback avatar color for provider keys missing from
+ * `PROVIDER_CONFIG`. Points at a System B text token — no raw hex here.
+ */
+const LIBRARY_DSP_FALLBACK_COLOR = 'var(--linear-text-quaternary)';
+
+/**
+ * Map a library asset's provider links -> `DspAvatarItem[]` for the stacked
+ * provider-logo affordance. Every link present on the asset renders `live`;
+ * brand color + label come from the canonical `PROVIDER_CONFIG`.
+ */
+function libraryProvidersToDspItems(
+  providers: LibraryReleaseAsset['providers']
+): DspAvatarItem[] {
+  return providers.map(provider => {
+    const config = PROVIDER_CONFIG[provider.key];
+    const label = config?.label ?? provider.label;
+    return {
+      id: provider.key,
+      label,
+      glyph: label.charAt(0).toUpperCase(),
+      color: config?.accent ?? LIBRARY_DSP_FALLBACK_COLOR,
+      status: 'live' as const,
+    };
+  });
+}
+
 const ProvidersCell = memo(function ProvidersCell({
   asset,
 }: {
   readonly asset: LibraryReleaseAsset;
 }) {
-  return (
-    <span className='system-b-library-count-pill inline-flex h-6 min-w-7 items-center justify-center border border-subtle px-2 tabular-nums text-secondary-token'>
-      {formatCompactCount(asset.providerCount)}
-    </span>
-  );
+  const items = libraryProvidersToDspItems(asset.providers);
+
+  if (items.length === 0) {
+    return (
+      <span
+        role='img'
+        aria-label='No providers'
+        className='system-b-library-meta-text text-quaternary-token'
+      >
+        &mdash;
+      </span>
+    );
+  }
+
+  return <DspAvatarStack dsps={items} maxVisible={3} />;
 });
 
 const CatalogArtworkCell = memo(function CatalogArtworkCell({
@@ -639,8 +681,8 @@ const LIBRARY_TABLE_COLUMNS = [
     id: 'providers',
     header: 'Providers',
     cell: ({ row }) => <ProvidersCell asset={row.original} />,
-    size: 86,
-    minSize: 72,
+    size: 120,
+    minSize: 96,
     meta: { className: 'hidden md:table-cell px-2' },
   }),
   libraryColumnHelper.display({

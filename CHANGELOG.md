@@ -15,8 +15,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+- **Release rows show stacked provider logos (GH-11493)**: Library table rows and shell release rows now render overlapping DSP avatars with a "+N more" chip and a hover popover listing every provider, replacing the bare provider-count number. The shell row's avatar stack also now reflects the release's full provider coverage instead of capping at four hardcoded majors.
+- [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
+=======
+=======
 - [internal] **iOS write-configuration resilience (GH-11003)**: Rewrote `apps/ios/scripts/write-configuration.sh` to use `/usr/bin/plutil` (always present on macOS) instead of `python3`, preventing failures when a broken Homebrew interpreter (e.g. pyexpat/libexpat symbol mismatch with python@3.14) is first on PATH. Adds a `TARGET_PLIST` env override for testability and four regression tests (`write-configuration.test.mjs`) run in `ios-ci.yml`.
+>>>>>>> origin/main
 - **Smoother icon transitions (GH-11472)**: Copy buttons and the mobile menu now morph between states with a soft, interruptible animation instead of snapping. Adds shared animation primitives (`lib/animation/motion-primitives.ts` + `AnimatedIconSwap`) for icon swaps, staggered entrances, and layered depth shadows.
+>>>>>>> origin/main
 - [internal] **Tool discovery skill (GH-13124)**: New `.claude/skills/tool-discovery/SKILL.md` — when a link/tool is shared without context, the agent searches GitHub (`gh search repos`) and the web for docs/pricing/reviews and returns a structured evaluation instead of asking for manual research or a gated unlock action.
 - [internal] **Ovie HUD auto-reload (GH-12988)**: Electron now polls `/api/health/build-info` every 60 seconds and reloads `/hud` windows when the deployed commit/build fingerprint changes, with no-store build-info responses so running operator shells pick up new HUD deploys without a manual restart.
 - [internal] **Mobile bottom nav derives from canonical config (GH-12644)**: `mobilePrimaryNavigation` no longer defines its own `mobileHome` item; it references the shared `newThreadNavItem` used by desktop nav directly, so mobile can no longer drift from desktop. Adds a regression test asserting every mobile nav item traces back to a canonical desktop nav item.
