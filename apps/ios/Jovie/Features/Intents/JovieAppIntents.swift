@@ -37,6 +37,18 @@ struct SendMessageIntent: AppIntent {
   }
 }
 
+struct StartVoiceCaptureIntent: AppIntent {
+  static let title: LocalizedStringResource = "Talk to Jovie"
+  static let description = IntentDescription("Opens Jovie and starts listening.")
+  static let openAppWhenRun = true
+
+  @MainActor
+  func perform() async throws -> some IntentResult {
+    IntentNavigationStore.shared.submit(.startVoiceCapture)
+    return .result()
+  }
+}
+
 struct ContinueLastConversationIntent: AppIntent {
   static let title: LocalizedStringResource = "Continue Jovie Chat"
   static let description = IntentDescription(
@@ -70,6 +82,15 @@ struct JovieAppShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Ask Jovie",
       systemImageName: "sparkles"
+    )
+    AppShortcut(
+      intent: StartVoiceCaptureIntent(),
+      phrases: [
+        "Talk to \(.applicationName)",
+        "Start talking to \(.applicationName)",
+      ],
+      shortTitle: "Talk",
+      systemImageName: "mic.fill"
     )
     AppShortcut(
       intent: ContinueLastConversationIntent(),

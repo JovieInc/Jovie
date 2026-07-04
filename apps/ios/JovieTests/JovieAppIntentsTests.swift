@@ -34,4 +34,16 @@ struct JovieAppIntentsTests {
       IntentNavigationStore.shared.consume() == .continueLastConversation
     )
   }
+
+  @Test func startVoiceCaptureIntentRequestsVoice() async throws {
+    IntentNavigationStore.shared.consume()
+
+    _ = try await StartVoiceCaptureIntent().perform()
+
+    #expect(IntentNavigationStore.shared.consume() == .startVoiceCapture)
+  }
+
+  @Test func shortcutsExposeVoiceCapture() {
+    #expect(JovieAppShortcuts.appShortcuts.count == 4)
+  }
 }

@@ -245,17 +245,17 @@ private struct AppContentView: View {
             chatRepository?.startNewConversation()
           },
           onAutoSendMessage: handleAutoSendMessage,
-          onTalk: {},
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
         } audienceContent: { _ in
           EmptyView()
-        } chatContent: { draft in
+        } chatContent: { draft, voiceCaptureTrigger in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
               draft: draft,
+              voiceCaptureTrigger: voiceCaptureTrigger,
               webBaseURL: appState.configuration.webBaseURL
             )
           } else {
@@ -283,7 +283,6 @@ private struct AppContentView: View {
             chatRepository?.startNewConversation()
           },
           onAutoSendMessage: handleAutoSendMessage,
-          onTalk: {},
           onLogout: onLogout
         ) {
           DashboardView(
@@ -305,11 +304,12 @@ private struct AppContentView: View {
             onRetry: { await reloadAudienceHighlights(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
-        } chatContent: { draft in
+        } chatContent: { draft, voiceCaptureTrigger in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
               draft: draft,
+              voiceCaptureTrigger: voiceCaptureTrigger,
               webBaseURL: appState.configuration.webBaseURL
             )
           } else {
@@ -468,6 +468,7 @@ private struct ChatComposerPreview: View {
   @Binding var draft: String
   let isOffline: Bool
   @FocusState private var isComposerFocused: Bool
+  @State private var voiceCaptureService = VoiceCaptureService()
 
   var body: some View {
     ChatComposerBar(
@@ -476,6 +477,10 @@ private struct ChatComposerPreview: View {
       placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
       isSending: false,
       isPlusEnabled: true,
+      voiceCaptureService: voiceCaptureService,
+      onVoiceStart: {},
+      onVoiceFinish: {},
+      onVoiceCancel: {},
       onSend: { draft = "" },
       onSelectWorkflow: { action in
         draft = action.prompt

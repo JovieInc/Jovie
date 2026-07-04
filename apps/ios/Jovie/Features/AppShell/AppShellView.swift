@@ -88,11 +88,10 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   let onSelectConversation: (String) -> Void
   let onStartNewChat: () -> Void
   let onAutoSendMessage: (String) -> Void
-  let onTalk: () -> Void
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
   @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
-  let chatContent: (Binding<String>) -> ChatContent
+  let chatContent: (Binding<String>, Binding<Int>) -> ChatContent
 
   @State private var selectedTab: AppShellTab
   @State private var navigationPath: [AppShellRoute] = []
@@ -101,6 +100,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   @State private var isKeyboardVisible = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
+  @State private var voiceCaptureTrigger = 0
   @State private var intentStore = IntentNavigationStore.shared
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -117,11 +117,10 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onStartNewChat: @escaping () -> Void = {},
     onAutoSendMessage: @escaping (String) -> Void = { _ in },
-    onTalk: @escaping () -> Void = {},
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
     @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
-    @ViewBuilder chatContent: @escaping (Binding<String>) -> ChatContent
+    @ViewBuilder chatContent: @escaping (Binding<String>, Binding<Int>) -> ChatContent
   ) {
     self.profile = profile
     self.isOffline = isOffline
@@ -134,7 +133,6 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     self.onSelectConversation = onSelectConversation
     self.onStartNewChat = onStartNewChat
     self.onAutoSendMessage = onAutoSendMessage
-    self.onTalk = onTalk
     self.onLogout = onLogout
     self.profileContent = profileContent()
     self.audienceContent = audienceContent
@@ -195,17 +193,6 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
       }
     }
     .background(JovieColor.backgroundBase)
-    // Talk FAB is a fixed shell-level overlay (JOV-3670) — not part of the
-    // elevated content transform, so it stays anchored at a constant offset
-    // regardless of drawer state. Hidden while the drawer is elevated so it
-    // doesn't float interactively on top of the recessed drawer plane.
-    .overlay(alignment: .bottomTrailing) {
-      if chatEnabled, !(isShowingDrawer || drawerDragOffset != 0) {
-        talkFAB
-          .padding(.trailing, JovieSpacing.large)
-          .padding(.bottom, JovieSpacing.large)
-      }
-    }
     .task(id: opensSettingsOnLaunch) {
       guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
       didOpenLaunchSettings = true
@@ -307,6 +294,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
       selectedTab: selectedTab,
       chatDraft: chatDraft,
       autoSendMessage: nil,
+      shouldStartVoiceCapture: false,
       openConversationID: nil,
       pendingRequest: intentStore.consume()
     )
@@ -325,6 +313,10 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
 
     if let conversationID = state.openConversationID {
       onSelectConversation(conversationID)
+    }
+
+    if state.shouldStartVoiceCapture {
+      voiceCaptureTrigger += 1
     }
 
     if state.selectedTab != previousTab {
@@ -422,7 +414,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     switch selectedTab {
     case .chat:
       if chatEnabled {
-        chatContent($chatDraft)
+        chatContent($chatDraft, $voiceCaptureTrigger)
       } else {
         profileContent
       }
@@ -558,22 +550,5 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     .padding(.horizontal, JovieSpacing.large)
     .padding(.vertical, JovieSpacing.small)
     .background(JovieColor.backgroundBase.opacity(0.96))
-  }
-
-  // Global Talk FAB — voice entry point (wired to voice feature in JOV-10378/2928).
-  // Anchored as a fixed shell-level overlay (see AppShellView.body) rather
-  // than living inside a bottom nav bar — the drawer is now the sole surface
-  // switcher (JOV-3670), so there is no shell nav chrome for the FAB to ride.
-  private var talkFAB: some View {
-    Button(action: onTalk) {
-      Image(systemName: "mic.fill")
-        .font(.system(size: 20, weight: .semibold))
-        .foregroundStyle(JovieColor.backgroundBase)
-        .frame(width: 52, height: 52)
-        .background(Color.white, in: Circle())
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel("Talk to Jovie")
-    .accessibilityIdentifier("shell-talk-fab")
   }
 }

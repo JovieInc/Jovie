@@ -4,6 +4,7 @@ struct AppShellIntentNavigationState: Equatable {
   var selectedTab: AppShellTab
   var chatDraft: String
   var autoSendMessage: String?
+  var shouldStartVoiceCapture = false
   var openConversationID: String?
   var pendingRequest: IntentNavigationRequest?
 }
@@ -22,6 +23,9 @@ enum AppShellIntentNavigation {
     switch request {
     case .openChat, .continueLastConversation:
       state.selectedTab = .chat
+    case .startVoiceCapture:
+      state.selectedTab = .chat
+      state.shouldStartVoiceCapture = true
     case let .sendMessage(text, autoSend):
       state.selectedTab = .chat
       if autoSend {

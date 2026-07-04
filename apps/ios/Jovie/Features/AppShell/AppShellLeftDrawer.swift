@@ -163,6 +163,7 @@ private struct DrawerSurfaceSwitcher: View {
           )
         }
       }
+      .frame(height: 62)
     }
   }
 }
@@ -188,9 +189,9 @@ private struct DrawerSurfaceButton: View {
       .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
       .padding(.horizontal, JovieSpacing.small)
       .padding(.vertical, 11)
-      .frame(maxWidth: .infinity)
+      .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
       .background(
-        isSelected ? JovieColor.surface1 : Color.clear,
+        isSelected ? JovieColor.surface1 : JovieColor.surface1.opacity(0.001),
         in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
       )
       .overlay {
@@ -199,6 +200,7 @@ private struct DrawerSurfaceButton: View {
       }
     }
     .buttonStyle(.plain)
+    .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
     .accessibilityLabel(tab.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     .accessibilityIdentifier("shell-drawer-surface-\(tab.accessibilityID)")
