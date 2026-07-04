@@ -170,6 +170,7 @@
     "ci:harness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__",
     "doc:freshness:check": "node scripts/doc-freshness-lint.mjs",
     "doc:freshness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs",
+    "hermes:gbrain-health": "tsx scripts/hermes/jobs/gbrain-health-summary.ts",
     "doc:gardening:run": "node scripts/doc-gardening-agent.mjs",
     "qa:swarm:list": "node scripts/qa-swarm/cli.mjs list",
     "qa:swarm:propose": "node scripts/qa-swarm/cli.mjs propose",

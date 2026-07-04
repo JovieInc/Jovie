@@ -131,6 +131,11 @@ tail -50 ~/.hermes/logs/codex-issue-shipper/*.log 2>/dev/null  # after a non-dry
 tsx scripts/hermes/jobs/agent-config-health.ts
 tail -50 ~/.hermes/logs/launchd/cron-agent-config-health.err.log
 
+# Latest gbrain health summary written by Hermes
+gbrain search "ops/gbrain-health/latest" --limit 3
+tail -50 ~/.hermes/logs/launchd/cron-gbrain-health-summary.log \
+  ~/.hermes/logs/launchd/cron-gbrain-health-summary.err.log
+
 # Free-model rankings
 cat ~/.hermes/state/model-router-rankings.json | jq .
 ```
