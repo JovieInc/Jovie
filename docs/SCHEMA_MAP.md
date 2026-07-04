@@ -56,6 +56,7 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 | `insights.ts` | `aiInsights`, `insightGenerationRuns` | `aiInsights.creatorProfileId` → `creatorProfiles` |
 | `ai-crawler-analytics.ts` | `aiCrawlerAnalyticsSnapshots` | `creatorProfileId` → `creatorProfiles`; 30-day Cloudflare AI-crawl aggregates per profile |
 | `tip-audience.ts` | `tipAudience` | Tracks fan engagement from tips |
+| `revenue-cohorts.ts` | `artistRevenueCohorts` | `userId` → `users` cascade; `creatorProfileId` → `creatorProfiles` set null; IRPAA cohort tag (`jovie_active`/`control`) + immutable 30-day pre-Jovie revenue baseline (gh-12141) |
 
 ### Communication & Email
 
