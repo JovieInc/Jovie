@@ -116,4 +116,24 @@ describe('EntityCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add To Calendar' }));
     expect(onCalendar).toHaveBeenCalledTimes(1);
   });
+
+  it('renders fallback text when cta.label is empty', () => {
+    const onAction = vi.fn();
+    const emptyLabel: EntityCardModel = {
+      id: 'e1',
+      kind: 'show',
+      title: 'Show',
+      imageAlt: 'Venue',
+      interactive: true,
+      cta: {
+        label: '',
+        onClick: onAction,
+      },
+    };
+
+    render(<EntityCard model={emptyLabel} treatment='compact' />);
+    const button = screen.getByRole('button');
+    expect(button).not.toHaveTextContent('');
+    expect(button).toHaveTextContent('Action');
+  });
 });
