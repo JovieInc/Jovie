@@ -1,4 +1,8 @@
 import { sql as drizzleSql } from 'drizzle-orm';
+import {
+  RECENT_ACTIVITY_RANGE,
+  resolveRangeStartOrEpoch,
+} from '@/lib/analytics/time-range';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
@@ -33,32 +37,6 @@ const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
   return value;
 };
 
-function toStartDate(range: AnalyticsRange): Date {
-  const now = new Date();
-  let startDate = new Date();
-
-  switch (range) {
-    case '1d':
-      startDate.setDate(now.getDate() - 1);
-      break;
-    case '7d':
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case '30d':
-      startDate.setDate(now.getDate() - 30);
-      break;
-    case '90d':
-      startDate.setDate(now.getDate() - 90);
-      break;
-    case 'all':
-      startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      break;
-  }
-
-  return startDate;
-}
-
 export async function getUserDashboardAnalytics(
   clerkUserId: string,
   range: AnalyticsRange,
@@ -78,9 +56,10 @@ export async function getUserDashboardAnalytics(
   const creatorProfile = { id: profile!.id };
 
   {
-    const startDate = toStartDate(range);
-    const recentThreshold = new Date();
-    recentThreshold.setDate(recentThreshold.getDate() - 7);
+    // Canonical window semantics: rolling N × 24h windows ending at query
+    // time, resolved by @/lib/analytics/time-range so every surface agrees.
+    const startDate = resolveRangeStartOrEpoch(range);
+    const recentThreshold = resolveRangeStartOrEpoch(RECENT_ACTIVITY_RANGE);
     const hasDailyProfileViews = await doesTableExist(
       TABLE_NAMES.dailyProfileViews
     );

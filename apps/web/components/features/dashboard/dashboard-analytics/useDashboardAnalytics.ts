@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { getTimeRangeLabel } from '@/lib/analytics/time-range';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { Range } from './types';
@@ -38,11 +39,10 @@ export function useDashboardAnalyticsState(): UseDashboardAnalyticsReturn {
     view: 'full',
   });
 
-  const rangeLabel = useMemo(() => {
-    if (range === '1d') return 'Last 24 hours';
-    if (range === '7d') return 'Last 7 days';
-    return 'Last 30 days';
-  }, [range]);
+  const rangeLabel = useMemo(
+    () => getTimeRangeLabel(range, 'description'),
+    [range]
+  );
 
   // Wrap refetch to match old API
   const refresh = async () => {

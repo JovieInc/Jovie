@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { AnimatedIconSwap } from '@/components/atoms/AnimatedIconSwap';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
@@ -181,27 +182,13 @@ export function MobileNav({
         aria-expanded={isOpen}
         aria-controls='mobile-nav-panel'
       >
-        <div className='relative size-5'>
-          {/* Hamburger → X morphing */}
-          <Menu
-            size={20}
-            className={cn(
-              'absolute inset-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
-              isOpen
-                ? 'opacity-0 rotate-90 scale-75'
-                : 'opacity-100 rotate-0 scale-100'
-            )}
-          />
-          <X
-            size={20}
-            className={cn(
-              'absolute inset-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
-              isOpen
-                ? 'opacity-100 rotate-0 scale-100'
-                : 'opacity-0 -rotate-90 scale-75'
-            )}
-          />
-        </div>
+        {/* Hamburger → X morphing via the shared icon-swap primitive */}
+        <AnimatedIconSwap
+          activeKey={isOpen ? 'close' : 'open'}
+          className='size-5'
+        >
+          {isOpen ? <X size={20} /> : <Menu size={20} />}
+        </AnimatedIconSwap>
       </button>
 
       {/* Portal: render overlay + nav panel outside header to avoid

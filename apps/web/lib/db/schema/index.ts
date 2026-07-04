@@ -432,8 +432,10 @@ export {
 // Feedback
 export {
   type FeedbackItem,
+  type FeedbackVote,
   feedbackItems,
   feedbackStatusEnumValues,
+  feedbackVoteEnumValues,
   insertFeedbackItemSchema,
   type NewFeedbackItem,
   selectFeedbackItemSchema,
