@@ -24,6 +24,8 @@ export interface DailyBucket {
   merged: number;
   opened: number;
   closed: number; // closed without merge
+  /** Median hours from PR creation to merge for PRs merged that day (null when no merges). */
+  mergeP50Hours?: number | null;
 }
 
 export interface ShippingVelocityResponse {
@@ -67,7 +69,13 @@ function buildEmptyBuckets(days: number): Map<string, DailyBucket> {
     const date = new Date(now);
     date.setUTCDate(date.getUTCDate() - i);
     const dateStr = date.toISOString().slice(0, 10);
-    buckets.set(dateStr, { date: dateStr, merged: 0, opened: 0, closed: 0 });
+    buckets.set(dateStr, {
+      date: dateStr,
+      merged: 0,
+      opened: 0,
+      closed: 0,
+      mergeP50Hours: null,
+    });
   }
 
   return buckets;
@@ -151,8 +159,21 @@ async function fetchPullRequestsFromGitHub(
   return nodes;
 }
 
+function medianHours(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    const low = sorted[mid - 1];
+    const high = sorted[mid];
+    if (low !== undefined && high !== undefined) return (low + high) / 2;
+  }
+  return sorted[mid] ?? null;
+}
+
 function computeBuckets(nodes: GitHubPrNode[], days: number): DailyBucket[] {
   const buckets = buildEmptyBuckets(days);
+  const mergeHoursByDate = new Map<string, number[]>();
 
   for (const node of nodes) {
     // Count by createdAt date (opened)
@@ -168,6 +189,15 @@ function computeBuckets(nodes: GitHubPrNode[], days: number): DailyBucket[] {
       const mergedBucket = buckets.get(mergedDate);
       if (mergedBucket) {
         mergedBucket.merged += 1;
+        const hoursToMerge =
+          (new Date(node.mergedAt).getTime() -
+            new Date(node.createdAt).getTime()) /
+          3_600_000;
+        if (Number.isFinite(hoursToMerge) && hoursToMerge >= 0) {
+          const hours = mergeHoursByDate.get(mergedDate) ?? [];
+          hours.push(hoursToMerge);
+          mergeHoursByDate.set(mergedDate, hours);
+        }
       }
     }
 
@@ -178,6 +208,13 @@ function computeBuckets(nodes: GitHubPrNode[], days: number): DailyBucket[] {
       if (closedBucket) {
         closedBucket.closed += 1;
       }
+    }
+  }
+
+  for (const [date, hours] of mergeHoursByDate) {
+    const bucket = buckets.get(date);
+    if (bucket) {
+      bucket.mergeP50Hours = medianHours(hours);
     }
   }
 
