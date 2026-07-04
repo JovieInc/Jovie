@@ -11,7 +11,6 @@ import {
   Input,
   Label,
 } from '@jovie/ui';
-import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -146,9 +145,9 @@ export function CreateProfileDialog({
             </Button>
             <Button
               type='submit'
+              loading={isPending}
               disabled={isPending || !displayName.trim() || !username.trim()}
             >
-              {isPending && <Loader2 className='size-3.5 animate-spin' />}
               Create Profile
             </Button>
           </DialogFooter>

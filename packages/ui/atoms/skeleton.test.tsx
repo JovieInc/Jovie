@@ -28,7 +28,7 @@ describe('Skeleton', () => {
       const skeleton = screen.getByTestId('skeleton');
       expect(skeleton).toHaveAttribute('data-state', 'static');
       expect(skeleton.className.split(/\s+/)).not.toContain('skeleton');
-      expect(skeleton.className).toContain('bg-(--color-skeleton-base)');
+      expect(skeleton.className).toContain('bg-surface-1');
     });
 
     it('is hidden from screen readers', () => {
