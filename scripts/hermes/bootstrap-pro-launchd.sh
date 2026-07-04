@@ -21,8 +21,13 @@ done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HERMES_HOME="${HOME}/.hermes"
+HERMES_SCRIPTS="${HERMES_HOME}/scripts"
 LAUNCH_AGENTS="${HOME}/Library/LaunchAgents"
 PRO_TEMPLATE_DIR="${REPO_ROOT}/scripts/hermes/launchd/pro"
+LAUNCHD_TEMPLATE_DIR="${REPO_ROOT}/scripts/hermes/launchd"
+SHIPPER_ENTRYPOINT_SRC="${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py"
+SHIPPER_ENTRYPOINT_DST="${HERMES_SCRIPTS}/shipper-gated-entrypoint.py"
+CODEX_SHIPPER_PLIST_TEMPLATE="${LAUNCHD_TEMPLATE_DIR}/co.jovie.hermes.cron-codex-issue-shipper.plist.template"
 
 log() { printf "\033[1;34m▶\033[0m %s\n" "$*"; }
 ok() { printf "\033[1;32m✓\033[0m %s\n" "$*"; }
@@ -77,8 +82,13 @@ require_cmd node
 require_cmd python3
 require_cmd launchctl
 chmod +x "${REPO_ROOT}/scripts/hermes/ship-loop.sh"
+[[ -f "$SHIPPER_ENTRYPOINT_SRC" ]] || die "Missing shipper entrypoint: $SHIPPER_ENTRYPOINT_SRC"
+[[ -f "$CODEX_SHIPPER_PLIST_TEMPLATE" ]] || die "Missing codex shipper plist: $CODEX_SHIPPER_PLIST_TEMPLATE"
 
-mkdir -p "$HERMES_HOME/logs/launchd" "$LAUNCH_AGENTS"
+mkdir -p "$HERMES_HOME/logs/launchd" "$HERMES_SCRIPTS" "$LAUNCH_AGENTS"
+cp "$SHIPPER_ENTRYPOINT_SRC" "$SHIPPER_ENTRYPOINT_DST"
+chmod +x "$SHIPPER_ENTRYPOINT_DST"
+ok "installed shipper-gated-entrypoint.py"
 
 log "Rendering Houston launchd plists (mode=$MODE)"
 while IFS= read -r label; do
@@ -89,9 +99,13 @@ while IFS= read -r label; do
   ok "rendered $label"
 done < <(pro_labels)
 
+render_plist "$CODEX_SHIPPER_PLIST_TEMPLATE" "${LAUNCH_AGENTS}/co.jovie.hermes.cron-codex-issue-shipper.plist"
+ok "rendered co.jovie.hermes.cron-codex-issue-shipper"
+
 if [[ "$MODE" == "reconfigure" ]]; then
   log "Reconfigure complete. Restart with:"
   echo "  launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-kanban-ship"
+  echo "  launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-issue-shipper"
   exit 0
 fi
 
@@ -104,6 +118,14 @@ while IFS= read -r label; do
   ok "bootstrapped $label"
 done < <(pro_labels)
 
+for label in co.jovie.hermes.cron-codex-issue-shipper; do
+  plist="${LAUNCH_AGENTS}/${label}.plist"
+  launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$plist"
+  ok "bootstrapped $label"
+done
+
 ok "Houston launchd bootstrap complete."
 log "Force a run: launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-kanban-ship"
-log "Tail logs: tail -f ~/.hermes/logs/launchd/cron-codex-kanban-ship.log ~/.hermes/logs/ship-loop.log"
+log "Force shipper: launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-issue-shipper"
+log "Tail logs: tail -f ~/.hermes/logs/launchd/cron-codex-kanban-ship.log ~/.hermes/logs/ship-loop.log ~/.hermes/logs/launchd/cron-codex-issue-shipper.log"

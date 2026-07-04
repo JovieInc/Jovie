@@ -1,14 +1,23 @@
 /**
- * Outbound ops notifications for Hermes cron jobs (Telegram + optional Slack).
+ * Best-effort ops alerts for Hermes shipping jobs (Telegram + optional Slack).
  */
 
 import { sendTelegram } from './telegram-client';
 
+export async function sendOpsAlert(text: string): Promise<{
+  readonly telegram: boolean;
+  readonly slack: boolean;
+}> {
+  const telegram = await sendTelegram(text);
+  const slack = await sendSlackWebhook(text);
+  return { telegram, slack };
+}
+
 async function sendSlackWebhook(text: string): Promise<boolean> {
-  const url = process.env.SLACK_WEBHOOK_URL?.trim();
-  if (!url) return false;
+  const webhook = process.env.SLACK_WEBHOOK_URL?.trim();
+  if (!webhook) return false;
   try {
-    const response = await fetch(url, {
+    const response = await fetch(webhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text.slice(0, 4000) }),
@@ -18,9 +27,4 @@ async function sendSlackWebhook(text: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** Best-effort fan-out for operator-visible shipper/control-plane alerts. */
-export async function notifyOps(text: string): Promise<void> {
-  await Promise.all([sendTelegram(text), sendSlackWebhook(text)]);
 }

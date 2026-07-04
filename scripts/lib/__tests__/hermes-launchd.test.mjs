@@ -86,9 +86,23 @@ describe('shipper-gated entrypoint', () => {
       join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
       'utf8'
     );
+    expect(script).toContain('pause_active');
     expect(script).toContain('gbrain_alive');
-    expect(script).toContain('grok_ready');
+    expect(script).toContain('grok_alive');
+    expect(script).toContain('checkout_gate');
     expect(script).toContain('codex-issue-shipper.ts');
+  });
+
+  it('documents pause, gbrain, grok, and checkout fail-closed gates', () => {
+    const script = readFileSync(
+      join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
+      'utf8'
+    );
+    expect(script).toContain('stale_checkout_abort');
+    expect(script).toContain('gbrain_gate_abort');
+    expect(script).toContain('grok_gate_abort');
+    expect(script).toContain('shipping-paused');
+    expect(script).toContain('SHIPPER_CRITICAL_PATHS');
   });
 
   it('codex issue shipper launchd plist uses the gated entrypoint', () => {
