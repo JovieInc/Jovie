@@ -7,4 +7,6 @@ export interface PublicRelease {
   readonly revealDate?: string | null;
   readonly artworkUrl: string | null;
   readonly artistNames: readonly string[];
+  /** Primary track audio preview, when one exists (feeds PAC inline play). */
+  readonly previewUrl?: string | null;
 }

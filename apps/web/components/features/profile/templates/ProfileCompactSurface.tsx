@@ -756,6 +756,7 @@ export function ProfileCompactSurface({
                 resolveNearbyTour={resolveNearbyTour}
                 merchCards={merchCards}
                 releases={releases}
+                hasTip={hasTip}
               />
             ) : (
               <ProfilePrimaryTabPanel
