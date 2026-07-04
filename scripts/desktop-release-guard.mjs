@@ -3,9 +3,9 @@
 /**
  * Prevent desktop code from landing without release handling.
  *
- * The desktop release workflow only publishes a DMG when VERSION or the
- * workflow itself changes. If apps/desktop changes land without either, users
- * on the shipped app never receive the fix.
+ * Desktop changes need an explicit release handoff. Feature branches should
+ * add an Unreleased changelog note; the main/release path stamps VERSION and
+ * publishes the next DMG.
  */
 
 import { execFileSync } from 'node:child_process';
