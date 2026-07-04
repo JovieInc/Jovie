@@ -63,6 +63,7 @@ Key routing rules:
 - Architecture review → invoke `plan-eng-review`
 - Clerk user management, instance inspection, auth debugging → invoke `clerk-cli`
 - Continuous QA swarm recipes (diff review, explore, vision, jury, test-gen, flakes) → invoke matching `/qa-swarm-*` command; load `qa-swarm` skill
+- A shared link/tool/product with no context expecting an opinion or evaluation → invoke `tool-discovery` instead of asking the human to research it first
 
 ## gbrain (long-term memory layer)
 
