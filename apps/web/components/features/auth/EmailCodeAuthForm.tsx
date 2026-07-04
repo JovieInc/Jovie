@@ -1,15 +1,11 @@
 'use client';
 
 import { useSignIn, useSignUp } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { useCallback, useState } from 'react';
-import {
-  AuthButton,
-  AuthInput,
-  FormError,
-  OtpInput,
-} from '@/features/auth/atoms';
+import { AuthInput, FormError, OtpInput } from '@/features/auth/atoms';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
@@ -17,6 +13,7 @@ import {
   isSessionExists,
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
+import { AUTH_CLASSES } from '@/lib/auth/constants';
 import type { AuthShellMode } from './AuthShell';
 
 /**
@@ -274,9 +271,14 @@ export function EmailCodeAuthForm({
           errorId='auth-email-code-error'
         />
         <FormError id='auth-email-code-error' message={errorMessage} />
-        <AuthButton type='submit' disabled={isPending || code.length < 6}>
+        <Button
+          type='submit'
+          className={AUTH_CLASSES.authCta}
+          static
+          disabled={isPending || code.length < 6}
+        >
           {isPending ? 'Verifying…' : 'Verify Code'}
-        </AuthButton>
+        </Button>
         <button
           type='button'
           onClick={handleBackToEmail}
@@ -307,8 +309,10 @@ export function EmailCodeAuthForm({
         onChange={event => setEmailAddress(event.target.value)}
       />
       <FormError message={errorMessage} />
-      <AuthButton
+      <Button
         type='submit'
+        className={AUTH_CLASSES.authCta}
+        static
         disabled={isPending || !isReady || emailAddress.trim().length === 0}
       >
         {isPending
@@ -316,7 +320,7 @@ export function EmailCodeAuthForm({
           : isSignUp
             ? 'Continue with Email'
             : 'Email me a Code'}
-      </AuthButton>
+      </Button>
     </form>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
@@ -9,9 +10,8 @@ import {
 } from '@/app/onboarding/actions/update-profile';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { AuthButton } from '@/features/auth';
 import { track } from '@/lib/analytics';
-import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_CLASSES, AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
 import { cn } from '@/lib/utils';
@@ -466,8 +466,10 @@ export function OnboardingProfileReviewStep({
 
             {/* CTA */}
             <div className={FORM_LAYOUT.formInner}>
-              <AuthButton
+              <Button
                 onClick={handleContinue}
+                className={AUTH_CLASSES.authCta}
+                static
                 disabled={
                   isSaving ||
                   !minTimeElapsed ||
@@ -483,7 +485,7 @@ export function OnboardingProfileReviewStep({
                   Boolean(avatarUrl),
                   Boolean(editableDisplayName.trim())
                 )}
-              </AuthButton>
+              </Button>
             </div>
           </>
         )}
