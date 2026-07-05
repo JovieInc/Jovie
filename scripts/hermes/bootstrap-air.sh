@@ -47,6 +47,10 @@ OPTIONAL_SECRETS=(
   TELEGRAM_ALLOWED_CHATS
   TELEGRAM_FREE_RESPONSE_CHATS
   TELEGRAM_HOME_CHANNEL
+  # agentcookie session sync (GH#10930) — set once Tailscale peer-to-peer is live
+  AGENTCOOKIE_ENCRYPT_KEY
+  AGENTCOOKIE_AIR_IP
+  AGENTCOOKIE_PORT
 )
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
@@ -218,7 +222,20 @@ if [[ "$MODE" == "install" ]]; then
   fi
   ok "Ollama ready with qwen3:4b-q4_K_M"
 
-  # 8. tsx for running the cron job scripts
+  # 8. agentcookie (optional — session sync from Pro; GH#10930)
+  if command -v agentcookie >/dev/null 2>&1; then
+    ok "agentcookie already installed at $(command -v agentcookie)"
+    ln -sf "$(command -v agentcookie)" "${HERMES_HOME}/bin/agentcookie"
+    ok "linked agentcookie into ~/.hermes/bin/"
+  else
+    log "agentcookie not found. To enable session/credential sync from the Pro:"
+    log "  Install: https://github.com/mvanhorn/agentcookie"
+    log "  Then set AGENTCOOKIE_ENCRYPT_KEY and AGENTCOOKIE_AIR_IP in Doppler"
+    log "  and re-run: ./scripts/hermes/bootstrap-air.sh --reconfigure"
+    warn "Skipping agentcookie setup (not blocking — install manually when ready)"
+  fi
+
+  # 8b. tsx for running the cron job scripts
   if command -v tsx >/dev/null 2>&1; then
     TSX_BIN="$(command -v tsx)"
   elif [[ -x "${REPO_ROOT}/node_modules/.bin/tsx" ]]; then
@@ -407,6 +424,19 @@ fi
 
 if [[ -z "$(doppler_get HERMES_TELEGRAM_BOT_TOKEN)" ]]; then
   warn "HERMES_TELEGRAM_BOT_TOKEN missing from Doppler — Telegram gateway disabled"
+fi
+
+if command -v agentcookie >/dev/null 2>&1 || [[ -x "${HERMES_HOME}/bin/agentcookie" ]]; then
+  if [[ -n "$(doppler_get AGENTCOOKIE_ENCRYPT_KEY)" ]]; then
+    ok "agentcookie installed and AGENTCOOKIE_ENCRYPT_KEY present — session sync ready"
+  else
+    warn "agentcookie installed but AGENTCOOKIE_ENCRYPT_KEY not in Doppler — receiver will not start"
+    warn "  Generate key: openssl rand -base64 32"
+    warn "  Store in Doppler: doppler secrets set AGENTCOOKIE_ENCRYPT_KEY=<key> --project jovie-web --config dev"
+    warn "  Also set AGENTCOOKIE_AIR_IP on the Pro with: tailscale ip -4 (run on this Air)"
+  fi
+else
+  warn "agentcookie not installed — session sync disabled (optional, see GH#10930)"
 fi
 
 echo

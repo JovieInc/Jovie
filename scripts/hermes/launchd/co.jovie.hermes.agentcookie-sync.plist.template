@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>co.jovie.hermes.agentcookie-sync</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{TSX_BIN}}</string>
+        <string>{{JOVIE_REPO}}/scripts/hermes/jobs/agentcookie-sync.ts</string>
+    </array>
+    <!-- Run every 15 minutes to detect receiver going dark quickly. -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HERMES_HOME</key>
+        <string>{{HOME}}/.hermes</string>
+        <key>PATH</key>
+        <string>{{HOME}}/.bun/bin:{{HOME}}/.hermes/bin:{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/agentcookie-sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/agentcookie-sync.err.log</string>
+</dict>
+</plist>

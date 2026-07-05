@@ -28,6 +28,9 @@ export const HERMES_PATHS = {
   telegramChatId: join(HERMES_HOME, 'state', 'telegram-chat-id'),
 } as const;
 
+export const AGENTCOOKIE_STATE_DIR = join(HERMES_HOME, 'state', 'agentcookie');
+export const AGENTCOOKIE_COOKIES_DIR = join(HERMES_HOME, 'cookies');
+
 export const VOICE_MEMOS_RECORDINGS =
   process.env.HERMES_VOICE_MEMOS_DIR ??
   join(
