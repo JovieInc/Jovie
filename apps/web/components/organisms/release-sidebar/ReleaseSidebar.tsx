@@ -38,6 +38,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { DrawerHero } from '@/components/shell/DrawerHero';
 import { DropDateChip } from '@/components/shell/DropDateChip';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import {
   type DspAvatarItem,
   DspAvatarStack,
@@ -245,6 +246,7 @@ function getDspAvatarItems(
       }),
       label,
       glyph: getProviderGlyph(label, provider.key),
+      iconPath: DSP_LOGO_CONFIG[provider.key]?.iconPath,
       color: providerConfig[provider.key]?.accent ?? DEFAULT_DSP_COLOR,
     };
   });
@@ -258,6 +260,7 @@ function getDspAvatarItems(
         status: 'missing' as const,
         label,
         glyph: getProviderGlyph(label, key),
+        iconPath: DSP_LOGO_CONFIG[key]?.iconPath,
         color: providerConfig[key]?.accent ?? DEFAULT_DSP_COLOR,
       };
     });

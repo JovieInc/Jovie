@@ -1,3 +1,4 @@
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import type {
   DspAvatarItem,
   DspStatus,
@@ -26,6 +27,7 @@ const SHELL_DSP_META: ReadonlyArray<{
   readonly providerKey: 'spotify' | 'apple_music' | 'youtube_music' | 'tidal';
   readonly label: string;
   readonly glyph: string;
+  readonly iconPath: string;
   readonly color: string;
 }> = [
   {
@@ -33,6 +35,7 @@ const SHELL_DSP_META: ReadonlyArray<{
     providerKey: 'spotify',
     label: 'Spotify',
     glyph: 'S',
+    iconPath: DSP_LOGO_CONFIG.spotify.iconPath,
     color: DSP_CONFIGS.spotify.color,
   },
   {
@@ -40,6 +43,7 @@ const SHELL_DSP_META: ReadonlyArray<{
     providerKey: 'apple_music',
     label: 'Apple Music',
     glyph: 'A',
+    iconPath: DSP_LOGO_CONFIG.apple_music.iconPath,
     color: DSP_CONFIGS.apple_music.color,
   },
   {
@@ -47,6 +51,7 @@ const SHELL_DSP_META: ReadonlyArray<{
     providerKey: 'youtube_music',
     label: 'YouTube Music',
     glyph: 'Y',
+    iconPath: DSP_LOGO_CONFIG.youtube_music.iconPath,
     color: DSP_CONFIGS.youtube_music.color,
   },
   {
@@ -54,6 +59,7 @@ const SHELL_DSP_META: ReadonlyArray<{
     providerKey: 'tidal',
     label: 'TIDAL',
     glyph: 'T',
+    iconPath: DSP_LOGO_CONFIG.tidal.iconPath,
     color: DSP_CONFIGS.tidal.color,
   },
 ];
@@ -88,12 +94,14 @@ export function releaseToDspItems(release: ReleaseViewModel): DspAvatarItem[] {
         id: meta.id,
         label: meta.label,
         glyph: meta.glyph,
+        iconPath: meta.iconPath,
         color: meta.color,
         status: providersByKey.has(meta.providerKey) ? 'live' : 'missing',
       }) satisfies {
         id: string;
         label: string;
         glyph: string;
+        iconPath: string;
         color: string;
         status: DspStatus;
       }
@@ -103,11 +111,13 @@ export function releaseToDspItems(release: ReleaseViewModel): DspAvatarItem[] {
     .filter(p => !majorKeys.has(p.key))
     .map(p => {
       const config = DSP_CONFIGS[p.key];
+      const logoConfig = DSP_LOGO_CONFIG[p.key];
       const label = config?.name ?? p.label;
       return {
         id: p.key,
         label,
         glyph: label.charAt(0).toUpperCase(),
+        iconPath: logoConfig?.iconPath,
         color:
           config?.color ?? PROVIDER_CONFIG[p.key]?.accent ?? FALLBACK_DSP_COLOR,
         status: 'live' as const,

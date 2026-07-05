@@ -175,6 +175,7 @@ import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
 import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { DSP_CONFIGS } from '@/lib/dsp-registry';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
@@ -869,11 +870,18 @@ const DSP_STATUS_DOT: Record<DspStatus, string> = {
 };
 
 function releaseDspItems(release: Release): DspAvatarItem[] {
+  const DSP_LOGO_KEY: Record<DspKey, string> = {
+    spotify: 'spotify',
+    apple: 'apple_music',
+    youtube: 'youtube_music',
+    tidal: 'tidal',
+  };
   return DSP_ORDER.map(dsp => ({
     id: dsp,
     status: release.dsps[dsp],
     label: DSP_LABEL[dsp],
     glyph: DSP_GLYPH[dsp],
+    iconPath: DSP_LOGO_CONFIG[DSP_LOGO_KEY[dsp]]?.iconPath,
     color: DSP_COLOR[dsp],
   }));
 }
