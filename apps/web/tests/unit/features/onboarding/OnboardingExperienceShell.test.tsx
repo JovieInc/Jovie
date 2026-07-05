@@ -27,7 +27,7 @@ describe('OnboardingExperienceShell', () => {
     expect(screen.getByText('Footer Dots')).toBeInTheDocument();
     expect(screen.getByText('Onboarding Stage')).toBeInTheDocument();
     expect(container.innerHTML).toContain('min-h-screen');
-    expect(container.innerHTML).toContain('min-h-[560px]');
+    expect(container.innerHTML).toContain('min-h-140');
   });
 
   it('supports a flat stage surface', () => {
@@ -53,6 +53,6 @@ describe('OnboardingExperienceShell', () => {
 
     expect(screen.getByText('Embedded Stage')).toBeInTheDocument();
     expect(container.innerHTML).toContain('flex min-h-0 flex-1 flex-col');
-    expect(container.innerHTML).toContain('min-h-[520px]');
+    expect(container.innerHTML).toContain('min-h-130');
   });
 });

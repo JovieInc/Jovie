@@ -1,15 +1,17 @@
 'use client';
 
 import { Bell } from 'lucide-react';
-import { useMemo } from 'react';
+import { type MouseEvent, useMemo } from 'react';
+import {
+  type EntityCardModel,
+  merchToEntityCard,
+  releaseToEntityCard,
+  showToEntityCard,
+} from '@/components/organisms/entity-card';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileMerchCard } from '@/features/profile/ProfileMerchCard';
-import {
-  ProfilePrimaryActionCard,
-  type ProfilePrimaryActionCardRelease,
-  resolveProfilePrimaryActionCardState,
-} from '@/features/profile/ProfilePrimaryActionCard';
+import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
+import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
   toProfileSurfaceDateValue as toDateValue,
@@ -18,12 +20,19 @@ import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+  type ProfilePacS2Slot,
+} from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
+import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
+import type { PublicRelease } from './releases/types';
+import { usePacEvents } from './usePacEvents';
 
 interface ProfileHomeRailProps {
   readonly artist: Artist;
@@ -39,9 +48,11 @@ interface ProfileHomeRailProps {
   readonly onPlayClick?: () => void;
   readonly onAlertsClick?: (context: NotificationSourceContext) => void;
   readonly isSubscribed?: boolean;
+  readonly profilePacAssignment?: ProfilePacAssignment;
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  readonly releases?: readonly PublicRelease[];
 }
 
 function getUpcomingTourDates(
@@ -64,94 +75,91 @@ function getUpcomingTourDates(
     );
 }
 
+function HomeAlertsSwitch() {
+  return (
+    <span
+      className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/18 bg-white/18 p-1 shadow-sm transition-colors duration-subtle group-hover:bg-white/24'
+      aria-hidden='true'
+      data-testid='profile-home-alerts-switch'
+    >
+      <span className='block h-6 w-6 rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)] dark:bg-white' />
+    </span>
+  );
+}
+
 function HomeAlertsCard({
   artist,
   onAlertsClick,
   renderMode,
-  variant,
+  prominent,
   sourceContext,
 }: Readonly<{
   artist: Artist;
   onAlertsClick?: (context: NotificationSourceContext) => void;
   renderMode: ProfileRenderMode;
-  variant: 'row' | 'bento';
+  prominent: boolean;
   sourceContext: NotificationSourceContext;
 }>) {
   const title = 'Alerts';
   const description = `${artist.name}: music, shows, merch.`;
   const isInteractive = renderMode === 'interactive';
   const subscribeHref = `/${artist.handle}?mode=subscribe`;
-  const sharedProps = {
-    className:
-      variant === 'bento'
-        ? 'group flex min-h-[70px] w-full min-w-0 items-center gap-3 rounded-[var(--profile-inner-radius)] border border-white/10 bg-white/[0.045] px-3.5 py-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-22px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
-        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
-    'data-testid':
-      variant === 'bento'
-        ? 'profile-home-alerts-fallback-card'
-        : 'profile-home-alerts-row',
-  } as const;
   const ariaLabel = `Turn on alerts for ${artist.name}`;
-  const content = (
-    <>
-      <Bell
-        className={cn(
-          'shrink-0 text-white/84',
-          variant === 'bento' ? 'h-[18px] w-[18px]' : 'h-4 w-4'
-        )}
-        aria-hidden='true'
-      />
-      <span className='min-w-0 flex-1'>
-        <span
-          className={
-            variant === 'bento'
-              ? 'block text-[13px] font-semibold leading-[1.15] [overflow-wrap:anywhere]'
-              : 'block text-[12.5px] font-semibold leading-4 [overflow-wrap:anywhere]'
-          }
-        >
-          {title}
-        </span>
-        <span
-          className={
-            variant === 'bento'
-              ? 'mt-0.5 block max-w-[25ch] text-[11.5px] leading-4 text-white/54 [overflow-wrap:anywhere]'
-              : 'mt-0.5 block text-[11px] leading-3.5 text-white/50 [overflow-wrap:anywhere]'
-          }
-        >
-          {description}
-        </span>
-      </span>
-      <span
-        className='relative inline-flex h-[28px] w-[48px] shrink-0 items-center rounded-full border border-white/12 bg-white/[0.16] p-[3px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-[background-color,border-color,opacity] duration-subtle group-hover:bg-white/[0.2]'
-        aria-hidden='true'
-        data-testid='profile-home-alerts-switch'
-      >
-        <span className='block h-[22px] w-[22px] rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)]' />
-      </span>
-    </>
+  const handleClick = isInteractive
+    ? (event: MouseEvent<HTMLElement>) => {
+        if (!onAlertsClick) {
+          return;
+        }
+        event.preventDefault();
+        onAlertsClick(sourceContext);
+      }
+    : undefined;
+
+  return (
+    <ProfileEmptyBentoCard
+      accent='alerts'
+      icon={Bell}
+      title={title}
+      body={description}
+      layout={prominent ? 'prominent' : 'inline'}
+      trailing={<HomeAlertsSwitch />}
+      href={isInteractive ? subscribeHref : undefined}
+      onClick={handleClick}
+      ariaLabel={ariaLabel}
+      dataTestId='profile-home-alerts-fallback-card'
+    />
   );
-
-  if (isInteractive) {
-    return (
-      <a
-        href={subscribeHref}
-        onClick={event => {
-          if (!onAlertsClick) {
-            return;
-          }
-          event.preventDefault();
-          onAlertsClick(sourceContext);
-        }}
-        aria-label={ariaLabel}
-        {...sharedProps}
-      >
-        {content}
-      </a>
-    );
-  }
-
-  return <div {...sharedProps}>{content}</div>;
 }
+
+function getS2OrderedItems({
+  assignedSlot,
+  merchItems,
+  showItems,
+}: Readonly<{
+  assignedSlot: ProfilePacS2Slot;
+  merchItems: readonly EntityCardModel[];
+  showItems: readonly EntityCardModel[];
+}>) {
+  const slotBuckets: Record<ProfilePacS2Slot, readonly EntityCardModel[]> = {
+    merch: merchItems,
+    tip: [],
+    tickets: showItems,
+    rsvp: showItems,
+  };
+  const preferredItems = slotBuckets[assignedSlot];
+  const fallbackItems =
+    assignedSlot === 'tickets' || assignedSlot === 'rsvp'
+      ? merchItems
+      : showItems;
+
+  return preferredItems.length > 0
+    ? [...preferredItems, ...fallbackItems]
+    : [...merchItems, ...showItems];
+}
+
+export const __profileHomeRailTestUtils = {
+  getS2OrderedItems,
+};
 
 export function ProfileHomeRail({
   artist,
@@ -159,16 +167,22 @@ export function ProfileHomeRail({
   profileSettings,
   featuredPlaylistFallback,
   tourDates = [],
-  hasPlayableDestinations,
   renderMode = 'interactive',
-  previewActionLabel = 'Listen',
-  onPlayClick,
   onAlertsClick,
   isSubscribed = false,
+  profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
   viewerLocation,
   resolveNearbyTour = true,
   merchCards = [],
+  releases = [],
 }: Readonly<ProfileHomeRailProps>) {
+  // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
+  // visible, once per state per session, keyed to the visitor's variant.
+  const { exposureRef } = usePacEvents({
+    profileId: artist.id,
+    assignment: profilePacAssignment,
+    enabled: renderMode !== 'preview',
+  });
   // Re-evaluate visibility at the release boundary so the rail's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
   // page was served from a stale ISR cache.
@@ -192,45 +206,124 @@ export function ProfileHomeRail({
     upcomingTourDates,
     effectiveLocation
   );
-  const nextTourDate = upcomingTourDates[0] ?? null;
-  const nearbyTourDate = nearbyDates[0]?.date ?? null;
-  const featuredState = useMemo(
-    () =>
-      resolveProfilePrimaryActionCardState({
-        artistName: artist.name,
-        latestRelease,
-        profileSettings,
-        nextTourDate,
-        nearbyTourDate,
-        featuredPlaylistFallback,
-        hasPlayableDestinations,
-        now,
-      }),
-    [
-      artist.name,
-      featuredPlaylistFallback,
-      hasPlayableDestinations,
-      latestRelease,
-      nearbyTourDate,
-      nextTourDate,
-      now,
-      profileSettings,
-    ]
-  );
+  const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
 
-  const hasPrimaryFeature =
-    featuredState.kind === 'release_countdown' ||
-    featuredState.kind === 'release_live' ||
-    featuredState.kind === 'tour_nearby' ||
-    featuredState.kind === 'tour_next' ||
-    featuredState.kind === 'playlist_fallback';
+  // One ordered card list — featured item first, then the rest. No stacked
+  // sections: a single carousel is the profile home surface.
+  const carouselItems = useMemo<EntityCardModel[]>(() => {
+    const featuredItems: EntityCardModel[] = [];
+    const releaseItems: EntityCardModel[] = [];
+    const merchItems: EntityCardModel[] = [];
+    const showItems: EntityCardModel[] = [];
+
+    // Featured: the latest release when it's visible per profile settings.
+    const hasFeaturedRelease = Boolean(
+      releaseVisibility?.show && latestRelease
+    );
+    const featuredReleaseSlug =
+      hasFeaturedRelease && latestRelease ? latestRelease.slug : null;
+    const featuredReleaseId =
+      featuredReleaseSlug === null
+        ? null
+        : (releases.find(release => release.slug === featuredReleaseSlug)?.id ??
+          null);
+
+    if (hasFeaturedRelease && latestRelease) {
+      featuredItems.push(
+        releaseToEntityCard(
+          {
+            id: featuredReleaseId ?? undefined,
+            title: latestRelease.title,
+            slug: latestRelease.slug,
+            artworkUrl: latestRelease.artworkUrl,
+            releaseDate: latestRelease.releaseDate,
+            releaseType: latestRelease.releaseType,
+          },
+          { handle: artist.handle, now }
+        )
+      );
+    } else if (upcomingTourDates.length === 0 && featuredPlaylistFallback) {
+      // Fallback feature when there's no release or upcoming show: the
+      // artist's confirmed "This Is" playlist, as a music card.
+      featuredItems.push({
+        id: `playlist-${featuredPlaylistFallback.playlistId}`,
+        kind: 'music',
+        href: featuredPlaylistFallback.url,
+        imageUrl: featuredPlaylistFallback.imageUrl,
+        imageAlt: featuredPlaylistFallback.title,
+        accent: 'green',
+        eyebrow: 'Playlist',
+        title: featuredPlaylistFallback.title,
+        cta: {
+          label: 'Open Playlist',
+          href: featuredPlaylistFallback.url,
+          external: true,
+        },
+      });
+    }
+
+    // Back catalog: include non-featured releases in the same carousel.
+    for (const release of releases) {
+      if (release.slug === '' || release.slug === featuredReleaseSlug) {
+        continue;
+      }
+      releaseItems.push(
+        releaseToEntityCard(release, { handle: artist.handle, now })
+      );
+    }
+
+    // Shoppable merch (revenue) next.
+    for (const card of merchCards) {
+      merchItems.push(merchToEntityCard(card, { handle: artist.handle }));
+    }
+
+    // Upcoming shows, nearest-to-viewer first when geo resolved.
+    const shows = [...upcomingTourDates].sort((a, b) =>
+      a.id === nearbyTourDateId ? -1 : b.id === nearbyTourDateId ? 1 : 0
+    );
+    for (const show of shows) {
+      showItems.push(
+        showToEntityCard({
+          id: show.id,
+          title: show.title,
+          venueName: show.venueName,
+          city: show.city,
+          startDate: show.startDate,
+          ticketUrl: show.ticketUrl,
+        })
+      );
+    }
+
+    return [
+      ...featuredItems,
+      ...getS2OrderedItems({
+        assignedSlot: profilePacAssignment.s2Slot,
+        merchItems,
+        showItems,
+      }),
+      ...releaseItems,
+    ];
+  }, [
+    artist.handle,
+    featuredPlaylistFallback,
+    latestRelease,
+    merchCards,
+    nearbyTourDateId,
+    now,
+    profilePacAssignment.s2Slot,
+    releases,
+    releaseVisibility?.show,
+    upcomingTourDates,
+  ]);
+
+  const isLowContentHome = carouselItems.length === 0;
 
   const alertsCard = isSubscribed ? null : (
     <HomeAlertsCard
       artist={artist}
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
-      variant={hasPrimaryFeature ? 'row' : 'bento'}
+      prominent={isLowContentHome}
       sourceContext={{
         artistId: artist.id,
         profileId: artist.id,
@@ -242,46 +335,19 @@ export function ProfileHomeRail({
     />
   );
 
-  const featureCard = hasPrimaryFeature ? (
-    <ProfilePrimaryActionCard
-      artist={artist}
-      latestRelease={latestRelease}
-      profileSettings={profileSettings}
-      featuredPlaylistFallback={featuredPlaylistFallback}
-      tourDates={tourDates}
-      hasPlayableDestinations={hasPlayableDestinations}
-      renderMode={renderMode}
-      previewActionLabel={previewActionLabel}
-      onPlayClick={onPlayClick}
-      viewerLocation={viewerLocation}
-      resolveNearbyTour={resolveNearbyTour}
-      size={
-        featuredState.kind === 'release_countdown' ||
-        featuredState.kind === 'release_live'
-          ? 'showcase'
-          : 'compact'
-      }
-      dataTestId='profile-home-primary-action-card'
-      className='w-full'
-      now={now}
-    />
-  ) : null;
-
   return (
     <div
-      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-[320px]'
+      ref={exposureRef}
+      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
-      data-feature-state={featuredState.kind}
     >
-      {featureCard ? (
-        <div className='min-w-0' data-testid='profile-home-feature-card'>
-          {featureCard}
-        </div>
-      ) : null}
-      {merchCards.slice(0, 3).map(card => (
-        <ProfileMerchCard key={card.id} artist={artist} card={card} />
-      ))}
       {alertsCard}
+      <ReleaseCatalogCarousel
+        items={carouselItems}
+        artistHandle={artist.handle}
+        artistId={artist.id}
+        analyticsEnabled={renderMode !== 'preview'}
+      />
     </div>
   );
 }

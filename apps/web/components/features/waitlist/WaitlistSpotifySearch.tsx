@@ -410,7 +410,7 @@ export function WaitlistSpotifySearch({
                   type='button'
                   tabIndex={0}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-[8px] p-3 text-left transition-colors',
+                    'flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors',
                     index === activeIndex
                       ? 'bg-surface-2'
                       : 'hover:bg-surface-2/50'
@@ -467,7 +467,7 @@ export function WaitlistSpotifySearch({
             type='button'
             tabIndex={0}
             className={cn(
-              'flex w-full items-center gap-3 rounded-[8px] p-3 text-left transition-colors',
+              'flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors',
               activeIndex === manualAddIndex
                 ? 'bg-surface-2'
                 : 'hover:bg-surface-2/50'

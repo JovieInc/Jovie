@@ -414,9 +414,11 @@ describe('ErrorBoundary', () => {
       const goHomeButton = screen.getByRole('button', { name: /go home/i });
 
       // Button uses CVA with Tailwind classes (variant='primary', size='sm')
+      expect(tryAgainButton).toHaveAttribute('data-variant', 'primary');
       expect(tryAgainButton).toHaveClass('bg-btn-primary');
-      // Button uses CVA with Tailwind classes (variant='outline', size='sm')
-      expect(goHomeButton).toHaveClass('border-default');
+      // Button uses CVA with Tailwind classes (variant='secondary', size='sm')
+      expect(goHomeButton).toHaveAttribute('data-variant', 'secondary');
+      expect(goHomeButton).toHaveClass('bg-btn-secondary');
     });
   });
 });

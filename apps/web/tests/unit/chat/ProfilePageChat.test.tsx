@@ -152,7 +152,7 @@ describe('ProfilePageChat', () => {
 
     const { getByRole } = renderProfilePageChat();
 
-    fireEvent.click(getByRole('button', { name: 'Reload Conversation' }));
+    fireEvent.click(getByRole('button', { name: 'Reload Chat' }));
 
     expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
   });

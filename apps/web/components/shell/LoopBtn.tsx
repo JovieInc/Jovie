@@ -43,12 +43,12 @@ export function LoopBtn({
     >
       <Repeat className='h-3.5 w-3.5' strokeWidth={2.25} />
       {mode === 'track' && (
-        <span className='absolute -bottom-px right-0 text-[8px] font-bold leading-none text-primary-token'>
+        <span className='absolute -bottom-px right-0 text-3xs font-bold leading-none text-primary-token'>
           1
         </span>
       )}
       {mode === 'section' && (
-        <span className='absolute -bottom-px right-0 text-[8px] font-bold leading-none text-primary-token'>
+        <span className='absolute -bottom-px right-0 text-3xs font-bold leading-none text-primary-token'>
           ⤴
         </span>
       )}

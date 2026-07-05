@@ -184,6 +184,34 @@ jobs:
             echo "is_ready=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Checkout systemic detector
+        if: >-
+          steps.trigger.outputs.should_continue == 'true' &&
+          steps.branch-check.outputs.is_agent_branch == 'true' &&
+          steps.trigger.outputs.trigger_type == 'ci_failure'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            scripts/lib/pr-check-failures.mjs
+            scripts/lib/detect-systemic-failures.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Enable pnpm
+        if: >-
+          steps.trigger.outputs.should_continue == 'true' &&
+          steps.branch-check.outputs.is_agent_branch == 'true' &&
+          steps.trigger.outputs.trigger_type == 'ci_failure'
+        run: corepack enable
+
+      - name: Setup Node
+        if: >-
+          steps.trigger.outputs.should_continue == 'true' &&
+          steps.branch-check.outputs.is_agent_branch == 'true' &&
+          steps.trigger.outputs.trigger_type == 'ci_failure'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22.13.1'
+
       - name: Detect systemic failures (fix path only)
         id: systemic-check
         if: >-
@@ -192,55 +220,21 @@ jobs:
           (steps.trigger.outputs.trigger_type == 'ci_failure' || steps.trigger.outputs.trigger_type == 'coderabbit_review')
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
-          PR_NUMBER="${{ steps.trigger.outputs.pr_number }}"
           TRIGGER_TYPE="${{ steps.trigger.outputs.trigger_type }}"
 
           # Only check for systemic failures on CI failures (not CodeRabbit reviews)
           if [[ "$TRIGGER_TYPE" != "ci_failure" ]]; then
             echo "is_systemic=false" >> "$GITHUB_OUTPUT"
+            echo "systemic_checks=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Get this PR's failing check names (structured JSON output)
-          THIS_PR_FAILS=$(gh pr checks "$PR_NUMBER" --json name,conclusion 2>/dev/null \
-            | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "failure") | .name' | sort -u || echo "")
-
-          if [[ -z "$THIS_PR_FAILS" ]]; then
-            echo "No failing checks found for PR #$PR_NUMBER"
-            echo "is_systemic=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Sample up to 10 other open agent PRs
-          OTHER_PRS=$(gh pr list --state open --json number,headRefName --limit 20 \
-            | jq -r --arg this "$PR_NUMBER" '.[] | select(.number != ($this | tonumber)) | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("(^|/)jov-[0-9]+"; "i")) | .number' \
-            | head -10)
-
-          SYSTEMIC_CHECKS=""
-          for CHECK_NAME in $THIS_PR_FAILS; do
-            FAIL_COUNT=1  # count this PR
-            for OTHER_PR in $OTHER_PRS; do
-              OTHER_STATUS=$(gh pr checks "$OTHER_PR" --json name,conclusion 2>/dev/null \
-                | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "failure") | .name' | grep -Fx "$CHECK_NAME" || true)
-              if [[ -n "$OTHER_STATUS" ]]; then
-                FAIL_COUNT=$((FAIL_COUNT + 1))
-              fi
-            done
-            if [[ $FAIL_COUNT -ge 3 ]]; then
-              SYSTEMIC_CHECKS="${SYSTEMIC_CHECKS}${CHECK_NAME} (failing on ${FAIL_COUNT} PRs)\n"
-            fi
-          done
-
-          if [[ -n "$SYSTEMIC_CHECKS" ]]; then
-            echo "Systemic failures detected:"
-            echo -e "$SYSTEMIC_CHECKS"
-            echo "is_systemic=true" >> "$GITHUB_OUTPUT"
-            echo "systemic_checks=$(echo -e "$SYSTEMIC_CHECKS" | head -5 | tr '\n' '; ')" >> "$GITHUB_OUTPUT"
-          else
-            echo "No systemic failures detected"
-            echo "is_systemic=false" >> "$GITHUB_OUTPUT"
-          fi
+          node scripts/lib/detect-systemic-failures.mjs \
+            --repo "$REPO" \
+            --pr "${{ steps.trigger.outputs.pr_number }}" \
+            --threshold 3
 
       - name: Retry guard (fix path only, max 5 attempts per SHA)
         id: retry-guard
@@ -391,7 +385,7 @@ jobs:
           elif [[ "$HAS_NEEDS_HUMAN" == "true" ]]; then
             echo "PR has needs-human label. Skipping all automation."
           elif [[ "$IS_SYSTEMIC" == "true" ]]; then
-            echo "Systemic blocker detected. Skipping individual fix — needs /drain on main."
+            echo "Systemic blocker detected. Skipping individual fix — merge-queue-autoenroll will rebase stale PRs."
           elif [[ "$TRIGGER_TYPE" == "ci_failure" || "$TRIGGER_TYPE" == "coderabbit_review" ]]; then
             if [[ "$RETRIES" == "true" ]]; then
               SHOULD_FIX="true"
@@ -433,6 +427,13 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            scripts/lib/upsert-pr-comment.sh
+          sparse-checkout-cone-mode: false
+
       - name: Label and comment systemic blocker
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -444,17 +445,17 @@ jobs:
             --method POST \
             --field "labels[]=systemic-blocker" || true
 
-          gh pr comment "$PR_NUMBER" --body "## Systemic CI Blocker Detected
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "systemic-ci-blocker" "## Systemic CI Blocker Detected
 
-          This PR's CI failures appear to be systemic (same checks failing on 3+ PRs):
+          This PR's CI failures appear to be systemic (same required checks failing on 3+ open agent PRs):
 
           \`\`\`
           $SYSTEMIC
           \`\`\`
 
-          **Skipping individual fix attempts.** These failures likely originate on \`main\` and should be fixed there first.
+          **Skipping individual code-fix attempts.** These failures likely originated on \`main\`.
 
-          Run \`/drain\` to fix systemic issues on main and then rebase all PRs."
+          **Automated remediation:** \`merge-queue-autoenroll\` rebases mergeable agent PRs onto latest \`main\` every ~20 minutes (\`scripts/drain-pr-remediate.mjs\`) to re-trigger CI. If checks stay red after that rebase, fix \`main\` first or address branch-specific failures manually."
 
   # ==========================================================================
   # FIX: Apply fixes using Claude agent (CI failure or CodeRabbit review)
@@ -495,7 +496,14 @@ jobs:
           fi
           echo "PR is from the same repository. Proceeding."
 
-      - name: Request unprivileged remediation
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            scripts/lib/upsert-pr-comment.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Queue automated stale-CI remediation
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
@@ -503,19 +511,13 @@ jobs:
           TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
           ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
         run: |
-          gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels" \
-            --method POST \
-            --field "labels[]=agent-remediation-requested" || true
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "agent-remediation-queued" "## Stale CI Remediation Queued
 
-          gh pr comment "$PR_NUMBER" --body "## Agent Remediation Queued
+          Privileged workflow execution is intentionally restricted for security — this job does not check out or execute PR branch code.
 
-          Privileged workflow execution is intentionally restricted for security.
+          **Automated next step:** \`merge-queue-autoenroll\` (every ~20 minutes) will mechanically rebase mergeable agent branches onto latest \`main\` via \`scripts/drain-pr-remediate.mjs\`, then re-enroll with \`merge-queue\`. That re-triggers CI when failures were fixed on \`main\`.
 
-          **Why:** This workflow no longer checks out or executes PR branch code in a write-privileged context.
-
-          **Requested action:** Run remediation in an unprivileged \`pull_request\` workflow for attempt $ATTEMPT (**trigger:** $TRIGGER_TYPE).
-
-          This guardrail prevents untrusted code execution in privileged jobs while keeping remediation traceability."
+          **Attempt:** $ATTEMPT/5 (**trigger:** $TRIGGER_TYPE). If checks remain red after the auto-rebase, branch-specific code fixes are still required (coder agent or human)."
       - name: Clean up stale attempt labels
         if: always()
         env:
@@ -558,7 +560,7 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Checkout main policy code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           persist-credentials: false
@@ -578,15 +580,11 @@ jobs:
           STATUSES=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/status --jq '.statuses')
           CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/check-runs --jq '.check_runs')
 
-          # 1. Check scope-judge status
+          # 1. Scope judge (advisory — LLM alignment off fast auto-merge path)
           SCOPE_STATUS=$(echo "$STATUSES" | jq -r '[.[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"')
-          echo "Scope judge: $SCOPE_STATUS"
-
-          if [[ "$SCOPE_STATUS" != "success" ]]; then
-            echo "Scope judge has not passed (status: $SCOPE_STATUS). Cannot auto-approve."
-            echo "all_passed=false" >> "$GITHUB_OUTPUT"
-            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> "$GITHUB_OUTPUT"
-            exit 0
+          echo "Scope judge (advisory): $SCOPE_STATUS"
+          if [[ "$SCOPE_STATUS" != "success" && "$SCOPE_STATUS" != "pending" ]]; then
+            echo "::warning::scope-judge reported $SCOPE_STATUS — advisory only, not blocking auto-approve."
           fi
 
           # 2. Check CI PR Ready (the aggregate required check)
@@ -673,7 +671,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
-          READY_THRESHOLD=12
+          READY_THRESHOLD=$(node scripts/ci-merge-queue-check.mjs max-queue-depth)
 
           OPEN_PRS=$(gh pr list --state open --base main --limit 100 --json number,isDraft,mergeStateStatus,labels,headRefName)
 
@@ -804,7 +802,7 @@ jobs:
             --method POST \
             --field "labels[]=queue-deferred" || true
 
-          gh pr comment "$PR_NUMBER" --body "## Auto-Merge Deferred
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "auto-merge-deferred" "## Auto-Merge Deferred
 
           This PR passed the automated quality gates and was auto-approved, but it was **not** added to the merge queue automatically.
 

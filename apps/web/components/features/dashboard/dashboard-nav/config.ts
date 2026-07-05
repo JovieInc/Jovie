@@ -5,6 +5,7 @@ import {
   Cable,
   CalendarDays,
   CheckSquare,
+  Flag,
   FolderKanban,
   Gauge,
   HandCoins,
@@ -15,6 +16,7 @@ import {
   Lock,
   type LucideIcon,
   MailCheck,
+  Map,
   Music,
   PieChart,
   Settings,
@@ -44,11 +46,11 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Start a new conversation',
+  description: 'Start a new chat',
 };
 
 export const newThreadNavItem: NavItem = {
-  name: 'New Conversation',
+  name: 'New Chat',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
@@ -231,6 +233,8 @@ const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   screenshots: ImageIcon,
   costs: Banknote,
   share_studio: Share2,
+  system_map: Map,
+  features: Flag,
 };
 
 function buildAdminNavigationItems(
@@ -281,18 +285,15 @@ export const adminNavigationSections: AdminNavSection[] = [
 // Mobile bottom-bar groupings (derived from shared items above)
 // ---------------------------------------------------------------------------
 
-/** Home item for mobile – starts a new chat. */
-export const mobileHome: NavItem = {
-  name: 'Home',
-  href: APP_ROUTES.CHAT,
-  id: 'home',
-  icon: SquarePen,
-  description: 'Start a new conversation',
-};
-
-/** Items shown as icons in the bottom tab bar (max 3). */
+/**
+ * Items shown as icons in the bottom tab bar (max 3).
+ *
+ * Picked by id from the canonical `primaryNavigation` — never redefine a
+ * NavItem here. A mobile-only nav item is a third source of truth that
+ * drifts from desktop.
+ */
 export const mobilePrimaryNavigation: NavItem[] = [
-  mobileHome,
+  newThreadNavItem,
   primaryNavigation.find(i => i.id === 'releases')!,
   primaryNavigation.find(i => i.id === 'audience')!,
 ];

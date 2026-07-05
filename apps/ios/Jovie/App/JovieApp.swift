@@ -340,6 +340,8 @@ struct JovieApp: App {
     Observability.configure(
       environment: configuration.observabilityEnvironment,
       dsn: configuration.sentryDSN,
+      ingestURL: configuration.observabilityIngestURL,
+      ingestSecret: configuration.observabilityIngestSecret,
       isEnabled: launchMode == .live
     )
     Observability.setTag(key: "platform", value: "ios")

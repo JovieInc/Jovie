@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import { type CSSProperties } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
+import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
 export interface EntityChipData {
   readonly kind: EntityKind;
@@ -37,13 +38,6 @@ const KIND_PREFIX: Record<EntityKind, string> = {
   event: 'Event',
 };
 
-const KIND_ACCENT_VAR: Record<EntityKind, string> = {
-  release: '--system-b-entity-chip-release-accent',
-  artist: '--system-b-entity-chip-artist-accent',
-  track: '--system-b-entity-chip-track-accent',
-  event: '--system-b-entity-chip-event-accent',
-};
-
 /**
  * Non-interactive presentational chip primitive. Interaction (click, popover,
  * keyboard activation) is the wrapper's job — wrapping `EntityChip` in
@@ -70,7 +64,7 @@ export function EntityChip({
       }
     : {};
   const accentStyle = {
-    '--jovie-entity-accent': `var(${KIND_ACCENT_VAR[data.kind]})`,
+    '--jovie-entity-accent': `var(${ENTITY_KIND_ACCENT_VAR[data.kind]})`,
   } as CSSProperties;
 
   const commonClassName = 'system-b-entity-chip';

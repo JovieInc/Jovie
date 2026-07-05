@@ -8,7 +8,7 @@ describe('BentoFeatureGrid', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'A command center for your career.',
+        name: 'A Command Center For Your Career.',
       })
     ).toBeInTheDocument();
 
@@ -19,7 +19,7 @@ describe('BentoFeatureGrid', () => {
 
     const section = screen
       .getByRole('heading', {
-        name: 'A command center for your career.',
+        name: 'A Command Center For Your Career.',
       })
       .closest('section');
     expect(section).toHaveAttribute('aria-labelledby', 'bento-heading');

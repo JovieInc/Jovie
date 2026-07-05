@@ -233,7 +233,7 @@ function BandsintownConnectionPill({
               className='h-3.5 w-3.5 shrink-0'
               style={{ color: accent }}
             />
-            <span className='max-w-[160px] truncate text-secondary-token'>
+            <span className='max-w-40 truncate text-secondary-token'>
               {artistName || 'Connected'}
             </span>
             {lastSyncedAt && !hovered && !menuOpen && (

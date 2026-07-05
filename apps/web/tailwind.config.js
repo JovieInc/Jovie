@@ -63,14 +63,34 @@ module.exports = {
         'button-md': 'var(--linear-button-height-md)',
         'app-control-x': 'var(--linear-app-control-padding-x)',
         'app-header': 'var(--linear-app-header-padding-x)',
+        'profile-notification-icon': 'var(--profile-notification-icon-size)',
       },
 
-      // Border radius - Linear-extracted values
+      // App-specific fixed layout tokens
+      width: {
+        'investor-label': '12.5rem',
+        'investor-name': '9.5rem',
+        'investor-stage': '6.25rem',
+        'investor-date': '7rem',
+        'investor-status': '4.5rem',
+      },
+
+      minWidth: {
+        'investor-table': '47.5rem',
+      },
+
+      // Border radius - System B canonical values
       borderRadius: {
-        xs: 'var(--radius-xs)', // 2px — tags, tiny elements
-        DEFAULT: 'var(--radius-default)', // 4px — buttons (Linear exact)
-        xl: 'var(--radius-xl)', // 10px — large cards
-        '3xl': 'var(--radius-3xl)', // 14px — large modals
+        xs: 'var(--radius-xs)',
+        sm: 'var(--radius-sm)',
+        DEFAULT: 'var(--radius-default)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+        '2xl': 'var(--radius-2xl)',
+        '3xl': 'var(--radius-3xl)',
+        dialog: 'var(--app-dialog-radius)',
+        'sidebar-floating': 'var(--app-shell-sidebar-floating-radius)',
         pill: 'var(--radius-pill)', // 48px — pill buttons
         // Legacy linear-prefixed aliases
         'linear-sm': 'var(--linear-radius-sm)',
@@ -84,6 +104,7 @@ module.exports = {
         'linear-content': 'var(--linear-content-max)',
         'linear-hero': 'var(--linear-hero-section-max)',
         'linear-pricing': 'var(--linear-pricing-grid-max)',
+        'profile-notifications-wide': '96.25rem',
         // DS_FOUNDATION_V1 canonical max widths
         'public-content': 'var(--ds-public-content-max)',
         'prose-canonical': 'var(--ds-prose-max)',
@@ -126,6 +147,7 @@ module.exports = {
 
         // Base colors
         base: 'var(--color-bg-base)',
+        paper: 'var(--color-bg-paper)',
 
         // Button colors
         'btn-primary': 'var(--color-btn-primary-bg)',
@@ -162,6 +184,7 @@ module.exports = {
         'brand-audiomack': 'var(--color-brand-audiomack)',
         'brand-audiomack-hover': 'var(--color-brand-audiomack-hover)',
         'brand-audiomack-subtle': 'var(--color-brand-audiomack-subtle)',
+        'brand-venmo': 'var(--color-brand-venmo)',
       },
 
       // Border colors with better naming (avoids border-border-subtle)

@@ -33,35 +33,33 @@ export function ArtistProfileSocialProof({
               key={quote.id}
               className='rounded-[1.1rem] bg-white/[0.018] p-5'
             >
-              <p className='text-[14px] leading-[1.7] text-primary-token'>
+              <p className='text-sm leading-[1.7] text-primary-token'>
                 {quote.quote}
               </p>
-              <p className='mt-5 text-[13px] font-medium text-primary-token'>
+              <p className='mt-5 text-app font-medium text-primary-token'>
                 {quote.name}
               </p>
-              <p className='mt-1 text-[12px] text-tertiary-token'>
-                {quote.role}
-              </p>
+              <p className='mt-1 text-xs text-tertiary-token'>{quote.role}</p>
             </article>
           ))}
         </div>
       ) : null}
 
       {!proofData.hasRealQuotes && proofData.founderQuote ? (
-        <article className='mx-auto mt-6 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-6 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
-          <blockquote className='max-w-[48rem] text-pretty text-[clamp(1.375rem,2.4vw,2rem)] font-semibold leading-[1.18] tracking-[-0.025em] text-black'>
+        <article className='mx-auto mt-6 max-w-280 overflow-hidden rounded-[1.9rem] border border-black/10 bg-white dark:bg-surface-1 px-6 py-6 text-black dark:text-white shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
+          <blockquote className='max-w-[48rem] text-pretty text-[clamp(1.375rem,2.4vw,2rem)] font-semibold leading-[1.18] tracking-[-0.025em] text-black dark:text-white'>
             “{proofData.founderQuote.quote}”
           </blockquote>
           <div className='mt-6 flex flex-col gap-1 text-left'>
-            <p className='text-[14px] font-medium tracking-[-0.02em] text-black'>
+            <p className='text-sm font-medium tracking-[-0.02em] text-black dark:text-white'>
               {proofData.founderQuote.name}
             </p>
-            <p className='text-[12px] tracking-[-0.01em] text-black/56'>
+            <p className='text-xs tracking-[-0.01em] text-secondary-token'>
               {proofData.founderQuote.role}
             </p>
             <Link
               href={proofData.founderQuote.profileHref}
-              className='mt-3 inline-flex w-fit font-mono text-[12px] tracking-[-0.02em] text-black/56 transition-colors hover:text-black'
+              className='mt-3 inline-flex w-fit font-mono text-xs tracking-[-0.02em] text-secondary-token transition-colors hover:text-primary-token'
             >
               {proofData.founderQuote.profileLabel}
             </Link>
@@ -70,7 +68,7 @@ export function ArtistProfileSocialProof({
       ) : null}
 
       {!proofData.hasRealQuotes && !proofData.founderQuote ? (
-        <p className='mt-6 text-[13px] leading-[1.65] text-tertiary-token'>
+        <p className='mt-6 text-app leading-[1.65] text-tertiary-token'>
           {proofData.founderFallback}
         </p>
       ) : null}

@@ -7,6 +7,7 @@ import {
   classifyNavigation,
   createAuthAnalyticsEvent,
   createAuthStateRecord,
+  getElectronAuthCompleteProtocolForOrigin,
   resolveAuthCallback,
   sanitizeReturnTo,
   validateNativeExchange,
@@ -264,6 +265,42 @@ describe('auth routing boundary', () => {
     ).toBe(
       'jovie://auth/complete?code=c&state=s&desktop_flow=desktop_flow_nonce_12345'
     );
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        protocol: 'jovie-staging',
+      })
+    ).toBe('jovie-staging://auth/complete?code=c&state=s');
+    expect(
+      buildElectronAuthCompleteUrl({
+        code: 'c',
+        state: 's',
+        protocol: 'jovie-local',
+      })
+    ).toBe('jovie-local://auth/complete?code=c&state=s');
+  });
+
+  it('derives the Electron callback protocol from the app origin', () => {
+    expect(getElectronAuthCompleteProtocolForOrigin('https://jov.ie')).toBe(
+      'jovie'
+    );
+    expect(
+      getElectronAuthCompleteProtocolForOrigin('https://staging.jov.ie')
+    ).toBe('jovie-staging');
+    expect(
+      getElectronAuthCompleteProtocolForOrigin('http://localhost:3112')
+    ).toBe('jovie-local');
+    expect(
+      getElectronAuthCompleteProtocolForOrigin('http://127.0.0.1:3112')
+    ).toBe('jovie-local');
+    expect(
+      getElectronAuthCompleteProtocolForOrigin('http://foo.localhost:3112')
+    ).toBe('jovie-local');
+    expect(getElectronAuthCompleteProtocolForOrigin('http://[::1]:3112')).toBe(
+      'jovie-local'
+    );
+    expect(getElectronAuthCompleteProtocolForOrigin('not a url')).toBe('jovie');
   });
 
   it('creates analytics payloads without leaking return URLs or token values', () => {

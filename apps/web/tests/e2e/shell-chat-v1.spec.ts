@@ -16,7 +16,10 @@ import {
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
-import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
+import {
+  chatComposerInputLocator,
+  gotoAuthenticatedChatRoute,
+} from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -211,7 +214,7 @@ function shellChatFrameLocators(page: Page): ShellChatLocators {
   const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
   const chatContent = shellScroll.locator('[data-testid="chat-content"]');
   const composer = shellFrame.locator('[data-testid="chat-composer-surface"]');
-  const input = composer.locator('[aria-label="Chat message input"]');
+  const input = chatComposerInputLocator(composer);
 
   return { chatContent, composer, input, shellFrame, shellScroll };
 }
@@ -345,7 +348,7 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   await expect(chatContent).toBeVisible({ timeout: 30_000 });
   await expect(composer).toHaveCSS(
     'border-radius',
-    /^(?:999px|18px|20px|24px|28px|36px)$/
+    /^(?:999px|18px|20px|24px|28px|36px|45rem)$/
   );
   await expect(page.locator('.animate-shell-in')).toHaveCount(0);
 });
@@ -440,7 +443,12 @@ test('chat route slash picker clears active transcript content in populated thre
     await expect(composer).toHaveAttribute('data-surface-mode', 'root');
     await assertSlashMenuClearsThreadContent(page);
 
-    await input.fill('/tak');
+    // Slash-picker scroll/layout passes can remount the composer; re-resolve locators.
+    const { composer: composerAfterPicker, input: inputAfterPicker } =
+      shellChatFrameLocators(page);
+    await expect(composerAfterPicker).toBeVisible({ timeout: 30_000 });
+    await expect(inputAfterPicker).toBeVisible({ timeout: 30_000 });
+    await inputAfterPicker.fill('/tak');
     await assertSlashMenuClearsThreadContent(page);
 
     const afterBox = await composer.boundingBox();

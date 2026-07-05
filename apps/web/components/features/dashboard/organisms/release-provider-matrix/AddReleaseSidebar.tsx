@@ -246,7 +246,7 @@ export function AddReleaseSidebar({
       footer={
         <DrawerButton
           tone='secondary'
-          className='h-8 w-full justify-center border-white bg-white text-black hover:border-white hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:border-white disabled:bg-white disabled:text-black/55 disabled:opacity-100'
+          className='h-8 w-full justify-center border-white bg-white dark:bg-surface-1 text-black dark:text-white hover:border-white hover:bg-white dark:bg-surface-1 hover:text-black dark:text-white disabled:cursor-not-allowed disabled:border-white disabled:bg-white dark:bg-surface-1 disabled:text-black dark:text-white/55 disabled:opacity-100'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
         >
@@ -326,7 +326,7 @@ export function AddReleaseSidebar({
               id='release-title'
               value={title}
               onChange={event => setTitle(event.target.value)}
-              placeholder='My New Release'
+              placeholder='My New Release' // ui-casing-allow: default release title placeholder
               autoFocus
               className='h-8 rounded-lg border-subtle bg-surface-0 text-xs'
             />

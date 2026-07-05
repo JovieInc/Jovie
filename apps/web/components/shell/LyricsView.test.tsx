@@ -24,7 +24,7 @@ describe('LyricsView', () => {
 
   it('renders the empty state when lines is empty', () => {
     render(<LyricsView {...baseProps} currentTimeSec={0} lines={[]} />);
-    expect(screen.getByText('No lyrics yet')).toBeInTheDocument();
+    expect(screen.getByText('No Lyrics Yet')).toBeInTheDocument();
   });
 
   it('shows the Transcribe button only when onTranscribe is provided', () => {

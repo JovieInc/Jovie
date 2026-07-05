@@ -38,6 +38,8 @@ apps/web/components/
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by a drift ratchet (`apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`) — the count may only go DOWN. Converge to tokens; never add new arbitrary values.
 
+**Server-import isolation:** `apps/web/components/{atoms,molecules,organisms}` are shared presentation layers that must bundle for the browser. Files in these layers must not import server-only specifiers (`server-only`, `@clerk/nextjs/server`, `drizzle-orm`, `@/lib/db/*`, `next/headers`, `/actions` modules, etc.) or contain `'use server'`. Violations are tracked by a drift ratchet (`apps/web/tests/unit/design-system/server-imports-ratchet.test.ts`) — the count may only go DOWN. Move server dependencies to a feature wrapper or API route.
+
 ## New Component Pattern
 
 | Type | Location | When to use |
@@ -194,6 +196,8 @@ This is the subtraction principle applied specifically to container boundaries. 
 
 - Hover states must not move layout or shift components without a product reason.
 - Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move.
+- Press/click feedback may use a subtle `scale(0.96)` when it is tactile and interruptible; provide a static opt-out when the motion would distract.
+- Menus, panels, drawers, and sidebars may use intentional `translate`/`scale` motion for open/close because the movement communicates spatial state.
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback.
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction.
 

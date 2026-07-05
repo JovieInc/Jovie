@@ -1,307 +1,123 @@
 ---
-description: Fix systemic CI blockers on main, rebase all PRs, then process the queue to zero
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(pnpm:*), Bash(jq:*), Bash(node:*), Bash(bash:*)
+description: Graphite-native PR drain — enroll clean PRs into the merge queue, fan out worktree fix agents for the rest, never go red
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(pnpm:*), Bash(jq:*), Bash(bash:*), Bash(chmod:*)
 ---
 
-# Drain — PRs to Zero
+# Drain — Graphite merge queue to zero
 
-One command to clear the entire PR queue. Fixes root causes first, then processes individual PRs.
+Clears the open-PR backlog the way the repo actually ships now: agents open PRs
+straight to `main`, the **Graphite merge queue** rebase-merges them server-side,
+and the queue **re-tests each PR against latest `main` before landing** — so the
+queue, not this command, is what keeps `main` green.
 
-## Current State
+## Hard rules (current CI — do not violate)
 
-Branch: !`git branch --show-current`
-Open PRs: !`gh pr list --state open --json number,title --jq 'length'`
+- **Never `gh pr merge` / `--auto` / `--admin`.** Branch protection lets only the
+  Graphite app push to `main`; those calls fail and bypass the queue.
+- **Enroll = add the `merge-queue` label.** That is the only way a PR enters the queue.
+- **`fast` is emergency/hotfix-only.** Ordinary generated PRs on `codex/*`,
+  `claude/*`, `agent/*`, or similar branches must not use `fast` unless the PR
+  is explicitly classified as emergency/hotfix/incident; otherwise the guard
+  removes `fast` and gates the PR for human review.
+- **Dequeue hard gates = remove only the `merge-queue` label.** A PR with
+  `needs-human`, `hold`, or `gated` must not keep occupying Graphite MQ slots.
+- **Never retarget to `integration/loop-*`.** That model is dormant; agents go to `main`.
+- **Never close a PR you didn't open.** Surface superseded/stale ones to the human.
+- **Never touch `gtmq_*` draft PRs** (author `app/graphite-app`) — that's the queue working.
+- **Opt-outs:** `needs-human`, `hold`, `gated` → leave the PR for a human after
+  removing `merge-queue` if it was already enrolled.
 
-## Phase 0: Diagnose Systemic Blockers
-
-Before touching any individual PR, identify failures that repeat across multiple PRs. Fixing these on main eliminates cascading failures.
-
-```bash
-# Get all open PRs with their check status
-gh pr list --state open --json number,title,headRefName,statusCheckRollup,labels --limit 100
-```
-
-For each open PR, collect failing checks:
-
-```bash
-gh pr checks <NUMBER> --json name,state,conclusion 2>/dev/null || echo "[]"
-```
-
-**Build a failure matrix:**
-| Check Name | Failing PRs | Count | Systemic? |
-
-A check is **systemic** if it fails on 3+ PRs. Common systemics:
-- A11y (axe) regressions introduced on main
-- Build failures from broken shared components
-- Flaky test suites
-- Lint rules that changed on main but branches are stale
-
-**Output:** List of systemic blockers (if any) and the check names that are failing everywhere.
-
-If no systemic blockers found, skip to Phase 2.
-
-## Phase 1: Fix Systemic Issues on Main
-
-For each systemic blocker identified in Phase 0:
+## Phase 0 — Classify + enroll the clean bucket
 
 ```bash
-git checkout main
-git pull origin main
+DRY_RUN=1 bash scripts/drain-pr-queue.sh   # preview the buckets
+bash scripts/drain-pr-queue.sh             # apply: -merge-queue on hard gates, +merge-queue on clean PRs, +needs-conflict-resolution on conflicts
 ```
 
-### Run the full CI suite locally
+The script enrolls every non-draft, `MERGEABLE`, green, non-opted-out PR and
+prints five work buckets: **DEQUEUE**, **CONFLICT**, **BLOCKED**, **SURFACE**,
+**GRAPHITE MQ**.
+
+## Phase 1 — Kill systemic blockers first
+
+If the same required check fails on **3+ PRs**, it's broken on `main`, not in the
+branches. Fix it once on `main` via a single PR, then add `merge-queue` so
+Graphite retests and lands it ahead of downstream work. Add `fast` only when
+the PR is explicitly emergency/hotfix/incident-classified; otherwise use the
+Graphite dashboard's merge-now path for human-approved emergency bypass. Don't
+fix the same thing on N branches.
 
 ```bash
-pnpm --filter @jovie/web run typecheck -- --pretty false # typecheck
-pnpm biome check apps/web                     # lint
-pnpm vitest --run --changed                   # tests
-pnpm --filter web lint:server-boundaries       # boundaries
+# failing-check histogram across open PRs
+gh pr list --state open --limit 100 --json number,statusCheckRollup --jq '
+  [.[] | .statusCheckRollup[]?
+    | select(.completedAt != null and .completedAt != "0001-01-01T00:00:00Z")
+    | {name: (.name // .context), conclusion: (.conclusion // ""), completedAt: .completedAt}
+    | select(.name != null and .name != "")
+  ]
+  | group_by(.name) | map(sort_by(.completedAt) | last)
+  | map(select(.conclusion | test("FAILURE|TIMED_OUT|ACTION_REQUIRED")))
+  | map(.name)
+  | group_by(.) | map({check: .[0], prs: length}) | sort_by(-.prs) | .[]'
 ```
 
-### Fix failures
+## Phase 2 — Fan out worktree fix agents (tiered models)
 
-- TypeScript errors: fix the types
-- Lint errors: `pnpm biome check apps/web --write` then fix remaining
-- Test failures: fix the code (not the test, unless the test is wrong)
-- A11y regressions: add aria labels, fix contrast, add roles as needed
+For each PR in the **CONFLICT** and **BLOCKED** buckets, spawn ONE Agent with
+`isolation: "worktree"` and `mode: "bypassPermissions"`. **Send all spawns in a
+single message** so they run in parallel. Pick the model by task:
 
-### Validate the fix
+- **Haiku** (cheap, mechanical): rebase a `CONFLICTING` branch whose conflicts are
+  lockfiles / imports / generated files; fix a failing unit/lint/type check that's
+  a clear mechanical break.
+- **Opus** (judgment): semantic merge conflicts (overlapping logic), test failures
+  that need reasoning about intent, anything touching auth/billing/migrations, or
+  any PR a Haiku agent returned `BLOCKED_SEMANTIC` on.
+
+Each agent's prompt must be self-contained and instruct it to:
+1. In its worktree, `git fetch origin && git checkout <head>` then `git rebase origin/main`.
+2. Resolve conflicts **preserving PR intent**. If a conflict needs non-trivial
+   semantic judgment and the agent is the cheap tier → stop and report
+   `BLOCKED_SEMANTIC` with the conflicting hunks (do not guess).
+3. Run focused local verify: `pnpm --filter @jovie/web run typecheck`,
+   `pnpm biome check apps/web`, and the specific failing test files.
+4. Fix root causes (not the test, unless the test is wrong).
+5. `git push --force-with-lease` to the PR's head branch. **Never push to `main`.**
+6. Add the `merge-queue` label (`gh pr edit <n> --add-label merge-queue`). **Never `gh pr merge`.**
+7. Report `DONE` / `BLOCKED_SEMANTIC` / `BLOCKED_OTHER` with the reason.
+
+Re-dispatch any `BLOCKED_SEMANTIC` returns to an Opus agent. After agents return,
+re-run Phase 0 to enroll anything now green.
+
+## Phase 3 — Surface, don't act
+
+For the **SURFACE** bucket (`needs-human`, `hold`, `gated`) and any
+duplicate/superseded PRs, **report to the human with a recommendation** — do
+not close or merge. The drain strips `merge-queue` from hard-gated PRs before
+surfacing them. Detect dupes:
 
 ```bash
-pnpm --filter @jovie/web run typecheck -- --pretty false && pnpm biome check apps/web && pnpm vitest --run
+gh pr list --state open --json number,title --limit 100 \
+  | jq -r 'group_by(.title)[] | select(length>1) | "DUP: \(.[0].title) -> \([.[].number])"'
 ```
 
-### Create a fix branch and open a PR
-
-```bash
-git checkout -b fix/systemic-ci-blockers main
-git add -A
-git commit -m "fix: resolve systemic CI blockers
-
-Fixes: <list the check names that were failing>
-
-Co-authored-by: Claude <claude@anthropic.com>"
-git push origin fix/systemic-ci-blockers
-gh pr create --base main --head fix/systemic-ci-blockers --title "fix: resolve systemic CI blockers"
-```
-
-### Wait for CI on the fix PR
-
-```bash
-# Watch the latest CI run
-gh run list --branch fix/systemic-ci-blockers --limit 1 --json databaseId,status,conclusion
-# If still running, wait:
-gh run watch <RUN_ID>
-# Once green, add the PR to the Graphite merge queue:
-gh pr edit --add-label merge-queue
-```
-
-**Do NOT proceed to Phase 2 until main CI is green.**
-
-## Phase 2: Bulk Rebase All Open PRs
-
-Now that main is healthy, update every open PR branch:
-
-```bash
-# Get all open PR numbers
-OPEN_PRS=$(gh pr list --state open --json number --jq '.[].number')
-
-for PR in $OPEN_PRS; do
-  echo "Updating PR #$PR branch..."
-  gh api repos/{owner}/{repo}/pulls/$PR/update-branch --method PUT 2>/dev/null || echo "PR #$PR: update-branch failed (may have conflicts)"
-done
-```
-
-Wait for CI to re-run on all PRs (give it a few minutes for checks to start):
-
-```bash
-sleep 120  # Let GitHub trigger CI runs
-
-# Check status of all PRs
-for PR in $OPEN_PRS; do
-  echo "PR #$PR checks:"
-  gh pr checks $PR --json name,state,conclusion 2>/dev/null | jq -r '.[] | "\(.name): \(.conclusion // .state)"'
-  echo "---"
-done
-```
-
-## Phase 2.5: Promote Drafts + Close Duplicates
-
-After rebasing, audit drafts and duplicates before orchestrating:
-
-### Auto-review and promote cursor-bot drafts
-
-Cursor-bot (author `app/cursor`) produces small, narrowly-scoped fixes for linter hotspots, a11y regressions, Sonar flags, etc. No human is needed to land these — review the diff, approve if it's sensible, promote from draft, and enable auto-merge.
-
-```bash
-CURSOR_DRAFTS=$(gh pr list --state open --draft --author app/cursor --json number --limit 100 --jq '.[].number')
-
-for PR in $CURSOR_DRAFTS; do
-  echo "=== Reviewing cursor draft #$PR ==="
-  # Check scope: line count and files touched
-  DIFFSTAT=$(gh pr diff $PR --patch 2>/dev/null | diffstat -s 2>/dev/null || gh pr view $PR --json additions,deletions,changedFiles --jq '"\(.additions)+/\(.deletions)- across \(.changedFiles) files"')
-  echo "Scope: $DIFFSTAT"
-
-  # Inspect the diff — agent decides if it's a sensible narrow fix.
-  # RED FLAGS (do NOT auto-approve, leave as draft):
-  #  - touches >10 files
-  #  - modifies migrations, auth middleware, billing, or cron handlers
-  #  - changes public API surface or shared UI primitives
-  #  - weakens a CI gate (disabled tests, skipped assertions, raised thresholds without justification)
-  # GREEN FLAGS (auto-approve):
-  #  - narrow fix to a linter/sonar/a11y finding
-  #  - test-only or comment-only change
-  #  - internal refactor < 50 lines with no behavior change
-  gh pr diff $PR | head -400  # inspect
-
-  # If the diff looks good (agent's judgment):
-  gh pr ready $PR
-  gh pr merge $PR --auto
-
-  # Close duplicates: if multiple cursor drafts tackle the same file/issue,
-  # keep the lowest-numbered one and close the rest.
-done
-```
-
-If two cursor drafts touch the same file(s), close the later one as a duplicate (see below). Cursor often opens 2–3 variants of the same fix; pick the cleanest.
-
-### Promote other passing drafts
-
-```bash
-DRAFT_PRS=$(gh pr list --state open --draft --json number,author --limit 100 --jq '.[] | select(.author.login != "app/cursor") | .number')
-
-for PR in $DRAFT_PRS; do
-  FAILING=$(gh pr checks $PR 2>/dev/null | grep -v skipping | grep "fail" | grep -v "Preview Deploy")
-  if [ -z "$FAILING" ]; then
-    echo "PR #$PR passed CI — promoting to ready-for-review"
-    gh pr ready $PR
-    gh pr merge $PR --auto
-  else
-    echo "PR #$PR still has failures — skipping"
-  fi
-done
-```
-
-### Close duplicate PRs
-
-Duplicates appear when agents open two PRs for the same Linear issue. Identify by matching titles:
-
-```bash
-gh pr list --state open --json number,title --limit 100 | python3 -c "
-import sys, json, collections
-prs = json.load(sys.stdin)
-by_title = collections.defaultdict(list)
-for p in prs:
-    by_title[p['title']].append(p['number'])
-for title, nums in by_title.items():
-    if len(nums) > 1:
-        print(f'DUPLICATE: {title} -> PRs {sorted(nums)}')
-"
-```
-
-For each duplicate group, keep the **lowest-numbered PR** and close the rest:
-
-```bash
-gh pr close <DUPLICATE_NUMBER> --comment "Closing duplicate — #<CANONICAL> is the canonical PR."
-```
-
-## Phase 3: Process Remaining PRs
-
-Now that main is fixed and all PRs are rebased, process the remaining queue:
-
-### Enable auto-merge on passing PRs
-
-```bash
-OPEN_PRS=$(gh pr list --state open --json number --jq '.[].number')
-
-for PR in $OPEN_PRS; do
-  FAILING=$(gh pr checks $PR 2>/dev/null | grep -v skipping | grep "fail" | grep -v "Preview Deploy")
-  if [ -z "$FAILING" ]; then
-    echo "PR #$PR passed CI — adding to Graphite merge queue"
-    gh pr edit $PR --add-label merge-queue
-  else
-    echo "PR #$PR still has failures"
-  fi
-done
-```
-
-### Phase 3b: Parallel per-PR agents (MANDATORY for remaining failures)
-
-For every still-failing PR after Phase 3, spawn ONE Agent per PR IN PARALLEL using `isolation: "worktree"` and `mode: "bypassPermissions"`. Send all spawn calls in a single message (multiple Agent tool calls in one turn) so they run concurrently.
-
-Each agent's prompt must include:
-1. The PR number, title, head branch
-2. Current failing checks (name + log URL from `gh pr checks $PR`)
-3. Any unresolved bot/human review comments (fetch via `gh api repos/{owner}/{repo}/pulls/$PR/comments --paginate`)
-4. Instructions:
-   - Check out the PR's head branch in the worktree
-   - Rebase onto latest `main`; resolve conflicts preserving PR intent
-   - Run `pnpm --filter=@jovie/web exec tsc --noEmit`, `pnpm biome check apps/web`, and the failing test files locally
-   - Fix root causes (not symptoms); update tests only if they're wrong
-   - Address each unaddressed CodeRabbit / Greptile comment (fix or reply explaining why declined)
-   - Commit with conventional messages, push to the PR head branch
-   - Enable auto-merge via `gh pr merge $PR --auto`
-   - Report DONE / DONE_WITH_CONCERNS / BLOCKED with the specific reason
-
-Sample Agent tool call (repeat per PR, all in one message):
-
-```
-Agent({
-  subagent_type: "general-purpose",
-  isolation: "worktree",
-  mode: "bypassPermissions",
-  description: "Fix PR #<NUMBER>",
-  prompt: "<self-contained prompt with failures + comments + instructions>"
-})
-```
-
-Do NOT wait for one agent before spawning the next. Do NOT run them sequentially. The point of this phase is fan-out.
-
-After all agents return, re-run Phase 3 auto-merge enablement and report.
-
-### Close stale or stuck PRs
-
-PRs that can't be fixed automatically (agent returns BLOCKED):
-- Close with a comment explaining why
-- Label as `needs-human` if human intervention is required
-
-## Phase 4: Report
-
-Produce a final summary:
-
-```bash
-# Final state
-ONE_HOUR_AGO=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)
-MERGED=$(gh pr list --state merged --json number --jq 'length' --search "merged:>=$ONE_HOUR_AGO" 2>/dev/null || echo "check manually")
-CLOSED=$(gh pr list --state closed --json number --jq 'length' --search "closed:>=$ONE_HOUR_AGO" 2>/dev/null || echo "check manually")
-OPEN=$(gh pr list --state open --json number,title,labels --limit 100)
-```
+## Phase 4 — Report
 
 ```markdown
 ## Drain Results
-
-### Systemic Issues Found & Fixed
-- <list issues fixed on main, or "None">
-
-### PR Queue Status
-- Merged: X PRs
-- Closed (duplicates/stale): X PRs
-- Still open: X PRs
-
-### Still Open (if any)
-| # | Title | Blocking Reason | Label |
-|---|-------|-----------------|-------|
-
-### Recommendations
-- <any patterns observed, e.g. "agents keep creating a11y issues — add pre-push axe check">
-- <any recurring failure patterns to address in AGENTS.md or CI>
+- Enrolled into queue: <n> (#…)
+- Fix agents dispatched: <n> (DONE: …, still blocked: …)
+- Surfaced for human: <n> (#… — recommend close/keep + why)
+- Graphite MQ in-flight: <n> groups
+- Systemic blockers fixed on main: <…/none>
+- Last merge: <ts>  | Open PRs: <n>
 ```
 
-## Constraints
+Flow-health targets: nothing non-draft sits unenrolled; no agent PR open >24h
+without a push; if a labeled PR isn't entering the queue, the `merge-queue` →
+Graphite enrollment wiring is broken — flag it.
 
-- **NEVER force-push to main** — only clean commits
-- **NEVER skip CI** on main — wait for green before proceeding
-- **NEVER merge PRs with failing checks** — fix first
-- **Systemic fixes go on main** — don't fix the same thing on 17 branches
-- **Individual fixes go on branches** — branch-specific issues stay on branches
-- Always run `/verify` before pushing fixes
+If a Graphite draft gets stale after a downstack MQ draft closes, first resubmit
+the source PR with `gt submit --always --update-only --no-edit --no-interactive
+--no-verify`. If the stale `gtmq_*` draft remains, use the Graphite dashboard
+to cancel/retry the queue entry. Do not close `gtmq_*` PRs from GitHub.

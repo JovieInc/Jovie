@@ -12,25 +12,45 @@ interface StripeConnectStatus {
   onboardingComplete: boolean;
   payoutsEnabled: boolean;
   email: string | null;
+  onboardingAvailable?: boolean;
 }
+
+type StripeConnectErrorCode = 'platform_profile_incomplete' | string;
 
 async function fetchJson(
   url: string,
   options?: RequestInit
 ): Promise<
-  { ok: true; data: Record<string, unknown> } | { ok: false; error: string }
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; error: string; code?: StripeConnectErrorCode }
 > {
   const res = await fetch(url, options);
   const data = await res.json();
-  if (!res.ok) return { ok: false, error: data.error || 'Request failed' };
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: data.error || 'Request failed',
+      code: typeof data.code === 'string' ? data.code : undefined,
+    };
+  }
   return { ok: true, data };
 }
+
+const PLATFORM_PROFILE_UNAVAILABLE_MESSAGE =
+  'Payout setup is temporarily unavailable. Please try again later.';
 
 export function SettingsPaymentsSection() {
   const [status, setStatus] = useState<StripeConnectStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<StripeConnectErrorCode | null>(
+    null
+  );
+  const [onboardingUnavailable, setOnboardingUnavailable] = useState(false);
+
+  const isPlatformProfileUnavailable =
+    onboardingUnavailable || errorCode === 'platform_profile_incomplete';
 
   const renderPanel = (children: ReactNode, footer?: ReactNode) => (
     <SettingsPanel>
@@ -43,17 +63,33 @@ export function SettingsPaymentsSection() {
     </SettingsPanel>
   );
 
+  const renderNotice = (message: string, tone: 'warning' | 'error') => (
+    <p
+      className={
+        tone === 'warning'
+          ? 'text-app leading-[18px] text-warning'
+          : 'text-app leading-[18px] text-destructive'
+      }
+    >
+      {message}
+    </p>
+  );
+
   // Fetch status on mount
   const fetchStatus = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
+      setErrorCode(null);
       const result = await fetchJson('/api/stripe-connect/status');
       if (!result.ok) {
         setError(result.error || 'Failed to load payment status');
+        setErrorCode(result.code ?? null);
         return;
       }
-      setStatus(result.data as unknown as StripeConnectStatus);
+      const nextStatus = result.data as unknown as StripeConnectStatus;
+      setStatus(nextStatus);
+      setOnboardingUnavailable(nextStatus.onboardingAvailable === false);
     } catch {
       setError('Failed to load payment status');
     } finally {
@@ -67,14 +103,25 @@ export function SettingsPaymentsSection() {
   }, [fetchStatus]);
 
   const handleConnect = async () => {
+    if (isPlatformProfileUnavailable) {
+      setError(PLATFORM_PROFILE_UNAVAILABLE_MESSAGE);
+      setErrorCode('platform_profile_incomplete');
+      return;
+    }
+
     setIsActionLoading(true);
     setError(null);
+    setErrorCode(null);
     try {
       const result = await fetchJson('/api/stripe-connect/onboard', {
         method: 'POST',
       });
       if (!result.ok) {
         setError(result.error || 'Failed to start onboarding');
+        setErrorCode(result.code ?? null);
+        if (result.code === 'platform_profile_incomplete') {
+          setOnboardingUnavailable(true);
+        }
         return;
       }
       if (typeof result.data.url === 'string') {
@@ -92,12 +139,14 @@ export function SettingsPaymentsSection() {
   const handleDisconnect = async () => {
     setIsActionLoading(true);
     setError(null);
+    setErrorCode(null);
     try {
       const result = await fetchJson('/api/stripe-connect/disconnect', {
         method: 'POST',
       });
       if (!result.ok) {
         setError(result.error || 'Failed to disconnect');
+        setErrorCode(result.code ?? null);
         return;
       }
       await fetchStatus();
@@ -113,7 +162,7 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<CreditCard className='h-4 w-4' aria-hidden />}
         title='Loading payments'
-        description='Checking your Stripe connection and payout status.'
+        description='Checking your stripe connection and payout status.'
       />
     );
   }
@@ -127,10 +176,27 @@ export function SettingsPaymentsSection() {
         description={error}
         action={
           <Button variant='secondary' size='sm' onClick={() => fetchStatus()}>
-            Try again
+            Try Again
           </Button>
         }
       />
+    );
+  }
+
+  // Platform profile incomplete — fail-soft unavailable state
+  if (isPlatformProfileUnavailable && !status?.connected) {
+    return renderPanel(
+      <SettingsActionRow
+        icon={<AlertTriangle className='h-4 w-4' aria-hidden />}
+        title='Payout setup temporarily unavailable'
+        description='Stripe payout onboarding is paused while jovie finishes platform setup. Your account is safe — try again later.'
+        action={
+          <Button variant='secondary' size='sm' disabled>
+            Connect Stripe
+          </Button>
+        }
+      />,
+      renderNotice(error ?? PLATFORM_PROFILE_UNAVAILABLE_MESSAGE, 'warning')
     );
   }
 
@@ -140,21 +206,25 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<CreditCard className='h-4 w-4' aria-hidden />}
         title='Stripe not connected'
-        description='Connect Stripe to receive fan payments directly through Jovie. Stripe handles payment processing, payouts, and tax reporting.'
+        description='Connect stripe to receive fan payments directly through jovie. Stripe handles payment processing, payouts, and tax reporting.'
         action={
           <Button
             onClick={handleConnect}
             loading={isActionLoading || undefined}
             variant='primary'
             size='sm'
+            disabled={isPlatformProfileUnavailable || undefined}
           >
             Connect Stripe
           </Button>
         }
       />,
-      error ? (
-        <p className='text-app leading-[18px] text-destructive'>{error}</p>
-      ) : undefined
+      error
+        ? renderNotice(
+            error,
+            isPlatformProfileUnavailable ? 'warning' : 'error'
+          )
+        : undefined
     );
   }
 
@@ -176,8 +246,9 @@ export function SettingsPaymentsSection() {
               loading={isActionLoading || undefined}
               variant='primary'
               size='sm'
+              disabled={isPlatformProfileUnavailable || undefined}
             >
-              Complete setup
+              Complete Setup
             </Button>
             <Button
               onClick={handleDisconnect}
@@ -191,9 +262,12 @@ export function SettingsPaymentsSection() {
           </div>
         }
       />,
-      error ? (
-        <p className='text-app leading-[18px] text-destructive'>{error}</p>
-      ) : undefined
+      error
+        ? renderNotice(
+            error,
+            isPlatformProfileUnavailable ? 'warning' : 'error'
+          )
+        : undefined
     );
   }
 
@@ -222,8 +296,8 @@ export function SettingsPaymentsSection() {
         </Button>
       }
     />,
-    error ? (
-      <p className='text-app leading-[18px] text-destructive'>{error}</p>
-    ) : undefined
+    error
+      ? renderNotice(error, isPlatformProfileUnavailable ? 'warning' : 'error')
+      : undefined
   );
 }

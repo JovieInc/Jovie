@@ -54,6 +54,19 @@ export interface ElectronAPI {
    * whether Electron has explicitly allowed the trusted Web Speech fallback.
    */
   readonly getDictationStatus?: () => Promise<DesktopDictationStatus>;
+  /**
+   * Push the current app state to the macOS menu bar extra (NSStatusItem).
+   * No-op in non-Electron contexts or on non-macOS platforms.
+   */
+  readonly setTrayState?: (payload: {
+    state: string;
+    unreadCount?: number;
+  }) => Promise<{ ok: boolean; reason?: string }>;
+  /**
+   * Subscribe to tray quick-action events from the main process.
+   * Returns an unsubscribe function.
+   */
+  readonly onTrayAction?: (cb: (action: string) => void) => () => void;
 }
 
 export interface DesktopAuthCompletion {
@@ -540,6 +553,34 @@ export function useDesktopDictationStatus(): DesktopDictationStatus {
   return status;
 }
 
+export type DesktopTrayState = 'idle' | 'active' | 'unread' | 'error';
+
+/**
+ * Push state to the macOS menu bar extra.
+ * Silently no-ops when not running in Electron or when the installed binary
+ * predates the tray bridge (stale binary graceful degradation).
+ */
+export async function setDesktopTrayState(
+  state: DesktopTrayState,
+  unreadCount?: number
+): Promise<void> {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.setTrayState !== 'function') return;
+  await api.setTrayState({ state, unreadCount });
+}
+
+/**
+ * Subscribe to quick-action events fired by the tray context menu.
+ * The `action` string is one of: 'open-chat' | 'new-message' | 'open-preferences'.
+ * Returns an unsubscribe function; safe to call in browser contexts (returns no-op).
+ */
+export function onDesktopTrayAction(cb: (action: string) => void): () => void {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.onTrayAction !== 'function') return noopUnsubscribe;
+  const unsubscribe = api.onTrayAction(cb);
+  return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
+}
+
 // Exported for tests only — do not call directly from product code.
 export const __testing = {
   reset: () => reportedMissing.clear(),
@@ -551,5 +592,7 @@ export const __testing = {
   openDesktopAuthUrl,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,
+  setDesktopTrayState,
+  onDesktopTrayAction,
   RELEASE_DOWNLOAD_URL,
 };

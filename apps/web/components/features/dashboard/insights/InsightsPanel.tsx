@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
@@ -10,26 +11,30 @@ import {
   PageToolbarActionButton,
 } from '@/components/organisms/table';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
+import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
 import { InsightEmptyState } from './InsightEmptyState';
 
 interface PrioritySectionProps {
   readonly label: string;
-  readonly colorClass: string;
+  readonly colorClass?: string;
+  readonly colorStyle?: CSSProperties;
   readonly insights: InsightResponse[];
 }
 
 function PrioritySection({
   label,
   colorClass,
+  colorStyle,
   insights,
 }: PrioritySectionProps) {
   if (insights.length === 0) return null;
   return (
     <section>
       <h3
-        className={`mb-3 text-app font-caption tracking-normal ${colorClass}`}
+        className={`mb-3 text-app font-caption tracking-normal ${colorClass ?? ''}`}
+        style={colorStyle}
       >
         {label}
       </h3>
@@ -97,12 +102,12 @@ function InsightsPanelContent({
     <div className='space-y-6'>
       <PrioritySection
         label='High Priority'
-        colorClass='text-orange-600 dark:text-orange-400'
+        colorStyle={{ color: getAccentCssVars('orange').solid }}
         insights={grouped.high}
       />
       <PrioritySection
         label='Recommended'
-        colorClass='text-blue-600 dark:text-blue-400'
+        colorStyle={{ color: getAccentCssVars('blue').solid }}
         insights={grouped.medium}
       />
       <PrioritySection
@@ -186,10 +191,10 @@ export function InsightsPanelView({
             value={selectedCategory}
             onValueChange={onCategoryChange}
             options={CATEGORY_FILTERS}
-            aria-label='Filter insights by category'
+            aria-label='Filter Insights By Category'
             surface='ghost'
             className='flex flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0'
-            triggerClassName='min-h-8 border border-subtle bg-surface-1 px-3 py-1 text-[12.5px] text-secondary-token hover:border-default hover:bg-surface-0 hover:text-primary-token data-[state=active]:border-default data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token'
+            triggerClassName='min-h-8 border border-subtle bg-surface-1 px-3 py-1 text-xs text-secondary-token hover:border-default hover:bg-surface-0 hover:text-primary-token data-[state=active]:border-default data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token'
           />
 
           <InsightsPanelContent

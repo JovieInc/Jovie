@@ -187,6 +187,7 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/dashboard/activity/recent` | GET | `auth` | Recent activity feed |
+| `/api/dashboard/ai-crawlers` | GET | `auth` | AI crawler analytics (Pro detail; free users get teaser counts) |
 | `/api/dashboard/analytics` | GET | `auth` | Analytics overview |
 | `/api/dashboard/audience/members` | GET | `auth` | Audience member list |
 | `/api/dashboard/audience/source-groups` | GET, POST | `auth` | Audience source group management |
@@ -200,6 +201,7 @@
 | `/api/dashboard/pixels/health` | GET | `auth` | Pixel health check |
 | `/api/dashboard/pixels/test-event` | POST | `auth` | Send test pixel event |
 | `/api/dashboard/profile` | GET, PUT | `auth` | Profile data |
+| `/api/dashboard/releases/artwork-downloads` | POST | `auth` | Toggle allow-artwork-downloads for the active profile |
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |
 | `/api/dashboard/releases/[releaseId]/tracks` | GET | `auth` | Release tracks |

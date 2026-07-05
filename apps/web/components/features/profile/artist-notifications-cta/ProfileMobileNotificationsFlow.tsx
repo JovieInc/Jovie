@@ -6,7 +6,9 @@ import {
   Check,
   ChevronLeft,
   Mail,
+  MessageCircle,
   Music2,
+  Send,
   Shirt,
   X,
 } from 'lucide-react';
@@ -20,12 +22,17 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
+import {
+  type CountryOption,
+  CountrySelector,
+} from '@/features/profile/notifications';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 
 export type ProfileMobileNotificationsFlowStep =
   | 'email'
+  | 'capture_success'
   | 'otp'
   | 'name'
   | 'birthday'
@@ -38,9 +45,12 @@ interface ProfileMobileNotificationsFlowProps {
   readonly portalContainer?: HTMLElement | null;
   readonly artistName: string;
   readonly channel?: 'email' | 'sms';
+  readonly country: CountryOption;
   readonly step: ProfileMobileNotificationsFlowStep;
   readonly accentHex?: string | null;
   readonly emailInput: string;
+  readonly phoneInput: string;
+  readonly successContactEcho?: string | null;
   readonly otpCode: string;
   readonly nameInput: string;
   readonly birthdayInput: string;
@@ -52,6 +62,7 @@ interface ProfileMobileNotificationsFlowProps {
   readonly birthdayHintShown: boolean;
   readonly resendCooldownEnd: number;
   readonly isResending: boolean;
+  readonly isCountryOpen: boolean;
   readonly contentPrefs: Record<NotificationContentType, boolean>;
   readonly canEditPreferences?: boolean;
   readonly canGoBackFromPreferences?: boolean;
@@ -60,8 +71,13 @@ interface ProfileMobileNotificationsFlowProps {
   readonly showArtistEmailSection?: boolean;
   readonly onClose: () => void;
   readonly onBack: () => void;
+  readonly onChannelChange: (channel: 'email' | 'sms') => void;
+  readonly onCountryOpenChange: (open: boolean) => void;
+  readonly onCountrySelect: (country: CountryOption) => void;
   readonly onEmailChange: (value: string) => void;
+  readonly onPhoneChange: (value: string) => void;
   readonly onEmailSubmit: () => void;
+  readonly onDismissCapture?: () => void;
   readonly onOtpChange: (value: string) => void;
   readonly onOtpComplete: (value: string) => void;
   readonly onOtpSubmit: () => void;
@@ -76,9 +92,12 @@ interface ProfileMobileNotificationsFlowProps {
 }
 
 const FLOW_TRANSITION = {
-  duration: 0.22,
+  duration: 0.42,
   ease: [0.22, 1, 0.36, 1] as const,
 };
+
+const CAPTURE_CONSENT_COPY =
+  'By submitting, you agree to receive updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.';
 
 const MONTH_OPTIONS = [
   'January',
@@ -151,20 +170,49 @@ function ScreenShell({
   body,
   children,
   footer,
+  /**
+   * `compact` vertically centers the title + field + CTA as one balanced group
+   * instead of stretching the field region and pinning the footer to the bottom.
+   * Used for short single-field steps so the field and CTA
+   * read as one unit with no dead vertical space (JOV-3555).
+   */
+  compact = false,
 }: Readonly<{
   title: string;
   body?: string;
   children: React.ReactNode;
   footer: React.ReactNode;
+  compact?: boolean;
 }>) {
+  if (compact) {
+    return (
+      <div className='flex flex-1 flex-col justify-center'>
+        <div className='space-y-5'>
+          <div className='space-y-2'>
+            <h2 className='text-xl font-semibold leading-[1.08] tracking-normal dark:text-white'>
+              {title}
+            </h2>
+            {body ? (
+              <p className='max-w-[24rem] text-sm leading-5 text-white/58'>
+                {body}
+              </p>
+            ) : null}
+          </div>
+          <div>{children}</div>
+          <div>{footer}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className='flex flex-1 flex-col'>
       <div className='space-y-2 pb-6 pt-2'>
-        <h2 className='text-[22px] font-semibold leading-[1.08] tracking-normal text-white'>
+        <h2 className='text-xl font-semibold leading-[1.08] tracking-normal dark:text-white'>
           {title}
         </h2>
         {body ? (
-          <p className='max-w-[24rem] text-[14px] leading-5 text-white/58'>
+          <p className='max-w-[24rem] text-sm leading-5 text-white/58'>
             {body}
           </p>
         ) : null}
@@ -209,7 +257,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-full bg-white/14 px-5 text-[14px] font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] dark:text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -230,7 +278,7 @@ function SecondaryTextButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className='inline-flex h-10 w-full items-center justify-center rounded-full px-5 text-[13px] font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-10 w-full items-center justify-center rounded-3xl px-5 text-app font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -262,7 +310,7 @@ function LabeledInput({
 }>) {
   return (
     <label className='block space-y-2'>
-      <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+      <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
         {label}
       </span>
       <input
@@ -275,9 +323,79 @@ function LabeledInput({
         onChange={event => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className='h-12 w-full touch-manipulation rounded-full border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.005em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        className='h-12 w-full touch-manipulation rounded-3xl border border-white/10 bg-white/[0.03] px-4 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
       />
     </label>
+  );
+}
+
+function InlineCaptureField({
+  channel,
+  country,
+  isCountryOpen,
+  value,
+  placeholder,
+  isSubmitting,
+  onCountryOpenChange,
+  onCountrySelect,
+  onValueChange,
+  onSubmit,
+}: Readonly<{
+  channel: 'email' | 'sms';
+  country: CountryOption;
+  isCountryOpen: boolean;
+  value: string;
+  placeholder: string;
+  isSubmitting: boolean;
+  onCountryOpenChange: (open: boolean) => void;
+  onCountrySelect: (country: CountryOption) => void;
+  onValueChange: (value: string) => void;
+  onSubmit: () => void;
+}>) {
+  return (
+    <div className='rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.035] p-1.5'>
+      <div className='flex min-h-13 items-center gap-1'>
+        {channel === 'sms' ? (
+          <CountrySelector
+            country={country}
+            isOpen={isCountryOpen}
+            onOpenChange={onCountryOpenChange}
+            onSelect={onCountrySelect}
+          />
+        ) : (
+          <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
+            <Mail className='size-4.5' />
+          </span>
+        )}
+        <input
+          data-testid='mobile-email-input'
+          type={channel === 'sms' ? 'tel' : 'email'}
+          inputMode={channel === 'sms' ? 'tel' : 'email'}
+          autoComplete={channel === 'sms' ? 'tel' : 'email'}
+          value={value}
+          placeholder={placeholder}
+          onChange={event => onValueChange(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onSubmit();
+            }
+          }}
+          disabled={isSubmitting}
+          aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
+          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        />
+        <button
+          type='button'
+          onClick={onSubmit}
+          disabled={isSubmitting}
+          className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
+          aria-label='Submit'
+        >
+          <Send className='size-4' />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -308,14 +426,14 @@ function BirthdaySelectors({
   return (
     <div className='grid grid-cols-3 gap-3'>
       <label className='block space-y-2'>
-        <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
           Month
         </span>
         <select
           data-testid='mobile-birthday-month'
           value={parts.month}
           onChange={event => updatePart('month', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-3xl border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] dark:text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Month</option>
           {MONTH_OPTIONS.map((month, index) => (
@@ -327,14 +445,14 @@ function BirthdaySelectors({
       </label>
 
       <label className='block space-y-2'>
-        <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
           Day
         </span>
         <select
           data-testid='mobile-birthday-day'
           value={parts.day}
           onChange={event => updatePart('day', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-3xl border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] dark:text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Day</option>
           {Array.from({ length: 31 }, (_, index) => index + 1).map(day => (
@@ -346,14 +464,14 @@ function BirthdaySelectors({
       </label>
 
       <label className='block space-y-2'>
-        <span className='text-[13px] font-medium tracking-[-0.01em] text-white/42'>
+        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
           Year
         </span>
         <select
           data-testid='mobile-birthday-year'
           value={parts.year}
           onChange={event => updatePart('year', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-full border border-white/10 bg-white/[0.03] px-3 text-[16px] font-medium tracking-[-0.005em] text-white focus:border-white/18 focus:outline-none'
+          className='h-12 w-full touch-manipulation appearance-none rounded-3xl border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] dark:text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Year</option>
           {yearOptions.map(year => (
@@ -373,9 +491,12 @@ export function ProfileMobileNotificationsFlow({
   portalContainer,
   artistName,
   channel = 'email',
+  country,
   step,
   accentHex = '#8b5cf6',
   emailInput,
+  phoneInput,
+  successContactEcho = null,
   otpCode,
   nameInput,
   birthdayInput,
@@ -387,6 +508,7 @@ export function ProfileMobileNotificationsFlow({
   birthdayHintShown,
   resendCooldownEnd,
   isResending,
+  isCountryOpen,
   contentPrefs,
   canEditPreferences = false,
   canGoBackFromPreferences = false,
@@ -394,8 +516,13 @@ export function ProfileMobileNotificationsFlow({
   showArtistEmailSection = false,
   onClose,
   onBack,
+  onChannelChange,
+  onCountryOpenChange,
+  onCountrySelect,
   onEmailChange,
+  onPhoneChange,
   onEmailSubmit,
+  onDismissCapture,
   onOtpChange,
   onOtpComplete,
   onOtpSubmit,
@@ -498,40 +625,95 @@ export function ProfileMobileNotificationsFlow({
 
   const screen = (() => {
     if (step === 'email') {
+      const isSms = channel === 'sms';
+      const fieldValue = isSms ? phoneInput : emailInput;
       return (
         <ScreenShell
-          title={channel === 'sms' ? 'Text Alerts' : 'Email Alerts'}
-          body={`${artistName} alerts.`}
+          compact
+          title='Get Updates'
+          body={`${artistName}: music, shows, merch.`}
           footer={
-            <div className='space-y-3'>
+            <div className='min-h-27 space-y-3'>
               {error ? (
                 <p className='text-sm text-red-400' role='alert'>
                   {error}
                 </p>
               ) : null}
-              <PrimaryButton onClick={onEmailSubmit} disabled={isSubmitting}>
-                Continue
-              </PrimaryButton>
+              <p className='text-xs leading-4 text-white/42'>
+                {CAPTURE_CONSENT_COPY}
+              </p>
+              <div className='flex items-center justify-between gap-3'>
+                <button
+                  type='button'
+                  onClick={() => onChannelChange(isSms ? 'email' : 'sms')}
+                  disabled={isSubmitting}
+                  className='inline-flex h-9 items-center gap-1.5 rounded-full px-1 text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  {isSms ? (
+                    <Mail className='size-3.5' />
+                  ) : (
+                    <MessageCircle className='size-3.5' />
+                  )}
+                  {isSms ? 'Use Email' : 'Use SMS'}
+                </button>
+                {onDismissCapture ? (
+                  <button
+                    type='button'
+                    onClick={onDismissCapture}
+                    disabled={isSubmitting}
+                    className='inline-flex h-9 items-center rounded-full px-1 text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
+                  >
+                    Not Now
+                  </button>
+                ) : null}
+              </div>
             </div>
           }
         >
-          <LabeledInput
-            label={channel === 'sms' ? 'Phone number' : 'Email address'}
-            value={emailInput}
-            placeholder={channel === 'sms' ? '(555) 123-4567' : 'you@email.com'}
-            type={channel === 'sms' ? 'tel' : 'email'}
-            inputMode={channel === 'sms' ? 'tel' : 'email'}
-            autoComplete={channel === 'sms' ? 'tel' : 'email'}
-            onChange={onEmailChange}
-            onKeyDown={event => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onEmailSubmit();
-              }
-            }}
-            disabled={isSubmitting}
-            testId='mobile-email-input'
+          <InlineCaptureField
+            channel={channel}
+            country={country}
+            isCountryOpen={isCountryOpen}
+            value={fieldValue}
+            placeholder={isSms ? '555 123 4567' : 'you@email.com'}
+            isSubmitting={isSubmitting}
+            onCountryOpenChange={onCountryOpenChange}
+            onCountrySelect={onCountrySelect}
+            onValueChange={isSms ? onPhoneChange : onEmailChange}
+            onSubmit={onEmailSubmit}
           />
+        </ScreenShell>
+      );
+    }
+
+    if (step === 'capture_success') {
+      return (
+        <ScreenShell
+          compact
+          title='You’re On The List'
+          body={
+            successContactEcho
+              ? `Updates are on for ${successContactEcho}.`
+              : `${artistName} updates are on.`
+          }
+          footer={
+            <p className='min-h-10 text-sm text-white/46'>
+              Setting up your preferences...
+            </p>
+          }
+        >
+          <div className='flex min-h-28 items-center justify-center'>
+            <div
+              className='flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] shadow-[0_20px_44px_rgba(0,0,0,0.28)]'
+              style={
+                {
+                  boxShadow: `0 20px 44px rgba(0,0,0,0.28), inset 0 0 0 1px ${accentHex}55`,
+                } as CSSProperties
+              }
+            >
+              <Check className='h-9 w-9 dark:text-white' />
+            </div>
+          </div>
         </ScreenShell>
       );
     }
@@ -565,13 +747,13 @@ export function ProfileMobileNotificationsFlow({
             </div>
           }
         >
-          <div className='rounded-[24px] border border-white/10 bg-white/[0.03] p-4'>
+          <div className='rounded-3xl border border-white/10 bg-white/[0.03] p-4'>
             <OtpInput
               value={otpCode}
               onChange={onOtpChange}
               onComplete={onOtpComplete}
               autoFocus={step === 'otp'}
-              aria-label='Enter 6-digit verification code'
+              aria-label='Enter Verification Code'
               disabled={isSubmitting}
               error={Boolean(error)}
               size='compact'
@@ -594,7 +776,7 @@ export function ProfileMobileNotificationsFlow({
           }
         >
           <LabeledInput
-            label='First name'
+            label='First Name'
             value={nameInput}
             placeholder='Alex'
             autoComplete='given-name'
@@ -659,7 +841,7 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <p
-                className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'
+                className='text-app font-semibold tracking-[-0.01em] text-white/42'
                 data-testid='profile-mobile-notifications-sent-from'
               >
                 Sent from Jovie
@@ -681,7 +863,7 @@ export function ProfileMobileNotificationsFlow({
                         <span className='inline-flex h-8 w-8 items-center justify-center text-white/68'>
                           <Icon className='size-4.5' />
                         </span>
-                        <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
+                        <span className='text-mid font-medium tracking-[-0.015em] text-white/88'>
                           {meta.label}
                         </span>
                       </div>
@@ -701,7 +883,7 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'>
+                  <p className='text-app font-semibold tracking-[-0.01em] text-white/42'>
                     Sent by {artistName}
                   </p>
 
@@ -711,7 +893,7 @@ export function ProfileMobileNotificationsFlow({
                         <Mail className='size-4.5' />
                       </span>
                       <div>
-                        <p className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
+                        <p className='text-mid font-medium tracking-[-0.015em] text-white/88'>
                           Artist Emails
                         </p>
                       </div>
@@ -721,7 +903,7 @@ export function ProfileMobileNotificationsFlow({
                       onCheckedChange={checked =>
                         onArtistEmailToggle?.(checked)
                       }
-                      aria-label='Artist emails'
+                      aria-label='Artist Emails'
                       className='data-[state=checked]:bg-[var(--mobile-flow-accent)] data-[state=unchecked]:bg-white/14'
                     />
                   </div>
@@ -750,7 +932,7 @@ export function ProfileMobileNotificationsFlow({
               } as CSSProperties
             }
           >
-            <Check className='h-10 w-10 text-white' />
+            <Check className='h-10 w-10 dark:text-white' />
           </div>
         </div>
       </ScreenShell>
@@ -772,7 +954,7 @@ export function ProfileMobileNotificationsFlow({
 
       <div
         className={cn(
-          'relative mx-auto flex w-full max-w-[430px] flex-col px-5',
+          'relative mx-auto flex w-full max-w-108 flex-col px-5',
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
             : 'h-full pb-8 pt-6'
@@ -836,7 +1018,7 @@ export function ProfileMobileNotificationsFlow({
       <div
         className={cn(
           overlayRootClassName,
-          'bg-[color:var(--profile-stage-bg)] text-white'
+          'bg-[color:var(--profile-stage-bg)] dark:text-white'
         )}
         data-testid='profile-mobile-notifications-flow'
         role='dialog'
@@ -849,20 +1031,20 @@ export function ProfileMobileNotificationsFlow({
       <div
         className={cn(
           overlayRootClassName,
-          'flex items-center justify-center bg-black/52 px-4 py-6 text-white backdrop-blur-sm'
+          'flex items-center justify-center bg-black/52 px-4 py-6 dark:text-white backdrop-blur-sm'
         )}
         data-testid='profile-mobile-notifications-flow'
         role='dialog'
         aria-modal='true'
         style={contentStyle}
       >
-        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
           {contentBody}
         </div>
       </div>
     ) : (
       <div
-        className='relative min-h-[600px] rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] text-white'
+        className='relative min-h-150 rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] dark:text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

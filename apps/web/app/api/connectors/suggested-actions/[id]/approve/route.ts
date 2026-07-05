@@ -54,7 +54,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     // Also return payload so we can include eventPayload in the workflow_runs row.
     const updated = await db
       .update(suggestedActions)
-      .set({ status: 'accepted', approvedAt: new Date() })
+      .set({ status: 'approved', approvedAt: new Date() })
       .where(
         and(
           eq(suggestedActions.id, id),

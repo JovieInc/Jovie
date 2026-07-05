@@ -39,7 +39,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
-    'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0';
+    'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-subtle last:border-b-0';
   if (isChecked || isSelected) {
     return cn(baseClasses, rowState.selected);
   }
@@ -295,7 +295,7 @@ function CreatorProfileTableRowComponent({
         </div>
       </td>
       <td className='px-4 py-2.5 align-middle max-lg:hidden lg:table-cell'>
-        <div className='flex max-w-[230px] justify-start overflow-hidden'>
+        <div className='flex max-w-58 justify-start overflow-hidden'>
           <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>

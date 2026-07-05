@@ -1,4 +1,4 @@
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { FALLBACK_AVATARS } from './featured-creators-fallback';
 import { HomeLiveProofSection } from './HomeLiveProofSection';
 

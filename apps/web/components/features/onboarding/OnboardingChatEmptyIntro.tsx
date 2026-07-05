@@ -124,7 +124,7 @@ export function OnboardingChatEmptyIntro({
         </div>
       </div>
 
-      <p className='text-center text-[12.5px] leading-5 text-secondary-token'>
+      <p className='text-center text-xs leading-5 text-secondary-token'>
         Already have an account?{' '}
         <Link
           href={APP_ROUTES.SIGNIN}

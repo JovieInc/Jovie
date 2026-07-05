@@ -19,10 +19,35 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-pr-monitor.plist.template` | every 10 min | Detect stuck PRs |
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | every 15 min | Claim one open GitHub issue labeled `codex` and dispatch a coder-profile agent |
+| `co.jovie.hermes.cron-pipeline-scoreboard.plist.template` | every 60 min | Write daily pipeline scoreboard to local state + gbrain, and alert on 12h shipper stalls |
+| `co.jovie.hermes.cron-gbrain-health-summary.plist.template` | 07:15 local daily | Probe gbrain, write latest health summary back to gbrain, and notify ops |
+| `co.jovie.hermes.cron-agent-config-health.plist.template` | every 15 min | Detect invalid Hermes/OpenClaw agent config before gateway churn |
 | `co.jovie.hermes.cron-cost-monitor.plist.template` | every 60 min | Cost kill switch |
 | `co.jovie.hermes.cron-daily-briefing.plist.template` | 07:00 daily | Morning briefing to Telegram |
 | `co.jovie.hermes.cron-deterministic-tracker.plist.template` | 03:00 daily | Self-improvement clustering |
 | `co.jovie.hermes.cron-free-model-health.plist.template` | 02:00 daily | Free-model rankings refresh |
+
+## Houston (MacBook Pro) units
+
+Coder/shipping loops run on Houston, not Hermes-Air. Pro-only templates live in `pro/` and are installed by `scripts/hermes/bootstrap-pro-launchd.sh` (not `bootstrap-air.sh`).
+
+| File | Schedule | Purpose |
+|---|---|---|
+| `pro/co.jovie.hermes.cron-codex-kanban-ship.plist.template` | every 15 min | Launch `scripts/hermes/ship-loop.sh` → `~/.hermes/scripts/codex-kanban-ship.py` (PAUSE + gbrain gated) |
+| `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | every 15 min | `~/.hermes/scripts/shipper-gated-entrypoint.py` → fail-closed gbrain/grok/checkout gate → `codex-issue-shipper.ts` |
+
+Install on the Pro:
+
+```bash
+./scripts/hermes/bootstrap-pro-launchd.sh
+launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.cron-codex-kanban-ship
+launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.cron-codex-issue-shipper
+tail -f ~/.hermes/logs/launchd/cron-codex-kanban-ship.log ~/.hermes/logs/ship-loop.log ~/.hermes/logs/launchd/cron-codex-issue-shipper.log
+```
+
+`bootstrap-pro-launchd.sh` copies `scripts/hermes/shipper-gated-entrypoint.py` to `~/.hermes/scripts/` on every install/reconfigure. The entrypoint refuses to exec the TypeScript shipper unless the primary `~/Jovie` checkout is clean `main` at `origin/main` (after fetch); stale ticks log `stale_checkout_abort` and notify Telegram/Slack.
+
+Ship outcomes append to `~/.hermes/events/events.jsonl` from `codex-kanban-ship.py`.
 
 ## Logs
 

@@ -82,7 +82,7 @@ describe('useStickToBottom', () => {
   };
 
   it('observes the bottom sentinel with a near-bottom root margin', () => {
-    const { result } = renderHook(() => useStickToBottom({ messageCount: 1 }));
+    const { result } = renderHook(() => useStickToBottom());
 
     const container = document.createElement('div');
     result.current.scrollContainerRef.current = container;
@@ -103,7 +103,7 @@ describe('useStickToBottom', () => {
   });
 
   it('releases sticky state when the sentinel leaves the viewport', () => {
-    const { result } = renderHook(() => useStickToBottom({ messageCount: 2 }));
+    const { result } = renderHook(() => useStickToBottom());
     attachSentinel(result);
 
     act(() => {
@@ -116,7 +116,7 @@ describe('useStickToBottom', () => {
   });
 
   it('re-attaches sticky state when the sentinel re-enters the viewport', () => {
-    const { result } = renderHook(() => useStickToBottom({ messageCount: 2 }));
+    const { result } = renderHook(() => useStickToBottom());
     attachSentinel(result);
 
     act(() => {
@@ -132,7 +132,7 @@ describe('useStickToBottom', () => {
   });
 
   it('batches resize-driven scroll writes to one rAF per frame', () => {
-    const { result } = renderHook(() => useStickToBottom({ messageCount: 1 }));
+    const { result } = renderHook(() => useStickToBottom());
 
     const container = document.createElement('div');
     Object.defineProperty(container, 'scrollHeight', {
@@ -167,7 +167,7 @@ describe('useStickToBottom', () => {
   });
 
   it('does not scroll on resize when the user has scrolled away', () => {
-    const { result } = renderHook(() => useStickToBottom({ messageCount: 1 }));
+    const { result } = renderHook(() => useStickToBottom());
 
     const container = document.createElement('div');
     Object.defineProperty(container, 'scrollHeight', {
@@ -200,8 +200,48 @@ describe('useStickToBottom', () => {
     expect(scrollTop).toBe(0);
   });
 
+  it('does NOT force-pin to bottom when messages arrive while user is scrolled away (regression: gh-11948)', () => {
+    const { result } = renderHook(() => useStickToBottom());
+
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'scrollHeight', {
+      configurable: true,
+      value: 800,
+    });
+    let scrollTop = 0;
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: value => {
+        scrollTop = value;
+      },
+    });
+    attachSentinel(result, container);
+
+    const content = document.createElement('div');
+    act(() => {
+      result.current.totalSizeRef(content);
+      // User scrolls away — sentinel leaves the viewport.
+      intersectionCallback?.([
+        { isIntersecting: false } as IntersectionObserverEntry,
+      ]);
+    });
+
+    expect(result.current.isStuckToBottom).toBe(false);
+
+    // New message appended: content grows (ResizeObserver fires).
+    act(() => {
+      resizeCallback?.([{ target: content } as ResizeObserverEntry]);
+    });
+
+    // Must NOT scroll back to bottom — user is scrolled away.
+    flushRaf();
+    expect(scrollTop).toBe(0);
+    expect(result.current.isStuckToBottom).toBe(false);
+  });
+
   it('keeps onScroll as a no-op (no layout reads)', () => {
-    const { result } = renderHook(() => useStickToBottom({ messageCount: 1 }));
+    const { result } = renderHook(() => useStickToBottom());
 
     const container = document.createElement('div');
     const scrollHeightSpy = vi.spyOn(container, 'scrollHeight', 'get');

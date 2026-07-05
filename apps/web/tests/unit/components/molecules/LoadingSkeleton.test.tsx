@@ -25,7 +25,7 @@ describe('LoadingSkeleton', () => {
       <LoadingSkeleton height='h-3.5' width='w-3.5' rounded='full' />
     );
 
-    const skeleton = container.firstElementChild;
+    const skeleton = container.querySelector('[aria-hidden="true"]');
 
     expect(skeleton).not.toBeNull();
     expect(skeleton?.className).toContain('h-3.5');
@@ -38,7 +38,7 @@ describe('LoadingSkeleton', () => {
       <LoadingSkeleton height='rounded-md' width='grid-cols-2' />
     );
 
-    const skeleton = container.firstElementChild;
+    const skeleton = container.querySelector('[aria-hidden="true"]');
 
     expect(skeleton).not.toBeNull();
     expect(skeleton?.className).toContain('h-4');

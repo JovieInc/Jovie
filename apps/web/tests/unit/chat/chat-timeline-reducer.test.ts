@@ -377,4 +377,128 @@ describe('chat timeline reducer', () => {
       textPart('Please answer'),
     ]);
   });
+
+  // Regression guard for JOV-3528: an on-send refetch (title polling, post-stream
+  // query invalidation) returns the same completed messages and must NOT hand the
+  // transcript fresh message objects / a fresh array. New references break the
+  // memoized `ChatMessage` reference check and replay its entrance animation,
+  // which reads as the whole transcript flashing blank then re-rendering.
+  describe('on-send refetch does not destructively replace settled content', () => {
+    const serverEcho = [
+      {
+        id: 'msg_user_server',
+        role: 'user' as const,
+        parts: [textPart('Hello')],
+        createdAt: new Date(100),
+        clientMessageId: 'turn_client_1:user',
+        turnId: 'turn_server',
+      },
+      {
+        id: 'msg_assistant_server',
+        role: 'assistant' as const,
+        parts: [textPart('Hi there, here is your answer.')],
+        createdAt: new Date(101),
+        clientMessageId: 'assistant:turn_client_1',
+        turnId: 'turn_server',
+      },
+    ];
+
+    // Fresh objects every call, mirroring a real React Query JSON response.
+    function freshServerEcho() {
+      return serverEcho.map(message => ({
+        ...message,
+        parts: message.parts.map(part => ({ ...part })),
+      }));
+    }
+
+    function settledConversation() {
+      // send → server acknowledges (user row goes `sent`) → stream completes.
+      const sent = reduceChatTimeline(
+        createInitialChatTimelineState('conv_1'),
+        {
+          type: 'message.send.started',
+          conversationId: 'conv_1',
+          clientTurnId: 'turn_client_1',
+          clientMessageId: 'turn_client_1:user',
+          requestId: 'req_1',
+          parts: [textPart('Hello')],
+          now: 100,
+        }
+      );
+      const acknowledged = reduceChatTimeline(sent, {
+        type: 'message.send.acknowledged',
+        conversationId: 'conv_1',
+        clientTurnId: 'turn_client_1',
+        turnId: 'turn_server',
+        serverUserMessageId: 'msg_user_server',
+        now: 150,
+      });
+      const completed = reduceChatTimeline(acknowledged, {
+        type: 'assistant.stream.completed',
+        conversationId: 'conv_1',
+        clientTurnId: 'turn_client_1',
+        turnId: 'turn_server',
+        requestId: 'req_1',
+        parts: [textPart('Hi there, here is your answer.')],
+        now: 500,
+      });
+      // First refetch settles server metadata onto the rows.
+      return reduceChatTimeline(completed, {
+        type: 'conversation.refetch.succeeded',
+        conversationId: 'conv_1',
+        requestId: 'refetch_0',
+        receivedAt: 550,
+        messages: freshServerEcho(),
+      });
+    }
+
+    it('preserves message + array identity across a steady-state refetch', () => {
+      const settled = settledConversation();
+      const before = selectRenderableMessages(settled);
+
+      // A subsequent refetch (e.g. title-poll tick) with identical content must
+      // leave the rendered list untouched — no new array, no new row objects, no
+      // new `parts` references. New references would replay the memoized
+      // ChatMessage entrance animation = the transcript flash on send (JOV-3528).
+      const refetched = reduceChatTimeline(settled, {
+        type: 'conversation.refetch.succeeded',
+        conversationId: 'conv_1',
+        requestId: 'refetch_1',
+        receivedAt: 600,
+        messages: freshServerEcho(),
+      });
+
+      const after = selectRenderableMessages(refetched);
+
+      expect(after.map(m => m.id)).toEqual(before.map(m => m.id));
+      expect(after).toBe(before);
+      for (let index = 0; index < before.length; index++) {
+        expect(after[index]).toBe(before[index]);
+        expect(after[index]?.parts).toBe(before[index]?.parts);
+      }
+    });
+
+    it('keeps streamed assistant content stable across repeated refetches', () => {
+      const settled = settledConversation();
+      let state = settled;
+      // Hammer the refetch path the way title polling + invalidation does.
+      for (let tick = 0; tick < 4; tick++) {
+        state = reduceChatTimeline(state, {
+          type: 'conversation.refetch.succeeded',
+          conversationId: 'conv_1',
+          requestId: `refetch_loop_${tick}`,
+          receivedAt: 700 + tick,
+          messages: freshServerEcho(),
+        });
+      }
+
+      const messages = selectRenderableMessages(state);
+      expect(messages).toBe(selectRenderableMessages(settled));
+      expect(messages[messages.length - 1]).toMatchObject({
+        id: 'assistant:turn_client_1',
+        status: 'complete',
+        parts: [textPart('Hi there, here is your answer.')],
+      });
+    });
+  });
 });

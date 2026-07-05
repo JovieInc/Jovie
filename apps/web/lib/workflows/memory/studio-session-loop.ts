@@ -2,7 +2,7 @@
  * Studio Session Memory Loop (gh-9869 v0)
  *
  * Thin runner / workflow executor.
- * - Gate: FEATURE_MEMORY_STUDIO_SESSION_V0 (default false)
+ * - Gate: FEATURE_MEMORY_STUDIO_SESSION_V0 (default true for internal v1)
  * - Uses AgentHarness for enrichment + opportunity proposal
  * - Full evidence/provenance on every fact (memory source records + observations)
  * - Reuses patterns from lib/connectors/workflows/execute-approved-action.ts (CAS, logging, captureError)
@@ -18,7 +18,7 @@ import {
   type StudioSessionResult,
 } from '@/lib/agents/agent-harness';
 import { captureError } from '@/lib/error-tracking';
-import { isEnabled } from '@/lib/feature-flags';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { logger } from '@/lib/utils/logger';
 
 export interface RunStudioSessionMemoryLoopInput extends StudioSessionInput {
@@ -39,7 +39,7 @@ export async function runStudioSessionMemoryLoop(
   input: RunStudioSessionMemoryLoopInput
 ): Promise<RunStudioSessionMemoryLoopResult> {
   const flagName = 'MEMORY_STUDIO_SESSION_V0' as const;
-  const gated = !isEnabled(flagName) && !input.force;
+  const gated = !isCodeFlagEnabled(flagName) && !input.force;
 
   if (gated) {
     logger.warn('[memory-loop] studio-session v0 gated off (default)', {

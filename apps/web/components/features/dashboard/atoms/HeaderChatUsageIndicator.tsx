@@ -18,16 +18,36 @@ export const HeaderChatUsageIndicator = memo(
       enabled: !isPassiveRuntime && !isDemoRoute,
     });
 
-    if (
-      isPassiveRuntime ||
-      isDemoRoute ||
-      !data ||
-      (!data.isNearLimit && !data.isExhausted)
-    ) {
+    if (isPassiveRuntime || isDemoRoute || !data) {
       return null;
     }
 
     const copy = getChatUsageCopy(data);
+    const isPaidPlan = data.plan === 'pro' || data.plan === 'max';
+    const showHealthyPaidUsage =
+      isPaidPlan && !data.isNearLimit && !data.isExhausted;
+
+    if (!isPaidPlan && !data.isNearLimit && !data.isExhausted) {
+      return null;
+    }
+
+    if (showHealthyPaidUsage) {
+      return (
+        <Link
+          href={APP_ROUTES.PRICING}
+          className='group inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface-1 px-2.5 py-1.5 text-app font-caption text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+          aria-label={copy.headerAriaLabel}
+        >
+          <span className='font-medium text-primary-token'>
+            {copy.planLabel}
+          </span>
+          <span className='text-tertiary-token' aria-hidden>
+            ·
+          </span>
+          <span className='tabular-nums'>{copy.headerLabel}</span>
+        </Link>
+      );
+    }
 
     return (
       <Link

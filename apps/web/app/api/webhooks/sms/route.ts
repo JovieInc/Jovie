@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { sendOutboundSmsBestEffort } from '@/lib/notifications/providers/sms/outbound-sms';
 import {
   claimWebhookEventForProcessing,
   clearWebhookEventClaim,
@@ -150,9 +151,18 @@ export async function POST(request: NextRequest) {
     await clearWebhookEventClaim(dedupe.webhookEventId);
   }
 
-  // Outbound replies are best-effort and post-commit. In Phase 1 we don't
-  // ship outbound SMS until A2P 10DLC is verified; the provider's TwiML
-  // response is a no-op acknowledgement.
+  // Outbound auto-replies (STOP ack, HELP, code-not-found) are best-effort
+  // and post-commit so the inbound webhook acks before Twilio POST latency.
+  if (result.outboundReply) {
+    void sendOutboundSmsBestEffort({
+      to: result.outboundReply.to,
+      body: result.outboundReply.body,
+      source: `sms_webhook_${result.kind}`,
+      providerEventId,
+      metadata: { kind: result.kind },
+    });
+  }
+
   return NextResponse.json(
     { ok: true, kind: result.kind },
     { status: result.status, headers: NO_STORE_HEADERS }

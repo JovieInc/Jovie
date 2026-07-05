@@ -8,6 +8,7 @@ import {
   getBaseServerConfig,
   isNonProductionServerNoise,
 } from '@/lib/sentry/config';
+import { isTransientInfraHttpTransaction } from '@/lib/sentry/non-actionable-issues';
 
 const baseConfig = getBaseServerConfig();
 
@@ -17,14 +18,25 @@ const baseConfig = getBaseServerConfig();
 //   URL: https://app.jovie.com/api/health  |  Interval: 1 min
 const HEALTH_ENDPOINT_PATTERN = /^\/api\/health/;
 
+// SDK v10 no longer exports SamplingContext from @sentry/nextjs's isomorphic
+// surface — derive it from the init() options' tracesSampler parameter.
+type SamplingContext = Parameters<
+  NonNullable<NonNullable<Parameters<typeof Sentry.init>[0]>['tracesSampler']>
+>[0];
+
 Sentry.init({
   ...baseConfig,
 
   // Drop performance traces for the health endpoint — Sentry's uptime monitor
   // pings it every minute, which would otherwise skew p50/p99 latency data.
-  tracesSampler: samplingContext => {
+  tracesSampler: (samplingContext: SamplingContext) => {
     const name = samplingContext.name ?? '';
     if (HEALTH_ENDPOINT_PATTERN.test(name)) {
+      return 0;
+    }
+    // Upstash Redis pipeline latency blips during cold starts are transient infra
+    // noise (JOV-3666) — exclude from performance traces to avoid ai_detected_http alerts.
+    if (isTransientInfraHttpTransaction(name)) {
       return 0;
     }
     return baseConfig.tracesSampleRate;

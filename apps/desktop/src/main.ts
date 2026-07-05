@@ -11,6 +11,12 @@ import {
   screen,
   shell,
 } from 'electron';
+import {
+  isTrayAppState,
+  MenuBarTray,
+  type TrayAction,
+  type TrayStatePayload,
+} from './tray';
 import { autoUpdater } from 'electron-updater';
 import {
   bindPendingDesktopAuthCompletion,
@@ -27,12 +33,18 @@ import {
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
 import { APP_ENV, APP_URL } from './env';
 import {
+  decideHudBuildReload,
+  getHudBuildFingerprint,
+  isHudRoutePath,
+} from './hud-build-reload';
+import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
   matchesPathPrefix,
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import { decideRendererRecovery } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
 
@@ -50,6 +62,12 @@ const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
+// A crashed/killed renderer is reloaded up to this many times before the shell
+// gives up and shows the visible load-failure page (Retry) instead of leaving
+// the window black. Reset to 0 on every successful load so only crash *loops*
+// hit the cap.
+const MAX_RENDERER_CRASH_RELOADS = 2;
+const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
@@ -78,11 +96,19 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
+const AUTH_RETURN_SCHEME =
+  APP_ENV === 'staging'
+    ? 'jovie-staging'
+    : APP_ENV === 'local'
+      ? 'jovie-local'
+      : 'jovie';
+const AUTH_RETURN_PROTOCOL = `${AUTH_RETURN_SCHEME}:`;
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
+const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
+const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_RUNTIME_LABEL_BY_PLATFORM: Partial<
   Record<NodeJS.Platform, string>
 > = {
@@ -136,13 +162,21 @@ const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
+let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
+let currentHudBuildFingerprint: string | null = null;
 
-app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
+function getDesktopAppDisplayName(): string {
+  if (APP_ENV === 'staging') return 'Jovie Staging';
+  if (APP_ENV === 'local') return 'Jovie Local';
+  return 'Jovie';
+}
+
+app.setName(getDesktopAppDisplayName());
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -394,6 +428,15 @@ function parseDesktopAuthReturnDeepLink(urlString: string) {
     AUTH_RETURN_PROTOCOL,
     AUTH_RETURN_HOST,
     AUTH_RETURN_COMPLETE_PATH
+  );
+}
+
+function isAuthReturnDeepLinkCandidate(urlString: string): boolean {
+  const parsed = parseUrl(urlString);
+  return (
+    parsed?.protocol === AUTH_RETURN_PROTOCOL &&
+    parsed.hostname === AUTH_RETURN_HOST &&
+    parsed.pathname === AUTH_RETURN_COMPLETE_PATH
   );
 }
 
@@ -786,6 +829,61 @@ function showDesktopLoadFailure(win: BrowserWindow): void {
   void win.loadURL(buildDesktopLoadFailureUrl());
 }
 
+function isHudWindow(win: BrowserWindow): boolean {
+  if (win.isDestroyed()) return false;
+  const parsed = parseUrl(win.webContents.getURL());
+  return parsed?.origin === APP_ORIGIN && isHudRoutePath(parsed.pathname);
+}
+
+async function fetchHudBuildFingerprint(): Promise<string | null> {
+  const buildInfoUrl = new URL('/api/health/build-info', APP_URL);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const response = await fetch(buildInfoUrl, {
+      headers: {
+        'cache-control': 'no-cache',
+        pragma: 'no-cache',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+
+    const buildInfo: unknown = await response.json();
+    return getHudBuildFingerprint(buildInfo);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function reloadAppWindowsForHudBuildChange(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (isHudWindow(win)) {
+      win.webContents.reload();
+    }
+  }
+}
+
+async function checkHudBuildAndReload(): Promise<void> {
+  if (!BrowserWindow.getAllWindows().some(isHudWindow)) {
+    return;
+  }
+
+  const nextFingerprint = await fetchHudBuildFingerprint();
+  const decision = decideHudBuildReload({
+    currentFingerprint: currentHudBuildFingerprint,
+    nextFingerprint,
+  });
+  currentHudBuildFingerprint = decision.nextFingerprint;
+
+  if (decision.shouldReload) {
+    reloadAppWindowsForHudBuildChange();
+  }
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
@@ -823,7 +921,24 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     report: reportDesktopSecurityEvent,
   });
 
+  // Visibility safety net (JOV-3835): if `ready-to-show` never fires — e.g. a
+  // signed-out initial navigation redirects to /signin, the in-window nav is
+  // aborted to about:blank, and the separate auth-handoff window fails to
+  // appear — the app would launch to an invisible/black window with no way to
+  // sign in. If nothing has become visible shortly after launch, force a
+  // usable sign-in surface into THIS (main) window, which we know can render.
+  const initialVisibilityFallback = setTimeout(() => {
+    if (win.isDestroyed() || isAuthHandoffOpen() || win.isVisible()) return;
+    const current = win.webContents.getURL();
+    if (!current || current === 'about:blank') {
+      const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+      void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+    }
+    showWindowNow(win);
+  }, 6000);
+
   win.once('ready-to-show', () => {
+    clearTimeout(initialVisibilityFallback);
     if (isAuthHandoffOpen()) {
       mainWindowHiddenForAuthHandoff = true;
       return;
@@ -883,6 +998,39 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       showDesktopLoadFailure(win);
     }
   );
+
+  // Renderer crash recovery. Electron leaves a crashed/killed renderer as a
+  // blank black window with no recovery, which strands the user. Reload the
+  // view on a crash, capped to avoid a crash loop, then fall back to the
+  // visible load-failure page (Retry) instead of black.
+  let rendererCrashReloadCount = 0;
+  win.webContents.on('did-finish-load', () => {
+    rendererCrashReloadCount = 0;
+  });
+  win.webContents.on('render-process-gone', (_event, details) => {
+    const action = decideRendererRecovery({
+      reason: details.reason,
+      reloadCount: rendererCrashReloadCount,
+      maxReloads: MAX_RENDERER_CRASH_RELOADS,
+    });
+    console.error('[Jovie Desktop] Renderer process gone', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+      action,
+    });
+    if (win.isDestroyed() || action === 'ignore') return;
+    if (action === 'reload') {
+      rendererCrashReloadCount += 1;
+      win.webContents.reload();
+      return;
+    }
+    showDesktopLoadFailure(win);
+  });
+  win.webContents.on('unresponsive', () => {
+    console.warn('[Jovie Desktop] Renderer unresponsive', {
+      url: win.webContents.getURL().split('?')[0],
+    });
+  });
 
   win.webContents.session.setPermissionRequestHandler(
     (webContents, permission, callback, details) => {
@@ -1032,7 +1180,7 @@ function refreshApplicationMenu(): void {
 }
 
 function checkForUpdatesFromMenu(): void {
-  if (process.platform === 'linux') {
+  if (!shouldScheduleDesktopAutoUpdate()) {
     return;
   }
 
@@ -1046,8 +1194,18 @@ function checkForUpdatesFromMenu(): void {
   });
 }
 
+function shouldScheduleDesktopAutoUpdate(): boolean {
+  // Local dev shells never auto-update. Production and staging each publish to
+  // their own electron-updater channel; see apps/desktop/BUILDS.md.
+  if (APP_ENV === 'local' || process.platform === 'linux') {
+    return false;
+  }
+
+  return true;
+}
+
 function scheduleDesktopAutoUpdate(): void {
-  if (process.platform === 'linux') {
+  if (!shouldScheduleDesktopAutoUpdate()) {
     return;
   }
 
@@ -1062,6 +1220,16 @@ function scheduleDesktopAutoUpdate(): void {
       // Same: non-fatal update check failure
     });
   }, UPDATE_INTERVAL_MS);
+}
+
+function scheduleHudBuildAutoReload(): void {
+  void checkHudBuildAndReload();
+
+  const interval = setInterval(() => {
+    void checkHudBuildAndReload();
+  }, HUD_BUILD_INFO_POLL_INTERVAL_MS);
+
+  interval.unref?.();
 }
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
@@ -1150,6 +1318,21 @@ function buildApplicationMenu(): Menu {
   }
 
   return Menu.buildFromTemplate(template);
+}
+
+function handleTrayAction(action: TrayAction): void {
+  if (action === 'open-preferences') {
+    openPreferences();
+    return;
+  }
+
+  const win =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+  showWindow(win);
+
+  if (action === 'new-message') {
+    win.webContents.send(TRAY_ACTION_CHANNEL, action);
+  }
 }
 
 function sendToAppWindows(channel: UpdateChannel): void {
@@ -1303,13 +1486,13 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+    app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME);
 }
 
 if (gotSingleInstanceLock) {
@@ -1322,8 +1505,7 @@ if (gotSingleInstanceLock) {
 
     const invalidAuthReturn = argv.some(
       arg =>
-        arg.startsWith(`${AUTH_RETURN_PROTOCOL}//${AUTH_RETURN_HOST}`) &&
-        !parseDesktopAuthReturnDeepLink(arg)
+        isAuthReturnDeepLinkCandidate(arg) && !parseDesktopAuthReturnDeepLink(arg)
     );
     if (invalidAuthReturn) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
@@ -1349,7 +1531,7 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    if (url.startsWith('jovie://auth/complete')) {
+    if (isAuthReturnDeepLinkCandidate(url)) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }
@@ -1373,6 +1555,12 @@ app.whenReady().then(() => {
 
   registerAuthReturnProtocol();
   refreshApplicationMenu();
+
+  // macOS menu bar extra (NSStatusItem via Electron Tray)
+  if (process.platform === 'darwin') {
+    menuBarTray = new MenuBarTray(handleTrayAction);
+  }
+
   createWindow(
     pendingAuthCompletion
       ? new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL).toString()
@@ -1382,6 +1570,7 @@ app.whenReady().then(() => {
   );
   pendingLegacyAuthReturnRoute = null;
   scheduleDesktopAutoUpdate();
+  scheduleHudBuildAutoReload();
 
   app.on('activate', () => {
     if (isAuthHandoffOpen() && authHandoffWindow) {
@@ -1417,5 +1606,24 @@ ipcMain.handle(
     }
 
     return getDesktopDictationStatus();
+  }
+);
+
+ipcMain.handle(
+  TRAY_SET_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent, payload: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    if (
+      !menuBarTray ||
+      payload === null ||
+      typeof payload !== 'object' ||
+      !isTrayAppState((payload as Record<string, unknown>).state)
+    ) {
+      return { ok: false, reason: 'invalid-payload' };
+    }
+    menuBarTray.setState(payload as TrayStatePayload);
+    return { ok: true };
   }
 );

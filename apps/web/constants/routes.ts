@@ -49,6 +49,7 @@ export const APP_ROUTES = {
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
+  JOVIE_WORK: '/app/jovie-work',
   LYRICS: '/app/lyrics',
   PRESENCE: '/app/presence',
 
@@ -110,15 +111,19 @@ export const APP_ROUTES = {
   ADMIN_AGENT_RUN: '/app/admin/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
   ADMIN_COSTS: '/app/admin/costs',
+  ADMIN_SYSTEM: '/app/admin/system',
+  ADMIN_FEATURES: '/app/admin/features',
   FEATURE_FLAGS: '/app/feature-flags',
 
   // System
   UNAVAILABLE: '/unavailable',
+  USER_CREATION_ERROR: '/error/user-creation-failed',
   DESIGN_STUDIO: '/exp/page-builder',
-  /** Legacy HUD URL — redirects to /app/admin/ops (admin) or /hud-tv (token). */
+  /** Admin Ops HUD — shipper status, KPIs, and live metrics (admin-gated). */
   HUD: '/hud',
   /** Token-only TV/wallboard view of the Ops HUD. */
   HUD_TV: '/hud-tv',
+  HUD_WIKI: '/hud/wiki' as const,
 
   // Marketing
   HOME: '/',
@@ -249,6 +254,9 @@ export function buildLibraryViewRoute(
 
   return `${APP_ROUTES.LIBRARY}?view=${encodeURIComponent(view)}`;
 }
+
+export const buildWikiPageHref = (slug: string) =>
+  `${APP_ROUTES.HUD_WIKI}/${encodeURIComponent(slug)}` as const;
 
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {
   return (

@@ -11,6 +11,8 @@ const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
+const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
+const TRAY_ACTION_CHANNEL = 'tray-action';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -147,5 +149,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** Probe desktop dictation support without exposing node/native APIs. */
     getDictationStatus: () => {
       return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
+    },
+
+    /**
+     * Push the current app state to the macOS menu bar extra.
+     * No-op on non-macOS or when the main process tray is unavailable.
+     */
+    setTrayState: (payload: { state: string; unreadCount?: number }) => {
+      return ipcRenderer.invoke(TRAY_SET_STATE_CHANNEL, payload) as Promise<{
+        ok: boolean;
+        reason?: string;
+      }>;
+    },
+
+    /**
+     * Subscribe to tray quick-action events (e.g. "new-message") fired by the
+     * main process when the user clicks a menu bar context-menu item.
+     */
+    onTrayAction: (cb: (action: string) => void): (() => void) => {
+      if (typeof cb !== 'function') return () => undefined;
+      const listener = (_: unknown, action: string) => cb(action);
+      ipcRenderer.on(TRAY_ACTION_CHANNEL, listener);
+      return () => ipcRenderer.removeListener(TRAY_ACTION_CHANNEL, listener);
     },
 });

@@ -21,10 +21,9 @@ import 'server-only';
 import { tool } from 'ai';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
+import { generateMerchDesigns } from '@/lib/merch/design-generation';
 import {
   createAlternativeMerchFromCard,
-  generateMerchFromConcept,
-  previewMerchFromConcept,
   selectAndCreateMerchCard,
 } from '@/lib/services/merch/merch-generator';
 
@@ -51,19 +50,17 @@ export function createMerchGenerateTool(params: {
         return { success: false as const, error: 'Profile ID required' };
       }
 
-      const result = await generateMerchFromConcept({
+      return generateMerchDesigns({
         profileId: params.profileId,
         clerkUserId: params.clerkUserId,
-        prompt: prompt ?? 'Generate premium merch for this artist.',
-        itemType: itemType ?? null,
+        prompt:
+          [prompt, itemType ? `Item type: ${itemType}` : '']
+            .filter(Boolean)
+            .join('\n')
+            .trim() || 'Premium illustrated merch for this artist.',
         conversationId: params.conversationId ?? null,
         turnId: params.turnId ?? null,
       });
-
-      return {
-        ...result,
-        nextStep: 'Pick 1, 2, or 3. You can also tell me what to change.',
-      };
     },
   });
 }
@@ -86,19 +83,17 @@ export function createMerchPreviewTool(params: {
         return { success: false as const, error: 'Profile ID required' };
       }
 
-      const result = await previewMerchFromConcept({
+      return generateMerchDesigns({
         profileId: params.profileId,
         clerkUserId: params.clerkUserId,
-        prompt: prompt ?? 'Preview premium merch for this artist.',
-        itemType: itemType ?? null,
+        prompt:
+          [prompt, itemType ? `Item type: ${itemType}` : '']
+            .filter(Boolean)
+            .join('\n')
+            .trim() || 'Premium illustrated merch concepts for this artist.',
         conversationId: params.conversationId ?? null,
         turnId: params.turnId ?? null,
       });
-
-      return {
-        ...result,
-        nextStep: 'Pick 1, 2, or 3. You can also tell me what to change.',
-      };
     },
   });
 }

@@ -20,7 +20,8 @@ struct JovieAppIntentsTests {
     _ = try await intent.perform()
 
     #expect(
-      IntentNavigationStore.shared.consume() == .sendMessage("launch my single")
+      IntentNavigationStore.shared.consume() ==
+        .sendMessage(text: "launch my single", autoSend: true)
     )
   }
 
@@ -32,5 +33,17 @@ struct JovieAppIntentsTests {
     #expect(
       IntentNavigationStore.shared.consume() == .continueLastConversation
     )
+  }
+
+  @Test func startVoiceCaptureIntentRequestsVoice() async throws {
+    IntentNavigationStore.shared.consume()
+
+    _ = try await StartVoiceCaptureIntent().perform()
+
+    #expect(IntentNavigationStore.shared.consume() == .startVoiceCapture)
+  }
+
+  @Test func shortcutsExposeVoiceCapture() {
+    #expect(JovieAppShortcuts.appShortcuts.count == 4)
   }
 }

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import {
   MarketingContainer,
-  MarketingHero,
+  MarketingHeroLayout,
   MarketingPageShell,
 } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
@@ -24,7 +24,7 @@ function TipsHero() {
   return (
     <section className='relative overflow-hidden'>
       <div className='hero-glow pointer-events-none absolute inset-0' />
-      <MarketingHero variant='centered' className='items-start text-left'>
+      <MarketingHeroLayout variant='centered' className='items-start text-left'>
         <p className='marketing-kicker'>Pay</p>
         <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
           Turn every payment into a fan.
@@ -42,7 +42,7 @@ function TipsHero() {
         <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
           Free forever. No credit card required.
         </p>
-      </MarketingHero>
+      </MarketingHeroLayout>
     </section>
   );
 }
@@ -76,7 +76,7 @@ function HowItWorksSection() {
   return (
     <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>How it works</p>
@@ -149,7 +149,7 @@ function BenefitsSection() {
   return (
     <section className='relative z-10 bg-base pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='marketing-divider mb-14' />
 
           <div className='homepage-section-intro'>
@@ -206,7 +206,7 @@ function SocialProofSection() {
   return (
     <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>Built for real-world artists</p>

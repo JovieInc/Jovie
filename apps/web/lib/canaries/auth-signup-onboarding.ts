@@ -78,6 +78,55 @@ export function bodyContainsOnboardingChat(body: string): boolean {
 }
 
 /**
+ * Testids that prove the onboarding interview actually *initialized* — not just
+ * that the chat container string is present in the SSR HTML. The original
+ * canary only checked `onboarding-chat`, so a render where the interview never
+ * mounted its starter prompt or composer still passed. These markers close
+ * that gap at the HTTP level (the Playwright spec asserts visibility on top).
+ */
+export const INITIALIZED_INTERVIEW_MARKERS = [
+  'data-testid="onboarding-empty-intro"',
+  'data-testid="onboarding-starter-suggestions"',
+  'data-testid="onboarding-centered-composer"',
+] as const;
+
+/**
+ * True when the body contains the onboarding chat container AND at least one
+ * marker proving the interview surface initialized (starter intro / composer).
+ * A bare `onboarding-chat` with none of these is a broken-init render.
+ */
+export function bodyContainsInitializedInterview(body: string): boolean {
+  if (!bodyContainsOnboardingChat(body)) return false;
+  return INITIALIZED_INTERVIEW_MARKERS.some(marker => body.includes(marker));
+}
+
+/**
+ * Known, acceptable fallback strings the onboarding turn can surface when the
+ * AI provider is degraded. The full-turn spec asserts the visible end state is
+ * either a real assistant reply OR one of these — never "any text" (which would
+ * let a broken error page pass) and never an indefinite spinner.
+ *
+ * Sourced from the real contract:
+ *  - `onboarding-handler.ts` stream `onError` copy
+ *  - `OnboardingChat.getOnboardingErrorMessage` ("still connecting")
+ *  - the handler's `temporarily unavailable` error bodies
+ */
+export const ONBOARDING_TURN_FALLBACK_MESSAGES = [
+  'Jovie hit a temporary issue while processing your message',
+  'Jovie is still connecting. Try again in a moment.',
+  'Onboarding chat is temporarily unavailable',
+] as const;
+
+/**
+ * True when `text` contains one of the known onboarding fallback messages.
+ */
+export function isKnownOnboardingFallback(text: string): boolean {
+  return ONBOARDING_TURN_FALLBACK_MESSAGES.some(message =>
+    text.includes(message)
+  );
+}
+
+/**
  * Build the anonymous onboarding chat probe payload used by deploy + prod crons.
  * Intentionally omits a Turnstile token: a healthy build should reach the bot
  * gate and return 403 TURNSTILE_REQUIRED, not 503 ONBOARDING_CHAT_DISABLED.

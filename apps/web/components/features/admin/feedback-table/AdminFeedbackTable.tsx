@@ -110,8 +110,8 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
     <span
       className={
         status === 'dismissed'
-          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-tertiary-token'
-          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-secondary-token'
+          ? 'inline-flex min-h-6 items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-tertiary-token'
+          : 'inline-flex min-h-6 items-center rounded bg-surface-1 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-secondary-token'
       }
     >
       {status}
@@ -296,7 +296,7 @@ export function AdminFeedbackTable({
   );
 
   return (
-    <div className='flex h-full min-h-[620px] overflow-hidden'>
+    <div className='flex h-full min-h-155 overflow-hidden'>
       <div className='h-full w-full border-r border-subtle bg-(--linear-app-content-surface) lg:w-[58%]'>
         <AdminTableHeader
           title='Feedback'
@@ -343,7 +343,7 @@ export function AdminFeedbackTable({
                       ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'
                       : 'New feedback will appear here once users submit it.'
                   }
-                  className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
+                  className='min-h-55 rounded-none border-x-0 border-b-0 shadow-none'
                 />
               }
             />
@@ -448,7 +448,7 @@ export function AdminFeedbackTable({
               className='space-y-1.5'
               surface='card'
             >
-              <div className='rounded-md bg-surface-0 px-2.5 py-2 text-[12.5px] leading-[19px] whitespace-pre-wrap text-primary-token'>
+              <div className='rounded-md bg-surface-0 px-2.5 py-2 text-xs leading-[19px] whitespace-pre-wrap text-primary-token'>
                 {selected.message}
               </div>
             </DrawerSection>
@@ -460,7 +460,7 @@ export function AdminFeedbackTable({
               surface='card'
             >
               <div className='overflow-auto rounded-md bg-surface-0 p-0'>
-                <pre className='p-2.5 text-[10.5px] leading-[16px] text-secondary-token'>
+                <pre className='p-2.5 text-3xs leading-[16px] text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
                 </pre>
               </div>

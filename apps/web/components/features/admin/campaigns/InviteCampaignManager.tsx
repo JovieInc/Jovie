@@ -140,7 +140,7 @@ function CampaignCallout({
   return (
     <div
       className={cn(
-        'flex items-start gap-2 rounded-[10px] border px-4 py-3',
+        'flex items-start gap-2 rounded-lg border px-4 py-3',
         toneClassName,
         className
       )}

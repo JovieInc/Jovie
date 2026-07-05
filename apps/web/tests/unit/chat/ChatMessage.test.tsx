@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage } from '@/components/jovie/components/ChatMessage';
@@ -26,9 +26,13 @@ vi.mock('motion/react', () => ({
 vi.mock('@jovie/ui', () => ({
   Button: ({
     children,
+    size,
+    variant,
     ...props
   }: ComponentProps<'button'> & { size?: string; variant?: string }) => (
-    <button {...props}>{children}</button>
+    <button data-size={size} data-variant={variant} {...props}>
+      {children}
+    </button>
   ),
   Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
   PopoverContent: ({
@@ -66,6 +70,13 @@ vi.mock('next/dynamic', () => ({
 
 vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
   ChatMarkdown: ({ content }: { content: string }) => <div>{content}</div>,
+}));
+
+const copyMarkdownToClipboardMock = vi.fn().mockResolvedValue(true);
+
+vi.mock('@/lib/chat/copy-markdown', () => ({
+  copyMarkdownToClipboard: (...args: unknown[]) =>
+    copyMarkdownToClipboardMock(...args),
 }));
 
 describe('ChatMessage', () => {
@@ -169,6 +180,21 @@ describe('ChatMessage', () => {
     expect(loading.querySelector('.system-b-chat-loading-line')).toBeTruthy();
   });
 
+  it('copies assistant markdown through the rich clipboard helper', () => {
+    copyMarkdownToClipboardMock.mockClear();
+    const messageProps = {
+      id: 'assistant-copy-rich',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: '**Bold** answer' }],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy message' }));
+
+    expect(copyMarkdownToClipboardMock).toHaveBeenCalledWith('**Bold** answer');
+  });
+
   it('keeps assistant reply and copy action on named System B primitives', () => {
     const messageProps = {
       id: 'assistant-copy',
@@ -182,7 +208,9 @@ describe('ChatMessage', () => {
       'system-b-chat-message-reply'
     );
     const copyButton = screen.getByRole('button', { name: 'Copy message' });
-    expect(copyButton).toHaveClass('system-b-chat-copy-button');
+    expect(copyButton).toHaveAttribute('data-variant', 'ghost');
+    expect(copyButton).toHaveAttribute('data-size', 'icon');
+    expect(copyButton).toHaveClass('h-7');
     expect(copyButton.querySelector('.system-b-chat-copy-icon')).toBeTruthy();
   });
 
@@ -352,5 +380,22 @@ describe('ChatMessage', () => {
       'href',
       '/app/library?view=merch'
     );
+  });
+
+  it('reserves copy-row height in DOM while streaming to prevent layout shift (JOV-11948)', () => {
+    const streamingProps = {
+      id: 'streaming-msg',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'Streaming…' }],
+      isStreaming: true,
+    };
+    const { container } = fastRender(<ChatMessage {...streamingProps} />);
+
+    // The copy-row div must exist in the DOM while streaming so its CSS-defined
+    // height is reserved and the layout does not shift when streaming ends.
+    const copyRow = container.querySelector('.system-b-chat-copy-row');
+    expect(copyRow).not.toBeNull();
+    // Copy button must NOT be rendered while streaming (no interactive element).
+    expect(screen.queryByRole('button', { name: /copy/i })).toBeNull();
   });
 });

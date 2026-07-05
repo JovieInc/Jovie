@@ -2,11 +2,14 @@
 
 Jovie owns the first-party Apple Wallet profile pass stack: pass serials, signing, auth tokens, source links, update registration, and scan analytics.
 
-## Runtime Gate
+## Availability
 
-- App flag: `APPLE_WALLET_PROFILE_PASS`
-- Statsig gate: `apple_wallet_profile_pass`
-- Default: off
+The iOS/mobile pass API is available when the user is authenticated, the profile
+is complete, and Apple Wallet signing config is present. It is not gated by a
+Statsig rollout flag.
+
+The web dashboard may still use the `APPLE_WALLET_PROFILE_PASS` app flag to hide
+or show web-only Wallet affordances while those surfaces are iterated.
 
 ## Environment
 
@@ -36,7 +39,7 @@ EVENT: the Wallet pass is not a payment instrument. It opens the profile; paymen
 ## Data Flow
 
 1. iOS or mobile web requests `GET /api/wallet/apple/profile-pass`.
-2. The backend checks the gate, profile readiness, and Apple signing config.
+2. The backend checks profile readiness and Apple signing config.
 3. Jovie creates or updates exactly one active Wallet `audienceSourceLinks` row per profile/pass type.
 4. Jovie signs a generic `.pkpass` with a QR code to the tracked `/s/[code]` source link.
 5. Apple Wallet registers devices through `/api/wallet/apple/v1/...`.

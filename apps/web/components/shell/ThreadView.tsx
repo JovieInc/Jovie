@@ -17,7 +17,7 @@ export interface ThreadViewProps {
   readonly thread: ThreadViewData;
   /** Rendered turns / cards (typically `<ThreadTurn>`s and `<Thread*Card>`s). */
   readonly children: ReactNode;
-  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this conversation..." />`. */
+  /** Composer slot — defaults to `<ThreadComposer placeholder="Reply to this chat..." />`. */
   readonly composer?: ReactNode;
   /** Submit handler forwarded to the default ThreadComposer. */
   readonly onComposerSubmit?: (text: string) => void;
@@ -60,7 +60,7 @@ export function ThreadView({
   children,
   composer,
   onComposerSubmit,
-  composerPlaceholder = 'Reply to this conversation...',
+  composerPlaceholder = 'Reply to this chat...',
 }: ThreadViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -97,18 +97,18 @@ export function ThreadView({
       >
         <div className='mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[9rem] pt-5 sm:pt-6'>
           <header>
-            <h1 className='text-[24px] font-semibold leading-tight text-primary-token'>
+            <h1 className='text-2xl font-semibold leading-tight text-primary-token'>
               {thread.title}
             </h1>
             {thread.entityKind && thread.entityId && (
-              <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+              <p className='mt-1.5 text-xs text-tertiary-token'>
                 Linked to {thread.entityKind} ·{' '}
                 <span className='text-secondary-token'>{thread.entityId}</span>
               </p>
             )}
           </header>
 
-          <div className='mt-8 space-y-4 text-[13.5px] leading-relaxed'>
+          <div className='mt-8 space-y-2.5 text-app leading-relaxed'>
             {children}
           </div>
         </div>

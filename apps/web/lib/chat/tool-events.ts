@@ -5,6 +5,7 @@ import {
   type UIMessage,
 } from 'ai';
 import { z } from 'zod';
+import { normalizeToolFailureOutput } from './tool-errors';
 import { getToolUiConfig } from './tool-ui-registry';
 
 export type PersistedToolState =
@@ -30,6 +31,8 @@ export interface PersistedToolEvent {
   readonly input?: Record<string, unknown>;
   readonly output?: Record<string, unknown>;
   readonly errorMessage?: string;
+  readonly errorCode?: string;
+  readonly retryable?: boolean;
   readonly summary?: string;
   readonly uiHint: PersistedToolUiHint;
   readonly approval?: PersistedToolApproval;
@@ -56,6 +59,8 @@ export const persistedToolEventSchema = z.object({
   input: recordSchema.optional(),
   output: recordSchema.optional(),
   errorMessage: z.string().optional(),
+  errorCode: z.string().optional(),
+  retryable: z.boolean().optional(),
   summary: z.string().optional(),
   uiHint: z.enum(['artifact', 'status']),
   approval: approvalSchema.optional(),
@@ -267,6 +272,10 @@ function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
 
   const persistedOutput =
     state === 'succeeded' ? capPersistedToolOutput(output) : output;
+  const normalizedFailure =
+    state === 'failed'
+      ? normalizeToolFailureOutput(toolName, output ?? { error: errorMessage })
+      : null;
 
   return {
     schemaVersion: 2,
@@ -274,14 +283,15 @@ function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
     toolName,
     state,
     input,
-    output: persistedOutput,
-    errorMessage,
-    summary: getSummaryForState(
-      state,
+    output:
+      (normalizedFailure as unknown as Record<string, unknown> | undefined) ??
       persistedOutput,
-      outputError,
-      approvalReason
-    ),
+    errorMessage: normalizedFailure?.error ?? errorMessage,
+    errorCode: normalizedFailure?.errorCode,
+    retryable: normalizedFailure?.retryable,
+    summary:
+      normalizedFailure?.error ??
+      getSummaryForState(state, persistedOutput, outputError, approvalReason),
     uiHint: config.uiHint,
     approval,
   };

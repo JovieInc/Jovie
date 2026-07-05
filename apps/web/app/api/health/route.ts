@@ -11,6 +11,30 @@ import {
   getClientIP,
   healthLimiter,
 } from '@/lib/rate-limit';
+import { getRedis } from '@/lib/redis';
+
+const REDIS_KEEPALIVE_TIMEOUT_MS = 2000;
+
+/**
+ * Issue one cheap Redis command per health invocation so the free-tier Upstash
+ * DB never goes idle long enough (~14 days) to auto-archive. Archiving makes
+ * every rate limiter error and fall back to in-memory, fanning out the
+ * [CRITICAL] alert cluster (JOV-11962). Fail-soft and timeout-bounded — health
+ * must stay green even when Redis is unreachable or unconfigured.
+ */
+async function pingRedisKeepalive(): Promise<void> {
+  try {
+    const redis = getRedis({
+      signal: AbortSignal.timeout(REDIS_KEEPALIVE_TIMEOUT_MS),
+    });
+    await redis?.ping();
+  } catch (error) {
+    void captureWarning('Redis keepalive ping failed', error, {
+      service: 'redis',
+      route: '/api/health',
+    });
+  }
+}
 
 function hasTrustedAutomationBypass(request: Request): boolean {
   const configuredSecret = env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
@@ -61,6 +85,11 @@ export async function GET(request: Request) {
     }
   }
 
+  // Keep the Upstash DB warm. Started here so it runs concurrently with the DB
+  // check and never delays the happy path; awaited before each response so the
+  // command is guaranteed to flush before the serverless function freezes.
+  const keepalive = pingRedisKeepalive();
+
   // Minimal response - only status and timestamp (no environment details)
   const summary: Record<string, unknown> = {
     status: 'checking',
@@ -71,6 +100,7 @@ export async function GET(request: Request) {
     const databaseUrl = env.DATABASE_URL;
 
     if (!databaseUrl) {
+      await keepalive;
       summary.status = 'degraded';
       summary.database = 'unavailable';
       return NextResponse.json(summary, {
@@ -81,6 +111,8 @@ export async function GET(request: Request) {
 
     // Pure connectivity check — SELECT 1 proves DB is reachable, no table dependency
     await db.execute(drizzleSql`SELECT 1`);
+
+    await keepalive;
 
     // Success: return canonical {"status":"ok"} only (no timestamp/database).
     // 503 responses include extra diagnostic fields — the asymmetry is intentional.
@@ -95,6 +127,7 @@ export async function GET(request: Request) {
       }
     );
   } catch (error) {
+    await keepalive;
     void captureWarning('Health check degraded', error, {
       service: 'health',
       route: '/api/health',

@@ -22,3 +22,7 @@ export const PITCH_MODEL = 'anthropic/claude-haiku-4-5-20251001';
 
 /** Lightweight model used for generating conversation titles */
 export const TITLE_MODEL = 'google/gemini-2.0-flash';
+
+/** Model used for YouTube packaging intelligence extraction */
+export const PACKAGING_INTELLIGENCE_MODEL =
+  'anthropic/claude-haiku-4-5-20251001';

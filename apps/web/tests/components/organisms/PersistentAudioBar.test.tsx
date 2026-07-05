@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -73,6 +74,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
 }));
 
+let mockPrefersReducedMotion = false;
+vi.mock('@/lib/hooks/useReducedMotion', () => ({
+  useReducedMotion: () => mockPrefersReducedMotion,
+}));
+
 vi.mock('@/components/atoms/TruncatedText', () => ({
   TruncatedText: ({ children }: { children: ReactNode }) => (
     <span>{children}</span>
@@ -142,8 +148,17 @@ describe('PersistentAudioBar', () => {
     pathname = '/app';
     searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };
+    mockPrefersReducedMotion = false;
     resetAudioChromeSnapshot();
   });
+
+  /** Flush the two requestAnimationFrame ticks the cinematic reveal waits on. */
+  async function flushReveal() {
+    await act(async () => {
+      await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+      await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+    });
+  }
 
   it('renders nothing when no track is active', () => {
     const { container } = render(<PersistentAudioBar />);
@@ -352,7 +367,7 @@ describe('PersistentAudioBar', () => {
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
     const waveformSeek = within(expandedSurface).getByRole('slider', {
-      name: 'Seek track waveform',
+      name: 'Seek Track Waveform',
     });
 
     fireEvent.change(waveformSeek, { target: { value: '18' } });
@@ -579,5 +594,55 @@ describe('PersistentAudioBar', () => {
     expect(push).toHaveBeenCalledWith(
       resolveLyricsReturnRoute(searchParams.get('from'), APP_ROUTES.CHAT)
     );
+  });
+
+  it('cinematically reveals the shell V1 bar into place on first play', async () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+
+    // First frame: off the bottom + transparent so the transition has a
+    // "from" state to decelerate out of.
+    expect(expandedSurface.style.transform).toBe('translateY(100%)');
+    expect(expandedSurface.style.opacity).toBe('0');
+
+    await flushReveal();
+
+    // Lands into place: no translate offset, fully opaque, interactive.
+    expect(expandedSurface.style.transform).toBe('translateY(0)');
+    expect(expandedSurface.style.opacity).toBe('1');
+    expect(expandedSurface.style.pointerEvents).toBe('auto');
+  });
+
+  it('keeps the reserved bar height across the reveal so nothing shifts', async () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    const reservedHeight = 'var(--linear-app-audio-bar-max-height)';
+
+    // Height is reserved from the very first frame (only transform/opacity
+    // animate), so surrounding content never reflows.
+    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
+
+    await flushReveal();
+
+    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
+  });
+
+  it('snaps the shell V1 bar revealed without a translate frame under reduced motion', () => {
+    mockPrefersReducedMotion = true;
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+
+    // No translateY(100%) frame ever paints — it's already in place.
+    expect(expandedSurface.style.transform).toBe('translateY(0)');
+    expect(expandedSurface.style.opacity).toBe('1');
   });
 });

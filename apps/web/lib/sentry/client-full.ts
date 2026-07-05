@@ -36,9 +36,24 @@ let isInitialized = false;
 let isReplayLoaded = false;
 
 /**
- * Integration type - inferred from Sentry's breadcrumbsIntegration return type
+ * Integration type. SDK v10 no longer exports `Integration` from @sentry/nextjs's
+ * isomorphic surface, so derive it from the init() options' integrations array.
  */
-type SentryIntegration = ReturnType<typeof Sentry.breadcrumbsIntegration>;
+type SentryIntegration = Extract<
+  NonNullable<NonNullable<Parameters<typeof Sentry.init>[0]>['integrations']>,
+  readonly unknown[]
+>[number];
+
+/**
+ * breadcrumbsIntegration / replayIntegration are client-only exports that exist
+ * on @sentry/nextjs at runtime in the browser build but are absent from its
+ * isomorphic type surface in SDK v10. Cast to a typed view of just the
+ * client-only factories this module calls.
+ */
+const clientSentry = Sentry as typeof Sentry & {
+  breadcrumbsIntegration: () => SentryIntegration;
+  replayIntegration: () => SentryIntegration;
+};
 
 /**
  * Full Sentry configuration options.
@@ -92,7 +107,7 @@ export interface FullSentryConfig {
  */
 export function getFullClientConfig(
   options: FullSentryConfig = {}
-): Sentry.BrowserOptions {
+): NonNullable<Parameters<typeof Sentry.init>[0]> {
   const baseConfig = getBaseClientConfig();
   const {
     tracesSampleRate = TRACES_SAMPLE_RATE,
@@ -108,12 +123,12 @@ export function getFullClientConfig(
 
   // Add breadcrumb integration if enabled (default behavior)
   if (enableBreadcrumbs) {
-    integrations.push(Sentry.breadcrumbsIntegration());
+    integrations.push(clientSentry.breadcrumbsIntegration());
   }
 
   // Add Replay integration if enabled
   if (enableReplay) {
-    integrations.push(Sentry.replayIntegration());
+    integrations.push(clientSentry.replayIntegration());
     isReplayLoaded = true;
   }
 
@@ -222,11 +237,14 @@ export async function addReplayIntegration(): Promise<boolean> {
     return false;
   }
 
-  // Dynamically import Replay integration to enable code splitting
-  const { replayIntegration } = await import('@sentry/nextjs');
+  // Dynamically import Replay integration to enable code splitting.
+  // replayIntegration is a client-only runtime export (see clientSentry note).
+  const mod = (await import('@sentry/nextjs')) as unknown as {
+    replayIntegration: () => SentryIntegration;
+  };
 
   // Add the Replay integration to the existing client
-  client.addIntegration(replayIntegration());
+  client.addIntegration(mod.replayIntegration());
   isReplayLoaded = true;
 
   return true;

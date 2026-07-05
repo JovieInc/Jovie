@@ -140,7 +140,7 @@ const QrPreview = memo(function QrPreview({
   if (isLoading || !dataUrl) {
     return (
       <div
-        className='flex items-center justify-center rounded-lg bg-white'
+        className='flex items-center justify-center rounded-lg bg-white dark:bg-surface-1'
         style={{ width: QR_DISPLAY_SIZE, height: QR_DISPLAY_SIZE }}
         aria-hidden='true'
       >
@@ -271,7 +271,7 @@ export function EarningsTab() {
           <QrCode className='h-6 w-6 text-tertiary-token' />
         </div>
         <h2 className='text-base font-semibold text-primary-token'>
-          No handle set
+          No Handle Set
         </h2>
         <p className='max-w-sm text-app text-secondary-token'>
           Set up your artist handle in profile settings to generate a QR code
@@ -306,21 +306,21 @@ export function EarningsTab() {
       ) : (
         <dl className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           <StatCard
-            label='Total revenue'
+            label='Total Revenue'
             value={formatAmount(stats?.totalRevenueCents ?? 0)}
             icon={DollarSign}
             iconBg='bg-surface-1 border border-subtle'
             iconColor='text-success'
           />
           <StatCard
-            label='Tips received'
+            label='Tips Received'
             value={String(stats?.totalTips ?? 0)}
             icon={Hash}
             iconBg='bg-surface-1 border border-subtle'
             iconColor='text-info'
           />
           <StatCard
-            label='Average tip'
+            label='Average Tip'
             value={formatAmount(stats?.averageTipCents ?? 0)}
             icon={TrendingUp}
             iconBg='bg-surface-1 border border-subtle'
@@ -371,7 +371,7 @@ export function EarningsTab() {
 
         <div className='flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6'>
           {/* Preview */}
-          <div className='shrink-0 rounded-lg bg-white p-2'>
+          <div className='shrink-0 rounded-lg bg-white dark:bg-surface-1 p-2'>
             <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
           </div>
 

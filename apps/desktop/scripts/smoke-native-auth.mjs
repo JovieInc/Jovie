@@ -14,17 +14,34 @@ const SMOKE_CLIENT_IP =
 const CLEAR_ELECTRON_AUTH_ON_START =
   process.env.SMOKE_CLEAR_ELECTRON_AUTH === '1';
 const SKIP_START_SIGN_OUT = process.env.SMOKE_SKIP_START_SIGNOUT === '1';
+const NATIVE_AUTH_CALLBACK_SCHEME = getNativeAuthSchemeForBaseUrl(BASE_URL);
 const REQUEST_TIMEOUT_MS = parsePositiveInteger(
   process.env.SMOKE_REQUEST_TIMEOUT_MS,
   180_000
 );
 const SMOKE_AUTH_EVIDENCE_KEY = 'jovie.desktopAuth.smokeAuthEvidence';
+const NATIVE_AUTH_CALLBACK_PREFIX = `${NATIVE_AUTH_CALLBACK_SCHEME}://auth/complete?`;
 
 let playwrightChromium;
 
 function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getNativeAuthSchemeForBaseUrl(baseUrl) {
+  const hostname = new URL(baseUrl).hostname.toLowerCase();
+  if (hostname === 'jov.ie') return 'jovie';
+  if (hostname === 'staging.jov.ie') return 'jovie-staging';
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname.endsWith('.localhost')
+  ) {
+    return 'jovie-local';
+  }
+  return 'jovie';
 }
 
 function sleep(ms) {
@@ -74,7 +91,7 @@ async function requestTestingToken(secretKey) {
       throw new Error(`Testing token request failed: ${response.status}`);
     }
     data = await response.json();
-  } catch (error) {
+  } catch {
     const output = execFileSync(
       'curl',
       [
@@ -100,7 +117,11 @@ async function requestTestingToken(secretKey) {
   return data.token;
 }
 
-async function clerkBackendRequest(secretKey, path, { method = 'GET', body } = {}) {
+async function clerkBackendRequest(
+  secretKey,
+  path,
+  { method = 'GET', body } = {}
+) {
   const response = await fetch(`https://api.clerk.com/v1${path}`, {
     method,
     headers: {
@@ -241,13 +262,9 @@ async function newAuthContext(browser, fapiHost, testingToken) {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
-  await page.waitForFunction(
-    () => Boolean(window.Clerk?.loaded),
-    undefined,
-    {
-      timeout: 90_000,
-    }
-  );
+  await page.waitForFunction(() => Boolean(window.Clerk?.loaded), undefined, {
+    timeout: 90_000,
+  });
   return { context, page };
 }
 
@@ -255,7 +272,10 @@ async function signUpFresh(page, email, redirectUrl = null) {
   try {
     return await page.evaluate(
       async ({ email: targetEmail, code, redirectUrl: targetRedirectUrl }) => {
-        async function waitForActiveIdentity(fallbackSessionId, fallbackUserId) {
+        async function waitForActiveIdentity(
+          fallbackSessionId,
+          fallbackUserId
+        ) {
           for (let attempt = 0; attempt < 30; attempt += 1) {
             if (clerk.user?.id || clerk.session?.id) {
               return {
@@ -314,12 +334,10 @@ async function signUpFresh(page, email, redirectUrl = null) {
     );
   } catch (error) {
     if (!isNavigationInterruption(error)) throw error;
-    return await getClerkPageIdentity(page, 'fresh-signup').catch(
-      async () => {
-        await waitForAppSessionCookie(page.context(), 'fresh-signup');
-        return getClerkSessionIdentity(page.context(), 'fresh-signup');
-      }
-    );
+    return await getClerkPageIdentity(page, 'fresh-signup').catch(async () => {
+      await waitForAppSessionCookie(page.context(), 'fresh-signup');
+      return getClerkSessionIdentity(page.context(), 'fresh-signup');
+    });
   }
 }
 
@@ -405,7 +423,12 @@ async function signInExisting(page, email, redirectUrl = null) {
   }
 }
 
-async function signInWithTicket(page, ticket, expectedUserId, redirectUrl = null) {
+async function signInWithTicket(
+  page,
+  ticket,
+  expectedUserId,
+  redirectUrl = null
+) {
   try {
     return await page.evaluate(
       async ({
@@ -465,13 +488,13 @@ async function signInWithTicket(page, ticket, expectedUserId, redirectUrl = null
               );
             });
         } else if (signIn?.ticket && signIn?.finalize) {
-          ticketAttempt = await signIn.ticket({ ticket: signInTicket }).catch(
-            error => {
+          ticketAttempt = await signIn
+            .ticket({ ticket: signInTicket })
+            .catch(error => {
               throw new Error(
                 `Clerk ticket sign-in threw: ${describeError(error)}`
               );
-            }
-          );
+            });
           if (ticketAttempt.error) {
             throw new Error(
               `Clerk ticket sign-in failed: ${describeError(ticketAttempt.error)}`
@@ -483,13 +506,13 @@ async function signInWithTicket(page, ticket, expectedUserId, redirectUrl = null
             );
           });
         } else {
-          ticketAttempt = await futureSignIn.ticket({ ticket: signInTicket }).catch(
-            error => {
+          ticketAttempt = await futureSignIn
+            .ticket({ ticket: signInTicket })
+            .catch(error => {
               throw new Error(
                 `Clerk future ticket sign-in threw: ${describeError(error)}`
               );
-            }
-          );
+            });
         }
 
         if (ticketAttempt.error) {
@@ -552,12 +575,7 @@ async function signInWithFreshTicket(
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     try {
       const ticket = await createSignInTicket(secretKey, expectedUserId);
-      return await signInWithTicket(
-        page,
-        ticket,
-        expectedUserId,
-        redirectUrl
-      );
+      return await signInWithTicket(page, ticket, expectedUserId, redirectUrl);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
       if (attempt < 4) {
@@ -660,14 +678,40 @@ async function requestRedirect(page, targetUrl, label) {
   );
 }
 
-async function requestNativeCallbackRedirect(page, callbackPath, label) {
-  const nativeCallbackUrl = await requestRedirect(page, callbackPath, label);
-  if (!nativeCallbackUrl.startsWith('jovie://auth/complete?')) {
+async function completeNativeReturnBounce(page, nativeReturnUrl, label) {
+  const parsed = new URL(nativeReturnUrl);
+  const callbackPromise = Promise.race([
+    waitForNativeProtocolRequest(page, parsed.pathname),
+    waitForNativeRedirectResponse(page, parsed.pathname),
+  ]);
+  await page.goto(nativeReturnUrl, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+  const nativeCallbackUrl = await callbackPromise;
+  if (!nativeCallbackUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) {
     throw new Error(
-      `${label} did not return the Electron app callback: ${nativeCallbackUrl}`
+      `${label} native-return bounce did not yield the Electron app callback: ${nativeCallbackUrl}`
     );
   }
+
   return nativeCallbackUrl;
+}
+
+async function requestNativeCallbackRedirect(page, callbackPath, label) {
+  const redirectUrl = await requestRedirect(page, callbackPath, label);
+  if (redirectUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) {
+    return redirectUrl;
+  }
+
+  const parsedRedirect = new URL(redirectUrl);
+  if (parsedRedirect.pathname !== '/auth/native-return') {
+    throw new Error(
+      `${label} did not return the Electron app callback or native-return bounce: ${redirectUrl}`
+    );
+  }
+
+  return await completeNativeReturnBounce(page, redirectUrl, label);
 }
 
 function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
@@ -679,7 +723,7 @@ function waitForNativeProtocolRequest(page, label, timeout = 60_000) {
 
     function onRequest(request) {
       const requestUrl = request.url();
-      if (!requestUrl.startsWith('jovie://auth/complete?')) return;
+      if (!requestUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) return;
       clearTimeout(timeoutId);
       page.off('request', onRequest);
       resolve(requestUrl);
@@ -698,7 +742,7 @@ function waitForNativeRedirectResponse(page, label, timeout = 60_000) {
 
     function onResponse(response) {
       const location = response.headers().location;
-      if (!location?.startsWith('jovie://auth/complete?')) return;
+      if (!location?.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) return;
       clearTimeout(timeoutId);
       page.off('response', onResponse);
       resolve(location);
@@ -724,13 +768,9 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
-  await page.waitForFunction(
-    () => Boolean(window.Clerk?.loaded),
-    undefined,
-    {
-      timeout: 90_000,
-    }
-  );
+  await page.waitForFunction(() => Boolean(window.Clerk?.loaded), undefined, {
+    timeout: 90_000,
+  });
 
   const activeSessionId = await page.evaluate(
     () => window.Clerk?.session?.id ?? null
@@ -769,8 +809,8 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
 async function requestNativeCallback(page, authUrl, email) {
   const authCallbackUrl = await requestRedirect(page, authUrl, 'auth start');
   const parsedAuthCallback = new URL(authCallbackUrl);
-  if (parsedAuthCallback.protocol === 'jovie:') {
-    if (!authCallbackUrl.startsWith('jovie://auth/complete?')) {
+  if (authCallbackUrl.startsWith(NATIVE_AUTH_CALLBACK_PREFIX)) {
+    if (parsedAuthCallback.protocol !== `${NATIVE_AUTH_CALLBACK_SCHEME}:`) {
       throw new Error(
         `Auth start did not return the Electron app callback: ${authCallbackUrl}`
       );
@@ -1101,9 +1141,7 @@ async function startElectronBrowserAuth() {
       })()`);
       if (!result?.ok) {
         throw new Error(
-          `Desktop auth handoff bridge failed: ${
-            result?.reason ?? 'unknown'
-          }`
+          `Desktop auth handoff bridge failed: ${result?.reason ?? 'unknown'}`
         );
       }
     } finally {
@@ -1130,58 +1168,6 @@ async function startElectronBrowserAuth() {
   }
 
   return new URL(rawAuthUrl, BASE_URL).toString();
-}
-
-async function findAuthenticatedElectronPage(expectedUserId) {
-  const deadline = Date.now() + 60_000;
-  const unwaitlistedTargets = new Set();
-
-  while (Date.now() < deadline) {
-    const targets = (await getElectronTargets()).filter(isBaseUrlTarget);
-    for (const target of targets) {
-      const page = await connectCdpPage(target).catch(() => null);
-      if (!page) continue;
-      try {
-        if (!unwaitlistedTargets.has(target.id)) {
-          const unwaitlistResult = await page.evaluate(`(async () => {
-            const body = document.body?.innerText ?? '';
-            if (!/waitlist/i.test(body)) return null;
-            const response = await fetch('/api/dev/unwaitlist', {
-              method: 'POST',
-            });
-            return { status: response.status, ok: response.ok };
-          })()`);
-          if (unwaitlistResult) {
-            unwaitlistedTargets.add(target.id);
-            if (!unwaitlistResult.ok && unwaitlistResult.status !== 404) {
-              throw new Error(
-                `Dev unwaitlist failed with ${unwaitlistResult.status}`
-              );
-            }
-            await page.navigate(`${BASE_URL}/app/chat?runtime=electron`);
-            page.close();
-            continue;
-          }
-        }
-
-        const matched = await page.evaluate(`(() => {
-          return Boolean(
-            window.Clerk?.loaded &&
-              window.Clerk?.user?.id === ${JSON.stringify(expectedUserId)} &&
-              window.Clerk?.session
-          );
-        })()`);
-        if (matched) return page;
-        page.close();
-      } catch {
-        page.close();
-      }
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  throw new Error('Electron did not become authenticated');
 }
 
 function parseStoredSmokeAuthEvidence(value, expectedUserId, minCapturedAt) {

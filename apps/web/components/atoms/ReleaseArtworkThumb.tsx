@@ -38,7 +38,7 @@ export function ReleaseArtworkThumb({
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm',
+        'relative shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
         className
       )}
       style={{ width: size, height: size }}

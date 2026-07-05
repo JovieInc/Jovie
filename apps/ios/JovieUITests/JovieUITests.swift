@@ -58,10 +58,44 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(app.staticTexts["Tim White"].exists)
-    XCTAssertTrue(app.buttons["Chat"].exists)
-    XCTAssertTrue(app.buttons["Profile"].exists)
+    XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
     XCTAssertTrue(app.buttons["Open Settings"].exists)
     attachScreenshot(named: "profile", app: app)
+  }
+
+  func testReadyLaunchWithoutQRShowsUnavailableFallback() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-qr-unavailable",
+      expectedElementDescription: "\"QR unavailable\""
+    ) {
+      $0.buttons["QR unavailable"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Tim White"].exists)
+    XCTAssertTrue(app.buttons["Copy URL"].exists)
+    XCTAssertTrue(
+      app.buttons["QR unavailable"].exists,
+      "Dashboard did not show the no-payload QR fallback.\n\(app.debugDescription)"
+    )
+  }
+
+  func testProfileLoadErrorRetryRestoresDashboard() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-profile-error",
+      expectedElementDescription: "\"Retry\""
+    ) {
+      $0.buttons["Retry"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Couldn't load your profile."].exists)
+    attachScreenshot(named: "profile-error", app: app)
+
+    app.buttons["Retry"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Retry did not restore the dashboard.\n\(app.debugDescription)"
+    )
   }
 
   func testNeedsOnboardingLaunchShowsContinueOnWeb() {
@@ -81,6 +115,19 @@ final class JovieUITests: XCTestCase {
     }
 
     attachScreenshot(named: "settings", app: app)
+    for linkTitle in ["Support", "Billing", "Privacy", "Terms"] {
+      XCTAssertTrue(
+        app.buttons[linkTitle].waitForExistence(timeout: 2),
+        "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+    for valueTitle in ["Version", "Build"] {
+      XCTAssertTrue(
+        app.staticTexts[valueTitle].waitForExistence(timeout: 2),
+        "Settings value row \(valueTitle) did not appear.\n\(app.debugDescription)"
+      )
+    }
+
     app.buttons["Log Out"].tap()
 
     XCTAssertTrue(
@@ -89,27 +136,284 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  func testBottomNavigationSwitchesBetweenChatAndProfile() {
+  func testDrawerSwitchesBetweenChatAndProfile() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.staticTexts["Ask Jovie"]
     }
 
     XCTAssertTrue(app.textFields["Ask Jovie"].exists)
-    let profileTab = app.buttons["shell-tab-profile"]
-    let chatTab = app.buttons["shell-tab-chat"]
     XCTAssertTrue(
-      profileTab.waitForExistence(timeout: 3),
-      "Bottom navigation did not appear.\n\(app.debugDescription)"
+      app.staticTexts["Ask Jovie about your profile, releases, and next moves."].exists,
+      "Chat empty state did not explain the online intro behavior.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(chatTab.exists)
     attachScreenshot(named: "chat", app: app)
 
-    profileTab.tap()
+    app.buttons["Open navigation drawer"].tap()
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Drawer surface switcher did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(chatSurface.exists)
+
+    profileSurface.tap()
 
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Bottom nav did not switch to Profile.\n\(app.debugDescription)"
+      "Drawer switcher did not switch to Profile.\n\(app.debugDescription)"
     )
+  }
+
+  // JOV-3670 evidence (a): the drawer is the SOLE surface switcher. The former
+  // bottom QR/sparkle pill (shell-tab-* buttons, no drawer prefix) must not
+  // exist anywhere in the shell, whether the drawer is closed or open.
+  func testDrawerIsSoleSurfaceSwitcherNoPillRemains() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    // Closed-drawer state: no bare shell-tab-* pill buttons anywhere in the shell.
+    XCTAssertFalse(
+      app.buttons["shell-tab-chat"].exists,
+      "Removed bottom pill chat button still exists with drawer closed.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["shell-tab-profile"].exists,
+      "Removed bottom pill profile button still exists with drawer closed.\n\(app.debugDescription)"
+    )
+
+    // Voice control is present inside the composer and unrelated to the removed pill.
+    XCTAssertTrue(
+      app.buttons["chat-voice-button"].waitForExistence(timeout: 3),
+      "Voice button did not appear on the chat tab.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open navigation drawer"].tap()
+
+    // Open-drawer state: only the drawer-namespaced surface switcher exists.
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Drawer surface switcher did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(chatSurface.exists)
+    XCTAssertFalse(
+      app.buttons["shell-tab-chat"].exists,
+      "Bare (non-drawer) chat pill button still exists with drawer open.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["shell-tab-profile"].exists,
+      "Bare (non-drawer) profile pill button still exists with drawer open.\n\(app.debugDescription)"
+    )
+  }
+
+  // GH-12948: "Audience" must stay on one line in the drawer surface switcher.
+  func testDrawerSurfaceSwitcherLabelsStaySingleLine() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let audienceSurface = app.buttons["shell-drawer-surface-shell-tab-audience"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Profile drawer surface did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      audienceSurface.waitForExistence(timeout: 3),
+      "Audience drawer surface did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      chatSurface.waitForExistence(timeout: 3),
+      "Chat drawer surface did not appear.\n\(app.debugDescription)"
+    )
+
+    // Wrapped labels stack vertically and make the offending tab much taller.
+    let heights = [
+      profileSurface.frame.height,
+      audienceSurface.frame.height,
+      chatSurface.frame.height,
+    ]
+    XCTAssertLessThanOrEqual(
+      heights.max()! - heights.min()!,
+      4,
+      "Surface tab heights diverged — a label likely wrapped.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(audienceSurface.label, "Audience")
+  }
+
+  // JOV-3670 evidence (b): removing the bottom pill's safeAreaInset must not
+  // leave a ghost reserved footprint. Assert the composer/content region
+  // extends to fill the reclaimed space, and that layout stays stable across
+  // chat/profile x chatEnabled(true/false) states.
+  func testNoGhostFootprintAfterPillRemovalAcrossStates() {
+    // chatEnabled == true (ready dashboard loaded): composer sits at the true
+    // safe-area bottom, not floating above a reserved-but-empty pill gap.
+    let chatApp = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+    let composerInput = chatApp.textFields["Ask Jovie"]
+    XCTAssertTrue(waitForHittable(composerInput, timeout: 3))
+    let chatWindowMaxY = chatApp.windows.firstMatch.frame.maxY
+    XCTAssertGreaterThan(
+      composerInput.frame.maxY,
+      chatWindowMaxY - 160,
+      "Chat composer left a ghost gap where the removed bottom pill used to sit.\n\(chatApp.debugDescription)"
+    )
+    attachScreenshot(named: "no-ghost-footprint-chat", app: chatApp)
+
+    chatApp.buttons["Open navigation drawer"].tap()
+    chatApp.buttons["shell-drawer-surface-shell-tab-profile"].tap()
+    let copyURLButton = chatApp.buttons["Copy URL"]
+    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 3))
+    attachScreenshot(named: "no-ghost-footprint-profile", app: chatApp)
+    endUITestSession(chatApp)
+
+    // chatEnabled == false (needs-onboarding shell): no chat composer/pill at
+    // all, and no leftover blank strip reserved at the bottom of the shell.
+    let onboardingApp = launchMockApp(
+      launchArgument: "-ui-testing-needs-onboarding",
+      expectedElementDescription: "\"Continue on Web\""
+    ) {
+      $0.buttons["Continue on Web"]
+    }
+    let continueButton = onboardingApp.buttons["Continue on Web"]
+    XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
+    XCTAssertFalse(
+      onboardingApp.buttons["shell-talk-fab"].exists,
+      "Talk FAB should not render when chat is disabled.\n\(onboardingApp.debugDescription)"
+    )
+    XCTAssertFalse(
+      onboardingApp.buttons["shell-tab-chat"].exists,
+      "Removed pill must not render in the chatEnabled == false shell.\n\(onboardingApp.debugDescription)"
+    )
+    attachScreenshot(named: "no-ghost-footprint-needs-onboarding", app: onboardingApp)
+  }
+
+  func testVoiceButtonAppearsOnChatComposer() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    XCTAssertTrue(
+      app.buttons["chat-voice-button"].waitForExistence(timeout: 3),
+      "Voice button did not appear on the chat tab.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(app.staticTexts["STT"].exists)
+    XCTAssertFalse(app.staticTexts["Transcription"].exists)
+    attachScreenshot(named: "voice-button", app: app)
+  }
+
+  func testOfflineChatLaunchShowsCachedHistoryIntro() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-offline",
+      expectedElementDescription: "\"Ask Jovie (offline)\""
+    ) {
+      $0.textFields["Ask Jovie (offline)"]
+    }
+
+    let offlineStatusPredicate = NSPredicate(format: "label == %@", "Offline")
+    XCTAssertEqual(
+      app.staticTexts.matching(offlineStatusPredicate).count,
+      1,
+      "Offline chat should show exactly one status indicator in the shell header.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Offline"].exists,
+      "Shell header did not show the canonical offline status.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(NSPredicate(format: "label == %@", "Offline")).count,
+      1,
+      "Offline chat launch showed more than one standalone offline status indicator.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
+      "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
+      "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["@tim"].exists,
+      "Drawer account subtitle should keep the @handle while offline.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(offlineStatusPredicate).count,
+      1,
+      "Opening the drawer must not add another Offline status indicator.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["shell-drawer-account"].staticTexts["Offline"].exists,
+      "Drawer account header showed a redundant offline status.\n\(app.debugDescription)"
+    )
+  }
+
+  // JOV-3608: entity/skill chat tokens must render as clean label text, with
+  // no raw `@kind:id[label]` / `/skill:id` wire syntax visible in the
+  // transcript -- in either the assistant bubble (onDark chip tone) or the
+  // user bubble (onLight chip tone). This is a text-level contract: chip
+  // runs are concatenated `Text`, not separately-identifiable views, so the
+  // assertion is "label text is present" + "no staticText matches the raw
+  // token grammar" rather than a per-chip accessibility identifier.
+  func testEntityAndSkillTokensRenderAsLabelsNotRawSyntax() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-entity-fixture",
+      expectedElementDescription: "\"Midnight Drive\""
+    ) {
+      $0.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Midnight Drive")).firstMatch
+    }
+
+    let rawTokenPredicate = NSPredicate(format: "label MATCHES %@", ".*@\\w+:.*")
+    let rawSkillTokenPredicate = NSPredicate(format: "label MATCHES %@", ".*/skill:\\w+.*")
+
+    XCTAssertEqual(
+      app.staticTexts.matching(rawTokenPredicate).count,
+      0,
+      "Transcript rendered a raw @kind:id[...] entity token instead of a chip label.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.staticTexts.matching(rawSkillTokenPredicate).count,
+      0,
+      "Transcript rendered a raw /skill:id token instead of a chip label.\n\(app.debugDescription)"
+    )
+
+    // Assistant-bubble entity/skill labels (all four kinds + the skill token
+    // from MobileChatEntityFixture.default).
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Midnight Drive")).firstMatch.exists,
+      "Release entity chip label not found.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Opus")).firstMatch.exists,
+      "Track entity chip label not found.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Coachella 2027")).firstMatch.exists,
+      "Event entity chip label not found.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Generate album art")).firstMatch.exists,
+      "Skill chip label not found.\n\(app.debugDescription)"
+    )
+
+    // User-bubble entity token (onLight tone) -- the fixture's first message
+    // is a user turn mentioning @artist:art_1[Porter Robinson].
+    XCTAssertTrue(
+      app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Porter Robinson")).firstMatch.exists,
+      "User-bubble artist entity chip label not found.\n\(app.debugDescription)"
+    )
+
+    attachScreenshot(named: "chat-entity-chips", app: app)
   }
 
   func testSwipeNavigatesBetweenProfileAndChat() {
@@ -132,6 +436,51 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testChatComposerWorkflowSheetShowsWorkflowGrid() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let plusButton = app.buttons["Open workflow sheet"]
+    XCTAssertTrue(
+      waitForHittable(plusButton, timeout: 3),
+      "Chat composer plus button did not become hittable.\n\(app.debugDescription)"
+    )
+
+    plusButton.tap()
+
+    XCTAssertTrue(
+      app.buttons["Make merch"].waitForExistence(timeout: 3),
+      "Workflow sheet did not appear.\n\(app.debugDescription)"
+    )
+    for title in [
+      "Make merch",
+      "Smart link",
+      "Camera",
+      "Photo/file",
+      "Release campaign",
+      "Lyric video",
+    ] {
+      XCTAssertTrue(
+        app.buttons[title].waitForExistence(timeout: 2),
+        "Workflow action \(title) did not appear.\n\(app.debugDescription)"
+      )
+    }
+
+    app.buttons["Make merch"].tap()
+
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(input, timeout: 3),
+      "Chat composer input did not become hittable after workflow selection.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      input.value as? String,
+      "Make merch for my latest release.",
+      "Workflow selection did not prefill the composer draft.\n\(app.debugDescription)"
+    )
+  }
+
   func testChatComposerPreservesDraftAcrossShellNavigation() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
@@ -149,13 +498,15 @@ final class JovieUITests: XCTestCase {
     input.typeText(draft)
     XCTAssertEqual(input.value as? String, draft)
 
-    app.buttons["shell-tab-profile"].tap()
+    app.buttons["Open navigation drawer"].tap()
+    app.buttons["shell-drawer-surface-shell-tab-profile"].tap()
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
       "Shell navigation did not switch to Profile.\n\(app.debugDescription)"
     )
 
-    app.buttons["shell-tab-chat"].tap()
+    app.buttons["Open navigation drawer"].tap()
+    app.buttons["shell-drawer-surface-shell-tab-chat"].tap()
     let restoredInput = app.textFields["Ask Jovie"]
     XCTAssertTrue(
       waitForHittable(restoredInput, timeout: 3),
@@ -180,25 +531,35 @@ final class JovieUITests: XCTestCase {
       $0.textFields["Ask Jovie"]
     }
 
-    let profileTab = app.buttons["shell-tab-profile"]
-    let chatTab = app.buttons["shell-tab-chat"]
+    let drawerOpenButton = app.buttons["Open navigation drawer"]
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
     let profileReady = app.buttons["Copy URL"]
     let chatReady = app.textFields["Ask Jovie"]
 
     XCTAssertTrue(
-      profileTab.waitForExistence(timeout: timeoutSeconds),
-      "Bottom navigation did not appear before runtime measurement.\n\(app.debugDescription)"
+      drawerOpenButton.waitForExistence(timeout: timeoutSeconds),
+      "Drawer open control did not appear before runtime measurement.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(chatTab.exists)
 
     measure(metrics: shellRuntimeMetrics(for: app)) {
-      profileTab.tap()
+      drawerOpenButton.tap()
+      XCTAssertTrue(
+        waitForHittable(profileSurface, timeout: timeoutSeconds),
+        "Drawer surface switcher did not become hittable.\n\(app.debugDescription)"
+      )
+      profileSurface.tap()
       XCTAssertTrue(
         waitForHittable(profileReady, timeout: timeoutSeconds),
         "Measured transition to Profile did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
       )
 
-      chatTab.tap()
+      drawerOpenButton.tap()
+      XCTAssertTrue(
+        waitForHittable(chatSurface, timeout: timeoutSeconds),
+        "Drawer surface switcher did not become hittable.\n\(app.debugDescription)"
+      )
+      chatSurface.tap()
       XCTAssertTrue(
         waitForHittable(chatReady, timeout: timeoutSeconds),
         "Measured transition to Chat did not finish within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
@@ -206,22 +567,147 @@ final class JovieUITests: XCTestCase {
     }
   }
 
-  func testShellMenuAndSettingsNavigationAreFullScreen() {
+  func testAudienceHighlightsLaunchShowsHeroAndStatTiles() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-audience",
+      expectedElementDescription: "\"Profile views\""
+    ) {
+      $0.staticTexts["Profile views"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Audience"].exists)
+    XCTAssertTrue(app.staticTexts["1,284"].exists)
+    XCTAssertTrue(app.staticTexts["+18% vs last week"].exists)
+    XCTAssertTrue(app.staticTexts["Unique fans"].exists)
+    XCTAssertTrue(app.staticTexts["Subscribed fans"].exists)
+    XCTAssertTrue(app.staticTexts["Link clicks"].exists)
+    XCTAssertTrue(app.staticTexts["Listen clicks"].exists)
+    XCTAssertTrue(app.buttons["Ask Jovie about your audience"].exists)
+  }
+
+  func testAudienceDrawerSurfaceOpensHighlights() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]
     }
 
-    app.buttons["More"].tap()
+    app.buttons["Open navigation drawer"].tap()
+    let audienceSurface = app.buttons["Audience"]
     XCTAssertTrue(
-      app.staticTexts["Jovie"].waitForExistence(timeout: 3),
-      "Shell navigation did not reveal the menu.\n\(app.debugDescription)"
+      audienceSurface.waitForExistence(timeout: 3),
+      "Audience drawer surface did not appear.\n\(app.debugDescription)"
     )
 
-    app.buttons["Close Menu"].tap()
-    app.buttons["Open Settings"].tap()
+    audienceSurface.tap()
+    XCTAssertTrue(
+      app.staticTexts["Profile views"].waitForExistence(timeout: 3),
+      "Audience drawer surface did not open highlights.\n\(app.debugDescription)"
+    )
+  }
+
+  func testAudienceAskJovieCTAOpensScopedChat() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-audience",
+      expectedElementDescription: "\"Ask Jovie about your audience\""
+    ) {
+      $0.buttons["Ask Jovie about your audience"]
+    }
+
+    app.buttons["Ask Jovie about your audience"].tap()
+
+    let chatInput = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(chatInput, timeout: 3),
+      "Audience CTA did not open chat.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      chatInput.value as? String,
+      "Ask Jovie about my audience trends and who is engaging most.",
+      "Audience CTA did not scope chat to the audience prompt.\n\(app.debugDescription)"
+    )
+  }
+
+  func testShellDrawerAndSettingsNavigation() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
+      "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["Start a conversation to see recent conversations here."].exists,
+      "Shell drawer did not show the empty recent conversations state.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.buttons["New chat"].exists)
+    XCTAssertTrue(app.buttons["Settings"].exists)
+    XCTAssertFalse(
+      app.buttons["Close navigation drawer"].exists,
+      "Drawer IA (gate 3A) removes the X close button; close is tap-content-card or edge-drag only.\n\(app.debugDescription)"
+    )
+
+    // Gate 3A: no close button. Closing happens by tapping the elevated
+    // content card's exposed sliver (the transparent scrim covering it).
+    let contentSliver = app.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5))
+    contentSliver.tap()
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Tapping the exposed content card did not close the drawer.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open navigation drawer"].tap()
+    app.buttons["Settings"].tap()
     XCTAssertTrue(
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
-      "Shell navigation did not open settings.\n\(app.debugDescription)"
+      "Shell navigation did not open settings from the drawer.\n\(app.debugDescription)"
+    )
+  }
+
+  // JOV-3672: while the drawer is open, the elevated content card must be
+  // non-interactive so the drawer is the sole active switcher — a tap on the
+  // (visually still-present but inert) gear icon must not open Settings.
+  func testDrawerOpenMakesContentCardInert() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
+      "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
+    )
+
+    XCTAssertFalse(
+      app.buttons["Open Settings"].isHittable,
+      "Content card's Settings gear stayed hittable while the drawer was open — content must be inert.\n\(app.debugDescription)"
+    )
+
+    // Drawer's own surface switcher remains the sole active switcher.
+    XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-profile"].isHittable)
+  }
+
+  // JOV-3672 (eng F11): an edge-drag starting while the composer has focus
+  // must not open the drawer — it would fight text selection/cursor placement.
+  func testEdgeDragDoesNotOpenDrawerWhileComposerFocused() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(input, timeout: 3),
+      "Chat composer input did not become hittable.\n\(app.debugDescription)"
+    )
+    input.tap()
+
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+    start.press(forDuration: 0.05, thenDragTo: end)
+
+    XCTAssertFalse(
+      app.descendants(matching: .any)["shell-drawer"].isHittable,
+      "Edge-drag opened the drawer while the composer was focused.\n\(app.debugDescription)"
     )
   }
 
@@ -235,11 +721,25 @@ final class JovieUITests: XCTestCase {
   }
 
   func testCopyURLButtonShowsCopiedState() throws {
-    // Pre-existing flake: tap timing is unreliable in CI; the "Copied" state
-    // sometimes resolves before the assertion fires, especially on slower runners.
-    // Tracked in JOV-1972. Skipped here instead of via -skip-testing: xcodebuild
-    // flag which is unreliable across Xcode versions.
-    throw XCTSkip("Pre-existing flake — tracked in JOV-1972")
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["dashboard-copy-url-button"]
+    }
+
+    let copyURLButton = app.buttons["dashboard-copy-url-button"]
+    XCTAssertTrue(
+      copyURLButton.waitForExistence(timeout: 3),
+      "Copy URL button did not appear.\n\(app.debugDescription)"
+    )
+
+    copyURLButton.tap()
+
+    let copiedState = NSPredicate(format: "label == %@ OR value == %@", "Copied", "Copied")
+    let copiedExpectation = expectation(for: copiedState, evaluatedWith: copyURLButton)
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [copiedExpectation], timeout: 2),
+      .completed,
+      "Copy URL button did not show copied state.\n\(app.debugDescription)"
+    )
   }
 
   func testLiveAuthViewRenders() throws {
@@ -320,31 +820,57 @@ final class JovieUITests: XCTestCase {
   }
 
   func testAuthCallbackDeepLinkCompletesHarness() throws {
+    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123"
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
-      expectedElementDescription: "\"Continue in Browser\""
+      additionalLaunchArguments: ["-ui-testing-open-auth-callback", callbackURL],
+      expectedElementDescription: "\"Copy URL\""
     ) {
-      $0.buttons["Continue in Browser"]
+      $0.buttons["Copy URL"]
     }
 
-    try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?code=test_code&state=state_123",
-      targetApp: app
-    )
+    app.terminate()
+    app.launch()
 
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 10),
-      "Auth callback did not route to the authenticated shell.\n\(app.debugDescription)"
+      "Duplicate auth callback should leave the authenticated shell stable.\n\(app.debugDescription)"
     )
+  }
 
-    try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?code=test_code&state=state_123",
-      targetApp: app
-    )
+  /// Waits for `element` to appear, resending `resendURL` once if the shell
+  /// hasn't appeared after a shorter checkpoint.
+  ///
+  /// `XCUIApplication.open(_:)` routes the deep link through Springboard,
+  /// which can silently drop delivery to an already-foregrounded app under
+  /// CI load (the "Open in Jovie" confirmation prompt races against a fixed
+  /// `waitForExistence` window in `acceptSystemOpenPromptIfNeeded`, and when
+  /// no prompt appears -- the common case for an app that's already frontmost
+  /// -- there's no independent signal that delivery actually succeeded). A
+  /// single resend after a short checkpoint absorbs that race without
+  /// masking a genuine app-side regression, since the full timeout budget
+  /// only elapses if the resend also fails to land.
+  private func waitForShellWithResend(
+    _ element: XCUIElement,
+    resendURL rawURL: String,
+    targetApp app: XCUIApplication,
+    failureMessage: String,
+    checkpoint: TimeInterval = 20,
+    totalTimeout: TimeInterval = 60,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) throws {
+    if element.waitForExistence(timeout: checkpoint) {
+      return
+    }
+
+    try openAuthCallbackURL(rawURL, targetApp: app)
 
     XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Duplicate auth callback should leave the authenticated shell stable.\n\(app.debugDescription)"
+      element.waitForExistence(timeout: totalTimeout - checkpoint),
+      "\(failureMessage)\n\(app.debugDescription)",
+      file: file,
+      line: line
     )
   }
 
@@ -488,6 +1014,7 @@ final class JovieUITests: XCTestCase {
 
   private func launchMockApp(
     launchArgument: String,
+    additionalLaunchArguments: [String] = [],
     expectedElementDescription: String,
     timeout: TimeInterval = 5,
     file: StaticString = #filePath,
@@ -496,6 +1023,7 @@ final class JovieUITests: XCTestCase {
   ) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
+    app.launchArguments.append(contentsOf: additionalLaunchArguments)
     app.launchArguments.append("-ui-testing-allow-exit")
     addTeardownBlock { [app] in
       self.endUITestSession(app)
@@ -585,17 +1113,8 @@ final class JovieUITests: XCTestCase {
   private func endUITestSession(_ app: XCUIApplication) {
     guard app.state != .notRunning else { return }
 
-    if app.state == .runningForeground {
-      let exitButton = app.buttons["ui-test-exit"]
-      if exitButton.waitForExistence(timeout: 1) {
-        exitButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-      }
-    }
-
-    if !app.wait(for: .notRunning, timeout: 5) {
-      app.terminate()
-      _ = app.wait(for: .notRunning, timeout: 2)
-    }
+    app.terminate()
+    _ = app.wait(for: .notRunning, timeout: 5)
   }
 
   private func attachScreenshot(named name: String, app: XCUIApplication) {

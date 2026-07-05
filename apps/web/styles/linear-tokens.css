@@ -379,7 +379,9 @@
    layout, and effects are shared.
    ============================================ */
 
-:root.dark {
+:root.dark,
+.linear-marketing.dark,
+[data-theme="linear"].dark {
   /* Text — extracted directly from linear.app computed styles (2026-03-10):
      --color-text-primary: #f7f8f8  (rgb 247,248,248)
      --color-text-secondary: #d0d6e0 (much brighter than previous)

@@ -4,7 +4,7 @@ import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 
 function SummaryCardSkeleton() {
   return (
-    <div className='min-h-[116px] rounded-md border border-subtle bg-surface-0 px-3 py-3'>
+    <div className='min-h-29 rounded-md border border-subtle bg-surface-0 px-3 py-3'>
       <LoadingSkeleton height='h-7' width='w-8' rounded='md' />
       <LoadingSkeleton height='h-3' width='w-20' rounded='md' />
       <LoadingSkeleton height='h-4' width='w-full' rounded='md' />
@@ -67,7 +67,7 @@ export default function RetargetingAdsLoading() {
       </SettingsPanel>
 
       <SettingsPanel
-        className='min-h-[156px]'
+        className='min-h-39'
         title={<LoadingSkeleton height='h-4' width='w-40' rounded='md' />}
         description={<LoadingSkeleton height='h-3' width='w-72' rounded='md' />}
         cardClassName='p-4'

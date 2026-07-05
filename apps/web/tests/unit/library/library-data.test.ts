@@ -7,6 +7,7 @@ import {
   formatLibraryReleaseDate,
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
+  getLibraryDrawerHeroClass,
   LIBRARY_GRID_DENSITY_LAYOUT,
 } from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -270,6 +271,26 @@ describe('library data', () => {
     expect(getLibraryAssetAspectRatio(portraitVideo)).toBe('9:16');
     expect(getLibraryAspectRatioClass('16:9')).toBe('aspect-video');
     expect(getLibraryAspectRatioClass('9:16')).toBe('aspect-[9/16]');
+  });
+
+  it('compacts the drawer hero so large images stay inside the rail', () => {
+    // Square / landscape art is width-bound so it cannot exceed the rail width.
+    const square = getLibraryDrawerHeroClass('1:1');
+    expect(square).toContain('aspect-square');
+    expect(square).toContain('max-w-56');
+    expect(square).toContain('w-full');
+
+    const landscape = getLibraryDrawerHeroClass('16:9');
+    expect(landscape).toContain('aspect-video');
+    expect(landscape).toContain('max-w-56');
+
+    // Portrait art is HEIGHT-bound so a tall 9:16 canvas cannot blow out the
+    // narrow rail vertically; width derives down from the height cap.
+    const portrait = getLibraryDrawerHeroClass('9:16');
+    expect(portrait).toContain('aspect-[9/16]');
+    expect(portrait).toContain('max-h-72');
+    expect(portrait).toContain('w-auto');
+    expect(portrait).not.toContain('max-w-56');
   });
 
   it('exposes density-aware grid layout classes', () => {

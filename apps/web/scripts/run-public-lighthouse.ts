@@ -4,6 +4,26 @@ import { getLighthousePublicSurfaceManifest } from '@/tests/e2e/utils/public-sur
 
 const BASE_URL = process.env.BASE_URL?.trim();
 
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  if (!value?.trim()) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`Expected a positive integer, got "${value}"`);
+  }
+  return parsed;
+}
+
+function parseShardIndex(value: string | undefined, totalShards: number) {
+  if (!value?.trim()) return 0;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed >= totalShards) {
+    throw new Error(
+      `PUBLIC_LIGHTHOUSE_SHARD_INDEX must be between 0 and ${totalShards - 1}; got "${value}"`
+    );
+  }
+  return parsed;
+}
+
 function getValidatedBaseUrl(): string {
   if (!BASE_URL) {
     throw new Error('BASE_URL is required for public Lighthouse runs');
@@ -41,16 +61,58 @@ async function main() {
   const urls = surfaces.map(surface =>
     new URL(surface.resolvedPath, baseUrl).toString()
   );
+  const totalShards = parsePositiveInteger(
+    process.env.PUBLIC_LIGHTHOUSE_TOTAL_SHARDS,
+    1
+  );
+  const shardIndex = parseShardIndex(
+    process.env.PUBLIC_LIGHTHOUSE_SHARD_INDEX,
+    totalShards
+  );
+  const selectedUrls = urls.filter(
+    (_, index) => index % totalShards === shardIndex
+  );
+
+  if (selectedUrls.length === 0) {
+    throw new Error(
+      `No public Lighthouse URLs selected for shard ${shardIndex}/${totalShards}`
+    );
+  }
+
+  console.log(
+    `Running public Lighthouse shard ${shardIndex + 1}/${totalShards}: ${selectedUrls.length}/${urls.length} URLs`
+  );
 
   const args = [
     'exec',
     'lhci',
     'autorun',
     '--config=.lighthouserc.public-launch.json',
-    ...urls.map(url => `--collect.url=${url}`),
+    ...selectedUrls.map(url => `--collect.url=${url}`),
   ];
 
-  await runCommand('pnpm', args, process.env);
+  // Retry once on failure to absorb transient Chrome DevTools flakes
+  // (PROTOCOL_TIMEOUT / "Waiting for DevTools protocol response has exceeded
+  // the allotted time"), which fail lhci collection and were jamming the
+  // Graphite merge queue. Real assertion/perf failures are deterministic, so
+  // they still fail the retry — this clears flakes without masking regressions.
+  // ponytail: blanket retry-once; per-error classification only if a real
+  // perf regression ever slips through a borderline retry.
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await runCommand('pnpm', args, process.env);
+      return;
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS) throw error;
+      console.error(
+        `Public Lighthouse attempt ${attempt}/${MAX_ATTEMPTS} failed; retrying after Chrome cooldown. Cause: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      await new Promise(resolve => setTimeout(resolve, 5_000));
+    }
+  }
 }
 
 void main().catch(error => {

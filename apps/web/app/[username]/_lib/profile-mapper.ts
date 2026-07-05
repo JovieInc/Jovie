@@ -44,6 +44,7 @@ export function mapProfileWithLinksToCreatorProfile(
     active_since_year: result.activeSinceYear ?? null,
     is_featured: result.isFeatured || false,
     marketing_opt_out: result.marketingOptOut || false,
+    // Canonical metric: CANONICAL_METRICS.profile_views (lib/analytics/metrics.ts)
     profile_views: result.profileViews || 0,
     username_normalized: result.usernameNormalized,
     search_text:

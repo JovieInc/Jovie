@@ -29,22 +29,28 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Get changed copy files
         id: changed
         run: |
-          # Files changed vs. base branch that match copy patterns
-          git diff --name-only origin/${{ github.base_ref }}...HEAD \
+          # Files changed vs. base branch that match copy patterns.
+          # --diff-filter=d excludes deleted files (can't slopcheck a removed file).
+          # CHANGELOG.md is excluded: it is append-only and /ship-generated, so the
+          # whole-file slop score only ever grows and always fails regardless of the
+          # new entry's quality. Changelog copy quality is governed by the changelog
+          # format rules in .claude/rules/release.md, not this marketing-copy gate.
+          git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD \
             | grep -E '\.(md|mdx)$' \
-            | grep -v -E '^(node_modules|\.cache|drizzle/migrations)' \
+            | grep -v -E '^(node_modules|\.cache|drizzle/migrations|DESIGN\.md)' \
+            | grep -v -E '(^|/)CHANGELOG\.md$' \
             > /tmp/changed_copy_files.txt || true
 
           if [ -s /tmp/changed_copy_files.txt ]; then
@@ -60,7 +66,7 @@ jobs:
         if: steps.changed.outputs.has_files == 'true'
         run: |
           mapfile -t files < /tmp/changed_copy_files.txt
-          python3 scripts/slopcheck.py --max 3.0 "${files[@]}"
+          python3 scripts/slopcheck.py --max 3.0 --diff-base "origin/${{ github.base_ref }}" "${files[@]}"
 
       - name: No copy files changed — skip
         if: steps.changed.outputs.has_files == 'false'
@@ -71,10 +77,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 

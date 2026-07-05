@@ -141,8 +141,9 @@ describe('GET /api/mobile/v1/me', () => {
     });
   });
 
-  it('reports chatEnabled from the mobile chat runtime switch', async () => {
+  it('reports chatEnabled for complete authenticated profiles without rollout env', async () => {
     vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', '');
+    vi.stubEnv('MOBILE_CHAT_ALPHA_GATE_ENABLED', 'true');
     hoisted.getSessionContextMock.mockResolvedValue({
       user: {
         userStatus: 'active',
@@ -164,7 +165,7 @@ describe('GET /api/mobile/v1/me', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.chatEnabled).toBe(false);
+    expect(data.chatEnabled).toBe(true);
   });
 
   it('returns needs_onboarding when the DB user is missing', async () => {

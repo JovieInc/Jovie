@@ -56,12 +56,12 @@ function renderLogoMark(
 
 function getLogoLinkClass(mark: string, isLinear: boolean): string {
   if (mark === 'text') {
-    return 'inline-flex items-center gap-1 rounded-md px-2 py-1 -mx-2 -my-1 focus-ring-themed text-[10px] uppercase tracking-widest text-muted-foreground/40 transition-colors duration-150 ease-out hover:text-muted-foreground';
+    return 'inline-flex items-center gap-1 rounded-md px-2 py-1 -mx-2 -my-1 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
   }
   if (isLinear) {
-    return 'rounded-md p-1 -m-1 focus-ring-themed transition-opacity duration-150 ease-out hover:opacity-80';
+    return 'rounded-md p-1 -m-1 focus-ring-themed transition-opacity duration-subtle ease-out hover:opacity-80';
   }
-  return 'rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1';
+  return 'rounded-md p-1 -m-1 focus-ring-themed transition-colors duration-subtle ease-out hover:bg-surface-1';
 }
 
 export function FooterBranding({
@@ -80,7 +80,7 @@ export function FooterBranding({
 
   const logoClass = isLinear
     ? 'opacity-100'
-    : 'opacity-50 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100';
+    : 'opacity-50 transition-opacity duration-subtle ease-out group-hover:opacity-100 group-focus-within:opacity-100';
 
   const ctaStyle: CSSProperties | undefined = isLinear
     ? { color: 'var(--linear-text-tertiary)' }
@@ -96,7 +96,7 @@ export function FooterBranding({
       <Link
         href={logoHref}
         prefetch={false}
-        aria-label='Jovie home'
+        aria-label='Jovie Home'
         className={logoLinkClass}
       >
         {renderLogoMark(mark, size, isLinear, logoClass)}
@@ -107,12 +107,11 @@ export function FooterBranding({
           href={signUpLink}
           prefetch={false}
           className={cn(
-            'text-[10px] leading-snug uppercase font-semibold tracking-[0.04em]',
-            'transition-all duration-150 ease-out text-center',
+            'text-3xs leading-snug uppercase font-semibold tracking-[0.04em]',
+            'text-center',
             'rounded-md px-2 py-1 -mx-2 -my-1',
-            !isLinear && 'text-tertiary-token hover:text-secondary-token',
             !isLinear &&
-              'opacity-60 group-hover:opacity-100 group-focus-within:opacity-100',
+              'text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white',
             !isLinear && 'hover:bg-surface-1'
           )}
           style={ctaStyle}

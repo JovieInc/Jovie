@@ -110,6 +110,18 @@ If this is **not** a bug fix and no new test is required, say so explicitly (for
 
 *Add screenshots or videos to help explain your changes*
 
+## Design Skill Evidence
+
+*Complete this section for UI, UX, design-system, Ovie visual, or design-skill changes*
+
+- [ ] Design-read included: `Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>`
+- [ ] Dials included: `DESIGN_VARIANCE`, `MOTION_INTENSITY`, `VISUAL_DENSITY`
+- [ ] Before/after evidence included (screenshots, mockups, or component/file evidence)
+- [ ] Narrow lint and typecheck output included
+- [ ] `design-canonical` checklist included with explicit pass/fail for contrast, states, layout, motion, icons, anti-slop, and evidence
+
+If the PR is not design-related, say `design-canonical: not applicable`.
+
 ## Related Issues
 
 Closes #(issue number)
@@ -146,4 +158,3 @@ If this PR introduces custom SVGs:
 4. **Configuration**: Added to ESLint approved list
 
 Use the [Design Review Checklist](docs/DESIGN_REVIEW_CHECKLIST.md) for detailed guidance.
-

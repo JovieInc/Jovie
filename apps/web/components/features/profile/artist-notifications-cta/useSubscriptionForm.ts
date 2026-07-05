@@ -22,6 +22,7 @@ import {
   useSubscribeNotificationsMutation,
   useVerifyEmailOtpMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
+import { getNotificationCaptureError } from '@/lib/validation/schemas/notifications';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
 import {
@@ -233,8 +234,14 @@ export function useSubscriptionForm({
         const normalizedPhone = normalizeSubscriptionPhone(
           buildPhoneE164(phoneInput, country.dialCode)
         );
-        if (!normalizedPhone) {
-          updateError('Please enter a valid phone number', origin);
+        const sharedError = getNotificationCaptureError({
+          channel: 'sms',
+          value:
+            normalizedPhone ?? buildPhoneE164(phoneInput, country.dialCode),
+          country_code: country.code,
+        });
+        if (sharedError) {
+          updateError(sharedError, origin);
           return false;
         }
 
@@ -243,20 +250,27 @@ export function useSubscriptionForm({
       }
 
       const trimmedEmail = emailInput.trim();
-      if (!trimmedEmail) {
-        updateError('Email address is required', origin);
-        return false;
-      }
-
-      if (!normalizeSubscriptionEmail(trimmedEmail)) {
-        updateError('Please enter a valid email address', origin);
+      const sharedError = getNotificationCaptureError({
+        channel: 'email',
+        value: trimmedEmail,
+      });
+      if (sharedError) {
+        updateError(sharedError, origin);
         return false;
       }
 
       clearError();
       return true;
     },
-    [channel, clearError, country.dialCode, emailInput, phoneInput, updateError]
+    [
+      channel,
+      clearError,
+      country.code,
+      country.dialCode,
+      emailInput,
+      phoneInput,
+      updateError,
+    ]
   );
 
   const handleFieldBlur = useCallback(() => {

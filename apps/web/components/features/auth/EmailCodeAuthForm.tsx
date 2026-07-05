@@ -1,14 +1,19 @@
 'use client';
 
 import { useSignIn, useSignUp } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
+import { useSearchParams } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { useCallback, useState } from 'react';
+import { AuthInput, FormError, OtpInput } from '@/features/auth/atoms';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
-  AuthButton,
-  AuthInput,
-  FormError,
-  OtpInput,
-} from '@/features/auth/atoms';
+  isBotProtectionError,
+  isSessionExists,
+  parseClerkError,
+} from '@/lib/auth/clerk-errors';
+import { AUTH_CLASSES } from '@/lib/auth/constants';
 import type { AuthShellMode } from './AuthShell';
 
 /**
@@ -61,6 +66,10 @@ function readClerkError(error: unknown): ClerkErrorLike {
 }
 
 function getSendErrorMessage(mode: AuthShellMode, error: unknown): string {
+  if (isBotProtectionError(error)) {
+    return parseClerkError(error);
+  }
+
   const { code } = readClerkError(error);
 
   if (mode === 'sign-in' && code === 'form_identifier_not_found') {
@@ -79,6 +88,10 @@ function getSendErrorMessage(mode: AuthShellMode, error: unknown): string {
 }
 
 function getVerifyErrorMessage(error: unknown): string {
+  if (isBotProtectionError(error)) {
+    return parseClerkError(error);
+  }
+
   const { code } = readClerkError(error);
 
   if (code === 'form_code_incorrect') {
@@ -96,6 +109,8 @@ export function EmailCodeAuthForm({
   redirectUrl,
   initialEmailAddress,
 }: EmailCodeAuthFormProps) {
+  const searchParams = useSearchParams();
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   const signInState = useSignIn();
   const signUpState = useSignUp();
   const [step, setStep] = useState<EmailCodeStep>('email');
@@ -107,11 +122,25 @@ export function EmailCodeAuthForm({
   const isSignUp = mode === 'sign-up';
   const signIn = signInState.signIn;
   const signUp = signUpState.signUp;
-  const isReady = isSignUp ? Boolean(signUp) : Boolean(signIn);
+  const isReady =
+    (isSignUp ? Boolean(signUp) : Boolean(signIn)) &&
+    !(isAuthLoaded && isSignedIn);
+
+  const redirectSignedInVisitor = useCallback(() => {
+    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
+    globalThis.location?.assign(destination);
+  }, [searchParams]);
 
   const sendCode = useCallback(async () => {
     const trimmedEmail = emailAddress.trim();
-    if (!trimmedEmail || isPending || !isReady) return;
+    if (
+      !trimmedEmail ||
+      isPending ||
+      !isReady ||
+      (isAuthLoaded && isSignedIn)
+    ) {
+      return;
+    }
 
     setIsPending(true);
     setErrorMessage(null);
@@ -137,11 +166,27 @@ export function EmailCodeAuthForm({
       setCode('');
       setStep('code');
     } catch (error) {
+      if (isSessionExists(error)) {
+        redirectSignedInVisitor();
+        return;
+      }
+
       setErrorMessage(getSendErrorMessage(mode, error));
     } finally {
       setIsPending(false);
     }
-  }, [emailAddress, isPending, isReady, isSignUp, mode, signIn, signUp]);
+  }, [
+    emailAddress,
+    isAuthLoaded,
+    isPending,
+    isReady,
+    isSignedIn,
+    isSignUp,
+    mode,
+    redirectSignedInVisitor,
+    signIn,
+    signUp,
+  ]);
 
   const verifyCode = useCallback(
     async (submittedCode: string) => {
@@ -200,6 +245,10 @@ export function EmailCodeAuthForm({
     setErrorMessage(null);
   }, []);
 
+  if (isAuthLoaded && isSignedIn) {
+    return null;
+  }
+
   if (step === 'code') {
     return (
       <form
@@ -222,9 +271,14 @@ export function EmailCodeAuthForm({
           errorId='auth-email-code-error'
         />
         <FormError id='auth-email-code-error' message={errorMessage} />
-        <AuthButton type='submit' disabled={isPending || code.length < 6}>
+        <Button
+          type='submit'
+          className={AUTH_CLASSES.authCta}
+          static
+          disabled={isPending || code.length < 6}
+        >
           {isPending ? 'Verifying…' : 'Verify Code'}
-        </AuthButton>
+        </Button>
         <button
           type='button'
           onClick={handleBackToEmail}
@@ -255,8 +309,10 @@ export function EmailCodeAuthForm({
         onChange={event => setEmailAddress(event.target.value)}
       />
       <FormError message={errorMessage} />
-      <AuthButton
+      <Button
         type='submit'
+        className={AUTH_CLASSES.authCta}
+        static
         disabled={isPending || !isReady || emailAddress.trim().length === 0}
       >
         {isPending
@@ -264,7 +320,7 @@ export function EmailCodeAuthForm({
           : isSignUp
             ? 'Continue with Email'
             : 'Email me a Code'}
-      </AuthButton>
+      </Button>
     </form>
   );
 }

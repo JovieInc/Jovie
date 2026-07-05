@@ -7,6 +7,7 @@ import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palet
 import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import {
   mockClearPendingShell,
+  mockOpenPreviewPanel,
   mockRouterPush,
   mockShowPendingShell,
   mockToastInfo,
@@ -51,16 +52,18 @@ describe('DashboardNav interactions', () => {
   it('renders the full primary navigation config', () => {
     renderDashboardNav({ renderFn: render });
 
-    expect(
-      screen.getByRole('link', { name: 'New Conversation' })
-    ).toHaveAttribute('href', APP_ROUTES.CHAT);
+    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
+    );
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
       buildLibraryViewRoute('releases')
     );
     expect(
-      screen.getByRole('link', { name: 'Artist Profile' })
-    ).toHaveAttribute('href', APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+      screen.getByRole('button', { name: 'Artist Profile' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Artist Profile' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_TOURING
@@ -83,9 +86,10 @@ describe('DashboardNav interactions', () => {
       'href',
       buildLibraryViewRoute('releases')
     );
-    expect(
-      screen.getByRole('link', { name: 'New Conversation' })
-    ).toHaveAttribute('href', APP_ROUTES.CHAT);
+    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
+    );
   });
 
   it('shows grouped admin navigation with growth links for admin users', () => {
@@ -145,7 +149,8 @@ describe('DashboardNav interactions', () => {
     expect(labelNode).toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
-  it('renders Artist Profile in the primary artist group on chat routes', () => {
+  it('opens the in-chat profile rail from the artist name on chat routes', async () => {
+    const user = userEvent.setup();
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
     renderDashboardNav({
       renderFn: render,
@@ -160,9 +165,9 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    expect(
-      screen.getByRole('link', { name: 'Artist Profile' })
-    ).toHaveAttribute('href', APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    await user.click(screen.getByRole('button', { name: 'Tim White' }));
+
+    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
@@ -196,7 +201,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByLabelText('Command palette search')).toBeInTheDocument();
   });
 
-  it('groups the Design V1 shell into top nav, artist group, and More sections', () => {
+  it('groups the Design V1 shell into top nav and artist sections without duplicate Settings', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
@@ -215,10 +220,11 @@ describe('DashboardNav interactions', () => {
     expect(screen.queryByRole('button', { name: 'Work' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Catalog' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Growth' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Artist' })).toHaveAttribute(
       'aria-expanded',
       'true'
     );
@@ -227,8 +233,9 @@ describe('DashboardNav interactions', () => {
       buildLibraryViewRoute('releases')
     );
     expect(
-      screen.getByRole('link', { name: 'Artist Profile' })
-    ).toHaveAttribute('href', APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+      screen.getByRole('button', { name: 'Tim White' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tim White' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_TOURING
@@ -237,9 +244,7 @@ describe('DashboardNav interactions', () => {
       'href',
       APP_ROUTES.AUDIENCE
     );
-    expect(
-      container.querySelector('[data-nav-section="more"]')
-    ).toBeInTheDocument();
+    expect(container.querySelector('[data-nav-section="more"]')).toBeNull();
   });
 
   it('renders recent chats in the Design V1 sidebar as App Router links', () => {
@@ -265,7 +270,7 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(screen.getByText('Conversations')).toBeInTheDocument();
+    expect(screen.getByText('Chats')).toBeInTheDocument();
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: true,
@@ -277,7 +282,7 @@ describe('DashboardNav interactions', () => {
     );
     expect(
       screen.getByRole('button', {
-        name: 'Conversation Actions for Pitch tasks',
+        name: 'Chat Actions for Pitch tasks',
       })
     ).toBeInTheDocument();
   });
@@ -308,15 +313,12 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(
-      screen.getAllByRole('link', { name: 'New Conversation' })
-    ).toHaveLength(1);
-    expect(
-      screen.getByRole('button', { name: 'New Conversation' })
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
   });
 
-  it('keeps Artist Profile in the artist group off chat routes', () => {
+  it('navigates to chat and opens the profile rail from artist name off chat routes', async () => {
+    const user = userEvent.setup();
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.AUDIENCE);
     renderDashboardNav({
       renderFn: render,
@@ -331,10 +333,10 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    expect(
-      screen.getByRole('link', { name: 'Artist Profile' })
-    ).toHaveAttribute('href', APP_ROUTES.SETTINGS_ARTIST_PROFILE);
-    expect(mockRouterPush).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Tim White' }));
+
+    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
+    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
   });
 
   it('shows the releases pending shell once for a pointer click', async () => {

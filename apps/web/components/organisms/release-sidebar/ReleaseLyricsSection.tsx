@@ -231,10 +231,10 @@ export function ReleaseLyricsSection({
           }}
           rows={draftLyrics ? 10 : 4}
           disabled={!isEditable || isSaving}
-          className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
+          className='min-h-35 resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
         />
         {/* Auto-save status indicator */}
-        <div className='min-h-[22px]'>
+        <div className='min-h-6'>
           <ReleaseSaveStatusRow status={saveStatus} feedback={actionFeedback} />
         </div>
       </div>
@@ -279,7 +279,7 @@ export function ReleaseLyricsSection({
                   size='icon'
                   disabled={isActionsDisabled || isFormatting}
                   className='h-7 w-7 rounded-l-none px-1.5'
-                  aria-label='Choose format'
+                  aria-label='Choose Format'
                 >
                   <ChevronDown className='h-3.5 w-3.5' />
                 </DrawerButton>

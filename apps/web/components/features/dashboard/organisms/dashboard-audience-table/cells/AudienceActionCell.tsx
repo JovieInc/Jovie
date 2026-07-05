@@ -46,7 +46,7 @@ export const AudienceActionCell = memo(function AudienceActionCell({
         size='sm'
         onClick={handleClick}
         aria-label={`Message ${displayName}`}
-        className='min-h-[28px] px-2.5 text-2xs'
+        className='min-h-7 px-2.5 text-2xs'
       >
         Message
       </Button>

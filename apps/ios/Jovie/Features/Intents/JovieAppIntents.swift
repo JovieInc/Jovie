@@ -20,7 +20,7 @@ struct OpenChatIntent: AppIntent {
 struct SendMessageIntent: AppIntent {
   static let title: LocalizedStringResource = "Ask Jovie"
   static let description = IntentDescription(
-    "Opens Jovie chat with your message ready to send."
+    "Opens Jovie chat and sends your message to Jovie."
   )
   static let openAppWhenRun = true
 
@@ -32,7 +32,19 @@ struct SendMessageIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult {
-    IntentNavigationStore.shared.submit(.sendMessage(message))
+    IntentNavigationStore.shared.submit(.sendMessage(text: message, autoSend: true))
+    return .result()
+  }
+}
+
+struct StartVoiceCaptureIntent: AppIntent {
+  static let title: LocalizedStringResource = "Talk to Jovie"
+  static let description = IntentDescription("Opens Jovie and starts listening.")
+  static let openAppWhenRun = true
+
+  @MainActor
+  func perform() async throws -> some IntentResult {
+    IntentNavigationStore.shared.submit(.startVoiceCapture)
     return .result()
   }
 }
@@ -70,6 +82,15 @@ struct JovieAppShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Ask Jovie",
       systemImageName: "sparkles"
+    )
+    AppShortcut(
+      intent: StartVoiceCaptureIntent(),
+      phrases: [
+        "Talk to \(.applicationName)",
+        "Start talking to \(.applicationName)",
+      ],
+      shortTitle: "Talk",
+      systemImageName: "mic.fill"
     )
     AppShortcut(
       intent: ContinueLastConversationIntent(),

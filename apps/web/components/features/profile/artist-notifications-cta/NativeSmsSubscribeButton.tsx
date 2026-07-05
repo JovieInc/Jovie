@@ -254,8 +254,8 @@ export function NativeSmsSubscribeButton({
         disabled={phase === 'pending'}
         className={cn(
           'inline-flex h-11 items-center justify-center gap-2 rounded-full px-4',
-          'bg-[oklch(10%_0_0)] text-white',
-          'text-[15px] font-medium tracking-[-0.165px]',
+          'bg-[oklch(10%_0_0)] text-white dark:text-white',
+          'text-mid font-medium tracking-[-0.165px]',
           'transition-colors duration-subtle',
           'hover:bg-[oklch(15%_0_0)]',
           'disabled:cursor-not-allowed disabled:opacity-60'
@@ -290,7 +290,7 @@ export function NativeSmsSubscribeButton({
           <span className='sr-only'>{`Verification code: ${intent.code.split('').join(' ')}`}</span>
           <span
             aria-hidden='true'
-            className='rounded border px-3 py-2 font-mono text-[18px] font-medium tracking-wider'
+            className='rounded border px-3 py-2 font-mono text-lg font-medium tracking-wider'
           >
             {intent.code}
           </span>

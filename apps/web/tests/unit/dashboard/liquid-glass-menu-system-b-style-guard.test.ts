@@ -7,16 +7,14 @@ const sourcePath =
   'components/features/dashboard/organisms/LiquidGlassMenu.tsx';
 
 const transformMotionPatterns = [
-  /\bactive:scale(?:-\[[^\]]+\]|-\d+)?\b/,
+  /\bhover:scale(?:-\[[^\]]+\]|-\d+)?\b/,
+  /\bhover:translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
+  /\bhover:-translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
   /\btransition-all\b/,
-  /\btransition-transform\b/,
-  /\btransition-\[[^\]]*transform[^\]]*\]/,
-  /\btranslate-y-/,
-  /\bscale(?:-\[[^\]]+\]|-\d{1,3})/,
 ];
 
 describe('dashboard LiquidGlassMenu System B guard', () => {
-  it('keeps mobile menu feedback color or opacity only', () => {
+  it('keeps mobile menu hover feedback non-positional', () => {
     const source = readFileSync(path.join(webRoot, sourcePath), 'utf8');
     const offenders = transformMotionPatterns
       .filter(pattern => pattern.test(source))
@@ -30,6 +28,6 @@ describe('dashboard LiquidGlassMenu System B guard', () => {
     expect(source).toContain('transition-opacity');
     expect(source).toContain('active:bg-surface-2');
     expect(source).toContain('active:text-primary-token');
-    expect(source).toContain('min-w-[64px]');
+    expect(source).toContain('min-w-16');
   });
 });

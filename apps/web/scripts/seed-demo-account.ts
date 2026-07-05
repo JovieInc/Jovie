@@ -26,6 +26,7 @@ import {
   INTERNAL_DJ_DEMO_PERSONA,
 } from '@/lib/demo-personas';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import { assertSeedDatabaseTarget } from './seed-database-guard';
 
 const {
   users,
@@ -204,6 +205,8 @@ if (!DATABASE_URL) {
   console.error('DATABASE_URL not configured');
   process.exit(1);
 }
+
+assertSeedDatabaseTarget({ scriptName: 'seed-demo-account.ts' });
 
 const DEMO_CLERK_USER_ID = process.env.DEMO_CLERK_USER_ID;
 if (!DEMO_CLERK_USER_ID) {

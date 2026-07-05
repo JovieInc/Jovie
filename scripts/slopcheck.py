@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -144,8 +145,24 @@ _NOT_JUST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Em-dash patterns (— or --)
-_EM_DASH_PATTERN = re.compile(r"—|--")
+# Em-dash patterns (— or prose --).
+# Excludes CSS custom properties (--variable-name) and Markdown table separators
+# (|---|---) by requiring -- is not preceded by another dash and not followed by
+# a word character or another dash.
+_EM_DASH_PATTERN = re.compile(r"—|(?<!-)--(?![a-zA-Z0-9_\-])")
+
+# Preprocessing patterns to strip non-prose regions before scoring
+_FRONTMATTER_PATTERN = re.compile(r"^---.*?---\s*", re.DOTALL)
+_FENCED_CODE_PATTERN = re.compile(r"```.*?```", re.DOTALL)
+_INLINE_CODE_PATTERN = re.compile(r"`[^`\n]+`")
+
+
+def _strip_code(text: str) -> str:
+    """Remove frontmatter, fenced code blocks, and inline code from markdown text."""
+    text = _FRONTMATTER_PATTERN.sub("", text)
+    text = _FENCED_CODE_PATTERN.sub("", text)
+    text = _INLINE_CODE_PATTERN.sub("", text)
+    return text
 
 # Sentence splitter (rough, good enough for penalty scoring)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
@@ -195,6 +212,7 @@ def slop_score(text: str, filename: str = "<stdin>") -> SlopResult:
     """
     Score text for AI slop tells. Returns SlopResult with 0–10 penalty and hits list.
     """
+    text = _strip_code(text)
     lower = text.lower()
     hits: list[str] = []
     penalty = 0.0
@@ -253,6 +271,29 @@ def slop_score(text: str, filename: str = "<stdin>") -> SlopResult:
 # CLI
 # ---------------------------------------------------------------------------
 
+def extract_added_lines(diff_text: str) -> str:
+    """Return prose added in a unified diff (skip +++ file headers)."""
+    lines: list[str] = []
+    for line in diff_text.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            lines.append(line[1:])
+    return "\n".join(lines)
+
+
+def read_git_added_lines(path: str, diff_base: str) -> tuple[str, str]:
+    """Return added copy for path vs diff_base...HEAD."""
+    proc = subprocess.run(
+        ["git", "diff", f"{diff_base}...HEAD", "--", path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise OSError(proc.stderr.strip() or f"git diff failed for {path}")
+    added = extract_added_lines(proc.stdout)
+    return added, f"{path} (added lines)"
+
+
 def _read_file(path: str) -> tuple[str, str]:
     if path == "-":
         return sys.stdin.read(), "<stdin>"
@@ -283,12 +324,24 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Only print failing files",
     )
+    parser.add_argument(
+        "--diff-base",
+        metavar="REF",
+        help="Score only lines added vs REF...HEAD (for long-lived docs like CHANGELOG.md)",
+    )
     args = parser.parse_args(argv)
 
     any_fail = False
     for path in args.files:
         try:
-            text, name = _read_file(path)
+            if args.diff_base:
+                text, name = read_git_added_lines(path, args.diff_base)
+                if not text.strip():
+                    if not args.quiet:
+                        print(f"{path}: no added copy — skipped")
+                    continue
+            else:
+                text, name = _read_file(path)
         except (OSError, IOError) as e:
             print(f"ERROR reading {path}: {e}", file=sys.stderr)
             any_fail = True

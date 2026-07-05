@@ -49,7 +49,7 @@ export interface CircleIconButtonProps
   readonly children: React.ReactNode;
   /** Accessible label for screen readers */
   readonly ariaLabel: string;
-  /** Button size - xs: 32px, sm: 36px, md: 40px, lg: 44px */
+  /** Button size - xs/sm/md: 40px, lg: 44px */
   readonly size?: CircleIconButtonSize;
   /** Visual variant */
   readonly variant?: CircleIconButtonVariant;
@@ -60,10 +60,10 @@ export interface CircleIconButtonProps
 }
 
 const sizeStyles: Record<CircleIconButtonSize, string> = {
-  xs: 'h-8 w-8', // 32px - compact, good for dense UIs
-  sm: 'h-9 w-9', // 36px - default for most use cases
-  md: 'h-10 w-10', // 40px - standard touch target
-  lg: 'h-11 w-11', // 44px - large touch target (mobile-first)
+  xs: 'h-10 w-10',
+  sm: 'h-10 w-10',
+  md: 'h-10 w-10',
+  lg: 'h-11 w-11',
 };
 
 const iconSizeStyles: Record<CircleIconButtonSize, string> = {
@@ -127,10 +127,10 @@ const variantStyles: Record<
   pearl: {
     buttonVariant: 'ghost',
     className: cn(
-      'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token backdrop-blur-xl',
-      'shadow-[var(--profile-pearl-shadow)]',
-      'hover:bg-[var(--profile-pearl-bg-hover)] hover:text-primary-token',
-      'active:bg-[var(--profile-pearl-bg-active)]'
+      'border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-primary-token backdrop-blur-xl',
+      'shadow-(--profile-pearl-shadow)',
+      'hover:bg-(--profile-pearl-bg-hover) hover:text-primary-token',
+      'active:bg-(--profile-pearl-bg-active)'
     ),
   },
   pearlQuiet: {
@@ -138,9 +138,9 @@ const variantStyles: Record<
     className: cn(
       'border border-transparent bg-transparent text-primary-token/78 backdrop-blur-xl',
       'shadow-none',
-      'hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] hover:text-primary-token hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
-      'focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] focus-visible:text-primary-token focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]',
-      'active:bg-[var(--profile-pearl-bg-active)] active:text-primary-token'
+      'hover:border-(--profile-pearl-border) hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] hover:text-primary-token hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
+      'focus-visible:border-(--profile-pearl-border) focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] focus-visible:text-primary-token focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]',
+      'active:bg-(--profile-pearl-bg-active) active:text-primary-token'
     ),
   },
 };

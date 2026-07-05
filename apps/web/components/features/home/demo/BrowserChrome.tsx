@@ -18,7 +18,7 @@ export function BrowserChrome({
     >
       {/* Title bar */}
       <div className='flex items-center gap-2 px-3.5 py-2.5 border-b border-subtle'>
-        <div className='flex gap-[5px]'>
+        <div className='flex gap-1'>
           <span className='h-2 w-2 rounded-full bg-tertiary-token opacity-35' />
           <span className='h-2 w-2 rounded-full bg-tertiary-token opacity-35' />
           <span className='h-2 w-2 rounded-full bg-tertiary-token opacity-35' />
@@ -27,7 +27,7 @@ export function BrowserChrome({
           {title}
         </div>
         {/* Spacer to balance the dots */}
-        <div className='w-[29px]' />
+        <div className='w-7' />
       </div>
 
       {/* Content */}

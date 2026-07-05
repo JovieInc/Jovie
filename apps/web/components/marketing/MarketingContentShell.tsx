@@ -22,7 +22,7 @@ export function MarketingContentShell({
         <div
           className={cn(
             'marketing-body',
-            'text-[var(--linear-text-secondary)]',
+            'text-(--linear-text-secondary)',
             className
           )}
         >

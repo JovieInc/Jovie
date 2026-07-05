@@ -1,7 +1,0 @@
-{
-  "scripts": {
-    "setup": "bash scripts/setup.sh",
-    "run": "doppler run -- pnpm --filter web dev:local",
-    "archive": "bash scripts/archive.sh"
-  }
-}

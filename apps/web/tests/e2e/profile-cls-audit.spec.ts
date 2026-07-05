@@ -16,6 +16,14 @@
 
 import type { Page } from '@playwright/test';
 
+import {
+  attachClsResult,
+  CLS_INTERACTION_BUDGET,
+  collectInteractionCls,
+  installInteractionClsObserver,
+  measureBufferedCls,
+  shouldSkipClsInDevMode,
+} from '../helpers/cls-measurement';
 import { expect, test } from './setup';
 import {
   smokeNavigate,
@@ -26,34 +34,7 @@ import {
 // Override to run unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/** CLS threshold — aligns with "true zero is over-engineering" premise */
-const CLS_BUDGET = 0.05;
-
-/**
- * Measure Cumulative Layout Shift using PerformanceObserver.
- * Observes layout-shift entries (buffered) and sums values,
- * excluding shifts caused by recent user input.
- */
-async function measureCLS(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    return new Promise<number>(resolve => {
-      let cls = 0;
-      const observer = new PerformanceObserver(list => {
-        for (const entry of list.getEntries()) {
-          if (!(entry as any).hadRecentInput) {
-            cls += (entry as any).value;
-          }
-        }
-      });
-      observer.observe({ type: 'layout-shift', buffered: true });
-      // Give time for any pending shifts to be reported
-      setTimeout(() => {
-        observer.disconnect();
-        resolve(cls);
-      }, 1000);
-    });
-  });
-}
+const CLS_BUDGET = CLS_INTERACTION_BUDGET;
 
 /**
  * Intercept analytics routes to prevent side effects during testing
@@ -71,15 +52,10 @@ async function interceptAnalytics(page: Page): Promise<void> {
 }
 
 test.describe('Profile CLS Audit @nightly', () => {
-  // CLS budgets are only meaningful against production builds.
-  // In dev mode Turbopack adds significant overhead that makes CLS
-  // assertions unreliable. Skip unless running in CI.
-  const isDevMode = !process.env.CI;
-
   test('profile initial load has CLS < 0.05', async ({ page }, testInfo) => {
     test.setTimeout(180_000);
 
-    if (isDevMode) {
+    if (shouldSkipClsInDevMode()) {
       test.skip(
         true,
         'CLS budgets are unreliable in dev mode (Turbopack overhead)'
@@ -105,15 +81,12 @@ test.describe('Profile CLS Audit @nightly', () => {
         // Continue even if some images are still loading
       });
 
-    const cls = await measureCLS(page);
+    const cls = await measureBufferedCls(page);
 
-    await testInfo.attach('cls-initial-load', {
-      body: JSON.stringify(
-        { cls, budget: CLS_BUDGET, profile: TEST_PROFILES.DUALIPA },
-        null,
-        2
-      ),
-      contentType: 'application/json',
+    await attachClsResult(testInfo, 'cls-initial-load', {
+      cls,
+      budget: CLS_BUDGET,
+      profile: TEST_PROFILES.DUALIPA,
     });
 
     console.log(
@@ -131,7 +104,7 @@ test.describe('Profile CLS Audit @nightly', () => {
   }, testInfo) => {
     test.setTimeout(180_000);
 
-    if (isDevMode) {
+    if (shouldSkipClsInDevMode()) {
       test.skip(
         true,
         'CLS budgets are unreliable in dev mode (Turbopack overhead)'
@@ -144,19 +117,7 @@ test.describe('Profile CLS Audit @nightly', () => {
     await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
     await waitForHydration(page);
 
-    // Inject a fresh CLS observer before the state transition
-    await page.evaluate(() => {
-      (window as any).__clsValue = 0;
-      const observer = new PerformanceObserver(list => {
-        for (const entry of list.getEntries()) {
-          if (!(entry as any).hadRecentInput) {
-            (window as any).__clsValue += (entry as any).value;
-          }
-        }
-      });
-      observer.observe({ type: 'layout-shift', buffered: false });
-      (window as any).__clsObserver = observer;
-    });
+    await installInteractionClsObserver(page);
 
     // Trigger subscribe form — try clicking the CTA, fall back to query param
     const notifyButton = page
@@ -192,24 +153,12 @@ test.describe('Profile CLS Audit @nightly', () => {
       return;
     }
 
-    // Collect the CLS value and disconnect the observer
-    const cls = await page.evaluate(() => {
-      return new Promise<number>(resolve => {
-        setTimeout(() => {
-          const observer = (window as any).__clsObserver;
-          if (observer) observer.disconnect();
-          resolve((window as any).__clsValue || 0);
-        }, 1000);
-      });
-    });
+    const cls = await collectInteractionCls(page);
 
-    await testInfo.attach('cls-subscribe-transition', {
-      body: JSON.stringify(
-        { cls, budget: CLS_BUDGET, profile: TEST_PROFILES.DUALIPA },
-        null,
-        2
-      ),
-      contentType: 'application/json',
+    await attachClsResult(testInfo, 'cls-subscribe-transition', {
+      cls,
+      budget: CLS_BUDGET,
+      profile: TEST_PROFILES.DUALIPA,
     });
 
     console.log(
@@ -225,7 +174,7 @@ test.describe('Profile CLS Audit @nightly', () => {
   test('drawer open/close has CLS < 0.05', async ({ page }, testInfo) => {
     test.setTimeout(180_000);
 
-    if (isDevMode) {
+    if (shouldSkipClsInDevMode()) {
       test.skip(
         true,
         'CLS budgets are unreliable in dev mode (Turbopack overhead)'
@@ -241,19 +190,7 @@ test.describe('Profile CLS Audit @nightly', () => {
     await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
     await waitForHydration(page);
 
-    // Inject a fresh CLS observer before the drawer interaction
-    await page.evaluate(() => {
-      (window as any).__clsValue = 0;
-      const observer = new PerformanceObserver(list => {
-        for (const entry of list.getEntries()) {
-          if (!(entry as any).hadRecentInput) {
-            (window as any).__clsValue += (entry as any).value;
-          }
-        }
-      });
-      observer.observe({ type: 'layout-shift', buffered: false });
-      (window as any).__clsObserver = observer;
-    });
+    await installInteractionClsObserver(page);
 
     // Open listen drawer — try clicking Listen button, fall back to query param
     const listenButton = page.locator('[data-testid="listen-button"]').first();
@@ -313,29 +250,13 @@ test.describe('Profile CLS Audit @nightly', () => {
         // Drawer may already be closed
       });
 
-    // Collect the CLS value and disconnect the observer
-    const cls = await page.evaluate(() => {
-      return new Promise<number>(resolve => {
-        setTimeout(() => {
-          const observer = (window as any).__clsObserver;
-          if (observer) observer.disconnect();
-          resolve((window as any).__clsValue || 0);
-        }, 1000);
-      });
-    });
+    const cls = await collectInteractionCls(page);
 
-    await testInfo.attach('cls-drawer-interaction', {
-      body: JSON.stringify(
-        {
-          cls,
-          budget: CLS_BUDGET,
-          viewport: '375x812',
-          profile: TEST_PROFILES.DUALIPA,
-        },
-        null,
-        2
-      ),
-      contentType: 'application/json',
+    await attachClsResult(testInfo, 'cls-drawer-interaction', {
+      cls,
+      budget: CLS_BUDGET,
+      viewport: '375x812',
+      profile: TEST_PROFILES.DUALIPA,
     });
 
     console.log(

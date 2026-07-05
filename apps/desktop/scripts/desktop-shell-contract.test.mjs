@@ -21,23 +21,19 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop\/\$\{app\.getVersion\(\)\}`;/
   );
-  assert.match(mainSource, /await shell\.openExternal\(parsed\.toString\(\)\);/);
   assert.match(
     mainSource,
-    /const MACOS_TRAFFIC_LIGHT_X = 20;/
+    /await shell\.openExternal\(parsed\.toString\(\)\);/
   );
-  assert.match(
-    mainSource,
-    /const MACOS_TRAFFIC_LIGHT_Y = 17;/
-  );
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 20;/);
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 17;/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
   );
-  assert.match(
-    mainSource,
-    /app\.setName\(APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie'\);/
-  );
+  assert.match(mainSource, /function getDesktopAppDisplayName\(\): string/);
+  assert.match(mainSource, /if \(APP_ENV === 'local'\) return 'Jovie Local';/);
+  assert.match(mainSource, /app\.setName\(getDesktopAppDisplayName\(\)\);/);
   assert.match(mainSource, /APP_ENV === 'local'/);
   assert.match(mainSource, /Jovie-Local/);
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
@@ -53,6 +49,31 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /function createWindow\(initialUrl = APP_URL\): BrowserWindow/
   );
+});
+
+test('desktop polls build-info and reloads only hud windows on deploy drift', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  for (const symbol of [
+    'HUD_BUILD_INFO_POLL_INTERVAL_MS',
+    'fetchHudBuildFingerprint',
+    'getHudBuildFingerprint',
+    'decideHudBuildReload',
+    'isHudRoutePath',
+    'isHudWindow',
+    'scheduleHudBuildAutoReload',
+  ]) {
+    assert.match(mainSource, new RegExp(`\\b${symbol}\\b`));
+  }
+
+  assert.match(mainSource, /\/api\/health\/build-info/);
+  assert.match(mainSource, /60 \* 1000/);
+  assert.match(
+    mainSource,
+    /BrowserWindow\.getAllWindows\(\)\.some\(isHudWindow\)/
+  );
+  assert.match(mainSource, /win\.webContents\.reload\(\)/);
+  assert.doesNotMatch(mainSource, /commitSha.*deployedAt/);
 });
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {
@@ -88,8 +109,14 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /Desktop shell runtime: \$\{runtimeLabel\}/);
   assert.doesNotMatch(mainSource, /Desktop shell runtime: Mac OS/);
   assert.match(mainSource, /data:text\/html;charset=utf-8/);
-  assert.match(mainSource, /function escapeHtmlAttribute\(value: string\): string/);
-  assert.match(mainSource, /<a class="primary" href="\$\{retryUrl\}">Retry<\/a>/);
+  assert.match(
+    mainSource,
+    /function escapeHtmlAttribute\(value: string\): string/
+  );
+  assert.match(
+    mainSource,
+    /<a class="primary" href="\$\{retryUrl\}">Retry<\/a>/
+  );
   assert.doesNotMatch(mainSource, /onclick="window\.location\.href/);
   assert.match(mainSource, /did-fail-load/);
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
@@ -103,10 +130,26 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
   assert.match(mainSource, /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL/);
   assert.match(mainSource, /function hideMainWindowForAuthHandoff\(\): void/);
-  assert.match(mainSource, /function restoreMainWindowAfterAuthHandoff\(\): void/);
+  assert.match(
+    mainSource,
+    /function restoreMainWindowAfterAuthHandoff\(\): void/
+  );
   assert.match(mainSource, /mainWindowHiddenForAuthHandoff/);
   assert.match(mainSource, /win === mainWindow && isAuthHandoffOpen\(\)/);
-  assert.match(mainSource, /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/);
+  assert.match(
+    mainSource,
+    /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/
+  );
+  assert.match(mainSource, /const initialVisibilityFallback = setTimeout/);
+  assert.match(mainSource, /current === 'about:blank'/);
+  assert.match(
+    mainSource,
+    /const authUrl = buildCentralDesktopAuthUrl\('sign_in', '\/app'\);/
+  );
+  assert.match(
+    mainSource,
+    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(authUrl\)\);/
+  );
   assert.match(
     mainSource,
     /void win\.loadURL\(buildDesktopAuthHandoffUrl\(initialAuthUrl\)\);/
@@ -138,7 +181,10 @@ const FORBIDDEN_MAC_ENTITLEMENTS = [
 ];
 
 test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags)', async () => {
-  for (const fileName of ['entitlements.mac.plist', 'entitlements.mac.inherit.plist']) {
+  for (const fileName of [
+    'entitlements.mac.plist',
+    'entitlements.mac.inherit.plist',
+  ]) {
     const entitlements = await readFile(
       join(desktopRoot, 'build', fileName),
       'utf8'
@@ -156,14 +202,42 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
 });
 
 test('desktop production bundle declares the jovie auth protocol', async () => {
-  const builderConfig = await readFile(
-    join(desktopRoot, 'electron-builder.yml'),
-    'utf8'
-  );
+  const [builderConfig, mainSource, stagingConfig, localConfig] =
+    await Promise.all([
+      readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
+      readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
+      readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
+      readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
+    ]);
 
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
   assert.match(builderConfig, /CFBundleURLSchemes:\s*\n\s*- jovie/);
+  assert.match(mainSource, /APP_ENV === 'staging'\s*\?\s*'jovie-staging'/);
+  assert.match(mainSource, /APP_ENV === 'local'\s*\?\s*'jovie-local'/);
+  assert.match(mainSource, /:\s*'jovie';/);
+  assert.match(
+    mainSource,
+    /function isAuthReturnDeepLinkCandidate\(urlString: string\): boolean/
+  );
+  assert.match(
+    mainSource,
+    /isAuthReturnDeepLinkCandidate\(arg\) && !parseDesktopAuthReturnDeepLink\(arg\)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /startsWith\(`\$\{AUTH_RETURN_PROTOCOL\}\/\/\$\{AUTH_RETURN_HOST\}`\)/
+  );
+  assert.match(
+    mainSource,
+    /app\.setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME/
+  );
+  assert.match(stagingConfig, /CFBundleURLTypes:/);
+  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
+  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(localConfig, /CFBundleURLTypes:/);
+  assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
+  assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
 });
 
 test('desktop navigation uses explicit URL disposition allowlists', async () => {
@@ -182,7 +256,10 @@ test('desktop navigation uses explicit URL disposition allowlists', async () => 
     mainSource,
     /const URL_DISPOSITION_OPTIONS = \{ appUrl: APP_URL, appEnv: APP_ENV \} as const;/
   );
-  assert.match(mainSource, /function resolveNavigationUrl\(urlString: string\): string/);
+  assert.match(
+    mainSource,
+    /function resolveNavigationUrl\(urlString: string\): string/
+  );
   assert.match(
     mainSource,
     /return new URL\(urlString, APP_URL\)\.toString\(\);/
@@ -277,8 +354,13 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
   assert.match(mainSource, /installDesktopCspWatchdog/);
+  assert.match(
+    mainSource,
+    /function shouldScheduleDesktopAutoUpdate\(\): boolean/
+  );
+  assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
-  assert.match(mainSource, /process\.platform === 'linux'/);
+  assert.match(mainSource, /if \(!shouldScheduleDesktopAutoUpdate\(\)\)/);
   assert.match(mainSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
   assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
@@ -378,10 +460,31 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
   );
 
   assert.match(smokeSource, /const callbackOrigin = parsed\.origin;/);
-  assert.match(smokeSource, /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/);
+  assert.match(
+    smokeSource,
+    /const BASE_URL = process\.env\.BASE_URL \?\? 'http:\/\/localhost:3112';/
+  );
+  assert.match(
+    smokeSource,
+    /const NATIVE_AUTH_CALLBACK_SCHEME = getNativeAuthSchemeForBaseUrl\(BASE_URL\);/
+  );
+  assert.match(
+    smokeSource,
+    /if \(hostname === 'staging\.jov\.ie'\) return 'jovie-staging';/
+  );
+  assert.match(smokeSource, /if \(hostname === 'jov\.ie'\) return 'jovie';/);
+  assert.match(
+    smokeSource,
+    /hostname === 'localhost'[\s\S]*return 'jovie-local';/
+  );
+  assert.match(smokeSource, /return 'jovie';\s*\n}/);
+  assert.match(smokeSource, /NATIVE_AUTH_CALLBACK_PREFIX/);
   assert.match(smokeSource, /async function waitForDesktopAuthHandoff/);
   assert.match(smokeSource, /state === 'opened'/);
-  assert.match(smokeSource, /candidate\.textContent\?\.includes\('Cancel Sign-In'\)/);
+  assert.match(
+    smokeSource,
+    /candidate\.textContent\?\.includes\('Cancel Sign-In'\)/
+  );
   assert.match(smokeSource, /process\.env\.SMOKE_REQUEST_TIMEOUT_MS/);
   assert.match(smokeSource, /180_000/);
   assert.match(
@@ -404,6 +507,15 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
     smokeSource,
     /new URL\(\s*`\/auth\/callback\?state=\$\{encodeURIComponent\(authState\)\}`,\s*BASE_URL\s*\)/
   );
+  assert.match(smokeSource, /async function completeNativeReturnBounce/);
+  assert.match(
+    smokeSource,
+    /parsedRedirect\.pathname !== '\/auth\/native-return'/
+  );
+  assert.match(
+    smokeSource,
+    /redirectUrl\.startsWith\(NATIVE_AUTH_CALLBACK_PREFIX\)/
+  );
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {
@@ -419,11 +531,10 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     'utf8'
   );
 
-  assert.match(rootLayout, /import Script from 'next\/script';/);
-  assert.match(
-    rootLayout,
-    /<Script src='\/electron-runtime-init\.js' strategy='beforeInteractive' \/>/
-  );
+  // Loaded as a plain synchronous <script> in <head> (not next/script) so it
+  // runs before React hydration. next/script + nonce drift caused local E2E
+  // console errors, so the runtime marker is injected this way intentionally.
+  assert.match(rootLayout, /<script src='\/electron-runtime-init\.js' \/>/);
   assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
@@ -441,8 +552,14 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     globalsCss,
     /grid-template-columns: var\(--electron-sidebar-width\) minmax\(0, 1fr\);/
   );
-  assert.doesNotMatch(globalsCss, /grid-template-columns: var\(--linear-app-sidebar-width\)/);
-  assert.match(titlebarSource, /data-testid='electron-traffic-light-safe-area'/);
+  assert.doesNotMatch(
+    globalsCss,
+    /grid-template-columns: var\(--linear-app-sidebar-width\)/
+  );
+  assert.match(
+    titlebarSource,
+    /data-testid='electron-traffic-light-safe-area'/
+  );
   assert.match(
     titlebarSource,
     /w-\[var\(--electron-traffic-light-safe-width\)\]/

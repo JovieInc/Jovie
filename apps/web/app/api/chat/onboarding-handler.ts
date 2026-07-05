@@ -5,9 +5,22 @@ import type { UIMessage } from 'ai';
 import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  decideFallbackTurn,
+  type FallbackTurn,
+} from '@/lib/chat/onboarding-script/engine';
+import {
+  buildScriptedFallbackResponse,
+  type FallbackReason,
+} from '@/lib/chat/onboarding-script/respond';
+import { STREAM_ERROR_LINE } from '@/lib/chat/onboarding-script/script';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
-import { encodeToolEvents } from '@/lib/chat/tool-events';
+import {
+  encodeToolEvents,
+  type PersistedToolEvent,
+} from '@/lib/chat/tool-events';
 import {
   buildOnboardingTools,
   createOnboardingTurnState,
@@ -16,6 +29,7 @@ import type { ChatTelemetry } from '@/lib/chat/types';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { getEntitlements } from '@/lib/entitlements/registry';
+import { publicEnv } from '@/lib/env-public';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
@@ -28,11 +42,13 @@ import {
   checkAnonymousChatRateLimit,
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
+import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
 import {
   isTurnstileConfigured,
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
+import { logger } from '@/lib/utils/logger';
 
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
 const CHAT_DISABLED_GATE = 'ai_chat_disabled';
@@ -117,13 +133,50 @@ function extractAsn(req: Request): string | null {
   );
 }
 
-function shouldBypassTurnstileForLocalRuntime(): boolean {
-  if (isSecureEnv()) return false;
+function extractRequestHostname(req: Request): string | null {
+  const rawHost = req.headers.get('host');
+  const normalized = rawHost?.split(',')[0]?.trim();
+  if (!normalized) {
+    try {
+      return new URL(req.url).hostname;
+    } catch {
+      return null;
+    }
+  }
+
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    try {
+      return new URL(normalized).hostname;
+    } catch {
+      return null;
+    }
+  }
+
+  return normalized.replace(/:\d+$/, '');
+}
+
+function isSecureTurnstileEnvironment(req: Request): boolean {
+  const isSecureVercelDeployment =
+    env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview';
+  if (isSecureVercelDeployment) return true;
+
+  const isLocalPublicSmoke =
+    env.PUBLIC_NOAUTH_SMOKE === '1' &&
+    isLocalDevelopmentAutomationHostname(extractRequestHostname(req));
+  if (isLocalPublicSmoke) return false;
+
+  return isSecureEnv();
+}
+
+function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
+  if (isSecureTurnstileEnvironment(req)) return false;
 
   return (
     env.NODE_ENV === 'development' ||
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1'
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    (env.PUBLIC_NOAUTH_SMOKE === '1' &&
+      isLocalDevelopmentAutomationHostname(extractRequestHostname(req)))
   );
 }
 
@@ -163,20 +216,13 @@ export async function tryHandleAnonymousOnboardingChat(
   // Anonymous onboarding is a live route, not a default-off rollout. Reuse the
   // existing chat kill switch so unconfigured Statsig cannot disable /start.
   // Anonymous → pass `null` userId; Statsig falls back to public conditions.
-  const shouldBypassTurnstile = shouldBypassTurnstileForLocalRuntime();
+  // The switch no longer 503s onboarding: it skips the LLM dispatch and the
+  // deterministic script (JOV-3806) carries the conversation instead. Abuse
+  // controls (Turnstile, rate limits) below still run in full.
+  const shouldBypassTurnstile = shouldBypassTurnstileForLocalRuntime(req);
   const chatDisabled = shouldBypassTurnstile
     ? false
     : await checkGateForUser(null, CHAT_DISABLED_GATE, false);
-  if (chatDisabled) {
-    return NextResponse.json(
-      {
-        error: 'Onboarding chat is temporarily unavailable',
-        errorCode: 'ONBOARDING_CHAT_DISABLED',
-        requestId,
-      },
-      { status: 503, headers: { ...corsHeaders, 'x-request-id': requestId } }
-    );
-  }
 
   // --- Session cookie: read existing or mint a new one ---
   const incomingCookieHeader = req.headers.get('cookie') || '';
@@ -381,7 +427,65 @@ export async function tryHandleAnonymousOnboardingChat(
   // until we have signal a real artist is on the other end — flipped via
   // confirmSpotifyArtist + recordInterviewSignal in a follow-up commit.
   const freeTierLimits = getEntitlements('free');
+
+  const responseHeaders: Record<string, string> = {
+    ...corsHeaders,
+    'x-request-id': requestId,
+    'x-chat-mode': 'onboarding',
+  };
+  if (mintedSessionCookie) {
+    responseHeaders['set-cookie'] =
+      buildSessionCookieHeader(mintedSessionCookie);
+  }
+
+  // Deterministic scripted fallback (JOV-3806): serves the onboarding rail
+  // without the LLM. Fresh state derivation — the LLM turn may have partially
+  // mutated `onboardingState` before failing.
+  const serveScriptedFallback = async (
+    reason: FallbackReason
+  ): Promise<Response> => {
+    const fallbackState = createOnboardingTurnState({
+      sessionId,
+      turnCount,
+      messages: uiMessages,
+    });
+    const turn: FallbackTurn = await decideFallbackTurn({
+      uiMessages,
+      state: fallbackState,
+    });
+    const built = buildScriptedFallbackResponse({
+      turn,
+      reason,
+      headers: responseHeaders,
+    });
+    await persistAnonymousAssistantRecord({
+      conversationId,
+      latestUserClientMessageId: latestUserMessage.clientMessageId,
+      content: turn.text,
+      toolCalls: built.persistedToolEvents,
+      assistantSource: 'script',
+      scriptLineKey: turn.line.key,
+    });
+    Sentry.addBreadcrumb({
+      category: 'onboarding-chat',
+      message: 'scripted_fallback_dispatch',
+      level: 'warning',
+      data: { reason, lineKey: turn.line.key, turnCount },
+    });
+    return built.response;
+  };
+
+  const forcedFallbackReason: FallbackReason | null = chatDisabled
+    ? 'kill_switch'
+    : isLlmFailureInjected(req)
+      ? 'injected'
+      : null;
+
   try {
+    if (forcedFallbackReason) {
+      return await serveScriptedFallback(forcedFallbackReason);
+    }
+
     const turn = await executeChatTurn({
       uiMessages,
       artistContext: null,
@@ -415,16 +519,6 @@ export async function tryHandleAnonymousOnboardingChat(
       },
     });
 
-    const responseHeaders: Record<string, string> = {
-      ...corsHeaders,
-      'x-request-id': requestId,
-      'x-chat-mode': 'onboarding',
-    };
-    if (mintedSessionCookie) {
-      responseHeaders['set-cookie'] =
-        buildSessionCookieHeader(mintedSessionCookie);
-    }
-
     return turn.streamResult.toUIMessageStreamResponse({
       headers: responseHeaders,
       onFinish: async ({ responseMessage }) => {
@@ -434,8 +528,9 @@ export async function tryHandleAnonymousOnboardingChat(
           responseMessage,
         });
       },
-      onError: () =>
-        'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.',
+      // Mid-stream failures cannot swap the Response for the scripted
+      // fallback; the lint-clean script line is the recovery copy instead.
+      onError: () => STREAM_ERROR_LINE.text,
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
@@ -444,22 +539,54 @@ export async function tryHandleAnonymousOnboardingChat(
         headers: { ...corsHeaders, 'x-request-id': requestId },
       });
     }
+    // The LLM failure still pages — the fallback masks the user impact, not
+    // the incident. The logger line keeps the failure visible in local dev,
+    // where Sentry is a no-op and the fallback would otherwise hide it.
+    logger.error(
+      '[onboarding-chat] LLM turn failed; serving scripted fallback',
+      { error, requestId, turnCount }
+    );
     Sentry.captureException(error, {
       tags: { feature: 'ai-chat', chat_mode: 'onboarding' },
       extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
     });
-    return NextResponse.json(
-      {
-        error: 'Onboarding chat failed',
-        errorCode: 'INTERNAL_ERROR',
-        requestId,
-      },
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'x-request-id': requestId },
-      }
-    );
+    try {
+      return await serveScriptedFallback('llm_error');
+    } catch (fallbackError) {
+      Sentry.captureException(fallbackError, {
+        tags: {
+          feature: 'ai-chat',
+          chat_mode: 'onboarding',
+          context: 'scripted_fallback_failed',
+        },
+        extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+      });
+      return NextResponse.json(
+        {
+          error: 'Onboarding chat failed',
+          errorCode: 'INTERNAL_ERROR',
+          requestId,
+        },
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'x-request-id': requestId },
+        }
+      );
+    }
   }
+}
+
+/**
+ * E2E-only LLM failure injection. Fails closed: the header is inert unless
+ * the server was started with `CHAT_LLM_FAILURE_INJECTION=1`, and production
+ * deploys ignore it unconditionally.
+ */
+function isLlmFailureInjected(req: Request): boolean {
+  return (
+    env.CHAT_LLM_FAILURE_INJECTION === '1' &&
+    env.VERCEL_ENV !== 'production' &&
+    req.headers.get('x-jovie-e2e-llm-failure') === '1'
+  );
 }
 
 interface LatestUserMessage {
@@ -561,9 +688,36 @@ async function persistAnonymousAssistantMessage({
   readonly latestUserClientMessageId: string;
   readonly responseMessage: UIMessage;
 }): Promise<void> {
+  const assistantText = sanitizeAssistantResponse(
+    extractUIMessageText(responseMessage.parts)
+  ).text;
+  await persistAnonymousAssistantRecord({
+    conversationId,
+    latestUserClientMessageId,
+    content: assistantText,
+    toolCalls: encodeToolEvents(responseMessage.parts),
+    assistantSource: 'llm',
+    scriptLineKey: null,
+  });
+}
+
+async function persistAnonymousAssistantRecord({
+  conversationId,
+  latestUserClientMessageId,
+  content,
+  toolCalls,
+  assistantSource,
+  scriptLineKey,
+}: {
+  readonly conversationId: string;
+  readonly latestUserClientMessageId: string;
+  readonly content: string;
+  readonly toolCalls: PersistedToolEvent[] | undefined;
+  /** Attribution for the nightly script-tuning job (JOV-3806). */
+  readonly assistantSource: 'llm' | 'script';
+  readonly scriptLineKey: string | null;
+}): Promise<void> {
   const now = new Date();
-  const assistantText = extractUIMessageText(responseMessage.parts);
-  const toolCalls = encodeToolEvents(responseMessage.parts);
   await db
     .insert(chatMessages)
     .values({
@@ -571,11 +725,13 @@ async function persistAnonymousAssistantMessage({
       clientMessageId: `assistant:${latestUserClientMessageId}`,
       role: 'assistant',
       content:
-        assistantText ||
+        content ||
         (toolCalls && toolCalls.length > 0
           ? ''
           : 'Done. What would you like to do next?'),
       toolCalls,
+      assistantSource,
+      scriptLineKey,
       createdAt: now,
     })
     .onConflictDoNothing({

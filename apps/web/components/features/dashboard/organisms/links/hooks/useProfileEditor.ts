@@ -8,7 +8,6 @@
  * debounced auto-save.
  */
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -110,7 +109,6 @@ export function useProfileEditor(
   options: UseProfileEditorOptions = {}
 ): UseProfileEditorReturn {
   const { debounceMs = PACER_TIMING.SAVE_DEBOUNCE_MS } = options;
-  const router = useRouter();
   const dashboardData = useDashboardData();
 
   // Profile mutation hooks
@@ -149,6 +147,7 @@ export function useProfileEditor(
     displayName: string;
     username: string;
   } | null>(null);
+  const wasEditingRef = useRef(false);
 
   // Track pending save data for comparison
   const pendingDataRef = useRef<{
@@ -229,8 +228,6 @@ export function useProfileEditor(
         if (result.warning) {
           toast.message(result.warning);
         }
-
-        router.refresh();
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Failed to update profile';
@@ -249,7 +246,6 @@ export function useProfileEditor(
       artist?.name,
       profileId,
       profileMutation,
-      router,
     ]
   );
   /* eslint-enable react-hooks/preserve-manual-memoization */
@@ -277,7 +273,10 @@ export function useProfileEditor(
     };
   }, [profileSaveStatus.success]);
 
-  // Sync state when selected profile changes
+  // Sync state when selected profile changes. Skip while inline editing so a
+  // server re-render cannot clobber in-progress keystrokes (chat profile rail).
+  // Also skip display/username adoption when exiting edit — the server snapshot
+  // may still be stale while auto-save has the typed value.
   useEffect(() => {
     if (!dashboardData.selectedProfile) {
       setArtist(null);
@@ -285,26 +284,39 @@ export function useProfileEditor(
       setProfileUsername('');
       setEditingField(null);
       lastProfileSavedRef.current = null;
+      wasEditingRef.current = false;
+      return;
+    }
+
+    const wasEditing = wasEditingRef.current;
+
+    if (editingField !== null) {
+      wasEditingRef.current = true;
       return;
     }
 
     setArtist(
       convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
     );
-    setProfileDisplayName(dashboardData.selectedProfile.displayName ?? '');
-    setProfileUsername(dashboardData.selectedProfile.username ?? '');
 
-    lastProfileSavedRef.current = {
-      displayName: dashboardData.selectedProfile.displayName ?? '',
-      username: dashboardData.selectedProfile.username ?? '',
-    };
-    setProfileSaveStatus({
-      saving: false,
-      success: null,
-      error: null,
-      lastSaved: null,
-    });
-  }, [dashboardData.selectedProfile]);
+    if (!wasEditing) {
+      setProfileDisplayName(dashboardData.selectedProfile.displayName ?? '');
+      setProfileUsername(dashboardData.selectedProfile.username ?? '');
+
+      lastProfileSavedRef.current = {
+        displayName: dashboardData.selectedProfile.displayName ?? '',
+        username: dashboardData.selectedProfile.username ?? '',
+      };
+      setProfileSaveStatus({
+        saving: false,
+        success: null,
+        error: null,
+        lastSaved: null,
+      });
+    }
+
+    wasEditingRef.current = false;
+  }, [dashboardData.selectedProfile, editingField]);
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -331,10 +343,9 @@ export function useProfileEditor(
       const avatarUrl = await avatarMutation.mutateAsync(file);
       setArtist(prev => (prev ? { ...prev, image_url: avatarUrl } : prev));
       toast.success('Profile photo updated');
-      router.refresh();
       return avatarUrl;
     },
-    [avatarMutation, router]
+    [avatarMutation]
   );
 
   // Handle display name change with auto-save

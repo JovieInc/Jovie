@@ -91,7 +91,7 @@ export function SystemBErrorFallback({
                 onClick={action.onClick}
                 className={actionClassName(action.variant)}
               >
-                {action.label}
+                {action.label || 'Action'}
               </button>
             );
           })}

@@ -1,3 +1,5 @@
+import { computeRatePercent } from '@/lib/analytics/metrics';
+
 /** Minimum base count before showing a percent delta in analytics chips. */
 export const MIN_SAMPLE_FOR_PERCENT_DELTA = 30;
 
@@ -17,5 +19,6 @@ export function formatAnalyticsStageRate(
     return null;
   }
 
-  return `${Math.round((current / base) * 100)}%`;
+  // Canonical rate derivation — see lib/analytics/metrics.ts.
+  return `${computeRatePercent(current, base, 0)}%`;
 }

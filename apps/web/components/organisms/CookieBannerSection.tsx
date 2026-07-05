@@ -65,11 +65,13 @@ export function CookieBannerSection() {
     }
   }, [visible]);
 
-  // Publish banner height + 16px bottom offset as CSS custom property on :root
-  // so layout regions (profile shells, QR coordination) reserve the exact space
-  // occupied by the fixed bottom-right card (bottom-4 + measured h).
-  // Cleared on hide/consent for zero layout impact. Matches useCookieBannerHeight
-  // total offset for toasts.
+  // Publish banner height + bottom offset + a separation gap as a CSS custom
+  // property on :root so layout regions (profile shells, QR coordination)
+  // reserve the exact space occupied by the fixed bottom-right card
+  // (bottom-4 = 16px + measured h) PLUS a 12px gap so chrome stacked above the
+  // banner (e.g. the public-profile bottom tab nav) never abuts or overlaps it
+  // (JOV-3555 — regression of JOV-1982). Cleared on hide/consent for zero
+  // layout impact. Matches useCookieBannerHeight total offset for toasts.
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -85,10 +87,16 @@ export function CookieBannerSection() {
     );
     if (!banner) return;
 
+    // 16px = banner's `bottom-4` inset from the viewport bottom.
+    // 12px = separation gap between the banner top and any chrome stacked above
+    // it (bottom tab nav) so both surfaces stay clear and fully tappable.
+    const BANNER_BOTTOM_INSET_PX = 16;
+    const BANNER_SEPARATION_GAP_PX = 12;
+
     const update = () => {
       root.style.setProperty(
         '--cookie-banner-h',
-        `${banner.getBoundingClientRect().height + 16}px`
+        `${banner.getBoundingClientRect().height + BANNER_BOTTOM_INSET_PX + BANNER_SEPARATION_GAP_PX}px`
       );
     };
 
@@ -180,17 +188,17 @@ export function CookieBannerSection() {
     <>
       {visible && !isSuppressedPath ? (
         <aside
-          aria-label='Cookie consent'
+          aria-label='Cookie Consent'
           data-testid='cookie-banner'
-          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-[340px] sm:max-w-[380px]'
+          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95'
         >
-          <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
+          <div className='rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
             <div className='flex items-start gap-3'>
               <div className='mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
                 <Shield className='h-3.5 w-3.5' aria-hidden='true' />
               </div>
               <div className='min-w-0 flex-1'>
-                <p className='text-[12px] leading-[1.5] text-secondary-token'>
+                <p className='text-xs leading-normal text-secondary-token'>
                   We use cookies for essential functionality and to improve your
                   experience.{' '}
                   <Link
@@ -212,7 +220,7 @@ export function CookieBannerSection() {
                 {saveError ? (
                   <p
                     role='alert'
-                    className='mt-2 text-[11px] leading-snug text-secondary-token'
+                    className='mt-2 text-2xs leading-snug text-secondary-token'
                   >
                     {saveError}
                   </p>

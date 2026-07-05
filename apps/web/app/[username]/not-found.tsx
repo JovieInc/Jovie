@@ -1,14 +1,11 @@
 import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
-import {
-  resolveNotFoundPathname,
-  resolveNotFoundVariant,
-} from '@/lib/routing/not-found-context';
 
-export default async function NotFound() {
-  const pathname = await resolveNotFoundPathname();
-  const variant = resolveNotFoundVariant(pathname);
-
+export default function NotFound() {
+  // This boundary only mounts under /[username]. Any miss here is a profile
+  // lookup failure — avoid headers() so ISR profile routes stay static on the
+  // standalone production server used by PR smoke.
+  const variant = 'profile-miss' as const;
   return (
     <PublicPageShell
       headerVariant='minimal'

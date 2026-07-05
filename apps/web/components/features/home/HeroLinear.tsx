@@ -31,7 +31,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
 
       {/* Hero text — left aligned, same max-width + padding as header nav */}
       <div className='relative z-10 flex flex-1 flex-col justify-center pb-6 pt-10 md:pb-8 md:pt-12'>
-        <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
+        <div className='mx-auto w-full max-w-linear-content px-5 sm:px-6 lg:px-0'>
           <div className='hero-stagger'>
             <p className='homepage-section-eyebrow'>
               Built for independent artists
@@ -57,7 +57,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
                 Request Access
               </Link>
             </div>
-            <p className='mt-3 text-[11px] tracking-[0.01em] text-quaternary-token'>
+            <p className='mt-3 text-2xs tracking-wide text-quaternary-token'>
               Private launch access. No credit card required.
             </p>
           </div>
@@ -65,7 +65,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
       </div>
 
       {/* Product screenshot — same max-width as header, top-cropped */}
-      <div className='relative z-10 mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
+      <div className='relative z-10 mx-auto w-full max-w-linear-content px-5 sm:px-6 lg:px-0'>
         <div
           className='relative overflow-hidden'
           style={{ borderRadius: '6px', aspectRatio: '16 / 6' }}

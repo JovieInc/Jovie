@@ -18,7 +18,7 @@ const SWIPE_ACTION_CLASS =
   'flex h-full flex-col items-center justify-center gap-1 px-4 text-xs font-caption transition-colors active:opacity-80';
 const NEUTRAL_SWIPE_ACTION_CLASS =
   'bg-surface-2 text-primary-token hover:bg-surface-3';
-const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-red-500 text-white';
+const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-red-500 text-white dark:text-white';
 
 /**
  * Determine the pill state based on visibility and validity.
@@ -211,7 +211,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
         itemId={id}
         actions={swipeActions}
         actionsWidth={180}
-        className='rounded-[10px]'
+        className='rounded-lg'
       >
         <LinkPill
           platformIcon={link.platform.icon}

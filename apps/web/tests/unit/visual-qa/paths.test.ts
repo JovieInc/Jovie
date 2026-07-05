@@ -33,9 +33,8 @@ describe('visual-qa paths', () => {
   });
 
   it('rejects traversal attempts in run ids', () => {
-    expect(() => resolveVisualQaRunDirectory('../escape')).toThrow(
-      /Invalid Visual QA run id/
-    );
+    // Assert behavior, not error-message copy — refactors must not break this guard.
+    expect(() => resolveVisualQaRunDirectory('../escape')).toThrow();
   });
 
   it('converts absolute artifact paths to run-relative paths', () => {

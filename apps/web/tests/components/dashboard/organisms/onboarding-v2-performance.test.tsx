@@ -238,9 +238,6 @@ vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
 }));
 
 vi.mock('@/features/auth', () => ({
-  AuthButton: ({ children, ...rest }: { children: ReactNode }) => (
-    <button {...rest}>{children}</button>
-  ),
   AuthBackButton: ({
     ariaLabel,
     onClick,

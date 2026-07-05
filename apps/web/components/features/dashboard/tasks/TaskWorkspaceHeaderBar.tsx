@@ -192,7 +192,7 @@ export function TaskWorkspaceHeaderBar({
         start={toolbarStart}
         end={toolbarEnd}
         className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
-        startClassName={mode === 'create' ? 'overflow-visible' : undefined}
+        startClassName='overflow-visible'
         endClassName='gap-0.5'
       />
     </div>
@@ -216,7 +216,7 @@ export function TaskSubviewTabs({
     return (
       <div className={cn('flex h-full items-center pl-1.5', className)}>
         {typeof taskCount === 'number' ? (
-          <span className='text-[10.5px] font-semibold text-tertiary-token'>
+          <span className='text-3xs font-semibold text-tertiary-token'>
             {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
           </span>
         ) : null}
@@ -229,16 +229,16 @@ export function TaskSubviewTabs({
       value={activeSubview}
       onValueChange={onSubviewChange}
       ariaLabel='Task subviews'
-      overflowMode='scroll'
+      overflowMode='collapse'
       variant='segment'
-      className={cn('pl-0', className)}
-      triggerClassName='gap-1.5 px-2 text-[12px]'
+      className={cn('pl-1.5', className)}
+      triggerClassName='gap-1.5 px-2 text-xs'
       options={subviews.map(subview => ({
         value: subview.id,
         label: (
           <span className='inline-flex min-w-0 items-center gap-1.5'>
             <span>{subview.label}</span>
-            <span className='text-[10.5px] tabular-nums opacity-70'>
+            <span className='text-3xs tabular-nums opacity-70'>
               {subview.count}
             </span>
           </span>

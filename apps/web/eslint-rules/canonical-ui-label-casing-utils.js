@@ -37,6 +37,7 @@ const BRAND_WORDS = new Set([
   'Apple',
   'GitHub',
   'Instagram',
+  'iOS',
   'LinkedIn',
   'SoundCloud',
   'Spotify',

@@ -16,7 +16,7 @@ _scripts_dir = Path(__file__).resolve().parents[1]
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
 
-from slopcheck import slop_score, main  # noqa: E402
+from slopcheck import extract_added_lines, slop_score, main  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +124,44 @@ class TestStructuralTicContraction:
         assert "not just" in hit_text.lower()
 
 
+class TestEmDashFalsePositives:
+    """CSS custom properties and Markdown table separators must NOT count as em-dashes."""
+
+    def test_css_custom_properties_not_counted(self):
+        # Technical docs reference CSS vars like --color-accent, --font-sans
+        text = (
+            "Use `--color-bg-base` for background and `--font-sans` for body text.\n"
+            "Set `var(--marketing-font-body)` to Inter.\n"
+        )
+        result = slop_score(text, filename="design.md")
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"CSS custom properties (--var-name) must not be counted as em-dashes. Got: {em_hits}"
+        )
+
+    def test_markdown_table_separators_not_counted(self):
+        # Markdown tables have |---|---| separator rows
+        text = (
+            "| Name | Value | Usage |\n"
+            "|-------|-------|-------|\n"
+            "| foo   | bar   | baz   |\n"
+        )
+        result = slop_score(text, filename="table.md")
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"Markdown table separators (|---|) must not be counted as em-dashes. Got: {em_hits}"
+        )
+
+    def test_prose_double_hyphen_still_counted(self):
+        # Prose -- used as a dash should still count (it's a slop tell)
+        text = ("This is a point -- and another point -- and yet another. " * 20)
+        result = slop_score(text, filename="prose.md")
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) > 0, (
+            "Prose double-hyphen (word -- word) should still be flagged as em-dash overuse"
+        )
+
+
 class TestEmDashPenalty:
     def test_no_penalty_within_budget(self):
         # 2 em-dashes for ~100 words: budget = 2*(100/500) = 0.4, so 2 > 0.4 → penalty
@@ -143,6 +181,66 @@ class TestEmDashPenalty:
         assert len(em_hits) > 0, "Heavy em-dash use should trigger a hit"
 
 
+class TestCodeBlockStripping:
+    """CLI flags (--flag) in code blocks must not count as em-dashes."""
+
+    def test_double_hyphens_in_fenced_code_not_counted(self):
+        # 20+ double-hyphens from CLI flags in a fenced bash block should NOT penalise
+        text = (
+            "Run the command to drain PRs.\n\n"
+            "```bash\n"
+            "gh pr list --state open --limit 100 --json number --jq '.[]'\n"
+            "gh pr edit 123 --add-label merge-queue --remove-label needs-human\n"
+            "pnpm --filter @jovie/web run typecheck --pretty false\n"
+            "git push --force-with-lease origin HEAD\n"
+            "```\n\n"
+            "That is all.\n"
+        )
+        result = slop_score(text)
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"CLI --flags in fenced code block should not be counted as em-dashes. "
+            f"Hits: {result.hits}"
+        )
+
+    def test_double_hyphens_in_inline_code_not_counted(self):
+        text = (
+            "Pass `--force-with-lease` and `--add-label merge-queue` "
+            "to avoid accidental overwrites. "
+            "Use `--filter @jovie/web` to scope the command.\n"
+        )
+        result = slop_score(text)
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"CLI --flags in inline code should not count as em-dashes. "
+            f"Hits: {result.hits}"
+        )
+
+    def test_frontmatter_dashes_not_counted(self):
+        text = (
+            "---\n"
+            "description: A drain command — clears the queue\n"
+            "allowed-tools: Bash(gh:*)\n"
+            "---\n\n"
+            "Short prose body.\n"
+        )
+        result = slop_score(text)
+        # Only the prose em-dash in "description" line would count, but that's
+        # in frontmatter which should be stripped too.
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) == 0, (
+            f"Em-dash in YAML frontmatter should not be counted. Hits: {result.hits}"
+        )
+
+    def test_em_dashes_in_prose_still_counted(self):
+        # Prose em-dashes outside code blocks should still be penalised
+        text = ("This — and that — and more — and yet — and also — "
+                "are all connected.\n") * 4
+        result = slop_score(text)
+        em_hits = [h for h in result.hits if "em-dash" in h]
+        assert len(em_hits) > 0, "Em-dashes in prose should still be caught"
+
+
 class TestScoreCap:
     def test_score_never_exceeds_ten(self):
         # Pathological slop — pile on every pattern
@@ -156,6 +254,25 @@ class TestScoreCap:
         ) * 5
         result = slop_score(text)
         assert result.score <= 10.0
+
+
+class TestExtractAddedLines:
+    def test_keeps_added_lines_only(self):
+        diff = "\n".join(
+            [
+                "--- a/CHANGELOG.md",
+                "+++ b/CHANGELOG.md",
+                "@@ -1,3 +1,4 @@",
+                " unchanged",
+                "-removed line",
+                "+added line",
+                "+second added line",
+            ]
+        )
+        assert extract_added_lines(diff) == "added line\nsecond added line"
+
+    def test_empty_diff_returns_empty_string(self):
+        assert extract_added_lines("") == ""
 
 
 class TestCLI:
@@ -205,6 +322,7 @@ if __name__ == "__main__":
         TestKnownClean(),
         TestStructuralTicContraction(),
         TestEmDashPenalty(),
+        TestCodeBlockStripping(),
         TestScoreCap(),
     ]
 

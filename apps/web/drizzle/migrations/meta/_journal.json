@@ -435,6 +435,76 @@
       "when": 1781300000000,
       "tag": "0061_user_profile_claims_unique_profile_role",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1781400000000,
+      "tag": "0062_backfill_public_release_approvals",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1782514417621,
+      "tag": "0063_even_apocalypse",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1782642684524,
+      "tag": "0064_charming_night_nurse",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1782700000000,
+      "tag": "0065_connector_enrichment_context_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1782800000000,
+      "tag": "0066_library_asset_share_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1782900000000,
+      "tag": "0067_ai_crawler_analytics",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1782950000000,
+      "tag": "0067_violet_kinsey_walden",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1783000000000,
+      "tag": "0068_public_profile_capture_dismissals",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1783000050000,
+      "tag": "0069_chat_message_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1783000100000,
+      "tag": "0070_agent_task_analytics",
+      "breakpoints": true
     }
   ]
 }

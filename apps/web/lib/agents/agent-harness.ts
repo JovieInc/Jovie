@@ -1,9 +1,14 @@
 /**
  * AgentHarness (gh-9869 v0 studio-session memory)
  *
- * Interface + OpenAI Agents SDK adapter stub for the memory loop.
+ * Interface + v0 adapter stub for the memory loop. The class is still named
+ * OpenAIAgentsAdapter for lineage; the *decided* harness target is now Vercel
+ * `eve` behind this interface (founder-directed, #12498; conditional-GO per
+ * docs/spikes/eve-agent-sdk-fit.md and docs/MEMORY_ADR.md Addendum).
  * v0: thin, explicit, provenance-first. No social/write scopes.
- * Future: swap in real @openai/agents or Vercel AI SDK agent.
+ * Future: EveAgentAdapter implements AgentHarness lands in the build epic,
+ * gated on the ai v6->v7 bump + an eve shake-out on a frozen pin; this stub
+ * stays as the rollback. No real agent SDK is called yet (keeps deps minimal).
  *
  * Called only when FEATURE_MEMORY_STUDIO_SESSION_V0 enabled (caller gate).
  * Every output carries evidence links + confidence + user scoping.

@@ -1,6 +1,5 @@
-import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
-import { generateObject } from '@/lib/ai/sdk';
+import { gateway, generateObject } from '@/lib/ai/sdk';
 import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
 import { INSIGHT_MODEL } from '@/lib/constants/ai-models';
 import type { GeneratedInsight, MetricSnapshot } from '@/types/insights';

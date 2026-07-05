@@ -56,6 +56,7 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { extractLastUserText } from '@/lib/chat/message-text';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -65,6 +66,11 @@ import {
   extractUIMessageText,
   parseChatRequestBody,
 } from '@/lib/chat/request-validation';
+import {
+  buildRetouchUnavailableAssistantMessage,
+  detectRetouchIntent,
+  resolveRetouchCapability,
+} from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
@@ -84,10 +90,13 @@ import {
   createMerchPreviewTool,
   createMerchSelectTool,
 } from '@/lib/chat/tools/merch-tools';
+import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
+import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
+  recordChatTurnModel,
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
@@ -97,17 +106,17 @@ import {
   type ChatTelemetry,
   type ReleaseContext,
 } from '@/lib/chat/types';
+import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
-
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { checkGatesForUser } from '@/lib/flags/server';
+import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
+import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -591,11 +600,18 @@ function buildChatTurnMetadata(input: {
   readonly conversationId: string;
   readonly turnId: string;
   readonly requestId: string;
+  readonly toolStepCapExhausted?: boolean;
+  /** Resolved model id that produced the turn (feedback attribution). */
+  readonly model?: string;
 }) {
   return {
     conversationId: input.conversationId,
     turnId: input.turnId,
     requestId: input.requestId,
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.toolStepCapExhausted
+      ? { toolStepCapExhausted: true as const }
+      : {}),
   };
 }
 
@@ -933,6 +949,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROFILE_REQUIRED' as const,
           error: 'Profile ID required',
         };
       }
@@ -940,6 +957,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PLAN_UNAVAILABLE' as const,
           error: 'Album art generation requires a Pro plan.',
         };
       }
@@ -948,6 +966,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROVIDER_UNAVAILABLE' as const,
           error: 'Album art generation is temporarily unavailable.',
         };
       }
@@ -985,6 +1004,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             burstLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -998,6 +1018,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             dailyLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -1097,6 +1118,7 @@ function createGenerateAlbumArtTool(params: {
           return {
             success: false as const,
             retryable: false,
+            errorCode: 'PROVIDER_UNAVAILABLE' as const,
             error: 'Album art generation is temporarily unavailable.',
           };
         }
@@ -1107,6 +1129,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'TOOL_EXECUTION_FAILED' as const,
           error: 'Unable to generate album art. Please try again.',
         };
       }
@@ -1965,6 +1988,13 @@ function buildChatTools(
   canGenerateAlbumArt: boolean,
   albumArtEnabled: boolean,
   canAccessMerchCreation: boolean,
+  canAccessAiRetouching: boolean,
+  teleprompterRecordingEnabled: boolean,
+  userEntitlements: Awaited<
+    ReturnType<
+      typeof import('@/lib/entitlements/server').getCurrentUserEntitlements
+    >
+  >,
   reservedTurn?: {
     readonly conversationId: string;
     readonly turnId: string;
@@ -1995,6 +2025,14 @@ function buildChatTools(
             artistName: artistContext.displayName,
             canGenerateAlbumArt,
             releases,
+          }),
+        }
+      : {}),
+    ...(canAccessAiRetouching
+      ? {
+          retouchImage: createRetouchImageTool({
+            profileId: resolvedProfileId,
+            entitlements: userEntitlements,
           }),
         }
       : {}),
@@ -2121,6 +2159,13 @@ function buildChatTools(
           }),
           showMerchSales: createMerchSalesTool(resolvedProfileId),
           showArtistPayouts: createMerchPayoutsTool(resolvedProfileId),
+        }
+      : {}),
+    ...(teleprompterRecordingEnabled
+      ? {
+          proposeVideoRecording: createProposeVideoRecordingTool({
+            clerkUserId,
+          }),
         }
       : {}),
   };
@@ -2374,9 +2419,19 @@ export async function POST(req: Request) {
   const toolIntent = normalizeToolIntent(body.toolIntent);
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
+  const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
+    userId,
+  });
+  const teleprompterRecordingEnabled = await getAppFlagValue(
+    'TELEPROMPTER_RECORDING',
+    { userId }
+  );
   const albumArtCapability = resolveAlbumArtCapability({
-    featureEnabled: FEATURE_FLAGS.ALBUM_ART_GENERATION,
+    featureEnabled: albumArtFeatureEnabled,
     providerConfigured: isXaiConfigured(),
+    entitlements: currentUserEntitlements,
+  });
+  const retouchCapability = resolveRetouchCapability({
     entitlements: currentUserEntitlements,
   });
 
@@ -2517,6 +2572,38 @@ export async function POST(req: Request) {
         }),
       });
     }
+
+    if (
+      retouchCapability.availability !== 'available' &&
+      detectRetouchIntent({ text: userText, toolIntent })
+    ) {
+      const replyText =
+        buildRetouchUnavailableAssistantMessage(retouchCapability);
+      await persistTerminalAssistantMessage({
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        status: 'failed_tool_unavailable',
+        content: replyText,
+        errorCode: retouchCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
+        errorMessage: retouchCapability.reason,
+      });
+
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'retouch-unavailable',
+          'x-conversation-id': reservation.conversationId,
+          'x-chat-turn-id': reservation.turn.id,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+          requestId,
+        }),
+      });
+    }
   }
 
   // Rate limiting - plan-aware daily quota + burst protection. For clients
@@ -2635,7 +2722,7 @@ export async function POST(req: Request) {
     reservedTurn?.conversationId ?? resolvedConversationId;
 
   try {
-    const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
+    const albumArtEnabled = albumArtFeatureEnabled;
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(
       resolvedProfileId,
@@ -2655,6 +2742,9 @@ export async function POST(req: Request) {
             albumArtCapability.availability === 'available',
             albumArtEnabled,
             planLimits.booleans.canAccessMerchCreation,
+            planLimits.booleans.canAccessAiRetouching,
+            teleprompterRecordingEnabled,
+            currentUserEntitlements,
             reservedTurn
           ),
         }
@@ -2715,12 +2805,31 @@ export async function POST(req: Request) {
       insightsEnabled,
       forceLightModel,
       lastUserText: userText,
-      tools,
+      tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,
       telemetry,
       onStreamError: persistStreamFailure,
     });
+
+    // Record the producing model on the turn row (fire-and-forget) so 👍/👎
+    // feedback votes can attribute this output to a model server-side, even
+    // when the vote arrives after a page reload (JOV #11460).
+    if (reservedTurn) {
+      recordChatTurnModel(reservedTurn.turnId, turn.selectedModel).catch(
+        error => {
+          Sentry.addBreadcrumb({
+            category: 'ai-chat',
+            message: 'chat_turn_model_record_failed',
+            level: 'warning',
+            data: {
+              turnId: reservedTurn.turnId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+        }
+      );
+    }
 
     return turn.streamResult.toUIMessageStreamResponse({
       headers: {
@@ -2739,14 +2848,18 @@ export async function POST(req: Request) {
               conversationId: reservedTurn.conversationId,
               turnId: reservedTurn.turnId,
               requestId,
+              model: turn.selectedModel,
+              toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,
       onFinish: async ({ responseMessage, isAborted }) => {
         if (!reservedTurn || streamFailurePersisted) return;
 
-        const assistantText = extractUIMessageText(
-          responseMessage.parts as Array<{ type: string; text?: string }>
-        );
+        const assistantText = sanitizeAssistantResponse(
+          extractUIMessageText(
+            responseMessage.parts as Array<{ type: string; text?: string }>
+          )
+        ).text;
         const toolCalls = preparePersistedToolEventsForTurnFinish({
           parts: responseMessage.parts,
           isAborted,
@@ -2769,6 +2882,16 @@ export async function POST(req: Request) {
               }
             : {}),
         });
+
+        if (!isAborted && assistantText.trim().length > 0) {
+          scheduleOnlineScoring({
+            traceId: requestId,
+            caseName: `prod:${requestId}`,
+            userPrompt: userText,
+            assistantResponse: assistantText,
+            plan: userPlan,
+          });
+        }
       },
       onError: () => {
         return 'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.';

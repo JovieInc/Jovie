@@ -40,7 +40,7 @@ export function ProfileIntentPage({
   const entry = PROFILE_VIEW_REGISTRY[mode];
 
   return (
-    <main className='mx-auto flex min-h-dvh w-full max-w-(--profile-shell-max-width) flex-col overflow-x-hidden bg-[color:var(--profile-drawer-bg)] text-primary-token'>
+    <main className='profile-intent-page mx-auto flex min-h-dvh w-full max-w-(--profile-shell-max-width) flex-col overflow-x-hidden bg-(--profile-drawer-bg) text-primary-token'>
       <header className='relative grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2.5 px-5 pb-3 pt-5'>
         <Link
           href={`/${artistHandle}`}
@@ -55,7 +55,7 @@ export function ProfileIntentPage({
             {entry.title}
           </h1>
           {entry.subtitle ? (
-            <p className='mt-0.5 truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'>
+            <p className='mt-0.5 truncate text-3xs font-[440] leading-[1.1] tracking-tight text-white/46'>
               {entry.subtitle}
             </p>
           ) : null}
@@ -65,7 +65,7 @@ export function ProfileIntentPage({
           className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
           aria-label={`${artistName} profile`}
         >
-          <Mark size={18} className='h-[18px] w-[18px]' />
+          <Mark size={18} className='h-5 w-5' />
         </Link>
       </header>
       <div className='mx-5 h-px bg-white/[0.06]' />

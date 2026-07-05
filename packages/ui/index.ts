@@ -53,6 +53,7 @@ export { Button, buttonVariants } from './atoms/button';
 // Card
 export type {
   CardContentProps,
+  CardContentState,
   CardDescriptionProps,
   CardFooterProps,
   CardHeaderProps,
@@ -160,6 +161,9 @@ export {
   FormMessage,
   useFormField,
 } from './atoms/form';
+// Inline offline notice
+export type { InlineOfflineNoticeProps } from './atoms/inline-offline';
+export { InlineOfflineNotice } from './atoms/inline-offline';
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
@@ -172,6 +176,9 @@ export { Kbd } from './atoms/kbd';
 // Label
 export type { LabelProps } from './atoms/label';
 export { Label, labelVariants } from './atoms/label';
+// Link
+export type { LinkProps } from './atoms/link';
+export { Link, linkVariants } from './atoms/link';
 // Popover
 export {
   Popover,
@@ -179,6 +186,9 @@ export {
   PopoverContent,
   PopoverTrigger,
 } from './atoms/popover';
+// Progress
+export type { ProgressBarProps } from './atoms/progress';
+export { ProgressBar } from './atoms/progress';
 // Radio Group
 export { RadioGroup, RadioGroupItem } from './atoms/radio-group';
 // Searchable Submenu
@@ -235,6 +245,9 @@ export { SimpleTooltip } from './atoms/simple-tooltip';
 // Skeleton
 export type { LoadingSkeletonProps, SkeletonProps } from './atoms/skeleton';
 export { LoadingSkeleton, Skeleton } from './atoms/skeleton';
+// Spinner
+export type { SpinnerProps, SpinnerSize, SpinnerTone } from './atoms/spinner';
+export { Spinner } from './atoms/spinner';
 // Switch
 export { Switch } from './atoms/switch';
 // Textarea
@@ -251,6 +264,9 @@ export {
 // Tooltip Shortcut (helper for label + keyboard shortcut pattern)
 export type { TooltipShortcutProps } from './atoms/tooltip-shortcut';
 export { TooltipShortcut } from './atoms/tooltip-shortcut';
+// Confirm Dialog
+export type { ConfirmDialogProps } from './confirm-dialog';
+export { ConfirmDialog } from './confirm-dialog';
 export {
   CHECKBOX_RADIO_ITEM_BASE,
   contextMenuContentClasses,
@@ -290,6 +306,7 @@ export {
   buttons,
   featureAccents,
   interactive,
+  JovieColor,
   radii,
   shadows,
   sidebar,

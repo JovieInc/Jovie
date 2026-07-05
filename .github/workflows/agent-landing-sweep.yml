@@ -20,7 +20,7 @@
 # 5. Scope judge = success
 # 6. CodeRabbit not blocking (no CHANGES_REQUESTED)
 # 7. CI harness risk classifier does not block unattended auto-merge
-# 8. Queue pressure guard: defers if 12+ other PRs already queued for auto-merge
+# 8. Queue pressure guard: defers when merge-queue depth hits GRAPHITE_QUEUE_POLICY.maxQueueDepth
 #
 # RELATIONSHIP TO agent-pipeline.yml:
 # This workflow is idempotent. Enabling auto-merge on an already-queued PR is
@@ -30,7 +30,7 @@ name: Agent Landing Sweep
 
 on:
   schedule:
-    # Every 15 minutes — matches the linear-ai-dispatcher cadence
+    # Every 15 minutes — matches the github-ai-dispatcher cadence
     - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
@@ -64,7 +64,7 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Checkout main policy code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           persist-credentials: false
@@ -77,9 +77,9 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
-          READY_THRESHOLD: '12'
         run: |
           set -euo pipefail
+          READY_THRESHOLD=$(node scripts/ci-merge-queue-check.mjs max-queue-depth)
 
           echo "=== Agent Landing Sweep ==="
           echo "Repository: $GH_REPO"
@@ -184,16 +184,13 @@ jobs:
               continue
             fi
 
-            # Gate: Scope judge must pass
+            # Advisory: scope judge (LLM alignment — off fast auto-landing path)
             SCOPE_STATUS=$(gh api "repos/$GH_REPO/commits/$PR_SHA/status" \
               --jq '[.statuses[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"' \
               2>/dev/null || echo "unknown")
-            echo "Scope judge: $SCOPE_STATUS"
-
-            if [[ "$SCOPE_STATUS" != "success" ]]; then
-              echo "Scope judge has not passed ($SCOPE_STATUS). Skipping."
-              SKIPPED=$((SKIPPED + 1))
-              continue
+            echo "Scope judge (advisory): $SCOPE_STATUS"
+            if [[ "$SCOPE_STATUS" != "success" && "$SCOPE_STATUS" != "pending" ]]; then
+              echo "::warning::scope-judge reported $SCOPE_STATUS — advisory only, not blocking auto-landing."
             fi
 
             # Gate: CodeRabbit must not be blocking

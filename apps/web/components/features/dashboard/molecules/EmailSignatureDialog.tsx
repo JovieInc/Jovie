@@ -56,7 +56,7 @@ export function EmailSignatureDialog({
       setRecentCopy(kind);
       toast.success(
         kind === 'html'
-          ? 'Email signature copied'
+          ? 'Email Signature copied'
           : 'Plain text signature copied'
       );
     } else {
@@ -66,7 +66,7 @@ export function EmailSignatureDialog({
 
   return (
     <Dialog open={open} onClose={onClose} size='2xl'>
-      <DialogTitle>Email signature</DialogTitle>
+      <DialogTitle>Email Signature</DialogTitle>
       <DialogBody className='space-y-4'>
         <p className='text-xs text-tertiary-token'>
           Paste this into Gmail, Apple Mail, or Outlook. Every email becomes a
@@ -76,10 +76,10 @@ export function EmailSignatureDialog({
           {previewSrcDoc ? (
             <iframe
               data-testid='email-signature-preview'
-              title='Email signature preview'
+              title='Email Signature preview'
               sandbox=''
               srcDoc={previewSrcDoc}
-              className='block h-48 w-full border-0 bg-white'
+              className='block h-48 w-full border-0 bg-white dark:bg-surface-1'
             />
           ) : (
             <p className='p-4 text-xs text-tertiary-token'>
@@ -102,7 +102,7 @@ export function EmailSignatureDialog({
             ) : (
               <Copy className='size-3' />
             )}
-            Copy as plain text
+            Copy As Plain Text
           </Button>
           <Button
             type='button'

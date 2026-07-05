@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
+import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
+import { AUTHED_AXE_SURFACES } from './utils/authed-axe-surface-manifest';
 import {
   assertPublicSurfaceHealthy,
   installPublicRouteMocks,
@@ -188,6 +190,21 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
           results.violations,
           `${surface.id} has accessibility violations`
         ).toEqual([]);
+
+        // Light-mode contrast check (JOV-11025): remove the 'dark' class to
+        // render in light theme, then scan color-contrast specifically.
+        // Public surfaces default to dark (className='dark' in app/layout.tsx),
+        // so this is the only place they're exercised in light mode.
+        await page.evaluate(() => {
+          document.documentElement.classList.remove('dark');
+        });
+        const lightModeResults = await new AxeBuilder({ page })
+          .withRules(['color-contrast'])
+          .analyze();
+        expect(
+          lightModeResults.violations,
+          `${surface.id} [light mode] has color-contrast violations`
+        ).toEqual([]);
       } finally {
         await page.close().catch(() => undefined);
         await surfaceContext.close().catch(() => undefined);
@@ -251,5 +268,137 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
         await surfaceContext.close().catch(() => undefined);
       }
     });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Authenticated surfaces — color-contrast gate in both light and dark themes
+// (JOV-11027)
+//
+// Runs ONLY when E2E_USE_TEST_AUTH_BYPASS=1 is set. Skips gracefully otherwise
+// so CI lanes without auth secrets are not broken.
+//
+// Each surface × theme combination is an independent test so a single
+// theme-specific failure is reported with the offending selector + ratio.
+// ---------------------------------------------------------------------------
+
+const AUTHED_AXE_THEMES = ['light', 'dark'] as const;
+
+function isTestAuthBypassAvailable(): boolean {
+  return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+}
+
+async function waitForAnyVisibleSelector(
+  page: import('@playwright/test').Page,
+  selectors: readonly string[],
+  timeoutMs = 30_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const selector of selectors) {
+      const visible = await page
+        .locator(selector)
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (visible) {
+        return;
+      }
+    }
+    await page.waitForTimeout(300);
+  }
+  throw new Error(
+    `None of the ready selectors became visible within ${timeoutMs}ms: ${selectors.join(', ')}`
+  );
+}
+
+test.describe('Axe color-contrast — authenticated surfaces (light + dark)', () => {
+  test.setTimeout(180_000);
+
+  for (const theme of AUTHED_AXE_THEMES) {
+    for (const surface of AUTHED_AXE_SURFACES) {
+      test(`${surface.id} [${theme}] passes WCAG AA color-contrast`, async ({
+        browser,
+      }, testInfo) => {
+        if (!isTestAuthBypassAvailable()) {
+          test.skip(
+            true,
+            'E2E_USE_TEST_AUTH_BYPASS=1 required for authenticated axe tests'
+          );
+          return;
+        }
+
+        const surfaceContext = await browser.newContext({
+          ...testInfo.project.use,
+          storageState: createEmptyStorageState(),
+        });
+        const page = await surfaceContext.newPage();
+
+        // Set theme in localStorage BEFORE first navigation so theme-init.js
+        // picks it up on page load. Authenticated routes (/app/*, /onboarding)
+        // respect 'jovie-theme' in localStorage; marketing routes always stay dark.
+        await page.addInitScript((t: string) => {
+          try {
+            localStorage.setItem('jovie-theme', t);
+          } catch {
+            // ignore if localStorage blocked
+          }
+        }, theme);
+
+        // Seed auth bypass cookies — the test auth bypass middleware reads these
+        // and mounts a synthetic session so no Clerk round-trip is needed.
+        await setTestAuthBypassSession(
+          page,
+          surface.persona ?? 'creator-ready'
+        );
+
+        await installPublicRouteMocks(page);
+
+        try {
+          await page.goto(surface.path, {
+            waitUntil: 'domcontentloaded',
+            timeout: 120_000,
+          });
+
+          // If the surface redirects (e.g. onboarding when already complete),
+          // wait for the landing URL to settle and any redirect target to render.
+          await waitForAnyVisibleSelector(page, surface.readySelectors, 60_000);
+
+          // Run axe scoped to color-contrast only.
+          // color-contrast is the WCAG AA rule (1.4.3) that gates this suite —
+          // the reported black-on-black regression class lives here.
+          const results = await new AxeBuilder({ page })
+            .withRules(['color-contrast'])
+            .analyze();
+
+          const violations = results.violations.filter(
+            v => v.id === 'color-contrast'
+          );
+
+          if (violations.length > 0) {
+            const detail = violations.flatMap(v =>
+              v.nodes.map(n => ({
+                html: n.html.slice(0, 300),
+                target: n.target,
+                failureSummary: n.failureSummary,
+              }))
+            );
+            console.error(
+              `[axe] ${surface.id} [${theme}] color-contrast violations:\n` +
+                JSON.stringify(detail, null, 2)
+            );
+          }
+
+          expect(
+            violations,
+            `${surface.id} [${theme}] has WCAG AA color-contrast violations — ` +
+              `check computed foreground/background ratios in the ${theme} theme`
+          ).toHaveLength(0);
+        } finally {
+          await page.close().catch(() => undefined);
+          await surfaceContext.close().catch(() => undefined);
+        }
+      });
+    }
   }
 });

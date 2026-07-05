@@ -1,1 +1,1 @@
-export const AUTH_FORM_MAX_WIDTH_CLASS = 'max-w-[420px]' as const;
+export const AUTH_FORM_MAX_WIDTH_CLASS = 'max-w-105' as const;

@@ -40,20 +40,20 @@ export function AutomaticReleaseSmartlinksSection() {
       />
 
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-linear-content'>
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-primary-token'>
-              New release?
+              New Release?
               <br />
-              Already live.
+              Already Live.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-secondary-token'>
                 Connect Spotify once. Every new release gets a smart link across
                 every platform — automatically.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
                 Zero manual work
               </span>
             </div>
@@ -96,18 +96,18 @@ export function AutomaticReleaseSmartlinksSection() {
                 {/* Mac window chrome */}
                 <div className='flex items-center px-5 h-12 border-b border-subtle bg-surface-1'>
                   <div className='flex gap-2'>
-                    <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
-                    <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
-                    <div className='w-3 h-3 rounded-full bg-[#61C554] border border-black/10' />
+                    <div className='w-3 h-3 rounded-full bg-(--color-accent-red) border border-black/10' />
+                    <div className='w-3 h-3 rounded-full bg-(--color-accent-orange) border border-black/10' />
+                    <div className='w-3 h-3 rounded-full bg-(--color-accent-green) border border-black/10' />
                   </div>
                   <div className='flex-1 text-center text-[var(--linear-caption-size)] text-tertiary-token'>
                     Jovie Dashboard
                   </div>
-                  <div className='w-[52px]' />
+                  <div className='w-13' />
                 </div>
 
                 {/* Demo capture from the shared /demo route */}
-                <div className='relative h-[420px] overflow-hidden'>
+                <div className='relative h-105 overflow-hidden'>
                   <MarketingPhoneImage
                     scenarioId='dashboard-releases-desktop'
                     altOverride='Jovie releases dashboard showing the live shared releases workspace'
@@ -130,7 +130,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
               {/* Smart Link Card — beside the table */}
               <div
-                className='hidden md:flex flex-col w-[272px] shrink-0 overflow-hidden rounded-t-2xl rounded-b-none'
+                className='hidden md:flex flex-col w-68 shrink-0 overflow-hidden rounded-t-2xl rounded-b-none'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-0)',
                   color: 'var(--linear-text-primary)',
@@ -203,7 +203,7 @@ export function AutomaticReleaseSmartlinksSection() {
                             DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG]
                               ?.iconPath
                           }
-                          className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
+                          className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
                         />
                       );
                     })}

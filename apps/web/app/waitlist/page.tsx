@@ -13,7 +13,7 @@ import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
  * server-side redirect loop (JOV-2161).
  */
 export default async function WaitlistPage() {
-  const authResult = await resolveUserState();
+  const authResult = await resolveUserState({ createDbUserIfMissing: false });
 
   if (authResult.state === CanonicalUserState.BANNED) {
     redirect(APP_ROUTES.UNAVAILABLE);

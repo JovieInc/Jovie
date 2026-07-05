@@ -94,7 +94,7 @@ describe('AudienceMemberSidebar', () => {
     expect(screen.getByText('Jordan Reyes')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-hero-subtitle-slot')).toHaveClass(
       'invisible',
-      'min-h-[16px]'
+      'min-h-4'
     );
   });
 

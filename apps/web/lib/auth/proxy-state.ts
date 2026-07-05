@@ -2,6 +2,12 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
+import {
+  CanonicalUserState,
+  type ProxyUserStateProjection,
+  resolveCanonicalState,
+  toProxyUserState,
+} from '@/lib/auth/canonical-user-state';
 import { db } from '@/lib/db';
 import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 import { QueryTimeoutError } from '@/lib/db/query-timeout';
@@ -11,12 +17,7 @@ import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
-export interface ProxyUserState {
-  needsWaitlist: boolean;
-  needsOnboarding: boolean;
-  isActive: boolean;
-  isBanned: boolean;
-}
+export type ProxyUserState = ProxyUserStateProjection;
 
 // Redis cache settings for user state
 // Transitional users get shorter TTL, active users get longer TTL.
@@ -211,96 +212,43 @@ async function tryGetStaleCachedState(
   return null;
 }
 
-/** Statuses that indicate waitlist approval */
-const APPROVED_STATUSES = [
-  'waitlist_approved',
-  'profile_claimed',
-  'onboarding_incomplete',
-  'active',
-] as const;
-
-// Uses the canonical isProfileComplete() from profile-completeness.ts.
-// This eliminates the redirect loop bug class where proxy, gate, and
-// dashboard had independent completeness checks that could disagree.
-import { isProfileComplete } from './profile-completeness';
-
-/**
- * Whether the user has a complete profile.
- * Maps proxy query field names to the canonical check.
- */
-function hasCompleteProfile(result: {
+type ProxyStateQueryResult = {
+  dbUserId: string;
+  userStatus: string | null;
+  deletedAt: Date | null;
   profileId: string | null;
   profileComplete: Date | null;
   profileUsername: string | null;
   profileUsernameNormalized: string | null;
   profileDisplayName: string | null;
   profileIsPublic: boolean | null;
-}): boolean {
-  if (!result.profileId) return false;
-  return isProfileComplete({
-    username: result.profileUsername,
-    usernameNormalized: result.profileUsernameNormalized,
-    displayName: result.profileDisplayName,
-    isPublic: result.profileIsPublic,
-    onboardingCompletedAt: result.profileComplete,
-  });
-}
+};
 
 /**
- * Determine user state from database query result
+ * Determine user state from database query result via the canonical resolver.
  */
 function determineUserState(
-  result:
-    | {
-        dbUserId: string;
-        userStatus: string | null;
-        deletedAt: Date | null;
-        profileId: string | null;
-        profileComplete: Date | null;
-        profileUsername: string | null;
-        profileUsernameNormalized: string | null;
-        profileDisplayName: string | null;
-        profileIsPublic: boolean | null;
-      }
-    | undefined,
+  result: ProxyStateQueryResult | undefined,
   waitlistEnabled: boolean
 ): ProxyUserState {
-  // No DB user → needs intake. Gate OFF only changes the access decision after
-  // intake; it does not skip the launch request flow.
-  if (!result?.dbUserId) {
-    return { ...DEFAULT_WAITLIST_STATE };
-  }
+  const canonicalState = resolveCanonicalState({
+    isAuthenticated: true,
+    hasDbUser: Boolean(result?.dbUserId),
+    userStatus: result?.userStatus ?? null,
+    deletedAt: result?.deletedAt ?? null,
+    waitlistGateEnabled: waitlistEnabled,
+    profile: result?.profileId
+      ? {
+          username: result.profileUsername,
+          usernameNormalized: result.profileUsernameNormalized,
+          displayName: result.profileDisplayName,
+          isPublic: result.profileIsPublic,
+          onboardingCompletedAt: result.profileComplete,
+        }
+      : null,
+  });
 
-  // Banned or soft-deleted users are blocked immediately
-  if (
-    result.deletedAt ||
-    result.userStatus === 'banned' ||
-    result.userStatus === 'suspended'
-  ) {
-    return { ...BANNED_STATE };
-  }
-
-  // Check waitlist approval using userStatus lifecycle
-  const isWaitlistApproved = APPROVED_STATUSES.includes(
-    result.userStatus as (typeof APPROVED_STATUSES)[number]
-  );
-
-  // Pending users stay on the waitlist even when rolling daily capacity opens.
-  if (result.userStatus === 'waitlist_pending') {
-    return { ...DEFAULT_WAITLIST_STATE };
-  }
-
-  // Not approved + waitlist enabled → send to waitlist
-  if (!isWaitlistApproved && waitlistEnabled) {
-    return { ...DEFAULT_WAITLIST_STATE };
-  }
-
-  // Either approved, or waitlist is disabled — route based on profile completeness
-  if (!hasCompleteProfile(result)) {
-    return { ...NEEDS_ONBOARDING_STATE };
-  }
-
-  return { ...ACTIVE_USER_STATE };
+  return toProxyUserState(canonicalState);
 }
 
 /**
@@ -327,37 +275,28 @@ function cacheUserState(
   });
 }
 
-/** Default state for unauthenticated or unknown users */
-const DEFAULT_WAITLIST_STATE: ProxyUserState = {
-  needsWaitlist: true,
-  needsOnboarding: false,
-  isActive: false,
-  isBanned: false,
-};
+/** Fallback when middleware cannot resolve Clerk identity. */
+const NEEDS_ONBOARDING_STATE: ProxyUserState = toProxyUserState(
+  resolveCanonicalState({
+    isAuthenticated: true,
+    hasDbUser: false,
+    userStatus: null,
+    deletedAt: null,
+    waitlistGateEnabled: true,
+    profile: null,
+  })
+);
 
-/** State for users who need onboarding */
-const NEEDS_ONBOARDING_STATE: ProxyUserState = {
-  needsWaitlist: false,
-  needsOnboarding: true,
-  isActive: false,
-  isBanned: false,
-};
-
-/** State for fully active users */
-const ACTIVE_USER_STATE: ProxyUserState = {
-  needsWaitlist: false,
-  needsOnboarding: false,
-  isActive: true,
-  isBanned: false,
-};
-
-/** State for banned or soft-deleted users */
-const BANNED_STATE: ProxyUserState = {
-  needsWaitlist: false,
-  needsOnboarding: false,
-  isActive: false,
-  isBanned: true,
-};
+/**
+ * Fail-closed fallback for DB failures. When the database is unreachable and
+ * no stale cache is available, route the user to the waitlist instead of
+ * onboarding. This prevents waitlist-pending users from bypassing the gate
+ * during a DB outage — the needsOnboarding path skips the waitlist check and
+ * would grant onboarding access to unapproved users.
+ */
+const FAIL_CLOSED_WAITLIST_STATE: ProxyUserState = toProxyUserState(
+  CanonicalUserState.WAITLIST_PENDING
+);
 
 /**
  * Execute the database query with retry logic and per-attempt timeouts.
@@ -515,7 +454,7 @@ export async function getUserState(
           clerkUserId,
           operation: 'getProxyUserState',
           errorType: 'transient',
-          fallback: 'needs-onboarding',
+          fallback: 'fail-closed-waitlist',
         }
       );
     } else {
@@ -523,11 +462,11 @@ export async function getUserState(
         clerkUserId,
         operation: 'getProxyUserState',
         errorType: isTransient ? 'transient' : 'persistent',
-        fallback: 'needs-onboarding',
+        fallback: 'fail-closed-waitlist',
       });
     }
 
-    return { ...NEEDS_ONBOARDING_STATE };
+    return { ...FAIL_CLOSED_WAITLIST_STATE };
   }
 }
 
