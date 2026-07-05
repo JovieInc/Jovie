@@ -121,7 +121,7 @@ The connector enrichment pipeline (#10806) needs agent-native CLIs for official 
 
 | Platform | API Status | Sniffing verdict |
 |---|---|---|
-| **Spotify for Artists** | Unpublished internal API | **Block** — auth requires real user session + 2FA; headless automation breaks on login; ToS violation risk on the user's account; pursue the official [Spotify gated partner API](https://developer.spotify.com/documentation/web-api) instead |
+| **[Streaming platform — internal ref]** | Unpublished internal API | **Block** — auth requires real user session + 2FA; headless automation breaks on login; ToS violation risk on the user's account; pursue the official gated partner API instead |
 | **Apple Music for Artists** | No API — scrape only | **Block** — highest risk; no programmatic access path; any CLI would be brittle to UI changes and carries ban risk; do not build until an official API exists |
 
 **The tool accelerates the BUILD of a sniffed CLI, but it does not solve the underlying gates:**
