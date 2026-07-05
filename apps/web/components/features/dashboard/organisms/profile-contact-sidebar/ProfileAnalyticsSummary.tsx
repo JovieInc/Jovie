@@ -1,35 +1,19 @@
 'use client';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
-import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
-import { DrawerButton, DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
-import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
+import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
 
 const numberFormatter = new Intl.NumberFormat();
 
-interface RangeOption {
-  value: AnalyticsRange;
-  label: string;
-  requiresPro: boolean;
-}
+const RANGE_VALUES: readonly AnalyticsRange[] = ['7d', '30d', '90d', 'all'];
 
-const RANGE_OPTIONS: RangeOption[] = [
-  // ui-casing-allow: numeric range label
-  { value: '7d', label: '7 Days', requiresPro: false },
-  { value: '30d', label: '30 Days', requiresPro: false },
-  { value: '90d', label: '90 Days', requiresPro: true },
-  { value: 'all', label: 'All Time', requiresPro: true },
-];
+/** Ranges gated behind a Pro plan on this surface. */
+const PRO_LOCKED_RANGES: readonly AnalyticsRange[] = ['90d', 'all'];
 
 export function ProfileAnalyticsSummary() {
   const [range, setRange] = useState<AnalyticsRange>('30d');
@@ -37,9 +21,6 @@ export function ProfileAnalyticsSummary() {
     range,
     view: 'traffic',
   });
-
-  const currentOption =
-    RANGE_OPTIONS.find(o => o.value === range) ?? RANGE_OPTIONS[1];
 
   if (isLoading && !data) {
     return (
@@ -71,10 +52,9 @@ export function ProfileAnalyticsSummary() {
       )}
     >
       <DrawerPropertyRow
-        label={CANONICAL_METRICS.profile_views.label}
+        label='Profile Views'
         value={numberFormatter.format(profileViews)}
       />
-      {/* Display alias for CANONICAL_METRICS.total_clicks */}
       <DrawerPropertyRow
         label='Link Clicks'
         value={numberFormatter.format(totalClicks)}
@@ -82,55 +62,13 @@ export function ProfileAnalyticsSummary() {
 
       {/* Time range selector */}
       <div className='flex justify-end'>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <DrawerButton
-              type='button'
-              tone='ghost'
-              className='h-6 rounded-full border-transparent px-1.5 py-0 text-2xs font-normal text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
-            >
-              <span>Last {currentOption.label}</span>
-              <ChevronDown
-                size={10}
-                className='text-tertiary-token'
-                aria-hidden='true'
-              />
-            </DrawerButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='end' className='w-36'>
-            {RANGE_OPTIONS.map(option => {
-              const isActive = option.value === range;
-              return (
-                <DropdownMenuItem
-                  key={option.value}
-                  disabled={option.requiresPro}
-                  onClick={() => {
-                    if (!option.requiresPro) setRange(option.value);
-                  }}
-                  className={cn(isActive && 'font-medium')}
-                >
-                  <span className='flex items-center gap-2 w-full'>
-                    <span className='flex-1'>Last {option.label}</span>
-                    {option.requiresPro && (
-                      <Lock
-                        size={12}
-                        className='text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    )}
-                    {isActive && !option.requiresPro && (
-                      <Check
-                        size={14}
-                        className='ml-auto text-primary-token'
-                        aria-hidden='true'
-                      />
-                    )}
-                  </span>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <TimeRangeSelector
+          variant='menu'
+          value={range}
+          onValueChange={setRange}
+          ranges={RANGE_VALUES}
+          lockedRanges={PRO_LOCKED_RANGES}
+        />
       </div>
     </div>
   );

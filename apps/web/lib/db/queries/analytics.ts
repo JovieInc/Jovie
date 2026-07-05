@@ -1,5 +1,8 @@
 import { sql as drizzleSql } from 'drizzle-orm';
-import { computeCaptureRate } from '@/lib/analytics/metrics';
+import {
+  RECENT_ACTIVITY_RANGE,
+  resolveRangeStartOrEpoch,
+} from '@/lib/analytics/time-range';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
@@ -34,32 +37,6 @@ const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
   return value;
 };
 
-function toStartDate(range: AnalyticsRange): Date {
-  const now = new Date();
-  let startDate = new Date();
-
-  switch (range) {
-    case '1d':
-      startDate.setDate(now.getDate() - 1);
-      break;
-    case '7d':
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case '30d':
-      startDate.setDate(now.getDate() - 30);
-      break;
-    case '90d':
-      startDate.setDate(now.getDate() - 90);
-      break;
-    case 'all':
-      startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      break;
-  }
-
-  return startDate;
-}
-
 export async function getUserDashboardAnalytics(
   clerkUserId: string,
   range: AnalyticsRange,
@@ -79,9 +56,10 @@ export async function getUserDashboardAnalytics(
   const creatorProfile = { id: profile!.id };
 
   {
-    const startDate = toStartDate(range);
-    const recentThreshold = new Date();
-    recentThreshold.setDate(recentThreshold.getDate() - 7);
+    // Canonical window semantics: rolling N × 24h windows ending at query
+    // time, resolved by @/lib/analytics/time-range so every surface agrees.
+    const startDate = resolveRangeStartOrEpoch(range);
+    const recentThreshold = resolveRangeStartOrEpoch(RECENT_ACTIVITY_RANGE);
     const hasDailyProfileViews = await doesTableExist(
       TABLE_NAMES.dailyProfileViews
     );
@@ -298,8 +276,10 @@ export async function getUserDashboardAnalytics(
 
     const uniqueUsers = Number(aggregates?.unique_users ?? 0);
 
-    // Canonical capture rate derivation — see lib/analytics/metrics.ts.
-    const captureRate = computeCaptureRate(subscribers, uniqueUsers);
+    // Calculate capture rate: (subscribers / unique_users) * 100
+    // Only calculate if we have unique users to avoid division by zero
+    const captureRate =
+      uniqueUsers > 0 ? Math.round((subscribers / uniqueUsers) * 1000) / 10 : 0;
 
     return {
       ...base,
