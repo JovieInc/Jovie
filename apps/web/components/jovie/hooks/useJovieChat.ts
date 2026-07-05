@@ -248,6 +248,12 @@ export function useJovieChat({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const activeClientTurnIdRef = useRef<string | null>(null);
+  // Assistant SDK message ids that existed BEFORE the active turn started.
+  // Between send and stream start, the SDK's "last assistant message" is still
+  // the previous turn's reply; reading its parts for the new turn flashes the
+  // old reply into the fresh assistant row and then destructively re-renders
+  // when the real stream begins (#11921).
+  const preTurnAssistantMessageIdsRef = useRef<Set<string>>(new Set());
   const streamRevisionRef = useRef(0);
   const lastAssistantPartsSignatureRef = useRef<string | null>(null);
   const sdkMessagesRef = useRef<UIMessage[]>([]);
@@ -501,6 +507,24 @@ export function useJovieChat({
     [activeConversationId, dispatchTimelineEvent, profileId]
   );
 
+  /**
+   * Parts of the assistant message that belongs to the ACTIVE turn. Returns []
+   * when the SDK's last assistant message predates the active turn (the
+   * previous reply), so stale content is never dispatched into the fresh
+   * assistant row (#11921).
+   */
+  const getActiveTurnAssistantParts = useCallback(
+    (candidateMessages: readonly UIMessage[]): UIMessage['parts'] => {
+      const assistantMessage = getLastAssistantMessage(candidateMessages);
+      if (!assistantMessage) return [];
+      if (preTurnAssistantMessageIdsRef.current.has(assistantMessage.id)) {
+        return [];
+      }
+      return getMessageParts(assistantMessage);
+    },
+    []
+  );
+
   const {
     messages: sdkMessages,
     sendMessage,
@@ -548,8 +572,9 @@ export function useJovieChat({
     },
     onError: error => {
       const clientTurnId = activeClientTurnIdRef.current;
-      const assistantMessage = getLastAssistantMessage(sdkMessagesRef.current);
-      const assistantParts = getMessageParts(assistantMessage);
+      const assistantParts = getActiveTurnAssistantParts(
+        sdkMessagesRef.current
+      );
 
       if (
         clientTurnId &&
@@ -649,8 +674,7 @@ export function useJovieChat({
     const clientTurnId = activeClientTurnIdRef.current;
     if (!clientTurnId) return;
 
-    const assistantMessage = getLastAssistantMessage(sdkMessages);
-    const parts = getMessageParts(assistantMessage);
+    const parts = getActiveTurnAssistantParts(sdkMessages);
     if (status === 'streaming' && parts.length === 0) {
       dispatchTimelineEvent({
         type: 'assistant.stream.started',
@@ -677,14 +701,19 @@ export function useJovieChat({
       revision: streamRevisionRef.current,
       now: Date.now(),
     });
-  }, [activeConversationId, dispatchTimelineEvent, sdkMessages, status]);
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    getActiveTurnAssistantParts,
+    sdkMessages,
+    status,
+  ]);
 
   // Wrap stop to clear submission state so the composer re-enables immediately
   // instead of waiting for the 30s safety timeout.
   const stop = useCallback(() => {
     const clientTurnId = activeClientTurnIdRef.current;
-    const assistantMessage = getLastAssistantMessage(sdkMessagesRef.current);
-    const assistantParts = getMessageParts(assistantMessage);
+    const assistantParts = getActiveTurnAssistantParts(sdkMessagesRef.current);
     rawStop();
     if (clientTurnId) {
       dispatchTimelineEvent({
@@ -698,7 +727,12 @@ export function useJovieChat({
       activeClientTurnIdRef.current = null;
     }
     setIsSubmitting(false);
-  }, [activeConversationId, dispatchTimelineEvent, rawStop]);
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    getActiveTurnAssistantParts,
+    rawStop,
+  ]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
@@ -850,6 +884,13 @@ export function useJovieChat({
       setIsSubmitting(true);
       const clientTurnId = crypto.randomUUID();
       activeClientTurnIdRef.current = clientTurnId;
+      // Snapshot which assistant messages already exist so this turn never
+      // treats a previous reply as its own streaming content (#11921).
+      preTurnAssistantMessageIdsRef.current = new Set(
+        sdkMessagesRef.current
+          .filter(message => message.role === 'assistant')
+          .map(message => message.id)
+      );
       streamRevisionRef.current = 0;
       lastAssistantPartsSignatureRef.current = null;
       const toolIntent =
