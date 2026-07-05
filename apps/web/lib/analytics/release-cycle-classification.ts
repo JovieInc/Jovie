@@ -108,10 +108,11 @@ export async function recordReleaseCycleStepEvent(
         },
       });
   } catch (err) {
-    logger.error(
-      '[release-cycle-classification] failed to record step event',
-      { releaseId: input.releaseId, step: input.step, err }
-    );
+    logger.error('[release-cycle-classification] failed to record step event', {
+      releaseId: input.releaseId,
+      step: input.step,
+      err,
+    });
   }
 }
 

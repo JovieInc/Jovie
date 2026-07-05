@@ -168,7 +168,8 @@ export async function getAgentTaskMetrics(
 
   return rows.map(row => {
     const total = Number(row.total_tasks) || 0;
-    const totalCost = row.total_cost_usd == null ? 0 : Number(row.total_cost_usd);
+    const totalCost =
+      row.total_cost_usd == null ? 0 : Number(row.total_cost_usd);
     const opportunities = Number(row.opportunity_count) || 0;
     return {
       agent: row.agent,

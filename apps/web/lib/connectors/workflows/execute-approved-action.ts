@@ -15,13 +15,13 @@
  */
 
 import { and, eq } from 'drizzle-orm';
+import { recordWorkflowStepResult } from '@/lib/analytics/agent-task-metrics';
 import type { CalendarApiClient } from '@/lib/connectors/google-calendar/create-event';
 import { createCalendarEvent } from '@/lib/connectors/google-calendar/create-event';
 import { db } from '@/lib/db';
 import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
-import { recordWorkflowStepResult } from '@/lib/analytics/agent-task-metrics';
 import { recordWorkflowRunOutcome } from './outcome-attribution';
 
 /** Agent identifier written to workflow_step_results rows for this executor. */

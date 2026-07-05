@@ -8,10 +8,10 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import {
-  RELEASE_CYCLE_STEP_KEYS,
-  RELEASE_CYCLE_STEPS,
   deriveReleaseAutomationSummary,
   isReleaseCycleStepKey,
+  RELEASE_CYCLE_STEP_KEYS,
+  RELEASE_CYCLE_STEPS,
 } from './release-cycle-classification';
 
 describe('RELEASE_CYCLE_STEPS', () => {
