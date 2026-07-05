@@ -90,8 +90,7 @@ export const BAKE_OFF_FIVE_TURN_FLOW: readonly BakeOffTurn[] = [
   {
     turn: 5,
     role: 'user',
-    utterance:
-      'Queue them for Thursday morning. That is all — thanks Jovie.',
+    utterance: 'Queue them for Thursday morning. That is all — thanks Jovie.',
   },
 ];
 

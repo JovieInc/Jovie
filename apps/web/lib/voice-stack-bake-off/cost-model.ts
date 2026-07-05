@@ -3,7 +3,9 @@
  * Sources cited in docs/product/voice-stack-bake-off-spike.md — update when pricing changes.
  */
 
-export type VoiceStackCandidate = 'xai-voice-agent' | 'elevenlabs-convai-twilio';
+export type VoiceStackCandidate =
+  | 'xai-voice-agent'
+  | 'elevenlabs-convai-twilio';
 
 export interface StackCostBreakdown {
   readonly candidate: VoiceStackCandidate;
@@ -54,8 +56,7 @@ export function getXaiCostBreakdown(): StackCostBreakdown {
 }
 
 export function getElevenLabsTwilioCostBreakdown(): StackCostBreakdown {
-  const telephony =
-    TWILIO_INBOUND_PER_MIN + TWILIO_OUTBOUND_PER_MIN / 2; // blended inbound-heavy artist calls
+  const telephony = TWILIO_INBOUND_PER_MIN + TWILIO_OUTBOUND_PER_MIN / 2; // blended inbound-heavy artist calls
   return {
     candidate: 'elevenlabs-convai-twilio',
     label: 'ElevenLabs ConvAI + Twilio telephony',
@@ -64,9 +65,7 @@ export function getElevenLabsTwilioCostBreakdown(): StackCostBreakdown {
     llmPassThroughPerMin: ELEVENLABS_LLM_ESTIMATE_PER_MIN,
     platformPerMin: 0,
     fullyLoadedPerMin:
-      ELEVENLABS_AGENT_PER_MIN +
-      telephony +
-      ELEVENLABS_LLM_ESTIMATE_PER_MIN,
+      ELEVENLABS_AGENT_PER_MIN + telephony + ELEVENLABS_LLM_ESTIMATE_PER_MIN,
     notes: [
       'ElevenAgents $0.08/min (PAYG, Jun 2026).',
       'LLM pass-through estimated; ElevenLabs may still absorb on some plans.',
