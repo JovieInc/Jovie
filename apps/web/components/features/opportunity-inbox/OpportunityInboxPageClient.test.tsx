@@ -94,6 +94,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'Detroit listeners up 340% — book a show',
@@ -136,6 +137,61 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByText('Connect Spotify')).toBeInTheDocument();
   });
 
+  it('filters cards by signal type and restores them on All', () => {
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'song-1',
+              signalType: 'new_song' as const,
+              typeLabel: 'New Song',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'New single detected on Spotify',
+              why: 'Fresh release found on your catalog.',
+              primaryActionLabel: 'Set up release',
+              status: 'pending' as const,
+            },
+            {
+              id: 'event-1',
+              signalType: 'new_event' as const,
+              typeLabel: 'New Event',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'Detroit listeners up 340% — book a show',
+              why: 'Promoter email matched your Detroit growth spike.',
+              primaryActionLabel: 'Add to calendar',
+              status: 'pending' as const,
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    expect(
+      screen.getByTestId('opportunity-inbox-signal-filters')
+    ).toBeInTheDocument();
+    expect(screen.getByText('New single detected on Spotify')).toBeVisible();
+
+    fireEvent.click(screen.getByTestId('opportunity-inbox-filter-new_event'));
+    expect(
+      screen.queryByText('New single detected on Spotify')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Detroit listeners up 340% — book a show')
+    ).toBeVisible();
+
+    fireEvent.click(
+      screen.getByTestId('opportunity-inbox-filter-new_profile_match')
+    );
+    expect(
+      screen.getByTestId('opportunity-inbox-filter-empty')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('opportunity-inbox-filter-all'));
+    expect(screen.getByText('New single detected on Spotify')).toBeVisible();
+  });
+
   it('removes a card optimistically after approve', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onSuccess?.();
@@ -147,6 +203,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'Detroit listeners up 340% — book a show',

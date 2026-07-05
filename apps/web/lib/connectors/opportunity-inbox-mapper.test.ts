@@ -19,12 +19,27 @@ describe('mapSuggestedActionToInboxCard', () => {
 
     expect(card).toMatchObject({
       id: 'action-1',
-      typeLabel: 'Suggestion',
+      signalType: 'new_event',
+      typeLabel: 'New Event',
       title: 'Detroit listeners up 340% — book a show',
       why: 'Promoter email matched your Detroit growth spike.',
       primaryActionLabel: 'Add to calendar',
       status: 'pending',
     });
+  });
+
+  it('uses the persisted signal_type when present', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'action-3',
+      kind: 'unknown.kind',
+      payload: { title: 'Fresh drop' },
+      rationale: null,
+      createdAt: new Date('2026-06-28T10:00:00.000Z'),
+      signalType: 'new_song',
+    });
+
+    expect(card.signalType).toBe('new_song');
+    expect(card.typeLabel).toBe('New Song');
   });
 
   it('falls back when payload title and rationale are missing', () => {
@@ -39,6 +54,8 @@ describe('mapSuggestedActionToInboxCard', () => {
     expect(card.title).toBe('Untitled suggestion');
     expect(card.why).toBe('Jovie found a booking signal worth your review.');
     expect(card.primaryActionLabel).toBe('Approve');
+    expect(card.signalType).toBe('other');
+    expect(card.typeLabel).toBe('Suggestion');
   });
 });
 

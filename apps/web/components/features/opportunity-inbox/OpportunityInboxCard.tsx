@@ -1,11 +1,37 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ArrowRight, MessageSquare, ThumbsDown, ThumbsUp } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarDays,
+  MessageSquare,
+  Music2,
+  Sparkles,
+  ThumbsDown,
+  ThumbsUp,
+  UserRound,
+} from 'lucide-react';
 import { useId, useState } from 'react';
+import type { OpportunitySignalType } from '@/lib/connectors/opportunity-inbox-signal-type';
 import { formatOpportunityInboxRelativeTime } from '@/lib/connectors/opportunity-inbox-time';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
+
+interface SignalTypeVisual {
+  readonly icon: LucideIcon;
+  /** Subtle accent on the meta icon+label only (accent discipline: no red/green). */
+  readonly accentClassName: string;
+}
+
+const SIGNAL_TYPE_VISUALS: Readonly<
+  Record<OpportunitySignalType, SignalTypeVisual>
+> = {
+  new_song: { icon: Music2, accentClassName: 'text-accent-blue' },
+  new_event: { icon: CalendarDays, accentClassName: 'text-accent-purple' },
+  new_profile_match: { icon: UserRound, accentClassName: 'text-accent-pink' },
+  other: { icon: Sparkles, accentClassName: '' },
+};
 
 export interface OpportunityInboxCardProps {
   readonly card: OpportunityInboxCardViewModel;
@@ -20,6 +46,22 @@ export interface OpportunityInboxCardProps {
   readonly isDismissing?: boolean;
   readonly isSubmittingFeedback?: boolean;
   readonly className?: string;
+}
+
+function SignalTypeIcon({
+  signalType,
+}: {
+  readonly signalType: OpportunitySignalType;
+}) {
+  const visual = SIGNAL_TYPE_VISUALS[signalType];
+  const Icon = visual.icon;
+  return (
+    <Icon
+      aria-hidden='true'
+      data-testid={`opportunity-inbox-signal-icon-${signalType}`}
+      className={cn('size-3.5 shrink-0', visual.accentClassName)}
+    />
+  );
 }
 
 export function OpportunityInboxCard({
@@ -58,7 +100,13 @@ export function OpportunityInboxCard({
       data-testid={`opportunity-inbox-card-${card.id}`}
     >
       <header className='system-b-opportunity-inbox-card-meta'>
-        <span className='system-b-opportunity-inbox-card-type'>
+        <SignalTypeIcon signalType={card.signalType} />
+        <span
+          className={cn(
+            'system-b-opportunity-inbox-card-type',
+            SIGNAL_TYPE_VISUALS[card.signalType].accentClassName
+          )}
+        >
           {card.typeLabel}
         </span>
         <span

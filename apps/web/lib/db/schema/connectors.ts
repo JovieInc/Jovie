@@ -442,6 +442,14 @@ export const suggestedActions = pgTable(
     /** Action payload. Schema varies by `kind`. */
     payload: jsonb('payload').notNull(),
 
+    /**
+     * Typed inbox category: `new_song` | `new_event` | `new_profile_match` |
+     * `other`. Text (not enum) so new detector types require no migration.
+     * Nullable: legacy rows are classified at read time by
+     * `classifyOpportunitySignalType`; detectors set it explicitly at insert.
+     */
+    signalType: text('signal_type'),
+
     status: suggestedActionStatusEnum('status').notNull().default('pending'),
 
     /** Source `context_facts` and `external_objects` refs that justify this suggestion. */

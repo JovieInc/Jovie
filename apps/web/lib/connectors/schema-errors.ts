@@ -39,6 +39,23 @@ export function isMissingConnectorSchemaError(error: unknown): boolean {
   return mentionsConnectorSchemaTable(message);
 }
 
+/**
+ * True when Postgres reports the `suggested_actions.signal_type` column is
+ * missing (code shipped ahead of the prod migration — the known
+ * migration-drift class). Callers degrade by re-querying without the column.
+ */
+export function isMissingSignalTypeColumnError(error: unknown): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  if (
+    !message.includes('does not exist') &&
+    unwrapPgError(error).code !== '42703'
+  ) {
+    return false;
+  }
+
+  return message.includes('signal_type');
+}
+
 export function isMissingConnectorWorkflowTablesError(error: unknown): boolean {
   const message = getDeepErrorMessage(error).toLowerCase();
   if (

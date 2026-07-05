@@ -3,6 +3,10 @@ import {
   isReportKind,
   parseReportMeasurement,
 } from './opportunity-inbox-report';
+import {
+  classifyOpportunitySignalType,
+  OPPORTUNITY_SIGNAL_TYPE_META,
+} from './opportunity-inbox-signal-type';
 import { classifySuggestedActionCategory } from './opportunity-inbox-tour-dates';
 import type {
   OpportunityInboxCardCategory,
@@ -18,28 +22,13 @@ interface SuggestedActionRow {
   readonly payload: unknown;
   readonly rationale: string | null;
   readonly createdAt: Date;
+  /** Persisted classification (nullable pre-backfill / pre-migration). */
+  readonly signalType?: string | null;
 }
 
 const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
 };
-
-const TYPE_LABEL_BY_KIND: Readonly<Record<string, string>> = {
-  'calendar.create_event': 'Suggestion',
-};
-
-function typeLabelFor(
-  kind: string,
-  category: OpportunityInboxCardCategory
-): string {
-  if (category === 'tour_date') {
-    return 'Tour date';
-  }
-  if (category === 'report') {
-    return 'Report';
-  }
-  return TYPE_LABEL_BY_KIND[kind] ?? 'Suggestion';
-}
 
 function primaryActionLabelFor(
   kind: string,
@@ -91,12 +80,14 @@ export function mapSuggestedActionToInboxCard(
   const report = isReportKind(row.kind)
     ? parseReportMeasurement(row.payload)
     : null;
+  const signalType = classifyOpportunitySignalType(row);
   const category: OpportunityInboxCardCategory = report
     ? 'report'
     : classifySuggestedActionCategory(row);
   return {
     id: row.id,
-    typeLabel: typeLabelFor(row.kind, category),
+    signalType,
+    typeLabel: OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
     createdAt: row.createdAt.toISOString(),
     title: titleFromPayload(row.payload, category),
     why: whyFromRow(row, category),
