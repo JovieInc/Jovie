@@ -2,7 +2,10 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { sendOutboundSmsBestEffort } from '@/lib/notifications/providers/sms/outbound-sms';
 import {
+  claimWebhookEventForProcessing,
+  clearWebhookEventClaim,
   handleVerifiedInbound,
   markWebhookEventProcessed,
   recordWebhookEvent,
@@ -106,22 +109,36 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const claimAcquired = await claimWebhookEventForProcessing(
+    dedupe.webhookEventId
+  );
+  if (!claimAcquired) {
+    logger.info('SMS webhook event already being processed — acking provider', {
+      providerEventId,
+    });
+    return NextResponse.json(
+      { ok: true, status: 'processing' },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  }
+
   const nativeSmsEnabled =
     env.NATIVE_SMS_ENABLED === 'true' || env.NATIVE_SMS_ENABLED === '1';
 
-  const result = await handleVerifiedInbound({
-    verified: verification,
-    webhookEventId: dedupe.webhookEventId,
-    nativeSmsEnabled,
-  });
+  let result: Awaited<ReturnType<typeof handleVerifiedInbound>>;
+  try {
+    result = await handleVerifiedInbound({
+      verified: verification,
+      webhookEventId: dedupe.webhookEventId,
+      nativeSmsEnabled,
+    });
+  } catch (error) {
+    await clearWebhookEventClaim(dedupe.webhookEventId);
+    throw error;
+  }
 
-  // Mark processed only after the handler returned successfully — for 5xx
-  // responses we leave processed=false so the provider retry will pick it
-  // up. Dedupe still works because webhookEvents (provider, event_id) is
-  // unique; the next attempt will see isFirstSeen=false but processed=false
-  // and the route returns 500 again (TODO: upgrade to claim-and-retry per
-  // codex F6 once we have a job runner). For Phase 1 ship, processed=true
-  // on any non-500 response is sufficient.
+  // Mark processed only after the handler returned successfully. For 5xx we
+  // clear the claim lease so the provider retry can reclaim and replay.
   if (result.status < 500) {
     try {
       await markWebhookEventProcessed(dedupe.webhookEventId);
@@ -130,11 +147,22 @@ export async function POST(request: NextRequest) {
         providerEventId,
       });
     }
+  } else {
+    await clearWebhookEventClaim(dedupe.webhookEventId);
   }
 
-  // Outbound replies are best-effort and post-commit. In Phase 1 we don't
-  // ship outbound SMS until A2P 10DLC is verified; the provider's TwiML
-  // response is a no-op acknowledgement.
+  // Outbound auto-replies (STOP ack, HELP, code-not-found) are best-effort
+  // and post-commit so the inbound webhook acks before Twilio POST latency.
+  if (result.outboundReply) {
+    void sendOutboundSmsBestEffort({
+      to: result.outboundReply.to,
+      body: result.outboundReply.body,
+      source: `sms_webhook_${result.kind}`,
+      providerEventId,
+      metadata: { kind: result.kind },
+    });
+  }
+
   return NextResponse.json(
     { ok: true, kind: result.kind },
     { status: result.status, headers: NO_STORE_HEADERS }

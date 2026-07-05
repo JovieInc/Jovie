@@ -24,7 +24,8 @@ async function main() {
   );
 
   const demoInput = {
-    userId: 'demo_user_creator_001',
+    userId: '00000000-0000-4000-8000-000000000101',
+    creatorProfileId: '00000000-0000-4000-8000-000000000102',
     triggerContext: {
       photoId: 'photo_demo_001',
       taggedName: 'Jordan Hale',
@@ -33,7 +34,7 @@ async function main() {
       assetIds: ['img_123.jpg'],
       note: 'Tagged during release shoot',
     },
-    sourceContextFactIds: ['cf_seed_photo_tag_001'],
+    sourceMemoryRecordIds: ['00000000-0000-4000-8000-000000000201'],
     nearbyContextRefs: [
       'gmail:msg_2026-05_demo_thread',
       'cal:evt_studio_session_may28',

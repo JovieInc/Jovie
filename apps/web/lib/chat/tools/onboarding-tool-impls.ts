@@ -182,6 +182,76 @@ export interface NextStepCardPayload {
   readonly decision: AccessDecision;
 }
 
+export interface ConfirmSpotifyArtistOutput {
+  readonly action: 'spotify_artist_confirmed';
+  readonly spotifyArtistId: string;
+  readonly artist: {
+    readonly id: string;
+    readonly name: string;
+    readonly url: string;
+    readonly imageUrl: string | null;
+    readonly followers: number | null;
+    readonly popularity: number | null;
+    readonly genres: readonly string[];
+  } | null;
+  readonly summary: string;
+}
+
+/**
+ * Shared confirm-artist implementation: record the pick on the turn state,
+ * fetch Spotify enrichment (best-effort), and return the card payload.
+ * Called by both the LLM tool below and the deterministic fallback engine
+ * (`lib/chat/onboarding-script/engine.ts`) so the two paths cannot drift.
+ */
+export async function buildConfirmSpotifyArtistOutput(
+  spotifyArtistId: string,
+  state: OnboardingTurnState
+): Promise<ConfirmSpotifyArtistOutput> {
+  state.spotifyArtistId = spotifyArtistId;
+  state.spotifyArtistName = null;
+  state.spotifyImageUrl = null;
+  state.spotifyGenres = [];
+  state.spotifyPopularity = null;
+  state.spotifyFollowers = null;
+  let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
+
+  try {
+    artist = await getSpotifyArtist(spotifyArtistId);
+  } catch (error) {
+    logger.warn('Onboarding Spotify artist enrichment failed', {
+      error,
+      spotifyArtistId,
+    });
+  }
+
+  if (artist) {
+    state.spotifyArtistName = artist.name;
+    state.spotifyImageUrl = artist.images?.[0]?.url ?? null;
+    state.spotifyGenres = artist.genres ?? [];
+    state.spotifyPopularity = artist.popularity ?? null;
+    state.spotifyFollowers = artist.followers?.total ?? null;
+  }
+
+  return {
+    action: 'spotify_artist_confirmed' as const,
+    spotifyArtistId,
+    artist: artist
+      ? {
+          id: artist.id,
+          name: artist.name,
+          url: buildSpotifyArtistUrl(artist.id),
+          imageUrl: artist.images?.[0]?.url ?? null,
+          followers: artist.followers?.total ?? null,
+          popularity: artist.popularity ?? null,
+          genres: artist.genres?.slice(0, 3) ?? [],
+        }
+      : null,
+    summary: artist
+      ? `${artist.name} matched on Spotify.`
+      : 'Spotify artist selected.',
+  };
+}
+
 export interface CheckoutCardPayload {
   readonly action: 'propose_checkout';
   readonly plan: 'free' | 'pro' | 'max' | null;
@@ -214,51 +284,8 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
     confirmSpotifyArtist: tool({
       description: TOOL_SCHEMAS.confirmSpotifyArtist.description,
       inputSchema: TOOL_SCHEMAS.confirmSpotifyArtist.inputSchema,
-      execute: async ({ spotifyArtistId }) => {
-        state.spotifyArtistId = spotifyArtistId;
-        state.spotifyArtistName = null;
-        state.spotifyImageUrl = null;
-        state.spotifyGenres = [];
-        state.spotifyPopularity = null;
-        state.spotifyFollowers = null;
-        let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
-
-        try {
-          artist = await getSpotifyArtist(spotifyArtistId);
-        } catch (error) {
-          logger.warn('Onboarding Spotify artist enrichment failed', {
-            error,
-            spotifyArtistId,
-          });
-        }
-
-        if (artist) {
-          state.spotifyArtistName = artist.name;
-          state.spotifyImageUrl = artist.images?.[0]?.url ?? null;
-          state.spotifyGenres = artist.genres ?? [];
-          state.spotifyPopularity = artist.popularity ?? null;
-          state.spotifyFollowers = artist.followers?.total ?? null;
-        }
-
-        return {
-          action: 'spotify_artist_confirmed' as const,
-          spotifyArtistId,
-          artist: artist
-            ? {
-                id: artist.id,
-                name: artist.name,
-                url: buildSpotifyArtistUrl(artist.id),
-                imageUrl: artist.images?.[0]?.url ?? null,
-                followers: artist.followers?.total ?? null,
-                popularity: artist.popularity ?? null,
-                genres: artist.genres?.slice(0, 3) ?? [],
-              }
-            : null,
-          summary: artist
-            ? `${artist.name} matched on Spotify.`
-            : 'Spotify artist selected.',
-        };
-      },
+      execute: async ({ spotifyArtistId }) =>
+        buildConfirmSpotifyArtistOutput(spotifyArtistId, state),
     }),
 
     checkHandle: tool({

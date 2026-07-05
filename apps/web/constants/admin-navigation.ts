@@ -38,7 +38,9 @@ export type AdminWorkspaceId =
   | 'investors'
   | 'screenshots'
   | 'costs'
-  | 'share_studio';
+  | 'share_studio'
+  | 'system_map'
+  | 'features';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
 
@@ -64,6 +66,8 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'screenshots',
   'share_studio',
   'costs',
+  'system_map',
+  'features',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -136,6 +140,20 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Share Studio',
     href: APP_ROUTES.ADMIN_SHARE_STUDIO,
     description: 'Preview story assets, payloads, and tracked share outputs',
+    section: 'utilities',
+  },
+  {
+    id: 'system_map',
+    label: 'System Map',
+    href: APP_ROUTES.ADMIN_SYSTEM,
+    description: 'Read-only map of skills, connectors, tools, and memory',
+    section: 'utilities',
+  },
+  {
+    id: 'features',
+    label: 'Features',
+    href: APP_ROUTES.ADMIN_FEATURES,
+    description: 'Runtime feature flags with per-environment toggles',
     section: 'utilities',
   },
 ] as const;

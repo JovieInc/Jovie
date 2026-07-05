@@ -40,6 +40,66 @@ struct MobileAuthFinalizationTests {
     #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_only"))
   }
 
+  @Test func planIsNilWhenNeitherSessionTokenNorTicketPresent() {
+    let response = NativeAuthExchangeResponse(
+      ticket: nil,
+      sessionToken: nil,
+      sessionId: nil,
+      userId: nil,
+      returnTo: "/dashboard",
+      expiresInSeconds: 0
+    )
+
+    let plan = MobileAuthFinalizationPlanner.plan(for: response)
+
+    #expect(plan == nil)
+  }
+
+  @Test func planFallsBackToTicketWhenSessionTokenIsEmptyString() {
+    let response = NativeAuthExchangeResponse(
+      ticket: "ticket_fallback",
+      sessionToken: "",
+      sessionId: nil,
+      userId: "user_456",
+      returnTo: "/dashboard",
+      expiresInSeconds: 3600
+    )
+
+    let plan = MobileAuthFinalizationPlanner.plan(for: response)
+
+    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_fallback"))
+  }
+
+  @Test func planFallsBackToTicketWhenUserIdIsEmptyString() {
+    let response = NativeAuthExchangeResponse(
+      ticket: "ticket_fallback",
+      sessionToken: "native-session-token",
+      sessionId: nil,
+      userId: "",
+      returnTo: "/dashboard",
+      expiresInSeconds: 3600
+    )
+
+    let plan = MobileAuthFinalizationPlanner.plan(for: response)
+
+    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_fallback"))
+  }
+
+  @Test func planIsNilWhenSessionTokenValidButTicketIsEmptyStringAndUserIdMissing() {
+    let response = NativeAuthExchangeResponse(
+      ticket: "",
+      sessionToken: nil,
+      sessionId: nil,
+      userId: nil,
+      returnTo: "/dashboard",
+      expiresInSeconds: 0
+    )
+
+    let plan = MobileAuthFinalizationPlanner.plan(for: response)
+
+    #expect(plan == nil)
+  }
+
   @Test func liveLaunchConfigurationUsesMockForNonLiveModes() {
     let result = LiveLaunchConfigurationResolver.resolve(
       launchMode: .uiTestingSignedOut,
@@ -93,6 +153,24 @@ struct MobileAuthFinalizationTests {
     )
   }
 
+  @Test func rejectsMissingClerkKeyInAnyBuildConfiguration() {
+    #expect(throws: ClerkPublishableKeyValidationError.missing) {
+      try ClerkPublishableKeyValidator.validateForDistribution("")
+    }
+
+    #expect(throws: ClerkPublishableKeyValidationError.missing) {
+      try ClerkPublishableKeyValidator.validateForDistribution("   ")
+    }
+  }
+
+  @Test func rejectsPlaceholderClerkKeyInAnyBuildConfiguration() {
+    #expect(throws: ClerkPublishableKeyValidationError.placeholder) {
+      try ClerkPublishableKeyValidator.validateForDistribution(
+        ClerkPublishableKeyValidator.placeholderKey
+      )
+    }
+  }
+
   @Test func rejectsPlaceholderClerkKeyInDistributionBuilds() {
 #if DEBUG
     // Development builds may use pk_test keys locally.
@@ -131,6 +209,8 @@ struct MobileAuthFinalizationTests {
       apiBaseURL: URL(string: "https://jov.ie")!,
       webBaseURL: URL(string: "https://jov.ie")!,
       sentryDSN: nil,
+      observabilityIngestURL: nil,
+      observabilityIngestSecret: nil,
       observabilityEnvironment: "test",
       clerkRedirectUrl: "ie.jov.jovie://callback",
       clerkCallbackUrlScheme: "ie.jov.jovie"

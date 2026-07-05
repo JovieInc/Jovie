@@ -1,63 +1,23 @@
 import 'server-only';
 
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { discoverThisIsPlaylistCandidate } from '@/lib/profile/featured-playlist-fallback-discovery';
 import {
-  type FeaturedPlaylistFallbackCandidate,
-  PLAYLIST_SOURCE,
-} from '@/lib/profile/featured-playlist-fallback-web';
+  getConfirmedFeaturedPlaylistFallback,
+  getDismissedPlaylistId,
+  getFeaturedPlaylistFallbackCandidate,
+} from '@/lib/profile/featured-playlist-fallback-data';
+import { discoverThisIsPlaylistCandidate } from '@/lib/profile/featured-playlist-fallback-discovery';
+import { PLAYLIST_SOURCE } from '@/lib/profile/featured-playlist-fallback-web';
 
-const featuredPlaylistFallbackCandidateSchema = z.object({
-  playlistId: z.string().min(1),
-  title: z.string().min(1),
-  url: z.string().url(),
-  imageUrl: z.string().url().nullable(),
-  artistSpotifyId: z.string().min(1),
-  source: z.literal(PLAYLIST_SOURCE),
-  discoveredAt: z.string().datetime(),
-  searchQuery: z.string().min(1),
-});
-
-const confirmedFeaturedPlaylistFallbackSchema =
-  featuredPlaylistFallbackCandidateSchema.extend({
-    confirmedAt: z.string().datetime(),
-  });
-
-export type ConfirmedFeaturedPlaylistFallback = z.infer<
-  typeof confirmedFeaturedPlaylistFallbackSchema
->;
-
-function getDismissedPlaylistId(
-  settings: Record<string, unknown> | null | undefined
-): string | null {
-  const dismissedId = settings?.featuredPlaylistFallbackDismissedId;
-  return typeof dismissedId === 'string' && dismissedId.trim().length > 0
-    ? dismissedId
-    : null;
-}
-
-export function getFeaturedPlaylistFallbackCandidate(
-  settings: Record<string, unknown> | null | undefined
-): FeaturedPlaylistFallbackCandidate | null {
-  const parsed = featuredPlaylistFallbackCandidateSchema.safeParse(
-    settings?.featuredPlaylistFallbackCandidate
-  );
-  return parsed.success ? parsed.data : null;
-}
-
-export function getConfirmedFeaturedPlaylistFallback(
-  settings: Record<string, unknown> | null | undefined
-): ConfirmedFeaturedPlaylistFallback | null {
-  const parsed = confirmedFeaturedPlaylistFallbackSchema.safeParse(
-    settings?.featuredPlaylistFallback
-  );
-  return parsed.success ? parsed.data : null;
-}
+export type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback-data';
+export {
+  getConfirmedFeaturedPlaylistFallback,
+  getFeaturedPlaylistFallbackCandidate,
+} from '@/lib/profile/featured-playlist-fallback-data';
 
 export async function refreshFeaturedPlaylistFallbackCandidate(input: {
   readonly profileId: string;

@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 // icon buttons (used by DrawerEditableTextField triggers + actions) to
 // canonical focus rings + DS subtle motion. Predecessor: rot 21 InlineEditRow.
 export const INLINE_ICON_BUTTON_BASE_CLASSNAME =
-  'h-auto w-auto shrink-0 rounded-full border border-transparent bg-transparent p-0.5 text-secondary-token leading-none shadow-none transition-[opacity,background-color,color,box-shadow] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) [&_svg]:block';
+  'relative h-auto min-h-10 w-auto min-w-10 shrink-0 rounded-full border border-transparent bg-transparent p-0.5 text-secondary-token leading-none shadow-none transition-[opacity,background-color,color,box-shadow,transform] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) [&_svg]:block';
 
 export const INLINE_ICON_BUTTON_VISIBLE_CLASSNAME =
   'p-0.5 opacity-60 hover:opacity-100 focus-visible:opacity-100';

@@ -40,6 +40,21 @@ describe('DrawerEditableTextField', () => {
     });
   });
 
+  it('renders compact copy actions that match metadata row density', () => {
+    render(
+      <DrawerEditableTextField
+        label='UPC'
+        value='5054227019579'
+        copyValue='5054227019579'
+        density='inline'
+      />
+    );
+
+    const copyButton = screen.getByLabelText('Copy UPC');
+    expect(copyButton.className).toContain('min-h-6');
+    expect(copyButton.className).toContain('min-w-6');
+  });
+
   it('copies the current value from display mode', async () => {
     render(
       <DrawerEditableTextField

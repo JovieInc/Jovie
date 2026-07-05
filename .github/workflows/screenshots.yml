@@ -63,7 +63,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           token: ${{ steps.app-token.outputs.token }}
 
@@ -174,11 +174,13 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
-            # Re-enable auto-merge (GitHub disables it on force-push)
-            gh pr merge --auto --squash "$EXISTING_PR" 2>/dev/null || true
+            # Re-apply merge-queue label (idempotent; Graphite enqueues by label)
+            # Graphite enqueues by label; native auto-merge retired
+            gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
-            gh pr merge --auto --squash "$PR_URL" || true
+            # Graphite enqueues by label; native auto-merge retired
+            gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
           fi

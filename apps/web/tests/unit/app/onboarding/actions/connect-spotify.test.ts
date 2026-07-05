@@ -32,7 +32,7 @@ const hoisted = vi.hoisted(() => {
   const invalidateProxyUserStateCacheMock = vi
     .fn()
     .mockResolvedValue(undefined);
-  const runBackgroundSyncOperationsMock = vi.fn();
+  const finalizePostOnboardingMock = vi.fn();
   const cookiesSetMock = vi.fn();
   const cookiesMock = vi.fn().mockResolvedValue({ set: cookiesSetMock });
 
@@ -76,7 +76,7 @@ const hoisted = vi.hoisted(() => {
     claimPrebuiltProfileForUserMock,
     invalidateProfileCacheMock,
     invalidateProxyUserStateCacheMock,
-    runBackgroundSyncOperationsMock,
+    finalizePostOnboardingMock,
     cookiesMock,
     cookiesSetMock,
     updateMock,
@@ -187,8 +187,8 @@ vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: hoisted.trackServerEventMock,
 }));
 
-vi.mock('@/app/onboarding/actions/sync', () => ({
-  runBackgroundSyncOperations: hoisted.runBackgroundSyncOperationsMock,
+vi.mock('@/app/onboarding/actions/post-onboarding', () => ({
+  finalizePostOnboarding: hoisted.finalizePostOnboardingMock,
 }));
 
 vi.mock('@/lib/cache/tags', () => ({
@@ -365,7 +365,7 @@ describe('connectOnboardingSpotifyArtist', () => {
     );
   });
 
-  it('runs background sync after direct-profile claim finalization', async () => {
+  it('finalizes post-onboarding work after direct-profile claim finalization', async () => {
     queueOwnedProfile();
     queueNoExistingClaim();
     queueLatestSettings({ spotifyImportStatus: 'importing' });
@@ -413,7 +413,7 @@ describe('connectOnboardingSpotifyArtist', () => {
         path: '/',
       })
     );
-    expect(hoisted.runBackgroundSyncOperationsMock).toHaveBeenCalledWith(
+    expect(hoisted.finalizePostOnboardingMock).toHaveBeenCalledWith(
       'clerk_123',
       'artist'
     );

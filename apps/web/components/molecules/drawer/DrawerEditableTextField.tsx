@@ -205,7 +205,7 @@ export const DrawerEditableTextField = React.memo(
               aria-label={`Edit ${label}`}
               className={cn(
                 'h-8 w-full rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
-                monospace && 'font-mono tracking-[0.02em]',
+                monospace && 'font-mono tracking-wider',
                 inputClassName
               )}
             />
@@ -222,7 +222,7 @@ export const DrawerEditableTextField = React.memo(
                     // removing horizontal inset. The hover chip sits over the
                     // text area so editable and static rows share the same
                     // visual grid.
-                    'h-auto px-0 py-0 rounded-[6px] hover:bg-surface-0'
+                    'h-auto px-0 py-0 rounded-md hover:bg-surface-0'
                   : 'h-8 rounded-lg px-2.5 hover:bg-surface-0',
                 density === 'inline' ? undefined : inputClassName,
                 'border border-transparent bg-transparent shadow-none',
@@ -233,7 +233,7 @@ export const DrawerEditableTextField = React.memo(
               <span
                 className={cn(
                   'block truncate text-app text-primary-token',
-                  monospace && 'font-mono tracking-[0.02em]',
+                  monospace && 'font-mono tracking-wider',
                   !hasValue && 'italic text-tertiary-token',
                   displayClassName,
                   !hasValue && emptyClassName
@@ -248,7 +248,7 @@ export const DrawerEditableTextField = React.memo(
             <span
               className={cn(
                 'block min-w-0 w-full truncate text-app text-primary-token',
-                monospace && 'font-mono tracking-[0.02em]',
+                monospace && 'font-mono tracking-wider',
                 !hasValue && 'italic text-tertiary-token',
                 displayClassName,
                 !hasValue && emptyClassName
@@ -270,7 +270,7 @@ export const DrawerEditableTextField = React.memo(
               ? actionSlotIds.map(slotId => (
                   <span
                     key={`action-slot-placeholder-${slotId}`}
-                    className='h-6 w-6 shrink-0 rounded-[6px] opacity-0'
+                    className='h-6 w-6 shrink-0 rounded-md opacity-0'
                   />
                 ))
               : null}
@@ -282,7 +282,7 @@ export const DrawerEditableTextField = React.memo(
                   handleCopyClick();
                 }}
                 aria-label={copyLabel ?? `Copy ${label}`}
-                className='h-6 w-6 text-tertiary-token'
+                className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
               >
                 {isSuccess ? (
                   <Check className='h-3.5 w-3.5 text-success' />
@@ -302,7 +302,7 @@ export const DrawerEditableTextField = React.memo(
                       target='_blank'
                       rel='noreferrer'
                       aria-label={action.ariaLabel}
-                      className='inline-flex h-6 w-6 items-center justify-center rounded-[6px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+                      className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
                       onClick={event => {
                         event.stopPropagation();
                         action.onClick?.();
@@ -318,7 +318,7 @@ export const DrawerEditableTextField = React.memo(
                         action.onClick?.();
                       }}
                       aria-label={action.ariaLabel}
-                      className='h-6 w-6 text-tertiary-token'
+                      className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
                     >
                       {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
                     </DrawerInlineIconButton>

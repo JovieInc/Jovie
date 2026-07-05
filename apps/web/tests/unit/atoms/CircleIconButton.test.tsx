@@ -33,7 +33,7 @@ describe('CircleIconButton', () => {
       </CircleIconButton>
     );
     const button = screen.getByRole('button', { name: 'Action' });
-    expect(button).toHaveClass('h-8', 'w-8');
+    expect(button).toHaveClass('h-10', 'w-10');
   });
 
   it('applies sm size classes by default', () => {
@@ -43,7 +43,7 @@ describe('CircleIconButton', () => {
       </CircleIconButton>
     );
     const button = screen.getByRole('button', { name: 'Action' });
-    expect(button).toHaveClass('h-9', 'w-9');
+    expect(button).toHaveClass('h-10', 'w-10');
   });
 
   it('applies md size classes', () => {
@@ -119,7 +119,7 @@ describe('CircleIconButton', () => {
     expect(button).toHaveClass('my-custom-class');
   });
 
-  it('keeps shared press feedback free of decorative transforms', () => {
+  it('keeps shared hover feedback free of decorative transforms', () => {
     const variants = [
       'surface',
       'frosted',
@@ -140,7 +140,7 @@ describe('CircleIconButton', () => {
         name: `${variant} action`,
       });
       expect(button.className).not.toMatch(
-        /\b(?:transition-all|duration-\d+|active:scale|active:translate|transform|motion-reduce:transform-none)\b/
+        /\b(?:transition-all|duration-\d+|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
       );
       unmount();
     }

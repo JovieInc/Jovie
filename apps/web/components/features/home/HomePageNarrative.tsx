@@ -2,8 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Container } from '@/components/site/Container';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import type { FeaturedCreator } from '@/lib/featured-creators';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { fillToMinimum } from './featured-creators-fallback';
 import { HomeAdaptiveProfileStory } from './HomeAdaptiveProfileStory';
 import { HomeAutoNotifySection } from './HomeAutoNotifySection';
@@ -36,7 +36,7 @@ export function FinalCallToAction({
       aria-labelledby='final-cta-headline'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px] text-center'>
+        <div className='mx-auto max-w-300 text-center'>
           <h2
             id='final-cta-headline'
             data-testid='final-cta-headline'

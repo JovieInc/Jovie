@@ -19,6 +19,7 @@ const {
   mockSentryAddBreadcrumb,
   mockCreateClerkClient,
   mockClerkGetUser,
+  mockGetServerClerkClient,
 } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
   mockCachedCurrentUser: vi.fn(),
@@ -35,6 +36,7 @@ const {
   mockSentryAddBreadcrumb: vi.fn(),
   mockCreateClerkClient: vi.fn(),
   mockClerkGetUser: vi.fn(),
+  mockGetServerClerkClient: vi.fn(),
 }));
 
 // =============================================================================
@@ -43,7 +45,7 @@ const {
 vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: mockCachedAuth,
+  getOptionalAuth: mockCachedAuth,
   getCachedCurrentUser: mockCachedCurrentUser,
 }));
 
@@ -133,6 +135,10 @@ vi.mock('@sentry/nextjs', () => ({
 
 vi.mock('@clerk/backend', () => ({
   createClerkClient: mockCreateClerkClient,
+}));
+
+vi.mock('@/lib/auth/request-clerk-client', () => ({
+  getServerClerkClient: mockGetServerClerkClient,
 }));
 
 // =============================================================================
@@ -265,9 +271,11 @@ describe('@critical gate.ts', () => {
     // Default: no fake timers needed since we mock setTimeout in retry tests
     mockIsWaitlistGateEnabled.mockResolvedValue(false);
     mockClerkGetUser.mockResolvedValue({ emailAddresses: [] });
-    mockCreateClerkClient.mockReturnValue({
+    const clerkBackendClient = {
       users: { getUser: mockClerkGetUser },
-    });
+    };
+    mockCreateClerkClient.mockReturnValue(clerkBackendClient);
+    mockGetServerClerkClient.mockResolvedValue(clerkBackendClient);
     setupNonBlockedStatus();
     mockResolveProfileState.mockReturnValue({
       state: CanonicalUserState.NEEDS_ONBOARDING,
@@ -299,6 +307,58 @@ describe('@critical gate.ts', () => {
       expect(result.dbUserId).toBeNull();
       expect(result.redirectTo).toBe('/signin');
       expect(result.context.isAdmin).toBe(false);
+    });
+
+    it('prefetches waitlist gate status before the auth gate DB query finishes', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: 'clerk_parallel_gate' });
+      mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
+
+      const callOrder: string[] = [];
+
+      mockIsWaitlistGateEnabled.mockImplementation(async () => {
+        callOrder.push('gate');
+        return true;
+      });
+
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockImplementation(async () => {
+                callOrder.push('db');
+                return [
+                  mockDbUserResult({
+                    profileId: 'profile-123',
+                    profileOnboardingCompletedAt: new Date(),
+                  }),
+                ];
+              }),
+            }),
+          }),
+        }),
+      });
+
+      await resolveUserState();
+
+      expect(callOrder).toEqual(['gate', 'db']);
+      expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
+    });
+
+    it('fetches waitlist gate status only once for existing users', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
+      mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
+      mockDbSelect.mockReturnValue(
+        createJoinSelectChain([
+          mockDbUserResult({
+            profileId: 'profile-123',
+            profileOnboardingCompletedAt: new Date(),
+          }),
+        ])
+      );
+
+      await resolveUserState();
+
+      expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
     });
 
     it('returns ACTIVE for a fully set up user with complete profile', async () => {
@@ -727,8 +787,8 @@ describe('@critical gate.ts', () => {
       expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
     });
 
-    it('throws TypeError when createDbUserIfMissing is true but no email', async () => {
-      delete process.env.CLERK_SECRET_KEY;
+    it('returns USER_CREATION_FAILED when createDbUserIfMissing is true but no email', async () => {
+      mockGetServerClerkClient.mockResolvedValue(null);
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
         emailAddresses: [],
@@ -737,14 +797,17 @@ describe('@critical gate.ts', () => {
       // No DB user found
       mockDbSelect.mockReturnValue(createJoinSelectChain([]));
 
-      await expect(resolveUserState()).rejects.toThrow(
-        'Email is required for user creation'
-      );
+      const result = await resolveUserState();
+
+      expect(result.state).toBe(CanonicalUserState.USER_CREATION_FAILED);
+      expect(result.redirectTo).toBe('/error/user-creation-failed');
+      expect(result.context.errorCode).toBe('EMAIL_REQUIRED_FOR_USER_CREATION');
       expect(mockCaptureError).toHaveBeenCalled();
+      expect(mockDbInsert).not.toHaveBeenCalled();
     });
 
     it('does not create a DB user from an unverified primary email', async () => {
-      delete process.env.CLERK_SECRET_KEY;
+      mockGetServerClerkClient.mockResolvedValue(null);
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
         emailAddresses: [
@@ -760,11 +823,57 @@ describe('@critical gate.ts', () => {
 
       mockDbSelect.mockReturnValue(createJoinSelectChain([]));
 
-      await expect(resolveUserState()).rejects.toThrow(
-        'Email is required for user creation'
-      );
+      const result = await resolveUserState();
+
+      expect(result.state).toBe(CanonicalUserState.USER_CREATION_FAILED);
+      expect(result.context.errorCode).toBe('EMAIL_REQUIRED_FOR_USER_CREATION');
       expect(mockDbInsert).not.toHaveBeenCalled();
       expect(mockCaptureError).toHaveBeenCalled();
+    });
+
+    it('resolves verified email via host-aware Clerk backend on staging hosts (JOV-2776)', async () => {
+      mockGetServerClerkClient.mockResolvedValue({
+        users: {
+          getUser: mockClerkGetUser.mockResolvedValueOnce({
+            emailAddresses: [
+              {
+                emailAddress: 'staging-native@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
+          }),
+        },
+      });
+      mockIsWaitlistGateEnabled.mockResolvedValue(true);
+
+      let selectCallCount = 0;
+      mockDbSelect.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return createJoinSelectChain([]);
+        }
+        if (selectCallCount === 2) {
+          return createSimpleSelectChain([
+            { id: 'waitlist-entry-123', status: 'claimed' },
+          ]);
+        }
+        if (selectCallCount === 3) {
+          return createJoinSelectChain([]);
+        }
+        return createSimpleSelectChain([
+          { userStatus: 'waitlist_approved', deletedAt: null },
+        ]);
+      });
+      mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
+
+      const result = await resolveUserState({ knownClerkUserId: 'clerk_123' });
+
+      expect(mockGetServerClerkClient).toHaveBeenCalled();
+      expect(mockCachedAuth).not.toHaveBeenCalled();
+      expect(mockCachedCurrentUser).not.toHaveBeenCalled();
+      expect(result.dbUserId).toBe('new-user-id');
+      expect(result.context.email).toBe('staging-native@example.com');
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
     });
 
     it('uses joined profile data when resolving canonical state', async () => {

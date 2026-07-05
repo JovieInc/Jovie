@@ -361,4 +361,83 @@ describe('electron-bridge — defensive guards', () => {
       bridgeMethod: 'getDictationStatus',
     });
   });
+
+  describe('setDesktopTrayState / onDesktopTrayAction — tray bridge', () => {
+    it('setDesktopTrayState silently no-ops when electronAPI is absent', async () => {
+      await expect(
+        __testing.setDesktopTrayState('idle')
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('setDesktopTrayState silently no-ops when setTrayState is missing (stale binary)', async () => {
+      setElectronAPI({ versions: { app: '0.1.0' } });
+      await expect(
+        __testing.setDesktopTrayState('active', 3)
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('setDesktopTrayState calls the bridge with state + unreadCount', async () => {
+      const setTrayState = vi.fn().mockResolvedValue({ ok: true });
+      setElectronAPI({ setTrayState });
+
+      await __testing.setDesktopTrayState('unread', 5);
+      expect(setTrayState).toHaveBeenCalledWith({
+        state: 'unread',
+        unreadCount: 5,
+      });
+    });
+
+    it('setDesktopTrayState omits unreadCount when not provided', async () => {
+      const setTrayState = vi.fn().mockResolvedValue({ ok: true });
+      setElectronAPI({ setTrayState });
+
+      await __testing.setDesktopTrayState('idle');
+      expect(setTrayState).toHaveBeenCalledWith({
+        state: 'idle',
+        unreadCount: undefined,
+      });
+    });
+
+    it('onDesktopTrayAction returns a noop unsubscribe when electronAPI is absent', () => {
+      const cb = vi.fn();
+      const unsub = __testing.onDesktopTrayAction(cb);
+      expect(typeof unsub).toBe('function');
+      expect(() => unsub()).not.toThrow();
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it('onDesktopTrayAction returns a noop unsubscribe when onTrayAction is missing', () => {
+      setElectronAPI({ versions: { app: '0.1.0' } });
+      const cb = vi.fn();
+      const unsub = __testing.onDesktopTrayAction(cb);
+      expect(typeof unsub).toBe('function');
+      expect(() => unsub()).not.toThrow();
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it('onDesktopTrayAction wires up the bridge listener and returns an unsubscribe', () => {
+      const mockUnsub = vi.fn();
+      const onTrayAction = vi.fn().mockReturnValue(mockUnsub);
+      setElectronAPI({ onTrayAction });
+
+      const cb = vi.fn();
+      const unsub = __testing.onDesktopTrayAction(cb);
+
+      expect(onTrayAction).toHaveBeenCalledWith(cb);
+      expect(typeof unsub).toBe('function');
+      unsub();
+      expect(mockUnsub).toHaveBeenCalledTimes(1);
+    });
+
+    it('onDesktopTrayAction falls back to noop when bridge returns non-function', () => {
+      const onTrayAction = vi.fn().mockReturnValue(undefined);
+      setElectronAPI({ onTrayAction });
+
+      const unsub = __testing.onDesktopTrayAction(vi.fn());
+      expect(typeof unsub).toBe('function');
+      expect(() => unsub()).not.toThrow();
+    });
+  });
 });

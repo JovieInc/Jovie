@@ -28,7 +28,10 @@ test.describe('Pricing Page', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
-    await page.goto('/pricing', { timeout: SMOKE_TIMEOUTS.NAVIGATION });
+    await page.goto('/pricing', {
+      waitUntil: 'domcontentloaded',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
     await waitForHydration(page);
   });
 
@@ -47,7 +50,7 @@ test.describe('Pricing Page', () => {
       })
     ).toBeVisible();
 
-    // Check that pricing tiers are visible
+    // Check that the canonical pricing tiers are visible
     await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
       'Free'
     );
@@ -58,7 +61,19 @@ test.describe('Pricing Page', () => {
       'Pro'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Waitlist'
+      'Recommended'
+    );
+    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
+      'Start Free Trial'
+    );
+    await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
+      'Max'
+    );
+    await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
+      'Full stack'
+    );
+    await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
+      'Start Free Trial'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
@@ -76,10 +91,15 @@ test.describe('Pricing Page', () => {
     await expect(freeTierCta).toHaveAttribute('href', /\/signup\?plan=free/);
     await expect(
       page.getByTestId('marketing-pricing-plan-pro').getByRole('link', {
-        name: 'Request Access',
+        name: 'Start Free Trial',
       })
     ).toHaveAttribute('href', '/signup?plan=pro');
-    const requestAccessButtonsOnGrid = await page
+    await expect(
+      page.getByTestId('marketing-pricing-plan-max').getByRole('link', {
+        name: 'Start Free Trial',
+      })
+    ).toHaveAttribute('href', '/signup?plan=max');
+    const pricingCardCtasAreCentered = await page
       .locator('.marketing-pricing-plan-card')
       .evaluateAll(cards =>
         cards.map(card => {
@@ -98,7 +118,7 @@ test.describe('Pricing Page', () => {
           );
         })
       );
-    expect(requestAccessButtonsOnGrid).toEqual([true, true]);
+    expect(pricingCardCtasAreCentered).toEqual([true, true, true]);
     await expect(
       page.getByRole('link', { name: 'Explore Artist Profiles' }).first()
     ).toBeVisible();

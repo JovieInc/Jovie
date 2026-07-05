@@ -16,7 +16,7 @@ export const authClerkLocalization = {
       title: 'Welcome back',
       subtitle: '',
       actionText: 'No account?',
-      actionLink: 'Request access',
+      actionLink: 'Create your account',
     },
     password: {
       title: 'Enter your password.',
@@ -40,7 +40,7 @@ export const authClerkLocalization = {
   },
   signUp: {
     start: {
-      title: 'Request access',
+      title: 'Create your account',
       subtitle: '',
       actionText: 'Have an account?',
       actionLink: 'Sign in',

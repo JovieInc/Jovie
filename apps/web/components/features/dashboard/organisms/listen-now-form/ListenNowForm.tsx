@@ -85,7 +85,7 @@ function ConnectedArtistBadge({
           className='rounded-full object-cover'
         />
       )}
-      <span className='max-w-[140px] truncate text-xs text-secondary-token'>
+      <span className='max-w-35 truncate text-xs text-secondary-token'>
         {info.artistName}
       </span>
       <CheckCircle2 className='h-3.5 w-3.5 text-green-500 shrink-0' />
@@ -95,7 +95,7 @@ function ConnectedArtistBadge({
           target='_blank'
           rel='noopener noreferrer'
           className='rounded-full p-1 text-tertiary-token'
-          aria-label='Open profile'
+          aria-label='Open Profile'
         >
           <ExternalLink className='h-3 w-3' />
         </InlineIconButton>
@@ -208,7 +208,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               />
             </div>
             <div className='flex flex-1 items-center gap-3 min-w-0'>
-              <span className='w-[100px] shrink-0 text-app font-medium text-primary-token'>
+              <span className='w-25 shrink-0 text-app font-medium text-primary-token'>
                 Spotify
               </span>
               {connectedDspInfo.spotify ? (
@@ -241,7 +241,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               <button
                 type='button'
                 onClick={() => openSearchPalette('spotify')}
-                className='shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
+                className='shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token'
               >
                 Search
               </button>
@@ -264,7 +264,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               />
             </div>
             <div className='flex flex-1 items-center gap-3 min-w-0'>
-              <span className='w-[100px] shrink-0 text-app font-medium text-primary-token'>
+              <span className='w-25 shrink-0 text-app font-medium text-primary-token'>
                 Apple Music
               </span>
               {connectedDspInfo.apple_music ? (
@@ -297,7 +297,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               <button
                 type='button'
                 onClick={() => openSearchPalette('apple_music')}
-                className='shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
+                className='shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token'
               >
                 Search
               </button>
@@ -333,7 +333,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                 aria-hidden
               />
             </div>
-            <span className='w-[100px] shrink-0 text-app font-medium text-primary-token'>
+            <span className='w-25 shrink-0 text-app font-medium text-primary-token'>
               YouTube
             </span>
             <Input
@@ -419,7 +419,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                         updateAdditionalLink(index, 'platform', value)
                       }
                     >
-                      <SelectTrigger className='w-[140px] shrink-0'>
+                      <SelectTrigger className='w-35 shrink-0'>
                         <SelectValue placeholder='Platform' />
                       </SelectTrigger>
                       <SelectContent>
@@ -442,7 +442,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                     </Select>
 
                     {dspInfo && (
-                      <span className='text-xs text-secondary truncate max-w-[120px] shrink-0'>
+                      <span className='text-xs text-secondary truncate max-w-30 shrink-0'>
                         {dspInfo.artistName}
                       </span>
                     )}
@@ -515,7 +515,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
       {success && (
         <ContentSurfaceCard className='border-emerald-500/20 bg-emerald-500/5 p-3'>
           <p className='text-sm text-emerald-600 dark:text-emerald-400'>
-            Music links saved successfully!
+            Music links saved!
           </p>
         </ContentSurfaceCard>
       )}

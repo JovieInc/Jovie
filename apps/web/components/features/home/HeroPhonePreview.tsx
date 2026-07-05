@@ -53,7 +53,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
 
           {/* Artist identity */}
           <div className='flex flex-col items-center px-5 pb-2'>
-            <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
+            <div className='rounded-full p-1 ring-1 ring-white/6 shadow-sm'>
               <Avatar
                 src={MOCK_ARTIST.image}
                 alt={MOCK_ARTIST.name}
@@ -71,7 +71,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
                 showLink={false}
                 as='p'
               />
-              <p className='mt-0.5 text-[11px] text-tertiary-token tracking-[0.2em] uppercase'>
+              <p className='mt-0.5 text-2xs text-tertiary-token tracking-[0.2em] uppercase'>
                 Artist
               </p>
             </div>
@@ -89,7 +89,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
 
           {/* Branding */}
           <div className='pb-3 pt-1 text-center'>
-            <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
+            <p className='text-3xs uppercase tracking-[0.15em] text-secondary-token'>
               Powered by Jovie
             </p>
           </div>
@@ -97,10 +97,10 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
       </div>
 
       <div className='flex flex-col items-center gap-1.5 text-center'>
-        <p className='text-[12px] font-medium text-secondary-token'>
+        <p className='text-xs font-medium text-secondary-token'>
           Smart artist profile
         </p>
-        <p className='max-w-[15rem] text-[11px] leading-5 text-tertiary-token'>
+        <p className='max-w-[15rem] text-2xs leading-5 text-tertiary-token'>
           New fans can subscribe fast. Returning fans get the next best action.
         </p>
       </div>
@@ -116,7 +116,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
             'inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.18)',
         }}
       >
-        <span className='text-[12px] text-tertiary-token'>
+        <span className='text-xs text-tertiary-token'>
           {'jov.ie/'}
           <span className='font-semibold text-secondary-token'>
             {displayHandle}

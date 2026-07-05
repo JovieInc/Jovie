@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
 import {
   SidebarProvider,
@@ -49,6 +50,7 @@ function AuthShellInner({
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state: sidebarState } = useSidebar();
+  const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
   const headerActionsState = useOptionalHeaderActions();
@@ -115,8 +117,8 @@ function AuthShellInner({
       audioPlayer={audioPlayer}
       mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
-      isTableRoute={isTableRoute}
       variant={shellVariant}
+      composerFocusActive={isComposerFocused && !isMobile}
     />
   );
 }

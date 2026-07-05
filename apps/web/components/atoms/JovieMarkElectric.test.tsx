@@ -55,4 +55,14 @@ describe('JovieMarkElectric', () => {
       );
     }
   });
+
+  it('uses a stable caller-provided id seed for SVG filters', () => {
+    const { container } = render(<JovieMarkElectric idSeed='stable-logo' />);
+    expect(container.querySelector('filter')?.getAttribute('id')).toBe(
+      'jve-filter-stable-logo'
+    );
+    expect(
+      container.querySelector('path[stroke-dasharray]')?.getAttribute('filter')
+    ).toBe('url(#jve-filter-stable-logo)');
+  });
 });

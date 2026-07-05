@@ -13,6 +13,11 @@ import {
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useAppFlag } from '@/lib/flags/client';
+import {
+  isLibraryApprovalStatus,
+  type LibraryApprovalStatus,
+} from '@/lib/library/approval-status';
+import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
@@ -33,11 +38,27 @@ export type ReleaseCatalogView = 'list' | 'assets';
 interface ReleaseCatalogPageClientProps {
   readonly view: ReleaseCatalogView;
   readonly merchCards?: readonly LibraryMerchCard[];
+  readonly approvalStatusByAssetId?: Readonly<Record<string, string>>;
+  readonly assetShareByAssetId?: Readonly<
+    Record<string, LibraryAssetShareViewModel>
+  >;
+}
+
+function toApprovalStatusMap(
+  approvalStatusByAssetId: Readonly<Record<string, string>>
+): ReadonlyMap<string, LibraryApprovalStatus> {
+  const entries = Object.entries(approvalStatusByAssetId).flatMap(
+    ([assetId, status]) =>
+      isLibraryApprovalStatus(status) ? [[assetId, status] as const] : []
+  );
+  return new Map(entries);
 }
 
 export function ReleaseCatalogPageClient({
   view,
   merchCards = [],
+  approvalStatusByAssetId = {},
+  assetShareByAssetId = {},
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -94,11 +115,32 @@ export function ReleaseCatalogPageClient({
       selectedProfile?.username ??
       'Artist';
 
+    const approvalStatusMap = toApprovalStatusMap(approvalStatusByAssetId);
+    const artistHandle =
+      selectedProfile?.usernameNormalized?.trim() ||
+      selectedProfile?.username?.trim() ||
+      null;
+
+    const withShare = (
+      asset: ReturnType<typeof buildLibraryReleaseAssets>[number]
+    ) => ({
+      ...asset,
+      share: assetShareByAssetId[asset.id] ?? null,
+    });
+
     return (
       <LibrarySurface
+        profileId={profileId}
+        artistHandle={artistHandle}
         assets={[
-          ...buildLibraryReleaseAssets(releases),
-          ...buildLibraryMerchAssets(merchCards, artistName),
+          ...buildLibraryReleaseAssets(releases, approvalStatusMap).map(
+            withShare
+          ),
+          ...buildLibraryMerchAssets(
+            merchCards,
+            artistName,
+            approvalStatusMap
+          ).map(withShare),
         ]}
       />
     );
@@ -119,7 +161,7 @@ export function ReleaseCatalogPageClient({
           refetch();
         }}
         secondaryAction={{
-          label: 'Refresh page',
+          label: 'Refresh Page',
           onClick: () => globalThis.location.reload(),
         }}
         extraContext={{ Profile: profileId }}

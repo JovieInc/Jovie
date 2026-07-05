@@ -138,7 +138,7 @@ async function submitEmail(
   const input = flow.locator('[data-testid="mobile-email-input"]').first();
   await input.fill(email);
 
-  const submitBtn = emailStep.getByRole('button', { name: /^continue$/i });
+  const submitBtn = emailStep.getByRole('button', { name: /^submit$/i });
   await expect(submitBtn).toBeEnabled();
 
   if (options.waitForSubscribe) {

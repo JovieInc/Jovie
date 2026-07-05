@@ -436,7 +436,9 @@ This project has evolved through several migrations:
 
 ## Contributing
 
-1. **Fork** the repository
+> **Internal team only.** JovieInc/Jovie is a proprietary codebase made public solely to use GitHub Actions CI minutes on the free tier. External contributions are not accepted.
+
+1. **Clone** the repository (no fork needed — push directly to feature branches)
 2. **Create branch** - `feat/your-feature` or `fix/your-bug`
 3. **Commit format** - Use conventional commits:
    - `feat:` - New features
@@ -451,6 +453,16 @@ This project has evolved through several migrations:
 - **CodeRabbit** - Automated AI code review
 - **Required Checks** - Typecheck, lint, fast tests
 - **Auto-Merge** - Enabled for Dependabot and approved PRs
+
+### PR Freshness / Conflict Handling
+
+Use the hardened PR conflict handler in dry-run mode before touching stale PRs:
+
+```bash
+node scripts/pr-conflict-handler.mjs --dry-run --max-concurrent 2
+```
+
+It classifies open PRs as `DIRTY`, `BEHIND`, `BLOCKED`, `UNSTABLE`, or `MERGEABLE`, orders safe work by base-branch dependency and diff size, respects in-flight CI, and caps CI-heavy re-triggers for the Neon pool. See [docs/pr-conflict-handler.md](docs/pr-conflict-handler.md) for apply-mode guardrails.
 
 ## Support
 
@@ -470,6 +482,8 @@ This project has evolved through several migrations:
 This project is proprietary and confidential. All rights reserved by Jovie Technology Inc.
 
 See [LICENSE](LICENSE) for full terms. Unauthorized copying, distribution, or use of this software is strictly prohibited.
+
+> **Note:** This repository is public only to use GitHub Actions CI minutes on the free tier. It is not an open-source project. See [docs/REPO-POLICY.md](docs/REPO-POLICY.md) for the full public/private repo policy.
 
 ### Release Versioning & Changelog
 

@@ -182,8 +182,10 @@ these, not redefine them.
     - Tailwind: `duration-cinematic ease-cinematic`
   - Raw durations and easings in route code are forbidden (will be enforced in
     Wave 4).
-- **Canonical button variants** — TBD by the Wave 1 audit; this section will
-  link forward to the Wave 1 PR once it lands.
+- **Canonical button variants** — `primary`, `secondary`, `tertiary`, `ghost`,
+  and `link`; destructive styling is `destructive`, not a variant.
+- **Canonical button sizes** — `sm` = 28px, `md` = 36px, `lg` = 44px; `icon`
+  uses the `md` control height with equal width.
 
 ## Common Failure Modes
 

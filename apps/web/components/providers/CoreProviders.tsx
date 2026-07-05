@@ -275,6 +275,28 @@ const THEME_ENABLED_PREFIXES = [
 
 type CoreProviderVariant = 'full' | 'homepage' | 'public';
 
+function isElectronRuntime(): boolean {
+  if (typeof document !== 'undefined') {
+    if (document.documentElement.dataset.desktopRuntime === 'electron') {
+      return true;
+    }
+  }
+
+  if (typeof navigator !== 'undefined') {
+    if (/JovieDesktop\//.test(navigator.userAgent)) {
+      return true;
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    return (
+      new URLSearchParams(window.location.search).get('runtime') === 'electron'
+    );
+  }
+
+  return false;
+}
+
 export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
   if (pathname === '/') {
     return 'homepage';
@@ -299,12 +321,14 @@ export function CoreProviders({
   const isHomepageVariant = variant === 'homepage';
   const isPublicVariant = variant === 'public';
   const isTestRuntime = env.IS_TEST || env.IS_E2E;
+  const isElectronRuntimeApp = isElectronRuntime();
   const enableAnalytics = useMemo(
     () =>
       !isTestRuntime &&
+      !isElectronRuntimeApp &&
       pathname !== '/' &&
       !MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix)),
-    [isTestRuntime, pathname]
+    [isElectronRuntimeApp, isTestRuntime, pathname]
   );
 
   if (isHomepageVariant) {

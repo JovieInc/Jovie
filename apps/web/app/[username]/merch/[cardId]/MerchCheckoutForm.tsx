@@ -83,13 +83,13 @@ export function MerchCheckoutForm({
   }
 
   return (
-    <div className='flex min-h-[328px] flex-col rounded-[8px] border border-white/12 bg-black/30 p-4 text-white shadow-[0_22px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-5'>
+    <div className='flex min-h-82 flex-col rounded-lg border border-white/12 bg-black/30 p-4 text-white dark:text-white shadow-[0_22px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-5'>
       <div className='flex items-start justify-between gap-4'>
         <div>
-          <p className='text-[11px] font-semibold uppercase leading-none text-white/54 [letter-spacing:0]'>
+          <p className='text-2xs font-semibold uppercase leading-none text-white/54 [letter-spacing:0]'>
             US shipping
           </p>
-          <p className='mt-2 text-[26px] font-semibold leading-none text-white [letter-spacing:0]'>
+          <p className='mt-2 text-2xl font-semibold leading-none text-white dark:text-white [letter-spacing:0]'>
             {formatPrice(card.retailPriceCents)}
           </p>
         </div>
@@ -97,7 +97,7 @@ export function MerchCheckoutForm({
       </div>
 
       <div className='mt-6'>
-        <p className='text-[12px] font-medium text-white/62'>Size</p>
+        <p className='text-xs font-medium text-white/62'>Size</p>
         <div className='mt-2 grid grid-cols-2 gap-2'>
           {variantKeys.map(variantKey => (
             <button
@@ -105,10 +105,10 @@ export function MerchCheckoutForm({
               key={variantKey}
               onClick={() => setSelectedVariantKey(variantKey)}
               className={cn(
-                'h-11 rounded-[6px] border text-[13px] font-semibold capitalize transition-[background-color,border-color,color] duration-subtle',
+                'h-11 rounded-md border text-app font-semibold capitalize transition-[background-color,border-color,color] duration-subtle',
                 selectedVariantKey === variantKey
-                  ? 'border-white bg-white text-black'
-                  : 'border-white/12 bg-white/[0.04] text-white hover:border-white/24 hover:bg-white/[0.07]'
+                  ? 'border-white bg-white dark:bg-surface-1 text-black dark:text-white'
+                  : 'border-white/12 bg-white/[0.04] text-white dark:text-white hover:border-white/24 hover:bg-white/[0.07]'
               )}
             >
               {variantLabel(variantKey)}
@@ -118,31 +118,31 @@ export function MerchCheckoutForm({
       </div>
 
       <div className='mt-5'>
-        <p className='text-[12px] font-medium text-white/62'>Quantity</p>
-        <div className='mt-2 flex h-11 w-36 items-center justify-between rounded-[6px] border border-white/12 bg-white/[0.04] px-1'>
+        <p className='text-xs font-medium text-white/62'>Quantity</p>
+        <div className='mt-2 flex h-11 w-36 items-center justify-between rounded-md border border-white/12 bg-white/[0.04] px-1'>
           <button
             type='button'
-            aria-label='Decrease quantity'
+            aria-label='Decrease Quantity'
             onClick={() => setQuantity(current => Math.max(1, current - 1))}
-            className='flex h-9 w-9 items-center justify-center rounded-[5px] text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
+            className='flex h-9 w-9 items-center justify-center rounded-md text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
           >
             <Minus className='h-4 w-4' />
           </button>
-          <span className='w-8 text-center text-[14px] font-semibold text-white'>
+          <span className='w-8 text-center text-sm font-semibold text-white dark:text-white'>
             {quantity}
           </span>
           <button
             type='button'
-            aria-label='Increase quantity'
+            aria-label='Increase Quantity'
             onClick={() => setQuantity(current => Math.min(5, current + 1))}
-            className='flex h-9 w-9 items-center justify-center rounded-[5px] text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
+            className='flex h-9 w-9 items-center justify-center rounded-md text-white/72 transition-colors duration-subtle hover:bg-white/10 hover:text-white'
           >
             <Plus className='h-4 w-4' />
           </button>
         </div>
       </div>
 
-      <div className='mt-6 space-y-2 border-t border-white/10 pt-4 text-[13px]'>
+      <div className='mt-6 space-y-2 border-t border-white/10 pt-4 text-app'>
         <div className='flex justify-between gap-4 text-white/64'>
           <span>Item subtotal</span>
           <span>{formatPrice(subtotal)}</span>
@@ -151,7 +151,7 @@ export function MerchCheckoutForm({
           <span>Standard shipping</span>
           <span>{formatPrice(shippingEstimate)}</span>
         </div>
-        <div className='flex justify-between gap-4 pt-1 text-[15px] font-semibold text-white'>
+        <div className='flex justify-between gap-4 pt-1 text-mid font-semibold text-white dark:text-white'>
           <span>Total before tax</span>
           <span>{formatPrice(total)}</span>
         </div>
@@ -161,17 +161,17 @@ export function MerchCheckoutForm({
         type='button'
         disabled={isSubmitting || !selectedVariantKey}
         onClick={submitCheckout}
-        className='mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-[6px] bg-white px-4 text-[14px] font-semibold text-black transition-opacity duration-subtle hover:opacity-92 disabled:pointer-events-none disabled:opacity-55'
+        className='mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-md bg-white dark:bg-surface-1 px-4 text-sm font-semibold text-black dark:text-white transition-opacity duration-subtle hover:opacity-92 disabled:pointer-events-none disabled:opacity-55'
       >
         {isSubmitting ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
         Checkout
       </button>
 
-      <div className='min-h-[36px] pt-3'>
+      <div className='min-h-9 pt-3'>
         {error ? (
-          <p className='text-[12px] leading-5 text-red-200'>{error}</p>
+          <p className='text-xs leading-5 text-red-200'>{error}</p>
         ) : (
-          <p className='text-[12px] leading-5 text-white/48'>
+          <p className='text-xs leading-5 text-white/48'>
             Produced after payment clears.
           </p>
         )}

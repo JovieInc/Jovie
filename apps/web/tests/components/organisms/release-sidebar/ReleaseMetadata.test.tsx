@@ -149,13 +149,13 @@ describe('ReleaseMetadata canvas status', () => {
     renderReleaseMetadata(buildRelease({ canvasStatus: 'uploaded' }));
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getByText('Has video')).toBeInTheDocument();
+    expect(screen.getByText('Has Video')).toBeInTheDocument();
   });
 
   it('shows ready to upload when canvas is generated', () => {
     renderReleaseMetadata(buildRelease({ canvasStatus: 'generated' }));
 
-    expect(screen.getByText('Ready to upload')).toBeInTheDocument();
+    expect(screen.getByText('Ready To Upload')).toBeInTheDocument();
   });
 
   it('falls back to not-set badge for unknown canvas status values', () => {
@@ -166,14 +166,14 @@ describe('ReleaseMetadata canvas status', () => {
     );
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getAllByText('Has video').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Has Video').length).toBeGreaterThanOrEqual(1);
   });
 
   it('defaults to not-set badge when canvas status is missing', () => {
     renderReleaseMetadata(buildRelease({ canvasStatus: undefined }));
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getAllByText('Has video').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Has Video').length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -186,8 +186,8 @@ describe('ReleaseMetadata copyright labels', () => {
       })
     );
 
-    expect(screen.getByText('℗')).toBeInTheDocument();
-    expect(screen.getByText('©')).toBeInTheDocument();
+    expect(screen.getByText('P-line')).toBeInTheDocument();
+    expect(screen.getByText('C-line')).toBeInTheDocument();
     expect(screen.getByText('℗ 2020 To Mine Limited')).toBeInTheDocument();
     expect(screen.getByText('© 2020 To Mine Limited')).toBeInTheDocument();
   });
@@ -200,8 +200,8 @@ describe('ReleaseMetadata copyright labels', () => {
       })
     );
 
-    expect(screen.queryByText('℗')).not.toBeInTheDocument();
-    expect(screen.getByText('©')).toBeInTheDocument();
+    expect(screen.queryByText('P-line')).not.toBeInTheDocument();
+    expect(screen.getByText('C-line')).toBeInTheDocument();
     expect(screen.getByText('© 2020 To Mine Limited')).toBeInTheDocument();
   });
 

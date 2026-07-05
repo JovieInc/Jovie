@@ -49,7 +49,7 @@ export function ReleaseMomentDrawer({
         >
           <SheetHeader>
             <div className='flex items-center gap-2'>
-              <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+              <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
                 {MOMENT_LABEL[moment.momentType]}
               </span>
               <span className='text-xs text-(--linear-text-tertiary)'>
@@ -82,7 +82,7 @@ export function ReleaseMomentDrawer({
                         </span>
                         · <span className='font-medium'>{task.title}</span>
                       </span>
-                      <span className='text-[11px] text-(--linear-text-tertiary)'>
+                      <span className='text-2xs text-(--linear-text-tertiary)'>
                         {task.category} · due {dueDate}
                       </span>
                     </div>
@@ -117,7 +117,7 @@ function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
         <h3 className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
           Fan notification
         </h3>
-        <span className='rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300'>
+        <span className='rounded-full bg-emerald-500/15 px-2 py-0.5 text-3xs font-semibold uppercase text-emerald-300'>
           {notif.channel}
         </span>
       </div>
@@ -125,7 +125,7 @@ function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
         {notif.headline}
       </p>
       <p className='text-xs text-(--linear-text-secondary)'>{notif.body}</p>
-      <p className='text-[11px] text-(--linear-text-tertiary)'>
+      <p className='text-2xs text-(--linear-text-tertiary)'>
         Sends Friday {notif.sendsAt}
       </p>
     </section>

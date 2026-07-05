@@ -1,6 +1,6 @@
-import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
-import { generateObject } from '@/lib/ai/sdk';
+import { gateway, generateObject } from '@/lib/ai/sdk';
+import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
 import { INSIGHT_MODEL } from '@/lib/constants/ai-models';
 import type { GeneratedInsight, MetricSnapshot } from '@/types/insights';
 import { buildSystemPrompt, buildUserPrompt } from './prompts';
@@ -65,7 +65,8 @@ export interface InsightGenerationResult {
  */
 export async function generateInsights(
   metrics: MetricSnapshot,
-  existingInsightTypes: string[]
+  existingInsightTypes: string[],
+  identity?: AiTelemetryIdentity
 ): Promise<InsightGenerationResult> {
   const { object, usage } = await generateObject({
     model: gateway(INSIGHT_MODEL),
@@ -74,13 +75,13 @@ export async function generateInsights(
     prompt: buildUserPrompt(metrics, existingInsightTypes),
     temperature: 0.3,
     maxOutputTokens: 4096,
-    experimental_telemetry: {
-      isEnabled: true,
+    experimental_telemetry: buildAiTelemetry({
+      functionId: 'jovie-insight-generator',
+      identity,
+      metadata: { model: INSIGHT_MODEL },
       recordInputs: true,
       recordOutputs: true,
-      functionId: 'jovie-insight-generator',
-      metadata: { model: INSIGHT_MODEL },
-    },
+    }),
   });
 
   // Filter out low-confidence insights

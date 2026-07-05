@@ -301,7 +301,7 @@ function TaskReleasePanelStatus({
     <EntitySidebarShell
       isOpen
       width={344}
-      ariaLabel='Release details'
+      ariaLabel='Release Details'
       title='Release'
       onClose={onClose}
       scrollStrategy='shell'
@@ -505,7 +505,7 @@ function TaskMetaMenuNumber({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <TaskMetaTrigger ariaLabel='Open task controls'>
+        <TaskMetaTrigger ariaLabel='Open Task Controls'>
           <span className='inline-flex items-center gap-1 text-2xs font-semibold text-tertiary-token'>
             <span className='shrink-0'>J-{task.taskNumber}</span>
             <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -667,10 +667,10 @@ function TaskDocumentPanel({
                 <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-secondary-token'>
                   <FileText className='h-5 w-5' />
                 </div>
-                <h2 className='mt-5 text-[21px] font-semibold tracking-[-0.03em] text-primary-token'>
-                  Pick a task from the list to see what it needs.
+                <h2 className='mt-5 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
+                  Pick A Task From The List To See What It Needs.
                 </h2>
-                <p className='mt-2 text-[13px] leading-relaxed text-tertiary-token'>
+                <p className='mt-2 text-app leading-relaxed text-tertiary-token'>
                   Open a task to review its status, metadata, due state, and
                   body in the detail pane.
                 </p>
@@ -708,7 +708,7 @@ function TaskDocumentPanel({
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task status'>
+                  <TaskMetaTrigger ariaLabel='Change Task Status'>
                     <TaskStageInline task={task} withChevron />
                   </TaskMetaTrigger>
                 </DropdownMenuTrigger>
@@ -736,7 +736,7 @@ function TaskDocumentPanel({
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task priority'>
+                  <TaskMetaTrigger ariaLabel='Change Task Priority'>
                     <TaskPriorityInline priority={task.priority} withChevron />
                   </TaskMetaTrigger>
                 </DropdownMenuTrigger>
@@ -764,7 +764,7 @@ function TaskDocumentPanel({
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <TaskMetaTrigger ariaLabel='Change task assignee'>
+                  <TaskMetaTrigger ariaLabel='Change Task Assignee'>
                     <TaskAssigneeInline
                       assigneeKind={task.assigneeKind}
                       artistName={artistName}
@@ -822,7 +822,7 @@ function TaskDocumentPanel({
                 <button
                   type='button'
                   onClick={onClose}
-                  aria-label='Back to task list'
+                  aria-label='Back To Task List'
                   className='inline-flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
                 >
                   <ArrowLeft className='h-4 w-4' />
@@ -834,12 +834,12 @@ function TaskDocumentPanel({
               <textarea
                 ref={descriptionEditorRef}
                 id='task-context-editor'
-                aria-label='Task description'
+                aria-label='Task Description'
                 value={description}
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
                 placeholder='Start writing...'
-                className='min-h-[520px] w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+                className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
                 style={{ boxShadow: 'none' }}
               />
               {showDescriptionHelper && descriptionHelper ? (
@@ -878,10 +878,10 @@ function TaskTitleEditor({
         ref={textareaRef}
         value={value}
         rows={1}
-        aria-label='Task title'
+        aria-label='Task Title'
         onChange={event => onChange(event.target.value)}
-        placeholder='Untitled Task'
-        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+        placeholder='Untitled Task' // ui-casing-allow: default task title placeholder
+        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',
@@ -925,7 +925,7 @@ function TaskEmptyState({
           ? 'Try widening the filters or search query.'
           : 'Create your first task, or tasks will appear automatically when you set up a release.'
       }
-      className='min-h-[360px]'
+      className='min-h-90'
       action={
         hasFilters ? (
           <Button
@@ -970,20 +970,34 @@ function TaskLoadingState() {
         <ShellListRowFrame
           key={row.key}
           interaction='none'
-          className='group/row grid min-h-16 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5'
+          data-testid='task-loading-row'
+          className='group/row flex min-h-16 items-center gap-3 px-3 py-1.5'
         >
-          <div className='skeleton h-4 w-4 rounded-full' />
-          <div className='min-w-0 space-y-2'>
+          <span className='flex shrink-0 items-center'>
+            <div className='skeleton h-5 w-5 rounded-full' aria-hidden='true' />
+          </span>
+
+          <div className='min-w-0 flex-1'>
             <div
-              className='skeleton h-3.5 rounded'
+              className='skeleton h-3.5 max-w-full rounded'
               style={{ width: row.titleWidth }}
+              aria-hidden='true'
             />
+            <div className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
+              <div
+                className='skeleton h-3 rounded'
+                style={{ width: row.metaWidth }}
+                aria-hidden='true'
+              />
+            </div>
+          </div>
+
+          <div className='flex shrink-0 items-center justify-end'>
             <div
-              className='skeleton h-3 rounded'
-              style={{ width: row.metaWidth }}
+              className='skeleton h-5 w-14 rounded-full'
+              aria-hidden='true'
             />
           </div>
-          <div className='skeleton h-5 w-14 rounded-full' />
         </ShellListRowFrame>
       ))}
     </div>
@@ -1000,7 +1014,7 @@ function TaskErrorState({
       <TableEmptyState
         title="Couldn't Load Tasks"
         description='Try reloading the task list.'
-        className='min-h-[240px] max-w-[28rem]'
+        className='min-h-60 max-w-[28rem]'
         action={
           <Button type='button' variant='secondary' size='sm' onClick={onRetry}>
             Retry
@@ -1058,6 +1072,7 @@ function MobileTaskSection({
   artistName,
   onOpenTask,
   onOpenRelease,
+  showAssignee,
 }: Readonly<{
   title: string;
   tasks: ReadonlyArray<TaskView>;
@@ -1065,6 +1080,7 @@ function MobileTaskSection({
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
   onOpenRelease: (task: TaskView) => void;
+  showAssignee: boolean;
 }>) {
   if (tasks.length === 0) {
     return null;
@@ -1076,7 +1092,7 @@ function MobileTaskSection({
         <h2 className='text-2xs font-semibold text-tertiary-token'>{title}</h2>
         <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
       </div>
-      <div className='space-y-1 overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
+      <div className='space-y-1 overflow-hidden rounded-2xl bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
         {tasks.map(task => (
           <MobileTaskListItem
             key={task.id}
@@ -1085,6 +1101,7 @@ function MobileTaskSection({
             onOpenTask={onOpenTask}
             onOpenRelease={onOpenRelease}
             isSelected={task.id === selectedTaskId}
+            showAssignee={showAssignee}
           />
         ))}
       </div>
@@ -1098,12 +1115,14 @@ function MobileTaskListItem({
   onOpenTask,
   onOpenRelease,
   isSelected,
+  showAssignee,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
   onOpenRelease: (task: TaskView) => void;
   isSelected: boolean;
+  showAssignee: boolean;
 }>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const priority = getTaskPriorityVisual(task.priority);
@@ -1135,7 +1154,7 @@ function MobileTaskListItem({
         <span className='block truncate text-sm font-semibold leading-[1.25] text-primary-token'>
           {task.title}
         </span>
-        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-secondary-token'>
+        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-secondary-token'>
           <span className='truncate'>{stage.label}</span>
           <span className='text-tertiary-token'>J-{task.taskNumber}</span>
           <span className='inline-flex items-center gap-1'>
@@ -1145,10 +1164,12 @@ function MobileTaskListItem({
             />
             <span>{priority.label}</span>
           </span>
-          <span className='truncate'>{assignee.label}</span>
+          {showAssignee ? (
+            <span className='truncate'>{assignee.label}</span>
+          ) : null}
         </span>
         {task.releaseTitle ? (
-          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-[10.5px] text-tertiary-token'>
+          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-3xs text-tertiary-token'>
             <Disc3 className='h-3 w-3 shrink-0' />
             <span className='min-w-0 truncate'>{task.releaseTitle}</span>
           </span>
@@ -1246,7 +1267,7 @@ function useTaskActions({
                 ? [
                     {
                       id: 'generate-pitch',
-                      label: 'Generate pitch',
+                      label: 'Generate Pitch',
                       icon: <Sparkles className='h-4 w-4' />,
                       onClick: () => onGeneratePitch(task),
                     } satisfies ContextMenuItemType,
@@ -1960,7 +1981,7 @@ export function TasksPageClient() {
               pills.length > 0
                 ? `Filter Tasks (${pills.length})`
                 : 'Filter Tasks',
-            ariaLabel: 'Filter tasks',
+            ariaLabel: 'Filter Tasks',
             placeholder: 'Search tasks',
             allowedFields: ['title'] as const,
           },
@@ -1973,7 +1994,7 @@ export function TasksPageClient() {
     () => (
       <DashboardHeaderActionGroup>
         <DashboardHeaderActionButton
-          ariaLabel='Create task'
+          ariaLabel='Create Task'
           icon={<Plus className='h-3.5 w-3.5' />}
           label='New Task'
           onClick={() => setHeaderMode('create')}
@@ -1988,27 +2009,40 @@ export function TasksPageClient() {
 
   useRegisterHeaderActions(headerActions);
 
+  const showAssigneeInListRows = assigneeFilter === 'all';
+  const suppressSelectedRowDetailDuplicates =
+    showTaskDocumentPane && Boolean(selectedTask);
+
   const renderTaskCell = useCallback(
-    (info: { row: { original: TaskView } }) => (
-      <TaskListRow
-        task={info.row.original}
-        onOpenRelease={openReleaseSidebar}
-        artistName={artistName}
-        isSelected={info.row.original.id === effectiveSelectedTaskId}
-        actionSlot={
-          <TaskRowActionMenu
-            items={getTaskContextMenuItems(info.row.original)}
-            selected={info.row.original.id === effectiveSelectedTaskId}
-            visibility='hover'
-          />
-        }
-      />
-    ),
+    (info: { row: { original: TaskView } }) => {
+      const isRowSelected = info.row.original.id === effectiveSelectedTaskId;
+
+      return (
+        <TaskListRow
+          task={info.row.original}
+          onOpenRelease={openReleaseSidebar}
+          artistName={artistName}
+          isSelected={isRowSelected}
+          showAssignee={showAssigneeInListRows}
+          hideTitle={suppressSelectedRowDetailDuplicates && isRowSelected}
+          hideDue={suppressSelectedRowDetailDuplicates && isRowSelected}
+          actionSlot={
+            <TaskRowActionMenu
+              items={getTaskContextMenuItems(info.row.original)}
+              selected={isRowSelected}
+              visibility='hover'
+            />
+          }
+        />
+      );
+    },
     [
       artistName,
       effectiveSelectedTaskId,
       getTaskContextMenuItems,
       openReleaseSidebar,
+      showAssigneeInListRows,
+      suppressSelectedRowDetailDuplicates,
     ]
   );
 
@@ -2072,6 +2106,7 @@ export function TasksPageClient() {
         isLoading={isActiveBoardLoading}
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
+        showAssigneeChip={assigneeFilter === 'all'}
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
         onMoveTask={handleMoveTask}
@@ -2126,6 +2161,7 @@ export function TasksPageClient() {
           artistName={artistName}
           onOpenTask={openTaskDocument}
           onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
         />
         <MobileTaskSection
           title='Closed'
@@ -2134,6 +2170,7 @@ export function TasksPageClient() {
           artistName={artistName}
           onOpenTask={openTaskDocument}
           onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
         />
       </>
     );
@@ -2146,6 +2183,7 @@ export function TasksPageClient() {
         artistName={artistName}
         onOpenTask={openTaskDocument}
         onOpenRelease={openReleaseSidebar}
+        showAssignee={assigneeFilter === 'all'}
       />
     );
   }

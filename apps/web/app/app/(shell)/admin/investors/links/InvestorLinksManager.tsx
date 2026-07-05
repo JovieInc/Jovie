@@ -551,7 +551,7 @@ export function InvestorLinksManager() {
             No investor links yet.
           </div>
         ) : (
-          <InvestorTable minWidth='min-w-[700px]'>
+          <InvestorTable minWidth='min-w-175'>
             <InvestorTableHead>
               <InvestorTableHeaderRow>
                 <InvestorTableHeaderCell>Label</InvestorTableHeaderCell>

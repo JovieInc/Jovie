@@ -7,6 +7,7 @@ import {
   type ProfileEditPreview,
   ProfileEditPreviewCard,
 } from '@/components/features/dashboard/organisms/ProfileEditPreviewCard';
+import { resolveToolFailurePresentation } from '@/lib/chat/tool-errors';
 import {
   encodeToolEvents,
   type PersistedToolEvent,
@@ -14,19 +15,28 @@ import {
 import { getToolUiConfig } from '@/lib/chat/tool-ui-registry';
 import { env } from '@/lib/env-client';
 import { addBreadcrumb } from '@/lib/sentry/client-lite';
+import { isVideoRecordingProposalPayload } from '@/lib/teleprompter/types';
 import { cn } from '@/lib/utils';
 import { ChatAlbumArtCard } from './components/ChatAlbumArtCard';
 import { ChatAnalyticsCard } from './components/ChatAnalyticsCard';
+import { ChatArtifactErrorCard } from './components/ChatArtifactErrorCard';
 import { ChatAvatarUploadCard } from './components/ChatAvatarUploadCard';
+import { ChatFeedbackControl } from './components/ChatFeedbackControl';
 import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
+import { ChatMerchActionCard } from './components/ChatMerchActionCard';
 import {
   ChatMerchOptionsCard,
   ChatMerchSelectionCard,
   isChatMerchGenerationResult,
   isChatMerchSelectionResult,
 } from './components/ChatMerchCard';
+import {
+  ChatMerchDesignCarousel,
+  isChatMerchDesignCarouselResult,
+} from './components/ChatMerchDesignCarousel';
 import { ChatPitchCard } from './components/ChatPitchCard';
+import { ChatVideoRecordingProposalCard } from './components/ChatVideoRecordingProposalCard';
 import type {
   ChatInsightsToolResult,
   MessagePart,
@@ -37,11 +47,52 @@ import { isChatAlbumArtToolResult } from './types';
 
 type ToolRendererVariant = 'chat' | 'inline';
 
+/**
+ * Feedback context for 👍/👎 votes on tool/skill results (JOV #11460).
+ * Provided by the authenticated chat surface; absent = controls hidden.
+ */
+export interface ChatToolFeedbackContext {
+  readonly messageId: string;
+  readonly turnId?: string;
+  readonly conversationId?: string;
+}
+
 interface ToolPartsRendererProps {
   readonly parts: readonly MessagePart[];
   readonly profileId?: string;
   readonly variant: ToolRendererVariant;
   readonly hasMessageText?: boolean;
+  readonly feedback?: ChatToolFeedbackContext;
+}
+
+/** Tool states that accept feedback (in-flight work is not votable). */
+const FEEDBACK_ELIGIBLE_STATES: ReadonlySet<PersistedToolEvent['state']> =
+  new Set(['succeeded', 'failed']);
+
+function ToolEventFeedback({
+  event,
+  feedback,
+  className,
+}: Readonly<{
+  event: PersistedToolEvent;
+  feedback: ChatToolFeedbackContext | undefined;
+  className?: string;
+}>) {
+  if (!feedback || !FEEDBACK_ELIGIBLE_STATES.has(event.state)) {
+    return null;
+  }
+
+  return (
+    <ChatFeedbackControl
+      messageId={feedback.messageId}
+      turnId={feedback.turnId}
+      conversationId={feedback.conversationId}
+      toolCallId={event.toolCallId}
+      toolName={event.toolName}
+      excerpt={event.summary ?? undefined}
+      className={className}
+    />
+  );
 }
 
 function isInsightsResult(result: unknown): result is ChatInsightsToolResult {
@@ -91,7 +142,15 @@ function getToolStatusBody(event: PersistedToolEvent): string | undefined {
   switch (event.state) {
     case 'running':
       return event.summary;
-    case 'failed':
+    case 'failed': {
+      const presentation = resolveToolFailurePresentation({
+        toolName: event.toolName,
+        errorCode: event.errorCode,
+        errorMessage: event.errorMessage ?? event.summary,
+        retryable: event.retryable,
+      });
+      return presentation.body;
+    }
     case 'denied':
       return event.errorMessage ?? event.summary;
     case 'needs-approval':
@@ -99,6 +158,19 @@ function getToolStatusBody(event: PersistedToolEvent): string | undefined {
     case 'succeeded':
       return event.summary ?? 'Completed';
   }
+}
+
+function getToolStatusNextStep(event: PersistedToolEvent): string | undefined {
+  if (event.state !== 'failed') {
+    return undefined;
+  }
+
+  return resolveToolFailurePresentation({
+    toolName: event.toolName,
+    errorCode: event.errorCode,
+    errorMessage: event.errorMessage ?? event.summary,
+    retryable: event.retryable,
+  }).nextStep;
 }
 
 const TOOL_STATUS_ICONS: Record<PersistedToolEvent['state'], typeof Loader2> = {
@@ -134,14 +206,17 @@ function ToolActivityRow({
   multiple,
   index,
   count,
+  feedback,
 }: Readonly<{
   event: PersistedToolEvent;
   variant: ToolRendererVariant;
   multiple: boolean;
   index: number;
   count: number;
+  feedback?: ChatToolFeedbackContext;
 }>) {
   const body = getToolStatusBody(event);
+  const nextStep = getToolStatusNextStep(event);
   const isInline = variant === 'inline';
   const isError = event.state === 'failed' || event.state === 'denied';
   const isRunning = event.state === 'running';
@@ -164,7 +239,7 @@ function ToolActivityRow({
           aria-hidden='true'
           data-testid='tool-activity-timeline-line'
           className={cn(
-            'absolute left-[7px] w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
+            'absolute left-2 w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
             index === 0 ? 'top-3.5' : 'top-0',
             index === count - 1 ? 'bottom-[calc(100%_-_14px)]' : 'bottom-0'
           )}
@@ -190,7 +265,7 @@ function ToolActivityRow({
         <div
           title={getToolStatusTitle(event)}
           className={cn(
-            'truncate font-semibold tracking-[-0.01em]',
+            'truncate font-semibold tracking-tight',
             isError && 'text-red-500',
             isInline ? 'text-xs' : 'text-app'
           )}
@@ -207,10 +282,20 @@ function ToolActivityRow({
             {body}
           </div>
         ) : null}
+        {nextStep ? (
+          <div
+            className={cn(
+              'mt-0.5 text-tertiary-token',
+              isInline ? 'line-clamp-2 text-3xs' : 'line-clamp-2 text-2xs'
+            )}
+          >
+            {nextStep}
+          </div>
+        ) : null}
         {showVerboseDetails ? (
           <details
             data-testid='chat-tool-verbose'
-            className='mt-1.5 text-[10.5px] leading-4 text-tertiary-token'
+            className='mt-1.5 text-3xs leading-4 text-tertiary-token'
           >
             <summary className='cursor-pointer select-none text-secondary-token'>
               Verbose tool details
@@ -226,6 +311,11 @@ function ToolActivityRow({
           </details>
         ) : null}
       </div>
+      <ToolEventFeedback
+        event={event}
+        feedback={feedback}
+        className='shrink-0 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100'
+      />
     </div>
   );
 }
@@ -233,9 +323,11 @@ function ToolActivityRow({
 function ToolActivityFeed({
   events,
   variant,
+  feedback,
 }: Readonly<{
   events: readonly PersistedToolEvent[];
   variant: ToolRendererVariant;
+  feedback?: ChatToolFeedbackContext;
 }>) {
   if (events.length === 0) {
     return null;
@@ -249,7 +341,7 @@ function ToolActivityFeed({
       data-tool-count={events.length}
       className={cn(
         'w-full text-primary-token',
-        variant === 'inline' ? 'max-w-full' : 'max-w-[420px]',
+        variant === 'inline' ? 'max-w-full' : 'max-w-105',
         multiple ? 'space-y-0.5' : 'space-y-0'
       )}
     >
@@ -261,6 +353,7 @@ function ToolActivityFeed({
           multiple={multiple}
           index={index}
           count={events.length}
+          feedback={feedback}
         />
       ))}
     </div>
@@ -408,6 +501,21 @@ function renderAlbumArtArtifact(
 }
 
 function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
+  if (event.state === 'running') {
+    return <ChatPitchCard state='loading' />;
+  }
+
+  if (event.state === 'failed') {
+    return (
+      <ChatPitchCard
+        state='error'
+        error={
+          event.errorMessage ?? event.summary ?? 'Pitch generation failed.'
+        }
+      />
+    );
+  }
+
   if (!isPitchOutput(event.output)) {
     return null;
   }
@@ -423,6 +531,9 @@ function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
 }
 
 function renderMerchGenerationArtifact(event: PersistedToolEvent): ReactNode {
+  if (isChatMerchDesignCarouselResult(event.output)) {
+    return <ChatMerchDesignCarousel result={event.output} />;
+  }
   if (!isChatMerchGenerationResult(event.output)) {
     return null;
   }
@@ -430,16 +541,94 @@ function renderMerchGenerationArtifact(event: PersistedToolEvent): ReactNode {
   return <ChatMerchOptionsCard result={event.output} />;
 }
 
-function renderMerchSelectionArtifact(event: PersistedToolEvent): ReactNode {
+function renderMerchSelectionArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
   if (!isChatMerchSelectionResult(event.output)) {
     return null;
   }
 
-  return <ChatMerchSelectionCard result={event.output} />;
+  return <ChatMerchSelectionCard result={event.output} profileId={profileId} />;
+}
+
+interface MerchActionToolResult {
+  readonly success: true;
+  readonly action: 'publish_merch' | 'archive_merch' | 'unpause_merch';
+  readonly merchCardId: string;
+  readonly title: string;
+  readonly currentStatus: string;
+  readonly retailPrice: string;
+}
+
+function isMerchActionResult(result: unknown): result is MerchActionToolResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    (result as { success?: unknown }).success === true &&
+    typeof (result as { action?: unknown }).action === 'string' &&
+    typeof (result as { merchCardId?: unknown }).merchCardId === 'string'
+  );
+}
+
+function merchActionFromToolName(
+  toolName: string
+): 'publish' | 'archive' | 'unpause' | null {
+  switch (toolName) {
+    case 'publishMerchCard':
+      return 'publish';
+    case 'unpauseMerchCard':
+      return 'unpause';
+    case 'deleteOrArchiveMerchCard':
+      return 'archive';
+    default:
+      return null;
+  }
+}
+
+function renderMerchActionArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !isMerchActionResult(event.output)) {
+    return null;
+  }
+
+  const action = merchActionFromToolName(event.toolName);
+  if (!action) return null;
+
+  return (
+    <ChatMerchActionCard
+      profileId={profileId}
+      merchCardId={event.output.merchCardId}
+      action={action}
+      title={event.output.title}
+      currentStatus={event.output.currentStatus}
+      retailPrice={event.output.retailPrice}
+    />
+  );
+}
+
+function renderVideoRecordingArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !isVideoRecordingProposalPayload(event.output)) {
+    return null;
+  }
+
+  return (
+    <ChatVideoRecordingProposalCard
+      profileId={profileId}
+      payload={event.output}
+    />
+  );
 }
 
 const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   proposeAvatarUpload: event => renderAvatarUploadArtifact(event),
+  proposeVideoRecording: (event, profileId) =>
+    renderVideoRecordingArtifact(event, profileId),
   proposeProfileEdit: (event, profileId) =>
     renderProfileEditArtifact(event, profileId),
   proposeSocialLink: (event, profileId) =>
@@ -452,18 +641,61 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   generateReleasePitch: event => renderReleasePitchArtifact(event),
   createMerch: event => renderMerchGenerationArtifact(event),
   previewMerchOptions: event => renderMerchGenerationArtifact(event),
-  selectMerchDesign: event => renderMerchSelectionArtifact(event),
+  selectMerchDesign: (event, profileId) =>
+    renderMerchSelectionArtifact(event, profileId),
+  createMerchAlternativeItem: (event, profileId) =>
+    renderMerchSelectionArtifact(event, profileId),
+  publishMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
+  unpauseMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
+  deleteOrArchiveMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
 };
+
+function renderArtifactFailureCard(
+  event: PersistedToolEvent
+): ReactNode | null {
+  const config = getToolUiConfig(event.toolName);
+  const presentation = resolveToolFailurePresentation({
+    toolName: event.toolName,
+    errorCode: event.errorCode,
+    errorMessage: event.errorMessage ?? event.summary,
+    retryable: event.retryable,
+  });
+
+  return (
+    <ChatArtifactErrorCard
+      title={config.errorTitle ?? `${config.label} Failed`}
+      message={
+        presentation.body === presentation.nextStep
+          ? presentation.body
+          : `${presentation.body} ${presentation.nextStep}`
+      }
+      retryPrompt={`Please retry ${config.label.toLowerCase()}.`}
+      showRetry={presentation.recoverable}
+    />
+  );
+}
 
 function renderArtifactCard(
   event: PersistedToolEvent,
   profileId?: string
 ): ReactNode {
+  const renderer = ARTIFACT_RENDERERS[event.toolName];
+
+  if (event.state === 'failed') {
+    return renderer?.(event, profileId) ?? renderArtifactFailureCard(event);
+  }
+
+  if (event.state === 'running') {
+    return renderer?.(event, profileId) ?? null;
+  }
+
   if (event.state !== 'succeeded') {
     return null;
   }
 
-  const renderer = ARTIFACT_RENDERERS[event.toolName];
   return renderer?.(event, profileId) ?? null;
 }
 
@@ -472,11 +704,13 @@ function renderToolActivityGroups({
   profileId,
   variant,
   hasMessageText,
+  feedback,
 }: Readonly<{
   events: readonly PersistedToolEvent[];
   profileId?: string;
   variant: ToolRendererVariant;
   hasMessageText: boolean;
+  feedback?: ChatToolFeedbackContext;
 }>): ReactNode[] {
   const elements: ReactNode[] = [];
   let statusEvents: PersistedToolEvent[] = [];
@@ -492,7 +726,11 @@ function renderToolActivityGroups({
         key={`activity:${key}`}
         className={cn(hasMessageText && variant === 'chat' && 'mt-2.5')}
       >
-        <ToolActivityFeed events={statusEvents} variant={variant} />
+        <ToolActivityFeed
+          events={statusEvents}
+          variant={variant}
+          feedback={feedback}
+        />
       </div>
     );
     statusEvents = [];
@@ -517,6 +755,11 @@ function renderToolActivityGroups({
         className={cn(hasMessageText && variant === 'chat' && 'mt-3')}
       >
         {artifactCard}
+        <ToolEventFeedback
+          event={event}
+          feedback={feedback}
+          className='mt-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100'
+        />
       </div>
     );
   }
@@ -535,6 +778,7 @@ export function ToolPartsRenderer({
   profileId,
   variant,
   hasMessageText = false,
+  feedback,
 }: ToolPartsRendererProps) {
   const events = useMemo(() => getRenderableToolEvents(parts), [parts]);
   const loggedFallbackToolCallsRef = useRef<Set<string>>(new Set());
@@ -576,6 +820,7 @@ export function ToolPartsRenderer({
         profileId,
         variant,
         hasMessageText,
+        feedback,
       })}
     </>
   );

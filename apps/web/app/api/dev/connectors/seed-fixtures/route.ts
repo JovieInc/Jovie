@@ -1,12 +1,18 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { FIXTURE_BOOKING_EMAILS } from '@/lib/connectors/gmail/__fixtures__/booking-emails';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { storeTokens } from '@/lib/connectors/token-vault';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { connectorAccounts, externalObjects } from '@/lib/db/schema/connectors';
+import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -18,15 +24,12 @@ export const dynamic = 'force-dynamic';
  * LOCAL-ONLY dev endpoint. Seeds fixture Gmail messages + Calendar connector accounts
  * so that `extractAndPropose` can run without real OAuth credentials.
  *
- * Gated by `process.env.NODE_ENV !== 'production'`.
+ * Gated to explicit development environments only.
  * Redirects to settings/connectors with ?connected=mock after seeding.
  */
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'Not available in production' },
-      { status: 403 }
-    );
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson();
   }
 
   const { searchParams, origin } = new URL(request.url);
@@ -58,10 +61,9 @@ export async function GET(request: Request) {
       .insert(connectorAccounts)
       .values({
         userId: dbUser.id,
-        provider: drizzleSql`'gmail'::connector_provider`,
+        provider: CONNECTOR_PROVIDERS.gmail,
         providerAccountId: FIXTURE_EMAIL,
-        status:
-          drizzleSql`'connected'::connector_status` as unknown as 'connected',
+        status: asConnectorStatusSql('connected'),
         scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
         capabilities: { canRead: true, isMock: true },
       })
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
           connectorAccounts.providerAccountId,
         ],
         set: {
-          status: drizzleSql`'connected'::connector_status`,
+          status: asConnectorStatusSql('connected'),
           capabilities: { canRead: true, isMock: true },
           updatedAt: new Date(),
         },
@@ -94,10 +96,9 @@ export async function GET(request: Request) {
       .insert(connectorAccounts)
       .values({
         userId: dbUser.id,
-        provider: drizzleSql`'google_calendar'::connector_provider`,
+        provider: CONNECTOR_PROVIDERS.google_calendar,
         providerAccountId: FIXTURE_EMAIL,
-        status:
-          drizzleSql`'connected'::connector_status` as unknown as 'connected',
+        status: asConnectorStatusSql('connected'),
         scopes: [
           'https://www.googleapis.com/auth/calendar.events.readonly',
           'https://www.googleapis.com/auth/calendar.events',
@@ -111,7 +112,7 @@ export async function GET(request: Request) {
           connectorAccounts.providerAccountId,
         ],
         set: {
-          status: drizzleSql`'connected'::connector_status`,
+          status: asConnectorStatusSql('connected'),
           capabilities: { canRead: true, canWrite: true, isMock: true },
           updatedAt: new Date(),
         },
@@ -135,7 +136,7 @@ export async function GET(request: Request) {
           .insert(externalObjects)
           .values({
             connectorAccountId: gmailAccount.id,
-            provider: drizzleSql`'gmail'::connector_provider`,
+            provider: CONNECTOR_PROVIDERS.gmail,
             kind: 'gmail_message',
             providerId: msg.id,
             payload: {

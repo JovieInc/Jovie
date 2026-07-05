@@ -6,6 +6,7 @@ import type {
   TaskStatus,
 } from '@/lib/tasks/types';
 import type { AccentPaletteName } from '@/lib/ui/accent-palette';
+import { capitalizeFirst } from '@/lib/utils/string-utils';
 
 export interface TaskVisualStage {
   readonly label: string;
@@ -183,3 +184,43 @@ export function getTaskPriorityMeta(
 
 // DEPRECATION: use getTaskAssigneeVisual instead.
 export const getTaskAssigneeMeta = getTaskAssigneeVisual;
+
+/**
+ * Agent statuses where Jovie is actively working the task. These drive
+ * the inline "agent working" glyph on the row so a returning user can
+ * see at a glance which queue items have a live thread. Terminal states
+ * (idle/approved/failed) are excluded — the glyph signals *in-flight*
+ * work, not history.
+ */
+const ACTIVE_AGENT_STATUSES = new Set<TaskAgentStatus>([
+  'queued',
+  'drafting',
+  'awaiting_review',
+]);
+
+export function isTaskAgentWorking(
+  assigneeKind: TaskAssigneeKind,
+  status: TaskStatus,
+  agentStatus: TaskAgentStatus
+): boolean {
+  return (
+    assigneeKind === 'jovie' &&
+    status === 'in_progress' &&
+    ACTIVE_AGENT_STATUSES.has(agentStatus)
+  );
+}
+
+/**
+ * Presentational label for a task category (design / lyric / video /
+ * distribution …). Categories are free-form strings on the task record;
+ * this normalizes whitespace and Title-Cases the first word for display
+ * per the UI casing rules. Returns null when the category is absent or
+ * blank so callers can render nothing without a layout placeholder.
+ */
+export function getTaskCategoryLabel(
+  category: string | null | undefined
+): string | null {
+  const trimmed = category?.trim();
+  if (!trimmed) return null;
+  return capitalizeFirst(trimmed);
+}

@@ -9,12 +9,12 @@ import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatUsageState } from '@/lib/chat-usage/copy';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
+import { formatResetAt, getMonthlyUsage } from '@/lib/chat-usage/metrics';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
-import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { cn } from '@/lib/utils';
 
-const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-[342px]';
+const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-86';
 
 interface UsagePanelShellProps {
   readonly children: ReactNode;
@@ -36,19 +36,6 @@ function UsagePanelShell({ children, className }: UsagePanelShellProps) {
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
-}
-
-function formatResetAt(value: string | null | undefined): string {
-  if (!value) return 'Reset timing unavailable';
-  const resetAt = new Date(value);
-  if (Number.isNaN(resetAt.getTime())) return 'Reset timing unavailable';
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(resetAt);
 }
 
 function getStatusToneClasses(state: ChatUsageState): string {
@@ -73,23 +60,6 @@ function getProgressToneClasses(state: ChatUsageState): string {
   }
 
   return 'bg-error/10 [&::-moz-progress-bar]:bg-error [&::-webkit-progress-bar]:bg-error/10 [&::-webkit-progress-value]:bg-error';
-}
-
-function getMonthlyUsage(data: ChatUsageData): {
-  readonly limit: number;
-  readonly used: number;
-  readonly remaining: number;
-  readonly resetAt: string | null | undefined;
-} {
-  const limit = data.monthlyLimit ?? data.dailyLimit * 30;
-  const used = data.monthlyUsed ?? data.used;
-
-  return {
-    limit,
-    used,
-    remaining: data.monthlyRemaining ?? Math.max(0, limit - used),
-    resetAt: data.monthlyResetAt,
-  };
 }
 
 interface UsageMeterRowProps {
@@ -260,6 +230,7 @@ export function SettingsUsageStatsSection() {
   const copy = getChatUsageCopy(data);
   const showUpgradeCta = copy.state !== 'healthy';
   const monthly = getMonthlyUsage(data);
+  const isStale = data._stale === true;
 
   return (
     <UsagePanelShell>
@@ -271,7 +242,7 @@ export function SettingsUsageStatsSection() {
             </p>
             <span
               className={cn(
-                'inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-medium tracking-[0.01em]',
+                'inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-medium tracking-wide',
                 getStatusToneClasses(copy.state)
               )}
             >
@@ -293,6 +264,18 @@ export function SettingsUsageStatsSection() {
             </Button>
           ))}
       </div>
+
+      {isStale ? (
+        <div className='border-b border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+          <div className='flex items-start gap-2 text-warning'>
+            <AlertCircle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
+            <p className='text-app leading-[18px]'>
+              Usage counts may be cached while billing syncs. Refresh in a
+              moment for the latest quota.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className='divide-y divide-(--linear-app-frame-seam)'>
         <UsageMeterRow

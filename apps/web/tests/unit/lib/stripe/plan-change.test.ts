@@ -54,7 +54,7 @@ vi.mock('@/lib/stripe/config', () => ({
     };
     return mapping[priceId] ?? null;
   }),
-  PRICE_MAPPINGS: {
+  ACTIVE_PRICE_MAPPINGS: {
     price_pro_monthly: {
       priceId: 'price_pro_monthly',
       plan: 'pro',

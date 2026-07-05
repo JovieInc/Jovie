@@ -20,6 +20,8 @@ export function mapProfileWithLinksToCreatorProfile(
     username: result.username,
     display_name: result.displayName,
     bio: result.bio,
+    career_highlights: result.careerHighlights ?? null,
+    target_playlists: result.targetPlaylists ?? null,
     avatar_url: result.avatarUrl,
     spotify_url: result.spotifyUrl,
     apple_music_url: result.appleMusicUrl,
@@ -30,6 +32,7 @@ export function mapProfileWithLinksToCreatorProfile(
     deezer_id: result.deezerId ?? null,
     tidal_id: result.tidalId ?? null,
     soundcloud_id: result.soundcloudId ?? null,
+    musicbrainz_id: result.musicbrainzId ?? null,
     is_public: !!result.isPublic,
     is_verified: !!result.isVerified,
     is_claimed: !!result.isClaimed,
@@ -41,6 +44,7 @@ export function mapProfileWithLinksToCreatorProfile(
     active_since_year: result.activeSinceYear ?? null,
     is_featured: result.isFeatured || false,
     marketing_opt_out: result.marketingOptOut || false,
+    // Canonical metric: CANONICAL_METRICS.profile_views (lib/analytics/metrics.ts)
     profile_views: result.profileViews || 0,
     username_normalized: result.usernameNormalized,
     search_text:

@@ -43,7 +43,7 @@ export function HomepageReleaseVelocityReveal() {
   return (
     <section
       aria-labelledby='homepage-release-velocity-heading'
-      className='relative isolate overflow-hidden bg-[#020303] px-[var(--homepage-page-gutter)] py-20 text-center sm:py-24 lg:py-28'
+      className='relative isolate overflow-hidden bg-(--color-bg-hover) px-[var(--homepage-page-gutter)] py-20 text-center sm:py-24 lg:py-28'
       data-testid='homepage-release-velocity-reveal'
     >
       <div
@@ -61,7 +61,7 @@ export function HomepageReleaseVelocityReveal() {
       >
         <span aria-hidden='true'>
           <RevealWords
-            className='mr-[0.18em] inline-block text-white'
+            className='mr-[0.18em] inline-block text-white dark:text-white'
             testId='homepage-release-velocity-lead'
             text={LEAD_TEXT}
             wrapperClassName='text-white'

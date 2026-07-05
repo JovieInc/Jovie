@@ -82,6 +82,7 @@ export default defineConfig({
       'tests/integration/**',
       'tests/**/*.nightly.test.ts',
       'tests/product-screenshots/**',
+      'tests/visual-qa/**',
       'node_modules/**',
       '.next/**',
       '.stryker-tmp/**',

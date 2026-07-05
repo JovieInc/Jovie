@@ -1,17 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMerchGeneration, selectMerchDesign } from '@/lib/merch/service';
+import {
+  createAlternativeMerchItem,
+  createMerchGeneration,
+  selectMerchDesign,
+} from '@/lib/merch/service';
 import {
   canFulfillMerch,
+  createAlternativeMerchFromCard,
   generateMerchFromConcept,
   previewMerchFromConcept,
   selectAndCreateMerchCard,
 } from './merch-generator';
 
 vi.mock('@/lib/merch/service', () => ({
+  createAlternativeMerchItem: vi.fn(),
   createMerchGeneration: vi.fn(),
   selectMerchDesign: vi.fn(),
 }));
 
+const mockCreateAlternativeMerchItem = vi.mocked(createAlternativeMerchItem);
 const mockCreateMerchGeneration = vi.mocked(createMerchGeneration);
 const mockSelectMerchDesign = vi.mocked(selectMerchDesign);
 
@@ -99,6 +106,28 @@ describe('merch-generator wrappers', () => {
       optionId: null,
       optionNumber: 2,
       publish: true,
+    });
+  });
+
+  it('maps createAlternativeMerchFromCard arguments', async () => {
+    mockCreateAlternativeMerchItem.mockResolvedValueOnce({} as never);
+
+    await createAlternativeMerchFromCard({
+      merchCardId: 'merch_1',
+      profileId: 'profile_5',
+      clerkUserId: 'clerk_5',
+      itemType: 'hoodie',
+      conversationId: 'conversation_5',
+      turnId: 'turn_5',
+    });
+
+    expect(mockCreateAlternativeMerchItem).toHaveBeenCalledWith({
+      merchCardId: 'merch_1',
+      profileId: 'profile_5',
+      clerkUserId: 'clerk_5',
+      itemType: 'hoodie',
+      conversationId: 'conversation_5',
+      turnId: 'turn_5',
     });
   });
 });

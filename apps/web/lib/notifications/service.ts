@@ -5,10 +5,8 @@ import {
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
-import {
-  type SendSmsResult,
-  sendTwilioSms,
-} from '@/lib/notifications/providers/sms/twilio-sender';
+import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms';
+import type { SendSmsResult } from '@/lib/notifications/providers/sms/twilio-sender';
 import { checkQuota, incrementQuota } from '@/lib/notifications/quota';
 import { checkReputation, recordSend } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
@@ -46,7 +44,7 @@ export type SmsSender = (params: {
   body: string;
 }) => Promise<SendSmsResult>;
 
-let smsProvider: SmsSender = ({ to, body }) => sendTwilioSms({ to, body });
+let smsProvider: SmsSender = ({ to, body }) => sendOutboundSms({ to, body });
 
 export const setSmsProvider = (provider: SmsSender) => {
   smsProvider = provider;

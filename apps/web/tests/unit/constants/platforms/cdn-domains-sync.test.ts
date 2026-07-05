@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getAllImageDomainPatterns,
+  getCspConnectSrcDomains,
   getCspImgSrcDomains,
   getDspCdnDomains,
   getImageServingPlatformIds,
@@ -45,6 +46,26 @@ describe('CDN domain registry', () => {
       // Infrastructure domains
       expect(patterns).toContain('img.clerk.com');
       expect(patterns).toContain('*.blob.vercel-storage.com');
+    });
+  });
+
+  describe('getCspConnectSrcDomains', () => {
+    it('prefixes every domain with https://', () => {
+      const domains = getCspConnectSrcDomains();
+      for (const domain of domains) {
+        expect(domain).toMatch(/^https:\/\//);
+      }
+    });
+
+    it('includes vercel.com for chat surface deployment status', () => {
+      const domains = getCspConnectSrcDomains();
+      expect(domains).toContain('https://vercel.com');
+    });
+
+    it('includes Vercel Blob storage for client-side uploads', () => {
+      const domains = getCspConnectSrcDomains();
+      expect(domains).toContain('https://*.blob.vercel-storage.com');
+      expect(domains).toContain('https://*.public.blob.vercel-storage.com');
     });
   });
 

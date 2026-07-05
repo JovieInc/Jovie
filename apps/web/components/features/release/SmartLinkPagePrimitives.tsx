@@ -50,7 +50,7 @@ export function SmartLinkArtworkCard({
   return (
     <div
       className={cn(
-        'relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/[0.08]',
+        'relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 shadow-2xl outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
         className
       )}
     >
@@ -99,7 +99,7 @@ export function SmartLinkPoweredByFooter() {
     <footer className='shrink-0 pb-5 pt-3 text-center'>
       <Link
         href='/'
-        className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
+        className='smart-link-powered-by inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
       >
         <span>Powered by</span>
         <span className='font-semibold'>Jovie</span>

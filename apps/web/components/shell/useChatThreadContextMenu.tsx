@@ -47,7 +47,7 @@ export function useChatThreadContextMenu(
           router.push(APP_ROUTES.CHAT);
         }
       } catch {
-        notifications.error('Could not archive chat');
+        notifications.error('Could not archive conversation');
       }
     },
     [deleteConversation, notifications, options.activeThreadId, router]

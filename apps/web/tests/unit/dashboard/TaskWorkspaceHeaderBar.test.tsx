@@ -91,7 +91,7 @@ vi.mock('@/components/organisms/table/molecules/DisplayMenuDropdown', () => ({
     <div>
       {trigger}
       <button type='button' onClick={() => onViewModeChange?.('list')}>
-        List view
+        List View
       </button>
     </div>
   ),
@@ -146,7 +146,7 @@ describe('TaskWorkspaceHeaderBar', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Display options' })
+      screen.getByRole('button', { name: 'Display Options' })
     ).toBeInTheDocument();
   });
 
@@ -165,7 +165,7 @@ describe('TaskWorkspaceHeaderBar', () => {
 
     render(<TaskWorkspaceHeaderBar {...props} mode='default' />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
+    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
 
     expect(props.onViewModeChange).toHaveBeenCalledWith('list');
   });
@@ -181,12 +181,12 @@ describe('TaskWorkspaceHeaderBar', () => {
       />
     );
 
-    expect(screen.getByLabelText('New task name')).toHaveValue(
+    expect(screen.getByLabelText('New Task Name')).toHaveValue(
       'Draft release plan'
     );
     expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    fireEvent.submit(screen.getByLabelText('New task name').closest('form')!);
+    fireEvent.submit(screen.getByLabelText('New Task Name').closest('form')!);
     expect(props.onSubmitCreate).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));

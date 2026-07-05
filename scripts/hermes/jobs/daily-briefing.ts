@@ -14,10 +14,16 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 import { chat } from '../lib/free-model-router';
+import { gbrainRecall } from '../lib/gbrain';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import {
+  readLatestScoreboard,
+  renderPipelineScoreboard,
+} from '../lib/pipeline-scoreboard';
 import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'daily-briefing';
@@ -122,6 +128,36 @@ function totalPaidSpendYesterday(): number {
   }
 }
 
+export function latestPipelineScoreboard(): string {
+  const scoreboard = readLatestScoreboard(
+    `${HERMES_PATHS.stateDir}/pipeline-scoreboard-latest.json`
+  );
+  return scoreboard ? renderPipelineScoreboard(scoreboard) : '';
+}
+
+export function buildDailyBriefingContext(args: {
+  readonly mergedPrs: ReadonlyArray<{
+    readonly number: number;
+    readonly title: string;
+  }>;
+  readonly voiceMemos: number;
+  readonly dispatches: number;
+  readonly paidSpend: number;
+  readonly pipelineScoreboard?: string;
+}): string {
+  return JSON.stringify(
+    {
+      mergedPrs: args.mergedPrs.map(p => `#${p.number} ${p.title}`),
+      voiceMemosIngested: args.voiceMemos,
+      tasksDispatched: args.dispatches,
+      paidSpendUsd: args.paidSpend,
+      pipelineScoreboard: args.pipelineScoreboard ?? '',
+    },
+    null,
+    2
+  );
+}
+
 async function main(): Promise<void> {
   await withJobLogging(JOB, async () => {
     const { since, until } = yesterdayRange();
@@ -137,28 +173,39 @@ async function main(): Promise<void> {
       until
     );
     const paidSpend = totalPaidSpendYesterday();
+    const pipelineScoreboard = latestPipelineScoreboard();
 
-    const context = JSON.stringify(
-      {
-        mergedPrs: merged.map(p => `#${p.number} ${p.title}`),
-        voiceMemosIngested: voiceMemos,
-        tasksDispatched: dispatches,
-        paidSpendUsd: paidSpend,
-      },
-      null,
-      2
+    const context = buildDailyBriefingContext({
+      mergedPrs: merged,
+      voiceMemos,
+      dispatches,
+      paidSpend,
+      pipelineScoreboard,
+    });
+
+    // Recall durable founder context (priorities, decisions, open threads) so the
+    // brief is memory-aware, not just yesterday's mechanical counts. Soft-degrades to ''.
+    const memory = gbrainRecall(
+      `founder priorities decisions blockers ${merged
+        .map(p => p.title)
+        .join(' ')
+        .slice(0, 200)}`,
+      5
     );
+    const memoryBlock = memory
+      ? `\n\nRelevant long-term context (from gbrain):\n${memory}`
+      : '';
 
     const result = await chat(
       [
         {
           role: 'system',
           content:
-            'You are Hermes, an always-on chief-of-staff for a pre-PMF founder. Write a terse morning briefing (≤200 words, Markdown). Lead with what shipped, then what to focus on today. No emoji except where signaling. Plain language. No filler.',
+            'You are Hermes, an always-on chief-of-staff for a pre-PMF founder. Write a terse morning briefing (≤200 words, Markdown). Lead with what shipped, then what to focus on today. Use the long-term context to connect yesterday to ongoing priorities. No emoji except where signaling. Plain language. No filler.',
         },
         {
           role: 'user',
-          content: `Yesterday's data (UTC):\n\`\`\`json\n${context}\n\`\`\``,
+          content: `Yesterday's data (UTC):\n\`\`\`json\n${context}\n\`\`\`\n\nInclude the pipeline scoreboard as a compact section in the daily digest.${memoryBlock}`,
         },
       ],
       { caller: JOB, need: 'reasoning', maxTokens: 600, temperature: 0.4 }
@@ -177,7 +224,12 @@ async function main(): Promise<void> {
   });
 }
 
-void main().catch(err => {
-  console.error(`[${JOB}] fatal:`, err);
-  process.exit(0);
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  void main().catch(err => {
+    console.error(`[${JOB}] fatal:`, err);
+    process.exit(0);
+  });
+}

@@ -10,6 +10,7 @@
  * - Visual feedback on copy
  */
 
+import { Button } from '@jovie/ui';
 import {
   type MouseEvent,
   useCallback,
@@ -111,7 +112,7 @@ export function CopyLinkInput({
         readOnly
         value={displayValue ?? url}
         onClick={handleInputClick}
-        aria-label='URL to copy'
+        aria-label='URL To Copy'
         data-copied={isCopied ? 'true' : undefined}
         className={cn(
           'system-b-copy-link-input w-full rounded-full border px-2.5 py-1.5 pr-9',
@@ -122,14 +123,19 @@ export function CopyLinkInput({
           inputClassName
         )}
       />
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onClick={handleCopy}
         aria-label={isCopied ? 'Copied to clipboard' : 'Copy to clipboard'}
         title={isCopied ? 'Copied!' : 'Copy to clipboard'}
         data-copied={isCopied ? 'true' : undefined}
         className={cn(
-          'system-b-copy-link-button absolute right-1.5 rounded-full border p-1',
+          'absolute inset-y-0 right-1.5 my-auto h-6 w-6 rounded-full border p-1',
+          isCopied
+            ? 'border-success/20 bg-success-subtle text-success'
+            : 'border-transparent text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
           buttonClassName
         )}
       >
@@ -148,7 +154,7 @@ export function CopyLinkInput({
           />
         </span>
         <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-      </button>
+      </Button>
     </div>
   );
 }

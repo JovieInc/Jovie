@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   extractErrorMetadata,
   getErrorType,
+  getNextStepMessage,
   getPreferredErrorMessage,
   getUserFriendlyMessage,
+  messagePartsIncludeFailedTool,
+  shouldSuppressChatPauseForToolFailure,
 } from '@/components/jovie/utils';
 
 describe('extractErrorMetadata', () => {
@@ -96,6 +99,37 @@ describe('getPreferredErrorMessage', () => {
 
     expect(getPreferredErrorMessage(error, 'server', {})).toBe(
       'Service is temporarily unavailable.'
+    );
+  });
+});
+
+describe('tool failure chat pause suppression', () => {
+  it('detects failed tool parts in assistant messages', () => {
+    expect(
+      messagePartsIncludeFailedTool([
+        {
+          type: 'dynamic-tool',
+          toolName: 'retouchImage',
+          toolCallId: 'tool-1',
+          state: 'output-error',
+          errorText: 'Retouch is not provisioned for this account.',
+        },
+      ])
+    ).toBe(true);
+  });
+
+  it('suppresses composer pause for recoverable tool stream errors', () => {
+    const error = Object.assign(new Error('Retouch provider unavailable'), {
+      code: 'TOOL_UNPROVISIONED',
+    });
+
+    expect(getErrorType(error)).toBe('tool');
+    expect(shouldSuppressChatPauseForToolFailure(error, [])).toBe(true);
+    expect(
+      getUserFriendlyMessage('tool', undefined, 'TOOL_UNPROVISIONED')
+    ).toContain('provisioned');
+    expect(getNextStepMessage('tool', 'TOOL_UNPROVISIONED')).toContain(
+      'workaround'
     );
   });
 });

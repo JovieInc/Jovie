@@ -82,21 +82,22 @@ The `agent-landing-sweep.yml` workflow runs every 15 minutes as a scheduled fall
 
 This catches PRs that the event-driven pipeline missed due to delivery delays or race conditions.
 
-## Linear AI Automation
+## GitHub AI Automation
 
-The Linear automation path uses two workflows:
+The GitHub-native agent path uses two workflows:
 
-- **`linear-ai-orchestrator.yml`**
-  - Trigger: `repository_dispatch` (`linear_todo_ready`) from `/api/webhooks/linear`
-  - Behavior: waits for a CodeRabbit plan marker, assigns the issue to Codex in Linear, runs implementation, pushes a codex/* branch for auto-PR creation, then updates Linear to review
-  - Includes bounded polling with configurable loop counts (`MAX_PLAN_WAIT_ATTEMPTS`, `PLAN_POLL_INTERVAL_SECONDS`)
-  - Burn controls: routine dispatch defaults to `model_tier: economy`; only an explicit
-    `premium` payload preserves the premium path
+- **`github-ai-orchestrator.yml`**
+  - Trigger: `issues.labeled` with `agent-ready`, or `workflow_dispatch` replay
+  - Behavior: claims the issue (`status:in-progress`), runs Claude Code implementation, opens a PR with `Fixes #N`, then moves the issue to `status:in-review`
   - Capacity controls: new agent work is deferred when 5 agent PRs are already open
 
-- **`linear-sync-on-merge.yml`**
+- **`github-ai-dispatcher.yml`**
+  - Trigger: every 15 minutes + `workflow_dispatch`
+  - Behavior: scans open `agent-ready` issues without status labels, dispatches the orchestrator when capacity allows
+
+- **`linear-sync-on-merge.yml`** (parallel-run mirror only)
   - Trigger: `pull_request.closed` (merged)
-  - Behavior: reads Linear markers from PR body, moves issue to done, comments merge details back to Linear
+  - Behavior: reads legacy Linear markers from PR body and syncs the mirror issue to Done until `TRACKER_GITHUB_ONLY=1`
 
 ## Main CI Health Monitor
 
@@ -137,7 +138,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | --- | --- | --- |
 | Fast Gate | Cheap deterministic checks required for every merge candidate. | `ci-fast`, `Unit Tests` |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `Structural Contract`, `CI Risk Classifier` |
-| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)` |
+| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)` |
 | Preview Evidence | Preview deploys and visual/a11y/performance evidence for review. | `Build (public routes)`, `Lighthouse (public routes PR)`, `Lighthouse (dashboard PR)`, `Lighthouse (onboarding PR)`, `Lighthouse (admin PR)`, `Preview Deploy (PR)` |
 | Main Deploy | Post-merge staging, canary, production promotion, and deploy-health gates. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -149,7 +150,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Job | Tier | Local remediation command |
 | --- | --- | --- |
 | `ci-fast` | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
-| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs` |
+| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors` |
 | `CI Risk Classifier` | structural-contract | `pnpm ci:harness:check` |
 | `Unit Tests` | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build (public routes)` | preview-evidence | `pnpm run build:web` |
@@ -158,6 +159,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | `Lighthouse (onboarding PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr` |
 | `Lighthouse (admin PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:admin:pr` |
 | `E2E Smoke (PR Fast Feedback)` | risk-triggered-smoke | `pnpm run test:web:smoke` |
+| `Golden Path (PR)` | risk-triggered-smoke | `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci` |
 | `Preview Deploy (PR)` | preview-evidence | `pnpm run build:web` |
 
 ### Risk-Triggered Evidence

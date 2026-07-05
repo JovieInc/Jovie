@@ -8,9 +8,9 @@
  * generateObject + Zod schema + AI Gateway.
  */
 
-import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
-import { generateObject } from '@/lib/ai/sdk';
+import { gateway, generateObject } from '@/lib/ai/sdk';
+import { type AiTelemetryIdentity, buildAiTelemetry } from '@/lib/ai/telemetry';
 import { PITCH_MODEL } from '@/lib/constants/ai-models';
 import {
   buildPitchDraftSystemPrompt,
@@ -66,7 +66,8 @@ export function truncateToLimit(text: string, limit: number): string {
  */
 export async function generatePitches(
   input: PitchInput,
-  instructions?: string
+  instructions?: string,
+  identity?: AiTelemetryIdentity
 ): Promise<PitchGenerationResult> {
   const { object, usage } = await generateObject({
     model: gateway(PITCH_MODEL),
@@ -75,13 +76,13 @@ export async function generatePitches(
     prompt: buildUserPrompt(input, instructions),
     temperature: 0.4,
     maxOutputTokens: 2048,
-    experimental_telemetry: {
-      isEnabled: true,
+    experimental_telemetry: buildAiTelemetry({
+      functionId: 'jovie-pitch-generator',
+      identity,
+      metadata: { model: PITCH_MODEL },
       recordInputs: true,
       recordOutputs: true,
-      functionId: 'jovie-pitch-generator',
-      metadata: { model: PITCH_MODEL },
-    },
+    }),
   });
 
   // Safety net: hard-cap each pitch to its platform limit
@@ -108,8 +109,9 @@ export async function generatePitchDraft(params: {
   readonly input: PitchInput;
   readonly destination: PitchDestination;
   readonly instructions?: string;
+  readonly identity?: AiTelemetryIdentity;
 }): Promise<PitchDraftGenerationResult> {
-  const { input, destination, instructions } = params;
+  const { input, destination, instructions, identity } = params;
   const { object, usage } = await generateObject({
     model: gateway(PITCH_MODEL),
     schema: pitchDraftResponseSchema,
@@ -117,17 +119,17 @@ export async function generatePitchDraft(params: {
     prompt: buildPitchDraftUserPrompt({ input, destination, instructions }),
     temperature: 0.4,
     maxOutputTokens: 1200,
-    experimental_telemetry: {
-      isEnabled: true,
-      recordInputs: true,
-      recordOutputs: true,
+    experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-pitch-draft-generator',
+      identity,
       metadata: {
         model: PITCH_MODEL,
         target: destination.target,
         platform: destination.platform ?? 'none',
       },
-    },
+      recordInputs: true,
+      recordOutputs: true,
+    }),
   });
 
   return {

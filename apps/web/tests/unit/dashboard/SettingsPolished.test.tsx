@@ -22,9 +22,7 @@ vi.mock('@/features/dashboard/organisms/account-settings', () => ({
 vi.mock('@/features/dashboard/organisms/DataPrivacySection', () => ({
   DataPrivacySection: () => <div>Data Privacy</div>,
 }));
-vi.mock('@/features/dashboard/organisms/SettingsAdminSection', () => ({
-  SettingsAdminSection: () => <div>Admin Settings</div>,
-}));
+
 vi.mock('@/features/dashboard/organisms/SettingsAdPixelsSection', () => ({
   SettingsAdPixelsSection: () => <div>Pixels</div>,
 }));
@@ -100,6 +98,11 @@ describe('SettingsPolished', () => {
     ).toHaveLength(0);
     expect(screen.queryByText('ACCOUNT')).not.toBeInTheDocument();
     expect(screen.getByText('Account', { selector: 'p' })).toBeVisible();
+
+    const accountNavLink = screen.getByRole('link', { name: 'Account' });
+    expect(accountNavLink.className).toContain('h-7');
+    expect(accountNavLink.className).toContain('px-2.5');
+    expect(accountNavLink.className).not.toContain('py-1');
   });
 
   it('keeps the full settings navigation visible when a section is focused', () => {

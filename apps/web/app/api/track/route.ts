@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { writeDailyProfileViews } from '@/lib/analytics/daily-profile-views';
 import type { AudienceSourceType } from '@/lib/audience/activity-types';
 import {
   resolveAudienceClickEventType,
@@ -15,7 +16,7 @@ import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
 } from '@/lib/cookies/consent-state';
-import { db } from '@/lib/db';
+import { db, doesTableExist } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -376,7 +377,8 @@ export async function POST(request: NextRequest) {
       httpReferer && isSameOriginReferrer(httpReferer, request.url)
         ? undefined
         : httpReferer;
-    const geoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
+    const rawGeoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
+    const geoCity = rawGeoCity ? decodeURIComponent(rawGeoCity) : undefined;
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry') ??
@@ -449,6 +451,10 @@ export async function POST(request: NextRequest) {
         })
       : null;
 
+    const hasDailyProfileViewsTable = await doesTableExist(
+      'daily_profile_views'
+    );
+
     const trackingResult = await withSystemIngestionSession(async tx => {
       const metadata = buildClickMetadata(
         target,
@@ -477,6 +483,23 @@ export async function POST(request: NextRequest) {
           audienceMemberId,
         })
         .returning({ id: clickEvents.id });
+
+      // Click implies profile view: keep daily_profile_views in sync when
+      // /api/audience/visit did not fire (e.g. blocked scripts, token failures).
+      if (
+        insertedClickEvent &&
+        !botDetection.isBot &&
+        hasDailyProfileViewsTable
+      ) {
+        const now = new Date();
+        await writeDailyProfileViews(
+          tx,
+          profile.id,
+          now.toISOString().slice(0, 10),
+          now,
+          { route: 'api/track' }
+        );
+      }
 
       if (insertedClickEvent && audienceMemberId) {
         await recordAudienceEvent(tx, {

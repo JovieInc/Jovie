@@ -35,6 +35,7 @@ import { logger } from '@/lib/utils/logger';
 import { createMerchArtwork } from './artwork';
 import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
+import { selectPreferredMockupUrl } from './mockup-urls';
 import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
   buildMerchPresetPriceQuotes,
@@ -271,6 +272,40 @@ function buildOptionSpecs(
   ];
 }
 
+function isMerchDesignLane(value: string): value is MerchDesignLane {
+  return (
+    value === 'band_tour_uniform' ||
+    value === 'fashion_graphic_item' ||
+    value === 'artist_world_artifact'
+  );
+}
+
+function buildAlternativeDesignName(
+  sourceTitle: string,
+  productType: string
+): string {
+  const title = sourceTitle.trim();
+  const lowerTitle = title.toLowerCase();
+  const removableSuffixes = [
+    'tank top',
+    'sweatshirt',
+    't-shirt',
+    'hoodie',
+    'beanie',
+    'shirt',
+    'tee',
+    'cap',
+    'hat',
+  ];
+  const matchedSuffix = removableSuffixes.find(
+    suffix => lowerTitle === suffix || lowerTitle.endsWith(` ${suffix}`)
+  );
+  const baseTitle = matchedSuffix
+    ? title.slice(0, title.length - matchedSuffix.length).trim()
+    : title;
+  return `${baseTitle || title} ${productSuffixFromProductType(productType)}`;
+}
+
 function buildLearningSnapshot(
   spec: MerchOptionSpec,
   garmentColor: string,
@@ -339,7 +374,7 @@ function getDesignOptionSellability(
         option.estimatedPrintfulProductCostCents,
       artistRoyaltyRateBps: option.pricing.artistRoyaltyRateBps,
       pricing: option.pricing,
-      primaryImageUrl: option.mockupUrls[0] ?? '',
+      primaryImageUrl: selectPreferredMockupUrl(option.mockupUrls) ?? '',
       mockupUrls: option.mockupUrls,
       printful,
     }).reasons,
@@ -492,6 +527,54 @@ function calculateRankScore(
   );
 }
 
+function attachPrintfulMockupsAsync(
+  options: readonly MerchDesignOption[]
+): void {
+  void Promise.allSettled(
+    options.map(async option => {
+      const printFileUrl = option.printFileUrls[0];
+      if (!printFileUrl) {
+        logger.warn('[merch-pipeline] skipping mockups without print file', {
+          optionId: option.id,
+        });
+        return;
+      }
+
+      try {
+        const { results, errors } = await generateProductMockups({
+          printFileUrl,
+          catalogProductId: option.printfulCatalogProductId,
+          catalogVariantIds: option.printfulCatalogVariantIds,
+          placements: option.placements,
+          technique: option.technique,
+          productTypes: [option.productType],
+        });
+        const mockupUrls = results.flatMap(result => result.mockupUrls);
+        if (mockupUrls.length > 0) {
+          await attachMockupsToDesignOption(option.id, mockupUrls);
+          logger.info('[merch-pipeline] Printful mockups attached', {
+            optionId: option.id,
+            mockupCount: mockupUrls.length,
+          });
+        } else if (errors.length > 0) {
+          logger.warn('[merch-pipeline] Printful mockup generation failed', {
+            optionId: option.id,
+            errors,
+          });
+        }
+      } catch (error) {
+        logger.warn(
+          '[merch-pipeline] mockup step failed (non-fatal for batch)',
+          {
+            optionId: option.id,
+            err: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
+    })
+  );
+}
+
 export async function createMerchGeneration(params: {
   readonly profileId: string;
   readonly clerkUserId: string;
@@ -534,6 +617,7 @@ export async function createMerchGeneration(params: {
         designName: spec.designName,
         lane: spec.lane,
         concept: spec.concept,
+        productType: catalog.productType,
       });
       const grossMargin =
         pricing.retailPriceCents -
@@ -586,49 +670,7 @@ export async function createMerchGeneration(params: {
 
     // Async Printful photorealistic mockups (non-blocking). Internal artwork mockups
     // are already persisted; Printful URLs are merged when tasks complete.
-    void Promise.allSettled(
-      insertedOptions.map(async option => {
-        const printFileUrl = option.printFileUrls[0];
-        if (!printFileUrl) {
-          logger.warn('[merch-pipeline] skipping mockups without print file', {
-            optionId: option.id,
-          });
-          return;
-        }
-
-        try {
-          const { results, errors } = await generateProductMockups({
-            printFileUrl,
-            catalogProductId: option.printfulCatalogProductId,
-            catalogVariantIds: option.printfulCatalogVariantIds,
-            placements: option.placements,
-            technique: option.technique,
-            productTypes: [option.productType],
-          });
-          const mockupUrls = results.flatMap(result => result.mockupUrls);
-          if (mockupUrls.length > 0) {
-            await attachMockupsToDesignOption(option.id, mockupUrls);
-            logger.info('[merch-pipeline] Printful mockups attached', {
-              optionId: option.id,
-              mockupCount: mockupUrls.length,
-            });
-          } else if (errors.length > 0) {
-            logger.warn('[merch-pipeline] Printful mockup generation failed', {
-              optionId: option.id,
-              errors,
-            });
-          }
-        } catch (error) {
-          logger.warn(
-            '[merch-pipeline] mockup step failed (non-fatal for batch)',
-            {
-              optionId: option.id,
-              err: error instanceof Error ? error.message : String(error),
-            }
-          );
-        }
-      })
-    );
+    attachPrintfulMockupsAsync(insertedOptions);
 
     await db
       .update(merchGenerationBatches)
@@ -745,7 +787,7 @@ export async function selectMerchDesign(params: {
         title: selected.designName,
         description: selected.concept,
         productType: selected.productType,
-        primaryImageUrl: selected.mockupUrls[0] ?? '',
+        primaryImageUrl: selectPreferredMockupUrl(selected.mockupUrls) ?? '',
         mockupUrls: selected.mockupUrls,
         printful,
         currency: 'USD',
@@ -815,6 +857,213 @@ export async function selectMerchDesign(params: {
         ? publishSellability.reasons
         : undefined,
   };
+}
+
+export async function createAlternativeMerchItem(params: {
+  readonly merchCardId: string;
+  readonly profileId: string;
+  readonly clerkUserId: string;
+  readonly itemType: string;
+  readonly conversationId?: string | null;
+  readonly turnId?: string | null;
+}): Promise<
+  MerchSelectionResult & {
+    readonly sourceMerchCardId: string;
+    readonly productType: string;
+    readonly printfulProductName: string;
+  }
+> {
+  await assertCanManageMerchProfile(params.profileId, params.clerkUserId);
+
+  const [sourceCard] = await db
+    .select()
+    .from(merchCards)
+    .where(
+      and(
+        eq(merchCards.id, params.merchCardId),
+        eq(merchCards.creatorProfileId, params.profileId)
+      )
+    )
+    .limit(1);
+
+  if (!sourceCard) {
+    throw new Error('Merch card not found');
+  }
+
+  const [sourceOption] = sourceCard.selectedDesignOptionId
+    ? await db
+        .select()
+        .from(merchDesignOptions)
+        .where(eq(merchDesignOptions.id, sourceCard.selectedDesignOptionId))
+        .limit(1)
+    : [];
+  const printFileUrl =
+    sourceOption?.printFileUrls[0] ?? sourceCard.printful.printFileUrls[0];
+  if (!printFileUrl) {
+    throw new Error('Original merch design has no reusable print file');
+  }
+
+  const profile = await getCreatorProfileForMerch(params.profileId);
+  const releaseContext = await getReleaseContext(params.profileId);
+  const prompt = `Create a ${params.itemType} version of ${sourceCard.title} with the same design.`;
+  const artistBrief = buildArtistBrief(profile, releaseContext, prompt);
+  const generationId = randomUUID();
+
+  await db.insert(merchGenerationBatches).values({
+    id: generationId,
+    creatorProfileId: params.profileId,
+    createdByClerkUserId: params.clerkUserId,
+    chatConversationId: params.conversationId ?? null,
+    chatTurnId: params.turnId ?? null,
+    prompt,
+    command: 'create_merch_alternative_item',
+    artistBrief,
+    status: 'generating',
+  });
+
+  try {
+    const catalog = await resolveMerchCatalogSelection(params.itemType);
+    const { pricing, providerWarnings } = catalog;
+    const grossMargin =
+      pricing.retailPriceCents -
+      pricing.estimatedPrintfulProductCostCents -
+      pricing.stripeFeeEstimateCents -
+      pricing.refundReserveCents;
+    const optionId = randomUUID();
+    const designLane =
+      sourceOption?.designLane ??
+      (isMerchDesignLane(sourceCard.learning.styleLane)
+        ? sourceCard.learning.styleLane
+        : 'fashion_graphic_item');
+    const title = buildAlternativeDesignName(
+      sourceCard.title,
+      catalog.productType
+    );
+    const learning = {
+      ...(sourceOption?.learning ?? sourceCard.learning),
+      garmentColor: catalog.colorway,
+      selectedOverOptionIds: [],
+    };
+
+    const [option] = await db
+      .insert(merchDesignOptions)
+      .values({
+        id: optionId,
+        generationBatchId: generationId,
+        creatorProfileId: params.profileId,
+        optionNumber: 1,
+        status: 'selected',
+        designLane,
+        designName: title,
+        productType: catalog.productType,
+        printfulProductName: catalog.productName,
+        printfulCatalogProductId: catalog.catalogProductId,
+        printfulCatalogVariantIds: catalog.catalogVariantIds,
+        variantMap: catalog.variantMap,
+        colorway: catalog.colorway,
+        availableSizes: catalog.sizes,
+        placements: catalog.placements,
+        technique: catalog.technique,
+        retailPriceCents: pricing.retailPriceCents,
+        estimatedPrintfulProductCostCents:
+          pricing.estimatedPrintfulProductCostCents,
+        estimatedShippingCostCents: pricing.estimatedShippingCostCents,
+        estimatedGrossMarginCents: grossMargin,
+        artistShareCents: pricing.artistPayoutPerUnitEstimateCents,
+        jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
+        pricing,
+        concept: sourceCard.description,
+        whyItFits:
+          sourceOption?.whyItFits ??
+          'It keeps the approved design and moves it onto a different Printful product.',
+        mockupUrls: [],
+        printFileUrls: [printFileUrl],
+        productionWarnings: providerWarnings,
+        qualityReview: sourceOption?.qualityReview ?? {
+          copyrightRisk: 'low',
+          typography: 'deterministic',
+          printFeasible: true,
+        },
+        learning,
+      })
+      .returning();
+
+    const printful = buildPrintfulSnapshot({
+      catalogProductId: option.printfulCatalogProductId,
+      catalogVariantIds: option.printfulCatalogVariantIds,
+      variantMap: option.variantMap,
+      placements: option.placements,
+      technique: option.technique,
+      printFileUrl,
+      availabilityRegion: catalog.availabilityRegion,
+      shippingProfile: catalog.shippingProfile,
+      productName: option.printfulProductName,
+      pricing: option.pricing,
+      providerWarnings,
+    });
+
+    const [card] = await db
+      .insert(merchCards)
+      .values({
+        creatorProfileId: params.profileId,
+        createdByClerkUserId: params.clerkUserId,
+        selectedDesignOptionId: option.id,
+        status: 'draft',
+        title,
+        description: sourceCard.description,
+        productType: option.productType,
+        primaryImageUrl: printFileUrl,
+        mockupUrls: [],
+        printful,
+        currency: 'USD',
+        retailPriceCents: option.retailPriceCents,
+        estimatedPrintfulProductCostCents:
+          option.estimatedPrintfulProductCostCents,
+        estimatedShippingCostCents: option.estimatedShippingCostCents,
+        platformFeeCents: 0,
+        artistRoyaltyRateBps: option.pricing.artistRoyaltyRateBps,
+        artistPayoutPerUnitEstimateCents: option.artistShareCents,
+        jovieMarginPerUnitEstimateCents: option.jovieShareCents,
+        pricing: option.pricing,
+        rankScore: 50,
+        learning,
+      })
+      .returning();
+
+    await db
+      .update(merchGenerationBatches)
+      .set({
+        selectedOptionId: option.id,
+        selectedMerchCardId: card.id,
+        completedAt: new Date(),
+        status: 'ready',
+      })
+      .where(eq(merchGenerationBatches.id, generationId));
+
+    attachPrintfulMockupsAsync([option]);
+
+    return {
+      success: true,
+      merchCardId: card.id,
+      status: card.status,
+      selectedOptionId: option.id,
+      title: card.title,
+      publicUrl: null,
+      sourceMerchCardId: sourceCard.id,
+      productType: option.productType,
+      printfulProductName: option.printfulProductName,
+    };
+  } catch (error) {
+    await db
+      .update(merchGenerationBatches)
+      .set({
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown merch error',
+        completedAt: new Date(),
+      })
+      .where(eq(merchGenerationBatches.id, generationId));
+    throw error;
+  }
 }
 
 export async function publishMerchCard(params: {

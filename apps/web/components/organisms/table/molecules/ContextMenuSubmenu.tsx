@@ -86,7 +86,7 @@ export function ContextMenuSubmenu({
         <div
           className={cn(
             'absolute left-full top-0 ml-1',
-            'min-w-[160px] rounded-md',
+            'min-w-40 rounded-md',
             'bg-surface-1 shadow-lg',
             'p-1',
             'animate-in slide-in-from-left-2 fade-in',

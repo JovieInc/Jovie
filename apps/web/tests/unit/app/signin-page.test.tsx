@@ -10,8 +10,29 @@ const { authShellMock, authLayoutMock, routerPrefetchMock, searchParamsState } =
     searchParamsState: { value: '' },
   }));
 
+const replaceMock = vi.fn();
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
+  useRouter: () => ({
+    replace: replaceMock,
+  }),
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({
+    isLoaded: true,
+    isSignedIn: false,
+  }),
+}));
+
+vi.mock('@/lib/auth/gate', () => ({
+  CanonicalUserState: {
+    UNAUTHENTICATED: 'UNAUTHENTICATED',
+  },
+  resolveUserState: vi.fn().mockResolvedValue({
+    state: 'UNAUTHENTICATED',
+  }),
 }));
 
 vi.mock('@/features/auth', async () => {
@@ -37,18 +58,21 @@ vi.mock('@/features/auth', async () => {
 });
 
 import { APP_ROUTES } from '@/constants/routes';
-import SignInPage from '../../../app/(auth)/signin/page';
+import { SignInPageClient } from '../../../app/(auth)/signin/SignInPageClient';
 
 describe('signin page', () => {
   beforeEach(() => {
     authShellMock.mockReset();
     authLayoutMock.mockReset();
     routerPrefetchMock.mockReset();
+    replaceMock.mockReset();
     searchParamsState.value = '';
+    document.cookie =
+      '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   });
 
   it('renders AuthShell with the expected auth props', () => {
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
@@ -77,7 +101,7 @@ describe('signin page', () => {
   it('passes a valid email query param through to Clerk initialValues', async () => {
     searchParamsState.value = 'email=test%40example.com';
 
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -89,7 +113,7 @@ describe('signin page', () => {
   it('ignores an invalid email query param', async () => {
     searchParamsState.value = 'email=not-an-email';
 
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -106,7 +130,7 @@ describe('signin page', () => {
       '/signin?oauth_error=access_denied'
     );
 
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Sign-in was cancelled. Try again, or pick a different method.'
@@ -125,7 +149,7 @@ describe('signin page', () => {
       '/signin?oauth_error=server_error'
     );
 
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Something went wrong with sign-in. Please try again.'
@@ -135,7 +159,7 @@ describe('signin page', () => {
   it('preserves redirect_url when linking from sign in to sign up', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -149,7 +173,7 @@ describe('signin page', () => {
     searchParamsState.value =
       'desktop_return=%2Fapp%2Fsettings%3Ftab%3Dbilling';
 
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -167,7 +191,7 @@ describe('signin page', () => {
   it('uses mobile_return for mobile browser auth fallback and cross-link', async () => {
     searchParamsState.value = 'mobile_return=%2Fapp%2Fsettings';
 
-    render(<SignInPage />);
+    render(<SignInPageClient />);
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({

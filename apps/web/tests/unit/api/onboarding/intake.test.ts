@@ -317,7 +317,7 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
     expect(res.status).toBe(400);
   });
 
-  it('stores privacy-preserving intake metadata without queueing summarization', async () => {
+  it('persists the validated transcript while keeping intake out of the summary queue', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'User Person',
       username: 'userhandle',
@@ -341,12 +341,12 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
     expect(values).toHaveBeenCalledTimes(2);
     expect(values.mock.calls[0]?.[0]).toMatchObject({
       source: 'onboarding_chat',
-      transcript: [],
+      transcript: VALID_BODY.transcript,
       status: 'dismissed',
     });
     expect(values.mock.calls[1]?.[0]).toMatchObject({
       source: 'onboarding_chat',
-      transcript: [],
+      transcript: VALID_BODY.transcript,
       status: 'dismissed',
       metadata: expect.objectContaining({
         accessOutcome: 'waitlisted_gate_on',
@@ -355,17 +355,44 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
       }),
     });
     expect(onConflictDoUpdate.mock.calls[0]?.[0].set).toMatchObject({
-      transcript: [],
+      transcript: VALID_BODY.transcript,
       status: 'dismissed',
     });
     expect(onConflictDoUpdate.mock.calls[1]?.[0].set).toMatchObject({
-      transcript: [],
+      transcript: VALID_BODY.transcript,
       status: 'dismissed',
       metadata: expect.objectContaining({
         accessOutcome: 'waitlisted_gate_on',
         waitlistEntryId: 'waitlist_entry_1',
       }),
     });
+  });
+
+  it('rejects transcript entries with unknown question ids before persistence', async () => {
+    mockCurrentUser.mockResolvedValue({
+      emailAddresses: [
+        {
+          emailAddress: 'user@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        transcript: [
+          {
+            ...VALID_BODY.transcript[0],
+            questionId: 'not-a-real-step',
+          },
+        ],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
   });
 
   it('creates the intake user without overwriting concurrent status fields', async () => {

@@ -24,19 +24,18 @@ export const DashboardSettings = memo(function DashboardSettings({
 
   if (!artist) {
     return (
-      <div className='mx-auto w-full max-w-[980px] px-3 pb-6 pt-1 sm:px-4 lg:px-5'>
+      <div className='mx-auto w-full max-w-245 px-3 pb-6 pt-1 sm:px-4 lg:px-5'>
         <SettingsErrorState message='Unable to load your profile settings. Please refresh the page.' />
       </div>
     );
   }
 
   return (
-    <div className='mx-auto w-full max-w-[980px] px-3 pb-6 pt-1 sm:px-4 lg:px-5'>
+    <div className='mx-auto w-full max-w-245 px-3 pb-6 pt-1 sm:px-4 lg:px-5'>
       <SettingsPolished
         artist={artist}
         onArtistUpdate={setArtist}
         focusSection={focusSection}
-        isAdmin={dashboardData.isAdmin}
       />
     </div>
   );

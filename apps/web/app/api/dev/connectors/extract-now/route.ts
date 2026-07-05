@@ -4,6 +4,10 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { extractAndPropose } from '@/lib/connectors/extract-and-propose';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -15,14 +19,11 @@ export const dynamic = 'force-dynamic';
  * LOCAL-ONLY dev endpoint. Triggers `extractAndPropose` for the authenticated user.
  * Used by the "Extract now" dev button in /settings/connectors.
  *
- * Gated by `process.env.NODE_ENV !== 'production'`.
+ * Gated to explicit development environments only.
  */
 export async function POST() {
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'Not available in production' },
-      { status: 403 }
-    );
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson();
   }
 
   try {

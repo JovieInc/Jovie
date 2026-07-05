@@ -7,10 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   apiQuery,
   dashboardQuery,
+  executeWithTimeout,
   isPostgresTimeoutError,
   isQueryTimeoutError,
   QUERY_TIMEOUTS,
   QueryTimeoutError,
+  setStatementTimeout,
   withTimeout,
 } from '@/lib/db/query-timeout';
 
@@ -111,6 +113,45 @@ describe('Query Timeout', () => {
       const result = await apiQuery(fastQuery, 'Test API query');
 
       expect(result).toEqual({ data: 'result' });
+    });
+  });
+
+  describe('executeWithTimeout statement_timeout opt-in', () => {
+    it('sets PostgreSQL statement_timeout when db client is provided', async () => {
+      const execute = vi.fn().mockResolvedValue(undefined);
+      const db = { execute } as const;
+
+      await executeWithTimeout(async () => 'ok', 'api', 'Test query', {
+        db,
+        timeoutMs: 5000,
+      });
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      const [statement] = execute.mock.calls[0] as [
+        { queryChunks?: unknown[] },
+      ];
+      expect(JSON.stringify(statement)).toContain('set_config');
+      expect(JSON.stringify(statement)).not.toContain('SET statement_timeout');
+    });
+
+    it('skips PostgreSQL statement_timeout when db client is omitted', async () => {
+      const execute = vi.fn().mockResolvedValue(undefined);
+
+      await executeWithTimeout(async () => 'ok', 'api', 'Test query');
+
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setStatementTimeout', () => {
+    it('rejects invalid timeout values before hitting the database', async () => {
+      const execute = vi.fn().mockResolvedValue(undefined);
+      const db = { execute } as const;
+
+      await expect(setStatementTimeout(db, 0)).rejects.toThrow(
+        'Invalid statement_timeout ms: 0'
+      );
+      expect(execute).not.toHaveBeenCalled();
     });
   });
 

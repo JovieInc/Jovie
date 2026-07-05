@@ -4,6 +4,10 @@ import { ChevronRight } from 'lucide-react';
 import { ContentMetricStat } from '@/components/molecules/ContentMetricStat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import {
+  computeCaptureRate,
+  computeUniqueVisitorShare,
+} from '@/lib/analytics/metrics';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 
 const numberFormatter = new Intl.NumberFormat();
@@ -66,14 +70,15 @@ export function AudienceFunnelMetrics() {
   const uniqueVisitors = data?.unique_users ?? 0;
   const subscribers = data?.subscribers ?? 0;
 
+  // Canonical rate derivations — see lib/analytics/metrics.ts.
   const visitorRate =
     profileViews > 0
-      ? `${Math.round((uniqueVisitors / profileViews) * 100)}% of views`
+      ? `${computeUniqueVisitorShare(uniqueVisitors, profileViews)}% of views`
       : undefined;
 
   const subscriberRate =
     uniqueVisitors > 0
-      ? `${Math.round((subscribers / uniqueVisitors) * 100)}% conversion`
+      ? `${computeCaptureRate(subscribers, uniqueVisitors, 0)}% conversion`
       : undefined;
 
   return (
@@ -85,14 +90,14 @@ export function AudienceFunnelMetrics() {
       />
       <FunnelArrow />
       <FunnelStep
-        label='Visitors'
+        label='Fans'
         value={fmt.format(uniqueVisitors)}
         rate={visitorRate}
         loading={isLoading}
       />
       <FunnelArrow />
       <FunnelStep
-        label='Subscribers'
+        label='Subscribed Fans'
         value={fmt.format(subscribers)}
         rate={subscriberRate}
         loading={isLoading}

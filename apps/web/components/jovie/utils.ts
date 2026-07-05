@@ -1,4 +1,49 @@
+import type { UIMessage } from 'ai';
+
+import {
+  isRecoverableToolErrorCode,
+  isRecoverableToolStreamError,
+  resolveToolFailurePresentation,
+} from '@/lib/chat/tool-errors';
 import type { ChatErrorType, MessagePart } from './types';
+
+/**
+ * Cheap fingerprint for streamed part updates. Avoids JSON.stringify on the hot path.
+ */
+export function getPartsChangeFingerprint(parts: UIMessage['parts']): string {
+  let fingerprint = `${parts.length}:`;
+
+  for (const part of parts) {
+    const type = part.type;
+
+    if (type === 'text' || type === 'reasoning') {
+      const text =
+        'text' in part && typeof part.text === 'string' ? part.text : '';
+      fingerprint += `${type[0]}${text.length}|`;
+      continue;
+    }
+
+    if (type === 'file') {
+      const url = 'url' in part && typeof part.url === 'string' ? part.url : '';
+      fingerprint += `f${url.length}|`;
+      continue;
+    }
+
+    if (
+      typeof type === 'string' &&
+      (type.startsWith('tool-') || type === 'dynamic-tool')
+    ) {
+      const state =
+        'state' in part && typeof part.state === 'string' ? part.state : '';
+      fingerprint += `${type}:${state}|`;
+      continue;
+    }
+
+    fingerprint += `${type}|`;
+  }
+
+  return fingerprint;
+}
 
 /**
  * Extract text content from message parts
@@ -25,6 +70,10 @@ export function getErrorType(error: Error): ChatErrorType {
 
   if (error.name === 'TypeError' && error.message.includes('fetch')) {
     return 'network';
+  }
+
+  if (isRecoverableToolStreamError(error) || isRecoverableToolErrorCode(code)) {
+    return 'tool';
   }
 
   if (status === 429 || code === 'RATE_LIMITED') {
@@ -54,7 +103,8 @@ export function getErrorType(error: Error): ChatErrorType {
  */
 export function getUserFriendlyMessage(
   type: ChatErrorType,
-  retryAfter?: number
+  retryAfter?: number,
+  errorCode?: string
 ): string {
   switch (type) {
     case 'network':
@@ -65,6 +115,14 @@ export function getUserFriendlyMessage(
         : 'Too many requests. Please wait a moment.';
     case 'server':
       return 'We encountered a temporary issue. Please try again.';
+    case 'tool':
+      return (
+        resolveToolFailurePresentation({
+          toolName: 'action',
+          errorCode,
+          errorMessage: null,
+        }).body ?? 'This action could not finish. You can keep chatting.'
+      );
     default:
       return 'Something went wrong. Please try again.';
   }
@@ -73,7 +131,10 @@ export function getUserFriendlyMessage(
 /**
  * Get next step message based on error type
  */
-export function getNextStepMessage(type: ChatErrorType): string {
+export function getNextStepMessage(
+  type: ChatErrorType,
+  errorCode?: string
+): string {
   switch (type) {
     case 'network':
       return 'Check your connection and try again';
@@ -81,9 +142,63 @@ export function getNextStepMessage(type: ChatErrorType): string {
       return 'Wait a moment, then try again';
     case 'server':
       return 'Try again or contact support if this persists';
+    case 'tool':
+      return resolveToolFailurePresentation({
+        toolName: 'action',
+        errorCode,
+        errorMessage: null,
+      }).nextStep;
     default:
       return 'Try again or contact support';
   }
+}
+
+export function messagePartsIncludeFailedTool(
+  parts: readonly MessagePart[]
+): boolean {
+  for (const part of parts) {
+    if (
+      typeof part !== 'object' ||
+      part === null ||
+      !('type' in part) ||
+      typeof part.type !== 'string'
+    ) {
+      continue;
+    }
+
+    if (
+      part.type === 'dynamic-tool' ||
+      (part.type.startsWith('tool-') && part.type !== 'tool-invocation')
+    ) {
+      const state =
+        'state' in part && typeof part.state === 'string' ? part.state : null;
+      if (state === 'output-error') {
+        return true;
+      }
+
+      if (state === 'output-available' && 'output' in part) {
+        const output = part.output;
+        if (
+          typeof output === 'object' &&
+          output !== null &&
+          (output as { success?: unknown }).success === false
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+export function shouldSuppressChatPauseForToolFailure(
+  error: Error,
+  parts: readonly MessagePart[]
+): boolean {
+  return (
+    messagePartsIncludeFailedTool(parts) || isRecoverableToolStreamError(error)
+  );
 }
 
 interface ErrorMetadata {
@@ -189,11 +304,19 @@ export function getPreferredErrorMessage(
 
   const rawMessage = error.message?.trim();
   if (!rawMessage) {
-    return getUserFriendlyMessage(type, metadata.retryAfter);
+    return getUserFriendlyMessage(
+      type,
+      metadata.retryAfter,
+      metadata.errorCode
+    );
   }
 
   if (isJsonLikeErrorMessage(rawMessage)) {
-    return getUserFriendlyMessage(type, metadata.retryAfter);
+    return getUserFriendlyMessage(
+      type,
+      metadata.retryAfter,
+      metadata.errorCode
+    );
   }
 
   return rawMessage;

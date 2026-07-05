@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   getTaskAssigneeVisual,
+  getTaskCategoryLabel,
   getTaskPriorityVisual,
   getTaskStageVisual,
   getTaskStatusVisual,
+  isTaskAgentWorking,
 } from './task-presentation';
 
 describe('task-presentation', () => {
@@ -75,5 +77,30 @@ describe('task-presentation', () => {
       avatarName: 'Tim White',
       accent: 'blue',
     });
+  });
+
+  it('Title-Cases category labels and degrades on blank input', () => {
+    expect(getTaskCategoryLabel('distribution')).toBe('Distribution');
+    expect(getTaskCategoryLabel('  design ')).toBe('Design');
+    expect(getTaskCategoryLabel('')).toBeNull();
+    expect(getTaskCategoryLabel('   ')).toBeNull();
+    expect(getTaskCategoryLabel(null)).toBeNull();
+    expect(getTaskCategoryLabel(undefined)).toBeNull();
+  });
+
+  it('flags the agent-working glyph only for live Jovie in-progress work', () => {
+    expect(isTaskAgentWorking('jovie', 'in_progress', 'drafting')).toBe(true);
+    expect(isTaskAgentWorking('jovie', 'in_progress', 'queued')).toBe(true);
+    expect(isTaskAgentWorking('jovie', 'in_progress', 'awaiting_review')).toBe(
+      true
+    );
+    // Terminal / idle agent states are not "in-flight".
+    expect(isTaskAgentWorking('jovie', 'in_progress', 'idle')).toBe(false);
+    expect(isTaskAgentWorking('jovie', 'in_progress', 'approved')).toBe(false);
+    expect(isTaskAgentWorking('jovie', 'in_progress', 'failed')).toBe(false);
+    // Human-owned or non-active statuses never show the glyph.
+    expect(isTaskAgentWorking('human', 'in_progress', 'drafting')).toBe(false);
+    expect(isTaskAgentWorking('jovie', 'todo', 'drafting')).toBe(false);
+    expect(isTaskAgentWorking('jovie', 'done', 'approved')).toBe(false);
   });
 });

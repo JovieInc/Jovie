@@ -56,7 +56,7 @@ function SidebarSuggestionItem({
     <button
       type='button'
       className={cn(
-        'flex w-full min-h-[44px] items-center gap-2.5 px-3 py-2.5 text-left text-app text-primary-token transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
+        'flex w-full min-h-11 items-center gap-2.5 px-3 py-2.5 text-left text-app text-primary-token transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
         active ? 'bg-surface-2' : 'hover:bg-surface-2'
       )}
       onMouseEnter={onMouseEnter}
@@ -188,7 +188,7 @@ export function SidebarLinkInput({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) py-1 shadow-popover'
+            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) py-1 shadow-popover'
             onMouseDown={e => e.preventDefault()}
             aria-hidden='true'
           >

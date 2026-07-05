@@ -122,7 +122,7 @@ export function AboutSection({
             return (
               <span
                 key={genre}
-                className='rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-3 py-1 text-2xs font-caption capitalize text-[color:var(--profile-status-pill-fg)]'
+                className='rounded-full border border-(--profile-status-pill-border) bg-(--profile-status-pill-bg) px-3 py-1 text-2xs font-caption capitalize text-(--profile-status-pill-fg)'
               >
                 {genre}
               </span>
@@ -135,7 +135,7 @@ export function AboutSection({
         <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
             <h2 className='text-app font-caption text-white/70'>
-              Press photos
+              Press Photos
             </h2>
           </div>
 

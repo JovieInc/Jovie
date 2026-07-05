@@ -182,7 +182,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       }
                       className={clsx(
                         'w-full border-0 bg-transparent outline-none ring-0 focus-visible:ring-0',
-                        'px-4 py-3.5 text-sm/6 text-white placeholder-white/70',
+                        'px-4 py-3.5 text-sm/6 text-white dark:text-white placeholder-white/70',
                         'h-12 sm:h-11',
                         'rounded-xl sm:rounded-l-xl sm:rounded-r-none',
                         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50',
@@ -236,7 +236,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                         'h-12 sm:h-11 rounded-xl sm:rounded-l-none sm:rounded-r-xl',
                         'px-4 sm:px-6 flex items-center justify-center',
                         'text-sm font-medium',
-                        'bg-white text-gray-900 hover:bg-white/90 transition-colors',
+                        'bg-white dark:bg-surface-1 text-gray-900 hover:bg-white/90 transition-colors',
                         'disabled:bg-white/50 disabled:text-gray-500 disabled:cursor-not-allowed',
                         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white'
                       )}

@@ -1,12 +1,15 @@
 export {
   adminNavigation,
+  artistProfileNavItem,
   artistSettingsNavigation,
   dashboardHome,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,
   profileNavItem,
+  releasesNavItem,
   settingsNavigation,
+  touringNavItem,
   userSettingsNavigation,
 } from './config';
 export { DashboardNav } from './DashboardNav';

@@ -342,7 +342,7 @@ async function ensureBoardViewMode(page: Page): Promise<void> {
   const displayOptions = page.getByRole('button', { name: 'Display options' });
   await expect(displayOptions).toBeVisible({ timeout: 90_000 });
   await displayOptions.click();
-  await page.getByRole('button', { name: 'Board view' }).click();
+  await page.getByRole('button', { name: 'Board View' }).click();
   await expect(board).toBeVisible({ timeout: 90_000 });
 }
 
@@ -564,7 +564,7 @@ test.describe('Tasks layout', () => {
       });
 
       await page.getByRole('button', { name: 'Display options' }).click();
-      await page.getByRole('button', { name: 'Board view' }).click();
+      await page.getByRole('button', { name: 'Board View' }).click();
 
       await expect(page.getByTestId('tasks-board')).toBeVisible({
         timeout: 60_000,
@@ -606,9 +606,9 @@ test.describe('Tasks layout', () => {
     await expect(titleEditor).toHaveValue(taskTitle, { timeout: 15_000 });
     await titleEditor.fill(editedTitle);
 
-    await selectTaskMetaOption(page, 'Change task priority', 'Urgent');
-    await selectTaskMetaOption(page, 'Change task assignee', 'Jovie');
-    await selectTaskMetaOption(page, 'Change task status', 'In Progress');
+    await selectTaskMetaOption(page, 'Change Task Priority', 'Urgent');
+    await selectTaskMetaOption(page, 'Change Task Assignee', 'Jovie');
+    await selectTaskMetaOption(page, 'Change Task Status', 'In Progress');
 
     await expect
       .poll(() => getSeededTaskState(taskId), {

@@ -10,7 +10,7 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
   return (
     <section
       data-testid='homepage-hero'
-      className='homepage-hero homepage-hero--artist-profile relative overflow-hidden border-b border-white/[0.03] bg-black'
+      className='homepage-hero homepage-hero--artist-profile relative overflow-hidden border-b border-white/[0.03] bg-black dark:bg-black'
       aria-labelledby='artist-profile-hero-heading'
     >
       <div

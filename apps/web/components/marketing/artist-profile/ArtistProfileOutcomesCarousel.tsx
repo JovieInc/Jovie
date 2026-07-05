@@ -99,22 +99,22 @@ export function ArtistProfileOutcomesCarousel({
             <button
               type='button'
               aria-controls={railId}
-              aria-label='Scroll outcomes left'
+              aria-label='Scroll Outcomes Left'
               onClick={() => {
                 scrollByDirection('prev');
               }}
-              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               <ChevronLeft className='h-4 w-4' aria-hidden='true' />
             </button>
             <button
               type='button'
               aria-controls={railId}
-              aria-label='Scroll outcomes right'
+              aria-label='Scroll Outcomes Right'
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               <ChevronRight className='h-4 w-4' aria-hidden='true' />
             </button>
@@ -124,22 +124,22 @@ export function ArtistProfileOutcomesCarousel({
             <button
               type='button'
               aria-controls={railId}
-              aria-label='Scroll outcomes left'
+              aria-label='Scroll Outcomes Left'
               onClick={() => {
                 scrollByDirection('prev');
               }}
-              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-[12px] font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              className='rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
             >
               Prev
             </button>
             <button
               type='button'
               aria-controls={railId}
-              aria-label='Scroll outcomes right'
+              aria-label='Scroll Outcomes Right'
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-[12px] font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              className='rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
             >
               Next
             </button>
@@ -149,7 +149,7 @@ export function ArtistProfileOutcomesCarousel({
             ref={scrollerRef}
             id={railId}
             data-testid='artist-profile-outcomes-grid'
-            aria-label='Outcome showcase'
+            aria-label='Outcome Showcase'
             aria-describedby='artist-profile-outcomes-instructions'
             className='relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           >
@@ -180,7 +180,7 @@ function OutcomeCard({
     <article
       data-testid='artist-profile-outcome-card'
       className={cn(
-        'group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-[1.5rem] border border-white/8 bg-[#050505] shadow-[0_22px_56px_rgba(0,0,0,0.28)]',
+        'group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-[1.5rem] border border-white/8 bg-(--color-bg-base) shadow-[0_22px_56px_rgba(0,0,0,0.28)]',
         OUTCOME_CARD_WIDTHS[card.id]
       )}
       style={style}
@@ -280,31 +280,33 @@ function SellOutProof({
       </div>
 
       <div className='flex h-full flex-col rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-        <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
+        <p className='text-xs font-semibold tracking-[-0.02em] text-white dark:text-white'>
           {proof.drawerTitle}
         </p>
-        <p className='mt-1 text-[11px] text-white/44'>{proof.drawerSubtitle}</p>
+        <p className='mt-1 text-2xs text-tertiary-token'>
+          {proof.drawerSubtitle}
+        </p>
         <div className='mt-2.5 divide-y divide-white/6'>
           {proof.drawerRows.map(row => (
             <div
               key={row.id}
               className='grid grid-cols-[2.45rem_minmax(0,1fr)_auto] items-center gap-2 py-2.25'
             >
-              <span className='text-[11px] font-medium leading-[1.15] tracking-[-0.01em] text-white/52'>
+              <span className='text-2xs font-medium leading-[1.15] tracking-[-0.01em] text-secondary-token'>
                 {row.month}
-                <span className='block text-[14px] font-semibold tracking-[-0.04em] text-white'>
+                <span className='block text-sm font-semibold tracking-[-0.04em] text-white dark:text-white'>
                   {row.day}
                 </span>
               </span>
               <span className='min-w-0'>
-                <span className='block truncate text-[12.5px] font-semibold text-white'>
+                <span className='block truncate text-xs font-semibold text-white dark:text-white'>
                   {row.venue}
                 </span>
-                <span className='block truncate text-[11px] text-white/44'>
+                <span className='block truncate text-2xs text-tertiary-token'>
                   {row.location}
                 </span>
               </span>
-              <span className='text-[11px] font-medium text-white/64'>
+              <span className='text-2xs font-medium text-secondary-token'>
                 {row.ctaLabel}
               </span>
             </div>
@@ -324,16 +326,16 @@ function GetPaidProof({
     <div className='grid gap-2 sm:grid-cols-[0.9fr_1.1fr]'>
       <div className='flex flex-col justify-between rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:pt-3.5'>
         <div>
-          <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
             {proof.drawerTitle}
           </p>
-          <p className='mt-1 text-[13px] font-semibold tracking-[-0.03em] text-white'>
+          <p className='mt-1 text-app font-semibold tracking-[-0.03em] text-white dark:text-white'>
             {proof.drawerSubtitle}
           </p>
         </div>
 
         <div className='mt-3 space-y-1.5'>
-          <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
             {proof.chooseAmountLabel}
           </p>
           <div className='grid gap-1.5'>
@@ -341,10 +343,10 @@ function GetPaidProof({
               <div
                 key={row.id}
                 className={cn(
-                  'flex items-center justify-between rounded-[0.82rem] border px-3 py-1.75 text-[12px]',
+                  'flex items-center justify-between rounded-[0.82rem] border px-3 py-1.75 text-xs',
                   row.featured
-                    ? 'border-white/18 bg-white text-black'
-                    : 'border-white/8 bg-white/[0.03] text-white'
+                    ? 'border-white/18 bg-white dark:bg-surface-1 text-black dark:text-white'
+                    : 'border-white/8 bg-white/[0.03] text-white dark:text-white'
                 )}
               >
                 <span className='font-semibold tracking-[-0.02em]'>
@@ -352,8 +354,10 @@ function GetPaidProof({
                 </span>
                 <span
                   className={cn(
-                    'text-[10px] font-medium',
-                    row.featured ? 'text-black/62' : 'text-white/52'
+                    'text-3xs font-medium',
+                    row.featured
+                      ? 'text-secondary-token'
+                      : 'text-tertiary-token'
                   )}
                 >
                   {row.currency}
@@ -363,12 +367,12 @@ function GetPaidProof({
           </div>
         </div>
 
-        <span className='mt-3 inline-flex w-fit rounded-full bg-white px-3.5 py-2 text-[11px] font-semibold text-black'>
+        <span className='mt-3 inline-flex w-fit rounded-full bg-white dark:bg-surface-1 px-3.5 py-2 text-2xs font-semibold text-black dark:text-white'>
           {proof.ctaLabel}
         </span>
       </div>
 
-      <article className='relative min-h-[13.25rem] overflow-hidden rounded-[1.08rem] border border-white/8 bg-[#0d1015] shadow-[0_14px_32px_rgba(0,0,0,0.22)] sm:-translate-y-2'>
+      <article className='relative min-h-[13.25rem] overflow-hidden rounded-[1.08rem] border border-white/8 bg-(--color-bg-input) shadow-[0_14px_32px_rgba(0,0,0,0.22)] sm:-translate-y-2'>
         <Image
           alt={proof.screenshotAlt}
           fill
@@ -388,17 +392,17 @@ function ShareProof({
 }>) {
   return (
     <div className='flex justify-center sm:pt-2'>
-      <div className='relative ml-auto flex w-full max-w-[15.5rem] flex-col items-center rounded-[1.2rem] bg-[#fbfaf6] px-4 py-4.5 text-center text-black shadow-[0_16px_32px_rgba(0,0,0,0.14)]'>
-        <p className='text-[11px] font-semibold tracking-[0.02em] text-black/72'>
+      <div className='relative ml-auto flex w-full max-w-[15.5rem] flex-col items-center rounded-[1.2rem] bg-(--color-badge-text) px-4 py-4.5 text-center text-black dark:text-white shadow-[0_16px_32px_rgba(0,0,0,0.14)]'>
+        <p className='text-2xs font-semibold tracking-[0.02em] text-secondary-token'>
           {proof.title}
         </p>
 
-        <div className='mt-3.5 flex h-[9.75rem] w-[9.75rem] items-center justify-center rounded-[1rem] bg-white shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'>
-          <div className='grid grid-cols-7 gap-[6px]'>
+        <div className='mt-3.5 flex h-[9.75rem] w-[9.75rem] items-center justify-center rounded-[1rem] bg-white dark:bg-surface-1 shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'>
+          <div className='grid grid-cols-7 gap-2'>
             {QR_CELLS.map(cell => (
               <span
                 key={cell.id}
-                className='h-2.5 w-2.5 rounded-[3px]'
+                className='h-2.5 w-2.5 rounded-xs'
                 style={{
                   backgroundColor: cell.filled ? '#0b0b0b' : '#f2f0ea',
                 }}
@@ -407,10 +411,10 @@ function ShareProof({
           </div>
         </div>
 
-        <p className='mt-3.5 font-mono text-[11.5px] font-semibold tracking-[-0.02em] text-black'>
+        <p className='mt-3.5 font-mono text-2xs font-semibold tracking-[-0.02em] text-black dark:text-white'>
           {proof.url}
         </p>
-        <p className='mt-2 text-[11px] font-medium text-black/56'>
+        <p className='mt-2 text-2xs font-medium text-tertiary-token'>
           {proof.subtitle}
         </p>
       </div>

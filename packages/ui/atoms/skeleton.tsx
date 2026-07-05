@@ -12,6 +12,11 @@ export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
    * @default 'sm'
    */
   readonly rounded?: RoundedVariant;
+  /**
+   * When true, applies the canonical shimmer animation and loading state attrs.
+   * @default true
+   */
+  readonly shimmer?: boolean;
 }
 
 const roundedClasses: Record<RoundedVariant, string> = {
@@ -42,15 +47,18 @@ const roundedClasses: Record<RoundedVariant, string> = {
 export function Skeleton({
   className,
   rounded = 'sm',
+  shimmer = true,
   ...props
 }: SkeletonProps) {
   return (
     <div
       className={cn(
-        'skeleton motion-reduce:animate-none',
+        shimmer && 'skeleton motion-reduce:animate-none',
+        !shimmer && 'bg-surface-1 motion-reduce:animate-none',
         roundedClasses[rounded],
         className
       )}
+      data-state={shimmer ? 'shimmer' : 'static'}
       aria-hidden='true'
       {...props}
     />
@@ -112,12 +120,19 @@ export function LoadingSkeleton({
 
   if (lines === 1) {
     return (
-      <Skeleton className={cn(height, width, className)} rounded={rounded} />
+      <div role='status' aria-busy='true' aria-live='polite' className='w-full'>
+        <Skeleton className={cn(height, width, className)} rounded={rounded} />
+      </div>
     );
   }
 
   return (
-    <div className='space-y-2' aria-hidden='true'>
+    <div
+      className='space-y-2'
+      role='status'
+      aria-busy='true'
+      aria-live='polite'
+    >
       {lineKeys.map((key, index) => (
         <Skeleton
           key={key}

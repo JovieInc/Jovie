@@ -13,6 +13,8 @@ Before adding a new test, check the heatmap to see which surface needs it most:
 
 **When to add a test (decision rule):** add a test if (a) the file matches a critical glob in the register, OR (b) the change introduces a new branch / new API route / new server action / new entitlement, OR (c) the change is a bugfix (regression test mandatory). Otherwise no test required — but say so explicitly in the PR description.
 
+**Enforcement:** `.github/PULL_REQUEST_TEMPLATE.md` (Bug-to-Test section), `pnpm test:bug-to-test` (local + `/ship` Step 3.35), and Danger on PRs (`apps/web/dangerfile.ts`).
+
 ## Stack
 
 - Unit tests: Vitest with jsdom

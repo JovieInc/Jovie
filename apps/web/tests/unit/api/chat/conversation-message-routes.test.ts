@@ -7,7 +7,13 @@ const hoisted = vi.hoisted(() => {
     limit: selectLimitMock,
     orderBy: selectOrderByMock,
   }));
-  const selectFromMock = vi.fn().mockReturnValue({ where: selectWhereMock });
+  const selectLeftJoinMock = vi
+    .fn()
+    .mockReturnValue({ where: selectWhereMock });
+  const selectFromMock = vi.fn().mockReturnValue({
+    where: selectWhereMock,
+    leftJoin: selectLeftJoinMock,
+  });
   const selectMock = vi.fn().mockReturnValue({ from: selectFromMock });
 
   const insertReturningMock = vi.fn();
@@ -65,7 +71,12 @@ vi.mock('@/lib/db/schema/chat', () => ({
     role: 'role',
     content: 'content',
     toolCalls: 'toolCalls',
+    turnId: 'turnId',
     createdAt: 'createdAt',
+  },
+  chatTurns: {
+    id: 'turnId',
+    status: 'status',
   },
 }));
 
@@ -82,6 +93,7 @@ vi.mock('drizzle-orm', () => ({
 }));
 
 vi.mock('@ai-sdk/gateway', () => ({
+  createGateway: vi.fn(() => vi.fn()),
   gateway: vi.fn(),
 }));
 
@@ -115,6 +127,11 @@ vi.mock('@/app/api/chat/session-error-response', () => ({
 describe('chat conversation message routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
+    hoisted.selectLimitMock.mockReset();
+    hoisted.selectLimitMock.mockResolvedValue([]);
+    hoisted.insertReturningMock.mockReset();
+    hoisted.insertReturningMock.mockResolvedValue([]);
     hoisted.getSessionContextMock.mockResolvedValue({
       profile: { id: 'profile-1' },
     });
@@ -233,49 +250,65 @@ describe('chat conversation message routes', () => {
   });
 
   it('returns normalized tool calls on GET and flags legacy reads', async () => {
-    hoisted.selectLimitMock
-      .mockResolvedValueOnce([
-        {
-          id: 'conv-1',
-          title: 'Existing thread',
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'msg-v2',
-          role: 'assistant',
-          content: '',
-          toolCalls: [
-            {
-              schemaVersion: 2,
-              toolCallId: 'tool-v2',
+    const conversationRow = {
+      id: 'conv-1',
+      title: 'Existing thread',
+      creatorProfileId: 'profile-1',
+    };
+    const messageRows = [
+      {
+        id: 'msg-v2',
+        role: 'assistant',
+        content: '',
+        clientMessageId: null,
+        turnId: null,
+        turnStatus: null,
+        toolCalls: [
+          {
+            schemaVersion: 2,
+            toolCallId: 'tool-v2',
+            toolName: 'showTopInsights',
+            state: 'succeeded',
+            output: { success: true, title: 'Top Signals' },
+            summary: 'Top Signals',
+            uiHint: 'artifact',
+          },
+        ],
+        createdAt: new Date('2026-01-02T00:00:00.000Z'),
+      },
+      {
+        id: 'msg-legacy',
+        role: 'assistant',
+        content: '',
+        clientMessageId: null,
+        turnId: null,
+        turnStatus: null,
+        toolCalls: [
+          {
+            type: 'tool-invocation',
+            toolInvocation: {
+              toolCallId: 'tool-legacy',
               toolName: 'showTopInsights',
-              state: 'succeeded',
-              output: { success: true, title: 'Top Signals' },
-              summary: 'Top Signals',
-              uiHint: 'artifact',
+              state: 'result',
+              result: { success: true, title: 'Legacy Signals' },
             },
-          ],
-          createdAt: new Date('2026-01-02T00:00:00.000Z'),
-        },
-        {
-          id: 'msg-legacy',
-          role: 'assistant',
-          content: '',
-          toolCalls: [
-            {
-              type: 'tool-invocation',
-              toolInvocation: {
-                toolCallId: 'tool-legacy',
-                toolName: 'showTopInsights',
-                state: 'result',
-                result: { success: true, title: 'Legacy Signals' },
-              },
-            },
-          ],
-          createdAt: new Date('2026-01-01T00:00:00.000Z'),
-        },
-      ]);
+          },
+        ],
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ];
+
+    let selectLimitCalls = 0;
+    hoisted.selectLimitMock.mockImplementation(async () => {
+      selectLimitCalls += 1;
+      if (selectLimitCalls === 1) {
+        return [conversationRow];
+      }
+      if (selectLimitCalls === 2) {
+        return messageRows;
+      }
+      return [];
+    });
 
     const { GET } = await import('@/app/api/chat/conversations/[id]/route');
     const response = await GET(

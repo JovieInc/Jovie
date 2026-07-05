@@ -12,6 +12,7 @@ import {
   PITCH_TARGET_OPTIONS_TEXT,
   PITCH_TARGETS,
 } from '@/lib/services/pitch/targets';
+import { chatToolSchema } from './strict-schema';
 import { interviewSignalSchema } from './tools/onboarding-signals';
 
 // ---------------------------------------------------------------------------
@@ -22,12 +23,12 @@ export const TOOL_SCHEMAS = {
   proposeAvatarUpload: {
     description:
       'Show a profile photo upload widget in the chat. Use this when the artist wants to change, update, or set their profile photo. Do not describe how to upload — just call this tool.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
   generateAlbumArt: {
     description:
       'Generate three album art options for a release. Use when the artist asks to generate album artwork or cover art.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z.string().max(200).optional(),
       releaseId: z.string().uuid().optional(),
       styleId: z
@@ -43,9 +44,18 @@ export const TOOL_SCHEMAS = {
     }),
   },
 
+  retouchImage: {
+    description:
+      'Retouch an attached or referenced artist photo using the White Space editorial style.',
+    inputSchema: chatToolSchema({
+      styleId: z.enum(['white-space']).optional(),
+      instructions: z.string().max(500).optional(),
+    }),
+  },
+
   generateReleasePitch: {
     description: `Generate one copy-paste-ready release pitch for a destination. Ask where they want to pitch it before using this tool unless the task or user message clearly maps to: ${PITCH_TARGET_OPTIONS_TEXT}.`,
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z.string().max(200).optional(),
       releaseId: z.string().uuid().optional(),
       target: z.enum(PITCH_TARGETS).optional(),
@@ -59,7 +69,7 @@ export const TOOL_SCHEMAS = {
   createMerch: {
     description:
       'Generate exactly three premium merch options for the artist. Use when the artist asks to make merch, create a tee/hoodie/item, or make something that would sell.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       prompt: z.string().max(500).optional(),
       itemType: z.string().max(80).optional(),
       makeLive: z.boolean().optional(),
@@ -69,7 +79,7 @@ export const TOOL_SCHEMAS = {
   previewMerchOptions: {
     description:
       'Preview three merch design options without publishing them. Use when the artist asks for concepts or wants to see merch ideas first.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       prompt: z.string().max(500).optional(),
       itemType: z.string().max(80).optional(),
     }),
@@ -78,44 +88,59 @@ export const TOOL_SCHEMAS = {
   selectMerchDesign: {
     description:
       'Select one of the three merch options from a previous merch generation. Use after the artist picks option 1, 2, or 3.',
-    inputSchema: z
-      .object({
-        generationId: z.string().uuid(),
-        optionNumber: z.number().int().min(1).max(3).optional(),
-        optionId: z.string().uuid().optional(),
-        makeLive: z.boolean().optional(),
-      })
-      .refine(data => data.optionNumber !== undefined || data.optionId, {
-        message: 'Provide either optionNumber or optionId.',
-        path: ['optionNumber'],
-      }),
+    inputSchema: chatToolSchema({
+      generationId: z.string().uuid(),
+      optionNumber: z.number().int().min(1).max(3).optional(),
+      optionId: z.string().uuid().optional(),
+      makeLive: z.boolean().optional(),
+    }).refine(data => data.optionNumber !== undefined || data.optionId, {
+      message: 'Provide either optionNumber or optionId.',
+      path: ['optionNumber'],
+    }),
+  },
+
+  createMerchAlternativeItem: {
+    description:
+      'Create a new merch card that keeps an existing card design but moves it onto a different Printful product. Use when the artist asks for the same design on another item, like a hoodie, hat, tank, or a specific Printful catalog product ID.',
+    inputSchema: chatToolSchema({
+      merchCardId: z.string().uuid(),
+      itemType: z
+        .string()
+        .min(2)
+        .max(120)
+        .describe(
+          'Target product type or Printful catalog product ID, for example "hoodie", "hat", or "catalog product 71".'
+        ),
+    }),
   },
 
   publishMerchCard: {
-    description: 'Publish an existing merch card to the public artist profile.',
-    inputSchema: z.object({
+    description:
+      'Propose publishing an existing merch card to the public artist profile. Returns a confirmation card; does not publish until the artist confirms.',
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
   },
 
   pauseMerchCard: {
     description: 'Pause a live merch card so fans can no longer buy it.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
   },
 
   unpauseMerchCard: {
-    description: 'Make a paused merch card live again after validating it.',
-    inputSchema: z.object({
+    description:
+      'Propose making a paused merch card live again. Returns a confirmation card; does not unpause until the artist confirms.',
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
   },
 
   deleteOrArchiveMerchCard: {
     description:
-      'Archive a merch card. Use for kill/delete/remove merch requests.',
-    inputSchema: z.object({
+      'Propose archiving a merch card. Returns a confirmation card; does not archive until the artist confirms.',
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
   },
@@ -123,7 +148,7 @@ export const TOOL_SCHEMAS = {
   reorderMerchCards: {
     description:
       'Reorder merch cards on the artist profile. Use when the artist asks to rank, pin, or move merch cards.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       merchCardIds: z.array(z.string().uuid()).min(1).max(12),
     }),
   },
@@ -131,42 +156,42 @@ export const TOOL_SCHEMAS = {
   optimizeMerchCards: {
     description:
       'Optimize merch card ranking using sales, margin, clicks, recency, and availability.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
 
   showMerchSales: {
     description: 'Show merch revenue and purchase counts for this artist.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
 
   showArtistPayouts: {
     description:
       'Show internal artist payout liability for merch. Do not imply automatic payout in MVP.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
 
   showAccountStatus: {
     description:
       'Show authenticated account plan, billing verification, feature access, merch access, and safe next action.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
 
   showUsage: {
     description:
       'Show AI chat usage, daily/monthly limits, remaining messages, and reset time for the authenticated account.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
 
   openBillingPortal: {
     description:
       'Open the Stripe billing portal when available, or return billing settings when no billing account exists. Does not change the subscription.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
 
   proposeSocialLink: {
     description:
       'Propose adding a social link to the artist profile. Pass the full URL. The client will show a confirmation card with the detected platform. Use this when the artist asks to add a link or social profile URL.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       url: z
         .string()
         .describe(
@@ -178,7 +203,7 @@ export const TOOL_SCHEMAS = {
   proposeSocialLinkRemoval: {
     description:
       'Propose removing a social link from the artist profile. Use this when the artist asks to remove or delete a link. Returns a confirmation card with link details. You must specify the platform name (e.g. "instagram", "spotify", "twitter") to identify which link to remove.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       platform: z
         .string()
         .describe(
@@ -190,7 +215,7 @@ export const TOOL_SCHEMAS = {
   submitFeedback: {
     description:
       'Submit product feedback from the artist. Use this when the artist wants to share feedback, report a bug, or request a feature. Collect their feedback message first, then call this tool with the full text.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       message: z
         .string()
         .min(5)
@@ -206,7 +231,7 @@ export const TOOL_SCHEMAS = {
   searchSpotifyArtist: {
     description:
       'Open the Spotify artist picker popout in the chat. Use this on the FIRST turn the visitor mentions being a musician/artist, or whenever you need to identify which artist they are. The widget calls /api/spotify/search and renders suggestion cards; pass the query if the visitor has already named themselves, otherwise leave it empty to let them type.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       query: z
         .string()
         .max(200)
@@ -218,7 +243,7 @@ export const TOOL_SCHEMAS = {
   confirmSpotifyArtist: {
     description:
       'Lock in the Spotify artist the visitor picked. This pulls Spotify enrichment (avatar, name, followers, popularity, genres) and is the trigger for the profile-preview reveal stage. Call this ONLY after the user has explicitly selected a candidate from searchSpotifyArtist results.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       spotifyArtistId: z
         .string()
         .min(1)
@@ -232,7 +257,7 @@ export const TOOL_SCHEMAS = {
   checkHandle: {
     description:
       'Check whether a Jovie handle (username) is available. Use after the visitor has been identified (Spotify pick or self-named) to claim their handle. The widget shows green-check / red-x with suggestions if taken. Pass the proposed handle without the @ prefix.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       handle: z
         .string()
         .min(1)
@@ -254,13 +279,13 @@ export const TOOL_SCHEMAS = {
   proposeNextStep: {
     description:
       'Decide whether to render the checkout card, the waitlist confirmation card, or continue the interview. Call this once you believe you have enough signal (typically after confirmSpotifyArtist + checkHandle, OR after 2+ interview turns). The server runs the deterministic evaluator — you do NOT score the decision, you trigger the evaluation.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
   },
 
   proposeCheckout: {
     description:
       'Render the checkout card. Only call this AFTER proposeNextStep returned instant_access. The card defaults to a route-handoff to /onboarding/checkout (Stripe Embedded Checkout iframe is behind a separate flag pending CSP verification).',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       plan: z
         .enum(['free', 'pro', 'max'])
         .optional()

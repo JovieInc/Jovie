@@ -50,7 +50,7 @@ export const ContactItem = memo(function ContactItem({
   const hasEmailAndPhone = Boolean(contact.email) && Boolean(contact.phone);
 
   return (
-    <div className='rounded-[10px] border border-subtle bg-surface-1 p-4'>
+    <div className='rounded-lg border border-subtle bg-surface-1 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-app font-semibold text-primary-token'>
@@ -67,7 +67,7 @@ export const ContactItem = memo(function ContactItem({
             size='sm'
             variant='ghost'
             onClick={() => onUpdate({ isExpanded: !contact.isExpanded })}
-            className='rounded-lg px-3 text-2xs font-caption tracking-[-0.01em]'
+            className='rounded-lg px-3 text-2xs font-caption tracking-tight'
           >
             {contact.isExpanded ? 'Collapse' : 'Edit'}
           </Button>

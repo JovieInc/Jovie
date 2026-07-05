@@ -3,15 +3,16 @@
 /**
  * Prevent desktop code from landing without release handling.
  *
- * The desktop release workflow only publishes a DMG when VERSION or the
- * workflow itself changes. If apps/desktop changes land without either, users
- * on the shipped app never receive the fix.
+ * Desktop changes need an explicit release handoff. Feature branches should
+ * add an Unreleased changelog note; the main/release path stamps VERSION and
+ * publishes the next DMG.
  */
 
 import { execFileSync } from 'node:child_process';
 
 const DESKTOP_PATH_PREFIX = 'apps/desktop/';
 const RELEASE_HANDLING_PATHS = new Set([
+  'CHANGELOG.md',
   'VERSION',
   '.github/workflows/desktop-release.yml',
 ]);
@@ -107,7 +108,7 @@ function main() {
     '[desktop-release-guard] apps/desktop changed without a DMG release trigger.'
   );
   console.error(
-    'Change VERSION to publish a new desktop release, or update .github/workflows/desktop-release.yml with explicit release workflow handling.'
+    'Add CHANGELOG.md notes under [Unreleased], change VERSION on the main release path, or update .github/workflows/desktop-release.yml with explicit release workflow handling.'
   );
   console.error('Desktop files:');
   for (const file of result.desktopFiles) {

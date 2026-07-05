@@ -6,12 +6,17 @@ import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 import {
   APP_FLAG_DEFAULTS,
-  APP_FLAG_TO_STATSIG_GATE,
   LEGACY_STATSIG_GATE_KEYS,
   type ProfileAlertOptInVariant,
   type StatsigBackedAppFlagName,
   type SubscribeCTAVariant,
+  type TeleprompterShowcaseVariant,
 } from './contracts';
+import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+  parseProfilePacAssignment,
+} from './profile-pac';
 
 let statsigInitialized = false;
 let statsigClient: Statsig | null = null;
@@ -21,6 +26,38 @@ let statsigWarnedNoSecret = false;
 const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
 const STATSIG_INIT_TIMEOUT_MS = 10_000;
 const STATSIG_SHUTDOWN_TIMEOUT_MS = 1500;
+const GATE_CACHE_TTL_MS = 10_000;
+const gateCache = new Map<string, { value: boolean; expiresAt: number }>();
+
+function gateCacheKey(userId: string | null, gateKey: string): string {
+  return `${userId ?? 'anonymous'}:${gateKey}`;
+}
+
+function readCachedGateValue(
+  userId: string | null,
+  gateKey: string
+): boolean | undefined {
+  const cached = gateCache.get(gateCacheKey(userId, gateKey));
+  if (!cached || cached.expiresAt <= Date.now()) {
+    if (cached) {
+      gateCache.delete(gateCacheKey(userId, gateKey));
+    }
+    return undefined;
+  }
+
+  return cached.value;
+}
+
+function writeCachedGateValue(
+  userId: string | null,
+  gateKey: string,
+  value: boolean
+): void {
+  gateCache.set(gateCacheKey(userId, gateKey), {
+    value,
+    expiresAt: Date.now() + GATE_CACHE_TTL_MS,
+  });
+}
 
 function getStatsigUser(userId: string | null): StatsigUser {
   return StatsigUser.withUserID(userId ?? 'anonymous');
@@ -113,6 +150,11 @@ export async function checkGateForUser(
     return defaultValue;
   }
 
+  const cachedValue = readCachedGateValue(userId, gateKey);
+  if (cachedValue !== undefined) {
+    return cachedValue;
+  }
+
   await initializeStatsig();
 
   if (!statsigInitialized) {
@@ -126,25 +168,34 @@ export async function checkGateForUser(
     }
 
     const gate = statsig.getFeatureGate(getStatsigUser(userId), gateKey);
-    if (gate.getEvaluationDetails().reason === 'Unrecognized') {
-      return defaultValue;
-    }
-    return gate.value;
+    const value =
+      gate.getEvaluationDetails().reason === 'Unrecognized'
+        ? defaultValue
+        : gate.value;
+    writeCachedGateValue(userId, gateKey, value);
+    return value;
   } catch (error) {
     logger.error(`[Statsig] Error checking gate ${gateKey}`, error, 'Statsig');
     return defaultValue;
   }
 }
 
+export async function checkGatesForUser(
+  userId: string | null,
+  gates: ReadonlyArray<{ key: string; defaultValue?: boolean }>
+): Promise<boolean[]> {
+  return Promise.all(
+    gates.map(({ key, defaultValue = false }) =>
+      checkGateForUser(userId, key, defaultValue)
+    )
+  );
+}
+
 export async function getStatsigGateValue(
   flagName: StatsigBackedAppFlagName,
-  userId: string | null
+  _userId: string | null
 ): Promise<boolean> {
-  return checkGateForUser(
-    userId,
-    APP_FLAG_TO_STATSIG_GATE[flagName],
-    APP_FLAG_DEFAULTS[flagName]
-  );
+  return APP_FLAG_DEFAULTS[flagName];
 }
 
 export async function getExperiment(
@@ -179,6 +230,36 @@ export async function getExperiment(
   }
 }
 
+/**
+ * Logs a custom event to Statsig, keyed to the given stable user id.
+ *
+ * Used by the PAC instrumentation sink (`/api/profile/pac-event`) so
+ * variant-keyed arm metrics (exposures, captures, dismissals, conversions)
+ * land where the experiment auto-promotion loop reads them. Fail-safe:
+ * errors are logged and swallowed — event logging must never break a
+ * request path.
+ */
+export async function logStatsigEvent(
+  userId: string | null,
+  eventName: string,
+  value?: string | number,
+  metadata?: Record<string, string>
+): Promise<void> {
+  if (isE2ERuntime) return;
+
+  await initializeStatsig();
+  if (!statsigInitialized) return;
+
+  try {
+    const statsig = statsigClient;
+    if (!statsig) return;
+
+    statsig.logEvent(getStatsigUser(userId), eventName, value, metadata);
+  } catch (error) {
+    logger.warn(`[Statsig] Failed to log event ${eventName}`, error, 'Statsig');
+  }
+}
+
 export async function getProfileAlertOptInVariantValue(
   stableId: string | null
 ): Promise<ProfileAlertOptInVariant> {
@@ -193,6 +274,19 @@ export async function getProfileAlertOptInVariantValue(
   return 'button';
 }
 
+export async function getProfilePacAssignmentValue(
+  stableId: string | null
+): Promise<ProfilePacAssignment> {
+  const config = await getExperiment(
+    stableId,
+    LEGACY_STATSIG_GATE_KEYS.PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT
+  );
+  if (Object.keys(config).length === 0) {
+    return DEFAULT_PROFILE_PAC_ASSIGNMENT;
+  }
+  return parseProfilePacAssignment(config);
+}
+
 export async function getSubscribeCTAVariantValue(
   userId: string | null
 ): Promise<SubscribeCTAVariant> {
@@ -205,6 +299,20 @@ export async function getSubscribeCTAVariantValue(
     return variant;
   }
   return 'two_step';
+}
+
+export async function getTeleprompterShowcaseVariantValue(
+  userId: string | null
+): Promise<TeleprompterShowcaseVariant> {
+  const config = await getExperiment(
+    userId,
+    LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_SHOWCASE_EXPERIMENT
+  );
+  const variant = config.variant;
+  if (variant === 'interstitial' || variant === 'direct') {
+    return variant;
+  }
+  return 'direct';
 }
 
 export async function shutdownStatsig(): Promise<void> {

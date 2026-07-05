@@ -31,6 +31,12 @@ describe('test-mode auth bypass', () => {
     expect(isTestAuthBypassEnabled()).toBe(false);
   });
 
+  it('does not enable the bypass on Vercel production deployments even when the flag is set', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect(isTestAuthBypassEnabled()).toBe(false);
+  });
+
   it('does not leak bypass access on Vercel preview even for preview.jov.ie', () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     vi.stubEnv('VERCEL_ENV', 'preview');

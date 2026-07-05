@@ -16,6 +16,7 @@ interface JovieMarkElectricProps {
   readonly size?: number;
   readonly className?: string;
   readonly style?: CSSProperties;
+  readonly idSeed?: string;
   /**
    * Whether to animate the electric spark traveling around the perimeter.
    * Defaults to true; falls back to false when prefers-reduced-motion is set.
@@ -31,10 +32,11 @@ export function JovieMarkElectric({
   size,
   className,
   style,
+  idSeed,
   spark = true,
 }: JovieMarkElectricProps) {
   const reactId = useId();
-  const safeId = reactId.replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeId = (idSeed ?? reactId).replace(/[^a-zA-Z0-9_-]/g, '');
   const filterId = `jve-filter-${safeId}`;
   const styleId = `jve-style-${safeId}`;
   const sparkAnimationName = `jve-pulse-${safeId}`;

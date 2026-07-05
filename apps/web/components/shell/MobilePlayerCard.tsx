@@ -80,10 +80,10 @@ export const MobilePlayerCard = React.memo(function MobilePlayerCard({
         </div>
 
         <div className='min-w-0 flex-1'>
-          <div className='truncate text-[13px] font-caption text-primary-token leading-tight'>
+          <div className='truncate text-app font-caption text-primary-token leading-tight'>
             {trackTitle}
           </div>
-          <div className='truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
+          <div className='truncate text-2xs text-tertiary-token leading-tight mt-0.5'>
             {artistName}
           </div>
         </div>
@@ -91,7 +91,7 @@ export const MobilePlayerCard = React.memo(function MobilePlayerCard({
         <button
           type='button'
           onClick={onPlay}
-          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+          className='h-9 w-9 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset shrink-0 transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (

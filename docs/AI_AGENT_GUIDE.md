@@ -4,6 +4,16 @@ Quick-reference for AI agents working in the Jovie codebase. For hard guardrails
 
 ---
 
+## 0. Design System Contract (llms.txt)
+
+Before editing UI, read the auto-generated design contract:
+
+- **[`docs/llms-design-manifest.txt`](llms-design-manifest.txt)** — llms.txt-style token + component manifest sourced from `apps/web/styles/design-system.css`, `@jovie/ui` primitives, canonical surfaces, and design ESLint guardrails.
+- **Regenerate after token/rule changes:** `pnpm ds:llms-manifest` (CI check: `pnpm ds:llms-manifest:check`)
+- **Human specs:** [`DESIGN.md`](../DESIGN.md), [`docs/DESIGN_TOKENS.md`](DESIGN_TOKENS.md)
+
+---
+
 ## 1. API Route Inventory
 
 All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless noted.
@@ -554,7 +564,7 @@ For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 - **No emoji in UI** -- use SVG icons
 - **Conventional commits** -- `type(scope): description`
 - **PR size limits** -- max 10 files, 400 lines diff
-- **Pre-push gate** -- typecheck, lint, test, boundaries check
+- **Pre-push gate** -- `scripts/hooks/pre-push-gate.sh` (husky + [no-mistakes OWL pilot](NO_MISTAKES_GATE.md)); escape: `JOVIE_SKIP_PRE_PUSH_GATE=1`
 - **Static marketing pages** -- no per-request data in `app/(marketing)`
 - **TanStack Query** -- always use cache presets, always pass AbortSignal
 - **Route constants** -- import `APP_ROUTES`, never hardcode paths

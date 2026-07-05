@@ -139,6 +139,19 @@ describe('clerk-errors.ts', () => {
       );
     });
 
+    it('parses resource API error objects without ClerkAPIResponseError typing', async () => {
+      mockIsClerkAPIResponseError.mockReturnValue(false);
+
+      const { parseClerkError } = await import('@/lib/auth/clerk-errors');
+      const result = parseClerkError({
+        errors: [{ code: 'captcha_missing' }],
+      });
+
+      expect(result).toBe(
+        'Please disable ad blockers or try a different browser, then refresh the page.'
+      );
+    });
+
     it('returns custom message for OAuth errors', async () => {
       const clerkError = {
         errors: [{ code: 'external_account_not_found' }],
@@ -240,6 +253,59 @@ describe('clerk-errors.ts', () => {
       expect(parseClerkError(undefined)).toBe(
         'An unexpected error occurred. Please try again.'
       );
+    });
+  });
+
+  describe('getClerkErrorCode', () => {
+    it('returns the code from Clerk API response errors', async () => {
+      const clerkError = {
+        errors: [{ code: 'captcha_invalid' }],
+      };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+
+      const { getClerkErrorCode } = await import('@/lib/auth/clerk-errors');
+
+      expect(getClerkErrorCode(clerkError)).toBe('captcha_invalid');
+    });
+
+    it('returns the code from resource API error objects', async () => {
+      mockIsClerkAPIResponseError.mockReturnValue(false);
+
+      const { getClerkErrorCode } = await import('@/lib/auth/clerk-errors');
+
+      expect(
+        getClerkErrorCode({ errors: [{ code: 'bot_traffic_detected' }] })
+      ).toBe('bot_traffic_detected');
+    });
+
+    it('returns undefined when no code is present', async () => {
+      mockIsClerkAPIResponseError.mockReturnValue(false);
+
+      const { getClerkErrorCode } = await import('@/lib/auth/clerk-errors');
+
+      expect(getClerkErrorCode({ errors: [{}] })).toBeUndefined();
+      expect(getClerkErrorCode({ errors: [] })).toBeUndefined();
+      expect(getClerkErrorCode(new Error('test'))).toBeUndefined();
+      expect(getClerkErrorCode(null)).toBeUndefined();
+      expect(getClerkErrorCode(undefined)).toBeUndefined();
+    });
+  });
+
+  describe('isBotProtectionError', () => {
+    it('returns true for captcha and bot traffic codes', async () => {
+      mockIsClerkAPIResponseError.mockReturnValue(false);
+
+      const { isBotProtectionError } = await import('@/lib/auth/clerk-errors');
+
+      expect(
+        isBotProtectionError({ errors: [{ code: 'captcha_invalid' }] })
+      ).toBe(true);
+      expect(
+        isBotProtectionError({ errors: [{ code: 'bot_traffic_detected' }] })
+      ).toBe(true);
+      expect(
+        isBotProtectionError({ errors: [{ code: 'form_code_incorrect' }] })
+      ).toBe(false);
     });
   });
 

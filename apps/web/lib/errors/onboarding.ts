@@ -234,6 +234,13 @@ const TRANSACTION_ROLLBACK_PATTERNS = [
 ];
 
 /**
+ * Returns true when a database error is a username/handle unique constraint violation.
+ */
+export function isHandleUniqueViolation(error: unknown): boolean {
+  return mapDatabaseError(error).code === OnboardingErrorCode.USERNAME_TAKEN;
+}
+
+/**
  * Map database errors to onboarding error codes
  */
 export function mapDatabaseError(error: unknown): OnboardingError {

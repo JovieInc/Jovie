@@ -4,8 +4,14 @@ import {
   applyTaskListMove,
   compareTasksByBoardOrder,
   getVisibleTaskBoardStatuses,
+  resolveTaskBoardMoveInput,
 } from './task-board';
-import type { TaskBoardResult, TaskStatus, TaskView } from './types';
+import type {
+  TaskBoardColumnResult,
+  TaskBoardResult,
+  TaskStatus,
+  TaskView,
+} from './types';
 
 function createTask(
   id: string,
@@ -45,7 +51,7 @@ function createTask(
   };
 }
 
-function createBoard(tasks: TaskView[]): TaskBoardResult {
+function createColumns(tasks: TaskView[]): TaskBoardColumnResult[] {
   const statuses: TaskStatus[] = [
     'backlog',
     'todo',
@@ -54,18 +60,34 @@ function createBoard(tasks: TaskView[]): TaskBoardResult {
     'cancelled',
   ];
 
+  return statuses.map(status => {
+    const columnTasks = tasks.filter(task => task.status === status);
+    return {
+      status,
+      tasks: columnTasks,
+      totalCount: columnTasks.length,
+      nextCursor: null,
+    };
+  });
+}
+
+function createBoard(tasks: TaskView[]): TaskBoardResult {
   return {
-    columns: statuses.map(status => {
-      const columnTasks = tasks.filter(task => task.status === status);
-      return {
-        status,
-        tasks: columnTasks,
-        totalCount: columnTasks.length,
-        nextCursor: null,
-      };
-    }),
+    columns: createColumns(tasks),
     totalCount: tasks.length,
   };
+}
+
+function expectSingleAnchor(
+  input: ReturnType<typeof resolveTaskBoardMoveInput>
+): void {
+  expect(input).not.toBeNull();
+  if (!input) return;
+
+  const anchorCount = [input.beforeTaskId, input.afterTaskId].filter(
+    Boolean
+  ).length;
+  expect(anchorCount).toBeLessThanOrEqual(1);
 }
 
 describe('task board helpers', () => {
@@ -138,6 +160,72 @@ describe('task board helpers', () => {
     expect(
       moved?.columns.find(column => column.status === 'done')?.totalCount
     ).toBe(2);
+  });
+
+  it('resolves same-column middle moves with only a before anchor', () => {
+    const columns = createColumns([
+      createTask('todo-1', 'todo', 1),
+      createTask('todo-2', 'todo', 2),
+      createTask('todo-3', 'todo', 3),
+      createTask('todo-4', 'todo', 4),
+    ]);
+
+    const input = resolveTaskBoardMoveInput({
+      activeTaskId: 'todo-1',
+      overId: 'todo-3',
+      columns,
+    });
+
+    expectSingleAnchor(input);
+    expect(input).toEqual({
+      taskId: 'todo-1',
+      toStatus: 'todo',
+      beforeTaskId: 'todo-4',
+    });
+    expect(input?.afterTaskId).toBeUndefined();
+  });
+
+  it('resolves end-of-column moves with only an after anchor', () => {
+    const columns = createColumns([
+      createTask('todo-1', 'todo', 1),
+      createTask('todo-2', 'todo', 2),
+    ]);
+
+    const input = resolveTaskBoardMoveInput({
+      activeTaskId: 'todo-1',
+      overId: 'task-board-column:todo',
+      columns,
+    });
+
+    expectSingleAnchor(input);
+    expect(input).toEqual({
+      taskId: 'todo-1',
+      toStatus: 'todo',
+      afterTaskId: 'todo-2',
+    });
+  });
+
+  it('returns null when a drag would leave the task in the same position', () => {
+    const columns = createColumns([
+      createTask('todo-1', 'todo', 1),
+      createTask('todo-2', 'todo', 2),
+    ]);
+
+    expect(
+      resolveTaskBoardMoveInput({
+        activeTaskId: 'todo-1',
+        overId: 'todo-1',
+        columns,
+      })
+    ).toBeNull();
+
+    expect(
+      resolveTaskBoardMoveInput({
+        activeTaskId: 'todo-2',
+        overId: 'todo-2',
+        columns,
+      })
+    ).toBeNull();
   });
 
   it('applies optimistic list status updates with canonical ordering', () => {

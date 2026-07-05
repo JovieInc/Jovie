@@ -131,6 +131,7 @@ export {
   type UseAdminSocialLinksQueryOptions,
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
+export { useAiCrawlerAnalyticsQuery } from './useAiCrawlerAnalyticsQuery';
 export { useAlgorithmHealthQuery } from './useAlgorithmHealthQuery';
 export {
   type AppleMusicArtistResult,
@@ -223,7 +224,10 @@ export {
 // Chat capabilities query
 export { useChatCapabilitiesQuery } from './useChatCapabilitiesQuery';
 // Chat conversation query
-export { useChatConversationQuery } from './useChatConversationQuery';
+export {
+  CHAT_CONVERSATION_FETCH_TIMEOUT_MS,
+  useChatConversationQuery,
+} from './useChatConversationQuery';
 // Chat conversations list query
 export {
   type ChatConversation,
@@ -253,6 +257,12 @@ export {
   type ConfirmChatLinkInput,
   useConfirmChatLinkMutation,
 } from './useConfirmChatLinkMutation';
+// Confirm chat merch action mutation
+export {
+  type ConfirmChatMerchActionInput,
+  type ConfirmChatMerchActionType,
+  useConfirmChatMerchActionMutation,
+} from './useConfirmChatMerchActionMutation';
 // Confirm chat remove link mutation
 export {
   type ConfirmChatRemoveLinkInput,
@@ -385,6 +395,7 @@ export {
   type CreateInviteResponse,
   useCreateInviteMutation,
 } from './useInviteMutation';
+export { useJovieWorkFeedQuery } from './useJovieWorkFeedQuery';
 // Link verification mutation
 export {
   type LinkVerificationInput,

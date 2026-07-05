@@ -28,6 +28,8 @@ import {
   StaticAnalyticsSidebar,
 } from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
+import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
+import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { captureError } from '@/lib/error-tracking';
@@ -154,7 +156,7 @@ const MobileCardList = memo(function MobileCardList({
             loading={isFetchingNextPage}
             onClick={() => onLoadMore?.()}
           >
-            Load more members
+            Load More Members
           </Button>
         </div>
       ) : null}
@@ -297,7 +299,9 @@ export const DashboardAudienceTableUnified = memo(
     const handleRemoveMember = React.useCallback(
       async (member: AudienceMember) => {
         if (!profileId) {
-          toast.error('Unable to block member — profile not loaded');
+          toast.error(
+            'Unable to remove member — please refresh and try again.'
+          );
           return;
         }
         try {
@@ -492,7 +496,9 @@ export const DashboardAudienceTableUnified = memo(
     const handleSourceLinkAction = React.useCallback(
       async (action: 'copy' | 'open' | 'download') => {
         if (!profileId) {
-          toast.error('Profile is still loading');
+          toast.error(
+            'Unable to complete action — please refresh and try again.'
+          );
           return;
         }
 
@@ -592,7 +598,7 @@ export const DashboardAudienceTableUnified = memo(
             if (m.email) {
               void copyTextToClipboard(m.email).then(success => {
                 if (success) {
-                  toast.success('Email copied to clipboard');
+                  toast.success('Copied');
                   return;
                 }
                 toast.error('Unable to copy email');
@@ -603,7 +609,7 @@ export const DashboardAudienceTableUnified = memo(
             if (m.phone) {
               void copyTextToClipboard(m.phone).then(success => {
                 if (success) {
-                  toast.success('Phone number copied to clipboard');
+                  toast.success('Copied');
                   return;
                 }
                 toast.error('Unable to copy phone number');
@@ -677,11 +683,11 @@ export const DashboardAudienceTableUnified = memo(
           },
         }
       : {
-          label: 'Open profile settings',
+          label: 'Open Profile Settings',
           href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
         };
     const emptyStateSecondaryAction = {
-      label: 'Learn about audience',
+      label: 'Learn About Audience',
       href: '/support',
     };
 
@@ -752,6 +758,9 @@ export const DashboardAudienceTableUnified = memo(
 
         return <AnalyticsSidebar isOpen onClose={handleClosePanel} />;
       }
+      if (panelMode === 'ai-crawlers') {
+        return <AiCrawlerDetailPanel isOpen onClose={handleClosePanel} />;
+      }
       // Panel closed — render closed drawer to animate out
       return (
         <AudienceMemberSidebar
@@ -801,7 +810,7 @@ export const DashboardAudienceTableUnified = memo(
                 type='button'
                 variant='ghost'
                 size='icon'
-                aria-label='Source link actions'
+                aria-label='Source Link Actions'
                 title='Source link'
                 className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
               >
@@ -864,6 +873,13 @@ export const DashboardAudienceTableUnified = memo(
               <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
               <div className='flex-1 min-h-0 flex flex-col'>
+                <div className='shrink-0 border-b border-subtle px-4 py-3'>
+                  <AiCrawlerIntelligenceCard
+                    onOpenDetail={() => {
+                      openPanel('ai-crawlers');
+                    }}
+                  />
+                </div>
                 {/* Scrollable content area */}
                 <div className='flex-1 min-h-0 overflow-auto'>
                   {rows.length === 0 ? (

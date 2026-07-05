@@ -58,10 +58,10 @@ function HeroTaskPanel() {
   return (
     <div className='space-y-2'>
       <div className='flex items-center justify-between px-1'>
-        <p className='text-[10px] font-medium tracking-[0.02em] text-white/42'>
+        <p className='text-3xs font-medium tracking-[0.02em] text-white/42'>
           Release Tasks
         </p>
-        <span className='rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-white/62'>
+        <span className='rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-3xs font-medium text-white/62'>
           {HOME_HERO_TASKS.length} Open
         </span>
       </div>
@@ -85,17 +85,17 @@ function HeroTaskPanel() {
                   icon={statusStyle.icon}
                   className={statusStyle.iconClassName}
                 />
-                <p className='text-[12px] font-semibold leading-5 tracking-[-0.01em] text-white truncate'>
+                <p className='text-xs font-semibold leading-5 tracking-[-0.01em] text-white dark:text-white truncate'>
                   {task.title}
                 </p>
               </div>
               <span
-                className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-medium ${statusStyle.pillClassName}`}
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-3xs font-medium ${statusStyle.pillClassName}`}
               >
                 {task.statusLabel}
               </span>
             </div>
-            <div className='mt-1 flex items-center gap-2 pl-[14px] text-[10px] text-white/40'>
+            <div className='mt-1 flex items-center gap-2 pl-4 text-3xs text-white/40'>
               <span>{task.meta}</span>
               <span
                 aria-hidden='true'

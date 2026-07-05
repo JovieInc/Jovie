@@ -55,7 +55,7 @@ export function TableEmptyState({
     <DrawerSurfaceCard
       variant='card'
       className={cn(
-        'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-3 rounded-lg bg-surface-0 px-4 py-10 text-center',
+        'flex min-h-55 flex-1 flex-col items-center justify-center gap-3 rounded-lg bg-surface-0 px-4 py-10 text-center',
         className
       )}
     >

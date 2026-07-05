@@ -35,6 +35,24 @@ export const SKILL_REGISTRY = {
       connector: 'gmail_optional',
     },
   },
+  analyzePackaging: {
+    id: 'analyzePackaging',
+    name: 'Analyze packaging',
+    description:
+      'Extract transcript summary, title/thumbnail promise, first-30s hook, and niche priors for a YouTube video.',
+    kind: 'tool',
+    version: '1.0.0',
+    entitlement: 'aiCanUseTools',
+    model: 'anthropic/claude-haiku-4-5-20251001',
+    inputSchemaZodPath: 'apps/web/lib/services/packaging-intelligence/types.ts',
+    outputSchemaZodPath:
+      'apps/web/lib/services/packaging-intelligence/types.ts',
+    metadata: {
+      surface: 'youtube',
+      action: 'analyze_packaging',
+      connector: 'youtube',
+    },
+  },
   retouch: {
     id: 'retouch',
     name: 'Retouch image',

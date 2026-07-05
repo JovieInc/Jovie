@@ -1,11 +1,11 @@
-import { Button } from '@jovie/ui';
-import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
+  Button,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from './Tooltip';
+} from '@jovie/ui';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 
 const meta: Meta<typeof Tooltip> = {
   title: 'Atoms/Tooltip',

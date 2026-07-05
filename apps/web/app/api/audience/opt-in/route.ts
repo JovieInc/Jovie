@@ -20,6 +20,7 @@ import { audienceMembers } from '@/lib/db/schema/analytics';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { verifyOptInToken } from '@/lib/email/opt-in-token';
 import { captureError } from '@/lib/error-tracking';
+import { renderStandalonePage } from '@/lib/html/standalone-page';
 import { generalLimiter, getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
@@ -30,32 +31,21 @@ const optInBodySchema = z.object({
   optIn: z.boolean(),
 });
 
-const HTML_HEADERS = { 'Content-Type': 'text/html; charset=utf-8' } as const;
+const HTML_HEADERS = {
+  'Content-Type': 'text/html; charset=utf-8',
+  'Cache-Control': 'no-store',
+} as const;
 
-function htmlResponse(title: string, message: string, status: number) {
-  return new NextResponse(
-    `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5; color: #333; }
-    .card { background: #fff; padding: 48px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 400px; text-align: center; }
-    h1 { font-size: 24px; margin: 0 0 12px; }
-    p { font-size: 16px; line-height: 1.5; color: #666; margin: 0; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>${title}</h1>
-    <p>${message}</p>
-  </div>
-</body>
-</html>`,
-    { status, headers: HTML_HEADERS }
-  );
+function htmlResponse(
+  title: string,
+  message: string,
+  status: number,
+  tone: 'neutral' | 'success' | 'error' = 'neutral'
+) {
+  return new NextResponse(renderStandalonePage({ title, message, tone }), {
+    status,
+    headers: HTML_HEADERS,
+  });
 }
 
 async function applyOptIn(email: string, profileId: string, optIn: boolean) {
@@ -184,7 +174,12 @@ export async function GET(req: NextRequest) {
     const ip = getClientIP(req);
     const rl = await generalLimiter.limit(ip);
     if (!rl.success) {
-      return htmlResponse('Too Many Requests', 'Please try again later.', 429);
+      return htmlResponse(
+        'Too Many Requests',
+        'Please try again later.',
+        429,
+        'error'
+      );
     }
 
     const token = new URL(req.url).searchParams.get('token');
@@ -192,7 +187,8 @@ export async function GET(req: NextRequest) {
       return htmlResponse(
         'Invalid Link',
         'This opt-in link is invalid or expired.',
-        400
+        400,
+        'error'
       );
     }
 
@@ -201,7 +197,8 @@ export async function GET(req: NextRequest) {
       return htmlResponse(
         'Invalid Link',
         'This opt-in link is invalid or expired.',
-        403
+        403,
+        'error'
       );
     }
 
@@ -210,17 +207,24 @@ export async function GET(req: NextRequest) {
       return htmlResponse(
         'Not Found',
         'We could not find your subscription record.',
-        404
+        404,
+        'error'
       );
     }
 
     return htmlResponse(
       "You're Subscribed!",
       "You'll now receive updates about upcoming shows and new releases. You can unsubscribe at any time from any email.",
-      200
+      200,
+      'success'
     );
   } catch (error) {
     captureError('[audience] opt-in GET error', error);
-    return htmlResponse('Something went wrong', 'Please try again later.', 500);
+    return htmlResponse(
+      'Something went wrong',
+      'Please try again later.',
+      500,
+      'error'
+    );
   }
 }

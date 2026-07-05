@@ -21,8 +21,18 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | Workflow | Schedule | Purpose | Source |
 |----------|----------|---------|--------|
 | `Nightly Tests` | `0 2 * * *` PT | Full unit + E2E suite, Knip dead-code audit. Alerts on failure. | `.github/workflows/nightly-tests.yml` |
+| `Nightly Testing Agent` | `30 2 * * *` PT | Risk-ranked target selection, unit telemetry, Stryker mutation hotspots, daily report commit + Redis ops snapshot. LLM-free. | `.github/workflows/nightly-testing-agent.yml` |
 | `Test Coverage Audit` | `0 6 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage. Commits if changed. | `.github/workflows/test-coverage-audit.yml` |
 | `Neon Ephemeral Branch Cleanup` | (see workflow) | Reaps Neon branches created by per-PR ephemeral DB tests. | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
+
+## Local Hermes Launchd Schedule
+
+These are machine-local Hermes jobs, not Vercel production crons. They run from launchd on the operator Mac and write to `~/.hermes`.
+
+| Unit | Schedule | Purpose | Source |
+|------|----------|---------|--------|
+| `co.jovie.hermes.cron-pipeline-scoreboard` | every 60 min | Computes the daily codex shipping funnel, writes `pipeline-scoreboard-latest.json` + gbrain `ops/pipeline-scoreboard/latest`, and alerts on 12h shipper stalls. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
+| `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Runs bounded gbrain doctor/search probes, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack through existing ops notification helpers. | `scripts/hermes/jobs/gbrain-health-summary.ts` |
 
 ## Production Schedule
 
@@ -42,9 +52,10 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
+| `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
 | `/api/cron/clerk-config-audit` | `*/30 * * * *` | Every 30 minutes (JOV-2446) |
 
-13 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
+14 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
 
@@ -78,7 +89,9 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 | 2 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
 | 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
 | 4 | cleanupSmsIntents | Every day | Marks expired SMS subscribe intents, hard-deletes rows >24h old (folded from standalone cron per JOV-1901) |
-| 5 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
+|| 5 | aiCrawlerAnalytics | Every day | Syncs Cloudflare zone AI-crawl analytics into `ai_crawler_analytics_snapshots` per artist profile (skips when CF GraphQL not configured) |
+|| 6 | onboardingScriptAggregation | Every day | Onboarding deterministic-script self-improvement (JOV-3806): recomputes per-line conversion counters, mines lint-clean LLM candidates, promotes/retires variants |
+|| 7 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
 
 > **Note:** `scheduleNotifications` was previously listed here but has been called directly from `/api/cron/frequent` for sub-hourly scheduling. It is NOT a daily-maintenance sub-job. See AUTOMATION_AUDIT.md for rationale.
 
@@ -106,9 +119,11 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/data-retention` | 300s | Standalone entry with enhanced auth | `daily-maintenance` |
 | `/api/cron/pixel-forwarding` | 60s | Forwards up to 500 pixel events to ad platforms | `frequent` |
 | `/api/cron/process-campaigns` | 60s | Processes drip campaign sends | `frequent` |
+| `/api/cron/sync-ai-crawler-analytics` | 120s | Standalone entry for AI crawler analytics sync | `daily-maintenance` |
 | `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
+| `/api/cron/auth-signup-onboarding-canary` | 30s | Lightweight HTTP golden-path check: GET /signup, /signin, /start, POST /api/chat onboarding probe; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1871) | — |
 
 ## LLM Model Usage in Web App Crons
 

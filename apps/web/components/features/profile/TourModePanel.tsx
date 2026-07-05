@@ -1,8 +1,11 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+import { Ticket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -33,7 +36,7 @@ function getTicketStatusClassName(
   }
 
   return canBuyTickets
-    ? 'border-white/14 bg-white/[0.02] text-white'
+    ? 'border-white/14 bg-white/[0.02] text-white dark:text-white'
     : 'border-white/8 bg-transparent text-white/38';
 }
 
@@ -78,10 +81,10 @@ function DateBox({
 
   return (
     <div className='flex w-11 shrink-0 flex-col items-center justify-center'>
-      <span className='text-[10px] font-semibold tracking-[0.02em] text-white/52'>
+      <span className='text-3xs font-semibold tracking-wider text-white/52'>
         {displayDate.month}
       </span>
-      <span className='mt-1 text-[20px] font-[680] leading-none tracking-[-0.02em] text-white tabular-nums'>
+      <span className='mt-1 text-xl font-bold leading-none tracking-tighter text-(--color-text-tooltip) tabular-nums'>
         {displayDate.day}
       </span>
     </div>
@@ -123,10 +126,10 @@ function TourDateRow({
       <DateBox date={item.date.startDate} featured={false} />
 
       <div className='min-w-0'>
-        <p className='min-w-0 truncate text-[15px] font-medium tracking-[-0.03em] text-white'>
+        <p className='min-w-0 truncate text-mid font-medium tracking-[-0.03em] text-(--color-text-tooltip)'>
           {item.date.venueName}
         </p>
-        <p className='mt-0.5 min-w-0 truncate text-[12px] font-medium tracking-[-0.01em] text-white/52'>
+        <p className='mt-0.5 min-w-0 truncate text-xs font-medium tracking-tight text-white/52'>
           {location}
         </p>
       </div>
@@ -150,7 +153,7 @@ function TourDateRow({
           target='_blank'
           rel='noopener noreferrer'
           className={cn(
-            'inline-flex min-h-11 shrink-0 items-center rounded-[14px] border px-3 text-[12px] font-semibold tracking-[-0.01em] transition-[border-color,background-color,opacity] duration-subtle hover:opacity-90',
+            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-tight transition-[border-color,background-color,opacity] duration-subtle hover:opacity-90',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -159,7 +162,7 @@ function TourDateRow({
       ) : (
         <span
           className={cn(
-            'inline-flex min-h-11 shrink-0 items-center rounded-[14px] border px-3 text-[12px] font-semibold tracking-[-0.01em]',
+            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-tight',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -186,13 +189,14 @@ function TourDatesContent({
   if (allDates.length === 0) {
     const action =
       renderMode === 'preview' ? (
-        <button
+        <Button
           type='button'
-          className='inline-flex h-11 items-center rounded-full bg-white px-5 text-[13px] font-semibold tracking-[-0.01em] text-black'
+          variant='primary'
+          className='h-11 w-full rounded-full'
           disabled
         >
           Event Alerts
-        </button>
+        </Button>
       ) : (
         <ArtistNotificationsCTA
           artist={artist}
@@ -206,14 +210,15 @@ function TourDatesContent({
       );
 
     return (
-      <div className='flex min-h-[36vh] flex-col items-center justify-center px-6 py-12 text-center'>
-        <p className='text-[17px] font-semibold tracking-[-0.018em] text-white'>
-          No Events
-        </p>
-        <p className='mt-2 max-w-[25ch] text-[12.5px] leading-5 text-white/52'>
-          Get alerted when shows are announced.
-        </p>
-        <div className='mt-5'>{action}</div>
+      <div className='px-4 pb-4' data-testid='profile-primary-tab-events-empty'>
+        <ProfileEmptyBentoCard
+          accent='events'
+          icon={Ticket}
+          title='No Events'
+          body='Get alerted when shows are announced.'
+          layout='compact'
+          action={action}
+        />
       </div>
     );
   }
@@ -242,7 +247,7 @@ function TourDatesContent({
     <div data-testid='tour-drawer-list'>
       {groups.map(group => (
         <section key={group.label} className='pb-4'>
-          <div className='px-4 pb-2 pt-3 text-[11px] font-[680] uppercase tracking-[0.16em] text-white/32'>
+          <div className='px-4 pb-2 pt-3 text-2xs font-bold uppercase tracking-[0.16em] text-white/32'>
             {group.label}
           </div>
           <div className='border-y border-white/[0.075]'>

@@ -21,14 +21,10 @@ describe('AppShellFrame', () => {
       'data-shell-design',
       'shellChatV1'
     );
-    expect(mainContent).toHaveClass(
-      'lg:shadow-[var(--linear-app-shell-shadow)]'
-    );
+    expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
-    expect(mainContent).toHaveClass(
-      'lg:rounded-[var(--linear-app-shell-radius)]'
-    );
+    expect(mainContent).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
     expect(mainContent.querySelector('div.flex.flex-1')).toHaveClass(
       'lg:gap-[var(--linear-app-shell-gap)]'
     );
@@ -77,6 +73,47 @@ describe('AppShellFrame', () => {
     expect(mainContent.querySelector('div.flex.flex-1')).not.toHaveClass(
       'lg:gap-[var(--linear-app-shell-gap)]'
     );
+  });
+
+  it('keeps the right rail outside the non-scrolling shell clip', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div data-testid='fixture-right-rail'>Right rail</div>}
+      />
+    );
+
+    const scrollPane = screen.getByTestId('app-shell-scroll');
+    const rightRail = screen.getByTestId('app-shell-right-rail');
+
+    expect(scrollPane).toHaveClass('overflow-hidden');
+    expect(scrollPane).not.toHaveClass('overflow-y-auto');
+    expect(scrollPane).toContainElement(screen.getByText('Main Content'));
+    expect(scrollPane).not.toContainElement(rightRail);
+    expect(rightRail).toContainElement(
+      screen.getByTestId('fixture-right-rail')
+    );
+    expect(rightRail).toHaveClass('sticky', 'top-0');
+  });
+
+  it('marks composer focus on the shell frame for chrome retreat styles', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div>Right rail</div>}
+        composerFocusActive
+      />
+    );
+
+    const frame = screen.getByRole('main').closest('[data-app-shell-frame]');
+
+    expect(frame).toHaveAttribute('data-composer-focus', 'true');
+    expect(screen.getByTestId('app-shell-sidebar-mount')).toBeInTheDocument();
+    expect(screen.getByTestId('app-shell-right-rail')).toBeInTheDocument();
   });
 
   it('renders the shared audio player slot inside the shell frame', () => {

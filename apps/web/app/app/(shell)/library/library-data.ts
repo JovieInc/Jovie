@@ -1,5 +1,11 @@
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import {
+  DEFAULT_LIBRARY_APPROVAL_STATUS,
+  type LibraryApprovalStatus,
+} from '@/lib/library/approval-status';
+import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import type { LibraryMerchCard } from '@/lib/merch/types';
+import { hashLibraryWaveformSeed } from './library-waveform-peaks';
 
 export interface LibraryProviderLink {
   readonly key: string;
@@ -24,6 +30,14 @@ export type LibraryView =
   | 'videos'
   | 'audio';
 
+export type LibraryAspectRatio = '1:1' | '16:9' | '9:16';
+
+export type LibraryGridDensity = 'compact' | 'comfortable' | 'spacious';
+
+export type LibraryViewMode = 'grid' | 'list' | 'table';
+
+export type LibraryMediaOrientation = 'landscape' | 'portrait';
+
 export interface LibraryReleaseAsset {
   readonly itemKind?: LibraryItemKind;
   readonly id: string;
@@ -31,10 +45,13 @@ export interface LibraryReleaseAsset {
   readonly artist: string;
   readonly artworkUrl: string | null;
   readonly previewUrl: string | null;
+  readonly videoUrl: string | null;
+  readonly waveformSeed: number;
   readonly smartLinkPath: string;
   readonly releaseDate: string | null;
   readonly releaseType: ReleaseViewModel['releaseType'];
   readonly status: ReleaseViewModel['status'];
+  readonly approvalStatus: LibraryApprovalStatus;
   readonly trackCount: number;
   readonly providerCount: number;
   readonly providers: readonly LibraryProviderLink[];
@@ -60,6 +77,57 @@ export interface LibraryReleaseAsset {
   readonly description?: string;
   readonly createdAt?: string;
   readonly updatedAt?: string;
+  readonly aspectRatio?: LibraryAspectRatio;
+  readonly mediaOrientation?: LibraryMediaOrientation;
+  readonly share?: LibraryAssetShareViewModel | null;
+}
+
+export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {
+  compact: 'grid gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
+  comfortable: 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4',
+  spacious: 'grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3',
+};
+
+export function getLibraryAssetAspectRatio(
+  asset: LibraryReleaseAsset
+): LibraryAspectRatio {
+  if (asset.aspectRatio) return asset.aspectRatio;
+
+  const itemKind = getLibraryItemKind(asset);
+  if (itemKind === 'video') {
+    return asset.mediaOrientation === 'portrait' ? '9:16' : '16:9';
+  }
+
+  return '1:1';
+}
+
+export function getLibraryAspectRatioClass(ratio: LibraryAspectRatio): string {
+  switch (ratio) {
+    case '16:9':
+      return 'aspect-video';
+    case '9:16':
+      return 'aspect-[9/16]';
+    default:
+      return 'aspect-square';
+  }
+}
+
+/**
+ * Compact drawer-hero sizing for the narrow right rail.
+ *
+ * Caps width for square/landscape art and caps HEIGHT for portrait art so a
+ * tall 9:16 canvas does not blow the rail out vertically. Returns the wrapper
+ * class plus the aspect class; the aspect class keeps the media's true ratio
+ * while the cap that does not match the long axis is effectively inert.
+ */
+export function getLibraryDrawerHeroClass(ratio: LibraryAspectRatio): string {
+  const aspectClass = getLibraryAspectRatioClass(ratio);
+  // Portrait: bound by height so width derives down from the cap.
+  if (ratio === '9:16') {
+    return `${aspectClass} mx-auto h-full max-h-72 w-auto`;
+  }
+  // Square / landscape: bound by width.
+  return `${aspectClass} mx-auto w-full max-w-56`;
 }
 
 function normalizeHttpUrl(value: string | null | undefined): string | null {
@@ -68,8 +136,18 @@ function normalizeHttpUrl(value: string | null | undefined): string | null {
   return trimmed;
 }
 
+function resolveLibraryApprovalStatus(
+  assetId: string,
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
+): LibraryApprovalStatus {
+  return (
+    approvalStatusByAssetId?.get(assetId) ?? DEFAULT_LIBRARY_APPROVAL_STATUS
+  );
+}
+
 export function buildLibraryReleaseAssets(
-  releases: readonly ReleaseViewModel[]
+  releases: readonly ReleaseViewModel[],
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
 ): LibraryReleaseAsset[] {
   return releases.map(release => {
     const providers = release.providers.flatMap(provider => {
@@ -86,6 +164,7 @@ export function buildLibraryReleaseAssets(
     });
     const artworkUrl = normalizeHttpUrl(release.artworkUrl);
     const previewUrl = normalizeHttpUrl(release.previewUrl);
+    const videoUrl = normalizeHttpUrl(release.canvasVideoUrl);
     const hasArtwork = Boolean(artworkUrl);
     const hasLyrics = Boolean(release.lyrics?.trim());
     const hasVideoLinks = Boolean(release.hasVideoLinks);
@@ -102,10 +181,16 @@ export function buildLibraryReleaseAssets(
       artist: release.artistNames?.[0]?.trim() || 'Unknown Artist',
       artworkUrl,
       previewUrl,
+      videoUrl,
+      waveformSeed: hashLibraryWaveformSeed(release.id),
       smartLinkPath: release.smartLinkPath,
       releaseDate: release.releaseDate ?? null,
       releaseType: release.releaseType,
       status: release.status,
+      approvalStatus: resolveLibraryApprovalStatus(
+        release.id,
+        approvalStatusByAssetId
+      ),
       trackCount: release.totalTracks,
       providerCount: providers.length,
       providers,
@@ -153,21 +238,29 @@ function formatMerchStatus(status: LibraryMerchCard['status']): string {
 
 export function buildLibraryMerchAssets(
   cards: readonly LibraryMerchCard[],
-  artistName: string
+  artistName: string,
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
 ): LibraryReleaseAsset[] {
   return cards.map(card => {
     const imageUrl = normalizeHttpUrl(card.primaryImageUrl);
+    const assetId = `merch-${card.id}`;
     return {
       itemKind: 'merch',
-      id: `merch-${card.id}`,
+      id: assetId,
       title: card.title,
       artist: artistName,
       artworkUrl: imageUrl,
       previewUrl: null,
+      videoUrl: null,
+      waveformSeed: hashLibraryWaveformSeed(assetId),
       smartLinkPath: '/app/library?view=merch',
       releaseDate: card.publishedAt ?? card.updatedAt,
       releaseType: 'single',
       status: merchStatusToReleaseStatus(card.status),
+      approvalStatus: resolveLibraryApprovalStatus(
+        assetId,
+        approvalStatusByAssetId
+      ),
       trackCount: 0,
       providerCount: 0,
       providers: [],

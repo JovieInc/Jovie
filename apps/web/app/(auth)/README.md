@@ -41,7 +41,7 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 
 - [`tests/e2e/auth.setup.ts`](../../tests/e2e/auth.setup.ts) uses `@clerk/testing/playwright` to create the shared authenticated Playwright session for protected-route specs.
 - [`tests/e2e/auth.spec.ts`](../../tests/e2e/auth.spec.ts) intentionally creates a fresh signed-out browser context so `/signin` and `/signup` are tested as public auth pages, not as redirects for an already signed-in user.
-- [`tests/e2e/synthetic-auth-ui.spec.ts`](../../tests/e2e/synthetic-auth-ui.spec.ts) verifies the production auth surface renders SSO buttons without credential inputs.
+- [`tests/e2e/synthetic-auth-ui.spec.ts`](../../tests/e2e/synthetic-auth-ui.spec.ts) verifies the production auth surface renders SSO buttons and the intentional email/identifier input.
 
 ## Manual QA
 

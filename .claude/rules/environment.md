@@ -165,9 +165,12 @@ For daily local web dev and secret-bound test flows, prefer the root wrappers (`
 
 ```bash
 # Development
-pnpm dev                    # Start all dev servers
+pnpm dev                    # Web-only fast dev (same as dev:web:fast)
+pnpm run dev:all            # All workspace dev servers (docs, console, should-i-make, web, desktop)
 pnpm run dev:web:fast       # Fast local web app with pinned Doppler scope
 pnpm run dev:web:local      # Local web app without fast prewarm defaults
+pnpm run dev:cleanup        # Dry-run: list stale next/turbo dev processes (default >=4h)
+pnpm run dev:cleanup:force  # Terminate stale next/turbo dev processes
 
 # Building
 pnpm build                  # Build all packages

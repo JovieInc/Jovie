@@ -20,11 +20,11 @@ const ADMIN_SETTINGS_FILES = [
   findSourceFile(
     resolve(
       process.cwd(),
-      'components/features/dashboard/organisms/SettingsAdminSection.tsx'
+      'components/features/admin/OperationalControlPanel.tsx'
     ),
     resolve(
       process.cwd(),
-      'apps/web/components/features/dashboard/organisms/SettingsAdminSection.tsx'
+      'apps/web/components/features/admin/OperationalControlPanel.tsx'
     )
   ),
   findSourceFile(
@@ -117,24 +117,24 @@ describe('admin settings heading typography', () => {
     );
   });
 
-  it('keeps admin settings surfaces on shared settings primitives', () => {
-    const adminSection = readFileSync(
+  it('keeps operational controls on shared settings primitives', () => {
+    const operationalControls = readFileSync(
       findSourceFile(
         resolve(
           process.cwd(),
-          'components/features/dashboard/organisms/SettingsAdminSection.tsx'
+          'components/features/admin/OperationalControlPanel.tsx'
         ),
         resolve(
           process.cwd(),
-          'apps/web/components/features/dashboard/organisms/SettingsAdminSection.tsx'
+          'apps/web/components/features/admin/OperationalControlPanel.tsx'
         )
       ),
       'utf8'
     );
 
-    expect(adminSection).toContain('import { SettingsPanel }');
-    expect(adminSection).toContain('<SettingsPanel');
-    expect(adminSection).toContain('WaitlistSettingsPanel');
-    expect(adminSection).toContain('CampaignSettingsPanel');
+    expect(operationalControls).toContain('import { SettingsPanel }');
+    expect(operationalControls).toContain('<SettingsPanel');
+    expect(operationalControls).toContain('WaitlistSettingsPanel');
+    expect(operationalControls).toContain('CampaignSettingsPanel');
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   getDeepErrorMessage,
+  isMissingColumnError,
+  isUndefinedColumnError,
   isUniqueViolation,
   unwrapPgError,
 } from '@/lib/db/errors';
@@ -120,6 +122,54 @@ describe('getDeepErrorMessage', () => {
   it('returns plain message for unwrapped errors', () => {
     const error = new Error('something broke');
     expect(getDeepErrorMessage(error)).toBe('something broke');
+  });
+});
+
+describe('isUndefinedColumnError', () => {
+  it('detects raw PG undefined_column errors', () => {
+    const error = Object.assign(
+      new Error('column "latest_referrer_url" does not exist'),
+      {
+        code: '42703',
+      }
+    );
+
+    expect(isUndefinedColumnError(error)).toBe(true);
+  });
+
+  it('detects Drizzle-wrapped undefined_column errors', () => {
+    const pgError = Object.assign(
+      new Error('column "latest_action_label" does not exist'),
+      { code: '42703' }
+    );
+    const drizzleError = new Error(
+      'Failed query: update "audience_members"...'
+    );
+    drizzleError.cause = pgError;
+
+    expect(isUndefinedColumnError(drizzleError)).toBe(true);
+  });
+});
+
+describe('isMissingColumnError', () => {
+  it('matches a specific missing column in wrapped errors', () => {
+    const pgError = Object.assign(
+      new Error(
+        'column "latest_referrer_url" of relation "audience_members" does not exist'
+      ),
+      { code: '42703' }
+    );
+    const drizzleError = new Error(
+      'Failed query: update "audience_members"...'
+    );
+    drizzleError.cause = pgError;
+
+    expect(isMissingColumnError(drizzleError, 'latest_referrer_url')).toBe(
+      true
+    );
+    expect(isMissingColumnError(drizzleError, 'latest_action_label')).toBe(
+      false
+    );
   });
 });
 

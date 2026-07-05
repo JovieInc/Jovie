@@ -26,7 +26,10 @@ const CLERK_REQUIRED_PREFIXES = [
   '/monitoring/',
 ] as const;
 
-const AUTHENTICATED_API_PREFIXES = [
+// DOCUMENTATION-ONLY: these prefixes are no longer load-bearing.
+// The catch-all for /api/ above protects all API routes by default.
+// Kept as a reference of known authenticated APIs.
+const _AUTHENTICATED_API_PREFIXES = [
   '/api/account',
   '/api/admin',
   '/api/billing',
@@ -43,9 +46,11 @@ const AUTHENTICATED_API_PREFIXES = [
   '/api/stripe',
   '/api/suggestions',
   '/api/waitlist',
+  '/api/wallet',
 ] as const;
 
 const PUBLIC_API_EXACT_PATHS = [
+  '/api/auth/native/exchange',
   '/api/profile/view',
   '/api/stripe/pricing-options',
 ] as const;
@@ -70,6 +75,7 @@ export function isClerkRequiredPath(
     return true;
   }
 
+  // Public API routes explicitly do NOT need Clerk.
   if (
     PUBLIC_API_EXACT_PATHS.includes(
       pathname as (typeof PUBLIC_API_EXACT_PATHS)[number]
@@ -79,14 +85,21 @@ export function isClerkRequiredPath(
     return false;
   }
 
+  // Default-deny for all other /api/ routes: any API path not explicitly
+  // listed as public requires Clerk middleware context. This prevents new
+  // API routes from silently bypassing auth during Clerk config outages.
+  // Previously, only routes in AUTHENTICATED_API_PREFIXES were protected,
+  // meaning a new route not yet added to the list would fall through.
+  if (pathname.startsWith('/api/') || pathname === '/api') {
+    return true;
+  }
+
   // Keep this Clerk-specific subset aligned with categorizePath() in proxy.ts.
   // Duplicating the minimal matcher here avoids coupling this utility to proxy.
   return (
     CLERK_REQUIRED_EXACT_PATHS.includes(
       pathname as (typeof CLERK_REQUIRED_EXACT_PATHS)[number]
-    ) ||
-    CLERK_REQUIRED_PREFIXES.some(prefix => pathname.startsWith(prefix)) ||
-    AUTHENTICATED_API_PREFIXES.some(prefix => pathname.startsWith(prefix))
+    ) || CLERK_REQUIRED_PREFIXES.some(prefix => pathname.startsWith(prefix))
   );
 }
 

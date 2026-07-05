@@ -2,10 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn().mockResolvedValue(undefined),
+  captureWarning: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  },
 }));
 
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
 
 describe('parseJsonBody', () => {
   beforeEach(() => {
@@ -81,6 +91,38 @@ describe('parseJsonBody', () => {
     }
 
     vi.unstubAllEnvs();
+  });
+
+  it('rejects oversized Content-Length with 413 without reporting to Sentry', async () => {
+    const request = new Request('https://example.com/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages: [] }),
+      headers: {
+        'Content-Type': 'application/json',
+        'content-length': '1630428',
+      },
+    });
+
+    const result = await parseJsonBody(request, {
+      route: 'POST /api/chat',
+      maxBodySize: 256 * 1024,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.response.status).toBe(413);
+      const payload = await result.response.json();
+      expect(payload.error).toBe('Request body too large');
+    }
+
+    expect(captureError).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[POST /api/chat] Request body too large',
+      expect.objectContaining({
+        contentLength: '1630428',
+        maxBodySize: 256 * 1024,
+      })
+    );
   });
 
   it('returns fallback when empty body is allowed', async () => {

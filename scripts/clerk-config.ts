@@ -23,7 +23,7 @@
  *     pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth": {"...": "..."}}'
  *
  *   # Common auth fix helper: inspect current redirect-related config
- *   doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "jov.ie|myapp://"
+ *   doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
  *
  * Safety (enforced):
  * - Always runs `clerk whoami` + instance verification first.
@@ -49,6 +49,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // --- Types (explicit, no clever golf) ---
 interface ClerkConfigOptions {
@@ -92,7 +93,7 @@ const INSTANCE_TO_DOPPLER: Record<string, DopplerRun> = {
   },
 };
 
-function getDopplerForInstance(instance: string = 'dev'): DopplerRun {
+export function getDopplerForInstance(instance: string = 'dev'): DopplerRun {
   const key = (
     instance || 'dev'
   ).toLowerCase() as keyof typeof INSTANCE_TO_DOPPLER;
@@ -116,7 +117,7 @@ function getClerkCommandPrefix(doppler: DopplerRun): string[] {
 }
 
 // --- Safety guards (explicit, reused patterns) ---
-function assertTestOrAllowedInstance(
+export function assertTestOrAllowedInstance(
   secretKey: string | undefined,
   allowProd: boolean
 ): void {
@@ -134,7 +135,10 @@ function assertTestOrAllowedInstance(
   // staging keys are often pk_live_ but scoped; allow if flag or known
 }
 
-function assertPatchTargetAllowed(doppler: DopplerRun, allowProd: boolean) {
+export function assertPatchTargetAllowed(
+  doppler: DopplerRun,
+  allowProd: boolean
+) {
   if (doppler.clerkInstance === 'prod' && !allowProd) {
     throw new Error(
       'SAFETY: Refusing to patch the production Clerk app without --allow-prod.'
@@ -367,7 +371,7 @@ async function cmdPatch(options: ClerkConfigOptions): Promise<void> {
 async function cmdCheckRedirects(options: ClerkConfigOptions): Promise<void> {
   if (!options.pattern) {
     throw new Error(
-      'check-redirects requires --pattern "substring" (e.g. "myapp://" or "jov.ie")'
+      'check-redirects requires --pattern "substring" (e.g. "ie.jov.jovie|jovie://" for native schemes, or "jov.ie")'
     );
   }
 
@@ -436,7 +440,7 @@ Global options (apply to most):
 
 Examples (MUST use doppler for env-appropriate keys):
   doppler run --project jovie-web --config dev -- pnpm tsx scripts/clerk-config.ts pull --instance dev
-  doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "jov.ie|myapp://"
+  doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
   doppler run ... pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth":{"...":{}}}'
 
 See docs/CLERK_CLI.md for full manual flows + safety rules.
@@ -558,8 +562,13 @@ gh-9805 principles: explicit, complete, small, DRY, action-oriented.
   }
 }
 
-main().catch(err => {
-  console.error('clerk-config error:', err?.message || err);
-  logAudit('error', { message: String(err?.message || err) });
-  process.exit(1);
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(err => {
+    console.error('clerk-config error:', err?.message || err);
+    logAudit('error', { message: String(err?.message || err) });
+    process.exit(1);
+  });
+}

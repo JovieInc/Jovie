@@ -63,6 +63,7 @@ function CampaignSection({
   children,
   className,
   bodyClassName,
+  embedded = false,
 }: Readonly<{
   title: string;
   subtitle?: string;
@@ -70,7 +71,30 @@ function CampaignSection({
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
+  embedded?: boolean;
 }>) {
+  if (embedded) {
+    return (
+      <section
+        className={cn(
+          'space-y-4 border-t border-subtle pt-4 first:border-t-0 first:pt-0',
+          className
+        )}
+      >
+        <div className='flex items-start justify-between gap-3'>
+          <div className='min-w-0'>
+            <h4 className='text-app font-medium text-primary-token'>{title}</h4>
+            {subtitle ? (
+              <p className='mt-0.5 text-xs text-secondary-token'>{subtitle}</p>
+            ) : null}
+          </div>
+          {actions ? <div className='shrink-0'>{actions}</div> : null}
+        </div>
+        <div className={cn('space-y-4', bodyClassName)}>{children}</div>
+      </section>
+    );
+  }
+
   return (
     <ContentSurfaceCard className={cn('overflow-hidden', className)}>
       <ContentSectionHeader
@@ -116,7 +140,7 @@ function CampaignCallout({
   return (
     <div
       className={cn(
-        'flex items-start gap-2 rounded-[10px] border px-4 py-3',
+        'flex items-start gap-2 rounded-lg border px-4 py-3',
         toneClassName,
         className
       )}
@@ -216,7 +240,13 @@ const PREVIEW_PROFILE_COLUMNS: ColumnDef<CampaignPreviewProfile, unknown>[] = [
   }) as ColumnDef<CampaignPreviewProfile, unknown>,
 ];
 
-export function InviteCampaignManager() {
+interface InviteCampaignManagerProps {
+  readonly embedded?: boolean;
+}
+
+export function InviteCampaignManager({
+  embedded = false,
+}: Readonly<InviteCampaignManagerProps> = {}) {
   const [sendResult, setSendResult] =
     useState<SendCampaignInvitesResponse | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -303,6 +333,7 @@ export function InviteCampaignManager() {
   return (
     <div className='space-y-4' data-testid='admin-campaigns-content'>
       <CampaignSection
+        embedded={embedded}
         title='Campaign Results'
         subtitle='Live invite throughput and conversion outcomes'
         actions={
@@ -358,9 +389,10 @@ export function InviteCampaignManager() {
 
       {stats?.jobQueue && hasActiveJobs && (
         <CampaignSection
+          embedded={embedded}
           title='Job Queue Active'
           subtitle='Background work currently processing invite jobs'
-          className='border-info/20 bg-info/5'
+          className={embedded ? undefined : 'border-info/20 bg-info/5'}
           actions={
             <Icon
               name='Loader2'
@@ -419,15 +451,16 @@ export function InviteCampaignManager() {
           {Math.round(throttling.maxDelayMs / 1000)}s delay (~
           {effectiveRatePerHour}/hour).{' '}
           <a
-            href={APP_ROUTES.SETTINGS_ADMIN}
+            href={APP_ROUTES.ADMIN_OPS}
             className='underline hover:text-primary-token'
           >
-            Change in Settings
+            Change in Ops
           </a>
         </p>
       </CampaignCallout>
 
       <CampaignSection
+        embedded={embedded}
         title='Claim Funnel'
         subtitle='Invite-to-claim performance across recent sends'
       >
@@ -459,6 +492,7 @@ export function InviteCampaignManager() {
       </CampaignSection>
 
       <CampaignSection
+        embedded={embedded}
         title='Recent Invite Activity'
         subtitle='Latest recipients, status, and downstream engagement'
         actions={
@@ -488,6 +522,7 @@ export function InviteCampaignManager() {
       </CampaignSection>
 
       <CampaignSection
+        embedded={embedded}
         title='Preview'
         subtitle='Preview the next invite batch before queuing it'
         actions={
@@ -555,6 +590,7 @@ export function InviteCampaignManager() {
       </CampaignSection>
 
       <CampaignSection
+        embedded={embedded}
         title='Send Invites'
         subtitle='Queue the next batch once your preview looks correct'
       >

@@ -23,6 +23,9 @@ vi.mock('@/lib/db', () => ({
     onConflictDoNothing: vi.fn().mockReturnThis(),
     onConflictDoUpdate: vi.fn().mockReturnThis(),
     returning: vi.fn().mockResolvedValue([{ id: 'sub-1' }]),
+    execute: vi.fn().mockResolvedValue(undefined),
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
   },
 }));
@@ -92,7 +95,12 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
 
+vi.mock('@/lib/tracking/fire-subscribe-event', () => ({
+  fireSubscribeCAPIEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Import once after all mocks are set up
+import { db } from '@/lib/db';
 import {
   getNotificationStatusDomain,
   subscribeToNotificationsDomain,
@@ -102,6 +110,8 @@ import {
 describe('notifications/domain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(db.limit).mockReset().mockResolvedValue([]);
+    vi.mocked(db.execute).mockReset().mockResolvedValue(undefined);
   });
 
   describe('subscribeToNotificationsDomain', () => {
@@ -132,12 +142,61 @@ describe('notifications/domain', () => {
       expect(result.body.success).toBe(false);
     });
 
+    it('persists TCPA consent hash and version on legacy SMS subscribe (JOV-1845)', async () => {
+      const artistId = '123e4567-e89b-12d3-a456-426614174000';
+      const { db } = await import('@/lib/db');
+      const { getCurrentConsentSnapshot } = await import(
+        '@/lib/notifications/sms-consent'
+      );
+
+      vi.mocked(db.limit)
+        .mockResolvedValueOnce([
+          {
+            id: artistId,
+            displayName: 'Test Artist',
+            username: 'testartist',
+            creatorIsPro: true,
+            creatorClerkId: null,
+            settings: null,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await subscribeToNotificationsDomain({
+        artist_id: artistId,
+        phone: '+15551234567',
+        channel: 'sms',
+        country_code: 'US',
+        source: 'alerts-landing',
+      });
+
+      expect(result.status).toBe(200);
+      expect(result.body.success).toBe(true);
+
+      const consentSnapshot = getCurrentConsentSnapshot();
+      expect(db.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'sms',
+          phone: '+15551234567',
+          smsConsentAt: expect.any(Date),
+          smsConsentTextHash: consentSnapshot.textHash,
+          smsConsentVersion: consentSnapshot.version,
+        })
+      );
+
+      expect(db.onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({
+            smsConsentTextHash: expect.anything(),
+            smsConsentVersion: expect.anything(),
+          }),
+        })
+      );
+    });
+
     it('keeps the subscribe success path when audience enrichment fails', async () => {
       const artistId = '123e4567-e89b-12d3-a456-426614174000';
       const { db } = await import('@/lib/db');
-      const { withSystemIngestionSession } = await import(
-        '@/lib/ingestion/session'
-      );
       const { captureError } = await import('@/lib/error-tracking');
 
       vi.mocked(db.limit)
@@ -153,7 +212,7 @@ describe('notifications/domain', () => {
         ])
         .mockResolvedValueOnce([]);
 
-      vi.mocked(withSystemIngestionSession).mockRejectedValueOnce(
+      vi.mocked(db.execute).mockRejectedValueOnce(
         new Error('column "latest_referrer_url" does not exist')
       );
 

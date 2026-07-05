@@ -4,6 +4,10 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
+import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
@@ -13,20 +17,10 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST() {
-  // SECURITY: dev-only routes use ALLOW gate, not DENY gate. See audit #1.
-  // An AND-gate on (NODE_ENV && VERCEL_ENV === 'production') leaves preview/staging
-  // open because VERCEL_ENV === 'preview' there. The correct pattern is to allow
-  // only when the env is explicitly 'development'; every other env (preview,
-  // staging, production) returns 403.
-  const isDevEnv =
-    process.env.NODE_ENV === 'development' ||
-    process.env.VERCEL_ENV === 'development';
-
-  if (!isDevEnv) {
-    return NextResponse.json(
-      { success: false, error: 'Not available outside development' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson(undefined, {
+      headers: NO_STORE_HEADERS,
+    });
   }
 
   const entitlements = await getCurrentUserEntitlements();

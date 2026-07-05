@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
@@ -17,10 +18,10 @@ export async function GET() {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  const token = process.env.VERCEL_API_TOKEN;
-  const projectId = process.env.VERCEL_PROJECT_ID;
-  const teamId = process.env.VERCEL_TEAM_ID;
-  const stagingSha = process.env.NEXT_PUBLIC_BUILD_SHA ?? '';
+  const token = env.VERCEL_API_TOKEN;
+  const projectId = env.VERCEL_PROJECT_ID;
+  const teamId = env.VERCEL_TEAM_ID;
+  const stagingSha = env.NEXT_PUBLIC_BUILD_SHA ?? '';
 
   if (!token || !projectId || !teamId) {
     return NextResponse.json(
