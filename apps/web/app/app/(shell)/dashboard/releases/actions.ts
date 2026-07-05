@@ -480,6 +480,29 @@ export async function saveReleaseMetadata(params: {
   });
 }
 
+const EDITABLE_RELEASE_STATUSES: ReadonlyArray<ReleaseViewModel['status']> = [
+  'draft',
+  'scheduled',
+  'released',
+];
+
+/** Update a release's lifecycle status (draft / scheduled / released) inline. */
+export async function saveReleaseStatus(params: {
+  profileId: string;
+  releaseId: string;
+  status: ReleaseViewModel['status'];
+}): Promise<ReleaseViewModel> {
+  if (!EDITABLE_RELEASE_STATUSES.includes(params.status)) {
+    throw new TypeError('Invalid release status');
+  }
+
+  return mutateRelease(params, async (releaseId, profileId) => {
+    await updateReleaseColumns(releaseId, profileId, {
+      status: params.status,
+    });
+  });
+}
+
 export async function savePrimaryIsrc(params: {
   profileId: string;
   releaseId: string;

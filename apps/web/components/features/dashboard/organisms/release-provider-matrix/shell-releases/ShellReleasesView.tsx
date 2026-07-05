@@ -20,7 +20,9 @@ import type {
   TrackSidebarData,
 } from '@/components/organisms/release-sidebar';
 import {
+  type ContextMenuItemType,
   convertContextMenuItems,
+  TableContextMenu,
   useAmbientListSelection,
 } from '@/components/organisms/table';
 import type {
@@ -159,6 +161,7 @@ interface ReleasesListContentProps {
     string,
     ReturnType<typeof convertContextMenuItems>
   >;
+  readonly contextMenuItemsByReleaseId: Map<string, ContextMenuItemType[]>;
   readonly isSmartLinkLocked: (id: string) => boolean;
   readonly getSmartLinkLockReason: (id: string) => SmartLinkLockReason | null;
   readonly getSyncStatus: (id: string) => ShellReleaseSyncStatus;
@@ -180,6 +183,7 @@ function ReleasesListContent({
   canCreateManualReleases,
   isSyncing,
   actionMenusByReleaseId,
+  contextMenuItemsByReleaseId,
   isSmartLinkLocked,
   getSmartLinkLockReason,
   getSyncStatus,
@@ -305,17 +309,25 @@ function ReleasesListContent({
       className='py-1.5 space-y-px px-2'
     >
       {visibleReleases.map(r => (
-        <ShellReleaseRow
+        <TableContextMenu
           key={r.id}
-          release={r}
-          isSelected={r.id === selectedReleaseId}
-          onSelect={() => onSelect(r)}
-          actionMenuItems={actionMenusByReleaseId.get(r.id)}
-          smartLinkLockReason={
-            isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
-          }
-          syncStatus={getSyncStatus(r.id)}
-        />
+          items={contextMenuItemsByReleaseId.get(r.id)}
+        >
+          {/* Plain wrapper: Radix ContextMenu.Trigger asChild needs a host
+              element that accepts the injected ref/onContextMenu props. */}
+          <div data-shell-release-row-context-target>
+            <ShellReleaseRow
+              release={r}
+              isSelected={r.id === selectedReleaseId}
+              onSelect={() => onSelect(r)}
+              actionMenuItems={actionMenusByReleaseId.get(r.id)}
+              smartLinkLockReason={
+                isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
+              }
+              syncStatus={getSyncStatus(r.id)}
+            />
+          </div>
+        </TableContextMenu>
       ))}
     </div>
   );
@@ -405,6 +417,7 @@ export function ShellReleasesView({
     handleAddUrl,
     handleSaveMetadata,
     handleSavePrimaryIsrc,
+    handleSaveStatus,
     handleSaveLyrics,
     handleFormatLyrics,
     isLyricsSaving,
@@ -592,24 +605,23 @@ export function ShellReleasesView({
     [router]
   );
 
-  const actionMenusByReleaseId = useMemo(() => {
+  const contextMenuItemsByReleaseId = useMemo(() => {
     return new Map(
       visibleReleases.map(release => [
         release.id,
-        convertContextMenuItems(
-          buildReleaseActions({
-            release,
-            onEdit: openEditor,
-            onCopy: handleCopy,
-            artistName,
-            isSmartLinkLocked,
-            getSmartLinkLockReason,
-            onDelete: handleDeleteRequest,
-            canGenerateAlbumArt: showGenerateAlbumArtAction,
-            onGenerateAlbumArt: handleGenerateAlbumArt,
-            onGeneratePitch: handleGeneratePitch,
-          })
-        ),
+        buildReleaseActions({
+          release,
+          onEdit: openEditor,
+          onCopy: handleCopy,
+          artistName,
+          isSmartLinkLocked,
+          getSmartLinkLockReason,
+          onDelete: handleDeleteRequest,
+          canGenerateAlbumArt: showGenerateAlbumArtAction,
+          onGenerateAlbumArt: handleGenerateAlbumArt,
+          onGeneratePitch: handleGeneratePitch,
+          onChangeStatus: handleSaveStatus,
+        }),
       ])
     );
   }, [
@@ -619,11 +631,21 @@ export function ShellReleasesView({
     handleDeleteRequest,
     handleGenerateAlbumArt,
     handleGeneratePitch,
+    handleSaveStatus,
     isSmartLinkLocked,
     openEditor,
     showGenerateAlbumArtAction,
     visibleReleases,
   ]);
+
+  const actionMenusByReleaseId = useMemo(() => {
+    return new Map(
+      [...contextMenuItemsByReleaseId].map(([releaseId, items]) => [
+        releaseId,
+        convertContextMenuItems(items),
+      ])
+    );
+  }, [contextMenuItemsByReleaseId]);
 
   // ── Spotify connect / import wiring ──
 
@@ -960,6 +982,7 @@ export function ShellReleasesView({
             canCreateManualReleases={canCreateManualReleases}
             isSyncing={isSyncing}
             actionMenusByReleaseId={actionMenusByReleaseId}
+            contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
             isSmartLinkLocked={isSmartLinkLocked}
             getSmartLinkLockReason={getSmartLinkLockReason}
             getSyncStatus={getSyncStatus}

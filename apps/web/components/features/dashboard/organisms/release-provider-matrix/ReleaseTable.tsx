@@ -49,6 +49,7 @@ export function ReleaseTable({
   canGenerateAlbumArt,
   onGenerateAlbumArt,
   onGeneratePitch,
+  onChangeStatus,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -81,6 +82,7 @@ export function ReleaseTable({
         canGenerateAlbumArt,
         onGenerateAlbumArt,
         onGeneratePitch,
+        onChangeStatus,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
@@ -92,6 +94,7 @@ export function ReleaseTable({
       canGenerateAlbumArt,
       onGenerateAlbumArt,
       onGeneratePitch,
+      onChangeStatus,
       artistName,
       isSmartLinkLocked,
       getSmartLinkLockReason,
@@ -210,6 +213,7 @@ export function ReleaseTable({
           canGenerateAlbumArt={canGenerateAlbumArt}
           onGenerateAlbumArt={onGenerateAlbumArt}
           onGeneratePitch={onGeneratePitch}
+          onChangeStatus={onChangeStatus}
           columnVisibility={columnVisibility}
           rowHeight={rowHeight}
           onFocusedRowChange={onFocusedRowChange}

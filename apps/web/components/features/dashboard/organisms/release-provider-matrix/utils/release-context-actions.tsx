@@ -12,6 +12,10 @@ interface GetReleaseContextMenuItemsOptions {
   artistName?: string | null;
   isSmartLinkLocked?: (releaseId: string) => boolean;
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null;
+  onChangeStatus?: (
+    release: ReleaseViewModel,
+    status: ReleaseViewModel['status']
+  ) => void;
 }
 
 /**
@@ -31,6 +35,7 @@ export async function getReleaseContextMenuItems({
   artistName,
   isSmartLinkLocked,
   getSmartLinkLockReason,
+  onChangeStatus,
 }: GetReleaseContextMenuItemsOptions): Promise<ContextMenuItemType[]> {
   const { buildReleaseActions } = await import(
     '@/features/dashboard/organisms/releases/release-actions'
@@ -47,5 +52,6 @@ export async function getReleaseContextMenuItems({
     artistName,
     isSmartLinkLocked,
     getSmartLinkLockReason,
+    onChangeStatus,
   });
 }

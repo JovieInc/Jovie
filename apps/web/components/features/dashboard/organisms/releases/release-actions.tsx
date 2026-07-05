@@ -24,7 +24,21 @@ const menuIcon = (
     | 'Sparkles'
     | 'Trash2'
     | 'Copy'
+    | 'Check'
+    | 'FileText'
+    | 'AlarmClock'
+    | 'CheckCircle'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
+
+const RELEASE_STATUS_OPTIONS: ReadonlyArray<{
+  value: ReleaseViewModel['status'];
+  label: string;
+  icon: 'FileText' | 'AlarmClock' | 'CheckCircle';
+}> = [
+  { value: 'draft', label: 'Draft', icon: 'FileText' },
+  { value: 'scheduled', label: 'Scheduled', icon: 'AlarmClock' },
+  { value: 'released', label: 'Released', icon: 'CheckCircle' },
+];
 
 /**
  * Platform icon for a provider's "Open in..." action.
@@ -75,6 +89,11 @@ export interface BuildReleaseActionsOptions {
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   readonly onGeneratePitch?: (release: ReleaseViewModel) => void;
+  /** Status change handler — when provided, an inline status submenu is included */
+  readonly onChangeStatus?: (
+    release: ReleaseViewModel,
+    status: ReleaseViewModel['status']
+  ) => void;
 }
 
 function buildPrimaryCopySmartLinkItem(
@@ -253,6 +272,7 @@ export function buildReleaseActions({
   canGenerateAlbumArt,
   onGenerateAlbumArt,
   onGeneratePitch,
+  onChangeStatus,
 }: BuildReleaseActionsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
@@ -334,6 +354,28 @@ export function buildReleaseActions({
     icon: menuIcon('Hash'),
     items: metadataItems,
   });
+
+  // ── Status submenu (inline lifecycle change) ──
+  if (onChangeStatus) {
+    const currentStatus = RELEASE_STATUS_OPTIONS.find(
+      option => option.value === release.status
+    );
+    items.push({
+      id: 'release-status',
+      label: `Status: ${currentStatus?.label ?? release.status}`,
+      icon: menuIcon(currentStatus?.icon ?? 'FileText'),
+      items: RELEASE_STATUS_OPTIONS.map(option => {
+        const isCurrent = option.value === release.status;
+        return {
+          id: `status-${option.value}`,
+          label: option.label,
+          icon: menuIcon(isCurrent ? 'Check' : option.icon),
+          disabled: isCurrent,
+          onClick: () => onChangeStatus(release, option.value),
+        } satisfies ContextMenuItemType;
+      }),
+    });
+  }
 
   // ── External provider links ──
   const supportedProviders = new Set<ProviderKey>([

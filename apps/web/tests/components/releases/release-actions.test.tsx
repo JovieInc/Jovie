@@ -343,6 +343,57 @@ describe('buildReleaseActions', () => {
     ).not.toBeNull();
   });
 
+  it('omits the status submenu when no onChangeStatus handler is provided', () => {
+    const items = buildReleaseActions({
+      release: createRelease({ status: 'released' }),
+      onEdit: vi.fn(),
+      onCopy: vi.fn(),
+    });
+
+    const statusMenu = items.find(
+      item => 'id' in item && item.id === 'release-status'
+    );
+    expect(statusMenu).toBeUndefined();
+  });
+
+  it('adds a status submenu reflecting the current status when a handler is provided', () => {
+    const onChangeStatus = vi.fn();
+    const release = createRelease({ status: 'draft' });
+    const items = buildReleaseActions({
+      release,
+      onEdit: vi.fn(),
+      onCopy: vi.fn(),
+      onChangeStatus,
+    });
+
+    const statusMenu = items.find(
+      item => 'id' in item && item.id === 'release-status'
+    );
+    expect(statusMenu).toMatchObject({
+      id: 'release-status',
+      label: 'Status: Draft',
+    });
+    if (!statusMenu || !('items' in statusMenu)) {
+      throw new Error('Expected status submenu');
+    }
+
+    expect(statusMenu.items).toHaveLength(3);
+    const current = statusMenu.items.find(
+      item => 'id' in item && item.id === 'status-draft'
+    );
+    expect(current).toMatchObject({ label: 'Draft', disabled: true });
+
+    const released = statusMenu.items.find(
+      item => 'id' in item && item.id === 'status-released'
+    );
+    if (!released || !('onClick' in released)) {
+      throw new Error('Expected released status action');
+    }
+    expect(released).toMatchObject({ label: 'Released', disabled: false });
+    released.onClick?.();
+    expect(onChangeStatus).toHaveBeenCalledWith(release, 'released');
+  });
+
   it('reuses source icons for tracked share submenu entries', () => {
     const items = buildReleaseActions({
       release: createRelease(),

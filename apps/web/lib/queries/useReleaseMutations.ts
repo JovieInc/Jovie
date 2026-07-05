@@ -12,6 +12,7 @@ import {
   saveProviderOverride,
   saveReleaseLyrics,
   saveReleaseMetadata,
+  saveReleaseStatus,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -333,6 +334,10 @@ export function useSaveReleaseMetadataMutation(profileId: string) {
 
 export function useSavePrimaryIsrcMutation(profileId: string) {
   return useReleaseMutation(profileId, savePrimaryIsrc);
+}
+
+export function useSaveReleaseStatusMutation(profileId: string) {
+  return useReleaseMutation(profileId, saveReleaseStatus);
 }
 
 export function useFormatReleaseLyricsMutation(profileId: string) {
