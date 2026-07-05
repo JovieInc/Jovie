@@ -12,6 +12,8 @@
  * Pure function — no DB access.
  */
 
+import { computeRatePercent } from '@/lib/analytics/metrics';
+
 /** Minimal artist profile fields needed for brand integrity checks */
 export interface BrandIntegrityProfile {
   readonly id: string;
@@ -363,7 +365,7 @@ function computeIntegrityScore(checklist: DisambiguatingItem[]): number {
       earned += CHECKLIST_WEIGHTS[item.attribute] ?? 0;
     }
   }
-  return Math.round((earned / totalWeight) * 100);
+  return computeRatePercent(earned, totalWeight, 0);
 }
 
 /**

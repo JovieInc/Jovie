@@ -8,6 +8,8 @@
  * Pure logic — no DB access. Storage is caller's responsibility.
  */
 
+import { computeRatePercent } from '@/lib/analytics/metrics';
+
 /** Known answer engines to query */
 export type CitationEngine =
   | 'perplexity'
@@ -201,7 +203,9 @@ export function computeCitationStats(results: CitationResult[]): CitationStats {
  */
 export function formatShareOfCitation(share: number): string {
   if (!Number.isFinite(share) || share < 0) return '0%';
-  return `${Math.round(share * 1000) / 10}%`;
+  // share is a 0–1 fraction; render as a 1-decimal percentage via the
+  // canonical derivation helper (denominator 1 → share * 100).
+  return `${computeRatePercent(share, 1, 1)}%`;
 }
 
 /**
