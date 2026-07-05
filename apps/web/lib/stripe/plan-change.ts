@@ -22,10 +22,10 @@ import { logger } from '@/lib/utils/logger';
 
 import { stripe } from './client';
 import {
+  ACTIVE_PRICE_MAPPINGS,
   getActivePriceIds,
   getPriceMappingDetails,
   type PlanType,
-  PRICE_MAPPINGS,
 } from './config';
 
 /**
@@ -599,7 +599,7 @@ export async function getAvailablePlanChanges(customerId: string): Promise<{
   try {
     // Handle empty customer ID (no Stripe customer yet)
     if (!customerId) {
-      const allOptions = Object.values(PRICE_MAPPINGS).map(mapping => ({
+      const allOptions = Object.values(ACTIVE_PRICE_MAPPINGS).map(mapping => ({
         priceId: mapping.priceId,
         plan: mapping.plan,
         interval: mapping.interval,
@@ -623,7 +623,7 @@ export async function getAvailablePlanChanges(customerId: string): Promise<{
 
     if (!subscription) {
       // No subscription - show all options as "upgrades" from free
-      const allOptions = Object.values(PRICE_MAPPINGS).map(mapping => ({
+      const allOptions = Object.values(ACTIVE_PRICE_MAPPINGS).map(mapping => ({
         priceId: mapping.priceId,
         plan: mapping.plan,
         interval: mapping.interval,
@@ -655,8 +655,8 @@ export async function getAvailablePlanChanges(customerId: string): Promise<{
       return null;
     }
 
-    // Get all available plans except current
-    const availableChanges = Object.values(PRICE_MAPPINGS)
+    // Get all available plans except current (legacy prices excluded)
+    const availableChanges = Object.values(ACTIVE_PRICE_MAPPINGS)
       .filter(mapping => mapping.priceId !== currentPriceId)
       .map(mapping => ({
         priceId: mapping.priceId,

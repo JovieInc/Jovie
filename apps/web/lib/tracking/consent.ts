@@ -127,6 +127,37 @@ export function isMarketingAllowed(): boolean {
 }
 
 /**
+ * Check if analytics tracking is allowed.
+ *
+ * Reads the granular consent object from localStorage (jv_cc).
+ * Returns true if analytics consent has NOT been explicitly rejected.
+ * In consent-required regions without a stored choice, analytics stays blocked.
+ */
+export function isAnalyticsAllowed(): boolean {
+  if (globalThis.window === undefined) return false;
+
+  if (isGPCEnabled() || isDNTEnabled()) return false;
+
+  const legacyState = getConsentState();
+  if (legacyState === 'rejected') return false;
+
+  try {
+    const raw = globalThis.localStorage?.getItem('jv_cc');
+    if (!raw) {
+      const bannerRequired = globalThis.document.cookie
+        .split(';')
+        .some(cookie => cookie.trim().startsWith('jv_cc_required=1'));
+      return !bannerRequired;
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed?.analytics !== false;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Generate a session ID for anonymous tracking
  * This is NOT PII - it's a random identifier that doesn't persist long-term
  */

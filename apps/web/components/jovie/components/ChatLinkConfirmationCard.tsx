@@ -68,6 +68,26 @@ export function ChatLinkConfirmationCard({
   const handleAdd = useCallback(() => {
     setErrorMessage(null);
     setState('adding');
+
+    // Optimistically add the link to the live profile preview so the bento
+    // updates the instant the user confirms; roll back to the snapshot on error.
+    const snapshot = previewPanel?.previewData ?? null;
+    if (snapshot) {
+      previewPanel?.setPreviewData({
+        ...snapshot,
+        links: [
+          ...snapshot.links,
+          {
+            id: `chat-link-${Date.now()}`,
+            title: platform.name,
+            url: normalizedUrl,
+            platform: platform.id,
+            isVisible: true,
+          },
+        ],
+      });
+    }
+
     confirmLink.mutate(
       {
         profileId,
@@ -78,27 +98,13 @@ export function ChatLinkConfirmationCard({
       {
         onSuccess: () => {
           setState('added');
-
-          // Instantly update sidebar preview with the new link
-          if (previewPanel?.previewData) {
-            previewPanel.setPreviewData({
-              ...previewPanel.previewData,
-              links: [
-                ...previewPanel.previewData.links,
-                {
-                  id: `chat-link-${Date.now()}`,
-                  title: platform.name,
-                  url: normalizedUrl,
-                  platform: platform.id,
-                  isVisible: true,
-                },
-              ],
-            });
-          }
         },
         onError: () => {
           setState('pending');
           setErrorMessage('Unable to add link. Please try again.');
+          if (snapshot) {
+            previewPanel?.setPreviewData(snapshot);
+          }
         },
       }
     );

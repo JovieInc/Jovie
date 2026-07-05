@@ -43,8 +43,8 @@ export function ArtistInfo({
     subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE;
   const subtitleClassName =
     resolvedSubtitle === DEFAULT_PROFILE_TAGLINE
-      ? 'text-[12px] font-semibold leading-none tracking-[-0.01em] text-tertiary-token'
-      : 'text-app sm:text-[15px] font-[520] leading-[1.32] tracking-[-0.02em] text-secondary-token line-clamp-2';
+      ? 'text-xs font-semibold leading-none tracking-tight text-tertiary-token'
+      : 'text-app sm:text-mid font-[520] leading-[1.32] tracking-tighter text-secondary-token line-clamp-2';
 
   const avatarSizeMap = {
     sm: { mobile: 'lg', desktop: 'display-sm' },
@@ -66,7 +66,7 @@ export function ArtistInfo({
   }[resolvedAvatarSize];
 
   const avatarContent = (
-    <div className='rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] p-[3px] shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
+    <div className='rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) p-1 shadow-(--profile-pearl-shadow) backdrop-blur-xl'>
       <Avatar
         src={artist.image_url || ''}
         alt={artist.name}

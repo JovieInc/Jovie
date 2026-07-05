@@ -170,6 +170,10 @@ describe('release artist links', () => {
 
     const artistLink = screen.getByRole('link', { name: 'Test Artist' });
     expect(artistLink).toHaveAttribute('href', '/test-artist');
+
+    const title = screen.getByRole('heading', { name: 'Future Release' });
+    expect(title).toHaveClass('text-2xl', 'tracking-tight');
+    expect(title).not.toHaveClass('text-3xl', 'text-4xl');
   });
 
   it('renders a dismissible claim banner for unclaimed creators', () => {

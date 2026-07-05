@@ -61,6 +61,12 @@ describe('CDN domain registry', () => {
       const domains = getCspConnectSrcDomains();
       expect(domains).toContain('https://vercel.com');
     });
+
+    it('includes Vercel Blob storage for client-side uploads', () => {
+      const domains = getCspConnectSrcDomains();
+      expect(domains).toContain('https://*.blob.vercel-storage.com');
+      expect(domains).toContain('https://*.public.blob.vercel-storage.com');
+    });
   });
 
   describe('getCspImgSrcDomains', () => {

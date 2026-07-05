@@ -370,22 +370,27 @@ export async function completeOnboarding({
       await clearPendingClaimContext();
     }
 
+    // Await proxy user state cache invalidation BEFORE the redirect so
+    // middleware sees fresh state on the user's next navigation. A stale
+    // cache would rewrite a completed user back to /start (onboarding),
+    // creating a redirect loop. The 50-200ms cost is acceptable on the
+    // critical path.
+    try {
+      await invalidateProxyUserStateCache(userId);
+    } catch (error) {
+      await captureError('invalidate_proxy_user_state_cache failed', error, {
+        route: 'onboarding',
+        userId,
+      });
+    }
+
+    // Remaining side effects are fire-and-forget — they don't affect routing.
     await Promise.allSettled([
       runBoundedPostOnboardingSideEffect(
         'cache_handle_availability',
         () => cacheHandleAvailability(completion.username, false),
         {
           username: completion.username,
-        }
-      ),
-      // Immediately invalidate user state cache so middleware sees fresh state.
-      // This is best-effort because the completion cookie below also prevents
-      // redirect loops during the handoff to /app.
-      runBoundedPostOnboardingSideEffect(
-        'invalidate_proxy_user_state_cache',
-        () => invalidateProxyUserStateCache(userId),
-        {
-          userId,
         }
       ),
       runBoundedPostOnboardingSideEffect(

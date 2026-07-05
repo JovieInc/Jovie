@@ -180,13 +180,13 @@ export function ProfileLiveCelebration({
     <dialog
       ref={dialogRef}
       className='fixed inset-0 z-50 m-0 flex h-full w-full max-w-none items-center justify-center border-none bg-(--bg)/95 p-0 backdrop-blur-sm'
-      aria-label='Profile live celebration'
+      aria-label='Profile Live Celebration'
     >
       <ConfettiOverlay />
 
       {/* Content */}
       <div
-        className={`relative z-10 flex flex-col items-center gap-6 px-6 text-center transition-all duration-700 ease-out ${
+        className={`relative z-10 flex flex-col items-center gap-6 px-6 text-center transition-colors duration-cinematic ease-out ${
           isVisible
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-8 scale-95'
@@ -198,10 +198,10 @@ export function ProfileLiveCelebration({
         />
 
         <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
-          Your profile is live
+          Your Profile Is Live
         </h2>
 
-        <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2.5'>
+        <div className='flex items-center gap-2 rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2.5'>
           <span className='text-app font-medium text-primary-token'>
             {profileUrl}
           </span>
@@ -222,7 +222,7 @@ export function ProfileLiveCelebration({
           ref={continueRef}
           type='button'
           onClick={completeCelebration}
-          aria-label='Continue to the next step'
+          aria-label='Continue To The Next Step'
           className='mt-2 text-app text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
         >
           Continue →

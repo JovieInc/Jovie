@@ -1,5 +1,6 @@
 import type {
   MoveTaskInput,
+  TaskBoardColumnResult,
   TaskBoardResult,
   TaskListResult,
   TaskStatus,
@@ -82,6 +83,164 @@ function findTaskInBoard(
   }
 
   return null;
+}
+
+export function getTaskBoardColumnDroppableId(status: TaskStatus): string {
+  return `task-board-column:${status}`;
+}
+
+export function getTaskStatusFromBoardColumnDroppableId(
+  id: string
+): TaskStatus | null {
+  const status = id.replace('task-board-column:', '');
+  return TASK_BOARD_STATUSES.includes(status as TaskStatus)
+    ? (status as TaskStatus)
+    : null;
+}
+
+function findTaskInBoardColumns(
+  columns: ReadonlyArray<TaskBoardColumnResult>,
+  taskId: string
+): TaskView | null {
+  for (const column of columns) {
+    const task = column.tasks.find(candidate => candidate.id === taskId);
+    if (task) return task;
+  }
+
+  return null;
+}
+
+function findTaskStatusInBoardColumns(
+  columns: ReadonlyArray<TaskBoardColumnResult>,
+  taskId: string
+): TaskStatus | null {
+  return (
+    columns.find(column => column.tasks.some(task => task.id === taskId))
+      ?.status ?? null
+  );
+}
+
+export function resolveTaskBoardDropInsertIndex({
+  overTaskIndex,
+  destinationLength,
+  isSameColumn,
+  sourceIndex,
+  overIndex,
+}: Readonly<{
+  overTaskIndex: number;
+  destinationLength: number;
+  isSameColumn: boolean;
+  sourceIndex: number;
+  overIndex: number;
+}>): number {
+  if (overTaskIndex === -1) {
+    return destinationLength;
+  }
+
+  if (isSameColumn && sourceIndex < overIndex) {
+    return overTaskIndex + 1;
+  }
+
+  return overTaskIndex;
+}
+
+function toSingleAnchorMoveInput({
+  taskId,
+  toStatus,
+  beforeTaskId,
+  afterTaskId,
+}: Readonly<{
+  taskId: string;
+  toStatus: TaskStatus;
+  beforeTaskId: string | null;
+  afterTaskId: string | null;
+}>): MoveTaskInput {
+  if (beforeTaskId) {
+    return { taskId, toStatus, beforeTaskId };
+  }
+
+  if (afterTaskId) {
+    return { taskId, toStatus, afterTaskId };
+  }
+
+  return { taskId, toStatus };
+}
+
+export function resolveTaskBoardMoveInput({
+  activeTaskId,
+  overId,
+  columns,
+}: Readonly<{
+  activeTaskId: string;
+  overId: string;
+  columns: ReadonlyArray<TaskBoardColumnResult>;
+}>): MoveTaskInput | null {
+  const activeTask = findTaskInBoardColumns(columns, activeTaskId);
+  if (!activeTask || activeTask.id === overId) {
+    return null;
+  }
+
+  const overColumnStatus =
+    getTaskStatusFromBoardColumnDroppableId(overId) ??
+    findTaskStatusInBoardColumns(columns, overId);
+  if (!overColumnStatus) {
+    return null;
+  }
+
+  const destinationColumn = columns.find(
+    column => column.status === overColumnStatus
+  );
+  if (!destinationColumn) {
+    return null;
+  }
+
+  const destinationTasksWithoutActive = destinationColumn.tasks.filter(
+    task => task.id !== activeTaskId
+  );
+  const overTaskIndex = destinationTasksWithoutActive.findIndex(
+    task => task.id === overId
+  );
+  const sourceColumn = columns.find(
+    column => column.status === activeTask.status
+  );
+  const sourceIndex =
+    sourceColumn?.tasks.findIndex(task => task.id === activeTaskId) ?? -1;
+  const overIndex =
+    destinationColumn.tasks.findIndex(task => task.id === overId) ?? -1;
+  const insertIndex = resolveTaskBoardDropInsertIndex({
+    overTaskIndex,
+    destinationLength: destinationTasksWithoutActive.length,
+    isSameColumn: activeTask.status === overColumnStatus,
+    sourceIndex,
+    overIndex,
+  });
+  const beforeTaskId = destinationTasksWithoutActive[insertIndex]?.id ?? null;
+  const afterTaskId =
+    destinationTasksWithoutActive[insertIndex - 1]?.id ?? null;
+
+  if (activeTask.status === overColumnStatus && sourceColumn) {
+    const sourceTasksWithoutActive = sourceColumn.tasks.filter(
+      task => task.id !== activeTaskId
+    );
+    const currentBeforeTaskId =
+      sourceTasksWithoutActive[sourceIndex]?.id ?? null;
+    const currentAfterTaskId =
+      sourceTasksWithoutActive[sourceIndex - 1]?.id ?? null;
+
+    if (
+      currentBeforeTaskId === beforeTaskId &&
+      currentAfterTaskId === afterTaskId
+    ) {
+      return null;
+    }
+  }
+
+  return toSingleAnchorMoveInput({
+    taskId: activeTaskId,
+    toStatus: overColumnStatus,
+    beforeTaskId,
+    afterTaskId,
+  });
 }
 
 function resolveInsertIndex(

@@ -64,6 +64,17 @@ describe('merch tool schemas', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('createMerchAlternativeItem requires a merch card and target item', () => {
+    const schema = TOOL_SCHEMAS.createMerchAlternativeItem.inputSchema;
+    expect(schema.safeParse({}).success).toBe(false);
+
+    const valid = schema.safeParse({
+      merchCardId: '00000000-0000-0000-0000-000000000000',
+      itemType: 'catalog product 71',
+    });
+    expect(valid.success).toBe(true);
+  });
 });
 
 describe('TOOL_SCHEMAS descriptions', () => {
@@ -84,5 +95,11 @@ describe('TOOL_SCHEMAS descriptions', () => {
       10
     );
     expect(TOOL_SCHEMAS.selectMerchDesign.description).toContain('option');
+  });
+
+  it('createMerchAlternativeItem describes same-design product changes', () => {
+    expect(TOOL_SCHEMAS.createMerchAlternativeItem.description).toContain(
+      'same design'
+    );
   });
 });

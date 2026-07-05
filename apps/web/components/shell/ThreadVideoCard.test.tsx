@@ -27,7 +27,7 @@ describe('ThreadVideoCard', () => {
 
   it('omits the full-screen toolbar button when onFullscreen is missing', () => {
     render(<ThreadVideoCard title='clip' durationSec={20} />);
-    expect(screen.queryByRole('button', { name: 'Full-screen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Fullscreen' })).toBeNull();
   });
 
   it('fires onFullscreen when the toolbar button is clicked', () => {
@@ -39,7 +39,7 @@ describe('ThreadVideoCard', () => {
         onFullscreen={onFullscreen}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Full-screen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
     expect(onFullscreen).toHaveBeenCalledOnce();
   });
 });

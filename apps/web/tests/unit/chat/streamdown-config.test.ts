@@ -13,7 +13,7 @@ describe('getChatMarkdownStreamdownConfig', () => {
     expect(config.mode).toBe('streaming');
     expect(config.isAnimating).toBe(true);
     expect(config.caret).toBe('block');
-    expect(config.className).toContain('text-[15px]');
+    expect(config.className).toContain('system-b-chat-markdown');
     expect(config.className).toContain('custom-class');
   });
 
@@ -26,6 +26,31 @@ describe('getChatMarkdownStreamdownConfig', () => {
     );
   });
 
+  it('allows GFM table elements (regression: gh-11948 silent table stripping)', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+
+    const tableElements = ['table', 'thead', 'tbody', 'tr', 'th', 'td'];
+    for (const el of tableElements) {
+      expect(config.allowedElements).toContain(el);
+    }
+  });
+
+  it('allows img elements with safe attributes (regression: gh-11948)', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+
+    expect(config.allowedElements).toContain('img');
+    expect(config.allowedTags?.img).toEqual(
+      expect.arrayContaining(['src', 'alt', 'title'])
+    );
+  });
+
+  it('allows h5 and h6 headings', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+
+    expect(config.allowedElements).toContain('h5');
+    expect(config.allowedElements).toContain('h6');
+  });
+
   it('blocks unsafe protocols from links', () => {
     const config = getChatMarkdownStreamdownConfig(false);
 
@@ -36,5 +61,36 @@ describe('getChatMarkdownStreamdownConfig', () => {
     expect(config.urlTransform?.('https://jov.ie', 'href', {} as never)).toBe(
       'https://jov.ie'
     );
+  });
+
+  it('allows GFM table elements so comparison tables are not silently stripped', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+    const tableElements = [
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'td',
+      'th',
+    ] as const;
+    for (const el of tableElements) {
+      expect(config.allowedElements, `Expected ${el} to be allowed`).toContain(
+        el
+      );
+    }
+  });
+
+  it('allows img element with safe attributes', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+    expect(config.allowedElements).toContain('img');
+    expect((config.allowedTags as Record<string, string[]>)['img']).toEqual(
+      expect.arrayContaining(['src', 'alt'])
+    );
+  });
+
+  it('allows h5 and h6 headings', () => {
+    const config = getChatMarkdownStreamdownConfig(false);
+    expect(config.allowedElements).toContain('h5');
+    expect(config.allowedElements).toContain('h6');
   });
 });

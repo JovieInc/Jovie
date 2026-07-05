@@ -4,20 +4,22 @@ This document tracks the required CI checks for the `main` branch.
 
 ## Current Configuration
 
-**Last Updated**: 2026-02-10
+**Last Updated**: 2026-06-29
 
 ### Required Status Checks
 
-The following checks must pass before merging to `main`:
+The following check contexts must pass before merging to `main`. This list
+mirrors ruleset 10512119 — verify with:
 
-1. **Lint** - Code quality linting
-2. **Env Example Guard** - Prevents secret leaks in .env.example
-3. **Typecheck** - TypeScript type safety validation
-4. **Guardrails (proxy + format)** - Code formatting + Next.js proxy security
-5. **ci-fast** - Meta-gate aggregating fast checks
-6. **Migration Guard** - Database migration validation
-7. **CodeQL** - SAST security scanning
-8. **A11y (axe)** - WCAG 2.1 AA accessibility audit on public routes (via `ci-pr-ready` gate)
+```bash
+gh api repos/JovieInc/Jovie/rulesets/10512119 \
+  --jq '.rules[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'
+```
+
+1. **PR Ready** - Aggregate fast lane (`ci-fast`: typecheck + biome lint + server boundaries + guardrails)
+2. **Migration Guard** - Database migration validation (path-gated to DB/schema changes)
+3. **Fork PR Gate** - Blocks unreviewed external fork PRs; auto-passes for agents + team
+4. **PR Size Guard** - Caps PR size (800 lines / 40 files) to force small, reviewable PRs; `big-pr` label opts out
 
 ### Configuration Details
 
@@ -52,6 +54,10 @@ Full configuration is tracked in `/Users/timwhite/.claude/plans/glistening-dazzl
 
 ## History
 
+- **2026-06-29**: Added **PR Size Guard** to required status checks (ruleset 10512119, GH #12131)
+  - Caps PRs at 800 lines / 40 files (repo vars `PR_MAX_LINES` / `PR_MAX_FILES`); `big-pr` label opts out
+  - Closes the gap where oversized PRs could merge despite the size-guard workflow failing
+  - Also refreshed the required-checks list above to the current aggregate gates (PR Ready / Migration Guard / Fork PR Gate / PR Size Guard); the prior list predated the `PR Ready` aggregation
 - **2026-02-10**: Added A11y (axe) check to `ci-pr-ready` gate
   - Runs axe-core WCAG 2.1 AA audit on 5 public routes (no auth needed)
   - Path-gated: skips when no UI-relevant files changed

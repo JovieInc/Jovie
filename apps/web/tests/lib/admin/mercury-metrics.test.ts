@@ -1,19 +1,43 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
+import {
+  clearAdminMercuryMetricsCache,
+  getAdminMercuryMetrics,
+} from '@/lib/admin/mercury-metrics';
 
-const fetchMock = vi.fn();
+const mockCaptureError = vi.hoisted(() => vi.fn());
+const fetchMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
+}));
+
+vi.mock('@/lib/http/server-fetch', () => ({
+  ServerFetchTimeoutError: class ServerFetchTimeoutError extends Error {
+    timeoutMs: number;
+    context: string;
+
+    constructor(message: string, timeoutMs: number, context: string) {
+      super(message);
+      this.name = 'ServerFetchTimeoutError';
+      this.timeoutMs = timeoutMs;
+      this.context = context;
+    }
+  },
+  serverFetch: fetchMock,
+}));
 
 describe('getAdminMercuryMetrics', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    vi.stubGlobal('fetch', fetchMock);
     process.env = { ...originalEnv };
+    clearAdminMercuryMetricsCache();
+    fetchMock.mockReset();
+    mockCaptureError.mockReset();
   });
 
   afterEach(() => {
-    fetchMock.mockReset();
-    vi.unstubAllGlobals();
+    clearAdminMercuryMetricsCache();
     process.env = originalEnv;
   });
 
@@ -35,6 +59,7 @@ describe('getAdminMercuryMetrics', () => {
       errorMessage:
         'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('calculates balance and burn rate from debit transactions', async () => {
@@ -70,6 +95,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.isAvailable).toBe(true);
     expect(metrics.defaultStatus).toBe('alive');
     expect(metrics.errorMessage).toBeUndefined();
+    expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
   it('returns isAvailable false when Mercury API fails', async () => {
@@ -86,5 +112,64 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.isAvailable).toBe(false);
     expect(metrics.defaultStatus).toBe('unknown');
     expect(metrics.errorMessage).toContain('Mercury API error');
+    expect(mockCaptureError).toHaveBeenCalledOnce();
+  });
+
+  it('does not report ipNotWhitelisted 401 errors to Sentry', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: async () =>
+        JSON.stringify({
+          error: 'ipNotWhitelisted',
+          message: 'Request IP is not whitelisted',
+        }),
+    });
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.isConfigured).toBe(true);
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.errorMessage).toContain('401');
+    expect(metrics.errorMessage).toContain('ipNotWhitelisted');
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('caches Mercury failures and avoids repeat API calls within TTL', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: async () =>
+        JSON.stringify({
+          error: 'ipNotWhitelisted',
+          message: 'Request IP is not whitelisted',
+        }),
+    });
+
+    const first = await getAdminMercuryMetrics();
+    const second = await getAdminMercuryMetrics();
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(second).toEqual(first);
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('reports unexpected Mercury failures to Sentry only once per cache window', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock.mockRejectedValue(new Error('Network error'));
+
+    await getAdminMercuryMetrics();
+    await getAdminMercuryMetrics();
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(mockCaptureError).toHaveBeenCalledOnce();
   });
 });

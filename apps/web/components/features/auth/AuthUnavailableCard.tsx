@@ -33,7 +33,7 @@ export function AuthUnavailableCard({
       ? 'Sign up is temporarily unavailable'
       : 'Sign in is temporarily unavailable';
   const actionClassName =
-    'inline-flex h-(--linear-button-height-md) min-h-[40px] w-full items-center justify-center rounded-full border border-subtle bg-white px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-[#06070a] shadow-(--linear-shadow-button) transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24 disabled:cursor-not-allowed disabled:opacity-70';
+    'inline-flex h-(--linear-button-height-md) min-h-10 w-full items-center justify-center rounded-full border border-subtle bg-white dark:bg-surface-1 px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-(--color-bg-base) shadow-(--linear-shadow-button) transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-white dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24 disabled:cursor-not-allowed disabled:opacity-70';
 
   return (
     <section
@@ -50,7 +50,7 @@ export function AuthUnavailableCard({
       />
 
       <div className='mt-5 space-y-2'>
-        <h1 className='text-[1.5rem] font-[650] leading-[1.16] tracking-[-0.02em] text-white text-balance'>
+        <h1 className='text-[1.5rem] font-[650] leading-[1.16] tracking-[-0.02em] text-white dark:text-white text-balance'>
           {headline}
         </h1>
         <p className='mx-auto max-w-[20rem] text-[0.875rem] leading-[1.55] tracking-[-0.011em] text-white/60 text-pretty'>
@@ -77,7 +77,7 @@ export function AuthUnavailableCard({
       )}
 
       {showSignupLegal ? (
-        <p className='mt-4 text-[12px] leading-[1.6] tracking-[-0.01em] text-white/50'>
+        <p className='mt-4 text-xs leading-[1.6] tracking-[-0.01em] text-white/50'>
           By signing up, you agree to our{' '}
           <Link
             href={APP_ROUTES.LEGAL_TERMS}

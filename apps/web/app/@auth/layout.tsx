@@ -1,9 +1,11 @@
+import { isValidElement, type ReactNode } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
 import { isMockPublishableKey } from '@/components/providers/clerkAvailability';
 import { AuthUnavailableCard } from '@/features/auth';
 import { resolvePublishableKeyStaticFirst } from '@/lib/auth/staging-clerk-keys';
 import { publicEnv } from '@/lib/env-public';
+import AuthSlotDefault from './default';
 
 /**
  * Layout for the `@auth` parallel slot.
@@ -27,9 +29,26 @@ import { publicEnv } from '@/lib/env-public';
  * positioned over the page's existing `<main>`, and an extra landmark would
  * confuse a11y.
  */
+function isInactiveAuthSlot(children: ReactNode): boolean {
+  if (children == null || children === false) {
+    return true;
+  }
+
+  // Next renders `default.tsx` as a component node (truthy), not literal `null`.
+  // Treat that fallback the same as an empty slot so ISR routes never mount
+  // Clerk resolution or call headers() from this layout.
+  return isValidElement(children) && children.type === AuthSlotDefault;
+}
+
 export default async function AuthSlotLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Default @auth slot is null on ISR/marketing/profile routes. Skip Clerk
+  // resolution entirely so we never call headers() on statically generated pages.
+  if (isInactiveAuthSlot(children)) {
+    return null;
+  }
+
   const publishableKey = await resolvePublishableKeyStaticFirst();
 
   const isClerkUnavailable =

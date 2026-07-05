@@ -11,6 +11,20 @@ import {
 const MERCURY_BASE_URL =
   env.MERCURY_API_BASE_URL?.trim() || 'https://api.mercury.com/api/v1';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+/** Aligned with HUD poll cadence and other admin metric caches. */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+type CachedEntry = {
+  expiresAt: number;
+  value: AdminMercuryMetrics;
+};
+
+const mercuryMetricsCache = new Map<string, CachedEntry>();
+
+let lastReportedErrorKey: string | null = null;
+let lastReportedErrorAt = 0;
+
+const MERCURY_CACHE_KEY = 'admin:mercury:metrics';
 
 interface MercuryEnv {
   apiToken: string;
@@ -58,6 +72,72 @@ export interface AdminMercuryMetrics {
   defaultStatus: MercuryDefaultStatus;
   /** Error message if Mercury API call failed */
   errorMessage?: string;
+}
+
+const NON_REPORTABLE_MERCURY_API_ERROR_MARKERS = [
+  '(401)',
+  '(403)',
+  '(429)',
+  '(502)',
+  '(503)',
+  '(504)',
+  'ipNotWhitelisted',
+  'ip not whitelisted',
+] as const;
+
+function isNonReportableMercuryApiError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return NON_REPORTABLE_MERCURY_API_ERROR_MARKERS.some(marker =>
+    normalized.includes(marker.toLowerCase())
+  );
+}
+
+function buildUnconfiguredResponse(): AdminMercuryMetrics {
+  return {
+    balanceUsd: 0,
+    burnRateUsd: 0,
+    burnWindowDays: 30,
+    isConfigured: false,
+    isAvailable: false,
+    defaultStatus: 'unknown',
+    errorMessage:
+      'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
+  };
+}
+
+function buildErrorResponse(message: string): AdminMercuryMetrics {
+  return {
+    balanceUsd: 0,
+    burnRateUsd: 0,
+    burnWindowDays: 30,
+    isConfigured: true,
+    isAvailable: false,
+    defaultStatus: 'unknown',
+    errorMessage: `Mercury API error: ${message}`,
+  };
+}
+
+function reportMercuryMetricsErrorOnce(
+  message: string,
+  error: unknown,
+  errorMessage: string
+): void {
+  if (isNonReportableMercuryApiError(errorMessage)) {
+    return;
+  }
+
+  const key = `${message}:${errorMessage}`;
+  const now = Date.now();
+  if (
+    lastReportedErrorKey === key &&
+    now - lastReportedErrorAt < CACHE_TTL_MS
+  ) {
+    return;
+  }
+
+  lastReportedErrorKey = key;
+  lastReportedErrorAt = now;
+  captureError(message, error);
 }
 
 function getMercuryEnv(): MercuryEnv | null {
@@ -195,20 +275,11 @@ async function getCheckingTransactions(
   return transactions;
 }
 
-export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
+async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
   const mercuryEnv = getMercuryEnv();
 
   if (!mercuryEnv) {
-    return {
-      balanceUsd: 0,
-      burnRateUsd: 0,
-      burnWindowDays: 30,
-      isConfigured: false,
-      isAvailable: false,
-      defaultStatus: 'unknown',
-      errorMessage:
-        'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
-    };
+    return buildUnconfiguredResponse();
   }
 
   try {
@@ -233,9 +304,10 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     } catch (txError) {
       if (txError instanceof ServerFetchTimeoutError) {
         // Degraded mode: balance is still accurate, burn rate unavailable.
-        captureError(
+        reportMercuryMetricsErrorOnce(
           'Mercury transactions timed out — burn rate unavailable',
-          txError
+          txError,
+          txError.message
         );
       } else {
         // Re-throw non-timeout errors so the outer catch handles them.
@@ -253,15 +325,35 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    captureError('Error loading Mercury metrics', error);
-    return {
-      balanceUsd: 0,
-      burnRateUsd: 0,
-      burnWindowDays: 30,
-      isConfigured: true,
-      isAvailable: false,
-      defaultStatus: 'unknown',
-      errorMessage: `Mercury API error: ${message}`,
-    };
+    reportMercuryMetricsErrorOnce(
+      'Error loading Mercury metrics',
+      error,
+      message
+    );
+    return buildErrorResponse(message);
   }
+}
+
+export function clearAdminMercuryMetricsCache(): void {
+  mercuryMetricsCache.clear();
+  lastReportedErrorKey = null;
+  lastReportedErrorAt = 0;
+}
+
+export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
+  const now = Date.now();
+  const cached = mercuryMetricsCache.get(MERCURY_CACHE_KEY);
+
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
+  }
+
+  const metrics = await loadAdminMercuryMetrics();
+
+  mercuryMetricsCache.set(MERCURY_CACHE_KEY, {
+    value: metrics,
+    expiresAt: now + CACHE_TTL_MS,
+  });
+
+  return metrics;
 }

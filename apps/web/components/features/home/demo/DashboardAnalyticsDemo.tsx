@@ -48,7 +48,7 @@ export function DashboardAnalyticsDemo() {
             key={card.label}
             className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
           >
-            <p className='text-[11px] text-tertiary-token'>{card.label}</p>
+            <p className='text-2xs text-tertiary-token'>{card.label}</p>
             <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
               {card.value}
             </p>
@@ -61,7 +61,7 @@ export function DashboardAnalyticsDemo() {
         <p className='mb-3 text-xs font-medium text-secondary-token'>
           Clicks — Last 30 days
         </p>
-        <div className='flex items-end gap-[3px]' style={{ height: 100 }}>
+        <div className='flex items-end gap-1' style={{ height: 100 }}>
           {DAILY_CLICKS.map((d, i) => {
             const heightPct = (d.clicks / maxClicks) * 100;
             return (
@@ -78,7 +78,7 @@ export function DashboardAnalyticsDemo() {
             );
           })}
         </div>
-        <div className='mt-2 flex justify-between text-[10px] text-tertiary-token'>
+        <div className='mt-2 flex justify-between text-3xs text-tertiary-token'>
           <span>{DAILY_CLICKS[0].date}</span>
           <span>{DAILY_CLICKS.at(-1)?.date}</span>
         </div>

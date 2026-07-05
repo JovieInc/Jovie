@@ -1,4 +1,9 @@
 import { sql as drizzleSql } from 'drizzle-orm';
+import { computeCaptureRate } from '@/lib/analytics/metrics';
+import {
+  RECENT_ACTIVITY_RANGE,
+  resolveRangeStartOrEpoch,
+} from '@/lib/analytics/time-range';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
@@ -33,32 +38,6 @@ const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
   return value;
 };
 
-function toStartDate(range: AnalyticsRange): Date {
-  const now = new Date();
-  let startDate = new Date();
-
-  switch (range) {
-    case '1d':
-      startDate.setDate(now.getDate() - 1);
-      break;
-    case '7d':
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case '30d':
-      startDate.setDate(now.getDate() - 30);
-      break;
-    case '90d':
-      startDate.setDate(now.getDate() - 90);
-      break;
-    case 'all':
-      startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      break;
-  }
-
-  return startDate;
-}
-
 export async function getUserDashboardAnalytics(
   clerkUserId: string,
   range: AnalyticsRange,
@@ -78,12 +57,18 @@ export async function getUserDashboardAnalytics(
   const creatorProfile = { id: profile!.id };
 
   {
-    const startDate = toStartDate(range);
-    const recentThreshold = new Date();
-    recentThreshold.setDate(recentThreshold.getDate() - 7);
+    // Canonical window semantics: rolling N × 24h windows ending at query
+    // time, resolved by @/lib/analytics/time-range so every surface agrees.
+    const startDate = resolveRangeStartOrEpoch(range);
+    const recentThreshold = resolveRangeStartOrEpoch(RECENT_ACTIVITY_RANGE);
     const hasDailyProfileViews = await doesTableExist(
       TABLE_NAMES.dailyProfileViews
     );
+    // Canonical total views: daily_profile_views (written on /api/audience/visit
+    // and /api/track click-implies-view). SUM(audience_members.visits) diverges
+    // because (1) member visits predate the daily aggregate table, (2) seed scripts
+    // write independent random values, and (3) other write paths (e.g. short-link
+    // scans) increment member visits without daily_profile_views.
     const totalViewsSelect = hasDailyProfileViews
       ? drizzleSql`(
           select coalesce(sum(${dailyProfileViews.viewCount}), 0)
@@ -112,6 +97,7 @@ export async function getUserDashboardAnalytics(
               count: number;
             }>;
             total_views: AggregateValue;
+            unique_views: AggregateValue;
             unique_users: AggregateValue;
             total_clicks: AggregateValue;
             spotify_clicks: AggregateValue;
@@ -203,6 +189,15 @@ export async function getUserDashboardAnalytics(
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
             ),
+            audience_unique_views as (
+              select 1
+              from ${audienceMembers}
+              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
+                and not (
+                  coalesce(${audienceMembers.tags}, '[]'::jsonb) @> '["bot"]'::jsonb
+                )
+            ),
             audience_identified as (
               select 1
               from ${audienceMembers}
@@ -212,6 +207,7 @@ export async function getUserDashboardAnalytics(
             )
             select
               ${totalViewsSelect} as total_views,
+              (select count(*) from audience_unique_views) as unique_views,
               (select count(*) from audience_recent) as unique_users,
               (select count(*) from ranged_events) as total_clicks,
               (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,
@@ -234,11 +230,13 @@ export async function getUserDashboardAnalytics(
     );
 
     const totalViews = Number(aggregates?.total_views ?? 0);
+    const uniqueViews = Number(aggregates?.unique_views ?? 0);
     const subscribers = Number(aggregates?.subscribers ?? 0);
 
     const base: DashboardAnalyticsResponse = {
       view,
       profile_views: totalViews,
+      unique_views: uniqueViews,
       unique_users: Number(aggregates?.unique_users ?? 0),
       subscribers,
       top_cities: parseJsonArray<{ city: string | null; count: number }>(
@@ -279,10 +277,8 @@ export async function getUserDashboardAnalytics(
 
     const uniqueUsers = Number(aggregates?.unique_users ?? 0);
 
-    // Calculate capture rate: (subscribers / unique_users) * 100
-    // Only calculate if we have unique users to avoid division by zero
-    const captureRate =
-      uniqueUsers > 0 ? Math.round((subscribers / uniqueUsers) * 1000) / 10 : 0;
+    // Canonical capture rate derivation — see lib/analytics/metrics.ts.
+    const captureRate = computeCaptureRate(subscribers, uniqueUsers);
 
     return {
       ...base,

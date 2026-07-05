@@ -4,7 +4,10 @@ import { useClerk, useSignIn } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { consumeDesktopAuthCompletion } from '@/lib/desktop/electron-bridge';
-import { completeDesktopNativeAuth } from '@/lib/desktop/native-complete';
+import {
+  completeDesktopNativeAuth,
+  type DesktopReturnRouteVerificationResult,
+} from '@/lib/desktop/native-complete';
 
 type CompletionState = 'loading' | 'error';
 type ClerkBrowserGlobal = {
@@ -57,6 +60,27 @@ function isRecoverableCompletionReplayError(error: unknown): boolean {
   );
 }
 
+async function verifyDesktopReturnRoute(
+  returnTo: string
+): Promise<DesktopReturnRouteVerificationResult> {
+  const response = await fetch(returnTo, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    redirect: 'follow',
+  });
+  const finalUrl = new URL(response.url || returnTo, globalThis.location.href);
+  if (
+    finalUrl.pathname === '/signin' ||
+    finalUrl.pathname === '/signup' ||
+    finalUrl.pathname === '/sign-in' ||
+    finalUrl.pathname === '/sign-up'
+  ) {
+    return 'unauthenticated';
+  }
+
+  return response.ok ? 'ready' : 'unknown';
+}
+
 function NativeCompleteContent() {
   const router = useRouter();
   const clerk = useClerk();
@@ -87,6 +111,7 @@ function NativeCompleteContent() {
           reloadClerk: reloadBrowserClerk,
           getActiveSessionId: () => clerk.session?.id ?? null,
           getActiveUserId: () => clerk.user?.id ?? null,
+          verifyReturnRoute: verifyDesktopReturnRoute,
         });
 
         if (isActive) {
@@ -123,7 +148,7 @@ function NativeCompleteContent() {
   }, [clerk, router, signIn]);
 
   return (
-    <main className='grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'>
+    <main className='grid min-h-dvh place-items-center bg-background px-6 text-white dark:text-white [color-scheme:dark]'>
       <section className='w-full max-w-sm px-6 py-7 text-center'>
         <h1 className='text-[22px] font-semibold leading-7'>
           {state === 'error'

@@ -15,9 +15,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-
+import { ensureJovieRepoCwd } from '../lib/ensure-jovie-repo-cwd';
+import { gbrainLearn } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
+import { buildFollowUpBody, fileIssue } from '../lib/tracker-client';
 
 const JOB = 'pr-stuck-monitor';
 
@@ -162,6 +163,16 @@ async function processPr(pr: Pr): Promise<void> {
       labelApplied: labelOk,
       reasons: verdict.reasons,
     });
+
+    // Compound the stuck pattern to gbrain (idempotent per PR → updates as the PR's
+    // situation changes). Makes recurring stuck-reasons recallable across PRs.
+    gbrainLearn({
+      slug: `pr-stuck/pr-${pr.number}`,
+      title: `Stuck PR #${pr.number}: ${pr.title.slice(0, 60)}`,
+      body: `PR #${pr.number} flagged stuck.\n\nReasons:\n${verdict.reasons.map(r => `- ${r}`).join('\n')}\n\nLinear: ${filed.identifier ?? 'not filed'}`,
+      tags: ['type:pr-stuck', `pr:${pr.number}`],
+      type: 'pr-stuck',
+    });
   } else {
     logJobEvent({
       job: JOB,
@@ -174,6 +185,7 @@ async function processPr(pr: Pr): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  ensureJovieRepoCwd(import.meta.url);
   await withJobLogging(JOB, async () => {
     const prs = listOpenPRs();
     logJobEvent({ job: JOB, event: 'scanned', count: prs.length });

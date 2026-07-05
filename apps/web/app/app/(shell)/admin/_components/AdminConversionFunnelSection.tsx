@@ -28,7 +28,7 @@ export async function AdminConversionFunnelSection() {
 
       {funnel.errors.length > 0 ? (
         <div className='px-(--linear-app-content-padding-x) pb-(--linear-app-content-padding-y)'>
-          <p className='text-xs text-[var(--color-danger)]'>
+          <p className='text-xs text-(--color-danger)'>
             {funnel.errors.join('; ')}
           </p>
         </div>

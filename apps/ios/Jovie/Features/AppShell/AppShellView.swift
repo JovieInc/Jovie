@@ -1,8 +1,9 @@
 import SwiftUI
 
-enum AppShellTab: Equatable {
+enum AppShellTab: Equatable, Hashable {
   case chat
   case profile
+  case audience
 
   var accessibilityID: String {
     switch self {
@@ -10,6 +11,8 @@ enum AppShellTab: Equatable {
       return "shell-tab-chat"
     case .profile:
       return "shell-tab-profile"
+    case .audience:
+      return "shell-tab-audience"
     }
   }
 
@@ -19,6 +22,8 @@ enum AppShellTab: Equatable {
       return "Chat"
     case .profile:
       return "Profile"
+    case .audience:
+      return "Audience"
     }
   }
 
@@ -28,7 +33,20 @@ enum AppShellTab: Equatable {
       return "sparkles"
     case .profile:
       return "qrcode.viewfinder"
+    case .audience:
+      return "person.3"
     }
+  }
+
+}
+
+// File-level so unit tests can call it without importing SwiftUI.
+func resolveShellInitialTab(_ initialTab: AppShellTab, chatEnabled: Bool) -> AppShellTab {
+  switch initialTab {
+  case .chat:
+    return chatEnabled ? .chat : .profile
+  case .audience, .profile:
+    return initialTab
   }
 }
 
@@ -58,54 +76,171 @@ struct AppShellProfile: Equatable {
   }
 }
 
-struct AppShellView<ProfileContent: View, ChatContent: View>: View {
+struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: View>: View {
   let profile: AppShellProfile
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
   let billingURL: URL
+  let chatEnabled: Bool
+  let audienceEnabled: Bool
+  let recentConversations: [MobileConversationSummary]
+  let activeConversationID: String?
+  let onSelectConversation: (String) -> Void
+  let onStartNewChat: () -> Void
+  let onAutoSendMessage: (String) -> Void
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
-  let chatContent: (Binding<String>) -> ChatContent
+  @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
+  let chatContent: (Binding<String>, Binding<Int>) -> ChatContent
 
   @State private var selectedTab: AppShellTab
   @State private var navigationPath: [AppShellRoute] = []
-  @State private var isShowingMenu = false
+  @State private var isShowingDrawer = false
+  @State private var drawerDragOffset: CGFloat = 0
+  @State private var isKeyboardVisible = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
+  @State private var voiceCaptureTrigger = 0
+  @State private var intentStore = IntentNavigationStore.shared
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   init(
     profile: AppShellProfile,
     isOffline: Bool,
-    initialTab: AppShellTab = .profile,
+    initialTab: AppShellTab = .chat,
     opensSettingsOnLaunch: Bool = false,
     billingURL: URL,
+    chatEnabled: Bool = false,
+    audienceEnabled: Bool = true,
+    recentConversations: [MobileConversationSummary] = [],
+    activeConversationID: String? = nil,
+    onSelectConversation: @escaping (String) -> Void = { _ in },
+    onStartNewChat: @escaping () -> Void = {},
+    onAutoSendMessage: @escaping (String) -> Void = { _ in },
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
-    @ViewBuilder chatContent: @escaping (Binding<String>) -> ChatContent
+    @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
+    @ViewBuilder chatContent: @escaping (Binding<String>, Binding<Int>) -> ChatContent
   ) {
     self.profile = profile
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
     self.billingURL = billingURL
+    self.chatEnabled = chatEnabled
+    self.audienceEnabled = audienceEnabled
+    self.recentConversations = recentConversations
+    self.activeConversationID = activeConversationID
+    self.onSelectConversation = onSelectConversation
+    self.onStartNewChat = onStartNewChat
+    self.onAutoSendMessage = onAutoSendMessage
     self.onLogout = onLogout
     self.profileContent = profileContent()
+    self.audienceContent = audienceContent
     self.chatContent = chatContent
-    _selectedTab = State(initialValue: initialTab)
+    _selectedTab = State(
+      initialValue: Self.resolvedInitialTab(initialTab: initialTab, chatEnabled: chatEnabled)
+    )
   }
 
   var body: some View {
     NavigationStack(path: $navigationPath) {
+      GeometryReader { proxy in
+        let openOffset = drawerOpenOffset(safeAreaLeading: proxy.safeAreaInsets.leading)
+
+        // Drawer is the recessed BASE plane of the ZStack: it never overlays or
+        // dims content. The content container is the elevated plane that slides
+        // right to reveal it, matching the ChatGPT/desktop-app model.
+        ZStack(alignment: .leading) {
+          AppShellLeftDrawer(
+            isPresented: isShowingDrawer,
+            profile: profile,
+            chatEnabled: chatEnabled,
+            audienceEnabled: audienceEnabled,
+            selectedTab: selectedTab,
+            recentConversations: recentConversations,
+            activeConversationID: activeConversationID,
+            drawerWidth: drawerWidth,
+            onSelectTab: { tab in
+              closeDrawerThenSelect(tab)
+            },
+            onStartNewChat: {
+              closeDrawer()
+              startNewChat()
+            },
+            onSelectConversation: { conversationID in
+              closeDrawer()
+              onSelectConversation(conversationID)
+              selectTab(.chat)
+            },
+            onOpenSettings: {
+              closeDrawer()
+              navigationPath.append(.settings)
+            }
+          )
+          // reduceMotion: the drawer beneath is otherwise fully static, so
+          // crossfade its opacity with the content card instead of relying on
+          // the (also-disabled) spatial slide to reveal it.
+          .opacity(reduceMotion ? (isShowingDrawer ? 1 : 0) : 1)
+          .animation(reduceMotion ? drawerAnimation : nil, value: isShowingDrawer)
+
+          shellContent
+            .offset(x: reduceMotion ? 0 : contentOffset(openOffset: openOffset))
+            .opacity(reduceMotion && isShowingDrawer ? 0 : 1)
+            .animation(drawerAnimation, value: isShowingDrawer)
+            .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
+        }
+        .simultaneousGesture(edgeSwipeToOpenDrawer(openOffset: openOffset))
+      }
+    }
+    .background(JovieColor.backgroundBase)
+    .task(id: opensSettingsOnLaunch) {
+      guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
+      didOpenLaunchSettings = true
+      await Task.yield()
+      navigationPath.append(.settings)
+    }
+    .task {
+      applyPendingIntentNavigation()
+    }
+    .onChange(of: intentStore.pending) {
+      applyPendingIntentNavigation()
+    }
+    .onContinueUserActivity(ConversationUserActivity.activityType) { activity in
+      guard let payload = ConversationUserActivity.payload(from: activity.userInfo ?? [:]) else {
+        return
+      }
+      intentStore.submit(.openConversation(payload.conversationID))
+    }
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+      isKeyboardVisible = true
+    }
+    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+      isKeyboardVisible = false
+    }
+  }
+
+  // The elevated content plane: toolbar and paged content ride together as one
+  // transformable container so the drawer transform reads as a single spatial
+  // move, not independently animated pieces. The drawer is the sole surface
+  // switcher (JOV-3670) — there is no shell-level bottom bar; each screen's
+  // own composer/content extends into the reclaimed space.
+  private var shellContent: some View {
+    let isElevated = isShowingDrawer || drawerDragOffset != 0
+
+    return ZStack {
       ZStack {
         JovieColor.backgroundBase.ignoresSafeArea()
 
-        activeContent
-          .safeAreaInset(edge: .top, spacing: 0) {
-            shellToolbar
-          }
-          .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomNavigation
-          }
+        pagedContent
+          .id(selectedTab)
+          .transition(pageTransition)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .clipped()
       }
+      .safeAreaInset(edge: .top, spacing: 0) {
+        shellToolbar
+      }
+      .simultaneousGesture(pageSwipe)
       .navigationBarHidden(true)
       .navigationDestination(for: AppShellRoute.self) { route in
         switch route {
@@ -114,62 +249,284 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
             profile: profile,
             buildInfo: .current(),
             billingURL: billingURL,
+            onClose: { navigationPath.removeLast() },
             onLogout: onLogout
           )
           .navigationBarBackButtonHidden()
         }
       }
+      // Content is a non-interactive, dimmed-free card while the drawer is
+      // open: taps land on the transparent overlay below (which closes the
+      // drawer) instead of reaching gear/composer/chat rows underneath.
+      .allowsHitTesting(!isElevated)
+      .accessibilityHidden(isElevated)
+
+      if isElevated {
+        Color.clear
+          .contentShape(Rectangle())
+          .onTapGesture { closeDrawer() }
+          .accessibilityHidden(true)
+      }
     }
     .background(JovieColor.backgroundBase)
-    .contentShape(Rectangle())
-    .simultaneousGesture(edgeSwipe)
-    .fullScreenCover(isPresented: $isShowingMenu) {
-      AppNavigationMenu(
-        profile: profile,
-        isOffline: isOffline,
-        selectedTab: selectedTab,
-        onSelectTab: { tab in
-          selectedTab = tab
-          isShowingMenu = false
-        },
-        onOpenSettings: {
-          isShowingMenu = false
-          navigationPath.append(.settings)
-        },
-        onClose: { isShowingMenu = false }
-      )
+    .clipShape(shellContentClipShape(isElevated: isElevated))
+    .overlay(alignment: .leading) {
+      if isElevated {
+        Rectangle()
+          .fill(JovieColor.borderSubtle)
+          .frame(width: 1)
+      }
     }
-    .task(id: opensSettingsOnLaunch) {
-      guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
-      didOpenLaunchSettings = true
-      await Task.yield()
-      navigationPath.append(.settings)
+    .shadow(color: .black.opacity(isElevated ? 0.28 : 0), radius: 24, x: 8)
+  }
+
+  private func shellContentClipShape(isElevated: Bool) -> AnyShape {
+    if isElevated {
+      return AnyShape(RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous))
+    }
+    return AnyShape(Rectangle())
+  }
+
+  // Consume a navigation request raised by an App Intent (Siri / Shortcuts /
+  // Spotlight). Chat-bound requests land on Profile when chat is unavailable.
+  private func applyPendingIntentNavigation() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: selectedTab,
+      chatDraft: chatDraft,
+      autoSendMessage: nil,
+      shouldStartVoiceCapture: false,
+      openConversationID: nil,
+      pendingRequest: intentStore.consume()
+    )
+    let previousTab = selectedTab
+
+    guard AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: chatEnabled,
+      state: &state
+    ) else { return }
+
+    chatDraft = state.chatDraft
+
+    if let autoSendMessage = state.autoSendMessage {
+      onAutoSendMessage(autoSendMessage)
+    }
+
+    if let conversationID = state.openConversationID {
+      onSelectConversation(conversationID)
+    }
+
+    if state.shouldStartVoiceCapture {
+      voiceCaptureTrigger += 1
+    }
+
+    if state.selectedTab != previousTab {
+      withAnimation(.easeInOut(duration: 0.25)) {
+        selectedTab = state.selectedTab
+      }
+    } else {
+      selectedTab = state.selectedTab
     }
   }
 
+  private func selectTab(_ tab: AppShellTab) {
+    withAnimation(.easeInOut(duration: 0.25)) {
+      selectedTab = tab
+    }
+  }
+
+  private func startNewChat() {
+    onStartNewChat()
+    chatDraft = ""
+    selectTab(.chat)
+  }
+
+  private func openAudienceChat(prompt: String) {
+    guard chatEnabled else { return }
+    chatDraft = prompt
+    selectTab(.chat)
+  }
+
+  static func resolvedInitialTab(
+    initialTab: AppShellTab,
+    chatEnabled: Bool
+  ) -> AppShellTab {
+    resolveShellInitialTab(initialTab, chatEnabled: chatEnabled)
+  }
+
+  private var drawerWidth: CGFloat {
+    min(320, UIScreen.main.bounds.width * 0.86)
+  }
+
+  private var drawerAnimation: Animation {
+    reduceMotion ? .easeInOut(duration: 0.2) : JovieMotion.cinematic
+  }
+
+  private func drawerOpenOffset(safeAreaLeading: CGFloat) -> CGFloat {
+    drawerWidth + safeAreaLeading
+  }
+
+  // Content translates right by however far the drawer is open/dragged so the
+  // two planes move together as one gesture-driven transform.
+  private func contentOffset(openOffset: CGFloat) -> CGFloat {
+    if isShowingDrawer {
+      return max(0, openOffset + drawerDragOffset)
+    }
+    return max(0, drawerDragOffset)
+  }
+
+  private func openDrawer() {
+    guard !isShowingDrawer else { return }
+    dismissKeyboardIfNeeded()
+    isShowingDrawer = true
+  }
+
+  private func closeDrawer() {
+    drawerDragOffset = 0
+    isShowingDrawer = false
+  }
+
+  // Closing must finish its transform before the page crossfade starts —
+  // never animate the drawer-close and the tab-change spatial motion at once.
+  private func closeDrawerThenSelect(_ tab: AppShellTab) {
+    closeDrawer()
+    DispatchQueue.main.asyncAfter(deadline: .now() + JovieMotion.cinematicDuration) {
+      selectTab(tab)
+    }
+  }
+
+  private func dismissKeyboardIfNeeded() {
+    guard isKeyboardVisible else { return }
+    UIApplication.shared.sendAction(
+      #selector(UIResponder.resignFirstResponder),
+      to: nil,
+      from: nil,
+      for: nil
+    )
+  }
+
+  // Horizontally paged primary screens. The left drawer (sole surface switcher,
+  // JOV-3670) drives the same `selectedTab` selection so drawer taps and the
+  // horizontal swipe gesture stay in sync, and each screen keeps its own
+  // vertical scrolling (the swipe is recognized simultaneously and only acts
+  // on a clearly-horizontal end gesture).
   @ViewBuilder
-  private var activeContent: some View {
+  private var pagedContent: some View {
     switch selectedTab {
     case .chat:
-      chatContent($chatDraft)
+      if chatEnabled {
+        chatContent($chatDraft, $voiceCaptureTrigger)
+      } else {
+        profileContent
+      }
     case .profile:
       profileContent
+    case .audience:
+      audienceContent(openAudienceChat)
     }
+  }
+
+  // Slide direction follows the destination: Chat enters from the trailing edge,
+  // Profile from the leading edge, so the motion matches the swipe.
+  private var pageTransition: AnyTransition {
+    .asymmetric(
+      insertion: .move(edge: pageInsertionEdge),
+      removal: .move(edge: pageRemovalEdge)
+    )
+  }
+
+  private var pageInsertionEdge: Edge {
+    switch selectedTab {
+    case .chat:
+      return .trailing
+    case .profile, .audience:
+      return .leading
+    }
+  }
+
+  private var pageRemovalEdge: Edge {
+    switch selectedTab {
+    case .chat:
+      return .leading
+    case .profile, .audience:
+      return .trailing
+    }
+  }
+
+  private var pageSwipe: some Gesture {
+    DragGesture(minimumDistance: 24)
+      .onEnded { value in
+        guard !isShowingDrawer else { return }
+
+        let horizontal = value.translation.width
+        guard chatEnabled,
+              abs(horizontal) > 60,
+              abs(horizontal) > abs(value.translation.height) * 1.5,
+              value.startLocation.x >= 28 || horizontal < 0
+        else { return }
+
+        withAnimation(.easeInOut(duration: 0.28)) {
+          if horizontal < 0, selectedTab == .profile {
+            selectedTab = .chat
+          } else if horizontal > 0, selectedTab == .chat {
+            selectedTab = .profile
+          }
+        }
+      }
+  }
+
+  // Drives both directions: an edge-drag from the leading edge opens the
+  // drawer, and (while open) a drag anywhere on the elevated content closes
+  // it. Suppressed entirely while the composer is focused so an edge-drag
+  // inside the chat input can't fight text selection/cursor placement.
+  private func edgeSwipeToOpenDrawer(openOffset: CGFloat) -> some Gesture {
+    DragGesture(minimumDistance: 8, coordinateSpace: .global)
+      .onChanged { value in
+        guard !reduceMotion, !isKeyboardVisible else { return }
+
+        if isShowingDrawer {
+          drawerDragOffset = min(0, value.translation.width)
+        } else if value.startLocation.x < 28, value.translation.width > 0 {
+          drawerDragOffset = min(value.translation.width, openOffset)
+        }
+      }
+      .onEnded { value in
+        guard !reduceMotion, !isKeyboardVisible else { return }
+
+        let predicted = value.predictedEndTranslation.width
+        if isShowingDrawer {
+          if value.translation.width < -72 || predicted < -120 {
+            closeDrawer()
+          } else {
+            drawerDragOffset = 0
+          }
+          return
+        }
+
+        if value.startLocation.x < 28,
+           value.translation.width > 72 || predicted > 120
+        {
+          openDrawer()
+        }
+        drawerDragOffset = 0
+      }
   }
 
   private var shellToolbar: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      Button {
-        isShowingMenu = true
-      } label: {
-        Image(systemName: "line.3.horizontal")
+    HStack(alignment: .center, spacing: JovieSpacing.medium) {
+      Button(action: openDrawer) {
+        DashboardAvatarView(
+          name: profile.displayName,
+          avatarURL: profile.avatarURL
+        )
+        .frame(width: 32, height: 32)
       }
-      .buttonStyle(JovieIconButtonStyle())
-      .accessibilityLabel("Open Menu")
+      .buttonStyle(.plain)
+      .accessibilityLabel("Open navigation drawer")
+      .accessibilityIdentifier("shell-drawer-open")
 
-      VStack(spacing: 2) {
+      VStack(alignment: .leading, spacing: 2) {
         Text(selectedTab.title)
-          .font(JovieFont.body(size: 16, weight: .semibold))
+          .font(JovieFont.display(size: 22))
           .foregroundStyle(JovieColor.textPrimary)
           .lineLimit(1)
 
@@ -179,227 +536,19 @@ struct AppShellView<ProfileContent: View, ChatContent: View>: View {
             .foregroundStyle(JovieColor.textTertiary)
         }
       }
-      .frame(maxWidth: .infinity)
+
+      Spacer(minLength: 0)
 
       Button {
-        if selectedTab == .chat {
-          selectedTab = .profile
-        } else {
-          navigationPath.append(.settings)
-        }
+        navigationPath.append(.settings)
       } label: {
-        Image(systemName: selectedTab == .chat ? "qrcode.viewfinder" : "gearshape")
+        Image(systemName: "gearshape")
       }
       .buttonStyle(JovieIconButtonStyle())
-      .accessibilityLabel(selectedTab == .chat ? "Open Profile" : "Open Settings")
+      .accessibilityLabel("Open Settings")
     }
     .padding(.horizontal, JovieSpacing.large)
     .padding(.vertical, JovieSpacing.small)
     .background(JovieColor.backgroundBase.opacity(0.96))
-  }
-
-  private var bottomNavigation: some View {
-    HStack(spacing: JovieSpacing.small) {
-      tabButton(.chat)
-      tabButton(.profile)
-    }
-    .padding(6)
-    .frame(width: 236)
-    .background {
-      if #available(iOS 26.0, *) {
-        Capsule(style: .continuous)
-          .fill(JovieColor.surface1.opacity(0.54))
-          .glassEffect(.regular.tint(JovieColor.surface1.opacity(0.54)), in: .rect(cornerRadius: 28))
-      } else {
-        Capsule(style: .continuous)
-          .fill(.ultraThinMaterial)
-          .overlay {
-            Capsule(style: .continuous)
-              .stroke(JovieColor.borderDefault, lineWidth: 1)
-          }
-      }
-    }
-    .padding(.bottom, JovieSpacing.medium)
-  }
-
-  private func tabButton(_ tab: AppShellTab) -> some View {
-    let isSelected = selectedTab == tab
-
-    return Button {
-      selectedTab = tab
-    } label: {
-      HStack(spacing: JovieSpacing.small) {
-        Image(systemName: tab.systemImage)
-          .font(.system(size: 15, weight: .semibold))
-
-        Text(tab.title)
-          .font(JovieFont.body(size: 14, weight: .semibold))
-          .lineLimit(1)
-      }
-      .foregroundStyle(isSelected ? JovieColor.backgroundBase : JovieColor.textSecondary)
-      .frame(maxWidth: .infinity)
-      .frame(height: 42)
-      .background(
-        isSelected ? Color.white : Color.clear,
-        in: Capsule(style: .continuous)
-      )
-      .contentShape(Capsule(style: .continuous))
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(tab.title)
-    .accessibilityIdentifier(tab.accessibilityID)
-  }
-
-  private var edgeSwipe: some Gesture {
-    DragGesture(minimumDistance: 30)
-      .onEnded { value in
-        let horizontal = value.translation.width
-        guard abs(horizontal) > 72, abs(horizontal) > abs(value.translation.height) else {
-          return
-        }
-
-        if horizontal > 0, value.startLocation.x <= 52 {
-          isShowingMenu = true
-        } else if horizontal < 0 {
-          selectedTab = .profile
-        }
-      }
-  }
-}
-
-private struct AppNavigationMenu: View {
-  let profile: AppShellProfile
-  let isOffline: Bool
-  let selectedTab: AppShellTab
-  let onSelectTab: (AppShellTab) -> Void
-  let onOpenSettings: () -> Void
-  let onClose: () -> Void
-
-  var body: some View {
-    ZStack {
-      JovieColor.backgroundBase.ignoresSafeArea()
-
-      VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
-        HStack {
-          Text("Jovie")
-            .font(JovieFont.display(size: 30))
-            .foregroundStyle(JovieColor.textPrimary)
-
-          Spacer()
-
-          Button(action: onClose) {
-            Image(systemName: "xmark")
-          }
-          .buttonStyle(JovieIconButtonStyle())
-          .accessibilityLabel("Close Menu")
-        }
-
-        MenuAccountView(profile: profile, isOffline: isOffline)
-
-        VStack(spacing: JovieSpacing.small) {
-          MenuRow(
-            title: "Chat",
-            systemImage: AppShellTab.chat.systemImage,
-            isSelected: selectedTab == .chat
-          ) {
-            onSelectTab(.chat)
-          }
-
-          MenuRow(
-            title: "Profile",
-            systemImage: AppShellTab.profile.systemImage,
-            isSelected: selectedTab == .profile
-          ) {
-            onSelectTab(.profile)
-          }
-
-          MenuRow(
-            title: "Settings",
-            systemImage: "gearshape",
-            isSelected: false,
-            action: onOpenSettings
-          )
-        }
-
-        VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-          Text("Recent")
-            .font(JovieFont.body(size: 13, weight: .semibold))
-            .foregroundStyle(JovieColor.textTertiary)
-
-          Text("Conversations will appear here when mobile chat is enabled.")
-            .font(JovieFont.body(size: 15))
-            .foregroundStyle(JovieColor.textTertiary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, JovieSpacing.medium)
-
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, JovieSpacing.xLarge)
-      .padding(.top, JovieSpacing.xxLarge)
-      .padding(.bottom, JovieSpacing.xLarge)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-    .accessibilityIdentifier("shell-menu")
-  }
-}
-
-private struct MenuAccountView: View {
-  let profile: AppShellProfile
-  let isOffline: Bool
-
-  var body: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      DashboardAvatarView(
-        name: profile.displayName,
-        avatarURL: profile.avatarURL
-      )
-      .frame(width: 36, height: 36)
-
-      VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
-        Text(profile.displayName)
-          .font(JovieFont.body(size: 15, weight: .semibold))
-          .foregroundStyle(JovieColor.textPrimary)
-          .lineLimit(1)
-
-        Text(isOffline ? "Offline" : profile.secondaryText)
-          .font(JovieFont.body(size: 13, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .lineLimit(1)
-      }
-
-      Spacer(minLength: 0)
-    }
-  }
-}
-
-private struct MenuRow: View {
-  let title: String
-  let systemImage: String
-  let isSelected: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: JovieSpacing.medium) {
-        Image(systemName: systemImage)
-          .frame(width: 22)
-
-        Text(title)
-          .lineLimit(1)
-
-        Spacer(minLength: 0)
-      }
-      .font(JovieFont.body(size: 18, weight: .semibold))
-      .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
-      .padding(.vertical, 13)
-      .padding(.horizontal, JovieSpacing.medium)
-      .background(
-        isSelected ? JovieColor.surface1 : Color.clear,
-        in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
-      )
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(title)
   }
 }

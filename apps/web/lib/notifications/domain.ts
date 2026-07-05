@@ -1,16 +1,14 @@
-import { and, eq, or } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
-  audienceMembers,
   type FanNotificationPreferences,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   extractPayloadProps,
   inferChannel,
@@ -33,7 +31,7 @@ import { syncAudienceAlertState } from '@/lib/notifications/audience-alert-state
 import {
   buildEmailOtpExpiry,
   EMAIL_OTP_TTL_MINUTES,
-  generateEmailOtpCode,
+  generateFanCaptureEmailOtpCode,
   hashEmailOtp,
   isValidEmailOtpFormat,
 } from '@/lib/notifications/email-otp';
@@ -54,6 +52,10 @@ import {
   type NotificationSubscribeDomainResponse,
 } from '@/lib/notifications/response';
 import { sendNotification } from '@/lib/notifications/service';
+import {
+  type ConsentSnapshot,
+  getCurrentConsentSnapshot,
+} from '@/lib/notifications/sms-consent';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   normalizeSubscriptionEmail,
@@ -188,37 +190,53 @@ async function upsertAudienceMember(
   const fingerprint = createFingerprint(ipAddress, userAgent);
   const now = new Date();
 
-  await withSystemIngestionSession(async tx => {
-    await tx
-      .insert(audienceMembers)
-      .values({
-        creatorProfileId: artist_id,
-        fingerprint,
-        type: 'email',
-        displayName: 'Subscriber',
-        email: normalizedEmail,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        visits: 0,
-        engagementScore: 0,
-        intentLevel: 'low',
-        deviceType: 'unknown',
-        referrerHistory: [],
-        latestActions: [],
-        tags: [],
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [audienceMembers.creatorProfileId, audienceMembers.fingerprint],
-        set: {
-          type: 'email',
-          email: normalizedEmail,
-          lastSeenAt: now,
-          updatedAt: now,
-        },
-      });
-  });
+  // Use core columns only so fan capture works on DB branches that have not yet
+  // picked up optional audience summary migrations (latest_referrer_url, etc.).
+  // Drizzle's insert() always emits the full schema column list and fails when
+  // those optional columns are absent — same class of bug as audience/visit.
+  await db.execute(drizzleSql`
+    INSERT INTO audience_members (
+      creator_profile_id,
+      fingerprint,
+      type,
+      display_name,
+      first_seen_at,
+      last_seen_at,
+      visits,
+      engagement_score,
+      intent_level,
+      device_type,
+      referrer_history,
+      latest_actions,
+      email,
+      tags,
+      created_at,
+      updated_at
+    ) VALUES (
+      ${artist_id},
+      ${fingerprint},
+      'email',
+      'Subscriber',
+      ${now},
+      ${now},
+      0,
+      0,
+      'low',
+      'unknown',
+      '[]'::jsonb,
+      '[]'::jsonb,
+      ${normalizedEmail},
+      '[]'::jsonb,
+      ${now},
+      ${now}
+    )
+    ON CONFLICT (creator_profile_id, fingerprint)
+    DO UPDATE SET
+      type = 'email',
+      email = EXCLUDED.email,
+      last_seen_at = EXCLUDED.last_seen_at,
+      updated_at = EXCLUDED.updated_at
+  `);
 }
 
 async function upsertAudienceMemberBestEffort(
@@ -397,7 +415,7 @@ interface EmailOtpResult {
 }
 
 function createEmailOtp(): EmailOtpResult {
-  const otpCode = generateEmailOtpCode();
+  const otpCode = generateFanCaptureEmailOtpCode();
   return {
     otpCode,
     otpHash: hashEmailOtp(otpCode),
@@ -439,7 +457,9 @@ function buildUpsertConfig(
   shouldVerifyEmail: boolean,
   emailOtp: EmailOtpResult | null,
   ipAddress: string | null,
-  source: string | undefined
+  source: string | undefined,
+  smsConsentSnapshot: ConsentSnapshot | null,
+  smsConsentAt: Date
 ) {
   const target =
     channel === 'email'
@@ -462,10 +482,19 @@ function buildUpsertConfig(
       }
     : {};
 
+  const smsConsentFields =
+    channel === 'sms' && smsConsentSnapshot
+      ? {
+          smsConsentAt: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentAt}, ${smsConsentAt})`,
+          smsConsentTextHash: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentTextHash}, ${smsConsentSnapshot.textHash})`,
+          smsConsentVersion: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentVersion}, ${smsConsentSnapshot.version})`,
+        }
+      : {};
+
   const set =
     channel === 'email'
       ? { ...emailVerifyFields, ipAddress, source }
-      : { ipAddress, source };
+      : { ipAddress, source, ...smsConsentFields };
 
   return { target, set };
 }
@@ -528,6 +557,8 @@ function buildSubscriptionValues(params: {
   defaultPreferences: FanNotificationPreferences;
   shouldVerifyEmail: boolean;
   emailOtp: EmailOtpResult | null;
+  smsConsentSnapshot: ConsentSnapshot | null;
+  smsConsentAt: Date;
 }) {
   const {
     artist_id,
@@ -541,7 +572,10 @@ function buildSubscriptionValues(params: {
     defaultPreferences,
     shouldVerifyEmail,
     emailOtp,
+    smsConsentSnapshot,
+    smsConsentAt,
   } = params;
+
   return {
     creatorProfileId: artist_id,
     channel,
@@ -553,6 +587,13 @@ function buildSubscriptionValues(params: {
     source,
     preferences: defaultPreferences,
     confirmedAt: channel === 'sms' || shouldVerifyEmail ? null : new Date(),
+    ...(smsConsentSnapshot
+      ? {
+          smsConsentAt,
+          smsConsentTextHash: smsConsentSnapshot.textHash,
+          smsConsentVersion: smsConsentSnapshot.version,
+        }
+      : {}),
     emailOtpHash: emailOtp?.otpHash,
     emailOtpExpiresAt: emailOtp?.otpExpiresAt,
     emailOtpLastSentAt: emailOtp ? new Date() : null,
@@ -614,14 +655,15 @@ export const subscribeToNotificationsDomain = async (
 
     if (!result.success) {
       const props = extractPayloadProps(bodyObject);
+      const validationErrors = result.error.issues.map(issue => issue.message);
       await trackSubscribeError({
         artist_id: props.artist_id,
         error_type: 'validation_error',
-        validation_errors: result.error.format()._errors,
+        validation_errors: validationErrors,
         source: props.source,
         source_context: props.source_context,
       });
-      return buildSubscribeValidationError();
+      return buildSubscribeValidationError(validationErrors[0]);
     }
 
     const {
@@ -661,16 +703,21 @@ export const subscribeToNotificationsDomain = async (
       );
     }
 
-    // US-only guard for SMS channel
-    if (channel === 'sms' && country_code && country_code !== 'US') {
+    // US/CAN-only guard for SMS channel. The shared schema already rejects
+    // omitted/unsupported country codes; this branch preserves explicit domain
+    // telemetry for any future call-site that reaches this layer.
+    if (
+      channel === 'sms' &&
+      (!country_code || !['US', 'CA'].includes(country_code.toUpperCase()))
+    ) {
       await trackSubscribeError({
         artist_id,
-        error_type: 'sms_us_only',
+        error_type: 'sms_us_can_only',
         source,
         source_context,
       });
       return buildSubscribeValidationError(
-        'SMS notifications are currently available in the US only.'
+        'SMS notifications are available in the US and Canada only.'
       );
     }
 
@@ -718,13 +765,18 @@ export const subscribeToNotificationsDomain = async (
       artist_id
     );
     const emailOtp = shouldVerifyEmail ? createEmailOtp() : null;
+    const smsConsentSnapshot =
+      channel === 'sms' ? getCurrentConsentSnapshot() : null;
+    const smsConsentAt = new Date();
 
     const upsertConfig = buildUpsertConfig(
       channel,
       shouldVerifyEmail,
       emailOtp,
       ipAddress,
-      source
+      source,
+      smsConsentSnapshot,
+      smsConsentAt
     );
 
     await db
@@ -742,6 +794,8 @@ export const subscribeToNotificationsDomain = async (
           defaultPreferences,
           shouldVerifyEmail,
           emailOtp,
+          smsConsentSnapshot,
+          smsConsentAt,
         })
       )
       .onConflictDoUpdate(upsertConfig);
@@ -866,6 +920,21 @@ export const verifyEmailOtpDomain = async (
       emailOtpAttempts: 0,
     })
     .where(eq(notificationSubscriptions.id, subscription.id));
+
+  // Subscribe-time audience upsert is best-effort; ensure a row exists after
+  // confirmation so Pro creators see the fan in audience immediately.
+  const artistResult = await fetchArtistProfile(
+    parsed.data.artist_id,
+    undefined
+  );
+  if (isArtistProfileResult(artistResult) && artistResult.dynamicEnabled) {
+    await upsertAudienceMemberBestEffort(
+      parsed.data.artist_id,
+      normalizedEmail,
+      null,
+      null
+    );
+  }
 
   // JOV-1842: propagate confirmed alert state to audience_members.
   await syncAudienceAlertState(parsed.data.artist_id, {

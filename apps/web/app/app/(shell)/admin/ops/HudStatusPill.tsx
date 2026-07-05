@@ -12,7 +12,7 @@ export function HudStatusPill({ label, tone }: Readonly<HudStatusPillProps>) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1 text-[11.5px] font-[510] leading-none'
+        'inline-flex items-center rounded-full border px-3 py-1 text-2xs font-medium leading-none'
       )}
       style={{
         borderColor: `color-mix(in oklab, ${accent.solid} 26%, var(--linear-app-frame-seam))`,

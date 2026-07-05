@@ -69,7 +69,10 @@ import {
   useReleaseRightPanelTableMeta,
 } from '../useReleaseRightPanelTableMeta';
 import { releaseStatusToShell } from './release-adapters';
-import { ShellReleaseRow } from './ShellReleaseRow';
+import {
+  ShellReleaseRow,
+  type ShellReleaseSyncStatus,
+} from './ShellReleaseRow';
 
 /**
  * Match a release against a single filter value. Field-level operator
@@ -158,6 +161,7 @@ interface ReleasesListContentProps {
   >;
   readonly isSmartLinkLocked: (id: string) => boolean;
   readonly getSmartLinkLockReason: (id: string) => SmartLinkLockReason | null;
+  readonly getSyncStatus: (id: string) => ShellReleaseSyncStatus;
   readonly onConnectSpotify: () => void;
   readonly onNewRelease: () => void;
   readonly onSync: () => void;
@@ -178,6 +182,7 @@ function ReleasesListContent({
   actionMenusByReleaseId,
   isSmartLinkLocked,
   getSmartLinkLockReason,
+  getSyncStatus,
   onConnectSpotify,
   onNewRelease,
   onSync,
@@ -189,10 +194,10 @@ function ReleasesListContent({
     return (
       <div className='py-12 grid place-items-center text-center'>
         <div className='max-w-sm'>
-          <div className='text-[13px] font-caption text-primary-token'>
+          <div className='text-app font-caption text-primary-token'>
             Connect Spotify to get started
           </div>
-          <p className='mt-1 text-[12px] text-tertiary-token leading-[1.5]'>
+          <p className='mt-1 text-xs text-tertiary-token leading-normal'>
             Sync your catalog from Spotify or add a release manually to start
             generating smart links.
           </p>
@@ -230,7 +235,7 @@ function ReleasesListContent({
           data-testid='shell-releases-empty-state-connected'
         >
           <h3 className='text-app font-caption text-primary-token'>
-            No releases yet
+            No Releases Yet
           </h3>
           <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
             {canCreateManualReleases
@@ -275,14 +280,14 @@ function ReleasesListContent({
     return (
       <div className='py-12 grid place-items-center text-center'>
         <div>
-          <div className='text-[13px] font-caption text-secondary-token'>
+          <div className='text-app font-caption text-secondary-token'>
             No releases match your filters
           </div>
           {pills.length > 0 ? (
             <button
               type='button'
               onClick={onClearFilters}
-              className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-subtle'
+              className='mt-2 text-2xs text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-subtle'
             >
               Clear filters
             </button>
@@ -309,6 +314,7 @@ function ReleasesListContent({
           smartLinkLockReason={
             isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
           }
+          syncStatus={getSyncStatus(r.id)}
         />
       ))}
     </div>
@@ -449,6 +455,20 @@ export function ShellReleasesView({
       return lockReasons.get(releaseId) ?? null;
     },
     [lockReasons]
+  );
+
+  // Per-row in-flight agent state, derived from real mutation signals:
+  // a refresh is tracked per-release; an ISRC rescan applies to the
+  // currently-edited release. Idle rows resolve to `null` (no chrome).
+  const getSyncStatus = useCallback(
+    (releaseId: string): ShellReleaseSyncStatus => {
+      if (refreshingReleaseId === releaseId) return 'refreshing';
+      if (isRescanningIsrc && editingRelease?.id === releaseId) {
+        return 'rescanning-isrc';
+      }
+      return null;
+    },
+    [refreshingReleaseId, isRescanningIsrc, editingRelease?.id]
   );
 
   const visibleReleases = useMemo(() => applyPills(rows, pills), [rows, pills]);
@@ -942,6 +962,7 @@ export function ShellReleasesView({
             actionMenusByReleaseId={actionMenusByReleaseId}
             isSmartLinkLocked={isSmartLinkLocked}
             getSmartLinkLockReason={getSmartLinkLockReason}
+            getSyncStatus={getSyncStatus}
             onConnectSpotify={() => setSpotifySearchOpen(true)}
             onNewRelease={handleNewRelease}
             onSync={handleSync}

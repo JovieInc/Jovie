@@ -36,7 +36,9 @@ apps/web/components/
 - `molecules/` must NOT import from `organisms/`
 - `features/{x}/` must NOT import from `features/{y}/` — if a component is needed by 2+ features, **promote it** to the shared `atoms/`, `molecules/`, or `organisms/` layer
 
-**Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`).
+**Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by a drift ratchet (`apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`) — the count may only go DOWN. Converge to tokens; never add new arbitrary values.
+
+**Server-import isolation:** `apps/web/components/{atoms,molecules,organisms}` are shared presentation layers that must bundle for the browser. Files in these layers must not import server-only specifiers (`server-only`, `@clerk/nextjs/server`, `drizzle-orm`, `@/lib/db/*`, `next/headers`, `/actions` modules, etc.) or contain `'use server'`. Violations are tracked by a drift ratchet (`apps/web/tests/unit/design-system/server-imports-ratchet.test.ts`) — the count may only go DOWN. Move server dependencies to a feature wrapper or API route.
 
 ## New Component Pattern
 
@@ -92,6 +94,20 @@ The main content area (`<main>`) uses `bg-(--linear-app-content-surface)`, a ded
 - Card-within-card nesting (e.g., `DrawerSurfaceCard variant='card'` inside another card) — use `variant='flat'` for inner elements
 
 **Quick test:** If removing the element would cause no visual change, it's an elevation bug.
+
+### Color & Accent Discipline
+
+Canonical accents are the carbon palette (dark): gray `#8d8d93`, blue `#4d7dff`, purple `#9b4dff`, pink `#ea4a9c`, red `#ff4d5f`, orange `#ffab2e`, green `#43b85c`, teal `#22b8a7`. Use the Tailwind token utilities (`text-accent-blue`, `bg-accent-purple-subtle`, …), never arbitrary hex.
+
+- **Semantics are reserved:** green = success, red = error, orange = warning, blue = info.
+- **Prefer blue / purple / pink** for primary and decorative accents.
+- **Red/green gating by count:** at low density use red & green ONLY for their semantic meaning. When a single view has **≥4 categorical variables** (e.g. 5 metrics/series), the full palette including red & green is allowed as categorical colors — at that density they read as categories, not status.
+- **1–2 colors on a page → avoid red, green, yellow, and orange.** Use blue/purple/pink or greyscale.
+- **Never a single global accent.** Do not theme a whole screen in one accent. **Rotate per section** (one section blue, the next pink, the next purple…) or fall back to greyscale / black / white. Greyscale is the default; color is the exception, used to differentiate.
+- **Interactive accent is the exception to rotation:** links, focus rings, active states, and emphasized waveforms use the consistent `--color-accent` (`#7170ff`, blue-purple) — a focus/emphasis color, not a CTA color.
+- **CTAs are never saturated** — white-on-black pills (`--radius-pill: 9999px`). Accent goes on **title text**, never on an icon-on-colored-square.
+
+Canonical source: the "Jovie Design System" project on claude.ai/design (read via the DesignSync tool; its `SKILL.md` is the contract). See `DESIGN.md` for the full system.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
@@ -180,6 +196,8 @@ This is the subtraction principle applied specifically to container boundaries. 
 
 - Hover states must not move layout or shift components without a product reason.
 - Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move.
+- Press/click feedback may use a subtle `scale(0.96)` when it is tactile and interruptible; provide a static opt-out when the motion would distract.
+- Menus, panels, drawers, and sidebars may use intentional `translate`/`scale` motion for open/close because the movement communicates spatial state.
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback.
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction.
 

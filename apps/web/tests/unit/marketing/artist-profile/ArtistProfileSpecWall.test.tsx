@@ -60,7 +60,7 @@ describe('ArtistProfileSpecWall', () => {
     if (audienceQualityCard) {
       expect(
         within(audienceQualityCard).getByRole('img', {
-          name: 'Audience quality filtering preview',
+          name: 'Audience Quality Filtering Preview',
         })
       ).toBeInTheDocument();
       expect(

@@ -146,7 +146,7 @@ export function ImageWithFallback({
     return (
       <div
         className={cn(
-          'flex items-center justify-center',
+          'flex items-center justify-center outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
           isFill ? 'absolute inset-0' : 'h-full w-full',
           fallbackClassName
         )}
@@ -162,7 +162,10 @@ export function ImageWithFallback({
     <Image
       src={src}
       alt={alt}
-      className={className}
+      className={cn(
+        'outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
+        className
+      )}
       onError={() => {
         setHasError(true);
         onLoadError?.();

@@ -52,7 +52,7 @@ function resolveSummaryDescription(ctx: {
   if (ctx.billingLoading)
     return 'Checking your subscription and billing access.';
   if (ctx.isPro)
-    return 'Manage invoices, payment methods, and subscription details without leaving the app.';
+    return 'Open Stripe to manage invoices, payment methods, and subscription details.';
   if (ctx.canOpenPortal)
     return 'Open Stripe to review invoices, payment details, or reactivate your plan.';
   return 'Compare plans and upgrade when you are ready.';

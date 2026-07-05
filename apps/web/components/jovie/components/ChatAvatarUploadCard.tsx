@@ -2,7 +2,10 @@
 
 import { Check, ImagePlus, Loader2, RotateCw, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
-import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  type PreviewPanelData,
+  usePreviewPanelContext,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
@@ -18,22 +21,43 @@ export function ChatAvatarUploadCard() {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const previewPanel = usePreviewPanelContext();
+  // Snapshot + local object URL for the in-flight optimistic avatar swap.
+  const pendingRef = useRef<{
+    snapshot: PreviewPanelData | null;
+    objectUrl: string | null;
+  }>({ snapshot: null, objectUrl: null });
+
+  const clearObjectUrl = useCallback(() => {
+    if (pendingRef.current.objectUrl) {
+      URL.revokeObjectURL(pendingRef.current.objectUrl);
+      pendingRef.current.objectUrl = null;
+    }
+  }, []);
 
   const { mutate: uploadAvatar } = useAvatarMutation({
     onSuccess: (avatarUrl: string) => {
       setState('success');
 
-      // Instantly update sidebar preview with the new avatar
+      // Swap the optimistic object URL for the persisted avatar URL.
       if (previewPanel?.previewData) {
         previewPanel.setPreviewData({
           ...previewPanel.previewData,
           avatarUrl,
         });
       }
+      clearObjectUrl();
+      pendingRef.current.snapshot = null;
     },
     onError: (err: Error) => {
       setState('error');
       setError(err.message || 'Upload failed. Please try again.');
+
+      // Roll back to the pre-upload preview.
+      if (pendingRef.current.snapshot && previewPanel) {
+        previewPanel.setPreviewData(pendingRef.current.snapshot);
+      }
+      clearObjectUrl();
+      pendingRef.current.snapshot = null;
     },
   });
 
@@ -47,9 +71,18 @@ export function ChatAvatarUploadCard() {
       }
       setState('uploading');
       setError(null);
+
+      // Optimistically show the chosen image in the live preview while it uploads.
+      const snapshot = previewPanel?.previewData ?? null;
+      const objectUrl = snapshot ? URL.createObjectURL(file) : null;
+      pendingRef.current = { snapshot, objectUrl };
+      if (snapshot && objectUrl) {
+        previewPanel?.setPreviewData({ ...snapshot, avatarUrl: objectUrl });
+      }
+
       uploadAvatar(file);
     },
-    [uploadAvatar]
+    [uploadAvatar, previewPanel]
   );
 
   const handleClick = useCallback(() => {

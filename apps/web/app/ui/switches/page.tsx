@@ -9,7 +9,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -26,7 +26,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-tertiary-token'>{title}</span>
+      <span className='text-2xs text-tertiary-token'>{title}</span>
       {children}
     </div>
   );
@@ -36,7 +36,7 @@ export default function SwitchesPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Switch</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app toggle — compact 28×16px track, smooth thumb
         transition
       </p>
@@ -44,19 +44,19 @@ export default function SwitchesPage() {
       {/* Default states */}
       <Section title='Default States'>
         <Stack title='unchecked'>
-          <Switch aria-label='Toggle unchecked' />
+          <Switch aria-label='Toggle Unchecked' />
         </Stack>
         <Stack title='checked'>
-          <Switch defaultChecked aria-label='Toggle checked' />
+          <Switch defaultChecked aria-label='Toggle Checked' />
         </Stack>
         <Stack title='disabled unchecked'>
-          <Switch disabled aria-label='Toggle disabled unchecked' />
+          <Switch disabled aria-label='Toggle Disabled Unchecked' />
         </Stack>
         <Stack title='disabled checked'>
           <Switch
             disabled
             defaultChecked
-            aria-label='Toggle disabled checked'
+            aria-label='Toggle Disabled Checked'
           />
         </Stack>
       </Section>
@@ -65,10 +65,10 @@ export default function SwitchesPage() {
       <Section title='With Labels'>
         <Stack title='Enable notifications'>
           <div className='flex items-center gap-3'>
-            <Switch id='notifications' aria-label='Enable notifications' />
+            <Switch id='notifications' aria-label='Enable Notifications' />
             <label
               htmlFor='notifications'
-              className='text-[13px] font-[510] text-primary-token'
+              className='text-app font-medium text-primary-token'
             >
               Enable notifications
             </label>
@@ -79,11 +79,11 @@ export default function SwitchesPage() {
             <Switch
               id='auto-assign'
               defaultChecked
-              aria-label='Auto-assign issues'
+              aria-label='Auto Assign Issues'
             />
             <label
               htmlFor='auto-assign'
-              className='text-[13px] font-[510] text-primary-token'
+              className='text-app font-medium text-primary-token'
             >
               Auto-assign issues
             </label>
@@ -94,11 +94,11 @@ export default function SwitchesPage() {
             <Switch
               id='disabled-setting'
               disabled
-              aria-label='Disabled setting'
+              aria-label='Disabled Setting'
             />
             <label
               htmlFor='disabled-setting'
-              className='text-[13px] font-[510] text-primary-token opacity-50'
+              className='text-app font-medium text-primary-token opacity-50'
             >
               Disabled setting
             </label>
@@ -111,9 +111,9 @@ export default function SwitchesPage() {
         <Stack title='settings row'>
           <div className='flex w-64 flex-col divide-y rounded-lg border border-subtle'>
             {[
-              { label: 'Slack notifications', checked: true },
-              { label: 'Email digest', checked: false },
-              { label: 'Desktop alerts', checked: true },
+              { label: 'Slack Notifications', checked: true },
+              { label: 'Email Digest', checked: false },
+              { label: 'Desktop Alerts', checked: true },
             ].map(item => (
               <div
                 key={item.label}
@@ -121,7 +121,7 @@ export default function SwitchesPage() {
               >
                 <label
                   htmlFor={`setting-${item.label}`}
-                  className='text-[13px] font-[450] text-primary-token'
+                  className='text-app font-book text-primary-token'
                 >
                   {item.label}
                 </label>

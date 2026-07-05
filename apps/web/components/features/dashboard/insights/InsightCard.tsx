@@ -1,21 +1,44 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
+import type { CSSProperties } from 'react';
+import {
+  type AccentPaletteName,
+  getAccentCssVars,
+} from '@/lib/ui/accent-palette';
 import type { InsightResponse } from '@/types/insights';
 import { InsightActions } from './InsightActions';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
 
-const PRIORITY_BADGE_STYLES = {
-  high: 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  medium: 'border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-  low: 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token',
-} as const;
+// Priority is semantic: high → orange (warning), medium → blue (info),
+// low → neutral token greyscale.
+const PRIORITY_ACCENT: Record<
+  InsightResponse['priority'],
+  AccentPaletteName | null
+> = {
+  high: 'orange',
+  medium: 'blue',
+  low: null,
+};
 
 const PRIORITY_LABELS = {
   high: 'High priority',
   medium: 'Medium',
   low: 'Low',
 } as const;
+
+function priorityBadgeStyle(
+  priority: InsightResponse['priority']
+): CSSProperties | undefined {
+  const accent = PRIORITY_ACCENT[priority];
+  if (!accent) return undefined;
+  const { solid, subtle } = getAccentCssVars(accent);
+  return {
+    color: solid,
+    backgroundColor: subtle,
+    borderColor: `color-mix(in oklab, ${solid} 35%, transparent)`,
+  };
+}
 
 interface InsightCardProps {
   readonly insight: InsightResponse;
@@ -38,7 +61,12 @@ export function InsightCard({ insight }: InsightCardProps) {
             <Badge
               variant='secondary'
               size='sm'
-              className={`rounded-md px-1.5 py-0.5 text-3xs ${PRIORITY_BADGE_STYLES[insight.priority]}`}
+              className={`rounded-md px-1.5 py-0.5 text-3xs ${
+                insight.priority === 'low'
+                  ? 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'
+                  : ''
+              }`}
+              style={priorityBadgeStyle(insight.priority)}
             >
               {PRIORITY_LABELS[insight.priority]}
             </Badge>

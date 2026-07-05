@@ -143,10 +143,10 @@ export function ReleaseCountdown({
       <div className='flex items-baseline gap-2.5 tabular-nums'>
         {segments.map(segment => (
           <span key={segment.label}>
-            <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+            <span className='text-xl font-bold tracking-[-0.03em] text-(--color-text-tooltip)'>
               {segment.value}
             </span>
-            <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
+            <span className='ml-0.5 text-3xs font-semibold uppercase tracking-[0.08em] text-white/35'>
               {segment.label}
             </span>
           </span>
@@ -161,27 +161,27 @@ export function ReleaseCountdown({
       <div className='mt-2 flex items-center justify-center gap-3'>
         {timeLeft.days > 0 && (
           <div className='flex flex-col items-center'>
-            <span className='text-2xl font-bold tabular-nums text-white'>
+            <span className='text-2xl font-bold tabular-nums text-(--color-text-tooltip)'>
               {timeLeft.days}
             </span>
-            <span className='text-[10px] uppercase tracking-wider text-white/40'>
+            <span className='text-3xs uppercase tracking-wider text-white/40'>
               {timeLeft.days === 1 ? 'day' : 'days'}
             </span>
           </div>
         )}
         <div className='flex flex-col items-center'>
-          <span className='text-2xl font-bold tabular-nums text-white'>
+          <span className='text-2xl font-bold tabular-nums text-(--color-text-tooltip)'>
             {timeLeft.hours}
           </span>
-          <span className='text-[10px] uppercase tracking-wider text-white/40'>
+          <span className='text-3xs uppercase tracking-wider text-white/40'>
             {timeLeft.hours === 1 ? 'hr' : 'hrs'}
           </span>
         </div>
         <div className='flex flex-col items-center'>
-          <span className='text-2xl font-bold tabular-nums text-white'>
+          <span className='text-2xl font-bold tabular-nums text-(--color-text-tooltip)'>
             {timeLeft.minutes}
           </span>
-          <span className='text-[10px] uppercase tracking-wider text-white/40'>
+          <span className='text-3xs uppercase tracking-wider text-white/40'>
             min
           </span>
         </div>

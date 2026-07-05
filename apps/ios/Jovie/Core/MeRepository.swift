@@ -7,6 +7,7 @@ struct MeRepositoryResult: Equatable, Sendable {
 
 protocol MeRepositoryProtocol: Sendable {
   func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult
+  func cachedSnapshot(for clerkUserID: String) async -> MobileMeResponse?
 }
 
 struct MeRepository: MeRepositoryProtocol, Sendable {
@@ -16,6 +17,13 @@ struct MeRepository: MeRepositoryProtocol, Sendable {
   init(apiClient: APIClientProtocol, cache: MeCache) {
     self.apiClient = apiClient
     self.cache = cache
+  }
+
+  /// Returns the last persisted profile for this user without touching the
+  /// network. Used to paint the dashboard instantly on launch while a fresh
+  /// copy is revalidated in the background (stale-while-revalidate).
+  func cachedSnapshot(for clerkUserID: String) async -> MobileMeResponse? {
+    await cache.load(for: clerkUserID)?.response
   }
 
   func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult {

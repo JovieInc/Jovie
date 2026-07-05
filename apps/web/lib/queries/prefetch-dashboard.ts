@@ -1,11 +1,14 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { loadDspPresenceForProfile } from '@/app/app/(shell)/dashboard/presence/actions';
 import { getTasks } from '@/app/app/(shell)/dashboard/tasks/task-actions';
+import { loadTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
+import type { DashboardContact } from '@/types/contacts';
 import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import { tourDateToEventRecord } from './useEventsQuery';
 
 const fetchEarnings = createQueryFn('/api/dashboard/earnings');
 
@@ -72,4 +75,40 @@ export function prefetchForRoute(
       break;
     // 'profile' is chat-driven — no data prefetch needed
   }
+}
+
+/**
+ * Warm the caches behind the chat entity right panels (releases matrix,
+ * contacts, events) so opening a panel from an entity chip paints content
+ * immediately instead of a loading state. Keys and fetchers mirror
+ * useReleasesQuery / useContactsQuery / useEventsQuery exactly.
+ */
+export function prefetchChatEntityPanelData(
+  queryClient: QueryClient,
+  profileId: string
+): void {
+  const { staleTime } = FREQUENT_CACHE;
+
+  queryClient.prefetchQuery({
+    queryKey: queryKeys.releases.matrix(profileId),
+    queryFn: () => loadReleaseMatrix(profileId),
+    staleTime,
+  });
+  queryClient.prefetchQuery({
+    queryKey: queryKeys.contacts.list(profileId),
+    queryFn: ({ signal }) =>
+      fetchWithTimeout<DashboardContact[]>(
+        `/api/dashboard/contacts?profileId=${encodeURIComponent(profileId)}`,
+        { signal }
+      ),
+    staleTime,
+  });
+  queryClient.prefetchQuery({
+    queryKey: queryKeys.events.list(profileId),
+    queryFn: async () => {
+      const dates = await loadTourDates(profileId);
+      return dates.map(tourDateToEventRecord);
+    },
+    staleTime,
+  });
 }

@@ -95,7 +95,7 @@ describe('TabBar distribution', () => {
 
     for (const tab of screen.getAllByRole('tab')) {
       expect(tab.className).toContain('flex-1');
-      expect(tab.className).toContain('min-w-[72px]');
+      expect(tab.className).toContain('min-w-18');
     }
   });
 

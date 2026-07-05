@@ -15,13 +15,13 @@ export default function MemoLoading() {
   return (
     <div className='px-4 pt-8 sm:px-6 lg:pt-12'>
       <div className='mx-auto max-w-5xl animate-pulse space-y-4'>
-        <div className='h-8 w-64 rounded bg-[var(--color-bg-surface-1)]' />
-        <div className='h-4 w-32 rounded bg-[var(--color-bg-surface-1)]' />
+        <div className='h-8 w-64 rounded bg-surface-1' />
+        <div className='h-4 w-32 rounded bg-surface-1' />
         <div className='mt-8 space-y-3'>
           {SKELETON_LINES.map((key, i) => (
             <div
               key={key}
-              className='h-4 rounded bg-[var(--color-bg-surface-1)]'
+              className='h-4 rounded bg-surface-1'
               style={{ width: LINE_WIDTHS[i] }}
             />
           ))}

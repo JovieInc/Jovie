@@ -58,7 +58,7 @@ function DiagnosticPanel({
       </div>
 
       {totalRawResults === 0 && !hasErrors && (
-        <div className='mb-3 flex items-start gap-2 rounded-[10px] border border-warning/30 bg-warning/10 p-2 text-xs text-warning'>
+        <div className='mb-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-2 text-xs text-warning'>
           <AlertTriangle className='mt-0.5 h-3.5 w-3.5 shrink-0' />
           <div>
             <p className='font-medium'>
@@ -78,7 +78,7 @@ function DiagnosticPanel({
       )}
 
       {hasErrors && (
-        <div className='mb-3 flex items-start gap-2 rounded-[10px] border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive'>
+        <div className='mb-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive'>
           <XCircle className='mt-0.5 h-3.5 w-3.5 shrink-0' />
           <div>
             <p className='font-medium'>
@@ -104,7 +104,7 @@ function KeywordDiagnosticRow({
   diagnostic: DiscoveryKeywordDiagnostic;
 }>) {
   return (
-    <div className='flex items-center gap-2 rounded-[10px] border border-subtle bg-surface-0 px-2.5 py-2 text-xs'>
+    <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-2.5 py-2 text-xs'>
       {d.error && <XCircle className='h-3.5 w-3.5 shrink-0 text-destructive' />}
       {!d.error && d.rawResultCount === 0 && (
         <AlertTriangle className='h-3.5 w-3.5 shrink-0 text-warning' />

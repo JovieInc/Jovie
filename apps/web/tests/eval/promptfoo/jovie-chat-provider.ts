@@ -22,6 +22,11 @@ import {
   detectAlbumArtGenerationIntent,
 } from '@/lib/chat/album-art-capability';
 import { KNOWLEDGE_TOPICS } from '@/lib/chat/knowledge/topics';
+import {
+  isPromptDisclosureRequest,
+  PROMPT_DISCLOSURE_REFUSAL,
+  PROMPT_LEAK_CANARY,
+} from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import {
   canUseLightModel,
@@ -112,6 +117,7 @@ import {
 } from '@/lib/services/pitch/prompts';
 import { resolvePitchDestination } from '@/lib/services/pitch/targets';
 import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
+import { RECORDABLE_VIDEO_KINDS } from '@/lib/teleprompter/types';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { httpUrlSchema } from '@/lib/validation/schemas/base';
@@ -140,6 +146,7 @@ type EvalTarget =
   | 'release-task-classifier-contract'
   | 'onboarding-state-contract'
   | 'onboarding-tool-sequence-contract'
+  | 'prompt-disclosure-contract'
   | 'prompt-context-contract'
   | 'skill-artifact-contract'
   | 'skill-catalog-sync-contract'
@@ -215,15 +222,6 @@ const MAX_ONBOARDING_MESSAGES_PER_REQUEST = 50;
 const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
 const MAX_MOBILE_TEXT_LENGTH = 4000;
 const MAX_WELCOME_INITIAL_REPLY_LENGTH = 2000;
-const MOBILE_CHAT_RUNTIME_DISABLED_EVENT = {
-  type: 'error',
-  errorCode: 'MOBILE_CHAT_RUNTIME_DISABLED',
-  message: 'Native chat is not enabled for this build.',
-} as const;
-const MOBILE_CHAT_NDJSON_HEADERS = {
-  ...NO_STORE_HEADERS,
-  'Content-Type': 'application/x-ndjson; charset=utf-8',
-} as const;
 let releaseTaskClassifierModulePromise: Promise<ReleaseTaskClassifierModule> | null =
   null;
 const PROMPTFOO_CONFIG_PATH = 'tests/eval/promptfoo/promptfooconfig.yaml';
@@ -447,6 +445,15 @@ const ADVANCED_TOOL_SCHEMAS = {
       instructions: z.string().max(700).optional(),
     }),
   },
+  proposeVideoRecording: {
+    description:
+      'Propose recording a short talking-head video in the Jovie app. Use when Jovie has written a promo, thank-you, or behind-the-scenes script and the artist should record it. Shows Upload video and Record in app actions with an optional teleprompter showcase.',
+    inputSchema: z.object({
+      kind: z.enum(RECORDABLE_VIDEO_KINDS),
+      title: z.string().min(3).max(120),
+      script: z.string().min(12).max(1200),
+    }),
+  },
 } as const;
 
 const ALL_EVAL_TOOL_SCHEMAS = {
@@ -464,6 +471,7 @@ const MERCH_TOOL_NAMES = [
   'createMerch',
   'previewMerchOptions',
   'selectMerchDesign',
+  'createMerchAlternativeItem',
   'publishMerchCard',
   'pauseMerchCard',
   'unpauseMerchCard',
@@ -476,6 +484,7 @@ const MERCH_TOOL_NAMES = [
 
 const INSIGHT_TOOL_NAMES = ['showTopInsights'] as const;
 const ALBUM_ART_TOOL_NAMES = ['generateAlbumArt'] as const;
+const RETOUCH_TOOL_NAMES = ['retouchImage'] as const;
 const PROFILE_RELEASE_TOOL_NAMES = [
   'createRelease',
   'generateReleasePitch',
@@ -490,6 +499,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'createPromoStrategy',
   'markCanvasUploaded',
   'formatLyrics',
+  'proposeVideoRecording',
 ] as const;
 
 const PAID_TOOL_NAMES = [
@@ -498,6 +508,7 @@ const PAID_TOOL_NAMES = [
   ...INSIGHT_TOOL_NAMES,
   ...ALWAYS_PAID_TOOL_NAMES,
   ...ALBUM_ART_TOOL_NAMES,
+  ...RETOUCH_TOOL_NAMES,
   ...PROFILE_RELEASE_TOOL_NAMES,
   ...MERCH_TOOL_NAMES,
 ] as const;
@@ -610,6 +621,7 @@ const REQUIRED_PLAYLIST_GENERATION_CASES = [
 const REQUIRED_ONBOARDING_SYSTEM_PROMPT_CASES = ['prompt-rules'] as const;
 const REQUIRED_RELEASE_TASK_CLASSIFIER_CASES = ['prompt-and-coercion'] as const;
 const REQUIRED_CHAT_TITLE_CASES = ['prompt-and-fallback'] as const;
+const REQUIRED_PROMPT_DISCLOSURE_CASES = ['blocked-before-dispatch'] as const;
 let serverOnlyEvalShimRegistered = false;
 const AI_TOOL_PROMPT_TOOL_NAMES = [
   'generateAlbumArt',
@@ -649,6 +661,7 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   checkHandle: ['action', 'handle', 'available', 'summary'],
   confirmSpotifyArtist: ['action', 'spotifyArtistId', 'artist', 'summary'],
   createMerch: ['success', 'action', 'generationId', 'options'],
+  createMerchAlternativeItem: ['success', 'action', 'merchCardId'],
   createPromoStrategy: [
     'success',
     'action',
@@ -769,6 +782,7 @@ function toTarget(value: unknown): EvalTarget {
     value === 'release-task-classifier-contract' ||
     value === 'onboarding-state-contract' ||
     value === 'onboarding-tool-sequence-contract' ||
+    value === 'prompt-disclosure-contract' ||
     value === 'prompt-context-contract' ||
     value === 'skill-artifact-contract' ||
     value === 'skill-catalog-sync-contract' ||
@@ -841,10 +855,6 @@ function parseMobileChatTurnRequest(value: Record<string, unknown>): {
     text: value.text.trim(),
     source: value.source,
   };
-}
-
-function ndjsonEvent(event: Record<string, unknown>): string {
-  return `${JSON.stringify(event)}\n`;
 }
 
 function buildDefaultWebChatBody(
@@ -2153,10 +2163,18 @@ function evaluateMobileChatRouteContract(prompt: string, vars: EvalVars) {
   return {
     ...basePayload,
     parsedRequest: parsed,
-    status: 501,
-    headers: MOBILE_CHAT_NDJSON_HEADERS,
-    events: [MOBILE_CHAT_RUNTIME_DISABLED_EVENT],
-    responseText: ndjsonEvent(MOBILE_CHAT_RUNTIME_DISABLED_EVENT),
+    status: 200,
+    headers: NO_STORE_HEADERS,
+    contractOnly: true,
+    handlerReached: true,
+    responseJson: {
+      message:
+        'This deterministic mobile route eval stops at the chat handler boundary.',
+    },
+    responseText: JSON.stringify({
+      message:
+        'This deterministic mobile route eval stops at the chat handler boundary.',
+    }),
   };
 }
 
@@ -3712,6 +3730,10 @@ function resolveToolAvailabilityFlags(plan: PlanId, vars: EvalVars) {
       vars.canAccessMerchCreation,
       Boolean(planLimits.booleans.canAccessMerchCreation)
     ),
+    canAccessAiRetouching: toBoolean(
+      vars.canAccessAiRetouching,
+      Boolean(planLimits.booleans.canAccessAiRetouching)
+    ),
   };
 }
 
@@ -3733,6 +3755,9 @@ function getToolNamesForTurn(
   }
   if (flags.albumArtEnabled && flags.canGenerateAlbumArt) {
     toolNames.push(...ALBUM_ART_TOOL_NAMES);
+  }
+  if (flags.canAccessAiRetouching) {
+    toolNames.push(...RETOUCH_TOOL_NAMES);
   }
   if (flags.resolvedProfileIdPresent) {
     toolNames.push(...PROFILE_RELEASE_TOOL_NAMES);
@@ -4155,6 +4180,16 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         generationId: args.generationId,
         optionNumber: args.optionNumber ?? null,
         optionId: args.optionId ?? null,
+      };
+    case 'createMerchAlternativeItem':
+      return {
+        success: true,
+        action: 'create_merch_alternative_item',
+        merchCardId: '00000000-0000-4000-8000-000000000c03',
+        sourceMerchCardId: args.merchCardId,
+        itemType: args.itemType,
+        status: 'draft',
+        title: 'Tour Hoodie',
       };
     case 'publishMerchCard':
       return {
@@ -4790,6 +4825,11 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
         generationId: '00000000-0000-4000-8000-000000000b01',
         optionNumber: 1,
       };
+    case 'createMerchAlternativeItem':
+      return {
+        merchCardId: '00000000-0000-4000-8000-000000000c01',
+        itemType: 'hoodie',
+      };
     case 'publishMerchCard':
     case 'pauseMerchCard':
     case 'unpauseMerchCard':
@@ -4859,6 +4899,13 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
         releaseTitle: 'Neon Reef',
         target: 'playlist',
         platform: 'spotify',
+      };
+    case 'proposeVideoRecording':
+      return {
+        kind: 'promo',
+        title: 'Release day shout-out',
+        script:
+          'Hey everyone, Neon Reef is out now. Thank you so much for listening.',
       };
     default:
       return {};
@@ -5163,6 +5210,13 @@ function registryPathContent(path: string | undefined): string {
   return readFileSync(resolve(REPO_ROOT, path), 'utf8');
 }
 
+function requiresChatToolArtifactCoverage(skill: {
+  readonly kind: string;
+  readonly metadata: { readonly surface?: string | null };
+}): boolean {
+  return skill.kind === 'tool' && (skill.metadata.surface ?? 'chat') === 'chat';
+}
+
 function evaluateSkillRegistryInventory(vars: EvalVars) {
   const coverage = toObject(vars.coverage);
   const expectedSkillIds = Array.isArray(coverage.expectedSkillIds)
@@ -5290,11 +5344,18 @@ function evaluateSkillArtifactContract(vars: EvalVars) {
         minimumPromptChars,
         requiredPromptGuardrails,
         missingPromptGuardrails,
-        toolSchemaCovered: isTool && ALL_EVAL_TOOL_NAME_SET.has(skillId),
+        toolSchemaCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          ALL_EVAL_TOOL_NAME_SET.has(skillId),
         toolResultShapeCovered:
-          isTool && Object.hasOwn(TOOL_RESULT_REQUIRED_KEYS, skillId),
-        toolAvailabilityCovered: isTool && PAID_TOOL_NAME_SET.has(skillId),
-        toolRenderCovered: isTool && TOOL_UI_REGISTRY_NAME_SET.has(skillId),
+          !requiresChatToolArtifactCoverage(skill) ||
+          Object.hasOwn(TOOL_RESULT_REQUIRED_KEYS, skillId),
+        toolAvailabilityCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          PAID_TOOL_NAME_SET.has(skillId),
+        toolRenderCovered:
+          !requiresChatToolArtifactCoverage(skill) ||
+          TOOL_UI_REGISTRY_NAME_SET.has(skillId),
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -7032,6 +7093,50 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
   };
 }
 
+function evaluatePromptDisclosureContract(prompt: string, vars: EvalVars) {
+  const disclosureCase =
+    typeof vars.promptDisclosureCase === 'string'
+      ? vars.promptDisclosureCase
+      : 'blocked-before-dispatch';
+  const userText = prompt.trim();
+  const blocked = isPromptDisclosureRequest(userText);
+  const artistContext = buildTestArtistContext(
+    toObject(vars.artistOverrides) as Parameters<
+      typeof buildTestArtistContext
+    >[0]
+  );
+  const plan = toPlanId(vars.plan);
+  const planLimits = getEntitlements(plan);
+  const systemPrompt = buildSystemPrompt(artistContext, [], {
+    aiCanUseTools: planLimits.booleans.aiCanUseTools,
+    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    insightsEnabled: plan !== 'free',
+  });
+
+  return {
+    target: 'prompt-disclosure-contract',
+    adapter: 'prompt-disclosure-contract',
+    productionEntrypoint: 'apps/web/lib/chat/run.ts:executeChatTurn',
+    costTier: 'deterministic',
+    text: blocked ? PROMPT_DISCLOSURE_REFUSAL : '',
+    disclosureCase,
+    userText,
+    blocked,
+    modelDispatchPrevented: blocked,
+    refusalModelId: blocked ? 'prompt-disclosure-refusal' : null,
+    selectedModel: null,
+    modelCalled: false,
+    persistenceAttempted: false,
+    dbAttempted: false,
+    networkAttempted: false,
+    hasSecuritySection: systemPrompt.includes('## Security (CRITICAL)'),
+    hasCanary: systemPrompt.includes(PROMPT_LEAK_CANARY),
+    toolCalls: [],
+    toolResults: [],
+    toolExecutions: [],
+  };
+}
+
 function evaluateChatTitleContract(vars: EvalVars) {
   const titleCase =
     typeof vars.chatTitleCase === 'string'
@@ -7059,8 +7164,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
   const generatedTitle = sanitizeConversationTitle('"Neon Reef Launch Plan"');
   const sourceFacts = {
     importsUserFacingRouteDependencies: textIncludesAll(routeSource, [
-      "import { gateway } from '@ai-sdk/gateway'",
-      "import { generateText } from '@/lib/ai/sdk'",
+      "import { gateway, generateText } from '@/lib/ai/sdk'",
       "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
     ]),
     usesTitleModelConstant:
@@ -8161,6 +8265,7 @@ type EvalCaseSummary = {
   readonly albumArtProviderCase: string | null;
   readonly aiToolPromptCase: string | null;
   readonly chatTitleCase: string | null;
+  readonly promptDisclosureCase: string | null;
   readonly insightPromptCase: string | null;
   readonly interviewSummaryCase: string | null;
   readonly playlistGenerationCase: string | null;
@@ -8269,6 +8374,7 @@ function parseEvalCaseSummary(block: string): EvalCaseSummary {
     albumArtProviderCase: scalarValue(block, 'albumArtProviderCase'),
     aiToolPromptCase: scalarValue(block, 'aiToolPromptCase'),
     chatTitleCase: scalarValue(block, 'chatTitleCase'),
+    promptDisclosureCase: scalarValue(block, 'promptDisclosureCase'),
     insightPromptCase: scalarValue(block, 'insightPromptCase'),
     interviewSummaryCase: scalarValue(block, 'interviewSummaryCase'),
     playlistGenerationCase: scalarValue(block, 'playlistGenerationCase'),
@@ -8523,6 +8629,15 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       .filter(
         (chatTitleCase): chatTitleCase is string =>
           typeof chatTitleCase === 'string'
+      )
+  );
+  const promptDisclosureCaseNames = uniqueSorted(
+    deterministicCases
+      .filter(testCase => testCase.target === 'prompt-disclosure-contract')
+      .map(testCase => testCase.promptDisclosureCase)
+      .filter(
+        (promptDisclosureCase): promptDisclosureCase is string =>
+          typeof promptDisclosureCase === 'string'
       )
   );
   const insightPromptCaseNames = uniqueSorted(
@@ -8822,6 +8937,12 @@ function evaluateEvalCaseInventory(vars: EvalVars) {
       REQUIRED_CHAT_TITLE_CASES,
       chatTitleCaseNames
     ),
+    requiredPromptDisclosureCaseNames: [...REQUIRED_PROMPT_DISCLOSURE_CASES],
+    promptDisclosureCaseNames,
+    missingPromptDisclosureCaseNames: missingNames(
+      REQUIRED_PROMPT_DISCLOSURE_CASES,
+      promptDisclosureCaseNames
+    ),
     requiredInsightPromptCaseNames: [...REQUIRED_INSIGHT_PROMPT_CASES],
     insightPromptCaseNames,
     missingInsightPromptCaseNames: missingNames(
@@ -9084,6 +9205,11 @@ export default class JovieChatPromptfooProvider {
 
     if (target === 'prompt-context-contract') {
       const payload = evaluateSystemPromptContract(prompt, vars);
+      return jsonProviderResponse(payload, startedAt);
+    }
+
+    if (target === 'prompt-disclosure-contract') {
+      const payload = evaluatePromptDisclosureContract(prompt, vars);
       return jsonProviderResponse(payload, startedAt);
     }
 

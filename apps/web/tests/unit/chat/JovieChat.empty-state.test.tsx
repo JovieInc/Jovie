@@ -50,24 +50,30 @@ vi.mock('@tanstack/react-virtual', () => ({
 
 vi.mock('@/components/jovie/hooks', () => ({
   useJovieChat: () => mockChatState,
-  useChatImageAttachments: () => ({
-    pendingImages: [],
+  useChatFileAttachments: () => ({
+    pendingFiles: [],
     isDragOver: false,
-    isProcessing: false,
+    isUploading: false,
+    hasReadyFiles: false,
     addFiles: vi.fn(),
-    removeImage: vi.fn(),
-    clearImages: vi.fn(),
+    removeFile: vi.fn(),
+    clearFiles: vi.fn(),
     toFileUIParts: () => [],
     dropZoneRef: { current: null },
-  }),
-  useChatAudioAttachments: () => ({
-    pendingAudio: null,
-    isDragOver: false,
-    isProcessing: false,
-    addFiles: vi.fn(),
-    clearAudio: vi.fn(),
-    dropZoneRef: { current: null },
-    accept: 'audio/*',
+    accept: 'image/*,audio/*,video/*',
+    aggregate: {
+      total: 0,
+      done: 0,
+      uploading: 0,
+      queued: 0,
+      errors: 0,
+      duplicates: 0,
+      totalBytes: 0,
+      uploadedBytes: 0,
+      overallPct: 0,
+      speed: '—',
+      eta: '—',
+    },
   }),
   useStickToBottom: () => ({
     isStuckToBottom: true,
@@ -103,6 +109,12 @@ vi.mock('@/lib/queries', () => ({
       list: (profileId: string) => ['events', 'list', profileId],
     },
   },
+  usePlanGate: () => ({
+    isPro: true,
+    chatFileUploadLimit: null,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 vi.mock('@/components/jovie/components', async () => {
@@ -166,6 +178,9 @@ describe('JovieChat empty state', () => {
     expect(queryByText("Hey, I'm Jovie.")).toBeNull();
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
+    const emptyViewport = getByTestId('chat-empty-state-viewport');
+    expect(emptyViewport.className).toContain('flex-1');
+    expect(emptyViewport.className).toContain('justify-center');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
     expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();

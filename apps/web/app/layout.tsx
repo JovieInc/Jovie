@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import Script from 'next/script';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
@@ -12,9 +11,14 @@ import './globals.css';
 import '@/components/organisms/HeaderNav.css';
 import '@/components/site/MarketingFooter.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
+import { GoogleAnalytics } from '@/components/providers/GoogleAnalytics';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
+import {
+  isValidGaMeasurementId,
+  shouldMountGoogleAnalytics,
+} from '@/lib/tracking/google-consent-mode';
 
 const inter = localFont({
   src: '../public/fonts/Inter-Latin.woff2',
@@ -26,21 +30,13 @@ const inter = localFont({
 const satoshi = localFont({
   src: '../public/fonts/Satoshi-Latin.woff2',
   variable: '--font-satoshi',
-  display: 'optional',
+  display: 'swap',
   weight: '300 900',
 });
 
-// JOV-2267: DM Sans is only used in below-fold marketing sections
-// (HomeLoopDiagramSection, HomeStatQuoteSection, HomeBentoPairs) via
-// --marketing-font-body. Setting preload:false prevents a 68KB preload hint
-// on every page; display:'optional' already suppresses FOUT.
-const dmSans = localFont({
-  src: '../public/fonts/DMSans-Latin.woff2',
-  variable: '--font-dm-sans',
-  display: 'optional',
-  preload: false,
-  weight: '100 1000',
-});
+// DM Sans retired 2026-06-18 (JOV design-system unification — "one system, two
+// languages"). Body + UI type is now Inter everywhere; Satoshi is the single
+// approved display exception (hero / large display). See DESIGN.md decision log.
 
 export const metadata: Metadata = {
   title: {
@@ -169,6 +165,11 @@ export default async function RootLayout({
 }>) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
   const isTestAuthBypassRuntime = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const isSecureVercelDeployment =
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'preview';
+  const isPublicNoAuthSmokeRuntime =
+    process.env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureVercelDeployment;
   const clerkMockEnabled = process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
   const clerkProxyDisabled =
     process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
@@ -181,6 +182,13 @@ export default async function RootLayout({
       devEnv,
       isE2EClientRuntime,
     });
+  const gaMeasurementId = publicEnv.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+  const shouldMountGa = shouldMountGoogleAnalytics({
+    measurementId: gaMeasurementId,
+    isTest: process.env.NODE_ENV === 'test',
+    isE2E: isE2EClientRuntime,
+    isDemoRecording,
+  });
 
   let devToolbar: React.ReactNode = null;
   let FlagBadgeProvider: React.ComponentType<{
@@ -206,7 +214,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} ${satoshi.variable} ${dmSans.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
 
   const content = (
     <>
@@ -214,6 +222,7 @@ export default async function RootLayout({
       {auth}
       {devToolbar}
       {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
+      <GoogleAnalytics />
       <InstantlyPixel />
     </>
   );
@@ -225,7 +234,11 @@ export default async function RootLayout({
       data-clerk-mock={clerkMockEnabled ? '1' : undefined}
       data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
       data-e2e-mode={
-        isE2EClientRuntime || isTestAuthBypassRuntime ? '1' : undefined
+        isE2EClientRuntime ||
+        isTestAuthBypassRuntime ||
+        isPublicNoAuthSmokeRuntime
+          ? '1'
+          : undefined
       }
       data-demo-recording={isDemoRecording ? '1' : undefined}
       data-dev-chrome-disabled={shouldRenderDevChrome ? undefined : '1'}
@@ -233,8 +246,16 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
-        <Script src='/electron-runtime-init.js' strategy='beforeInteractive' />
-        <Script src='/theme-init.js' strategy='beforeInteractive' />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
+        <script src='/electron-runtime-init.js' />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
+        <script src='/theme-init.js' />
+        {shouldMountGa && isValidGaMeasurementId(gaMeasurementId) ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before the GA loader so consent defaults are queued before gtag.js executes. */}
+            <script id='ga-consent-init' src='/ga-consent-init.js' />
+          </>
+        ) : null}
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (

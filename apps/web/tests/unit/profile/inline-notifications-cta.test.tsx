@@ -118,6 +118,8 @@ function buildProfileNotifications(
 function buildFormState(overrides: Record<string, unknown> = {}) {
   return {
     emailInput: 'fan@test.com',
+    phoneInput: '',
+    country: { code: 'US', dialCode: '+1', label: 'United States' },
     error: null,
     otpCode: '',
     isSubmitting: false,
@@ -125,15 +127,20 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
     isResending: false,
     handleChannelChange: vi.fn(),
     handleEmailChange: vi.fn(),
+    handlePhoneChange: vi.fn(),
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue('error'),
     handleVerifyOtp: vi.fn().mockResolvedValue('error'),
     handleResendOtp: vi.fn().mockResolvedValue(true),
     notificationsState: 'idle',
     notificationsEnabled: true,
+    channel: 'email',
     subscribedChannels: {},
     openSubscription: vi.fn(),
     hydrationStatus: 'done',
+    isCountryOpen: false,
+    setCountry: vi.fn(),
+    setIsCountryOpen: vi.fn(),
     ...overrides,
   };
 }
@@ -197,7 +204,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
 
     await waitFor(() => {
       expect(handleSubscribe).toHaveBeenCalledTimes(1);
@@ -249,11 +256,13 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /^verify$/i }));
 
     expect(await screen.findByTestId('mobile-name-input')).toBeInTheDocument();
-    expect(screen.getByText('First Name')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'First Name' })
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     expect(

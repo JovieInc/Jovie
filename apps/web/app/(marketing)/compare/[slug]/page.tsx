@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import {
   FaqSection,
   MarketingContainer,
-  MarketingHero,
+  MarketingHeroLayout,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -61,7 +61,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
       <script type='application/ld+json'>{faqSchema}</script>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <MarketingHero variant='left'>
+      <MarketingHeroLayout variant='left'>
         <p className='marketing-kicker'>Compare</p>
         <h1 className='marketing-h1-linear mt-6 max-w-[20ch] text-primary-token'>
           {data.heroHeadline}
@@ -69,7 +69,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
         <p className='mt-6 max-w-[60ch] text-lg leading-relaxed text-secondary-token'>
           {data.heroSubheadline}
         </p>
-      </MarketingHero>
+      </MarketingHeroLayout>
 
       {/* Feature Comparison Table */}
       <MarketingContainer width='prose' className='pb-16'>
@@ -161,7 +161,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
           <div className='mt-8'>
             <Link
               href={APP_ROUTES.SIGNUP}
-              className='inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)'
+              className='inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)'
             >
               Try {APP_NAME} Free
             </Link>

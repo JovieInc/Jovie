@@ -46,6 +46,8 @@ export {
   type ToolsCatalogRow,
   toolsCatalog,
 } from './agents';
+// AI crawler analytics snapshots
+export { aiCrawlerAnalyticsSnapshots } from './ai-crawler-analytics';
 // Analytics (Clicks, Audience, Tips, Blocks)
 export {
   type AudienceAction,
@@ -80,6 +82,7 @@ export {
   type NewTip,
   type NotificationSubscription,
   notificationSubscriptions,
+  publicProfileCaptureDismissals,
   selectAudienceBlockSchema,
   selectClickEventSchema,
   selectNotificationSubscriptionSchema,
@@ -161,6 +164,7 @@ export {
   insertExternalObjectSchema,
   insertSuggestedActionSchema,
   insertWebhookDeliverySchema,
+  insertWorkflowRunOutcomeSchema,
   insertWorkflowRunSchema,
   type NewAgentRun,
   type NewConnectorAccount,
@@ -170,6 +174,7 @@ export {
   type NewSuggestedAction,
   type NewWebhookDelivery,
   type NewWorkflowRun,
+  type NewWorkflowRunOutcome,
   type SuggestedAction,
   selectAgentRunSchema,
   selectConnectorAccountSchema,
@@ -178,11 +183,14 @@ export {
   selectExternalObjectSchema,
   selectSuggestedActionSchema,
   selectWebhookDeliverySchema,
+  selectWorkflowRunOutcomeSchema,
   selectWorkflowRunSchema,
   suggestedActions,
   type WebhookDelivery,
   type WorkflowRun,
+  type WorkflowRunOutcome,
   webhookDeliveries,
+  workflowRunOutcomes,
   workflowRuns,
 } from './connectors';
 // Content (Providers, Releases, Recordings, Tracks)
@@ -365,6 +373,7 @@ export {
   leadSourcePlatformEnum,
   leadStatusEnum,
   libraryAssetApprovalStatusEnum,
+  libraryAssetVisibilityEnum,
   linkTypeEnum,
   merchCardStatusEnum,
   merchDesignLaneEnum,
@@ -415,11 +424,18 @@ export {
   webhookProviderEnum,
   workflowRunStatusEnum,
 } from './enums';
+// Feature flag per-environment overrides
+export {
+  type FeatureFlagOverrideRow,
+  featureFlagOverrides,
+} from './feature-flags';
 // Feedback
 export {
   type FeedbackItem,
+  type FeedbackVote,
   feedbackItems,
   feedbackStatusEnumValues,
+  feedbackVoteEnumValues,
   insertFeedbackItemSchema,
   type NewFeedbackItem,
   selectFeedbackItemSchema,
@@ -530,6 +546,15 @@ export {
   type NewLibraryAssetApprovalStatusRow,
   selectLibraryAssetApprovalStatusSchema,
 } from './library';
+// Library Asset Share (per-asset public/private URLs)
+export {
+  insertLibraryAssetShareSettingsSchema,
+  type LibraryAssetShareSettingsRow,
+  type LibraryAssetVisibilityValue,
+  libraryAssetShareSettings,
+  type NewLibraryAssetShareSettingsRow,
+  selectLibraryAssetShareSettingsSchema,
+} from './library-asset-share';
 // Library Share Drops (press kit / label review portals)
 export {
   insertLibraryShareDropItemSchema,
@@ -736,6 +761,14 @@ export {
   selectSmsSubscribeIntentSchema,
   smsSubscribeIntents,
 } from './notifications';
+// Onboarding deterministic script lines (JOV-3806)
+export {
+  insertOnboardingScriptLineSchema,
+  type NewOnboardingScriptLine,
+  type OnboardingScriptLine,
+  onboardingScriptLines,
+  selectOnboardingScriptLineSchema,
+} from './onboarding-script';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,

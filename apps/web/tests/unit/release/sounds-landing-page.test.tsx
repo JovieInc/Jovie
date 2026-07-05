@@ -146,6 +146,14 @@ describe('SoundsLandingPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('uses the shared compact smart-link hero title class', () => {
+    render(<SoundsLandingPage {...defaultProps} />);
+
+    const title = screen.getByRole('heading', { name: 'Test Song' });
+    expect(title).toHaveClass('text-2xl', 'tracking-tight');
+    expect(title).not.toHaveClass('text-3xl', 'text-4xl');
+  });
+
   it('fires click tracking via sendBeacon when provider button is clicked', () => {
     render(<SoundsLandingPage {...defaultProps} />);
     sendBeaconSpy.mockClear();

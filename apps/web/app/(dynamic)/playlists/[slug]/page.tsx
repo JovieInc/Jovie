@@ -255,7 +255,7 @@ export default async function PlaylistPage({
           )}
 
           {/* Title & Attribution */}
-          <h1 className='mt-6 text-center text-[24px] font-[510] leading-[1.2] tracking-[-0.48px] text-white'>
+          <h1 className='mt-6 text-center text-[24px] font-[510] leading-[1.2] tracking-[-0.48px] text-white dark:text-white'>
             {playlist.title}
           </h1>
           <p className='mt-1 text-[13px] font-[450] text-white/40'>
@@ -293,10 +293,11 @@ export default async function PlaylistPage({
               href={spotifyUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-[15px] font-[510] text-black transition-colors hover:bg-white/90'
+              className='mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-[15px] font-[510] text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
             >
               <SocialIcon
                 platform='spotify'
+                // eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- Spotify brand green on playlist CTA
                 className='h-5 w-5 text-[#1DB954]'
                 aria-hidden
               />
@@ -317,7 +318,7 @@ export default async function PlaylistPage({
 
                   {/* Track info */}
                   <div className='min-w-0 flex-1'>
-                    <p className='truncate text-[15px] font-[450] text-white'>
+                    <p className='truncate text-[15px] font-[450] text-white dark:text-white'>
                       {track.trackName}
                     </p>
                     {track.username ? (
@@ -340,6 +341,7 @@ export default async function PlaylistPage({
                       href={`https://open.spotify.com/track/${track.spotifyTrackId}`}
                       target='_blank'
                       rel='noopener noreferrer'
+                      // eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- Spotify brand green on track play affordance
                       className='flex-shrink-0 p-2 text-white/20 hover:text-[#1DB954]'
                       aria-label={`Play ${track.trackName} on Spotify`}
                     >

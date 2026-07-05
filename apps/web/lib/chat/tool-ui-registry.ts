@@ -107,6 +107,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Album art ready',
     errorTitle: "Couldn't create your album art",
   },
+  retouchImage: {
+    label: 'Retouch',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Retouching your photo…',
+    successTitle: 'Photo retouched',
+    errorTitle: "Couldn't retouch your photo",
+  },
   createMerch: {
     label: 'Merch',
     uiHint: 'artifact',
@@ -130,6 +138,14 @@ export const TOOL_UI_REGISTRY = {
     loadingTitle: 'Saving your merch pick…',
     successTitle: 'Merch pick saved',
     errorTitle: "Couldn't save that merch pick",
+  },
+  createMerchAlternativeItem: {
+    label: 'Merch item',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Creating alternate item…',
+    successTitle: 'Alternate item saved',
+    errorTitle: "Couldn't create that item",
   },
   publishMerchCard: {
     label: 'Merch publish',
@@ -306,6 +322,14 @@ export const TOOL_UI_REGISTRY = {
     loadingTitle: 'Preparing checkout…',
     successTitle: 'Checkout ready',
     errorTitle: "Couldn't prepare checkout",
+  },
+  proposeVideoRecording: {
+    label: 'Video recording',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Preparing your recording…',
+    successTitle: 'Ready to record',
+    errorTitle: "Couldn't prepare your recording",
   },
 } as const satisfies Record<string, ToolUiConfig>;
 

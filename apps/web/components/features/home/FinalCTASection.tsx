@@ -44,7 +44,7 @@ export function FinalCTASection() {
             <ClaimHandleForm submitButtonTestId='final-cta-action' />
           </div>
 
-          <p className='mt-5 text-[11px] tracking-[0.01em] text-quaternary-token'>
+          <p className='mt-5 text-2xs tracking-[0.01em] text-quaternary-token'>
             Be one of the first artists on Jovie.
           </p>
         </div>

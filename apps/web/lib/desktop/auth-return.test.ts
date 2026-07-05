@@ -4,6 +4,7 @@ import {
   buildDesktopAuthDeepLink,
   buildDesktopAuthReturnPath,
   buildDesktopCallbackFallbackRedirectUrl,
+  getDesktopAuthReturnProtocolForOrigin,
   getDesktopReturnRoute,
   sanitizeDesktopAuthUrl,
   sanitizeDesktopReturnRoute,
@@ -48,6 +49,24 @@ describe('desktop auth return helpers', () => {
     );
     expect(buildDesktopAuthDeepLink('/app/chat?thread=abc')).toBe(
       'jovie://auth-return?route=%2Fapp%2Fchat%3Fthread%3Dabc'
+    );
+    expect(
+      buildDesktopAuthDeepLink('/app/chat?thread=abc', 'jovie-staging')
+    ).toBe('jovie-staging://auth-return?route=%2Fapp%2Fchat%3Fthread%3Dabc');
+    expect(
+      buildDesktopAuthDeepLink('/app/chat?thread=abc', 'jovie-local')
+    ).toBe('jovie-local://auth-return?route=%2Fapp%2Fchat%3Fthread%3Dabc');
+  });
+
+  it('derives legacy desktop auth-return protocols from the browser origin', () => {
+    expect(getDesktopAuthReturnProtocolForOrigin('https://jov.ie')).toBe(
+      'jovie'
+    );
+    expect(
+      getDesktopAuthReturnProtocolForOrigin('https://staging.jov.ie')
+    ).toBe('jovie-staging');
+    expect(getDesktopAuthReturnProtocolForOrigin('http://localhost:3112')).toBe(
+      'jovie-local'
     );
   });
 

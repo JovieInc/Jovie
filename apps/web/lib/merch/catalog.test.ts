@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const printful = vi.hoisted(() => ({
   getCatalogProductAvailability: vi.fn(),
+  getCatalogProduct: vi.fn(),
   getCatalogVariantPrices: vi.fn(),
   isPrintfulConfigured: vi.fn(),
   listCatalogProducts: vi.fn(),
@@ -15,6 +16,7 @@ import { resolveMerchCatalogSelection } from './catalog';
 describe('resolveMerchCatalogSelection', () => {
   beforeEach(() => {
     printful.getCatalogProductAvailability.mockReset();
+    printful.getCatalogProduct.mockReset();
     printful.getCatalogVariantPrices.mockReset();
     printful.isPrintfulConfigured.mockReset();
     printful.listCatalogProducts.mockReset();
@@ -117,8 +119,94 @@ describe('resolveMerchCatalogSelection', () => {
     expect(printful.listCatalogProducts).toHaveBeenCalledWith({
       sellingRegionName: 'north_america',
       placements: ['front'],
-      limit: 50,
+      limit: 100,
+      offset: 0,
     });
+  });
+
+  it('searches additional catalog pages before falling back to defaults', async () => {
+    printful.isPrintfulConfigured.mockReturnValue(true);
+    printful.listCatalogProducts
+      .mockResolvedValueOnce(
+        Array.from({ length: 100 }, (_, index) => ({
+          id: 1000 + index,
+          name: `Catalog Product ${index}`,
+          type: 'poster',
+          is_discontinued: false,
+        }))
+      )
+      .mockResolvedValueOnce([
+        {
+          id: 222,
+          name: 'Structured Dad Hat',
+          type: 'hat',
+          model: 'cap',
+          is_discontinued: false,
+        },
+      ]);
+    printful.listCatalogVariants.mockResolvedValue([
+      {
+        id: 2201,
+        catalog_product_id: 222,
+        name: 'Black',
+        size: 'One Size',
+        color: 'Black',
+      },
+    ]);
+    printful.getCatalogVariantPrices.mockResolvedValue({
+      currency: 'USD',
+      product: {
+        id: 222,
+        placements: [{ id: 'front', price: '13.00' }],
+      },
+      variant: {
+        id: 2201,
+        techniques: [{ technique_key: 'dtg', price: '1.25' }],
+      },
+    });
+    printful.getCatalogProductAvailability.mockResolvedValue([]);
+
+    const selection = await resolveMerchCatalogSelection('make a hat');
+
+    expect(selection.catalogProductId).toBe(222);
+    expect(printful.listCatalogProducts).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses explicit Printful catalog product IDs when provided', async () => {
+    printful.isPrintfulConfigured.mockReturnValue(true);
+    printful.getCatalogProduct.mockResolvedValue({
+      id: 333,
+      name: 'Heavyweight Tank',
+      type: 'tank',
+      is_discontinued: false,
+    });
+    printful.listCatalogVariants.mockResolvedValue([
+      {
+        id: 3301,
+        catalog_product_id: 333,
+        name: 'M / Black',
+        size: 'M',
+        color: 'Black',
+      },
+    ]);
+    printful.getCatalogVariantPrices.mockResolvedValue({
+      currency: 'USD',
+      product: {
+        id: 333,
+        placements: [{ id: 'front', price: '15.00' }],
+      },
+      variant: {
+        id: 3301,
+        techniques: [{ technique_key: 'dtg', price: '1.25' }],
+      },
+    });
+    printful.getCatalogProductAvailability.mockResolvedValue([]);
+
+    const selection = await resolveMerchCatalogSelection('catalog product 333');
+
+    expect(selection.catalogProductId).toBe(333);
+    expect(printful.getCatalogProduct).toHaveBeenCalledWith(333);
+    expect(printful.listCatalogProducts).not.toHaveBeenCalled();
   });
 
   it('falls back to draft-only defaults when provider data is unsafe', async () => {

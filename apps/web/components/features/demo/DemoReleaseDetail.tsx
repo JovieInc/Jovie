@@ -34,13 +34,13 @@ export function DemoReleaseDetail({
     <div className='flex h-full flex-col'>
       {/* Header */}
       <div className='flex min-h-10 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 py-2'>
-        <div className='min-w-0 flex-1 text-[13px] font-[510] tracking-[-0.01em] text-secondary-token'>
+        <div className='min-w-0 flex-1 text-app font-medium tracking-tight text-secondary-token'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
         <DrawerInlineIconButton
           onClick={onClose}
           className='size-7 rounded-full'
-          aria-label='Close detail panel'
+          aria-label='Close Detail Panel'
         >
           <X className='size-4' />
         </DrawerInlineIconButton>
@@ -53,7 +53,7 @@ export function DemoReleaseDetail({
           <h2 className='mb-1 text-lg font-semibold text-primary-token'>
             {release.title}
           </h2>
-          <p className='text-[13px] text-secondary-token'>{release.artist}</p>
+          <p className='text-app text-secondary-token'>{release.artist}</p>
         </div>
 
         {/* Properties grid */}
@@ -86,7 +86,7 @@ export function DemoReleaseDetail({
               <span>{release.trackCount}</span>
             </div>
           </DemoPropertyRow>
-          <DemoPropertyRow label='Release date'>
+          <DemoPropertyRow label='Release Date'>
             <div className='-ml-2 rounded px-2 py-1'>
               <span>{release.releaseDate}</span>
             </div>
@@ -103,7 +103,7 @@ export function DemoReleaseDetail({
               {release.links.map(link => (
                 <DrawerSurfaceCard
                   key={link.id}
-                  className='flex items-center gap-2 rounded border-0 shadow-none px-2.5 py-1.5 text-[13px]'
+                  className='flex items-center gap-2 rounded border-0 shadow-none px-2.5 py-1.5 text-app'
                 >
                   <span
                     className='size-1.5 shrink-0 rounded-full'
@@ -129,7 +129,7 @@ export function DemoReleaseDetail({
               {release.labels.map(label => (
                 <span
                   key={label.id}
-                  className='flex items-center gap-1.5 rounded bg-surface-1 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'
+                  className='flex items-center gap-1.5 rounded bg-surface-1 px-1.5 py-0.5 text-3xs font-medium text-secondary-token'
                 >
                   <span
                     className='size-1.5 rounded-full'
@@ -154,14 +154,14 @@ export function DemoReleaseDetail({
                 {index < DEMO_ACTIVITY_TEMPLATE.length - 1 ? (
                   <div
                     aria-hidden='true'
-                    className='absolute bottom-0 left-[11px] top-0 w-px bg-(--linear-border-subtle)/65'
+                    className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle)/65'
                   />
                 ) : null}
-                <div className='relative z-10 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-surface-0'>
+                <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0'>
                   <div className='size-1 rounded-full bg-(--linear-text-tertiary)/80' />
                 </div>
                 <div className='min-w-0 flex-1 leading-snug text-secondary-token'>
-                  <div className='text-[12px] tracking-[-0.005em]'>
+                  <div className='text-xs tracking-[-0.005em]'>
                     <span className='font-[500] text-secondary-token'>
                       {activity.action}
                     </span>
@@ -172,7 +172,7 @@ export function DemoReleaseDetail({
                       </span>
                     ) : null}
                   </div>
-                  <div className='mt-0.5 text-[10.5px] text-tertiary-token/90'>
+                  <div className='mt-0.5 text-3xs text-tertiary-token/90'>
                     {activity.time}
                   </div>
                 </div>
@@ -193,17 +193,17 @@ export function DemoReleaseDetail({
                 rows={3}
                 readOnly
                 value='Leave a short update for your team. Demo comments stay local to this preview.'
-                className='w-full resize-none bg-transparent text-[12.5px] leading-[1.45] text-secondary-token outline-none placeholder:text-tertiary-token'
+                className='w-full resize-none bg-transparent text-xs leading-[1.45] text-secondary-token outline-none placeholder:text-tertiary-token'
               />
               <div className='mt-2 flex items-center justify-between border-t border-subtle/65 pt-2'>
-                <div className='inline-flex items-center gap-1.5 text-[11px] text-tertiary-token'>
+                <div className='inline-flex items-center gap-1.5 text-2xs text-tertiary-token'>
                   <MessageSquare className='size-3.5' aria-hidden />
                   <span>Private team note</span>
                 </div>
                 <div className='flex items-center gap-1.5'>
                   <DrawerInlineIconButton
                     className='size-7 rounded-full text-tertiary-token'
-                    aria-label='Attach file'
+                    aria-label='Attach File'
                   >
                     <Paperclip className='size-3.5' />
                   </DrawerInlineIconButton>
@@ -211,7 +211,7 @@ export function DemoReleaseDetail({
                     size='icon'
                     tone='secondary'
                     className='h-7 w-7 rounded-full'
-                    aria-label='Send comment'
+                    aria-label='Send Comment'
                     onClick={() =>
                       runDemoAction({
                         loadingMessage: 'Posting comment',
@@ -233,7 +233,7 @@ export function DemoReleaseDetail({
           <div className='mt-4 mb-4'>
             <DrawerSectionHeading className='mb-2'>Note</DrawerSectionHeading>
             <DrawerSurfaceCard className='border-0 shadow-none p-2.5'>
-              <p className='text-[13px] text-secondary-token'>{release.note}</p>
+              <p className='text-app text-secondary-token'>{release.note}</p>
             </DrawerSurfaceCard>
           </div>
         )}

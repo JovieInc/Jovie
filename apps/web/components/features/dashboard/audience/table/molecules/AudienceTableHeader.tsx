@@ -21,14 +21,14 @@ const MEMBER_COLUMNS = [
   { key: 'visits', label: 'Visits' },
   { key: 'actions', label: 'Actions', align: 'right' as const },
   { key: 'ltv', label: 'LTV' },
-  { key: 'lastSeen', label: 'Last seen' },
+  { key: 'lastSeen', label: 'Last Seen' },
 ] as const;
 
 const SUBSCRIBER_COLUMNS = [
   { key: 'email', label: 'Email' },
   { key: 'phone', label: 'Phone' },
   { key: 'country', label: 'Country' },
-  { key: 'createdAt', label: 'Signed up' },
+  { key: 'createdAt', label: 'Signed Up' },
 ] as const;
 
 type MemberColumnKey = (typeof MEMBER_COLUMNS)[number]['key'];
@@ -100,7 +100,7 @@ export function AudienceTableHeader({
       <tr className='text-app font-caption tracking-normal text-secondary-token'>
         <th className='w-14 border-b border-subtle px-4 py-2.5 text-left'>
           <Checkbox
-            aria-label='Select all'
+            aria-label='Select All'
             checked={headerCheckboxState}
             onCheckedChange={() => onToggleSelectAll()}
           />
@@ -143,7 +143,7 @@ export function AudienceTableHeader({
                   <>
                     <div
                       className={cn(
-                        'inline-flex items-center transition-all duration-150',
+                        'inline-flex items-center transition-colors duration-subtle',
                         selectedCount > 0
                           ? 'opacity-100 translate-y-0'
                           : 'pointer-events-none opacity-0 -translate-y-0.5'
@@ -156,7 +156,7 @@ export function AudienceTableHeader({
                             size='sm'
                             className='normal-case'
                           >
-                            Bulk actions
+                            Bulk Actions
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='end'>
@@ -174,7 +174,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-caption text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
+                        'inline-flex items-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-caption text-secondary-token tabular-nums transition-colors duration-subtle whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

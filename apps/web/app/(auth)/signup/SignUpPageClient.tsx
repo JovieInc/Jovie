@@ -275,7 +275,7 @@ export function SignUpPageClient() {
 
   return (
     <AuthLayout
-      formTitle='Request access'
+      formTitle='Create your account'
       showFormTitle={false}
       showFooterPrompt={false}
       layoutVariant='split'

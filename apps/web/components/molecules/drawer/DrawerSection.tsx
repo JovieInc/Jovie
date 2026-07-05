@@ -3,6 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useId, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CollapsibleSectionHeading } from './CollapsibleSectionHeading';
+import { useDrawerSectionGroup } from './DrawerSectionGroup';
 import { DrawerSectionHeading } from './DrawerSectionHeading';
 import { DrawerSurfaceCard } from './DrawerSurfaceCard';
 
@@ -19,6 +20,8 @@ export interface DrawerSectionProps {
   readonly collapsible?: boolean;
   /** Whether the section starts open. Defaults to true. */
   readonly defaultOpen?: boolean;
+  /** Stable id used by DrawerSectionGroup for single-open accordion behavior. */
+  readonly sectionId?: string;
   /** Delay mounting collapsed content until the first time it opens. */
   readonly lazyMount?: boolean;
   readonly headingTestId?: string;
@@ -132,35 +135,45 @@ export function DrawerSection({
   testId,
   collapsible,
   defaultOpen = true,
+  sectionId,
   lazyMount = false,
   headingTestId,
 }: DrawerSectionProps) {
+  const sectionGroup = useDrawerSectionGroup();
+  const isGrouped = Boolean(sectionGroup && sectionId);
   const isCollapsible = collapsible ?? !!title;
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [hasOpened, setHasOpened] = useState(defaultOpen);
   const contentId = useId();
-  const shouldRenderContent = !lazyMount || isOpen || hasOpened;
+  const resolvedIsOpen = isGrouped
+    ? sectionGroup?.openSectionId === sectionId
+    : isOpen;
+  const shouldRenderContent = !lazyMount || resolvedIsOpen || hasOpened;
   const handleToggle = useCallback(() => {
-    setIsOpen(prev => !prev);
-  }, []);
+    if (isGrouped && sectionId) {
+      sectionGroup?.toggleSection(sectionId);
+      return;
+    }
+    setIsOpen(previous => !previous);
+  }, [isGrouped, sectionGroup, sectionId]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (resolvedIsOpen) {
       setHasOpened(true);
     }
-  }, [isOpen]);
+  }, [resolvedIsOpen]);
 
   const heading = (
     <DrawerSectionHeadingSlot
       title={title}
       isCollapsible={isCollapsible}
-      isOpen={isOpen}
+      isOpen={resolvedIsOpen}
       onToggle={handleToggle}
       contentId={contentId}
       testId={headingTestId}
     />
   );
-  const isContentHidden = isCollapsible && !isOpen;
+  const isContentHidden = isCollapsible && !resolvedIsOpen;
 
   if (surface === 'card') {
     return (

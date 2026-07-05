@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -19,9 +23,6 @@ const VISIBLE_PAID_PLANS = VISIBLE_PRICING_PLANS.filter(
 );
 const primaryPaidPlanName =
   VISIBLE_PAID_PLANS.length === 1 ? VISIBLE_PAID_PLANS[0]?.name : null;
-const accessCopy = primaryPaidPlanName
-  ? `${primaryPaidPlanName} is ready when you want the release system turned on.`
-  : 'Pro and Max are ready when you want the release system turned on.';
 const requestAccessCopy = primaryPaidPlanName
   ? `Claim the profile first. Choose ${primaryPaidPlanName} when you want the release system turned on.`
   : 'Claim the profile first. Choose a paid plan when you want the release system turned on.';
@@ -139,50 +140,35 @@ export default function PricingPage() {
         {safeJsonLdStringify(PRICING_SCHEMA)}
       </script>
 
-      <section
-        aria-labelledby='pricing-hero-heading'
+      <MarketingHero
         className='system-b-pricing-hero'
-      >
-        <MarketingContainer width='page'>
-          <div className='system-b-pricing-hero-grid'>
-            <div className='system-b-pricing-hero-copy'>
-              <h1 id='pricing-hero-heading' className='system-b-pricing-title'>
-                Pricing
-              </h1>
-              <p className='system-b-pricing-lead'>
-                Artist profiles are free forever. Pro adds the release tools
-                when you need them.
-              </p>
-              <p className='system-b-pricing-note'>{accessCopy}</p>
-              <div className='system-b-pricing-actions'>
-                <Link
-                  href={`${APP_ROUTES.SIGNUP}?plan=free`}
-                  className='system-b-pricing-primary-link'
-                  data-primary-action='true'
-                >
-                  Claim your profile
-                </Link>
-                <Link
-                  href={APP_ROUTES.ARTIST_PROFILES}
-                  className='system-b-pricing-secondary-link'
-                >
-                  Explore Artist Profiles
-                </Link>
-              </div>
-            </div>
-
-            <div className='system-b-pricing-story-grid'>
-              {STORY_CARDS.map(card => (
-                <PricingStoryCard
-                  key={card.label}
-                  label={card.label}
-                  headline={card.headline}
-                  body={card.body}
-                />
-              ))}
-            </div>
+        headingId='pricing-hero-heading'
+        headline='Pricing'
+        subtitle='Artist profiles are free forever. Pro adds the release tools when you need them.'
+        primaryCta={{
+          label: 'Claim your profile',
+          href: `${APP_ROUTES.SIGNUP}?plan=free`,
+        }}
+        secondaryCta={{
+          label: 'Explore Artist Profiles',
+          href: APP_ROUTES.ARTIST_PROFILES,
+        }}
+        media={
+          <div className='system-b-pricing-story-grid'>
+            {STORY_CARDS.map(card => (
+              <PricingStoryCard
+                key={card.label}
+                label={card.label}
+                headline={card.headline}
+                body={card.body}
+              />
+            ))}
           </div>
+        }
+      />
 
+      <section aria-label='Plans' className='system-b-pricing-section'>
+        <MarketingContainer width='page'>
           <div className='system-b-pricing-plans'>
             <MarketingPricingPlans ctaVariant='secondary' mode='expanded' />
           </div>

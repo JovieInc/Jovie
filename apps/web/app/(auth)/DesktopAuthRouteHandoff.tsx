@@ -76,17 +76,17 @@ export function DesktopAuthRouteHandoff() {
 
   return (
     <main
-      className='relative isolate grid min-h-dvh place-items-center bg-[#06070a] px-6 text-white [color-scheme:dark]'
+      className='relative isolate grid min-h-dvh place-items-center bg-background px-6 text-white dark:text-white [color-scheme:dark]'
       data-desktop-auth-state={openState}
       data-testid='desktop-auth-route-handoff'
     >
       <section className='relative z-10 flex w-full max-w-[360px] flex-col items-center px-6 py-16 text-center'>
         <BrandLogo aria-hidden size={60} tone='white' />
-        <h1 className='sr-only'>Sign in to Jovie</h1>
+        <h1 className='sr-only'>Sign In To Jovie</h1>
         {isWaitingInBrowser ? null : (
           <button
             type='button'
-            className='mt-8 inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
+            className='mt-8 inline-flex h-11 w-full items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 text-[13px] font-medium text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
             disabled={openState === 'opening'}
             onClick={openAuthUrl}
           >

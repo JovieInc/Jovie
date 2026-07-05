@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { DeferredChatPageClient } from './DeferredChatPageClient';
 
-const CHAT_DESCRIPTION = 'Start a new chat with Jovie AI';
-const CHAT_TITLE = 'Home | Jovie';
+const CHAT_DESCRIPTION = 'Start a new conversation with Jovie AI';
+const CHAT_TITLE = 'Home';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {

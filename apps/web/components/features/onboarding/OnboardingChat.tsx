@@ -38,6 +38,7 @@ import {
   ChatProposeNextStepCard,
   type NextStepCardPayload,
 } from './ChatProposeNextStepCard';
+import { OnboardingChatEmptyIntro } from './OnboardingChatEmptyIntro';
 import type {
   OnboardingProfileArtist,
   OnboardingProfileBuilderState,
@@ -56,6 +57,7 @@ import {
   useArtistSelectionMessage,
 } from './OnboardingToolArtifacts';
 import type { OnboardingTurnstileStatus } from './OnboardingTurnstile';
+import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -402,7 +404,7 @@ const renderProposeNextStep: OnboardingToolRenderer = ({ part, key }) => {
   }
 
   return (
-    <div key={key} className='w-full max-w-[440px]'>
+    <div key={key} className='w-full max-w-110'>
       <ChatProposeNextStepCard payload={part.output} />
     </div>
   );
@@ -414,7 +416,7 @@ const renderProposeCheckout: OnboardingToolRenderer = ({ part, key }) => {
   }
 
   return (
-    <div key={key} className='w-full max-w-[440px]'>
+    <div key={key} className='w-full max-w-110'>
       <ChatProposeCheckoutCard payload={part.output} />
     </div>
   );
@@ -624,7 +626,7 @@ function ChatErrorStatusBanner({
   const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
 
   return (
-    <div className='px-3 py-2.5 text-[12.5px] leading-5'>
+    <div className='px-3 py-2.5 text-xs leading-5'>
       <div role='alert' aria-live='assertive' aria-atomic='true'>
         <p className='font-medium text-primary-token'>Message paused</p>
         <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
@@ -633,7 +635,7 @@ function ChatErrorStatusBanner({
             type='button'
             onClick={handleRetry}
             disabled={isBusy || isSubmitted}
-            className='mt-2 inline-flex h-7 items-center rounded-[8px] border border-subtle px-2.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+            className='mt-2 inline-flex h-7 items-center rounded-lg border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
           >
             Retry message
           </button>
@@ -644,6 +646,7 @@ function ChatErrorStatusBanner({
 }
 
 interface ComposerStatusBannerProps extends ChatErrorStatusBannerProps {
+  readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
 }
@@ -653,6 +656,7 @@ function ComposerStatusBanner({
   handleRetry,
   isBusy,
   isSubmitted,
+  reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
 }: ComposerStatusBannerProps) {
@@ -661,7 +665,12 @@ function ComposerStatusBanner({
   return (
     <div className='divide-y divide-white/[0.065]'>
       {shouldShowTurnstileBanner ? (
-        <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
+        <div
+          className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
+          data-testid='onboarding-turnstile-slot'
+        >
+          {turnstilePanel}
+        </div>
       ) : null}
       <ChatErrorStatusBanner
         chatError={chatError}
@@ -682,11 +691,15 @@ interface OnboardingMessageRegionProps {
   readonly onboardingComposerSurface: ReactNode;
   readonly onHandleCandidateChange: (handle: string | null) => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly onSelectStarterSuggestion: (prompt: string) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
+  readonly showEmptyIntro: boolean;
+  readonly composerPickerOpen: boolean;
 }
 
 function OnboardingMessageRegion({
+  composerPickerOpen,
   displayMessages,
   hasConversationStarted,
   isBusy,
@@ -695,8 +708,10 @@ function OnboardingMessageRegion({
   onboardingComposerSurface,
   onHandleCandidateChange,
   onSelectArtist,
+  onSelectStarterSuggestion,
   profileBuilderState,
   shouldDockComposer,
+  showEmptyIntro,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -717,7 +732,17 @@ function OnboardingMessageRegion({
 
   if (!hasConversationStarted) {
     return (
-      <ChatEmptyStateComposerRegion>
+      <ChatEmptyStateComposerRegion
+        above={
+          showEmptyIntro ? (
+            <OnboardingChatEmptyIntro
+              onSelectSuggestion={onSelectStarterSuggestion}
+              dimmed={composerPickerOpen}
+              isBusy={isBusy}
+            />
+          ) : undefined
+        }
+      >
         <div className='w-full' data-testid='onboarding-centered-composer'>
           {onboardingComposerSurface}
         </div>
@@ -761,8 +786,14 @@ export function OnboardingChat({
   turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
-  const [input, setInput] = useState('');
+  const initialStarterPrompt = starterPrompt
+    ? sanitizeHomepagePrompt(starterPrompt)
+    : '';
+  const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
+  const [input, setInput] = useState(initialStarterPrompt);
+  const latestInputRef = useRef(initialStarterPrompt);
   const [hasSentFirst, setHasSentFirst] = useState(false);
+  const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const [handleDraft, setHandleDraft] = useState<string | null>(null);
@@ -773,12 +804,32 @@ export function OnboardingChat({
   const hasTrackedChatStartedRef = useRef(false);
   const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
-  const hasInjectedStarterPromptRef = useRef(false);
+  const hasInjectedStarterPromptRef = useRef(hasInitialStarterPrompt);
   const hasAutoSubmittedStarterPromptRef = useRef(false);
   const hasRequestedStarterVerificationRef = useRef(false);
-  const pendingStarterPromptRef = useRef<string | null>(null);
+  const pendingStarterPromptRef = useRef<string | null>(
+    hasInitialStarterPrompt ? initialStarterPrompt : null
+  );
   const wasAwaitingTurnstileRetryRef = useRef(false);
+  const [localAutomationBypass, setLocalAutomationBypass] = useState<
+    boolean | null
+  >(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
+
+  const setComposerInput = useCallback((nextInput: string) => {
+    latestInputRef.current = nextInput;
+    setInput(nextInput);
+  }, []);
+
+  useEffect(() => {
+    setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
+  }, []);
+
+  useEffect(() => {
+    if (isTurnstileTokenUsable(turnstileToken, turnstileStatus)) {
+      setVerificationRequested(false);
+    }
+  }, [turnstileStatus, turnstileToken]);
 
   const transport = useMemo(
     () =>
@@ -815,7 +866,7 @@ export function OnboardingChat({
         failedMessage,
       });
       if (failedMessage) {
-        setInput(failedMessage);
+        setComposerInput(failedMessage);
         setMessages(current => [
           ...rollbackFailedUserTurn(current, failedMessage),
         ]);
@@ -830,8 +881,10 @@ export function OnboardingChat({
   const isSubmitted = status === 'submitted';
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
-  const requiresTurnstile = process.env.NODE_ENV !== 'development';
+  const requiresTurnstile =
+    process.env.NODE_ENV !== 'development' && localAutomationBypass !== true;
   const isAwaitingFirstToken =
+    localAutomationBypass !== null &&
     requiresTurnstile &&
     !hasSentFirst &&
     !isTurnstileTokenUsable(turnstileToken, turnstileStatus);
@@ -840,7 +893,7 @@ export function OnboardingChat({
   const displayMessages = getDisplayMessages(messages, shouldShowThinking);
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
   const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
-    useStickToBottom({ messageCount: displayMessages.length });
+    useStickToBottom();
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: 'onboarding',
@@ -852,10 +905,11 @@ export function OnboardingChat({
   });
 
   const submitText = useCallback(
-    (rawText: string) => {
+    (rawText: string, metadata?: Record<string, unknown>) => {
       const text = composeMessage(chipTray.chips, rawText).trim();
-      if (!text || isBusy) return;
+      if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
+        setVerificationRequested(true);
         onTurnstileRequired?.('Verify you are human to send');
         return;
       }
@@ -868,32 +922,34 @@ export function OnboardingChat({
           surface: 'start_chat',
         });
       }
-      sendMessage({ text });
+      sendMessage({ text, ...(metadata ? { metadata } : {}) });
       chipTray.clear();
       setHasSentFirst(true);
-      setInput('');
+      setComposerInput('');
     },
     [
       chipTray,
       isAwaitingFirstToken,
       isBusy,
+      localAutomationBypass,
       notifyJankSend,
       onTurnstileRequired,
       sendMessage,
+      setComposerInput,
     ]
   );
 
   const handleSubmit = useCallback(
     (event?: React.FormEvent) => {
       event?.preventDefault();
-      submitText(input);
+      submitText(latestInputRef.current);
     },
-    [input, submitText]
+    [submitText]
   );
 
   const handleInputChange = useCallback(
     (nextInput: string) => {
-      setInput(nextInput);
+      setComposerInput(nextInput);
 
       if (
         hasInjectedStarterPromptRef.current &&
@@ -903,7 +959,7 @@ export function OnboardingChat({
         pendingStarterPromptRef.current = nextInput.trim() ? nextInput : null;
       }
     },
-    [messages.length]
+    [messages.length, setComposerInput]
   );
 
   const handleRetry = useCallback(() => {
@@ -915,7 +971,12 @@ export function OnboardingChat({
   const handleArtistSelect = useCallback(
     (artist: OnboardingArtistSelection) => {
       setSelectedArtist(artist);
-      submitText(formatArtistSelectionMessage(artist));
+      // The Spotify id rides as message metadata (not visible text) so the
+      // server — LLM tools and the deterministic fallback engine alike — can
+      // confirm the exact artist without parsing the display name.
+      submitText(formatArtistSelectionMessage(artist), {
+        spotifyArtistId: artist.id,
+      });
     },
     [formatArtistSelectionMessage, submitText]
   );
@@ -946,17 +1007,18 @@ export function OnboardingChat({
     }
 
     if (nextPrompt) {
-      setInput(nextPrompt);
+      setComposerInput(nextPrompt);
       pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
     }
-  }, [intentId, starterPrompt]);
+  }, [intentId, setComposerInput, starterPrompt]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
     if (
       !prompt ||
       hasAutoSubmittedStarterPromptRef.current ||
+      localAutomationBypass === null ||
       messages.length > 0 ||
       isBusy
     ) {
@@ -966,6 +1028,7 @@ export function OnboardingChat({
     if (isAwaitingFirstToken) {
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
+        setVerificationRequested(true);
         onTurnstileRequired?.('Verify you are human to send');
       }
       return;
@@ -977,6 +1040,7 @@ export function OnboardingChat({
   }, [
     isAwaitingFirstToken,
     isBusy,
+    localAutomationBypass,
     messages.length,
     onTurnstileRequired,
     submitText,
@@ -1029,8 +1093,21 @@ export function OnboardingChat({
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 
+  const shouldReserveStarterVerification =
+    hasInitialStarterPrompt &&
+    messages.length === 0 &&
+    !hasSentFirst &&
+    chatError === null &&
+    !isTurnstileTokenUsable(turnstileToken, turnstileStatus) &&
+    localAutomationBypass !== true;
   const shouldShowTurnstileBanner =
-    Boolean(turnstilePanel) && turnstilePanelVisible && isAwaitingFirstToken;
+    Boolean(turnstilePanel) &&
+    (turnstilePanelVisible ||
+      shouldReserveStarterVerification ||
+      verificationRequested) &&
+    (isAwaitingFirstToken ||
+      shouldReserveStarterVerification ||
+      verificationRequested);
   const hasComposerStatusBanner =
     shouldShowTurnstileBanner || chatError !== null;
   const composerStatusBanner = hasComposerStatusBanner ? (
@@ -1039,6 +1116,7 @@ export function OnboardingChat({
       handleRetry={handleRetry}
       isBusy={isBusy}
       isSubmitted={isSubmitted}
+      reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
     />
@@ -1050,6 +1128,7 @@ export function OnboardingChat({
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
+  const showEmptyIntro = !intentId && !starterPrompt;
 
   useEffect(() => {
     if (shouldDockComposer) return;
@@ -1091,7 +1170,7 @@ export function OnboardingChat({
   return (
     <section
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)'
-      aria-label='Jovie onboarding chat'
+      aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
@@ -1113,6 +1192,7 @@ export function OnboardingChat({
           )}
         >
           <OnboardingMessageRegion
+            composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
@@ -1121,8 +1201,10 @@ export function OnboardingChat({
             onboardingComposerSurface={onboardingComposerSurface}
             onHandleCandidateChange={setHandleDraft}
             onSelectArtist={handleArtistSelect}
+            onSelectStarterSuggestion={submitText}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
+            showEmptyIntro={showEmptyIntro}
           />
         </div>
       </div>

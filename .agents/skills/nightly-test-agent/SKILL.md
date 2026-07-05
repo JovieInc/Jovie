@@ -40,3 +40,6 @@ Outputs:
 - `apps/web/test-results/nightly-agent/normalized-results.json`
 - `apps/web/test-results/nightly-agent/nightly-report.md`
 - `apps/web/test-results/nightly-agent/skill-delta.json`
+- `docs/NIGHTLY_TESTING_AGENT_REPORT.md` (committed daily report)
+- `apps/web/reports/nightly-agent/last-run.json` (machine-readable ops snapshot)
+- Redis key `nightly-agent:jovie:last_run` (admin ops HUD)

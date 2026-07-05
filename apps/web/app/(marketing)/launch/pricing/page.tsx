@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   MarketingContainer,
-  MarketingHero,
+  MarketingHeroLayout,
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
@@ -68,12 +68,12 @@ function FeatureList({ features }: FeatureListProps) {
 export default function PricingPage() {
   return (
     <MarketingPageShell>
-      <MarketingHero variant='centered'>
-        <h1 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
+      <MarketingHeroLayout variant='centered'>
+        <h1 id='pricing-heading' className='marketing-h2-linear max-w-170'>
           Simple pricing.{' '}
           <span className='text-secondary-token'>No surprises.</span>
         </h1>
-      </MarketingHero>
+      </MarketingHeroLayout>
 
       <MarketingContainer width='page'>
         <div

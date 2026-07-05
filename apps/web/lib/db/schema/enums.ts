@@ -722,19 +722,15 @@ export const referralCommissionStatusEnum = pgEnum(
 // ---------------------------------------------------------------------------
 
 export const connectorProviderEnum = pgEnum('connector_provider', [
-  'spotify',
-  'apple_music',
-  'youtube',
-  'instagram',
-  'tiktok',
-  'soundcloud',
+  'google_calendar',
+  'gmail',
 ]);
 
 export const connectorStatusEnum = pgEnum('connector_status', [
   'connected',
-  'disconnected',
+  'needs_reauth',
   'error',
-  'reauth_required',
+  'disabled',
 ]);
 
 export const webhookProviderEnum = pgEnum('webhook_provider', [
@@ -753,13 +749,22 @@ export const contextFactKindEnum = pgEnum('context_fact_kind', [
   'social_engagement',
   'playlist_placement',
   'other',
+  // Connector enrichment (JOV-3114) — also created in migration 0048 for greenfield DBs
+  'event_signal',
+  'tour_date_known',
+  'person_mentioned',
+  'song_mentioned',
+  'location_mentioned',
+  'studio_location',
 ]);
 
 export const suggestedActionStatusEnum = pgEnum('suggested_action_status', [
   'pending',
-  'accepted',
-  'dismissed',
-  'completed',
+  'approved',
+  'executed',
+  'rejected',
+  'failed',
+  'expired',
 ]);
 
 export const agentRunStatusEnum = pgEnum('agent_run_status', [
@@ -803,3 +808,8 @@ export const libraryAssetApprovalStatusEnum = pgEnum(
   'library_asset_approval_status',
   ['draft', 'needs_review', 'approved', 'archived']
 );
+
+export const libraryAssetVisibilityEnum = pgEnum('library_asset_visibility', [
+  'public',
+  'private',
+]);

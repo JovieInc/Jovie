@@ -100,7 +100,7 @@ describe('signup page', () => {
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        formTitle: 'Request access',
+        formTitle: 'Create your account',
         showFormTitle: false,
         showFooterPrompt: false,
         layoutVariant: 'split',

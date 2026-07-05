@@ -159,7 +159,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then P',
     category: 'navigation',
     icon: UserCircle,
-    href: APP_ROUTES.CHAT,
+    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'p',
@@ -239,7 +239,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   },
   {
     id: 'nav-chat',
-    label: 'Go to chat',
+    label: 'Go to conversation',
     keys: 'G then T',
     category: 'navigation',
     icon: MessageCircle,
@@ -388,6 +388,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   overview: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-dashboard')!,
   profile: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
+  'artist-profile': KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   calendar: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-calendar')!,
   audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,

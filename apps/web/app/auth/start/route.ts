@@ -30,6 +30,8 @@ const LOCAL_AUTH_START_LIMITER = createRateLimiter(RATE_LIMITERS.general, {
   warnOnFallback: false,
 });
 
+const DESKTOP_AUTH_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+
 function createState(): string {
   return crypto.randomUUID().replaceAll('-', '');
 }
@@ -138,6 +140,20 @@ export async function GET(request: Request) {
     );
   }
 
+  const rawDesktopFlow = getStringParam(url, 'desktop_flow');
+  const desktopFlow =
+    rawClient === 'electron' &&
+    rawDesktopFlow &&
+    DESKTOP_AUTH_FLOW_PATTERN.test(rawDesktopFlow)
+      ? rawDesktopFlow
+      : null;
+  if (rawClient === 'electron' && rawDesktopFlow && !desktopFlow) {
+    return NextResponse.json(
+      { error: 'Invalid desktop_flow' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
   try {
     const state = createState();
     const record = await createStoredAuthState({
@@ -146,6 +162,7 @@ export async function GET(request: Request) {
       returnTo,
       state,
       codeChallenge,
+      desktopFlow,
     });
 
     void trackAuthEvent('auth_started', {

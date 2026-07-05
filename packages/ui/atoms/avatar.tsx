@@ -108,7 +108,7 @@ const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
       <span
         ref={ref}
         className={cn(
-          'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full',
+          'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
           ring && 'ring-2 ring-surface-page',
           className
         )}

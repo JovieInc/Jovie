@@ -15,6 +15,7 @@ import { CLERK_KEY_STATUS_HEADER } from '@/lib/auth/clerk-key-status';
 import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
 import { publicEnv } from '@/lib/env-public';
 import { AppFlagProvider } from '@/lib/flags/client';
+import { resolveAuthRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,9 @@ export default async function AuthLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialFlags = await getAppFlagsSnapshot();
+  const initialFlags = await getAppFlagsSnapshot({
+    flagNames: resolveAuthRouteFlagNames(),
+  });
   const publishableKey = await resolvePublishableKeyFromHeaders();
   const hdrs = await headers();
   const isClerkUnavailable =

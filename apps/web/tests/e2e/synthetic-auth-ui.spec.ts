@@ -34,6 +34,7 @@ const FRONT_DOOR_CONFIG_ERRORS = [
   'auth unavailable',
   'clerk is not configured',
   'turnstile is not configured',
+  'verification failed (110200)',
 ] as const;
 
 const EMAIL_IDENTIFIER_INPUT_SELECTOR =
@@ -94,6 +95,15 @@ async function assertAuthShellReady(page: Page, expectedMode: string) {
   ).toBeVisible({ timeout: 30_000 });
 }
 
+async function assertClerkCaptchaMount(page: Page) {
+  const captcha = page.locator('#clerk-captcha[data-cl-size="invisible"]');
+  await expect(
+    captcha,
+    'Auth shell must mount the invisible Clerk Smart CAPTCHA element'
+  ).toHaveCount(1, { timeout: 15_000 });
+  await expect(captcha).toHaveAttribute('data-cl-theme', 'dark');
+}
+
 test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
   test.beforeEach(async () => {
     if (process.env.E2E_SYNTHETIC_MODE !== 'true') {
@@ -120,6 +130,7 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
 
     await assertNoFrontDoorConfigErrors(page);
     await assertAuthShellReady(page, 'sign-in');
+    await assertClerkCaptchaMount(page);
 
     console.log(
       '[Synthetic][Layer A] Asserting intentional email auth surface'
@@ -175,6 +186,7 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
 
     await assertNoFrontDoorConfigErrors(page);
     await assertAuthShellReady(page, 'sign-up');
+    await assertClerkCaptchaMount(page);
     await assertIntentionalEmailAuthSurface(page);
 
     const googleButton = page.getByRole('button', {

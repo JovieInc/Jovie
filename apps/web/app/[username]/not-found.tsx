@@ -1,7 +1,11 @@
-import Link from 'next/link';
+import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 
 export default function NotFound() {
+  // This boundary only mounts under /[username]. Any miss here is a profile
+  // lookup failure — avoid headers() so ISR profile routes stay static on the
+  // standalone production server used by PR smoke.
+  const variant = 'profile-miss' as const;
   return (
     <PublicPageShell
       headerVariant='minimal'
@@ -12,17 +16,7 @@ export default function NotFound() {
         className='profile-viewport system-b-public-profile-not-found-container'
       >
         <div className='system-b-public-profile-not-found-content'>
-          <p className='system-b-public-profile-not-found-code'>404</p>
-          <h1 className='system-b-public-profile-not-found-title'>
-            Profile not found
-          </h1>
-          <p className='system-b-public-profile-not-found-description'>
-            This profile may have moved or the link may be incorrect.
-          </p>
-
-          <Link href='/' className='system-b-public-profile-not-found-action'>
-            Return home
-          </Link>
+          <NotFoundPageContent variant={variant} surface='profile' />
         </div>
       </div>
     </PublicPageShell>

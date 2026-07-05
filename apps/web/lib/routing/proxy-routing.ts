@@ -1,5 +1,6 @@
 import { HOSTNAME, STAGING_HOSTNAMES } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { isReservedUsername } from '@/lib/validation/username-core';
 
 export interface PathCategory {
   needsNonce: boolean;
@@ -91,6 +92,11 @@ const ALL_RESERVED_ROOT_SEGMENTS = new Set<string>([
   ...APP_ROUTES_RESERVED,
 ]);
 
+/** True when a single-segment path is a known app/system route (not a handle). */
+export function isDedicatedRootSegment(segment: string): boolean {
+  return ALL_RESERVED_ROOT_SEGMENTS.has(segment);
+}
+
 /**
  * Returns the candidate username for a public profile path, or null.
  * Pure, synchronous, edge-compatible, fully testable.
@@ -103,6 +109,7 @@ export function getPublicProfileCandidate(pathname: string): string | null {
 
   const segment = parts[0];
   if (ALL_RESERVED_ROOT_SEGMENTS.has(segment)) return null;
+  if (isReservedUsername(segment)) return null;
 
   // Username bounds from lib/validation/username-core.ts
   if (segment.length < 3 || segment.length > 30) return null;
@@ -139,11 +146,26 @@ export function isProxyRewriteExempt(pathname: string): boolean {
 }
 
 /**
+ * Module-scope cache for categorizePath results.
+ *
+ * Bounded to 1000 entries with FIFO eviction (usernames are unbounded so an
+ * unguarded Map would grow without limit).  The returned PathCategory object
+ * is treated as immutable by all callers — the only spread site
+ * (clerk-middleware-bypass.ts) produces a new object from the spread, so
+ * sharing the cached reference is safe.
+ */
+const CATEGORIZE_PATH_CACHE_MAX = 1000;
+/** Exported for test teardown only. Do not call from production code. */
+export const _categorizePathCache = new Map<string, PathCategory>();
+
+/**
  * Categorize a pathname once for all routing decisions.
  * Eliminates redundant path matching throughout the middleware.
  * Now also owns public-profile candidate detection (derived from APP_ROUTES).
  */
 export function categorizePath(pathname: string): PathCategory {
+  const cached = _categorizePathCache.get(pathname);
+  if (cached) return cached;
   const isAuthPath =
     pathname === APP_ROUTES.SIGNIN ||
     pathname === APP_ROUTES.SIGNIN_HYPHEN ||
@@ -168,6 +190,9 @@ export function categorizePath(pathname: string): PathCategory {
     '/onboarding/checkout'
   );
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
+  const isDesktopAuthPath = pathname === APP_ROUTES.DESKTOP_AUTH;
+  const isNativeAuthCompletePath = pathname === APP_ROUTES.AUTH_NATIVE_COMPLETE;
+  const isStartPath = pathname === APP_ROUTES.START;
 
   const isProtectedPath =
     isAppShellPath ||
@@ -180,13 +205,18 @@ export function categorizePath(pathname: string): PathCategory {
     pathname.startsWith('/api/') ||
     isAppShellPath ||
     isAccountPath ||
+    isAuthPath ||
+    isAuthCallbackPath ||
     isBillingPath ||
+    isDesktopAuthPath ||
+    isNativeAuthCompletePath ||
     isOnboardingPath ||
+    isStartPath ||
     isWaitlistPath;
 
   const publicProfileCandidate = getPublicProfileCandidate(pathname);
 
-  return {
+  const result: PathCategory = {
     needsNonce,
     isProtectedPath,
     isAuthPath,
@@ -194,7 +224,26 @@ export function categorizePath(pathname: string): PathCategory {
     isSensitiveAPI: pathname.startsWith('/api/link/'),
     publicProfileCandidate,
   };
+
+  if (_categorizePathCache.size >= CATEGORIZE_PATH_CACHE_MAX) {
+    // FIFO eviction: remove the oldest entry
+    const firstKey = _categorizePathCache.keys().next().value;
+    if (firstKey !== undefined) _categorizePathCache.delete(firstKey);
+  }
+  _categorizePathCache.set(pathname, result);
+  return result;
 }
+
+/**
+ * Module-scope cache for analyzeHost results.
+ *
+ * Capped at 50 entries: the set of real hostnames (jov.ie, staging.jov.ie,
+ * localhost, Vercel preview URLs) is small and bounded in practice.
+ * FIFO eviction prevents unbounded growth from fuzz/scan traffic.
+ */
+const ANALYZE_HOST_CACHE_MAX = 50;
+/** Exported for test teardown only. Do not call from production code. */
+export const _analyzeHostCache = new Map<string, HostInfo>();
 
 /**
  * Analyze hostname once for all routing decisions.
@@ -202,13 +251,15 @@ export function categorizePath(pathname: string): PathCategory {
  * Investor portal: /investor-portal (path-based, bypasses Clerk auth)
  */
 export function analyzeHost(hostname: string): HostInfo {
+  const cached = _analyzeHostCache.get(hostname);
+  if (cached) return cached;
   const isDevOrPreview =
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.includes('vercel.app') ||
     STAGING_HOSTNAMES.has(hostname);
 
-  return {
+  const result: HostInfo = {
     isDevOrPreview,
     isMainHost:
       hostname === HOSTNAME ||
@@ -220,6 +271,14 @@ export function analyzeHost(hostname: string): HostInfo {
     isSupportHost: hostname === `support.${HOSTNAME}`,
     isInvestorPortal: INVESTOR_HOSTNAMES.has(hostname),
   };
+
+  if (_analyzeHostCache.size >= ANALYZE_HOST_CACHE_MAX) {
+    // FIFO eviction: remove the oldest entry
+    const firstKey = _analyzeHostCache.keys().next().value;
+    if (firstKey !== undefined) _analyzeHostCache.delete(firstKey);
+  }
+  _analyzeHostCache.set(hostname, result);
+  return result;
 }
 
 /** Dashboard is always at /app in single-domain architecture */

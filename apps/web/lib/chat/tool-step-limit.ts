@@ -4,6 +4,13 @@ export const CHAT_TOOL_STEP_LIMIT_PAID = 8;
 /** Max in-turn tool-loop steps for free plans (no advanced tools). */
 export const CHAT_TOOL_STEP_LIMIT_FREE = 3;
 
+/** Inline copy shown when an in-turn tool loop hits the configured step cap. */
+export const CHAT_TOOL_STEP_LIMIT_AFFORDANCE_MESSAGE =
+  'I hit the step limit — continue?';
+
+/** Short follow-up prompt submitted when the artist taps Continue. */
+export const CHAT_TOOL_STEP_LIMIT_CONTINUE_PROMPT = 'continue';
+
 export function resolveChatToolStepLimit(aiCanUseTools: boolean): number {
   return aiCanUseTools ? CHAT_TOOL_STEP_LIMIT_PAID : CHAT_TOOL_STEP_LIMIT_FREE;
 }

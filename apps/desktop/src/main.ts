@@ -8,11 +8,35 @@ import {
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  screen,
   shell,
-  type WebContents,
 } from 'electron';
+import {
+  isTrayAppState,
+  MenuBarTray,
+  type TrayAction,
+  type TrayStatePayload,
+} from './tray';
 import { autoUpdater } from 'electron-updater';
+import {
+  bindPendingDesktopAuthCompletion,
+  DESKTOP_AUTH_FLOW_PARAM,
+  type PendingDesktopAuthPkce,
+  parseAuthReturnDeepLink,
+  reportDesktopAuthBindingFailure,
+} from './desktop-auth-security';
+import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
+import {
+  shouldGrantTrustedAudioPermission,
+  shouldGrantTrustedAudioPermissionCheck,
+} from './desktop-permissions';
+import { createDesktopSecurityReporter } from './desktop-security-reporting';
 import { APP_ENV, APP_URL } from './env';
+import {
+  decideHudBuildReload,
+  getHudBuildFingerprint,
+  isHudRoutePath,
+} from './hud-build-reload';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -20,7 +44,9 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import { decideRendererRecovery } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
+import { sanitizeWindowState, type WindowState } from './window-state';
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
@@ -36,6 +62,12 @@ const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
+// A crashed/killed renderer is reloaded up to this many times before the shell
+// gives up and shows the visible load-failure page (Retry) instead of leaving
+// the window black. Reset to 0 on every successful load so only crash *loops*
+// hit the cap.
+const MAX_RENDERER_CRASH_RELOADS = 2;
+const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
@@ -64,11 +96,19 @@ const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
 const DESKTOP_AUTH_START_PATH = '/auth/start';
 const DESKTOP_AUTH_NATIVE_COMPLETE_PATH = '/auth/native-complete';
 const DESKTOP_RETURN_PARAM = 'desktop_return';
-const AUTH_RETURN_PROTOCOL = 'jovie:';
+const AUTH_RETURN_SCHEME =
+  APP_ENV === 'staging'
+    ? 'jovie-staging'
+    : APP_ENV === 'local'
+      ? 'jovie-local'
+      : 'jovie';
+const AUTH_RETURN_PROTOCOL = `${AUTH_RETURN_SCHEME}:`;
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
+const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
+const TRAY_ACTION_CHANNEL = 'tray-action';
 const DESKTOP_RUNTIME_LABEL_BY_PLATFORM: Partial<
   Record<NodeJS.Platform, string>
 > = {
@@ -105,12 +145,6 @@ interface DesktopAuthOpenResult {
   readonly reason?: string;
 }
 
-interface PendingDesktopAuthPkce {
-  readonly codeVerifier: string;
-  readonly codeChallenge: string;
-  readonly createdAt: number;
-}
-
 interface RecentDesktopAuthCompletion {
   readonly completion: DesktopAuthCompletion;
   readonly expiresAt: number;
@@ -123,17 +157,26 @@ const AUTH_HANDOFF_WINDOW_BOUNDS = {
   minHeight: 460,
 } as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
+const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
+let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
+let currentHudBuildFingerprint: string | null = null;
 
-app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
+function getDesktopAppDisplayName(): string {
+  if (APP_ENV === 'staging') return 'Jovie Staging';
+  if (APP_ENV === 'local') return 'Jovie Local';
+  return 'Jovie';
+}
+
+app.setName(getDesktopAppDisplayName());
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -306,6 +349,7 @@ function createDesktopAuthPkce(): PendingDesktopAuthPkce {
   return {
     codeVerifier,
     codeChallenge,
+    flowNonce: base64Url(randomBytes(24)),
     createdAt: Date.now(),
   };
 }
@@ -313,12 +357,6 @@ function createDesktopAuthPkce(): PendingDesktopAuthPkce {
 function rememberDesktopAuthPkce(pkce: PendingDesktopAuthPkce): void {
   pendingDesktopAuthPkce = pkce;
   recentAuthCompletion = null;
-}
-
-function consumePendingDesktopAuthPkce(): PendingDesktopAuthPkce | null {
-  const pending = pendingDesktopAuthPkce;
-  pendingDesktopAuthPkce = null;
-  return pending;
 }
 
 function buildCentralDesktopAuthUrl(
@@ -334,6 +372,7 @@ function buildCentralDesktopAuthUrl(
   authUrl.searchParams.set('return_to', returnTo);
   authUrl.searchParams.set('code_challenge', pkce.codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
+  authUrl.searchParams.set(DESKTOP_AUTH_FLOW_PARAM, pkce.flowNonce);
   return `${authUrl.pathname}${authUrl.search}`;
 }
 
@@ -382,31 +421,28 @@ function buildDesktopAuthHandoffUrl(authUrl: string): string {
   return url.toString();
 }
 
-function parseAuthReturnDeepLink(
-  urlString: string
-): Omit<DesktopAuthCompletion, 'codeVerifier'> | null {
-  const parsed = parseUrl(urlString);
-  if (
-    !parsed ||
-    parsed.protocol !== AUTH_RETURN_PROTOCOL ||
-    parsed.hostname !== AUTH_RETURN_HOST ||
-    parsed.pathname !== AUTH_RETURN_COMPLETE_PATH
-  ) {
-    return null;
-  }
-
-  const code = parsed.searchParams.get('code');
-  const state = parsed.searchParams.get('state');
-  if (!code || !state) return null;
-
-  return { code, state };
+function parseDesktopAuthReturnDeepLink(urlString: string) {
+  return parseAuthReturnDeepLink(
+    urlString,
+    parseUrl,
+    AUTH_RETURN_PROTOCOL,
+    AUTH_RETURN_HOST,
+    AUTH_RETURN_COMPLETE_PATH
+  );
 }
 
-function findAuthReturnInArgv(
-  argv: readonly string[]
-): Omit<DesktopAuthCompletion, 'codeVerifier'> | null {
+function isAuthReturnDeepLinkCandidate(urlString: string): boolean {
+  const parsed = parseUrl(urlString);
+  return (
+    parsed?.protocol === AUTH_RETURN_PROTOCOL &&
+    parsed.hostname === AUTH_RETURN_HOST &&
+    parsed.pathname === AUTH_RETURN_COMPLETE_PATH
+  );
+}
+
+function findAuthReturnInArgv(argv: readonly string[]) {
   for (const arg of argv) {
-    const completion = parseAuthReturnDeepLink(arg);
+    const completion = parseDesktopAuthReturnDeepLink(arg);
     if (completion) return completion;
   }
   return null;
@@ -433,38 +469,6 @@ function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null
   return null;
 }
 
-function isTrustedPermissionOrigin(urlString?: string): boolean {
-  const parsed = parseUrl(urlString ?? '');
-  return parsed?.origin === APP_ORIGIN;
-}
-
-function isTrustedPermissionRequest(
-  webContents: WebContents | null,
-  requestingOrigin?: string
-): boolean {
-  if (requestingOrigin !== undefined) {
-    return isTrustedPermissionOrigin(requestingOrigin);
-  }
-  return (
-    webContents !== null && isTrustedPermissionOrigin(webContents.getURL())
-  );
-}
-
-function isAudioOnlyMediaPermissionRequest(details: unknown): boolean {
-  if (details === null || typeof details !== 'object') return false;
-  const mediaTypes = (details as { mediaTypes?: unknown }).mediaTypes;
-  return (
-    Array.isArray(mediaTypes) &&
-    mediaTypes.includes('audio') &&
-    !mediaTypes.includes('video')
-  );
-}
-
-function isAudioMediaPermissionCheck(details: unknown): boolean {
-  if (details === null || typeof details !== 'object') return false;
-  return (details as { mediaType?: unknown }).mediaType === 'audio';
-}
-
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
@@ -478,13 +482,6 @@ function getDesktopDictationStatus(): DesktopDictationStatus {
   };
 }
 
-interface WindowState {
-  x?: number;
-  y?: number;
-  width: number;
-  height: number;
-}
-
 const WINDOW_STATE_FILE = path.join(
   app.getPath('userData'),
   'window-state.json'
@@ -495,23 +492,15 @@ function getAppIconPath(): string | undefined {
 }
 
 function loadWindowState(): WindowState {
+  const displayBounds = screen.getPrimaryDisplay().workArea;
+
   try {
     const raw = fs.readFileSync(WINDOW_STATE_FILE, 'utf8');
     const parsed: unknown = JSON.parse(raw);
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      'width' in parsed &&
-      'height' in parsed &&
-      typeof (parsed as Record<string, unknown>).width === 'number' &&
-      typeof (parsed as Record<string, unknown>).height === 'number'
-    ) {
-      return parsed as WindowState;
-    }
+    return sanitizeWindowState(parsed, displayBounds, reportDesktopSecurityEvent);
   } catch {
-    // Missing or corrupt — use defaults
+    return sanitizeWindowState(undefined, displayBounds);
   }
-  return { width: 1280, height: 800 };
 }
 
 function saveWindowState(win: BrowserWindow): void {
@@ -599,14 +588,23 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
 }
 
 function handleAuthCompletion(
-  completion: Omit<DesktopAuthCompletion, 'codeVerifier'>
+  completion: NonNullable<ReturnType<typeof parseDesktopAuthReturnDeepLink>>
 ): void {
-  const pkce = consumePendingDesktopAuthPkce();
-  if (!pkce) return;
+  const binding = bindPendingDesktopAuthCompletion(
+    pendingDesktopAuthPkce,
+    completion
+  );
+  pendingDesktopAuthPkce = null;
+
+  if (!binding.ok) {
+    reportDesktopAuthBindingFailure(reportDesktopSecurityEvent, binding);
+    return;
+  }
 
   const nativeCompletion: DesktopAuthCompletion = {
-    ...completion,
-    codeVerifier: pkce.codeVerifier,
+    code: completion.code,
+    state: completion.state,
+    codeVerifier: binding.codeVerifier,
   };
 
   if (app.isReady()) {
@@ -685,6 +683,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
     backgroundColor: APP_BACKGROUND_COLOR,
     modal: false,
     webPreferences: {
+      backgroundThrottling: false,
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
@@ -696,6 +695,10 @@ function showDesktopAuthHandoff(authUrl: string): void {
       webviewTag: false,
     },
   });
+
+  authHandoffWindow.webContents.setUserAgent(
+    `${authHandoffWindow.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
+  );
 
   authHandoffWindow.once('ready-to-show', () => {
     hideMainWindowForAuthHandoff();
@@ -826,6 +829,61 @@ function showDesktopLoadFailure(win: BrowserWindow): void {
   void win.loadURL(buildDesktopLoadFailureUrl());
 }
 
+function isHudWindow(win: BrowserWindow): boolean {
+  if (win.isDestroyed()) return false;
+  const parsed = parseUrl(win.webContents.getURL());
+  return parsed?.origin === APP_ORIGIN && isHudRoutePath(parsed.pathname);
+}
+
+async function fetchHudBuildFingerprint(): Promise<string | null> {
+  const buildInfoUrl = new URL('/api/health/build-info', APP_URL);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const response = await fetch(buildInfoUrl, {
+      headers: {
+        'cache-control': 'no-cache',
+        pragma: 'no-cache',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+
+    const buildInfo: unknown = await response.json();
+    return getHudBuildFingerprint(buildInfo);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function reloadAppWindowsForHudBuildChange(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (isHudWindow(win)) {
+      win.webContents.reload();
+    }
+  }
+}
+
+async function checkHudBuildAndReload(): Promise<void> {
+  if (!BrowserWindow.getAllWindows().some(isHudWindow)) {
+    return;
+  }
+
+  const nextFingerprint = await fetchHudBuildFingerprint();
+  const decision = decideHudBuildReload({
+    currentFingerprint: currentHudBuildFingerprint,
+    nextFingerprint,
+  });
+  currentHudBuildFingerprint = decision.nextFingerprint;
+
+  if (decision.shouldReload) {
+    reloadAppWindowsForHudBuildChange();
+  }
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
@@ -844,6 +902,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     trafficLightPosition:
       process.platform === 'darwin' ? MACOS_TRAFFIC_LIGHT_POSITION : undefined,
     webPreferences: {
+      backgroundThrottling: false,
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
@@ -856,7 +915,30 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     },
   });
 
+  installDesktopCspWatchdog({
+    session: win.webContents.session,
+    appOrigin: APP_ORIGIN,
+    report: reportDesktopSecurityEvent,
+  });
+
+  // Visibility safety net (JOV-3835): if `ready-to-show` never fires — e.g. a
+  // signed-out initial navigation redirects to /signin, the in-window nav is
+  // aborted to about:blank, and the separate auth-handoff window fails to
+  // appear — the app would launch to an invisible/black window with no way to
+  // sign in. If nothing has become visible shortly after launch, force a
+  // usable sign-in surface into THIS (main) window, which we know can render.
+  const initialVisibilityFallback = setTimeout(() => {
+    if (win.isDestroyed() || isAuthHandoffOpen() || win.isVisible()) return;
+    const current = win.webContents.getURL();
+    if (!current || current === 'about:blank') {
+      const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+      void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+    }
+    showWindowNow(win);
+  }, 6000);
+
   win.once('ready-to-show', () => {
+    clearTimeout(initialVisibilityFallback);
     if (isAuthHandoffOpen()) {
       mainWindowHiddenForAuthHandoff = true;
       return;
@@ -917,6 +999,39 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     }
   );
 
+  // Renderer crash recovery. Electron leaves a crashed/killed renderer as a
+  // blank black window with no recovery, which strands the user. Reload the
+  // view on a crash, capped to avoid a crash loop, then fall back to the
+  // visible load-failure page (Retry) instead of black.
+  let rendererCrashReloadCount = 0;
+  win.webContents.on('did-finish-load', () => {
+    rendererCrashReloadCount = 0;
+  });
+  win.webContents.on('render-process-gone', (_event, details) => {
+    const action = decideRendererRecovery({
+      reason: details.reason,
+      reloadCount: rendererCrashReloadCount,
+      maxReloads: MAX_RENDERER_CRASH_RELOADS,
+    });
+    console.error('[Jovie Desktop] Renderer process gone', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+      action,
+    });
+    if (win.isDestroyed() || action === 'ignore') return;
+    if (action === 'reload') {
+      rendererCrashReloadCount += 1;
+      win.webContents.reload();
+      return;
+    }
+    showDesktopLoadFailure(win);
+  });
+  win.webContents.on('unresponsive', () => {
+    console.warn('[Jovie Desktop] Renderer unresponsive', {
+      url: win.webContents.getURL().split('?')[0],
+    });
+  });
+
   win.webContents.session.setPermissionRequestHandler(
     (webContents, permission, callback, details) => {
       const requestingOrigin =
@@ -924,19 +1039,28 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
           ? details.requestingUrl
           : undefined;
       callback(
-        permission === 'media' &&
-          isAudioOnlyMediaPermissionRequest(details) &&
-          isTrustedPermissionRequest(webContents, requestingOrigin)
+        shouldGrantTrustedAudioPermission({
+          permission,
+          details,
+          webContents,
+          requestingOrigin,
+          parseUrl,
+          appOrigin: APP_ORIGIN,
+        })
       );
     }
   );
 
   win.webContents.session.setPermissionCheckHandler(
-    (webContents, permission, requestingOrigin, details) => {
-      if (permission !== 'media') return false;
-      if (!isAudioMediaPermissionCheck(details)) return false;
-      return isTrustedPermissionRequest(webContents, requestingOrigin);
-    }
+    (webContents, permission, requestingOrigin, details) =>
+      shouldGrantTrustedAudioPermissionCheck({
+        permission,
+        details,
+        webContents,
+        requestingOrigin,
+        parseUrl,
+        appOrigin: APP_ORIGIN,
+      })
   );
 
   // Navigation guard: app-host routes stay in-window; auth routes get the
@@ -1056,6 +1180,10 @@ function refreshApplicationMenu(): void {
 }
 
 function checkForUpdatesFromMenu(): void {
+  if (!shouldScheduleDesktopAutoUpdate()) {
+    return;
+  }
+
   if (updateReadyToInstall) {
     autoUpdater.quitAndInstall();
     return;
@@ -1064,6 +1192,44 @@ function checkForUpdatesFromMenu(): void {
   autoUpdater.checkForUpdatesAndNotify().catch(() => {
     // Network unavailable or no update server configured yet — non-fatal
   });
+}
+
+function shouldScheduleDesktopAutoUpdate(): boolean {
+  // Local dev shells never auto-update. Production and staging each publish to
+  // their own electron-updater channel; see apps/desktop/BUILDS.md.
+  if (APP_ENV === 'local' || process.platform === 'linux') {
+    return false;
+  }
+
+  return true;
+}
+
+function scheduleDesktopAutoUpdate(): void {
+  if (!shouldScheduleDesktopAutoUpdate()) {
+    return;
+  }
+
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+    // Network unavailable or no update server configured yet — non-fatal
+  });
+
+  const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {
+      // Same: non-fatal update check failure
+    });
+  }, UPDATE_INTERVAL_MS);
+}
+
+function scheduleHudBuildAutoReload(): void {
+  void checkHudBuildAndReload();
+
+  const interval = setInterval(() => {
+    void checkHudBuildAndReload();
+  }, HUD_BUILD_INFO_POLL_INTERVAL_MS);
+
+  interval.unref?.();
 }
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
@@ -1152,6 +1318,21 @@ function buildApplicationMenu(): Menu {
   }
 
   return Menu.buildFromTemplate(template);
+}
+
+function handleTrayAction(action: TrayAction): void {
+  if (action === 'open-preferences') {
+    openPreferences();
+    return;
+  }
+
+  const win =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+  showWindow(win);
+
+  if (action === 'new-message') {
+    win.webContents.send(TRAY_ACTION_CHANNEL, action);
+  }
 }
 
 function sendToAppWindows(channel: UpdateChannel): void {
@@ -1300,14 +1481,18 @@ function registerAuthReturnProtocol(): void {
     readonly defaultApp?: boolean;
   };
 
-  if (defaultAppProcess.defaultApp && process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+  if (
+    defaultAppProcess.defaultApp &&
+    process.argv.length >= 2 &&
+    !app.isPackaged
+  ) {
+    app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME, process.execPath, [
       path.resolve(process.argv[1]),
     ]);
     return;
   }
 
-  app.setAsDefaultProtocolClient('jovie');
+  app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME);
 }
 
 if (gotSingleInstanceLock) {
@@ -1315,6 +1500,15 @@ if (gotSingleInstanceLock) {
     const completion = findAuthReturnInArgv(argv);
     if (completion) {
       handleAuthCompletion(completion);
+      return;
+    }
+
+    const invalidAuthReturn = argv.some(
+      arg =>
+        isAuthReturnDeepLinkCandidate(arg) && !parseDesktopAuthReturnDeepLink(arg)
+    );
+    if (invalidAuthReturn) {
+      reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }
 
@@ -1331,9 +1525,14 @@ if (gotSingleInstanceLock) {
 
   app.on('open-url', (event, url) => {
     event.preventDefault();
-    const completion = parseAuthReturnDeepLink(url);
+    const completion = parseDesktopAuthReturnDeepLink(url);
     if (completion) {
       handleAuthCompletion(completion);
+      return;
+    }
+
+    if (isAuthReturnDeepLinkCandidate(url)) {
+      reportDesktopSecurityEvent('auth-deep-link-invalid-params');
       return;
     }
 
@@ -1356,6 +1555,12 @@ app.whenReady().then(() => {
 
   registerAuthReturnProtocol();
   refreshApplicationMenu();
+
+  // macOS menu bar extra (NSStatusItem via Electron Tray)
+  if (process.platform === 'darwin') {
+    menuBarTray = new MenuBarTray(handleTrayAction);
+  }
+
   createWindow(
     pendingAuthCompletion
       ? new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL).toString()
@@ -1364,18 +1569,8 @@ app.whenReady().then(() => {
       : APP_ENTRY_URL
   );
   pendingLegacyAuthReturnRoute = null;
-
-  // Auto-update: check on launch then every 30 minutes
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {
-    // Network unavailable or no update server configured yet — non-fatal
-  });
-
-  const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
-  setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {
-      // Same: non-fatal update check failure
-    });
-  }, UPDATE_INTERVAL_MS);
+  scheduleDesktopAutoUpdate();
+  scheduleHudBuildAutoReload();
 
   app.on('activate', () => {
     if (isAuthHandoffOpen() && authHandoffWindow) {
@@ -1411,5 +1606,24 @@ ipcMain.handle(
     }
 
     return getDesktopDictationStatus();
+  }
+);
+
+ipcMain.handle(
+  TRAY_SET_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent, payload: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    if (
+      !menuBarTray ||
+      payload === null ||
+      typeof payload !== 'object' ||
+      !isTrayAppState((payload as Record<string, unknown>).state)
+    ) {
+      return { ok: false, reason: 'invalid-payload' };
+    }
+    menuBarTray.setState(payload as TrayStatePayload);
+    return { ok: true };
   }
 );

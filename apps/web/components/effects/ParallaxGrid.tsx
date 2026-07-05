@@ -39,7 +39,7 @@ export function ParallaxGrid() {
       }}
     >
       <div
-        className='absolute inset-0 transition-transform duration-300'
+        className='absolute inset-0 transition-transform duration-cinematic'
         style={{
           backgroundImage: `
             radial-gradient(

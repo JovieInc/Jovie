@@ -2,14 +2,14 @@
  * Studio Session Memory Loop (gh-9869 v0)
  *
  * Thin runner / workflow executor.
- * - Gate: FEATURE_MEMORY_STUDIO_SESSION_V0 (default false)
+ * - Gate: FEATURE_MEMORY_STUDIO_SESSION_V0 (default true for internal v1)
  * - Uses AgentHarness for enrichment + opportunity proposal
- * - Full evidence/provenance on every fact (context_facts + synthetic refs)
+ * - Full evidence/provenance on every fact (memory source records + observations)
  * - Reuses patterns from lib/connectors/workflows/execute-approved-action.ts (CAS, logging, captureError)
  * - No social/write scopes ever enabled in v0.
  *
  * Triggered from: demo script, future Trigger.dev job (trigger/ dir), or cron on photo tags.
- * When 9872 lands: replace synthetic ids with real person_entities / studio_sessions / content_opportunities inserts.
+ * Writes to memory.ts tables via AgentHarness + MemoryStore.
  */
 
 import {
@@ -18,7 +18,7 @@ import {
   type StudioSessionResult,
 } from '@/lib/agents/agent-harness';
 import { captureError } from '@/lib/error-tracking';
-import { isEnabled } from '@/lib/feature-flags';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { logger } from '@/lib/utils/logger';
 
 export interface RunStudioSessionMemoryLoopInput extends StudioSessionInput {
@@ -39,7 +39,7 @@ export async function runStudioSessionMemoryLoop(
   input: RunStudioSessionMemoryLoopInput
 ): Promise<RunStudioSessionMemoryLoopResult> {
   const flagName = 'MEMORY_STUDIO_SESSION_V0' as const;
-  const gated = !isEnabled(flagName) && !input.force;
+  const gated = !isCodeFlagEnabled(flagName) && !input.force;
 
   if (gated) {
     logger.warn('[memory-loop] studio-session v0 gated off (default)', {
@@ -52,7 +52,7 @@ export async function runStudioSessionMemoryLoop(
       evidence: [],
       provenance: {
         triggeredAt: new Date().toISOString(),
-        sources: input.sourceContextFactIds || [],
+        sources: input.sourceMemoryRecordIds || [],
         flag: flagName,
       },
       gated: true,
@@ -76,7 +76,7 @@ export async function runStudioSessionMemoryLoop(
     };
 
     // In future: enqueue a workflowRuns row of kind 'studio_session_memory_v0' for durable follow-up (Trigger.dev or cron)
-    // For v0 the harness already wrote the evidence facts + opportunity proposal.
+    // For v0 the harness already wrote memory source records, observations, and opportunity.
 
     return result;
   } catch (err) {

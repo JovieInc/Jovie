@@ -63,7 +63,8 @@ function AnimatedHint({ hint }: { readonly hint: string | null }) {
   return (
     <output
       style={{
-        transition: 'opacity 200ms ease-out, transform 200ms ease-out',
+        transition:
+          'opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing), transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing)',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(-10px)',
         display: 'block',
@@ -337,7 +338,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
       <section
         ref={scrollContainerRef}
         className='flex-1 overflow-y-auto px-4 py-4 sm:py-6'
-        aria-label='Links list'
+        aria-label='Links List'
       >
         <div className='mx-auto max-w-2xl'>
           {/* Inline chat area */}

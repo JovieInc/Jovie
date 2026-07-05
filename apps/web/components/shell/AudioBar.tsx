@@ -208,6 +208,7 @@ export function AudioBar({
           onClick={onCollapse}
           tooltipSide='top'
           tone='ghost'
+          testId='audio-bar-minimize'
         >
           <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
         </IconBtn>
@@ -219,13 +220,16 @@ export function AudioBar({
     <section
       aria-label='Audio Player'
       className={cn(
-        'group/bar shrink-0 hidden lg:grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-8 py-2',
+        // Visibility is owned by shell parents (e.g. PersistentAudioBar surfaces).
+        // Avoid nested `hidden lg:*` here — when Tailwind is active in CI/jsdom,
+        // it leaves sibling now-playing chrome visible while hiding transport controls.
+        'group/bar shrink-0 grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-8 py-2',
         className
       )}
     >
       <div />
       {/* Center column: waveform drawer above (collapsible), transport below. */}
-      <div className='flex flex-col items-center justify-center min-h-[52px]'>
+      <div className='flex flex-col items-center justify-center min-h-13'>
         <div
           aria-hidden={!waveformOn}
           className='w-full overflow-hidden'

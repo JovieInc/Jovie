@@ -455,7 +455,7 @@ describe('DashboardAudienceTable', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load more members' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Load More Members' }));
 
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });

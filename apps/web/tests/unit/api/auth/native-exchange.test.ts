@@ -328,6 +328,37 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
+  it('does not fall back to a sign-in ticket when Clerk reports the iOS user resource is missing', async () => {
+    const missingUserError = new Error('Resource not found');
+    Object.assign(missingUserError, {
+      status: 404,
+      errors: [
+        {
+          code: 'resource_not_found',
+          longMessage: 'User not found',
+        },
+      ],
+    });
+    mockSessionsCreateSession.mockRejectedValue(missingUserError);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toEqual({
+      error: 'Native auth exchange failed',
+    });
+    expect(mockSignInTokensCreateSignInToken).not.toHaveBeenCalled();
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Native auth exchange route failed',
+      missingUserError,
+      {
+        route: '/api/auth/native/exchange',
+      }
+    );
+  });
+
   it('uses staging Clerk keys for iOS native exchange on staging hosts', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', 'production');

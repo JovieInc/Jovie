@@ -109,7 +109,7 @@ export function SmartHandleInput({
             />
           }
           aria-describedby={`${statusId} ${previewId}`}
-          aria-label='Enter your desired handle'
+          aria-label='Enter Your Desired Handle'
           autoCapitalize='none'
           autoCorrect='off'
           autoComplete='off'
@@ -128,7 +128,7 @@ export function SmartHandleInput({
 
       {/* Status message */}
       <output
-        className={`text-xs min-h-5 transition-all duration-300 ${getStatusClass()}`}
+        className={`text-xs min-h-5 transition-colors duration-cinematic ${getStatusClass()}`}
         id={statusId}
         aria-live='polite'
       >

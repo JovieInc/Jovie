@@ -1,7 +1,9 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import {
@@ -68,6 +70,12 @@ function toConnectorState(row: ConnectorAccountRow | null) {
   };
 }
 
+const EMPTY_CONNECTORS_DATA: SettingsConnectorsData = {
+  gmail: { status: 'not_connected' },
+  calendar: { status: 'not_connected' },
+  suggestedActions: [],
+};
+
 export async function loadSettingsConnectorsData(
   clerkUserId: string
 ): Promise<SettingsConnectorsData | null> {
@@ -77,6 +85,19 @@ export async function loadSettingsConnectorsData(
     return null;
   }
 
+  try {
+    return await loadSettingsConnectorsDataForUser(dbUser.id);
+  } catch (error) {
+    if (isMissingConnectorSchemaError(error)) {
+      return EMPTY_CONNECTORS_DATA;
+    }
+    throw error;
+  }
+}
+
+async function loadSettingsConnectorsDataForUser(
+  userId: string
+): Promise<SettingsConnectorsData> {
   const [gmailRow, calendarRow] = await Promise.all([
     db
       .select({
@@ -87,8 +108,8 @@ export async function loadSettingsConnectorsData(
       .from(connectorAccounts)
       .where(
         and(
-          eq(connectorAccounts.userId, dbUser.id),
-          drizzleSql`${connectorAccounts.provider} = 'gmail'::connector_provider`
+          eq(connectorAccounts.userId, userId),
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.gmail)
         )
       )
       .limit(1)
@@ -102,8 +123,8 @@ export async function loadSettingsConnectorsData(
       .from(connectorAccounts)
       .where(
         and(
-          eq(connectorAccounts.userId, dbUser.id),
-          drizzleSql`${connectorAccounts.provider} = 'google_calendar'::connector_provider`
+          eq(connectorAccounts.userId, userId),
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.google_calendar)
         )
       )
       .limit(1)
@@ -121,7 +142,7 @@ export async function loadSettingsConnectorsData(
     .from(suggestedActions)
     .where(
       and(
-        eq(suggestedActions.userId, dbUser.id),
+        eq(suggestedActions.userId, userId),
         eq(suggestedActions.status, 'pending')
       )
     )

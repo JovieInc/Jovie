@@ -29,16 +29,16 @@ const CANVAS_STATUS_CONFIG: Record<
   { label: string; className: string; displayLabel?: string }
 > = {
   uploaded: {
-    label: 'Has video',
+    label: 'Has Video',
     className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   },
   generated: {
-    label: 'Ready to upload',
+    label: 'Ready To Upload',
     className: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
   },
   not_set: {
-    label: 'No video',
-    displayLabel: 'Has video',
+    label: 'No Video',
+    displayLabel: 'Has Video',
     className: 'border-subtle bg-surface-1 text-secondary-token',
   },
 };
@@ -55,18 +55,18 @@ const METADATA_LABEL_CLASSNAME =
   'text-2xs font-medium leading-[15px] tracking-normal text-quaternary-token';
 const METADATA_VALUE_CLASSNAME = 'text-xs leading-[16px] text-secondary-token';
 const METADATA_BADGE_CLASSNAME =
-  'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-caption tracking-normal shadow-none';
+  'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-3xs font-caption tracking-normal shadow-none';
 const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 const METADATA_STACK_CLASSNAME = 'space-y-0.5';
 const METADATA_DISPLAY_VALUE_CLASSNAME =
-  'text-[11.5px] font-book leading-[16px] text-primary-token';
+  'text-2xs font-book leading-[16px] text-primary-token';
 const METADATA_INPUT_CLASSNAME =
   'h-7 rounded-lg border-subtle bg-surface-0 px-2.5 text-2xs font-book text-primary-token shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[11.5px] font-book tabular-nums text-primary-token'>
+    <span className='text-2xs font-book tabular-nums text-primary-token'>
       {clamped} / 100
     </span>
   );
@@ -80,7 +80,7 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='h-5 rounded-full border border-transparent bg-red-500/10 px-2 text-[9.5px] font-caption tracking-normal text-red-600 shadow-none dark:text-red-300'
+          className='h-5 rounded-full border border-transparent bg-red-500/10 px-2 text-3xs font-caption tracking-normal text-red-600 shadow-none dark:text-red-300'
         >
           E
         </Badge>
@@ -110,15 +110,19 @@ function formatCopyrightLine(line: string, symbol: '℗' | '©'): string {
 }
 
 function CopyrightLabel({
+  lineLabel,
   symbol,
   description,
 }: {
+  readonly lineLabel: string;
   readonly symbol: '℗' | '©';
   readonly description: string;
 }) {
   return (
     <span className='inline-flex items-center gap-1'>
-      <span>{symbol}</span>
+      <span>
+        {lineLabel} <span aria-hidden='true'>{symbol}</span>
+      </span>
       <SimpleTooltip content={description} side='top'>
         <span className='inline-flex items-center'>
           <Info
@@ -126,7 +130,9 @@ function CopyrightLabel({
             aria-hidden='true'
             className='text-muted-foreground'
           />
-          <span className='sr-only'>{description}</span>
+          <span className='sr-only'>
+            {lineLabel} ({symbol}): {description}
+          </span>
         </span>
       </SimpleTooltip>
     </span>
@@ -280,7 +286,7 @@ export function ReleaseMetadata({
                 label='Label'
                 value={release.label}
                 editable={canEditMetadata}
-                placeholder='Add Label'
+                placeholder='Add label'
                 emptyLabel='Unknown'
                 density='inline'
                 normalizeValue={nextValue => {
@@ -316,6 +322,7 @@ export function ReleaseMetadata({
               valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
+                  lineLabel='P-line'
                   symbol='℗'
                   description='Sound recording copyright (phonogram rights)'
                 />
@@ -335,7 +342,7 @@ export function ReleaseMetadata({
             labelClassName={METADATA_LABEL_CLASSNAME}
             label='Tracks'
             value={
-              <span className='text-[11.5px] font-book tabular-nums text-primary-token'>
+              <span className='text-2xs font-book tabular-nums text-primary-token'>
                 {release.totalTracks}{' '}
                 {release.totalTracks === 1 ? 'track' : 'tracks'}
               </span>
@@ -349,6 +356,7 @@ export function ReleaseMetadata({
               valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
+                  lineLabel='C-line'
                   symbol='©'
                   description='Composition copyright (musical work)'
                 />
@@ -374,7 +382,7 @@ export function ReleaseMetadata({
                     <DrawerButton
                       tone='secondary'
                       size='sm'
-                      className='-mx-0.5 h-5.5 gap-1 rounded-full border-subtle bg-surface-0 px-2 text-[10.5px] font-caption leading-none text-secondary-token shadow-none hover:bg-surface-0'
+                      className='-mx-0.5 h-5.5 gap-1 rounded-full border-subtle bg-surface-0 px-2 text-3xs font-caption leading-none text-secondary-token shadow-none hover:bg-surface-0'
                     >
                       <span>{canvasStatusDisplayLabel}</span>
                       <ChevronDown
@@ -441,7 +449,7 @@ export function ReleaseMetadata({
               labelClassName={METADATA_LABEL_CLASSNAME}
               label='Duration'
               value={
-                <span className='text-[11.5px] font-book tabular-nums text-primary-token'>
+                <span className='text-2xs font-book tabular-nums text-primary-token'>
                   {formatDuration(release.totalDurationMs)}
                 </span>
               }
@@ -480,7 +488,7 @@ export function ReleaseMetadata({
                     <Badge
                       key={genre}
                       variant='secondary'
-                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-[9.5px] font-caption tracking-normal text-secondary-token shadow-none'
+                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-3xs font-caption tracking-normal text-secondary-token shadow-none'
                     >
                       {genre}
                     </Badge>

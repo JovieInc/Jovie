@@ -2,6 +2,12 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
+import {
+  CanonicalUserState,
+  type ProxyUserStateProjection,
+  resolveCanonicalState,
+  toProxyUserState,
+} from '@/lib/auth/canonical-user-state';
 import { db } from '@/lib/db';
 import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 import { QueryTimeoutError } from '@/lib/db/query-timeout';
@@ -11,20 +17,21 @@ import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
-export interface ProxyUserState {
-  needsWaitlist: boolean;
-  needsOnboarding: boolean;
-  isActive: boolean;
-  isBanned: boolean;
-}
+export type ProxyUserState = ProxyUserStateProjection;
 
 // Redis cache settings for user state
 // Transitional users get shorter TTL, active users get longer TTL.
 // Safe to use longer TTLs because all state transitions (waitlist approval,
 // onboarding completion, user deletion) explicitly call invalidateProxyUserStateCache().
 const USER_STATE_CACHE_KEY_PREFIX = 'proxy:user-state:';
+const USER_STATE_STALE_CACHE_KEY_PREFIX = 'proxy:user-state:stale:';
 const USER_STATE_CACHE_TTL_SECONDS = 120; // 2 minutes - transitional users (invalidation is explicit)
 const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active users
+// Longer-lived stale snapshot used when the primary cache expires but Neon is
+// still waking up. State transitions call invalidateProxyUserStateCache() so
+// stale entries cannot outlive an explicit status change.
+const USER_STATE_STALE_CACHE_TTL_SECONDS = 1800; // 30 minutes
+const USER_STATE_STALE_CACHE_TTL_ACTIVE_SECONDS = 3600; // 1 hour - stable active users
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts.
 // Kept below the Neon p99 cold-start budget (~3 s) so that a single cache-miss
@@ -94,6 +101,18 @@ function getTtlForUserState(state: ProxyUserState): number {
   return USER_STATE_CACHE_TTL_SECONDS;
 }
 
+function getStaleTtlForUserState(state: ProxyUserState): number {
+  if (state.isActive) return USER_STATE_STALE_CACHE_TTL_ACTIVE_SECONDS;
+  return USER_STATE_STALE_CACHE_TTL_SECONDS;
+}
+
+function getStaleCacheKey(cacheKey: string): string {
+  return cacheKey.replace(
+    USER_STATE_CACHE_KEY_PREFIX,
+    USER_STATE_STALE_CACHE_KEY_PREFIX
+  );
+}
+
 /**
  * Try to get user state from Redis cache
  */
@@ -147,98 +166,89 @@ async function tryGetCachedState(
   return null;
 }
 
-/** Statuses that indicate waitlist approval */
-const APPROVED_STATUSES = [
-  'waitlist_approved',
-  'profile_claimed',
-  'onboarding_incomplete',
-  'active',
-] as const;
-
-// Uses the canonical isProfileComplete() from profile-completeness.ts.
-// This eliminates the redirect loop bug class where proxy, gate, and
-// dashboard had independent completeness checks that could disagree.
-import { isProfileComplete } from './profile-completeness';
-
 /**
- * Whether the user has a complete profile.
- * Maps proxy query field names to the canonical check.
+ * Try to get user state from the longer-lived stale Redis snapshot.
+ * Used when the primary cache has expired and the DB is slow or timing out.
  */
-function hasCompleteProfile(result: {
+async function tryGetStaleCachedState(
+  cacheKey: string,
+  clerkUserId: string
+): Promise<ProxyUserState | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  const staleCacheKey = getStaleCacheKey(cacheKey);
+
+  try {
+    const cacheStart = Date.now();
+    const redisTimeoutPromise = new Promise<null>(resolve => {
+      setTimeout(() => resolve(null), REDIS_CACHE_TIMEOUT_MS);
+    });
+    const cached = await Promise.race([
+      redis.get<ProxyUserState>(staleCacheKey),
+      redisTimeoutPromise,
+    ]);
+    const cacheDuration = Date.now() - cacheStart;
+
+    if (cached) {
+      Sentry.addBreadcrumb({
+        category: 'proxy-state',
+        message: 'Stale cache hit',
+        level: 'info',
+        data: {
+          cacheKey: staleCacheKey.replace(clerkUserId, '[REDACTED]'),
+          durationMs: cacheDuration,
+          userState: getUserStateLabel(cached),
+        },
+      });
+      return cached;
+    }
+  } catch (cacheError) {
+    captureWarning('[proxy-state] Redis stale cache read failed', {
+      error: cacheError,
+    });
+  }
+
+  return null;
+}
+
+type ProxyStateQueryResult = {
+  dbUserId: string;
+  userStatus: string | null;
+  deletedAt: Date | null;
   profileId: string | null;
   profileComplete: Date | null;
   profileUsername: string | null;
   profileUsernameNormalized: string | null;
   profileDisplayName: string | null;
-  profileAvatarUrl: string | null;
   profileIsPublic: boolean | null;
-}): boolean {
-  if (!result.profileId) return false;
-  return isProfileComplete({
-    username: result.profileUsername,
-    usernameNormalized: result.profileUsernameNormalized,
-    displayName: result.profileDisplayName,
-    isPublic: result.profileIsPublic,
-    onboardingCompletedAt: result.profileComplete,
-  });
-}
+};
 
 /**
- * Determine user state from database query result
+ * Determine user state from database query result via the canonical resolver.
  */
 function determineUserState(
-  result:
-    | {
-        dbUserId: string;
-        userStatus: string | null;
-        deletedAt: Date | null;
-        profileId: string | null;
-        profileComplete: Date | null;
-        profileUsername: string | null;
-        profileUsernameNormalized: string | null;
-        profileDisplayName: string | null;
-        profileAvatarUrl: string | null;
-        profileIsPublic: boolean | null;
-      }
-    | undefined,
+  result: ProxyStateQueryResult | undefined,
   waitlistEnabled: boolean
 ): ProxyUserState {
-  // No DB user → needs intake. Gate OFF only changes the access decision after
-  // intake; it does not skip the launch request flow.
-  if (!result?.dbUserId) {
-    return { ...DEFAULT_WAITLIST_STATE };
-  }
+  const canonicalState = resolveCanonicalState({
+    isAuthenticated: true,
+    hasDbUser: Boolean(result?.dbUserId),
+    userStatus: result?.userStatus ?? null,
+    deletedAt: result?.deletedAt ?? null,
+    waitlistGateEnabled: waitlistEnabled,
+    profile: result?.profileId
+      ? {
+          username: result.profileUsername,
+          usernameNormalized: result.profileUsernameNormalized,
+          displayName: result.profileDisplayName,
+          isPublic: result.profileIsPublic,
+          onboardingCompletedAt: result.profileComplete,
+        }
+      : null,
+  });
 
-  // Banned or soft-deleted users are blocked immediately
-  if (
-    result.deletedAt ||
-    result.userStatus === 'banned' ||
-    result.userStatus === 'suspended'
-  ) {
-    return { ...BANNED_STATE };
-  }
-
-  // Check waitlist approval using userStatus lifecycle
-  const isWaitlistApproved = APPROVED_STATUSES.includes(
-    result.userStatus as (typeof APPROVED_STATUSES)[number]
-  );
-
-  // Pending users stay on the waitlist even when rolling daily capacity opens.
-  if (result.userStatus === 'waitlist_pending') {
-    return { ...DEFAULT_WAITLIST_STATE };
-  }
-
-  // Not approved + waitlist enabled → send to waitlist
-  if (!isWaitlistApproved && waitlistEnabled) {
-    return { ...DEFAULT_WAITLIST_STATE };
-  }
-
-  // Either approved, or waitlist is disabled — route based on profile completeness
-  if (!hasCompleteProfile(result)) {
-    return { ...NEEDS_ONBOARDING_STATE };
-  }
-
-  return { ...ACTIVE_USER_STATE };
+  return toProxyUserState(canonicalState);
 }
 
 /**
@@ -247,49 +257,46 @@ function determineUserState(
 function cacheUserState(
   cacheKey: string,
   userState: ProxyUserState,
-  ttlSeconds: number
+  ttlSeconds: number,
+  staleTtlSeconds: number
 ): void {
   const redis = getRedis();
   if (!redis) return;
 
-  redis.set(cacheKey, userState, { ex: ttlSeconds }).catch(cacheError => {
+  const staleCacheKey = getStaleCacheKey(cacheKey);
+
+  Promise.all([
+    redis.set(cacheKey, userState, { ex: ttlSeconds }),
+    redis.set(staleCacheKey, userState, { ex: staleTtlSeconds }),
+  ]).catch(cacheError => {
     captureWarning('[proxy-state] Redis cache write failed', {
       error: cacheError,
     });
   });
 }
 
-/** Default state for unauthenticated or unknown users */
-const DEFAULT_WAITLIST_STATE: ProxyUserState = {
-  needsWaitlist: true,
-  needsOnboarding: false,
-  isActive: false,
-  isBanned: false,
-};
+/** Fallback when middleware cannot resolve Clerk identity. */
+const NEEDS_ONBOARDING_STATE: ProxyUserState = toProxyUserState(
+  resolveCanonicalState({
+    isAuthenticated: true,
+    hasDbUser: false,
+    userStatus: null,
+    deletedAt: null,
+    waitlistGateEnabled: true,
+    profile: null,
+  })
+);
 
-/** State for users who need onboarding */
-const NEEDS_ONBOARDING_STATE: ProxyUserState = {
-  needsWaitlist: false,
-  needsOnboarding: true,
-  isActive: false,
-  isBanned: false,
-};
-
-/** State for fully active users */
-const ACTIVE_USER_STATE: ProxyUserState = {
-  needsWaitlist: false,
-  needsOnboarding: false,
-  isActive: true,
-  isBanned: false,
-};
-
-/** State for banned or soft-deleted users */
-const BANNED_STATE: ProxyUserState = {
-  needsWaitlist: false,
-  needsOnboarding: false,
-  isActive: false,
-  isBanned: true,
-};
+/**
+ * Fail-closed fallback for DB failures. When the database is unreachable and
+ * no stale cache is available, route the user to the waitlist instead of
+ * onboarding. This prevents waitlist-pending users from bypassing the gate
+ * during a DB outage — the needsOnboarding path skips the waitlist check and
+ * would grant onboarding access to unapproved users.
+ */
+const FAIL_CLOSED_WAITLIST_STATE: ProxyUserState = toProxyUserState(
+  CanonicalUserState.WAITLIST_PENDING
+);
 
 /**
  * Execute the database query with retry logic and per-attempt timeouts.
@@ -313,7 +320,6 @@ async function executeUserStateQuery(clerkUserId: string) {
           profileUsername: creatorProfiles.username,
           profileUsernameNormalized: creatorProfiles.usernameNormalized,
           profileDisplayName: creatorProfiles.displayName,
-          profileAvatarUrl: creatorProfiles.avatarUrl,
           profileIsPublic: creatorProfiles.isPublic,
         })
         .from(users)
@@ -416,20 +422,51 @@ export async function getUserState(
     // Populate both cache layers
     setMemoryCachedState(cacheKey, userState);
     const ttl = getTtlForUserState(userState);
-    cacheUserState(cacheKey, userState, ttl);
+    const staleTtl = getStaleTtlForUserState(userState);
+    cacheUserState(cacheKey, userState, ttl, staleTtl);
 
     return userState;
   } catch (error) {
-    const isTransient =
-      error instanceof QueryTimeoutError || isRetryableError(error);
+    const isTimeout = error instanceof QueryTimeoutError;
+    const isTransient = isTimeout || isRetryableError(error);
 
-    await captureError('Database query failed in proxy state check', error, {
-      clerkUserId,
-      operation: 'getProxyUserState',
-      errorType: isTransient ? 'transient' : 'persistent',
-    });
+    const staleCached = await tryGetStaleCachedState(cacheKey, clerkUserId);
+    if (staleCached) {
+      await captureWarning(
+        '[proxy-state] Serving stale cache after DB failure',
+        error,
+        {
+          clerkUserId,
+          operation: 'getProxyUserState',
+          errorType: isTransient ? 'transient' : 'persistent',
+          fallback: 'stale-cache',
+        }
+      );
+      setMemoryCachedState(cacheKey, staleCached);
+      return staleCached;
+    }
 
-    return { ...NEEDS_ONBOARDING_STATE };
+    if (isTimeout) {
+      await captureWarning(
+        '[proxy-state] DB query timed out without stale cache fallback',
+        error,
+        {
+          clerkUserId,
+          operation: 'getProxyUserState',
+          errorType: 'transient',
+          fallback: 'fail-closed-waitlist',
+        }
+      );
+    } else {
+      await captureError('Database query failed in proxy state check', error, {
+        clerkUserId,
+        operation: 'getProxyUserState',
+        errorType: isTransient ? 'transient' : 'persistent',
+        fallback: 'fail-closed-waitlist',
+      });
+    }
+
+    return { ...FAIL_CLOSED_WAITLIST_STATE };
   }
 }
 
@@ -462,7 +499,10 @@ export async function invalidateProxyUserStateCache(
   if (!redis) return;
 
   try {
-    await redis.del(cacheKey);
+    await Promise.all([
+      redis.del(cacheKey),
+      redis.del(getStaleCacheKey(cacheKey)),
+    ]);
   } catch (error) {
     captureWarning('[proxy-state] Failed to invalidate cache', { error });
   }

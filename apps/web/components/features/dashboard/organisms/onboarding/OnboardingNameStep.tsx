@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import React from 'react';
-import { AuthButton } from '@/features/auth';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import { cn } from '@/lib/utils';
 
 interface OnboardingNameStepProps {
@@ -61,12 +61,14 @@ export function OnboardingNameStep({
             className='w-full rounded-md border border-subtle bg-surface-1 px-3 py-2.5 text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)'
           />
 
-          <AuthButton
+          <Button
             type='submit'
+            className={AUTH_CLASSES.authCta}
+            static
             disabled={!isValid || isTransitioning || isSubmitting}
           >
             {isSubmitting ? 'Submitting…' : 'Continue'}
-          </AuthButton>
+          </Button>
         </form>
       </div>
     </div>

@@ -47,7 +47,7 @@ export function DashboardReleasesDemo() {
   return (
     <div
       ref={containerRef}
-      className='overflow-hidden rounded-lg border border-subtle bg-surface-0 transition-[opacity,transform] duration-500'
+      className='overflow-hidden rounded-lg border border-subtle bg-surface-0 transition-[opacity,transform] duration-cinematic'
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(8px)',

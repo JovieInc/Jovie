@@ -86,6 +86,21 @@ export async function GET(request: Request) {
       returnTo: stateRecord.returnTo,
     });
 
+    // Electron sign-in runs in the user's real system browser, which does not
+    // reliably hand off a non-user-gesture 302 to a custom scheme. Bounce
+    // through a same-origin web page that fires the deep link AND offers an
+    // "Open Jovie" button. iOS keeps the raw redirect: ASWebAuthenticationSession
+    // intercepts its scheme directly. See app/(auth)/auth/native-return/page.tsx.
+    if (resolved.client === 'electron' && exchangeCode) {
+      const bounce = new URL('/auth/native-return', request.url);
+      bounce.searchParams.set('code', exchangeCode);
+      bounce.searchParams.set('state', stateRecord.state);
+      if (stateRecord.desktopFlow) {
+        bounce.searchParams.set('desktop_flow', stateRecord.desktopFlow);
+      }
+      return NextResponse.redirect(bounce, { headers: NO_STORE_HEADERS });
+    }
+
     return NextResponse.redirect(new URL(resolved.redirectUrl, request.url), {
       headers: NO_STORE_HEADERS,
     });

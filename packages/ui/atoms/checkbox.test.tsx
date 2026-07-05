@@ -216,11 +216,11 @@ describe('Checkbox', () => {
       );
     });
 
-    it('keeps press feedback free of transform motion', () => {
+    it('keeps hover feedback free of transform motion', () => {
       render(<Checkbox aria-label='Test' data-testid='checkbox' />);
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).not.toMatch(
-        /\b(?:transition-all|transition-transform|active:scale|active:translate|hover:-translate)\b/
+        /\b(?:transition-all|transition-transform|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
       );
     });
 

@@ -200,6 +200,20 @@ describe('proxy composition (critical)', () => {
 
       expect(mocks.buildContentSecurityPolicy).toHaveBeenCalled();
     });
+
+    it('generates nonce for desktop auth handoff pages', async () => {
+      const req = createTestRequest({ pathname: '/desktop-auth' });
+      await callMiddleware(req);
+
+      expect(mocks.buildContentSecurityPolicy).toHaveBeenCalled();
+    });
+
+    it('generates nonce for the dynamic start route used after desktop auth', async () => {
+      const req = createTestRequest({ pathname: '/start' });
+      await callMiddleware(req);
+
+      expect(mocks.buildContentSecurityPolicy).toHaveBeenCalled();
+    });
   });
 
   // ==========================================================================

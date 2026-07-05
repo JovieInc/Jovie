@@ -23,7 +23,7 @@ function getInnerBoxClass(
 ): string {
   if (isInlineStrip) return 'system-b-mounted-home-trust-strip-inner';
   return cn(
-    'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-3xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
     variant === 'compact'
       ? 'px-5 py-5 sm:px-6 sm:py-6'
       : 'px-6 py-7 sm:px-8 sm:py-9'
@@ -82,7 +82,7 @@ export function HomeTrustSection({
         className={cn(
           isInlineStrip
             ? 'homepage-trust-strip-inner'
-            : 'mx-auto max-w-[var(--linear-content-max)]',
+            : 'mx-auto max-w-linear-content',
           innerBoxClass
         )}
       >
@@ -90,7 +90,7 @@ export function HomeTrustSection({
           className={cn(
             isInlineStrip
               ? 'system-b-mounted-home-trust-strip-label'
-              : 'text-center font-medium tracking-[0.01em] text-[12px] text-white/56',
+              : 'text-center font-medium tracking-wide text-xs text-white/56',
             !isInlineStrip && labelMarginClass
           )}
         >
@@ -111,7 +111,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--awal system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--awal',
-                'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
+                'h-5 w-auto max-w-[36vw] select-none sm:h-6',
                 logoTone
               )}
             />
@@ -121,7 +121,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--orchard system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--orchard',
-                'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
+                'h-7 w-auto max-w-[34vw] select-none sm:h-8',
                 logoTone
               )}
             />
@@ -131,7 +131,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--umg system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--umg',
-                'h-[14px] w-auto max-w-[72vw] select-none sm:h-[16px]',
+                'h-4 w-auto max-w-[72vw] select-none sm:h-4',
                 logoTone
               )}
             />
@@ -141,7 +141,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--armada system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--armada',
-                'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
+                'h-6 w-auto max-w-[38vw] select-none sm:h-6',
                 logoTone
               )}
             />
@@ -154,7 +154,7 @@ export function HomeTrustSection({
               className={getLogoClass(
                 isInlineStrip,
                 'homepage-trust-logo homepage-trust-logo--black-hole system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--black-hole',
-                'h-[16px] w-auto sm:h-[18px]',
+                'h-4 w-auto sm:h-5',
                 ''
               )}
             />

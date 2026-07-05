@@ -531,7 +531,7 @@ describe('dev test-auth routes', () => {
     mockGetDevTestAuthAvailability.mockReturnValueOnce({
       enabled: false,
       trustedHost: false,
-      reason: 'Not available in production',
+      reason: 'Not available outside development',
     });
 
     const { POST } = await import('@/app/api/dev/test-auth/session/route');
@@ -546,7 +546,7 @@ describe('dev test-auth routes', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
       success: false,
-      error: 'Not available in production',
+      error: 'Not available outside development',
     });
   });
 
@@ -554,7 +554,7 @@ describe('dev test-auth routes', () => {
     mockGetDevTestAuthAvailability.mockReturnValueOnce({
       enabled: false,
       trustedHost: false,
-      reason: 'Not available in production',
+      reason: 'Not available outside development',
     });
 
     const { GET } = await import('@/app/api/dev/test-auth/enter/route');
@@ -567,7 +567,7 @@ describe('dev test-auth routes', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
       success: false,
-      error: 'Not available in production',
+      error: 'Not available outside development',
     });
   });
 
@@ -634,7 +634,7 @@ describe('dev test-auth routes', () => {
     mockGetDevTestAuthAvailability.mockReturnValueOnce({
       enabled: false,
       trustedHost: false,
-      reason: 'Not available in production',
+      reason: 'Not available outside development',
     });
 
     const { POST } = await import(
@@ -654,7 +654,7 @@ describe('dev test-auth routes', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
       success: false,
-      error: 'Not available in production',
+      error: 'Not available outside development',
     });
     expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
   });
@@ -842,7 +842,7 @@ describe('dev test-auth routes', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
       success: false,
-      error: 'Not available in production',
+      error: 'Not available outside development',
     });
     expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
     expect(mockGetDevTestAuthAvailability).not.toHaveBeenCalled();

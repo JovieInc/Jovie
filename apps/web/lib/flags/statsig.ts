@@ -6,12 +6,17 @@ import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 import {
   APP_FLAG_DEFAULTS,
-  APP_FLAG_TO_STATSIG_GATE,
   LEGACY_STATSIG_GATE_KEYS,
   type ProfileAlertOptInVariant,
   type StatsigBackedAppFlagName,
   type SubscribeCTAVariant,
+  type TeleprompterShowcaseVariant,
 } from './contracts';
+import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+  parseProfilePacAssignment,
+} from './profile-pac';
 
 let statsigInitialized = false;
 let statsigClient: Statsig | null = null;
@@ -188,13 +193,9 @@ export async function checkGatesForUser(
 
 export async function getStatsigGateValue(
   flagName: StatsigBackedAppFlagName,
-  userId: string | null
+  _userId: string | null
 ): Promise<boolean> {
-  return checkGateForUser(
-    userId,
-    APP_FLAG_TO_STATSIG_GATE[flagName],
-    APP_FLAG_DEFAULTS[flagName]
-  );
+  return APP_FLAG_DEFAULTS[flagName];
 }
 
 export async function getExperiment(
@@ -229,6 +230,36 @@ export async function getExperiment(
   }
 }
 
+/**
+ * Logs a custom event to Statsig, keyed to the given stable user id.
+ *
+ * Used by the PAC instrumentation sink (`/api/profile/pac-event`) so
+ * variant-keyed arm metrics (exposures, captures, dismissals, conversions)
+ * land where the experiment auto-promotion loop reads them. Fail-safe:
+ * errors are logged and swallowed — event logging must never break a
+ * request path.
+ */
+export async function logStatsigEvent(
+  userId: string | null,
+  eventName: string,
+  value?: string | number,
+  metadata?: Record<string, string>
+): Promise<void> {
+  if (isE2ERuntime) return;
+
+  await initializeStatsig();
+  if (!statsigInitialized) return;
+
+  try {
+    const statsig = statsigClient;
+    if (!statsig) return;
+
+    statsig.logEvent(getStatsigUser(userId), eventName, value, metadata);
+  } catch (error) {
+    logger.warn(`[Statsig] Failed to log event ${eventName}`, error, 'Statsig');
+  }
+}
+
 export async function getProfileAlertOptInVariantValue(
   stableId: string | null
 ): Promise<ProfileAlertOptInVariant> {
@@ -243,6 +274,19 @@ export async function getProfileAlertOptInVariantValue(
   return 'button';
 }
 
+export async function getProfilePacAssignmentValue(
+  stableId: string | null
+): Promise<ProfilePacAssignment> {
+  const config = await getExperiment(
+    stableId,
+    LEGACY_STATSIG_GATE_KEYS.PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT
+  );
+  if (Object.keys(config).length === 0) {
+    return DEFAULT_PROFILE_PAC_ASSIGNMENT;
+  }
+  return parseProfilePacAssignment(config);
+}
+
 export async function getSubscribeCTAVariantValue(
   userId: string | null
 ): Promise<SubscribeCTAVariant> {
@@ -255,6 +299,20 @@ export async function getSubscribeCTAVariantValue(
     return variant;
   }
   return 'two_step';
+}
+
+export async function getTeleprompterShowcaseVariantValue(
+  userId: string | null
+): Promise<TeleprompterShowcaseVariant> {
+  const config = await getExperiment(
+    userId,
+    LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_SHOWCASE_EXPERIMENT
+  );
+  const variant = config.variant;
+  if (variant === 'interstitial' || variant === 'direct') {
+    return variant;
+  }
+  return 'direct';
 }
 
 export async function shutdownStatsig(): Promise<void> {

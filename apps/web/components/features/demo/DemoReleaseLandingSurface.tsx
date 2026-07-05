@@ -36,25 +36,25 @@ export function DemoReleaseLandingSurface() {
         <div data-testid='demo-showcase-release-landing'>
           <div className='flex min-h-screen items-center justify-center bg-surface-0 px-5 py-10'>
             <div
-              className='w-full max-w-[340px] rounded-[32px] border border-white/8 bg-surface-1 p-5 shadow-[0_32px_100px_rgba(0,0,0,0.45)]'
+              className='w-full max-w-85 rounded-3xl border border-white/8 bg-surface-1 p-5 shadow-[0_32px_100px_rgba(0,0,0,0.45)]'
               data-testid='demo-release-creator-capture'
             >
-              <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
-                <p className='text-center text-[12px] font-semibold text-white/45'>
+              <div className='rounded-3xl border border-white/8 bg-white/[0.04] p-4'>
+                <p className='text-center text-xs font-semibold text-white/45'>
                   Creator Activation
                 </p>
-                <div className='mt-4 rounded-[20px] bg-white/[0.05] px-4 py-5 text-center'>
-                  <p className='text-[15px] font-semibold text-white'>
+                <div className='mt-4 rounded-3xl bg-white/[0.05] px-4 py-5 text-center'>
+                  <p className='text-mid font-semibold text-white dark:text-white'>
                     {RELEASE.title}
                   </p>
-                  <p className='mt-1 text-[12px] text-white/58'>
+                  <p className='mt-1 text-xs text-white/58'>
                     {ARTIST.displayName}
                   </p>
                 </div>
                 <div className='mt-5 flex justify-center'>
                   <a
                     href={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}
-                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 py-3 text-[15px] font-[600] tracking-[-0.02em] text-black'
+                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-mid font-[600] tracking-[-0.02em] text-black dark:text-white'
                   >
                     Use this sound
                   </a>

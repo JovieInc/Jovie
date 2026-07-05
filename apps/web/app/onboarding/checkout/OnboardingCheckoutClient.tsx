@@ -89,7 +89,7 @@ function ProfilePreviewCard({
           </div>
 
           <div className='w-full'>
-            <div className='flex items-center justify-between rounded-[14px] border border-subtle bg-surface-1 px-3.5 py-2.5'>
+            <div className='flex items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3.5 py-2.5'>
               <span className='text-app text-secondary-token'>
                 Jovie branding
               </span>
