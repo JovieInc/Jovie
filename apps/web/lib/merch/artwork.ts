@@ -30,6 +30,20 @@ const SHIRT_CHEST = {
   height: 980,
 } as const;
 
+const HOODIE_CHEST = {
+  left: 500,
+  top: 710,
+  width: 800,
+  height: 900,
+} as const;
+
+const HAT_FRONT = {
+  left: 680,
+  top: 720,
+  width: 440,
+  height: 300,
+} as const;
+
 let embeddedInterFontFace: string | null = null;
 
 function escapeXml(value: string): string {
@@ -192,20 +206,67 @@ function buildPrintSvg(params: {
   return Buffer.from(svg);
 }
 
-function buildBlankGarmentSvg(): Buffer {
+function productFamily(
+  productType: string | null | undefined
+): 'tee' | 'hoodie' | 'hat' {
+  const normalized = productType?.toLowerCase() ?? '';
+  if (normalized.includes('hoodie') || normalized.includes('sweatshirt')) {
+    return 'hoodie';
+  }
+  if (
+    normalized.includes('hat') ||
+    normalized.includes('cap') ||
+    normalized.includes('beanie')
+  ) {
+    return 'hat';
+  }
+  return 'tee';
+}
+
+function printRegionForProduct(productType: string | null | undefined) {
+  switch (productFamily(productType)) {
+    case 'hoodie':
+      return HOODIE_CHEST;
+    case 'hat':
+      return HAT_FRONT;
+    case 'tee':
+      return SHIRT_CHEST;
+  }
+}
+
+function garmentSvgForProduct(productType: string | null | undefined): string {
+  switch (productFamily(productType)) {
+    case 'hoodie':
+      return '<path d="M560 260 L720 420 H1080 L1240 260 L1560 420 L1390 760 L1260 690 V1880 H540 V690 L410 760 L240 420 Z" fill="#111" stroke="#050505" stroke-width="8"/><path d="M720 420 C780 560 1020 560 1080 420" fill="none" stroke="#242424" stroke-width="16"/><path d="M742 422 C710 580 640 690 570 790" fill="none" stroke="#2f2f2f" stroke-width="12"/><path d="M1058 422 C1090 580 1160 690 1230 790" fill="none" stroke="#2f2f2f" stroke-width="12"/>';
+    case 'hat':
+      return '<path d="M420 770 C480 480 1320 480 1380 770 L1380 920 H420 Z" fill="#111" stroke="#050505" stroke-width="8"/><path d="M660 775 C760 915 1040 915 1140 775" fill="none" stroke="#242424" stroke-width="16"/><path d="M610 930 C820 1030 1210 1010 1510 910 C1390 1120 650 1130 300 950 Z" fill="#0b0b0c" stroke="#050505" stroke-width="8"/>';
+    case 'tee':
+      return '<path d="M560 260 L720 420 H1080 L1240 260 L1560 420 L1390 760 L1260 690 V1880 H540 V690 L410 760 L240 420 Z" fill="#111" stroke="#050505" stroke-width="8"/><path d="M720 420 C780 560 1020 560 1080 420" fill="none" stroke="#242424" stroke-width="16"/>';
+  }
+}
+
+function buildBlankGarmentSvg(productType: string | null | undefined): Buffer {
+  const garment = garmentSvgForProduct(productType);
+
   return Buffer.from(`<svg width="${MOCKUP_WIDTH}" height="${MOCKUP_HEIGHT}" viewBox="0 0 ${MOCKUP_WIDTH} ${MOCKUP_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${MOCKUP_WIDTH}" height="${MOCKUP_HEIGHT}" fill="#f4f2ed"/>
-    <path d="M560 260 L720 420 H1080 L1240 260 L1560 420 L1390 760 L1260 690 V1880 H540 V690 L410 760 L240 420 Z" fill="#111" stroke="#050505" stroke-width="8"/>
-    <path d="M720 420 C780 560 1020 560 1080 420" fill="none" stroke="#242424" stroke-width="16"/>
+    <rect x="120" y="120" width="1560" height="1960" rx="48" fill="#fbfaf7" stroke="#dedbd1" stroke-width="4"/>
+    ${garment}
   </svg>`);
 }
 
-export async function renderMockup(printFile: Buffer): Promise<Buffer> {
-  const garmentBuffer = await sharp(buildBlankGarmentSvg()).png().toBuffer();
+export async function renderMockup(
+  printFile: Buffer,
+  productType?: string | null
+): Promise<Buffer> {
+  const productPrintRegion = printRegionForProduct(productType);
+  const garmentBuffer = await sharp(buildBlankGarmentSvg(productType))
+    .png()
+    .toBuffer();
 
   const croppedPrint = await sharp(printFile)
     .extract(PRINT_CHEST_REGION)
-    .resize(SHIRT_CHEST.width, SHIRT_CHEST.height, {
+    .resize(productPrintRegion.width, productPrintRegion.height, {
       fit: 'inside',
       withoutEnlargement: false,
     })
@@ -213,12 +274,14 @@ export async function renderMockup(printFile: Buffer): Promise<Buffer> {
     .toBuffer();
 
   const printMeta = await sharp(croppedPrint).metadata();
-  const printWidth = printMeta.width ?? SHIRT_CHEST.width;
-  const printHeight = printMeta.height ?? SHIRT_CHEST.height;
+  const printWidth = printMeta.width ?? productPrintRegion.width;
+  const printHeight = printMeta.height ?? productPrintRegion.height;
   const left =
-    SHIRT_CHEST.left + Math.round((SHIRT_CHEST.width - printWidth) / 2);
+    productPrintRegion.left +
+    Math.round((productPrintRegion.width - printWidth) / 2);
   const top =
-    SHIRT_CHEST.top + Math.round((SHIRT_CHEST.height - printHeight) / 2);
+    productPrintRegion.top +
+    Math.round((productPrintRegion.height - printHeight) / 2);
 
   return sharp(garmentBuffer)
     .composite([{ input: croppedPrint, top, left, blend: 'over' }])
@@ -234,9 +297,10 @@ export async function createMerchArtwork(params: {
   readonly designName: string;
   readonly lane: MerchDesignLane;
   readonly concept: string;
+  readonly productType?: string | null;
 }): Promise<{ readonly printFileUrl: string; readonly mockupUrl: string }> {
   const printFile = await sharp(buildPrintSvg(params)).png().toBuffer();
-  const mockup = await renderMockup(printFile);
+  const mockup = await renderMockup(printFile, params.productType);
   const basePath = `merch/generated/${params.profileId}/${params.generationId}/${params.optionId}`;
   const [printFileUrl, mockupUrl] = await Promise.all([
     uploadPublicBuffer({

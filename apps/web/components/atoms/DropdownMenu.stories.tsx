@@ -1,13 +1,13 @@
-import { Button } from '@jovie/ui';
-import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from './DropdownMenu';
+} from '@jovie/ui';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 
 const meta: Meta<typeof DropdownMenu> = {
   title: 'Atoms/DropdownMenu',

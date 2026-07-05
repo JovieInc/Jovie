@@ -12,10 +12,10 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-
+import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { buildFollowUpBody, fileIssue } from '../lib/linear-client';
+import { buildFollowUpBody, fileIssue } from '../lib/tracker-client';
 
 const JOB = 'deterministic-tracker';
 const THRESHOLD = 5;
@@ -115,6 +115,16 @@ async function main(): Promise<void> {
         count: c.count,
         identifier: filed.identifier,
         error: filed.error,
+      });
+
+      // Compound the pattern to gbrain (idempotent slug → recurring shapes update one
+      // page, not spam). Future runs / agents can recall "what intent shapes recur".
+      gbrainLearn({
+        slug: `deterministic/${gbrainSlug(c.key)}`,
+        title: `Deterministic candidate: ${c.key} (${c.count}x/${WINDOW_DAYS}d)`,
+        body: `Intent shape "${c.key}" dispatched ${c.count}x in the last ${WINDOW_DAYS} days.\n\nSamples:\n${c.samples.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nLinear: ${filed.identifier ?? 'not filed'}`,
+        tags: ['type:deterministic-candidate', `count:${c.count}`],
+        type: 'deterministic-candidate',
       });
     }
   });

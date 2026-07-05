@@ -6,7 +6,7 @@ import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 
-export const CHAT_THREAD_TITLE_FALLBACK = 'Thread | Jovie';
+export const CHAT_THREAD_TITLE_FALLBACK = 'Chat';
 
 export async function loadChatThreadTitle(
   conversationId: string
@@ -42,7 +42,5 @@ export async function loadChatThreadMetadataTitle(
   conversationId: string
 ): Promise<string> {
   const conversationTitle = await loadChatThreadTitle(conversationId);
-  return conversationTitle
-    ? `${conversationTitle} | Jovie`
-    : CHAT_THREAD_TITLE_FALLBACK;
+  return conversationTitle ?? CHAT_THREAD_TITLE_FALLBACK;
 }

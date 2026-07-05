@@ -468,9 +468,10 @@ export const userProfileClaims = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
-    // Each profile can only be claimed once (one owner/manager/viewer at a time per profile)
+    // One claim row per profile per role (owner, manager, viewer can coexist)
     uniqueProfile: uniqueIndex('idx_user_profile_claims_unique_profile').on(
-      table.creatorProfileId
+      table.creatorProfileId,
+      table.role
     ),
     userIdx: index('idx_user_profile_claims_user_id').on(table.userId),
   })

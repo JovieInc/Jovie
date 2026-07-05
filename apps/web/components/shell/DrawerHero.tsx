@@ -92,7 +92,7 @@ function DrawerHeroArtworkSlot({
         aria-hidden='true'
         className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-subtle ease-subtle'
       >
-        <span className='h-8 w-8 rounded-full bg-white text-black grid place-items-center'>
+        <span className='h-8 w-8 rounded-full bg-white dark:bg-surface-1 text-black dark:text-white grid place-items-center'>
           <Play
             className='h-4 w-4 translate-x-px'
             strokeWidth={2.5}
@@ -135,7 +135,7 @@ function DrawerHeroMetaSlot({
     <div
       aria-hidden={meta ? undefined : true}
       className={cn(
-        'mt-2 flex min-h-[22px] items-center gap-1.5 flex-wrap',
+        'mt-2 flex min-h-6 items-center gap-1.5 flex-wrap',
         !meta && 'invisible',
         metaClassName
       )}
@@ -163,7 +163,7 @@ function DrawerHeroTrailingSlot({
     <div
       aria-hidden={trailing ? undefined : true}
       className={cn(
-        'mt-4 min-h-[32px]',
+        'mt-4 min-h-8',
         !trailing && 'invisible',
         trailingClassName
       )}
@@ -266,8 +266,9 @@ export function DrawerHero({
         <div className='flex-1 min-w-0 pt-1'>
           <div className='flex items-start gap-2'>
             <h2
+              title={title}
               className={cn(
-                'flex-1 min-w-0 text-[17px] font-semibold text-primary-token leading-tight',
+                'flex-1 min-w-0 text-base font-semibold text-primary-token leading-tight',
                 resolvedTitleLineClamp &&
                   STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp],
                 stableLayout &&
@@ -306,7 +307,7 @@ export function DrawerHero({
               lineCount={resolvedSubtitleLineClamp}
               size='xs'
               className={cn(
-                'mt-1 text-[12px] leading-[16px] text-tertiary-token',
+                'mt-1 text-xs leading-[16px] text-tertiary-token',
                 subtitleClassName
               )}
               testId='drawer-hero-subtitle-slot'

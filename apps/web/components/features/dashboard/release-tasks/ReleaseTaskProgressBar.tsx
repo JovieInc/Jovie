@@ -29,7 +29,7 @@ export function ReleaseTaskProgressBar({
 
   return (
     <div className={className}>
-      <p className='text-2xs text-tertiary-token mb-1'>
+      <p className='text-2xs text-tertiary-token mb-1 tabular-nums'>
         {isComplete ? (
           <span className='text-accent'>
             Campaign complete! All {total} tasks done.

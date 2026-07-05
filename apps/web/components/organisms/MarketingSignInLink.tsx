@@ -21,7 +21,7 @@ export function MarketingSignInLink({
       <Button
         asChild
         variant='whitePill'
-        className='focus-ring-themed h-[36px] px-4 sm:h-[40px] sm:px-5 sm:text-[14px]'
+        className='focus-ring-themed h-9 px-4 sm:h-10 sm:px-5 sm:text-sm'
       >
         <Link href={APP_ROUTES.SIGNIN} prefetch>
           Sign in
@@ -35,8 +35,8 @@ export function MarketingSignInLink({
       href={APP_ROUTES.SIGNIN}
       prefetch
       className={cn(
-        'focus-ring-themed transition-colors duration-subtle',
-        'text-[13px] text-white/60 hover:text-white/90'
+        'focus-ring-themed',
+        'text-[13px] text-neutral-700 hover:text-neutral-950 dark:text-white/60 dark:hover:text-white/90'
       )}
     >
       Sign in

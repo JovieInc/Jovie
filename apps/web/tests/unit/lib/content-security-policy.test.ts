@@ -13,6 +13,7 @@ describe('buildContentSecurityPolicy', () => {
     const csp = buildContentSecurityPolicy({ nonce, isDev: false });
     const scriptSrc = findDirective(csp, 'script-src');
 
+    expect(scriptSrc).toContain("'self'");
     expect(scriptSrc).toContain(`'nonce-${nonce}'`);
     expect(scriptSrc).not.toContain("'unsafe-inline'");
   });
@@ -71,6 +72,17 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://vercel.com');
   });
 
+  it('includes Vercel Blob storage in connect-src for client uploads', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(connectSrc).toContain('https://*.blob.vercel-storage.com');
+    expect(connectSrc).toContain('https://*.public.blob.vercel-storage.com');
+  });
+
   it('includes Sentry regional ingest wildcard in connect-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
@@ -96,6 +108,30 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://clerk.staging.jov.ie');
     expect(connectSrc).toContain('wss://clerk.staging.jov.ie');
     expect(frameSrc).toContain('https://clerk.staging.jov.ie');
+  });
+
+  it('includes Google Analytics domains in script-src and connect-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(scriptSrc).toContain('https://www.googletagmanager.com');
+    expect(connectSrc).toContain('https://www.google-analytics.com');
+    expect(connectSrc).toContain('https://analytics.google.com');
+    expect(connectSrc).toContain('https://*.google-analytics.com');
+  });
+
+  it('includes GTM domain in img-src for conversion tracking pixels', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const imgSrc = findDirective(csp, 'img-src');
+
+    expect(imgSrc).toContain('https://www.googletagmanager.com');
   });
 
   it('includes vercel analytics inline script hash in script-src', () => {

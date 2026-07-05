@@ -72,7 +72,7 @@ export function ThemeToggleSegmented({
       >
         <div
           aria-hidden='true'
-          className={`pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full transition-transform duration-150 ease-[cubic-bezier(.25,1,.5,1)] ${isLinear ? '' : 'bg-surface-0 ring-1 ring-inset ring-(--color-border-subtle)'}`}
+          className={`pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full transition-transform duration-subtle ease-subtle ${isLinear ? '' : 'bg-surface-0 ring-1 ring-inset ring-(--color-border-subtle)'}`}
           style={{
             transform: `translateX(${indicatorX}px)`,
             ...(isLinear ? LINEAR_STYLES.indicator : {}),
@@ -81,7 +81,7 @@ export function ThemeToggleSegmented({
 
         <button
           type='button'
-          aria-label='System theme'
+          aria-label='System Theme'
           className={getButtonClass(currentTheme === 'system', isLinear)}
           style={
             isLinear
@@ -97,7 +97,7 @@ export function ThemeToggleSegmented({
         {wrapButton(
           <button
             type='button'
-            aria-label='Light theme'
+            aria-label='Light Theme'
             aria-describedby={
               shortcutDescription ? shortcutDescriptionId : undefined
             }
@@ -117,7 +117,7 @@ export function ThemeToggleSegmented({
         {wrapButton(
           <button
             type='button'
-            aria-label='Dark theme'
+            aria-label='Dark Theme'
             aria-describedby={
               shortcutDescription ? shortcutDescriptionId : undefined
             }

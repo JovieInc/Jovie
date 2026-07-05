@@ -9,6 +9,7 @@ import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
+
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 const POSTER_PATH = getMarketingExportImage(
@@ -67,7 +68,7 @@ export function ArtistProfilePayFlowVideoSection({
       />
       <div className='mt-12 sm:mt-14 lg:mt-16'>
         <ArtistProfilePhoneFrame>
-          <div className='relative h-full w-full bg-black'>
+          <div className='relative h-full w-full bg-black dark:bg-black'>
             <video
               ref={videoRef}
               aria-label={copy.ariaLabel}
@@ -96,7 +97,7 @@ export function ArtistProfilePayFlowVideoSection({
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className='relative z-10 inline-flex items-center gap-2 rounded-full bg-white/95 px-5 py-3 text-sm font-medium text-black shadow-lg transition hover:bg-white'
+                    className='relative z-10 inline-flex items-center gap-2 rounded-full bg-white/95 px-5 py-3 text-sm font-medium text-black dark:text-white shadow-lg transition hover:bg-white dark:hover:bg-surface-1'
                   >
                     <Play
                       aria-hidden='true'

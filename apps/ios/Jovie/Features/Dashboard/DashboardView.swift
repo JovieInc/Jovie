@@ -2,45 +2,133 @@ import PassKit
 import SwiftUI
 import UIKit
 
+/// Process-wide cache of decoded, downsampled avatar bitmaps. Keyed by URL so
+/// the same avatar rendered in the dashboard header, the menu, and settings
+/// never re-fetches or re-decodes — eliminating the flicker raw `AsyncImage`
+/// produces by dropping back to its placeholder on every appearance.
+enum AvatarImageCache {
+  private static let cache: NSCache<NSURL, UIImage> = {
+    let cache = NSCache<NSURL, UIImage>()
+    cache.countLimit = 64
+    return cache
+  }()
+
+  static func image(for url: URL) -> UIImage? {
+    cache.object(forKey: url as NSURL)
+  }
+
+  static func store(_ image: UIImage, for url: URL) {
+    cache.setObject(image, forKey: url as NSURL)
+  }
+}
+
+/// Non-isolated loader so the network fetch *and* the decode/downsample run off
+/// the main actor. Avatars are tiny on screen, so we downsample to a small
+/// thumbnail to keep memory and compositing cheap.
+enum AvatarImageLoader {
+  static func load(_ url: URL) async -> UIImage? {
+    guard let (data, response) = try? await URLSession.shared.data(from: url) else {
+      return nil
+    }
+
+    if let http = response as? HTTPURLResponse,
+       !(200 ... 299).contains(http.statusCode)
+    {
+      return nil
+    }
+
+    guard let image = UIImage(data: data) else {
+      return nil
+    }
+
+    // The async overload prepares the thumbnail off the main thread.
+    let thumbnail = await image.byPreparingThumbnail(
+      ofSize: CGSize(width: 96, height: 96)
+    ) ?? image
+    AvatarImageCache.store(thumbnail, for: url)
+    return thumbnail
+  }
+}
+
+/// Cache-first remote image view shared by dashboard avatars and chat entity
+/// chip thumbnails (GH-12708). Seeds `@State` from `AvatarImageCache` in
+/// `init` so re-appearance never flashes the fallback placeholder.
+struct CachedRemoteImageView<Fallback: View>: View {
+  let imageURL: URL?
+  let size: CGFloat
+  @ViewBuilder let fallback: () -> Fallback
+
+  @State private var image: UIImage?
+
+  init(
+    imageURL: URL?,
+    size: CGFloat,
+    @ViewBuilder fallback: @escaping () -> Fallback
+  ) {
+    self.imageURL = imageURL
+    self.size = size
+    self.fallback = fallback
+    _image = State(initialValue: imageURL.flatMap(AvatarImageCache.image(for:)))
+  }
+
+  var body: some View {
+    Group {
+      if let image {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFill()
+          .transition(.opacity)
+      } else {
+        fallback()
+      }
+    }
+    .frame(width: size, height: size)
+    .clipShape(Circle())
+    .animation(.easeOut(duration: 0.2), value: image == nil)
+    .task(id: imageURL) { await load() }
+  }
+
+  @MainActor
+  private func load() async {
+    guard let imageURL else {
+      image = nil
+      return
+    }
+
+    if let cached = AvatarImageCache.image(for: imageURL) {
+      if image == nil {
+        image = cached
+      }
+      return
+    }
+
+    guard let loaded = await AvatarImageLoader.load(imageURL) else {
+      return
+    }
+
+    image = loaded
+  }
+}
+
 struct DashboardAvatarView: View {
   let name: String
   let avatarURL: URL?
 
   var body: some View {
-    Group {
-      if let avatarURL {
-        AsyncImage(url: avatarURL) { phase in
-          switch phase {
-          case let .success(image):
-            image.resizable().scaledToFill()
-          case .empty, .failure:
-            fallback
-          @unknown default:
-            fallback
-          }
-        }
-      } else {
-        fallback
+    CachedRemoteImageView(imageURL: avatarURL, size: 28) {
+      ZStack {
+        Circle().fill(JovieColor.surface1)
+        Text(String(name.prefix(1)).uppercased())
+          .font(JovieFont.body(size: 13, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
       }
     }
-    .frame(width: 28, height: 28)
-    .clipShape(Circle())
     .overlay(Circle().stroke(JovieColor.borderDefault, lineWidth: 1))
-  }
-
-  private var fallback: some View {
-    ZStack {
-      Circle().fill(JovieColor.surface1)
-      Text(String(name.prefix(1)).uppercased())
-        .font(JovieFont.body(size: 13, weight: .semibold))
-        .foregroundStyle(JovieColor.textPrimary)
-    }
   }
 }
 
 struct DashboardView: View {
   let state: DashboardLoadState
-  let isOffline: Bool
   let brightnessManager: BrightnessControlling
   let showVenueModeOnLaunch: Bool
   let loadAppleWalletProfilePass: @Sendable () async throws -> Data
@@ -55,7 +143,6 @@ struct DashboardView: View {
 
   init(
     state: DashboardLoadState,
-    isOffline: Bool,
     brightnessManager: BrightnessControlling,
     showVenueModeOnLaunch: Bool = false,
     loadAppleWalletProfilePass: @escaping @Sendable () async throws -> Data = {
@@ -64,7 +151,6 @@ struct DashboardView: View {
     onRetry: @escaping () async -> Void
   ) {
     self.state = state
-    self.isOffline = isOffline
     self.brightnessManager = brightnessManager
     self.showVenueModeOnLaunch = showVenueModeOnLaunch
     self.loadAppleWalletProfilePass = loadAppleWalletProfilePass
@@ -141,15 +227,6 @@ struct DashboardView: View {
       }
 
       Spacer()
-
-      if isOffline {
-        Text("Offline")
-          .font(JovieFont.body(size: 12, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(JovieColor.surface1, in: Capsule())
-      }
     }
     .padding(.bottom, JovieSpacing.large)
     .overlay(alignment: .bottom) {
@@ -183,24 +260,28 @@ struct DashboardView: View {
     }
   }
 
+  // Mirrors the loaded layout exactly (full-width square QR, single URL line,
+  // two full-width pills, top-aligned) so the skeleton → loaded transition
+  // causes zero layout shift on a cold (uncached) first load.
   private var skeleton: some View {
     VStack(spacing: JovieSpacing.large) {
       RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
         .fill(JovieColor.surface1)
-        .frame(width: 280, height: 280)
+        .aspectRatio(1, contentMode: .fit)
+        .frame(maxWidth: .infinity)
       RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
         .fill(JovieColor.surface1)
-        .frame(width: 180, height: 18)
+        .frame(width: 180, height: 16)
       HStack(spacing: JovieSpacing.medium) {
         RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
           .fill(JovieColor.surface1)
-          .frame(height: 48)
+          .frame(height: 46)
         RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
           .fill(JovieColor.surface1)
-          .frame(height: 48)
+          .frame(height: 46)
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .redacted(reason: .placeholder)
   }
 
@@ -209,27 +290,12 @@ struct DashboardView: View {
       Button {
         isShowingVenueMode = true
       } label: {
-        if let payload = response.qrPayload, let image = QRCodeRenderer.image(for: payload) {
-          Image(uiImage: image)
-            .interpolation(.none)
-            .resizable()
-            .scaledToFit()
-            .jovieQRCodePlate()
-            .accessibilityLabel("Profile QR Code")
-        } else {
-          Text("QR unavailable")
-            .font(JovieFont.body(size: 15, weight: .medium))
-            .foregroundStyle(JovieColor.textTertiary)
-            .frame(width: 280, height: 280)
-            .background(
-              JovieColor.surface1,
-              in: RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
-            )
-        }
+        QRCodeCardView(payload: response.qrPayload)
       }
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity)
-      .accessibilityLabel("Profile QR Code")
+      .disabled(response.qrPayload == nil)
+      .accessibilityLabel(response.qrPayload == nil ? "QR unavailable" : "Profile QR Code")
       .accessibilityIdentifier("profile-qr-button")
 
       Text(response.publicProfileURL ?? "jov.ie")
@@ -241,6 +307,8 @@ struct DashboardView: View {
           copyURL(response.publicProfileURL)
         }
         .buttonStyle(JoviePillButtonStyle(filled: false))
+        .accessibilityIdentifier("dashboard-copy-url-button")
+        .accessibilityValue(didCopyURL ? "Copied" : "Copy URL")
 
         ShareLink(item: response.publicProfileURL ?? response.continueOnWebURL) {
           Text("Share")
@@ -360,5 +428,69 @@ private struct AppleWalletAddPassView: UIViewControllerRepresentable {
     func addPassesViewControllerDidFinish(_ controller: PKAddPassesViewController) {
       controller.dismiss(animated: true)
     }
+  }
+}
+
+/// A fixed-aspect QR card that reserves its square footprint up front and
+/// renders the QR off the main thread. The reserved space guarantees zero
+/// layout shift between the loading, loaded, and unavailable states. Shared by
+/// the dashboard and Venue Mode so both render identically. Uses the shared
+/// ``JovieQRCodePlate`` tokens so the plate matches the rest of the system.
+struct QRCodeCardView: View {
+  let payload: String?
+  var accessibilityLabelText: String = "Profile QR Code"
+
+  @State private var image: UIImage?
+
+  init(payload: String?, accessibilityLabelText: String = "Profile QR Code") {
+    self.payload = payload
+    self.accessibilityLabelText = accessibilityLabelText
+    // Seed from the renderer cache so a QR rendered once (e.g. on the
+    // dashboard) appears instantly when Venue Mode opens — no flash.
+    _image = State(
+      initialValue: payload.flatMap { QRCodeRenderer.cachedImage(for: $0) }
+    )
+  }
+
+  var body: some View {
+    ZStack {
+      RoundedRectangle(cornerRadius: JovieQRCodePlate.radius, style: .continuous)
+        .fill(payload == nil ? JovieColor.surface1 : JovieQRCodePlate.background)
+
+      if let image {
+        Image(uiImage: image)
+          .interpolation(.none)
+          .resizable()
+          .scaledToFit()
+          .padding(JovieQRCodePlate.padding)
+          .transition(.opacity)
+          .accessibilityLabel(accessibilityLabelText)
+      } else if payload == nil {
+        Text("QR unavailable")
+          .font(JovieFont.body(size: 15, weight: .medium))
+          .foregroundStyle(JovieColor.textTertiary)
+      }
+    }
+    .aspectRatio(1, contentMode: .fit)
+    .frame(maxWidth: .infinity)
+    .animation(.easeOut(duration: 0.2), value: image == nil)
+    .task(id: payload) { await render() }
+  }
+
+  @MainActor
+  private func render() async {
+    guard let payload, !payload.isEmpty else {
+      image = nil
+      return
+    }
+
+    if let cached = QRCodeRenderer.cachedImage(for: payload) {
+      if image == nil {
+        image = cached
+      }
+      return
+    }
+
+    image = await QRCodeRenderer.imageAsync(for: payload)
   }
 }

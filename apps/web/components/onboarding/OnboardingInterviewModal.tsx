@@ -165,7 +165,7 @@ export function OnboardingInterviewModal({
     <dialog
       ref={dialogRef}
       aria-label='Quick Interview'
-      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-48px)] w-full max-w-[480px] overflow-auto rounded-(--linear-radius-lg) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-6 text-primary-token shadow-(--linear-shadow-card-elevated) backdrop:bg-(--linear-bg-page) backdrop:backdrop-blur-sm'
+      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-48px)] w-full max-w-120 overflow-auto rounded-(--linear-radius-lg) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-6 text-primary-token shadow-(--linear-shadow-card-elevated) backdrop:bg-(--linear-bg-page) backdrop:backdrop-blur-sm'
     >
       <div className='mb-4 flex min-h-7 items-center justify-between gap-4 text-2xs text-secondary-token'>
         <span

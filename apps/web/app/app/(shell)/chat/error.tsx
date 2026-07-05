@@ -7,6 +7,9 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { ErrorProps } from '@/types/common';
 
 export default function ChatError({ error, reset }: ErrorProps) {
+  // Log the actual error for debugging, but never show raw message to users
+  console.error('[ChatError]', error);
+
   return (
     <ChatWorkspaceSurface>
       <div className='flex h-full items-center justify-center p-6'>
@@ -14,10 +17,10 @@ export default function ChatError({ error, reset }: ErrorProps) {
           <AlertCircle className='h-8 w-8 text-tertiary-token' />
           <div className='space-y-1'>
             <p className='text-sm font-medium text-primary-token'>
-              Chat couldn&apos;t load
+              Conversation couldn&apos;t load
             </p>
             <p className='text-sm text-secondary-token'>
-              {error.message || 'Please try again.'}
+              Something went wrong. Please try again.
             </p>
           </div>
           <Button

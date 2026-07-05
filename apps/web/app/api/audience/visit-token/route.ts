@@ -81,7 +81,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(getClientTrackingToken(parsed.data.profileId), {
+    const tokenResult = getClientTrackingToken(parsed.data.profileId);
+    return NextResponse.json(tokenResult, {
       headers: NO_STORE_HEADERS,
     });
   } catch (error) {

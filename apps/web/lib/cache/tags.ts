@@ -45,6 +45,9 @@ export const CACHE_TAGS = {
 
   // Audience data caches
   AUDIENCE_DATA: 'audience-data',
+
+  // Sitemap catalog — invalidated when releases/profiles are updated
+  SITEMAP_CATALOG: 'sitemap-catalog',
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
@@ -100,7 +103,7 @@ export function createSmartLinkContentTag(profileId: string): string {
  * Strips control characters except tab (0x09) that would crash response headers.
  * Cache tags with user-provided input (usernames, slugs) must be sanitized.
  */
-const INVALID_HEADER_CHARS = /[\x00-\x08\x0A-\x1F\x7F]/g;
+const INVALID_HEADER_CHARS = /[\x00-\x08\x0A-\x1F\x7F\u0100-\uFFFF]/g;
 
 /**
  * Sanitize a cache tag value by removing characters invalid in HTTP headers.

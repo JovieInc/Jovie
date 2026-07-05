@@ -25,10 +25,10 @@ export function FigCard({ title, description, icon, className }: FigCardProps) {
         </div>
       )}
 
-      <h3 className='text-[17px] font-medium leading-snug tracking-[-0.017em] text-primary-token'>
+      <h3 className='text-base font-medium leading-snug tracking-[-0.017em] text-primary-token'>
         {title}
       </h3>
-      <p className='mt-2.5 text-[14px] leading-relaxed text-secondary-token'>
+      <p className='mt-2.5 text-sm leading-relaxed text-secondary-token'>
         {description}
       </p>
     </div>

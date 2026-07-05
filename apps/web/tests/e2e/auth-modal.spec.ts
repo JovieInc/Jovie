@@ -24,7 +24,9 @@ function expectedDialogName(mode: 'signin' | 'signup') {
     return 'Authentication unavailable';
   }
 
-  return mode === 'signin' ? 'Sign in to Jovie' : 'Request access to Jovie';
+  return mode === 'signin'
+    ? 'Sign in to Jovie'
+    : 'Create your account on Jovie';
 }
 
 async function blockAnalytics(page: import('@playwright/test').Page) {

@@ -7,6 +7,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { APP_ROUTES } from '@/constants/routes';
+import { getTimeRangeLabel } from '@/lib/analytics/time-range';
 import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
@@ -72,12 +73,6 @@ function ErrorCards() {
       </div>
     </div>
   );
-}
-
-function getRangeLabel(range: CityRange): string {
-  if (range === '7d') return 'Last 7 days';
-  if (range === '30d') return 'Last 30 days';
-  return 'Last 90 days';
 }
 
 function getEmptyStateAction(
@@ -148,7 +143,10 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     return () => observer.disconnect();
   }, []);
 
-  const rangeLabel = useMemo(() => getRangeLabel(range), [range]);
+  const rangeLabel = useMemo(
+    () => getTimeRangeLabel(range, 'description'),
+    [range]
+  );
 
   // Run count-up animation when profile_views changes
   useEffect(() => {
@@ -212,7 +210,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
-      notifications.success('Copied to clipboard', { duration: 2000 });
+      notifications.success('Copied', { duration: 2000 });
       setTimeout(() => setCopied(false), CLIPBOARD_FEEDBACK_DELAY_MS);
     } catch (e) {
       void captureError('Failed to copy profile URL to clipboard', e, {
@@ -269,7 +267,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                     <HelpCircle className='h-3.5 w-3.5' />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side='top' className='max-w-[200px]'>
+                <TooltipContent side='top' className='max-w-50'>
                   <p className='text-app'>
                     Total page views, including repeat visits from the same
                     person
@@ -296,7 +294,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                     <HelpCircle className='h-3.5 w-3.5' />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side='top' className='max-w-[200px]'>
+                <TooltipContent side='top' className='max-w-50'>
                   <p className='text-app'>
                     Individual people who visited your profile, counted once per
                     person
@@ -328,7 +326,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     <div
       ref={containerRef}
       data-testid='dashboard-analytics-cards'
-      className='space-y-1 min-h-[140px]'
+      className='space-y-1 min-h-35'
     >
       <div className='flex flex-wrap items-center justify-between gap-2'>
         <div className='space-y-0.5'>

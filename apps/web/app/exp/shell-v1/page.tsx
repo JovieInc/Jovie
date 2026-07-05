@@ -287,7 +287,7 @@ const DURATION_CINEMATIC = 420;
 
 // Selected/focused row treatment — electric cyan accent. Calibrated to
 // stay invisible at low brightness (the "DJ on a red-eye flight" test):
-// Selection language: a small pill-chip on the left edge (h-3.5 w-[3px]
+// Selection language: a small pill-chip on the left edge (h-3.5 w-1
 // rounded-full) plus a soft cyan bg tint. The inset 2px bar didn't follow
 // the row's rounded-md corners gracefully — the pill is its own rounded
 // shape, vertically centered, so it reads as a deliberate accent instead
@@ -301,7 +301,7 @@ const SELECTED_ROW_CLASSES = [
   // Pseudo-element pill chip
   "before:content-['']",
   'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
-  'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
+  'before:h-3.5 before:w-1 before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
   'before:transition-colors before:duration-subtle before:ease-out',
@@ -661,9 +661,9 @@ const RELEASES: Release[] = [
     waveformSeed: 31,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 28, kind: 'verse', label: 'Verse 1' },
+      { at: 28, kind: 'verse', label: 'Verse 1' }, // ui-casing-allow: numbered section
       { at: 70, kind: 'chorus', label: 'Chorus' },
-      { at: 110, kind: 'verse', label: 'Verse 2' },
+      { at: 110, kind: 'verse', label: 'Verse 2' }, // ui-casing-allow: numbered section
       { at: 150, kind: 'outro', label: 'Outro' },
     ],
   },
@@ -1302,7 +1302,7 @@ const TRACKS: Track[] = [
     waveformSeed: 1,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 26, kind: 'verse', label: 'Verse 1' },
+      { at: 26, kind: 'verse', label: 'Verse 1' }, // ui-casing-allow: numbered section
       { at: 52, kind: 'chorus', label: 'Chorus' },
       { at: 88, kind: 'drop', label: 'Drop' },
     ],
@@ -1514,7 +1514,7 @@ const TASKS: Task[] = [
     id: 'J-128',
     title: 'Confirm artwork for The Deep End',
     description:
-      'Final mastered files came back. Need to approve the cover art crop for the Spotify Canvas before the smart link goes live next Friday.',
+      'Final mastered files came back. Need to approve the cover art crop for the Spotify Canvas before the smart link goes live next Friday.', // ui-casing-allow: multi-sentence body copy
     status: 'in_progress',
     priority: 'high',
     assignee: 'you',
@@ -1857,18 +1857,18 @@ function ShellV1ExperimentContent() {
         },
       },
       {
-        label: 'Open release',
+        label: 'Open Release',
         icon: ExternalLink,
         onSelect: () => setSelectedReleaseId(release.id),
       },
       {
-        label: 'Pin to top',
+        label: 'Pin To Top',
         icon: Pin,
         onSelect: noop(`pin ${release.id}`),
       },
       { kind: 'separator' },
       {
-        label: 'Copy smart link',
+        label: 'Copy Smart Link',
         icon: LinkIcon,
         shortcut: '⌘L',
         onSelect: noop(`copy link ${release.id}`),
@@ -1911,13 +1911,13 @@ function ShellV1ExperimentContent() {
           },
         },
         {
-          label: 'Pin to top',
+          label: 'Pin To Top',
           icon: Pin,
           onSelect: noop(`pin ${release.id}`),
         },
         { kind: 'separator' },
         {
-          label: 'Copy smart link',
+          label: 'Copy Smart Link',
           icon: LinkIcon,
           shortcut: '⌘L',
           onSelect: noop(`copy link ${release.id}`),
@@ -1936,7 +1936,7 @@ function ShellV1ExperimentContent() {
         },
         { kind: 'separator' },
         {
-          label: 'Close drawer',
+          label: 'Close Drawer',
           icon: X,
           shortcut: 'closeOverlay',
           onSelect: () => setSelectedReleaseId(null),
@@ -1959,19 +1959,19 @@ function ShellV1ExperimentContent() {
         },
       },
       {
-        label: 'Add to release',
+        label: 'Add To Release',
         icon: UserPlus,
         onSelect: noop(`add ${track.id} to release`),
       },
       {
-        label: 'Edit metadata',
+        label: 'Edit Metadata',
         icon: Pencil,
         shortcut: '⌘E',
         onSelect: noop(`edit ${track.id}`),
       },
       { kind: 'separator' },
       {
-        label: 'Copy share link',
+        label: 'Copy Share Link',
         icon: LinkIcon,
         shortcut: '⌘L',
         onSelect: noop(`copy link ${track.id}`),
@@ -1995,18 +1995,18 @@ function ShellV1ExperimentContent() {
   const onThreadContextMenu = (e: React.MouseEvent, thread: Thread) => {
     openContextMenu(e, [
       {
-        label: 'Open thread',
+        label: 'Open Thread',
         icon: ExternalLink,
         onSelect: () => openThread(thread.id),
       },
       { kind: 'separator' },
       {
-        label: 'Copy as Markdown',
+        label: 'Copy As Markdown',
         icon: Copy,
         onSelect: noop(`copy md ${thread.id}`),
       },
       {
-        label: 'Copy thread ID',
+        label: 'Copy Thread ID',
         icon: Copy,
         onSelect: noop(`copy id ${thread.id}`),
       },
@@ -2067,13 +2067,13 @@ function ShellV1ExperimentContent() {
       },
       { kind: 'separator' },
       {
-        label: 'Open release',
+        label: 'Open Release',
         icon: ExternalLink,
         disabled: !task.releaseId,
         onSelect: () => task.releaseId && setSelectedReleaseId(task.releaseId),
       },
       {
-        label: 'Copy task ID',
+        label: 'Copy Task ID',
         icon: Copy,
         onSelect: noop(`copy id ${task.id}`),
       },
@@ -2467,7 +2467,7 @@ function ShellV1ExperimentContent() {
             // Sits inside the same 32px gutter the audio bar uses (px-8) so
             // the album art aligns to a virtual grid as if the canvas's
             // content area extended down past it.
-            className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
+            className='hidden lg:block fixed bottom-7 z-30 w-56'
             style={{
               left: sidebarMode === 'docked' ? 264 : 32,
               opacity: barCollapsed ? 0 : 1,
@@ -2503,7 +2503,7 @@ function ShellV1ExperimentContent() {
                 : `padding-bottom var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
-          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
+          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'>
             {/* Static grain overlay — adds a subtle paper roughness so the
               dark surface doesn't read as flat slab. Pointer-events off,
               no animation; GPU-composited at zero per-frame cost. */}
@@ -2730,7 +2730,7 @@ function ShellV1ExperimentContent() {
                 aria-hidden={
                   !(view === 'releases' && selectedReleaseId !== null)
                 }
-                className='absolute inset-y-0 right-0 z-30 w-[412px] pointer-events-none'
+                className='absolute inset-y-0 right-0 z-30 w-103 pointer-events-none'
                 style={{
                   transform:
                     view === 'releases' && selectedReleaseId !== null
@@ -2769,7 +2769,7 @@ function ShellV1ExperimentContent() {
                 the direction the bar will travel when revealed (up from the
                 bottom edge). */}
             <Tooltip
-              label='Show audio bar'
+              label='Show Audio Bar'
               shortcut={SHORTCUTS.toggleBar}
               side='top'
             >
@@ -2890,7 +2890,7 @@ function ShellV1ExperimentContent() {
         <button
           type='button'
           onClick={() => setView('demo')}
-          aria-label='Exit screening room (Esc)'
+          aria-label='Exit Screening Room (Esc)'
           title='Exit screening room (Esc)'
           className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-out'
           style={{
@@ -2912,7 +2912,7 @@ function ShellV1ExperimentContent() {
 
 export default function ShellV1Experiment() {
   return (
-    <Suspense fallback={<div className='min-h-screen bg-[#050608]' />}>
+    <Suspense fallback={<div className='min-h-screen bg-(--color-bg-base)' />}>
       <ShellV1ExperimentContent />
     </Suspense>
   );
@@ -2998,7 +2998,7 @@ function FloatingSidebarLayer({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: same as above */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: same */}
       <div
-        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-[224px] rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)] overflow-hidden'
+        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-(--linear-app-shell-radius) border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-(--linear-app-shell-shadow) overflow-hidden'
         style={{
           transform: visible
             ? 'translateX(0)'
@@ -3139,7 +3139,7 @@ function Sidebar({
     <aside
       className={cn(
         'relative flex flex-col h-full shrink-0',
-        tight ? 'w-[212px]' : 'w-[224px]'
+        tight ? 'w-53' : 'w-56'
       )}
       onMouseEnter={bumpPinVisibility}
       onMouseMove={bumpPinVisibility}
@@ -3164,7 +3164,7 @@ function Sidebar({
                 strokeWidth={2.25}
               />
               <span
-                className='text-[13px] font-semibold tracking-[-0.012em] flex-1 truncate text-left'
+                className='text-app font-semibold tracking-[-0.012em] flex-1 truncate text-left'
                 style={{ letterSpacing: '-0.012em' }}
               >
                 Back
@@ -3179,7 +3179,7 @@ function Sidebar({
                   className='shrink-0 text-primary-token'
                   aria-hidden
                 />
-                <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
+                <span className='text-app font-semibold tracking-tighter text-primary-token flex-1 truncate'>
                   Jovie
                 </span>
                 <ChevronDown
@@ -3274,13 +3274,13 @@ function Sidebar({
               >
                 <span
                   className={cn(
-                    'text-[12.5px] font-medium tracking-[-0.005em]',
+                    'text-xs font-medium tracking-[-0.005em]',
                     s.id === 'danger' && 'text-rose-300/90'
                   )}
                 >
                   {s.label}
                 </span>
-                <span className='text-[10.5px] text-quaternary-token leading-tight'>
+                <span className='text-3xs text-quaternary-token leading-tight'>
                   {s.description}
                 </span>
               </button>
@@ -3347,7 +3347,7 @@ function Sidebar({
           <div className='space-y-3'>
             {!collapsed && (
               <div className='px-3 pb-1'>
-                <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
+                <span className='text-3xs font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
                   Artists
                 </span>
               </div>
@@ -3519,7 +3519,7 @@ function CanvasSubheader({
               type='button'
               onClick={() => onSubview(t.id)}
               className={cn(
-                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-subtle ease-out inline-flex items-center gap-1.5',
+                'h-7 px-2.5 rounded-md text-xs font-caption tracking-[-0.012em] transition-colors duration-subtle ease-out inline-flex items-center gap-1.5',
                 active
                   ? 'text-primary-token bg-surface-1/80'
                   : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1/50'
@@ -3529,7 +3529,7 @@ function CanvasSubheader({
               {typeof t.count === 'number' && (
                 <span
                   className={cn(
-                    'text-[10.5px] tabular-nums',
+                    'text-3xs tabular-nums',
                     active ? 'text-tertiary-token' : 'text-quaternary-token'
                   )}
                 >
@@ -3540,11 +3540,11 @@ function CanvasSubheader({
           );
         })}
         {onAddView && (
-          <Tooltip label='Save current filter as a view'>
+          <Tooltip label='Save Current Filter As A View'>
             <button
               type='button'
               onClick={onAddView}
-              aria-label='Add view'
+              aria-label='Add View'
               className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/50 transition-colors duration-subtle ease-out'
             >
               <Plus className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -3591,7 +3591,7 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
     >
       <ShellDropdown.Label>Status</ShellDropdown.Label>
       <ShellDropdown.RadioGroup value={status} onValueChange={setStatus}>
-        <ShellDropdown.RadioItem value='all' label='Any status' />
+        <ShellDropdown.RadioItem value='all' label='Any Status' />
         <ShellDropdown.RadioItem value='live' label='Live' />
         <ShellDropdown.RadioItem value='scheduled' label='Scheduled' />
         <ShellDropdown.RadioItem value='draft' label='Draft' />
@@ -3601,7 +3601,7 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
           <ShellDropdown.Separator />
           <ShellDropdown.Label>Kind</ShellDropdown.Label>
           <ShellDropdown.RadioGroup value={kind} onValueChange={setKind}>
-            <ShellDropdown.RadioItem value='all' label='Any kind' />
+            <ShellDropdown.RadioItem value='all' label='Any Kind' />
             <ShellDropdown.RadioItem value='single' label='Single' />
             <ShellDropdown.RadioItem value='ep' label='EP' />
             <ShellDropdown.RadioItem value='album' label='Album' />
@@ -3612,7 +3612,7 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
       <ShellDropdown.Sub>
         <ShellDropdown.SubTrigger
           icon={Calendar}
-          label='Date range'
+          label='Date Range'
           description={
             dateRange === 'any'
               ? 'Any date'
@@ -3628,21 +3628,24 @@ function CanvasFilterDropdown({ view }: { view: CanvasView }) {
             value={dateRange}
             onValueChange={setDateRange}
           >
-            <ShellDropdown.RadioItem value='any' label='Any date' />
-            <ShellDropdown.RadioItem value='7d' label='Last 7 days' />
-            <ShellDropdown.RadioItem value='30d' label='Last 30 days' />
-            <ShellDropdown.RadioItem value='90d' label='Last 90 days' />
+            <ShellDropdown.RadioItem value='any' label='Any Date' />
+            <ShellDropdown.RadioItem
+              value='7d'
+              label='Last 7 Days' // ui-casing-allow: numeric range label
+            />
+            <ShellDropdown.RadioItem value='30d' label='Last 30 Days' />
+            <ShellDropdown.RadioItem value='90d' label='Last 90 Days' />
           </ShellDropdown.RadioGroup>
         </ShellDropdown.SubContent>
       </ShellDropdown.Sub>
       <ShellDropdown.Separator />
       <ShellDropdown.CheckboxItem
-        label='Include drafts'
+        label='Include Drafts'
         checked={includeDrafts}
         onCheckedChange={setIncludeDrafts}
       />
       <ShellDropdown.CheckboxItem
-        label='Include archived'
+        label='Include Archived'
         checked={includeArchived}
         onCheckedChange={setIncludeArchived}
       />
@@ -3659,13 +3662,13 @@ function CanvasSortDropdown({ view }: { view: CanvasView }) {
     view === 'tasks'
       ? [
           { value: 'priority', label: 'Priority' },
-          { value: 'dueDate', label: 'Due date' },
+          { value: 'dueDate', label: 'Due Date' },
           { value: 'updatedAt', label: 'Updated' },
         ]
       : [
-          { value: 'releaseDate', label: 'Release date' },
+          { value: 'releaseDate', label: 'Release Date' },
           { value: 'title', label: 'Title' },
-          { value: 'streams', label: 'Weekly streams' },
+          { value: 'streams', label: 'Weekly Streams' },
           { value: 'addedAt', label: 'Added' },
         ];
   return (
@@ -3686,7 +3689,7 @@ function CanvasSortDropdown({ view }: { view: CanvasView }) {
         </Tooltip>
       }
     >
-      <ShellDropdown.Label>Sort by</ShellDropdown.Label>
+      <ShellDropdown.Label>Sort By</ShellDropdown.Label>
       <ShellDropdown.RadioGroup value={sortKey} onValueChange={setSortKey}>
         {fields.map(f => (
           <ShellDropdown.RadioItem
@@ -3762,12 +3765,12 @@ function subviewsForView(
       { id: 'all', label: 'All', count: tasks.length },
       {
         id: 'mine',
-        label: 'Assigned to me',
+        label: 'Assigned To Me',
         count: tasks.filter(t => t.assignee === 'you').length,
       },
       {
         id: 'jovie',
-        label: 'Assigned to Jovie',
+        label: 'Assigned To Jovie',
         count: tasks.filter(t => t.assignee === 'jovie').length,
       },
     ];
@@ -3855,7 +3858,7 @@ function Header({
         {/* Breadcrumb (visible when search is closed) */}
         <div
           aria-hidden={searchOpen}
-          className='absolute inset-0 flex items-center gap-2 text-[13px]'
+          className='absolute inset-0 flex items-center gap-2 text-app'
           style={{
             opacity: searchOpen ? 0 : 1,
             transform: searchOpen ? 'translateY(-2px)' : 'translateY(0)',
@@ -3868,14 +3871,14 @@ function Header({
               {i > 0 && (
                 <span
                   aria-hidden='true'
-                  className='text-quaternary-token/70 text-[12px] font-light select-none'
+                  className='text-quaternary-token/70 text-xs font-light select-none'
                 >
                   /
                 </span>
               )}
               <span
                 className={cn(
-                  'truncate text-[13px] font-semibold tracking-[-0.018em]',
+                  'truncate text-app font-semibold tracking-[-0.018em]',
                   crumb.emphasis
                     ? 'text-secondary-token'
                     : 'text-tertiary-token/80 hover:text-secondary-token cursor-default transition-colors duration-subtle ease-out'
@@ -3925,7 +3928,7 @@ function Header({
                 ? 'text-primary-token bg-surface-1'
                 : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1'
             )}
-            aria-label='Toggle right rail'
+            aria-label='Toggle Right Rail'
             aria-pressed={rightRailOpen}
           >
             <PanelRight className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -3959,11 +3962,11 @@ function pageActionForView(view: CanvasView): {
     case 'library':
       return { label: 'Generate', icon: Sparkles };
     case 'releases':
-      return { label: 'New release', icon: Plus };
+      return { label: 'New Release', icon: Plus };
     case 'tracks':
       return { label: 'Upload', icon: Plus };
     case 'tasks':
-      return { label: 'New task', icon: Plus };
+      return { label: 'New Task', icon: Plus };
     default:
       return null;
   }
@@ -3986,7 +3989,7 @@ function UserMenu({
         <button
           type='button'
           className='w-full text-left flex-1 min-w-0'
-          aria-label='Account menu'
+          aria-label='Account Menu'
         >
           {children}
         </button>
@@ -4002,7 +4005,7 @@ function UserMenu({
         <ShellDropdown.Item icon={Shield} label='Admin' />
       )}
       <ShellDropdown.Separator />
-      <ShellDropdown.Item icon={LogOut} label='Sign out' tone='danger' />
+      <ShellDropdown.Item icon={LogOut} label='Sign Out' tone='danger' />
     </ShellDropdown>
   );
 }
@@ -4074,10 +4077,10 @@ function DashboardHome() {
           card (Dismiss or its primary action), which forces a real
           decision instead of letting them skim past. */}
       <div className='flex-1 grid place-items-center min-h-0'>
-        <div className='w-full max-w-[480px] flex flex-col items-center'>
+        <div className='w-full max-w-120 flex flex-col items-center'>
           <div className='shrink-0 text-center pb-5'>
             <h1
-              className='text-[15px] font-medium text-tertiary-token'
+              className='text-mid font-medium text-tertiary-token'
               style={{ letterSpacing: '-0.012em' }}
             >
               {greeting}
@@ -4109,7 +4112,7 @@ function DashboardHome() {
           }}
           isLoading={false}
           isSubmitting={false}
-          placeholder='Ask Jovie'
+          placeholder='Ask Jovie' // ui-casing-allow: brand placeholder
         />
       </div>
     </div>
@@ -4396,11 +4399,11 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: 'channels',
     label: 'Channels',
-    description: 'Spotify, Apple Music, social posting',
+    description: 'Spotify, Apple Music, social posting', // ui-casing-allow: integration list copy
   },
   {
     id: 'danger',
-    label: 'Danger zone',
+    label: 'Danger Zone',
     description: 'Delete account, reset workspace',
   },
 ];
@@ -4546,7 +4549,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
   return (
     <article className='relative h-full overflow-hidden flex flex-col'>
       <div ref={scrollRef} className='flex-1 min-h-0 overflow-y-auto'>
-        <div className='max-w-2xl mx-auto px-8 pt-12 pb-6 space-y-4 text-[13.5px] leading-relaxed'>
+        <div className='max-w-2xl mx-auto px-8 pt-12 pb-6 space-y-4 text-app leading-relaxed'>
           {stage === 'ready' && (
             <>
               <ThreadTurn speaker='me'>{handle}</ThreadTurn>
@@ -4558,7 +4561,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
                 <button
                   type='button'
                   onClick={onComplete}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
                 >
                   Open Jovie
                   <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
@@ -4587,10 +4590,10 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           aria-hidden
         />
         <h1
-          className='text-[14px] font-medium text-tertiary-token'
+          className='text-sm font-medium text-tertiary-token'
           style={{ letterSpacing: '-0.01em' }}
         >
-          Welcome to Jovie
+          Welcome To Jovie
         </h1>
       </div>
 
@@ -4636,12 +4639,10 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
   const rows = settingsRowsFor(section);
   return (
     <article className='max-w-2xl mx-auto px-8 pt-8 pb-12'>
-      <h1 className='text-[24px] font-display tracking-[-0.018em] leading-tight text-primary-token'>
+      <h1 className='text-2xl font-display tracking-[-0.018em] leading-tight text-primary-token'>
         {meta.label}
       </h1>
-      <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
-        {meta.description}
-      </p>
+      <p className='mt-1.5 text-xs text-tertiary-token'>{meta.description}</p>
 
       {/* Single card per section. Rows stack inside with hairline
           dividers — no per-row card chrome. Danger keeps the same
@@ -4663,14 +4664,12 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
   tone?: 'default' | 'danger';
 }> {
   const valueText = (value: string) => (
-    <span className='text-[12.5px] text-tertiary-token tabular-nums'>
-      {value}
-    </span>
+    <span className='text-xs text-tertiary-token tabular-nums'>{value}</span>
   );
   const editBtn = (
     <button
       type='button'
-      className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+      className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
     >
       Edit
     </button>
@@ -4689,17 +4688,17 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: editBtn,
         },
         {
-          label: 'Two-factor authentication',
+          label: 'Two-factor Authentication', // ui-casing-allow: hyphenated settings label
           description: 'Required for production workspaces',
           control: (
-            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
               <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
               Enabled
             </span>
           ),
         },
         {
-          label: 'Active sessions',
+          label: 'Active Sessions',
           description: '3 devices · 1 in this browser',
           control: editBtn,
         },
@@ -4708,11 +4707,11 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
       return [
         {
           label: 'Handle',
-          description: 'jov.ie/timwhite — public artist URL',
+          description: 'jov.ie/timwhite — public artist URL', // ui-casing-allow: public URL copy
           control: valueText('@timwhite'),
         },
         {
-          label: 'Display name',
+          label: 'Display Name',
           control: valueText('Tim White'),
         },
         {
@@ -4721,7 +4720,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: editBtn,
         },
         {
-          label: 'External links',
+          label: 'External Links',
           description: '5 links · drag to reorder',
           control: editBtn,
         },
@@ -4729,7 +4728,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'workspace':
       return [
         {
-          label: 'Workspace name',
+          label: 'Workspace Name',
           control: valueText('Tim White Music'),
         },
         {
@@ -4738,7 +4737,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: editBtn,
         },
         {
-          label: 'Default release timezone',
+          label: 'Default Release Timezone',
           control: valueText('Pacific Time'),
         },
       ];
@@ -4750,14 +4749,14 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
             >
               Upgrade to Pro
             </button>
           ),
         },
         {
-          label: 'Payment method',
+          label: 'Payment Method',
           control: valueText('—'),
         },
         {
@@ -4769,22 +4768,22 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'channels':
       return [
         {
-          label: 'Spotify for Artists',
-          description: 'Auto-pitch playlists, push Canvas, sync streams',
+          label: 'Spotify For Artists',
+          description: 'Auto-pitch playlists, push Canvas, sync streams', // ui-casing-allow: feature list copy
           control: (
-            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
               <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
               Connected
             </span>
           ),
         },
         {
-          label: 'Apple Music for Artists',
+          label: 'Apple Music For Artists',
           description: 'Pull listener insights, schedule promo content',
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4796,7 +4795,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4806,12 +4805,12 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
     case 'danger':
       return [
         {
-          label: 'Reset workspace',
+          label: 'Reset Workspace',
           description: 'Wipe all releases, tracks, and tasks. Cannot undo.',
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Reset workspace
             </button>
@@ -4819,12 +4818,12 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           tone: 'danger',
         },
         {
-          label: 'Delete account',
-          description: 'Permanently delete your Jovie account. Cannot undo.',
+          label: 'Delete Account',
+          description: 'Permanently delete your Jovie account. Cannot undo.', // ui-casing-allow: destructive action copy
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Delete account
             </button>
@@ -5022,7 +5021,7 @@ function ReleaseRow({
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
+        'group/row relative grid items-center gap-3 h-13 rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         // [#] [art] [title/artist+badge fluid] [date] [right cluster: streams + DSP stack]
         drawerOpen
           ? 'grid-cols-[24px_40px_minmax(0,1fr)_auto]'
@@ -5037,7 +5036,7 @@ function ReleaseRow({
       <div className='relative grid place-items-center w-6'>
         <span
           className={cn(
-            'text-[12px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
+            'text-xs tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             (isCurrentTrack || isPlaying) && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -5086,12 +5085,12 @@ function ReleaseRow({
       {/* Title (with type badge) / artist */}
       <div className='min-w-0'>
         <div className='flex items-center gap-1.5 min-w-0'>
-          <span className='truncate text-[13px] font-caption leading-tight tracking-[-0.01em] text-primary-token'>
+          <span className='truncate text-app font-caption leading-tight tracking-tight text-primary-token'>
             {release.title}
           </span>
           <TypeBadge label={release.type} />
         </div>
-        <div className='truncate text-[11.5px] text-tertiary-token leading-tight mt-0.5'>
+        <div className='truncate text-2xs text-tertiary-token leading-tight mt-0.5'>
           <button
             type='button'
             onClick={e => {
@@ -5117,7 +5116,7 @@ function ReleaseRow({
       {/* Release date — hidden in narrow */}
       <span
         className={cn(
-          'text-[11px] text-tertiary-token tabular-nums whitespace-nowrap min-w-[68px] text-right',
+          'text-2xs text-tertiary-token tabular-nums whitespace-nowrap min-w-17 text-right',
           drawerOpen && 'hidden'
         )}
       >
@@ -5134,7 +5133,7 @@ function ReleaseRow({
         )}
         <span
           className={cn(
-            'text-[11px] text-secondary-token tabular-nums whitespace-nowrap min-w-[42px] text-right',
+            'text-2xs text-secondary-token tabular-nums whitespace-nowrap min-w-11 text-right',
             drawerOpen && 'hidden'
           )}
           title={`${release.weeklyStreams.toLocaleString()} streams this week`}
@@ -5169,7 +5168,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         trigger={
           <button
             type='button'
-            aria-label='Release actions'
+            aria-label='Release Actions'
             className={cn(
               'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
@@ -5180,10 +5179,10 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         }
       >
         <ShellDropdown.Item icon={Play} label='Play' shortcut='Space' />
-        <ShellDropdown.Item icon={ExternalLink} label='Open release' />
+        <ShellDropdown.Item icon={ExternalLink} label='Open Release' />
         <ShellDropdown.Separator />
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={Disc3} label='Move to release…' />
+          <ShellDropdown.SubTrigger icon={Disc3} label='Move To Release…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter releases…'
@@ -5194,7 +5193,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
           </ShellDropdown.SubContent>
         </ShellDropdown.Sub>
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={Users} label='Change artist…' />
+          <ShellDropdown.SubTrigger icon={Users} label='Change Artist…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter artists…'
@@ -5207,11 +5206,11 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         <ShellDropdown.Separator />
         <ShellDropdown.Item
           icon={LinkIcon}
-          label='Copy smart link'
+          label='Copy Smart Link'
           shortcut='⌘L'
         />
         <ShellDropdown.Item icon={Copy} label='Duplicate' shortcut='⌘D' />
-        <ShellDropdown.Item icon={Pin} label='Pin to top' />
+        <ShellDropdown.Item icon={Pin} label='Pin To Top' />
         <ShellDropdown.Separator />
         <ShellDropdown.Item icon={Archive} label='Archive' tone='danger' />
       </ShellDropdown>
@@ -5516,10 +5515,10 @@ const MOCK_DRAWER_LYRICS: readonly { at: number; text: string }[] = [
 
 type RangeKey = '24h' | '7d' | '30d' | '90d' | 'YTD';
 const RANGES: Array<{ key: RangeKey; label: string; days: number }> = [
-  { key: '24h', label: '24h', days: 1 },
-  { key: '7d', label: '7d', days: 7 },
-  { key: '30d', label: '30d', days: 30 },
-  { key: '90d', label: '90d', days: 90 },
+  { key: '24h', label: '24h', days: 1 }, // ui-casing-allow: compact range pill
+  { key: '7d', label: '7d', days: 7 }, // ui-casing-allow: compact range pill
+  { key: '30d', label: '30d', days: 30 }, // ui-casing-allow: compact range pill
+  { key: '90d', label: '90d', days: 90 }, // ui-casing-allow: compact range pill
   { key: 'YTD', label: 'YTD', days: 120 },
 ];
 
@@ -5615,15 +5614,15 @@ const PROVIDERS: Provider[] = [
   },
   {
     id: 'jiosaavn',
-    label: 'JioSaavn',
+    label: 'JioSaavn', // ui-casing-allow: DSP brand lockup
     group: 'streaming',
     initial: 'J',
     hue: 28,
   },
-  { id: 'kkbox', label: 'KKBox', group: 'streaming', initial: 'K', hue: 195 },
+  { id: 'kkbox', label: 'KKBox', group: 'streaming', initial: 'K', hue: 195 }, // ui-casing-allow: DSP brand lockup
   {
     id: 'netease',
-    label: 'NetEase Cloud Music',
+    label: 'NetEase Cloud Music', // ui-casing-allow: DSP brand lockup
     group: 'streaming',
     initial: 'N',
     hue: 0,
@@ -5651,7 +5650,7 @@ const PROVIDERS: Provider[] = [
   },
   {
     id: 'iheart',
-    label: 'iHeartRadio',
+    label: 'iHeartRadio', // ui-casing-allow: DSP brand lockup
     group: 'discovery',
     initial: 'I',
     hue: 330,
@@ -5681,8 +5680,8 @@ const PROVIDERS: Provider[] = [
     initial: 'B',
     hue: 50,
   },
-  { id: 'medianet', label: 'MediaNet', group: 'store', initial: 'M', hue: 215 },
-  { id: '7digital', label: '7Digital', group: 'store', initial: '7', hue: 240 },
+  { id: 'medianet', label: 'MediaNet', group: 'store', initial: 'M', hue: 215 }, // ui-casing-allow: DSP brand lockup
+  { id: '7digital', label: '7Digital', group: 'store', initial: '7', hue: 240 }, // ui-casing-allow: DSP brand lockup
   { id: 'napster', label: 'Napster', group: 'store', initial: 'N', hue: 195 },
 ];
 const PROVIDER_GROUP_LABEL: Record<ProviderGroup, string> = {
@@ -5733,16 +5732,16 @@ function DrawerDistribution({ release }: { release: Release }) {
   return (
     <div className='px-4 py-4'>
       <div className='flex items-center justify-between pb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           Providers
         </p>
-        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+        <span className='text-3xs tabular-nums text-tertiary-token'>
           {liveCount}/{rows.length} live
         </span>
       </div>
 
       {/* Search — matches the smart-link pill language. */}
-      <div className='flex items-center gap-1.5 h-7 pl-3 pr-2 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] mb-2 focus-within:border-cyan-300/40'>
+      <div className='flex items-center gap-1.5 h-7 pl-3 pr-2 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-2xs mb-2 focus-within:border-cyan-300/40'>
         <Search className='h-3 w-3 text-quaternary-token shrink-0' />
         <input
           value={filter}
@@ -5755,7 +5754,7 @@ function DrawerDistribution({ release }: { release: Release }) {
             type='button'
             onClick={() => setFilter('')}
             className='inline-flex items-center justify-center h-4 w-4 rounded text-quaternary-token hover:text-primary-token'
-            aria-label='Clear filter'
+            aria-label='Clear Filter'
           >
             <X className='h-3 w-3' strokeWidth={2.25} />
           </button>
@@ -5765,7 +5764,7 @@ function DrawerDistribution({ release }: { release: Release }) {
       {(Object.keys(grouped) as ProviderGroup[]).map(group =>
         grouped[group].length > 0 ? (
           <div key={group} className='mb-3 last:mb-0'>
-            <p className='text-[9.5px] uppercase tracking-[0.10em] text-quaternary-token/85 font-medium px-2 pt-1.5 pb-0.5'>
+            <p className='text-3xs uppercase tracking-[0.10em] text-quaternary-token/85 font-medium px-2 pt-1.5 pb-0.5'>
               {PROVIDER_GROUP_LABEL[group]}
             </p>
             <ul className='flex flex-col -mx-2'>
@@ -5773,10 +5772,10 @@ function DrawerDistribution({ release }: { release: Release }) {
                 <li key={p.id}>
                   <button
                     type='button'
-                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
+                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                   >
                     <span
-                      className='h-[16px] w-[16px] rounded grid place-items-center text-[8.5px] font-semibold text-white shrink-0'
+                      className='h-4 w-4 rounded grid place-items-center text-3xs font-semibold text-white dark:text-white shrink-0'
                       style={{
                         background:
                           p.status === 'missing'
@@ -5795,7 +5794,7 @@ function DrawerDistribution({ release }: { release: Release }) {
                           DSP_STATUS_DOT[p.status]
                         )}
                       />
-                      <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token w-[44px] text-right'>
+                      <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token w-11 text-right'>
                         {p.status}
                       </span>
                     </span>
@@ -5808,7 +5807,7 @@ function DrawerDistribution({ release }: { release: Release }) {
       )}
 
       {rows.length === 0 && (
-        <p className='text-[12px] text-quaternary-token text-center py-6'>
+        <p className='text-xs text-quaternary-token text-center py-6'>
           No providers match &ldquo;{filter}&rdquo;.
         </p>
       )}
@@ -5853,16 +5852,16 @@ function DrawerActivityTab({
           }
           meta={release.pitchReady ? 'Send' : 'Build'}
         />
-        <ActivityHoverRow icon={LinkIcon} label='Smart link' meta='Copy' />
-        <ActivityHoverRow icon={Copy} label='Duplicate release' meta='⌘D' />
+        <ActivityHoverRow icon={LinkIcon} label='Smart Link' meta='Copy' />
+        <ActivityHoverRow icon={Copy} label='Duplicate Release' meta='⌘D' />
         <ActivityHoverRow
           icon={ExternalLink}
-          label='Open public page'
+          label='Open Public Page'
           meta='Open'
         />
         <ActivityHoverRow
           icon={Archive}
-          label='Archive release'
+          label='Archive Release'
           meta=''
           danger
         />
@@ -5882,7 +5881,7 @@ function DrawerDetailsTab({ release }: { release: Release }) {
     { label: 'Album', value: release.album },
     { label: 'Type', value: release.type },
     {
-      label: 'Release date',
+      label: 'Release Date',
       value: new Date(release.releaseDate).toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -5903,7 +5902,7 @@ function DrawerDetailsTab({ release }: { release: Release }) {
   ];
   return (
     <div className='px-4 py-4'>
-      <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
+      <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
         Metadata
       </p>
       <dl className='flex flex-col -mx-2'>
@@ -6098,7 +6097,7 @@ function TracksView({
           <ColumnLabel
             field='bpm'
             label='BPM'
-            width='w-[44px]'
+            width='w-11'
             align='right'
             sortBy={sortBy}
             sortDir={sortDir}
@@ -6108,18 +6107,18 @@ function TracksView({
           <button
             type='button'
             onClick={onKeyModeToggle}
-            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
+            className='w-15 shrink-0 inline-flex items-center justify-end gap-1 text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
             title={`Switch to ${keyMode === 'normal' ? 'Camelot' : 'standard'} key notation`}
           >
             {keyMode === 'normal' ? 'Key' : 'Cam'}
           </button>
-          <span className='w-[176px] shrink-0 text-left text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+          <span className='w-44 shrink-0 text-left text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
             Waveform
           </span>
-          <span className='w-[64px] shrink-0 text-right text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+          <span className='w-16 shrink-0 text-right text-3xs uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
             Status
           </span>
-          <span className='w-10 shrink-0 text-right text-[10px] tabular-nums text-quaternary-token/70'>
+          <span className='w-10 shrink-0 text-right text-3xs tabular-nums text-quaternary-token/70'>
             {sorted.length}
           </span>
         </div>
@@ -6155,7 +6154,7 @@ function TracksView({
             />
           ))}
           {sorted.length === 0 && (
-            <li className='px-3 py-8 text-center text-[12px] text-tertiary-token'>
+            <li className='px-3 py-8 text-center text-xs text-tertiary-token'>
               No tracks match your filters.
             </li>
           )}
@@ -6217,7 +6216,7 @@ function TrackRow({
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
+        'group/row relative flex items-center gap-3 h-11 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         !isFocused && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
@@ -6226,7 +6225,7 @@ function TrackRow({
       <div className='relative w-5 shrink-0 grid place-items-center'>
         <span
           className={cn(
-            'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
+            'text-2xs tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             showPlayingBars && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -6270,11 +6269,11 @@ function TrackRow({
           surface here. */}
       <div className='flex-1 min-w-0'>
         <div className='flex items-baseline gap-2 min-w-0'>
-          <span className='truncate text-[13px] font-caption text-primary-token tracking-[-0.012em]'>
+          <span className='truncate text-app font-caption text-primary-token tracking-[-0.012em]'>
             {track.title}
           </span>
           {track.artist.includes(' & ') && (
-            <span className='truncate text-[11px] text-tertiary-token'>
+            <span className='truncate text-2xs text-tertiary-token'>
               feat. {track.artist.split(' & ').slice(1).join(' & ')}
             </span>
           )}
@@ -6282,13 +6281,13 @@ function TrackRow({
       </div>
 
       {/* BPM — heavier weight, monochrome, right-aligned */}
-      <span className='w-[44px] shrink-0 text-right text-[12.5px] tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
+      <span className='w-11 shrink-0 text-right text-xs tabular-nums font-semibold text-secondary-token tracking-tight'>
         {track.bpm}
       </span>
 
       {/* Key as a badge — quiet pill */}
-      <span className='w-[58px] shrink-0 flex justify-end'>
-        <span className='inline-flex items-center h-[18px] px-1.5 rounded text-[10.5px] font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
+      <span className='w-15 shrink-0 flex justify-end'>
+        <span className='inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
           {keyMode === 'normal' ? track.keyNormal : track.keyCamelot}
         </span>
       </span>
@@ -6297,7 +6296,7 @@ function TrackRow({
           playing/selected row's waveform pops by contrast. */}
       <div
         className={cn(
-          'w-[176px] shrink-0 transition-opacity duration-subtle ease-out',
+          'w-44 shrink-0 transition-opacity duration-subtle ease-out',
           isCurrentTrack || isFocused
             ? 'opacity-100'
             : 'opacity-60 group-hover/row:opacity-90'
@@ -6318,7 +6317,7 @@ function TrackRow({
       </div>
 
       {/* Status as a labeled chip — Live / Queued / Draft. */}
-      <div className='w-[64px] shrink-0 flex justify-end'>
+      <div className='w-16 shrink-0 flex justify-end'>
         <StatusBadge status={track.status} />
       </div>
 
@@ -6475,17 +6474,17 @@ function TasksView({
       aria-label='Tasks'
     >
       {/* List pane */}
-      <div className='w-[380px] shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
+      <div className='w-95 shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
         <div className='shrink-0 px-3 pt-3 pb-2 flex items-center gap-2'>
-          <span className='text-[12.5px] font-caption text-primary-token tracking-[-0.012em]'>
+          <span className='text-xs font-caption text-primary-token tracking-[-0.012em]'>
             All
           </span>
-          <span className='text-[11px] tabular-nums text-quaternary-token'>
+          <span className='text-2xs tabular-nums text-quaternary-token'>
             {tasks.length}
           </span>
           <button
             type='button'
-            className='ml-auto h-6 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
+            className='ml-auto h-6 px-2 rounded-md text-3xs uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
           >
             Filter
           </button>
@@ -6522,22 +6521,22 @@ function TasksView({
         ) : (
           <div className='h-full grid place-items-center px-8'>
             <div className='text-center max-w-sm'>
-              <p className='text-[13px] text-tertiary-token leading-relaxed'>
+              <p className='text-app text-tertiary-token leading-relaxed'>
                 Pick a task from the list to see what it needs.
               </p>
-              <p className='text-[11.5px] text-quaternary-token mt-2'>
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+              <p className='text-2xs text-quaternary-token mt-2'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
                   ↵
                 </kbd>
                 to open ·
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mx-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mx-1'>
                   j
                 </kbd>
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
                   k
                 </kbd>
                 to navigate ·
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums ml-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums ml-1'>
                   esc
                 </kbd>{' '}
                 to close
@@ -6602,7 +6601,7 @@ function TaskListItem({
         {/* Title — full width, no right-side icons stealing space. */}
         <span
           className={cn(
-            'truncate text-[12.5px] font-caption tracking-[-0.012em]',
+            'truncate text-xs font-caption tracking-[-0.012em]',
             task.status === 'done' || task.status === 'cancelled'
               ? 'text-tertiary-token line-through decoration-quaternary-token/50'
               : 'text-primary-token'
@@ -6661,7 +6660,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
         trigger={
           <button
             type='button'
-            aria-label='Task actions'
+            aria-label='Task Actions'
             className={cn(
               'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
@@ -6672,7 +6671,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
         }
       >
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={UserPlus} label='Assign to…' />
+          <ShellDropdown.SubTrigger icon={UserPlus} label='Assign To…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter people…'
@@ -6683,7 +6682,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
           </ShellDropdown.SubContent>
         </ShellDropdown.Sub>
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={LinkIcon} label='Link to…' />
+          <ShellDropdown.SubTrigger icon={LinkIcon} label='Link To…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter entities…'
@@ -6705,9 +6704,9 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
           </ShellDropdown.SubContent>
         </ShellDropdown.Sub>
         <ShellDropdown.Separator />
-        <ShellDropdown.Item icon={Pin} label='Pin task' />
-        <ShellDropdown.Item icon={Copy} label='Copy task ID' shortcut='⌘⇧.' />
-        <ShellDropdown.Item icon={LinkIcon} label='Copy link' shortcut='⌘L' />
+        <ShellDropdown.Item icon={Pin} label='Pin Task' />
+        <ShellDropdown.Item icon={Copy} label='Copy Task ID' shortcut='⌘⇧.' />
+        <ShellDropdown.Item icon={LinkIcon} label='Copy Link' shortcut='⌘L' />
         <ShellDropdown.Separator />
         <ShellDropdown.Item icon={Archive} label='Archive' />
         <ShellDropdown.Item icon={Trash2} label='Delete' tone='danger' />
@@ -6728,7 +6727,7 @@ function TaskDetail({
     : null;
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12'>
-      <h1 className='text-[26px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
+      <h1 className='text-2xl font-display tracking-tighter text-primary-token leading-tight'>
         {onOpenRelease
           ? renderWithEntities(task.title, RELEASES, onOpenRelease)
           : task.title}
@@ -6783,14 +6782,14 @@ function TaskDetail({
       </div>
 
       {task.description && (
-        <p className='mt-6 text-[14px] leading-[1.55] text-secondary-token max-w-prose'>
+        <p className='mt-6 text-sm leading-[1.55] text-secondary-token max-w-prose'>
           {onOpenRelease
             ? renderWithEntities(task.description, RELEASES, onOpenRelease)
             : task.description}
         </p>
       )}
 
-      <div className='mt-8 border-t border-(--linear-app-shell-border)/50 pt-4 text-[11.5px] text-quaternary-token'>
+      <div className='mt-8 border-t border-(--linear-app-shell-border)/50 pt-4 text-2xs text-quaternary-token'>
         Updated {relativeDate(task.updatedIso)}
       </div>
     </article>

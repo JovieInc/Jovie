@@ -7,6 +7,7 @@ import { isPressPhotoSchemaUnavailableError } from '@/lib/db/queries/press-photo
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { buildSeoFilename } from '@/lib/images/config';
 import { avatarUploadLimiter } from '@/lib/rate-limit';
@@ -327,10 +328,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Early check for blob token in production
-  if (
-    process.env.NODE_ENV === 'production' &&
-    !process.env.BLOB_READ_WRITE_TOKEN
-  ) {
+  if (env.NODE_ENV === 'production' && !env.BLOB_READ_WRITE_TOKEN) {
     logger.error('BLOB_READ_WRITE_TOKEN is not configured');
     return errorResponse(
       'Image upload is temporarily unavailable. Please try again later.',

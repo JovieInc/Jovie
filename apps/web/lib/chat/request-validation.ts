@@ -82,6 +82,45 @@ export function validateMessage(message: unknown): string | null {
   return null;
 }
 
+function measureChatRequestBodyBytes(
+  messages: readonly UIMessage[],
+  staticBody: Record<string, unknown>
+): number {
+  try {
+    return new TextEncoder().encode(JSON.stringify({ ...staticBody, messages }))
+      .byteLength;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+/**
+ * Trim chat messages so the serialized POST body stays within server limits.
+ * Drops oldest messages first while preserving the most recent turn.
+ */
+export function trimMessagesForChatRequest(
+  messages: readonly UIMessage[],
+  staticBody: Record<string, unknown>
+): UIMessage[] {
+  if (messages.length === 0) {
+    return [];
+  }
+
+  let trimmed = [...messages];
+  while (
+    trimmed.length > 1 &&
+    measureChatRequestBodyBytes(trimmed, staticBody) > MAX_CHAT_BODY_SIZE
+  ) {
+    trimmed = trimmed.slice(1);
+  }
+
+  if (trimmed.length > MAX_MESSAGES_PER_REQUEST) {
+    trimmed = trimmed.slice(-MAX_MESSAGES_PER_REQUEST);
+  }
+
+  return trimmed;
+}
+
 export function validateMessagesArray(messages: unknown): string | null {
   if (!Array.isArray(messages)) {
     return 'Messages must be an array';

@@ -183,7 +183,67 @@ describe('sitemap', () => {
       expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
     }
 
+    for (const entry of entries) {
+      expect(
+        entry.lastModified,
+        `${entry.url} must include lastModified for sitemap <lastmod>`
+      ).toBeDefined();
+    }
+
+    expect(entries.length).toBeGreaterThan(0);
     expect(selectMock).toHaveBeenCalledTimes(4);
     expect(queryMock).toHaveBeenCalled();
+  });
+
+  it('every sitemap entry has a lastModified date (SEO ratchet #11044)', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        { username: 'artist', updatedAt: new Date('2026-01-01') },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const entries = await sitemap();
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(
+        entry.lastModified,
+        `sitemap entry "${entry.url}" is missing lastModified`
+      ).toBeDefined();
+      expect(entry.lastModified).toBeInstanceOf(Date);
+    }
+  });
+
+  it('is non-empty (at minimum static marketing pages are included)', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const entries = await sitemap();
+
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.map(e => e.url)).toContain('https://jov.ie');
+  });
+
+  it('returns a non-empty sitemap where every entry has lastModified', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock.mockResolvedValue([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const entries = await sitemap();
+
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(entry.url).toMatch(/^https:\/\/jov\.ie/);
+      expect(entry.lastModified).toBeInstanceOf(Date);
+    }
   });
 });

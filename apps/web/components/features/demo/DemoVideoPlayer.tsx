@@ -54,7 +54,7 @@ export function DemoVideoPlayer({
     <BrowserFrame>
       {state !== 'error' && (
         <div
-          className='relative aspect-[1280/720] w-full overflow-hidden bg-black'
+          className='relative aspect-[1280/720] w-full overflow-hidden bg-black dark:bg-black'
           data-testid='demo-video-visual'
         >
           {posterUrl ? (
@@ -95,8 +95,8 @@ export function DemoVideoPlayer({
           {shouldShowPlayButton ? (
             <button
               type='button'
-              aria-label='Play Jovie demo video'
-              className='absolute left-1/2 top-1/2 z-20 inline-flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-2xl shadow-black/40 transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              aria-label='Play Jovie Demo Video'
+              className='absolute left-1/2 top-1/2 z-20 inline-flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white dark:bg-surface-1 text-black dark:text-white shadow-2xl shadow-black/40 transition-colors hover:bg-white dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black'
               onClick={handlePlay}
             >
               <Play aria-hidden='true' className='ml-1 size-7 fill-current' />

@@ -310,7 +310,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   <SelectTrigger className='h-8 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app'>
                     <SelectValue>{roleLabel}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
+                  <SelectContent className='rounded-lg border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
                     {CONTACT_ROLE_OPTIONS.map(option => (
                       <SelectItem
                         key={option.value}
@@ -383,7 +383,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                           {getPreferredChannelLabel(contact.preferredChannel)}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
+                      <SelectContent className='rounded-lg border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
                         <SelectItem value='email'>Email</SelectItem>
                         <SelectItem value='phone'>Phone</SelectItem>
                       </SelectContent>

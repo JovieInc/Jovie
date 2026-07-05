@@ -1,5 +1,8 @@
 import { cn } from '@/lib/utils';
-import { ShellMetadataChip } from './ShellMetadataChip';
+import {
+  ShellMetadataChip,
+  type ShellMetadataChipTone,
+} from './ShellMetadataChip';
 
 export interface DueChipProps {
   /** ISO timestamp of the due date. */
@@ -17,6 +20,17 @@ export interface DueChipProps {
 }
 
 const MS_PER_DAY = 86_400_000;
+/** Overdue tasks older than this read as stale metadata, not urgent red. */
+const STALE_OVERDUE_DAYS = 7;
+
+function resolveDueTone(days: number, muted: boolean): ShellMetadataChipTone {
+  if (muted) return 'muted';
+  if (days < 0) {
+    return Math.abs(days) <= STALE_OVERDUE_DAYS ? 'danger' : 'muted';
+  }
+  if (days <= 2) return 'warning';
+  return 'neutral';
+}
 
 function formatDueLabel(days: number): string {
   if (days === 0) return 'Due today';
@@ -62,11 +76,9 @@ export function DueChip({ dueIso, now, muted, className }: DueChipProps) {
   const reference = (now ?? new Date()).getTime();
   const days = Math.round((due - reference) / MS_PER_DAY);
   const label = formatDueLabel(days);
-  const soon = !muted && days >= 0 && days <= 2;
-  const overdue = !muted && days < 0;
   return (
     <ShellMetadataChip
-      tone={muted ? 'muted' : overdue ? 'danger' : soon ? 'warning' : 'neutral'}
+      tone={resolveDueTone(days, Boolean(muted))}
       className={cn('tabular-nums', className)}
       contentClassName='uppercase tracking-[0.04em]'
       title={new Date(due).toLocaleDateString()}

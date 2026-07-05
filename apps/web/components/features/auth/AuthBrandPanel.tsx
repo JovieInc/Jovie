@@ -17,8 +17,9 @@ export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
         // App-shell content surface elevation (matches `--linear-bg-surface-0`
         // = `--linear-app-content-surface` in Linear dark mode). 12px radius
         // matches the app shell frame so this reads as an extension of the
-        // shell. Hex-pinned because auth is dark regardless of root theme.
-        'auth-showcase-panel relative flex h-full min-h-[34rem] flex-col overflow-hidden rounded-[12px] bg-[#0a0b0e] text-white',
+        // shell. Tooltip tokens stay dark in both root themes because auth
+        // is dark regardless of root theme.
+        'auth-showcase-panel relative flex h-full min-h-[34rem] flex-col overflow-hidden rounded-xl bg-(--color-bg-tooltip) text-(--color-text-tooltip)',
         'border border-white/[0.05]',
         'lg:min-h-[calc(100svh-1rem)]',
         className
@@ -32,7 +33,7 @@ export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
 function AuthBrandFrame() {
   return (
     <section
-      aria-label='Product preview'
+      aria-label='Product Preview'
       className='absolute inset-0 flex flex-col'
     >
       {/* Spacer above the floating screenshot. */}
@@ -52,8 +53,8 @@ function AuthBrandFrame() {
       <div className='min-h-0 flex-1' />
 
       <div className='relative z-10 px-8 pb-4 sm:px-10'>
-        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'>
-          Built for Artists.
+        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
+          Built For Artists.
         </h2>
       </div>
     </section>

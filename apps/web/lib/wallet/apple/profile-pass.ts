@@ -25,7 +25,6 @@ import {
 } from '@/lib/db/schema/wallet';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   downloadImage,
@@ -104,7 +103,7 @@ export function isAppleWalletConfigured(): boolean {
 }
 
 export async function isAppleWalletProfilePassAvailable(
-  userId: string | null,
+  _userId: string | null,
   profile: AppleWalletProfile | null
 ): Promise<boolean> {
   if (!profile) return false;
@@ -121,7 +120,7 @@ export async function isAppleWalletProfilePassAvailable(
     return false;
   }
 
-  return getAppFlagValue('APPLE_WALLET_PROFILE_PASS', { userId });
+  return true;
 }
 
 function buildAuthenticationToken(

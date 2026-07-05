@@ -24,6 +24,7 @@ export const HERMES_PATHS = {
   heavyJobLock: join(HERMES_HOME, 'state', 'heavy-job.lock'),
   modelRankings: join(HERMES_HOME, 'state', 'model-router-rankings.json'),
   linearQueue: join(HERMES_HOME, 'state', 'linear-queue.jsonl'),
+  trackerQueue: join(HERMES_HOME, 'state', 'tracker-queue.jsonl'),
   telegramChatId: join(HERMES_HOME, 'state', 'telegram-chat-id'),
 } as const;
 

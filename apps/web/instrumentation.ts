@@ -11,6 +11,31 @@ type SentryModule = {
 
 let sentryModulePromise: Promise<SentryModule> | null = null;
 
+function isSecureVercelDeployment(): boolean {
+  return (
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.VERCEL_ENV === 'production'
+  );
+}
+
+function isLocalTestRuntime(): boolean {
+  if (isSecureVercelDeployment()) {
+    return false;
+  }
+
+  return (
+    process.env.NODE_ENV === 'test' || process.env.NEXT_PUBLIC_E2E_MODE === '1'
+  );
+}
+
+export function shouldSkipServerObservability(): boolean {
+  if (process.env.CI === 'true') return true;
+
+  const isLocalRuntime =
+    process.env.NODE_ENV === 'development' || isLocalTestRuntime();
+  return isLocalRuntime && process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
+}
+
 function loadSentry(): Promise<SentryModule> {
   if (!sentryModulePromise) {
     sentryModulePromise = import('@sentry/nextjs').then(module => ({
@@ -150,42 +175,23 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // Agnost AI analytics (Vercel AI SDK spans via OpenTelemetry).
-    // Lazy import keeps OTel out of Edge bundles; init failure must not block boot.
-    try {
-      const { initAgnostTelemetry } = await import(
-        '@/lib/observability/agnost'
-      );
-      await initAgnostTelemetry();
-    } catch (error) {
-      console.warn('[STARTUP] Agnost telemetry bootstrap failed:', error);
-    }
-
-    // Braintrust observability. Lazy dynamic import keeps the SDK out of the
-    // Edge bundle; the webpack-loader (next.config.js) handles foreign-module
-    // span propagation. Init failure must not block app boot.
-    if (process.env.BRAINTRUST_API_KEY) {
+    if (!isLocalTestRuntime() && process.env.CI !== 'true') {
+      // Agnost AI analytics (Vercel AI SDK spans via OpenTelemetry).
+      // Lazy import keeps OTel out of Edge bundles; init failure must not block boot.
       try {
-        const { initLogger } = await import('braintrust');
-        initLogger({
-          projectName: 'Jovie',
-          apiKey: process.env.BRAINTRUST_API_KEY,
-        });
+        const { initAgnostTelemetry } = await import(
+          '@/lib/observability/agnost'
+        );
+        await initAgnostTelemetry();
       } catch (error) {
-        console.warn('[STARTUP] Braintrust initLogger failed:', error);
+        console.warn('[STARTUP] Agnost telemetry bootstrap failed:', error);
       }
     }
 
     // Skip Sentry server SDK and startup validation in local/dev and CI.
     // CI public-route jobs boot production builds for smoke/a11y/Lighthouse, and
     // the server SDK adds no signal there while increasing startup fragility.
-    const isDev = process.env.NODE_ENV === 'development';
-    const isCi = process.env.CI === 'true';
-    const shouldSkipLocalSentry =
-      isDev && process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
-    const shouldSkipServerInstrumentation = shouldSkipLocalSentry || isCi;
-
-    if (!shouldSkipServerInstrumentation) {
+    if (!shouldSkipServerObservability()) {
       const Sentry = await loadSentry();
       await import('./sentry.server.config');
       // Run environment validation at startup to detect issues early
@@ -276,23 +282,14 @@ export async function register() {
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {
-    const isCi = process.env.CI === 'true';
-    const shouldSkipLocalSentry =
-      process.env.NODE_ENV === 'development' &&
-      process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
-    if (!shouldSkipLocalSentry && !isCi) {
+    if (!shouldSkipServerObservability()) {
       await import('./sentry.edge.config');
     }
   }
 }
 
 export async function onRequestError(...args: unknown[]) {
-  const isDev = process.env.NODE_ENV === 'development';
-  const isCi = process.env.CI === 'true';
-  const shouldSkipLocalSentry =
-    isDev && process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
-
-  if (shouldSkipLocalSentry || isCi) {
+  if (shouldSkipServerObservability()) {
     return;
   }
 

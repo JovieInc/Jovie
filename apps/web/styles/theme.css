@@ -115,7 +115,9 @@
 }
 
 .jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) [data-clerk-captcha],
-.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) #clerk-captcha {
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) #clerk-captcha,
+[data-auth-shell] #clerk-captcha,
+[data-auth-shell-mode] #clerk-captcha {
   display: none;
 }
 

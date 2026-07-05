@@ -5,6 +5,8 @@ struct AppConfiguration: Sendable {
   let apiBaseURL: URL
   let webBaseURL: URL
   let sentryDSN: String?
+  let observabilityIngestURL: URL?
+  let observabilityIngestSecret: String?
   let observabilityEnvironment: String
   // Clerk redirect config for iOS native SDK (gh-9806 / JOV-2652).
   // Must match allowed redirect URLs registered in Clerk dashboard for the
@@ -17,6 +19,8 @@ struct AppConfiguration: Sendable {
     apiBaseURL: URL(string: "http://localhost:3100")!,
     webBaseURL: URL(string: "https://jov.ie")!,
     sentryDSN: nil,
+    observabilityIngestURL: nil,
+    observabilityIngestSecret: nil,
     observabilityEnvironment: "test",
     clerkRedirectUrl: "ie.jov.jovie://callback",
     clerkCallbackUrlScheme: "ie.jov.jovie"
@@ -104,6 +108,20 @@ struct AppConfiguration: Sendable {
         "SENTRY_ENVIRONMENT",
       ]
     ) ?? "development"
+    let observabilityIngestURL = optionalStringValue(
+      key: "ObservabilityIngestUrl",
+      envKeys: [
+        "JOVIE_IOS_OBSERVABILITY_INGEST_URL",
+        "OBSERVABILITY_INGEST_URL",
+      ]
+    ).flatMap(URL.init(string:))
+    let observabilityIngestSecret = optionalStringValue(
+      key: "ObservabilityIngestSecret",
+      envKeys: [
+        "JOVIE_IOS_OBSERVABILITY_INGEST_SECRET",
+        "OBSERVABILITY_INGEST_SECRET",
+      ]
+    )
 
     // Clerk iOS redirect config (HOT ZONE gh-9806/JOV-2652): explicit, env-driven
     // so each Clerk instance (dev/staging/prod) can have its matching allowed
@@ -124,6 +142,8 @@ struct AppConfiguration: Sendable {
       apiBaseURL: apiBaseURL,
       webBaseURL: webBaseURL,
       sentryDSN: sentryDSN,
+      observabilityIngestURL: observabilityIngestURL,
+      observabilityIngestSecret: observabilityIngestSecret,
       observabilityEnvironment: observabilityEnvironment,
       clerkRedirectUrl: clerkRedirectUrl,
       clerkCallbackUrlScheme: clerkCallbackUrlScheme

@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
-import { isEnabled } from '@/lib/feature-flags';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
 export type AppShellFrameVariant = 'legacy' | 'shellChatV1';
@@ -18,6 +18,8 @@ interface AppShellFrameProps {
   readonly contentClassName?: string;
   readonly containerClassName?: string;
   readonly variant?: AppShellFrameVariant;
+  /** When true (desktop), sidebar dims and right rail slides partially off-screen. */
+  readonly composerFocusActive?: boolean;
 }
 
 /**
@@ -42,6 +44,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   // DemoShell, future surfaces) match the current production state. AuthShell
   // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
   variant = 'legacy',
+  composerFocusActive = false,
 }: Readonly<AppShellFrameProps>) {
   const isShellChatV1 = variant === 'shellChatV1';
 
@@ -49,6 +52,7 @@ export const AppShellFrame = memo(function AppShellFrame({
     <div
       data-app-shell-frame='true'
       data-shell-design={variant}
+      data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
         'relative flex h-full w-full flex-col overflow-hidden',
         isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
@@ -66,18 +70,23 @@ export const AppShellFrame = memo(function AppShellFrame({
             'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
         )}
       >
-        {sidebar}
+        <div
+          data-testid='app-shell-sidebar-mount'
+          className='transition-opacity duration-cinematic ease-cinematic motion-reduce:transition-none'
+        >
+          {sidebar}
+        </div>
 
         <main
           id='main-content'
           className={cn(
             'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
             isShellChatV1
-              ? 'lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'
+              ? 'lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'
               : 'lg:border-l lg:border-subtle'
           )}
         >
-          {isEnabled('CANVAS_GRAIN') && <CanvasGrain />}
+          {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
           {header}
           <div
             className={cn(

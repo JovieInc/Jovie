@@ -21,7 +21,7 @@ export function HomeStatQuoteSection({
 }: HomeStatQuoteSectionProps = {}) {
   const id = 'sq-purple';
   return (
-    <section className='relative overflow-hidden bg-black px-6 py-32 sm:py-40'>
+    <section className='relative overflow-hidden bg-black dark:bg-black px-6 py-32 sm:py-40'>
       <svg
         viewBox='0 0 1400 600'
         preserveAspectRatio='xMidYMid slice'
@@ -46,12 +46,12 @@ export function HomeStatQuoteSection({
           />
         ))}
       </svg>
-      <div className='relative mx-auto max-w-[1200px] text-left'>
-        <h3 className='m-0 max-w-[22ch] font-[var(--marketing-font-display)] text-[clamp(1.875rem,4vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.025em] text-[#F7F8F8]'>
+      <div className='relative mx-auto max-w-300 text-left'>
+        <h3 className='m-0 max-w-[22ch] font-[var(--marketing-font-display)] text-[clamp(1.875rem,4vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.025em] text-primary-token'>
           <span>Jovie delivers {stat}</span>
-          <span className='text-[#8A8F98]'> {body}</span>
+          <span className='text-tertiary-token'> {body}</span>
         </h3>
-        <div className='mt-7 font-[var(--marketing-font-body)] text-sm italic text-[#8A8F98]'>
+        <div className='mt-7 font-[var(--marketing-font-body)] text-sm italic text-tertiary-token'>
           {source}
         </div>
       </div>

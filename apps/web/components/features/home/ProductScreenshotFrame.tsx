@@ -122,14 +122,14 @@ export function ProductScreenshotFrame({
       {chrome === 'window' ? (
         <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
           <div className='flex gap-2' aria-hidden='true'>
-            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
-            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
-            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
+            <div className='h-3 w-3 rounded-full border border-black/10 bg-(--color-accent-red)' />
+            <div className='h-3 w-3 rounded-full border border-black/10 bg-(--color-accent-orange)' />
+            <div className='h-3 w-3 rounded-full border border-black/10 bg-(--color-accent-green)' />
           </div>
           <div className='flex-1 text-center text-xs text-tertiary-token'>
             {title}
           </div>
-          <div className='w-[52px]' />
+          <div className='w-13' />
         </div>
       ) : null}
 

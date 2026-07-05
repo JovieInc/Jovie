@@ -73,7 +73,7 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
           strokeLinecap='round'
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className='text-accent transition-[stroke-dashoffset,color] duration-500 group-hover:text-accent-hover'
+          className='text-accent transition-[stroke-dashoffset,color] duration-cinematic group-hover:text-accent-hover'
         />
       </svg>
       <span className='max-sm:hidden sm:inline text-2xs text-secondary-token'>

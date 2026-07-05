@@ -6,12 +6,15 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
+  Shirt,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { MerchPricingPresetPicker } from '@/components/molecules/MerchPricingPresetPicker';
 import { MerchPricingSummary } from '@/components/molecules/MerchPricingSummary';
+import { accentVar } from '@/components/organisms/entity-card/kind-presets';
+import type { EntityAccent } from '@/components/organisms/entity-card/types';
 import {
   hasRenderableMockup,
   isInternalMerchMockupUrl,
@@ -23,6 +26,17 @@ import { MERCH_DEFAULT_MARGIN_PRESET } from '@/lib/merch/pricing';
 import { cn } from '@/lib/utils';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 import { ChatMerchActionCard } from './ChatMerchActionCard';
+
+// Rotate the studio ambient-glow accent across generated options so the bento
+// grid reads as one card family with the public-profile EntityCard.
+const OPTION_ACCENTS: readonly EntityAccent[] = [
+  'purple',
+  'blue',
+  'green',
+  'orange',
+  'pink',
+  'teal',
+];
 
 interface MerchGenerationOption {
   readonly id: string;
@@ -125,6 +139,10 @@ function optionPrompt(
   return `${action} merch option ${option.option_number} from generation ${generationId}.`;
 }
 
+function alternativeItemPrompt(merchCardId: string, itemType: string): string {
+  return `Create a ${itemType} version of merch card ${merchCardId} with the same design.`;
+}
+
 function MerchOptionPricing({
   recommendation,
 }: {
@@ -198,25 +216,34 @@ export function ChatMerchOptionsCard({
     <ChatGenerationArtifactSurface
       title='Merch Options'
       subtitle={result.nextStep ?? 'Pick one to save it to Library'}
-      className='max-w-[640px]'
+      className='max-w-160'
     >
       <div className='grid gap-2.5 md:grid-cols-3'>
         {result.options.map(option => {
           const mockupUrls = option.mockup_urls ?? [];
           const imageUrl = selectPreferredMockupUrl(mockupUrls);
+          const productLabel =
+            option.printful_product_name ?? option.product_type;
           const mockupPending =
             hasRenderableMockup(mockupUrls) &&
             mockupUrls.every(url => isInternalMerchMockupUrl(url)) &&
             !mockupUrls.some(isPrintfulMockupUrl);
           const sellable = option.sellability?.sellable ?? true;
           const blockedReasons = option.sellability?.reasons ?? [];
+          const accent =
+            OPTION_ACCENTS[(option.option_number - 1) % OPTION_ACCENTS.length];
           return (
             <article
               key={option.id}
               data-testid='chat-merch-option-card'
-              className='min-w-0 overflow-hidden rounded-lg border border-subtle bg-surface-0 shadow-sm'
+              className='flex min-w-0 flex-col gap-2.5 rounded-[16px] border border-subtle bg-surface-1 p-2.5 shadow-card'
             >
-              <div className='relative aspect-square bg-surface-1'>
+              <div
+                className='relative aspect-square overflow-hidden rounded-[12px] border border-subtle'
+                style={{
+                  background: `radial-gradient(120% 120% at 32% 22%, color-mix(in oklab, ${accentVar(accent)} 22%, transparent), transparent 62%), linear-gradient(155deg, var(--color-bg-surface-2), var(--color-bg-surface-1))`,
+                }}
+              >
                 {imageUrl ? (
                   <Image
                     src={imageUrl}
@@ -235,34 +262,34 @@ export function ChatMerchOptionsCard({
                       className='h-7 w-7 animate-spin'
                       strokeWidth={1.8}
                     />
-                    <span className='text-[10.5px] font-medium'>
+                    <span className='text-3xs font-medium'>
                       Rendering mockup
                     </span>
                   </div>
                 )}
                 {mockupPending ? (
-                  <div className='absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/45 px-2 py-1.5 text-[10px] font-medium text-white backdrop-blur'>
+                  <div className='absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/45 px-2 py-1.5 text-3xs font-medium text-white dark:text-white backdrop-blur'>
                     <Loader2 className='h-3 w-3 animate-spin' strokeWidth={2} />
                     Photorealistic preview pending
                   </div>
                 ) : null}
                 <div className='absolute left-2 top-2'>
-                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-medium text-white backdrop-blur'>
+                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-3xs font-medium text-white dark:text-white backdrop-blur'>
                     Option {option.option_number}
                   </span>
                 </div>
               </div>
-              <div className='space-y-2 p-2.5'>
+              <div className='flex flex-1 flex-col gap-2'>
                 <div className='min-w-0'>
-                  <h3 className='truncate text-[13px] font-semibold text-primary-token'>
+                  <h3 className='truncate text-app font-semibold text-primary-token'>
                     {option.design_name}
                   </h3>
-                  <p className='mt-0.5 truncate text-[11px] text-tertiary-token'>
-                    {option.product_type}
+                  <p className='mt-0.5 truncate text-2xs text-tertiary-token'>
+                    {productLabel}
                     {option.colorway ? ` - ${option.colorway}` : ''}
                   </p>
                 </div>
-                <p className='line-clamp-3 min-h-[54px] text-[11.5px] leading-[18px] text-secondary-token'>
+                <p className='line-clamp-3 min-h-14 text-2xs leading-[18px] text-secondary-token'>
                   {option.concept}
                 </p>
                 <MerchOptionPricing
@@ -287,7 +314,7 @@ export function ChatMerchOptionsCard({
                   </Button>
                 </div>
                 {blockedReasons.length ? (
-                  <p className='flex min-h-8 items-start gap-1.5 text-[10.5px] leading-4 text-tertiary-token'>
+                  <p className='flex min-h-8 items-start gap-1.5 text-3xs leading-4 text-tertiary-token'>
                     <AlertTriangle className='mt-0.5 h-3 w-3 shrink-0' />
                     <span className='line-clamp-2'>
                       {blockedReasons.join(' ')}
@@ -313,6 +340,12 @@ export function ChatMerchSelectionCard({
   const statusLabel =
     result.status.slice(0, 1).toUpperCase() + result.status.slice(1);
   const blockedReasons = result.publishBlockedReasons ?? [];
+  const handleAlternativeItem = useCallback(
+    (itemType: string) => {
+      submitMerchPrompt(alternativeItemPrompt(result.merchCardId, itemType));
+    },
+    [result.merchCardId]
+  );
 
   return (
     <ChatGenerationArtifactSurface
@@ -327,16 +360,16 @@ export function ChatMerchSelectionCard({
           <CheckCircle2 className='h-4 w-4' strokeWidth={2.25} />
         </span>
         <div className='min-w-0 flex-1'>
-          <p className='text-[13px] font-semibold text-primary-token'>
+          <p className='text-app font-semibold text-primary-token'>
             Merch card created
           </p>
-          <p className='mt-0.5 text-[12px] leading-5 text-secondary-token'>
+          <p className='mt-0.5 text-xs leading-5 text-secondary-token'>
             {blockedReasons.length
               ? `${statusLabel} card is in Library as a draft until Printful and pricing checks pass.`
               : `${statusLabel} card is now available in Library.`}
           </p>
           {blockedReasons.length ? (
-            <p className='mt-1.5 line-clamp-2 text-[11px] leading-4 text-tertiary-token'>
+            <p className='mt-1.5 line-clamp-2 text-2xs leading-4 text-tertiary-token'>
               {blockedReasons.join(' ')}
             </p>
           ) : null}
@@ -364,6 +397,26 @@ export function ChatMerchSelectionCard({
                 <ExternalLink className='h-3 w-3' />
               </a>
             ) : null}
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              className='h-8 gap-1.5'
+              onClick={() => handleAlternativeItem('hoodie')}
+            >
+              <Shirt className='h-3 w-3' />
+              Hoodie
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              className='h-8 gap-1.5'
+              onClick={() => handleAlternativeItem('hat')}
+            >
+              <Shirt className='h-3 w-3' />
+              Hat
+            </Button>
           </div>
         </div>
       </div>

@@ -86,6 +86,46 @@ describe('handleMigrationErrors', () => {
     );
   });
 
+  it('returns fallback for creator_distribution_events migration errors', async () => {
+    const { handleMigrationErrors } = await import(
+      '@/lib/migrations/handleMigrationErrors'
+    );
+
+    const result = handleMigrationErrors(
+      {
+        code: '42P01',
+        message: 'relation "creator_distribution_events" does not exist',
+      },
+      { userId: 'profile_123', operation: 'creator_distribution_events' }
+    );
+
+    expect(result).toEqual({ shouldRetry: false, fallbackData: [] });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] creator_distribution_events migration in progress; treating as no activation events',
+      { userId: 'profile_123', operation: 'creator_distribution_events' }
+    );
+  });
+
+  it('returns fallback for creator_distribution_events failed query errors without postgres code', async () => {
+    const { handleMigrationErrors } = await import(
+      '@/lib/migrations/handleMigrationErrors'
+    );
+
+    const result = handleMigrationErrors(
+      {
+        message:
+          'Failed query: select "created_at", "event_type" from "creator_distribution_events" where ("creator_distribution_events"."creator_profile_id" = $1',
+      },
+      { userId: 'profile_123', operation: 'creator_distribution_events' }
+    );
+
+    expect(result).toEqual({ shouldRetry: false, fallbackData: [] });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] creator_distribution_events migration in progress; treating as no activation events',
+      { userId: 'profile_123', operation: 'creator_distribution_events' }
+    );
+  });
+
   it('returns fallback for social_links migration errors', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'

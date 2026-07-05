@@ -1,9 +1,11 @@
+import type { UIMessage } from 'ai';
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import {
   MAX_CHAT_BODY_SIZE,
   MAX_PARTS_PER_MESSAGE,
   parseChatRequestBody,
+  trimMessagesForChatRequest,
   validateMessagesArray,
 } from '@/lib/chat/request-validation';
 
@@ -65,6 +67,78 @@ describe('parseChatRequestBody', () => {
     expect(result.response.status).toBe(400);
     const payload = await result.response.json();
     expect(payload.error).toContain('Too many message parts');
+  });
+});
+
+describe('trimMessagesForChatRequest', () => {
+  const staticBody = {
+    profileId: '550e8400-e29b-41d4-a716-446655440000',
+    conversationId: '660e8400-e29b-41d4-a716-446655440001',
+  };
+
+  function userMessage(id: string, text: string): UIMessage {
+    return {
+      id,
+      role: 'user',
+      parts: [{ type: 'text', text }],
+    };
+  }
+
+  it('keeps all messages when the body is within the limit', () => {
+    const messages = [userMessage('m1', 'hello'), userMessage('m2', 'world')];
+    expect(trimMessagesForChatRequest(messages, staticBody)).toEqual(messages);
+  });
+
+  it('drops oldest messages until the serialized body fits', () => {
+    const largeText = 'x'.repeat(8_000);
+    const messages = Array.from({ length: 40 }, (_, index) =>
+      userMessage(`m${index}`, `${largeText}-${index}`)
+    );
+
+    const trimmed = trimMessagesForChatRequest(messages, staticBody);
+    const serialized = JSON.stringify({
+      ...staticBody,
+      messages: trimmed,
+    });
+
+    expect(trimmed.length).toBeGreaterThan(0);
+    expect(trimmed.length).toBeLessThan(messages.length);
+    expect(new TextEncoder().encode(serialized).byteLength).toBeLessThanOrEqual(
+      MAX_CHAT_BODY_SIZE
+    );
+    expect(trimmed.at(-1)?.id).toBe('m39');
+  });
+
+  it('preserves blob URL file parts when the body is within the limit', () => {
+    const blobUrl =
+      'https://example.blob.vercel-storage.com/chat-image-abc123.jpg';
+    const messages: UIMessage[] = [
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [
+          { type: 'text', text: 'Here is the cover art' },
+          {
+            type: 'file',
+            mediaType: 'image/jpeg',
+            url: blobUrl,
+          },
+        ],
+      },
+    ];
+
+    const trimmed = trimMessagesForChatRequest(messages, staticBody);
+    expect(trimmed).toEqual(messages);
+
+    const serialized = JSON.stringify({
+      ...staticBody,
+      messages: trimmed,
+    });
+
+    expect(serialized.includes(blobUrl)).toBe(true);
+    expect(new TextEncoder().encode(serialized).byteLength).toBeLessThan(
+      MAX_CHAT_BODY_SIZE
+    );
   });
 });
 

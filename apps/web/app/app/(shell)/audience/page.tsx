@@ -2,9 +2,9 @@ import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { DashboardAudienceClient } from '@/features/dashboard/organisms/DashboardAudienceClient';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
+import { LazyDashboardAudienceClient } from '@/features/dashboard/organisms/LazyDashboardAudienceClient';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
@@ -114,7 +114,7 @@ async function AudienceContent({
     );
 
     return (
-      <DashboardAudienceClient
+      <LazyDashboardAudienceClient
         mode={audienceData.mode}
         view={audienceData.view}
         initialRows={audienceData.rows}

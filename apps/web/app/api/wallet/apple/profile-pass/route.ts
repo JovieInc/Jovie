@@ -4,7 +4,6 @@ import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { captureError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   AppleWalletConfigError,
@@ -30,16 +29,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const enabled = await getAppFlagValue('APPLE_WALLET_PROFILE_PASS', {
-      userId,
-    });
-    if (!enabled) {
-      return NextResponse.json(
-        { error: 'Not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
     if (!isAppleWalletConfigured()) {
       return NextResponse.json(
         { error: 'Apple Wallet profile passes are not configured' },

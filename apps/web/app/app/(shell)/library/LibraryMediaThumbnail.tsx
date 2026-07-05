@@ -8,9 +8,11 @@ import {
 } from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
 import { cn } from '@/lib/utils';
+import { LibraryArtworkHoverZoom } from './LibraryArtworkHoverZoom';
 import { LibraryAudioWaveformThumbnail } from './LibraryAudioWaveformThumbnail';
 import { LibraryVideoScrubThumbnail } from './LibraryVideoScrubThumbnail';
 import type { LibraryReleaseAsset } from './library-data';
+import { getLibraryItemKind } from './library-data';
 import { scrubRatioFromPointer } from './library-thumbnail-utils';
 
 export type LibraryThumbnailSize = 'card' | 'row' | 'drawer';
@@ -71,9 +73,15 @@ export function LibraryMediaThumbnail({
   const [isHovering, setIsHovering] = useState(false);
   const [scrubRatio, setScrubRatio] = useState(0);
   const compact = size === 'row';
+  const itemKind = getLibraryItemKind(asset);
   const showVideoScrub = Boolean(asset.videoUrl);
   const showAudioScrub = Boolean(asset.previewUrl) && !showVideoScrub;
   const hasScrubPreview = showVideoScrub || showAudioScrub;
+  const showArtworkHoverZoom =
+    !hasScrubPreview &&
+    Boolean(asset.artworkUrl) &&
+    (itemKind === 'image' || itemKind === 'merch') &&
+    size !== 'row';
 
   const updateScrub = useCallback((event: ReactMouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -91,7 +99,16 @@ export function LibraryMediaThumbnail({
         showVideoScrub ? 'video' : showAudioScrub ? 'audio' : 'static'
       }
     >
-      <LibraryArtworkImage asset={asset} size={size} />
+      {showArtworkHoverZoom && asset.artworkUrl ? (
+        <LibraryArtworkHoverZoom
+          imageUrl={asset.artworkUrl}
+          title={asset.title}
+        >
+          <LibraryArtworkImage asset={asset} size={size} />
+        </LibraryArtworkHoverZoom>
+      ) : (
+        <LibraryArtworkImage asset={asset} size={size} />
+      )}
       {hasScrubPreview ? (
         <div
           role='slider'

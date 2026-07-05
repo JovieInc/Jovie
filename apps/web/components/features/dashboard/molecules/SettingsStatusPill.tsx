@@ -27,18 +27,18 @@ export function SettingsStatusPill({
 }: SettingsStatusPillProps) {
   const resolvedState = resolveState({ state, status });
 
-  if (!resolvedState) {
-    return null;
-  }
-
+  // Always render the container so Saving… → Saved → idle transitions never
+  // shift the surrounding form layout; idle just renders it invisible.
   return (
     <div
       className={cn(
-        'text-xs',
+        'min-h-4 text-xs',
         resolvedState === 'error' ? 'text-destructive' : 'text-secondary-token',
+        !resolvedState && 'invisible',
         className
       )}
       aria-live='polite'
+      data-state={resolvedState ?? 'idle'}
     >
       {resolvedState === 'saving' && 'Saving…'}
       {resolvedState === 'saved' && 'Saved'}

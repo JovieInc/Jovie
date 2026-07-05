@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { JOVIE_AGENT_DISPLAY_NAME } from '@/lib/brand/agent-display-name';
 import { env } from '@/lib/env-server';
 import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
 import { serverFetch } from '@/lib/http/server-fetch';
@@ -61,10 +62,17 @@ function isAgentBranch(value: unknown): boolean {
 
 function hasBlockingLabel(labels: unknown): boolean {
   if (!Array.isArray(labels)) return false;
+  const blocking = new Set([
+    'needs-human-taste',
+    'hold',
+    'gated',
+    'needs-human',
+    'human-review-required',
+  ]);
   return labels.some(label => {
     if (!isRecord(label)) return false;
     const name = typeof label.name === 'string' ? label.name : '';
-    return name === 'needs-human' || name === 'human-review-required';
+    return blocking.has(name);
   });
 }
 
@@ -262,7 +270,7 @@ function buildRecommendations(params: {
       status: 'blocked',
       priority: 100,
       url: null,
-      owner: 'Hermes',
+      owner: JOVIE_AGENT_DISPLAY_NAME,
       summary:
         params.dispatchUnavailableReason ??
         'Configure GitHub dispatch credentials before launching workers.',
@@ -277,7 +285,7 @@ function buildRecommendations(params: {
       status: 'blocked',
       priority: 90,
       url: params.blockers[0]?.url ?? null,
-      owner: 'Hermes',
+      owner: JOVIE_AGENT_DISPLAY_NAME,
       summary: `Clear ${params.blockers.length} blocked or failed automation item${params.blockers.length === 1 ? '' : 's'} before increasing worker volume.`,
       updatedAt: params.generatedAtIso,
     });
@@ -290,7 +298,7 @@ function buildRecommendations(params: {
       status: 'review',
       priority: params.mergePressure === 'high' ? 95 : 75,
       url: null,
-      owner: 'Hermes',
+      owner: JOVIE_AGENT_DISPLAY_NAME,
       summary:
         params.mergePressure === 'high'
           ? 'Merge queue pressure is high; review or land agent PRs before dispatching more.'
@@ -310,7 +318,7 @@ function buildRecommendations(params: {
       status: 'queued',
       priority: 50,
       url: null,
-      owner: 'Hermes',
+      owner: JOVIE_AGENT_DISPLAY_NAME,
       summary:
         'Dispatch one focused Codex or Claude worker from HUD when a scoped issue is ready.',
       updatedAt: params.generatedAtIso,

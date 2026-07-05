@@ -118,7 +118,7 @@ function MissingScopesList({
         {scopes.map(scope => (
           <code
             key={scope}
-            className='rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[11px] leading-4 text-warning'
+            className='rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-2xs leading-4 text-warning'
           >
             {scope}
           </code>

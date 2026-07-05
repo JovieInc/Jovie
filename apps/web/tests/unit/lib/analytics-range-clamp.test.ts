@@ -1,31 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { clampRangeToRetention as clampRange } from '@/lib/analytics/time-range';
 
 /**
- * Tests for the analytics range clamping logic.
- * This mirrors the clampRange function in the analytics API route.
+ * Tests for the canonical analytics range clamping logic
+ * (`@/lib/analytics/time-range`), used by the analytics API route.
  */
-
-type TimeRange = '1d' | '7d' | '30d' | '90d' | 'all';
-
-const RANGE_DAYS: Record<TimeRange, number> = {
-  '1d': 1,
-  '7d': 7,
-  '30d': 30,
-  '90d': 90,
-  all: 365,
-};
-
-function clampRange(requested: TimeRange, retentionDays: number): TimeRange {
-  const requestedDays = RANGE_DAYS[requested];
-  if (requestedDays <= retentionDays) return requested;
-
-  const ranges: TimeRange[] = ['1d', '7d', '30d', '90d', 'all'];
-  let best: TimeRange = '1d';
-  for (const r of ranges) {
-    if (RANGE_DAYS[r] <= retentionDays) best = r;
-  }
-  return best;
-}
 
 describe('clampRange', () => {
   describe('free plan (7 days retention)', () => {

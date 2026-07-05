@@ -6,7 +6,7 @@ Clerk-based authentication, user state resolution, and route gating for the Jovi
 
 - **`cached.ts`** — `getCachedAuth()` and `getOptionalAuth()` are request-scoped (`React.cache`) wrappers around Clerk's `auth()`. Use `getOptionalAuth()` for routes that may be unauthenticated; both also honor the dev test-auth bypass.
 - **`require-auth.ts`** — `requireAuth()` returns `userId` or a 401 response. The standard guard for API routes.
-- **`gate.ts`** — `resolveUserState()` is the single source of truth for full user state: queries Clerk + DB, lazy-creates the DB user, returns `{ state, redirectTo, context }` where `context` carries `isAdmin`, `isPro`, etc.
+- **`gate.ts`** — `resolveUserState()` is the single source of truth for full user state: queries Clerk + DB, lazy-creates the DB user, returns `{ state, redirectTo, context }` where `context` carries `isAdmin`, `isPro`, etc. Wrapped in `React.cache()` per request; prefetches waitlist gate status in parallel with the auth-gate DB JOIN (JOV-2993).
 - **`canonical-user-state.ts`** — `resolveCanonicalState()` is the pure state machine. Maps `(authState, dbUser, profile, waitlist, deletion)` → one of 8 `CanonicalUserState` values.
 - **`proxy-state.ts`** — Lightweight middleware-friendly snapshot (`isActive`, `needsOnboarding`, `needsWaitlist`, `isBanned`) with Redis caching for edge runtime.
 

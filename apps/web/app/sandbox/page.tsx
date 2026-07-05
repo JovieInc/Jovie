@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { requireDevelopmentOnlyPage } from '@/lib/security/require-development-only';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -10,6 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default function SandboxPage() {
+  requireDevelopmentOnlyPage();
+
   return (
     <StandaloneProductPage width='md'>
       <div className='space-y-6'>
@@ -23,7 +26,7 @@ export default function SandboxPage() {
           <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-2 sm:p-4 sm:pt-0'>
             <ContentSurfaceCard surface='nested' className='space-y-4 p-4'>
               <div className='space-y-1'>
-                <h2 className='text-[13px] font-semibold text-primary-token'>
+                <h2 className='text-app font-semibold text-primary-token'>
                   Buttons
                 </h2>
                 <p className='text-[12px] text-secondary-token'>
@@ -39,7 +42,7 @@ export default function SandboxPage() {
 
             <ContentSurfaceCard surface='nested' className='space-y-4 p-4'>
               <div className='space-y-1'>
-                <h2 className='text-[13px] font-semibold text-primary-token'>
+                <h2 className='text-app font-semibold text-primary-token'>
                   Inputs
                 </h2>
                 <p className='text-[12px] text-secondary-token'>

@@ -41,7 +41,7 @@ export function PriorityGlyph({ priority, className }: PriorityGlyphProps) {
       <span
         title='Urgent'
         className={cn(
-          'inline-flex items-center justify-center h-3 px-1 rounded text-[8px] font-bold leading-none bg-rose-500/15 text-rose-300',
+          'inline-flex items-center justify-center h-3 px-1 rounded text-3xs font-bold leading-none bg-rose-500/15 text-rose-300',
           className
         )}
       >
@@ -52,14 +52,14 @@ export function PriorityGlyph({ priority, className }: PriorityGlyphProps) {
   const bars = BARS_FOR_PRIORITY[priority];
   return (
     <span
-      className={cn('inline-flex items-end gap-[2px] h-2.5', className)}
+      className={cn('inline-flex items-end gap-1 h-2.5', className)}
       title={`Priority: ${priority}`}
     >
       {[1, 2, 3].map(i => (
         <span
           key={i}
           className={cn(
-            'w-[2px] rounded-sm',
+            'w-1 rounded-sm',
             i <= bars ? 'bg-secondary-token' : 'bg-quaternary-token/30'
           )}
           style={{ height: `${30 + i * 25}%` }}

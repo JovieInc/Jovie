@@ -31,7 +31,7 @@ export function MarketingMetricCard({
         className
       )}
     >
-      <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
+      <div className='flex items-center gap-2 text-xs font-medium text-secondary-token'>
         {icon}
         {label}
       </div>
@@ -47,7 +47,7 @@ export function MarketingMetricCard({
         {valueAside ? (
           <div
             className={cn(
-              'pb-1 text-[12px] text-tertiary-token',
+              'pb-1 text-xs text-tertiary-token',
               valueAsideClassName
             )}
           >
@@ -56,7 +56,7 @@ export function MarketingMetricCard({
         ) : null}
       </div>
       {description ? (
-        <div className='mt-1 text-[12px] leading-5 text-tertiary-token'>
+        <div className='mt-1 text-xs leading-5 text-tertiary-token'>
           {description}
         </div>
       ) : null}

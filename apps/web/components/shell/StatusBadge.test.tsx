@@ -8,7 +8,7 @@ describe('shell StatusBadge', () => {
 
     expect(screen.getByText('Live')).toBeInTheDocument();
     expect((container.firstElementChild as HTMLElement).className).toContain(
-      'h-[18px]'
+      'h-5'
     );
     expect(screen.getByText('Live').className).toContain('uppercase');
   });

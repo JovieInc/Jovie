@@ -1,3 +1,6 @@
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
+
 /**
  * Agnost AI analytics — OpenTelemetry trace export for Vercel AI SDK spans.
  *
@@ -8,18 +11,27 @@ const AGNOST_OTEL_ENDPOINT = 'https://otel.agnost.ai/v1/traces';
 /** Bounded OTLP export — observability sink must not hang cold starts. */
 const AGNOST_OTEL_TIMEOUT_MS = 10_000;
 
-const DEFAULT_AGNOST_ORG_ID = '384ebd06-d9a5-48dd-ba22-7a51e430c173';
+export const DEFAULT_AGNOST_ORG_ID = '3e2d4388-5d86-41f5-8f67-4a3bac08d72f';
 
 let agnostStarted = false;
 
-export function shouldEnableAgnost(): boolean {
-  if (process.env.CI === 'true') return false;
+const runtimeImport = new Function('specifier', 'return import(specifier)') as <
+  T,
+>(
+  specifier: string
+) => Promise<T>;
 
-  const orgId = process.env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
+export function shouldEnableAgnost(): boolean {
+  if (env.CI === 'true') return false;
+  if (env.NODE_ENV === 'test' || publicEnv.NEXT_PUBLIC_E2E_MODE === '1') {
+    return false;
+  }
+
+  const orgId = env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
   if (!orgId) return false;
 
-  if (process.env.NODE_ENV === 'development') {
-    return process.env.JOVIE_ENABLE_AGNOST === '1';
+  if (env.NODE_ENV === 'development') {
+    return env.JOVIE_ENABLE_AGNOST === '1';
   }
 
   return true;
@@ -27,7 +39,7 @@ export function shouldEnableAgnost(): boolean {
 
 export function getAgnostOrgId(): string | null {
   if (!shouldEnableAgnost()) return null;
-  return process.env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
+  return env.AGNOST_ORG_ID ?? DEFAULT_AGNOST_ORG_ID;
 }
 
 /**
@@ -42,8 +54,12 @@ export async function initAgnostTelemetry(): Promise<void> {
 
   try {
     const [{ NodeSDK }, { OTLPTraceExporter }] = await Promise.all([
-      import('@opentelemetry/sdk-node'),
-      import('@opentelemetry/exporter-trace-otlp-proto'),
+      runtimeImport<typeof import('@opentelemetry/sdk-node')>(
+        '@opentelemetry/sdk-node'
+      ),
+      runtimeImport<typeof import('@opentelemetry/exporter-trace-otlp-proto')>(
+        '@opentelemetry/exporter-trace-otlp-proto'
+      ),
     ]);
 
     const sdk = new NodeSDK({

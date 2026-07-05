@@ -99,6 +99,54 @@ export function releaseRowToEntityRef(release: ReleaseLikeRow): EntityRef {
   };
 }
 
+function refKey(ref: EntityRef): string {
+  return `${ref.kind}:${ref.id}`;
+}
+
+function recentMatchesQuery(ref: EntityRef, lowerQuery: string): boolean {
+  if (!lowerQuery) return true;
+  if (ref.label.toLowerCase().includes(lowerQuery)) return true;
+  const subtitle = ref.meta?.subtitle;
+  return subtitle ? subtitle.toLowerCase().includes(lowerQuery) : false;
+}
+
+/**
+ * Graph-attribute a recent so the user sees it came from their own world. An
+ * artist pulled from Spotify reads "Spotify artist"; once it's a recent it
+ * reads "Recent". Releases/events keep their date/type subtitle — that data is
+ * already owned, and ranking-first conveys the recency.
+ */
+function attributeRecent(ref: EntityRef): EntityRef {
+  if (ref.meta?.kind === 'artist' && !ref.meta.isYou) {
+    return { ...ref, meta: { ...ref.meta, subtitle: 'Recent' } };
+  }
+  return ref;
+}
+
+/**
+ * Own-graph-first ranking for the entity picker (GH-11943).
+ *
+ * Recently-referenced entities (`recents`, already kind-filtered) that match the
+ * query are surfaced first and graph-attributed; the source results (Spotify
+ * for artists, the creator's catalog for releases/events) fall in behind as the
+ * fallback. De-duped by `kind:id` so an artist who is both a recent and a
+ * Spotify hit appears exactly once (the recent wins).
+ */
+export function rankRecentsFirst(
+  recents: readonly EntityRef[],
+  sourceItems: readonly EntityRef[],
+  query: string,
+  limit: number
+): EntityRef[] {
+  const lowerQuery = query.trim().toLowerCase();
+  const matched = recents
+    .filter(ref => recentMatchesQuery(ref, lowerQuery))
+    .map(attributeRecent);
+  const seen = new Set(matched.map(refKey));
+  const fallback = sourceItems.filter(item => !seen.has(refKey(item)));
+  return [...matched, ...fallback].slice(0, limit);
+}
+
 /** Convert a Spotify artist search result to a picker EntityRef. */
 export function artistResultToEntityRef(r: SpotifyArtistResult): EntityRef {
   return {

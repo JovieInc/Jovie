@@ -4,12 +4,14 @@ const {
   mockDbSelect,
   mockDbUpdate,
   mockDbInsert,
+  mockFetchArtistBySpotifyUrl,
   mockReserveOnboardingHandle,
   mockDeriveClaimedOnboardingStateFromMessageRows,
 } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbInsert: vi.fn(),
+  mockFetchArtistBySpotifyUrl: vi.fn(),
   mockReserveOnboardingHandle: vi.fn(),
   mockDeriveClaimedOnboardingStateFromMessageRows: vi.fn(),
 }));
@@ -58,6 +60,7 @@ vi.mock('@/lib/db/schema/chat', () => ({
 
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
+    bio: 'creator_profiles.bio',
     id: 'creator_profiles.id',
     userId: 'creator_profiles.user_id',
     username: 'creator_profiles.username',
@@ -73,6 +76,11 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     avatarLockedByUser: 'creator_profiles.avatar_locked_by_user',
     avatarUrl: 'creator_profiles.avatar_url',
     creatorType: 'creator_profiles.creator_type',
+    genres: 'creator_profiles.genres',
+    spotifyFollowers: 'creator_profiles.spotify_followers',
+    spotifyId: 'creator_profiles.spotify_id',
+    spotifyPopularity: 'creator_profiles.spotify_popularity',
+    spotifyUrl: 'creator_profiles.spotify_url',
     theme: 'creator_profiles.theme',
     ingestionStatus: 'creator_profiles.ingestion_status',
   },
@@ -87,6 +95,14 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   desc: vi.fn((col: unknown) => ({ desc: col })),
   eq: vi.fn((col: unknown, val: unknown) => ({ eq: [col, val] })),
+}));
+
+vi.mock('@/lib/dsp-enrichment/providers/musicfetch', () => ({
+  fetchArtistBySpotifyUrl: mockFetchArtistBySpotifyUrl,
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
 }));
 
 vi.mock('@/lib/onboarding/claimed-state', () => ({
@@ -124,8 +140,9 @@ function queueProfileInsert(
     | { id: string }
     | { error: Error }
     | Array<{ id: string } | { error: Error }>
-) {
+): ReturnType<typeof vi.fn>[] {
   const outcomes = Array.isArray(outcome) ? outcome : [outcome];
+  const valueSpies: ReturnType<typeof vi.fn>[] = [];
 
   for (const current of outcomes) {
     const returning =
@@ -133,8 +150,11 @@ function queueProfileInsert(
         ? vi.fn().mockRejectedValue(current.error)
         : vi.fn().mockResolvedValue([current]);
     const values = vi.fn().mockReturnValue({ returning });
+    valueSpies.push(values);
     mockDbInsert.mockReturnValueOnce({ values });
   }
+
+  return valueSpies;
 }
 
 function queueProfileUpdate(
@@ -142,8 +162,9 @@ function queueProfileUpdate(
     | { id: string }
     | { error: Error }
     | Array<{ id: string } | { error: Error }>
-) {
+): ReturnType<typeof vi.fn>[] {
   const outcomes = Array.isArray(outcome) ? outcome : [outcome];
+  const valueSpies: ReturnType<typeof vi.fn>[] = [];
 
   for (const current of outcomes) {
     const returning =
@@ -152,8 +173,11 @@ function queueProfileUpdate(
         : vi.fn().mockResolvedValue([current]);
     const where = vi.fn().mockReturnValue({ returning });
     const set = vi.fn().mockReturnValue({ where });
+    valueSpies.push(set);
     mockDbUpdate.mockReturnValueOnce({ set });
   }
+
+  return valueSpies;
 }
 
 function queuePostPersistWrites() {
@@ -182,6 +206,7 @@ describe('materializeClaimedOnboardingProfile', () => {
       interviewSignals: [],
     });
     mockReserveOnboardingHandle.mockResolvedValue('coolartist1');
+    mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
 
   it('skips when chat state has no materializable profile data', async () => {
@@ -230,6 +255,66 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
 
     expect(mockReserveOnboardingHandle).not.toHaveBeenCalled();
+  });
+
+  it('imports Spotify image and MusicFetch bio while creating the live profile', async () => {
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: 'spotify_1',
+        name: 'Luna Waves',
+        url: 'https://open.spotify.com/artist/spotify_1',
+        imageUrl: 'https://i.scdn.co/image/luna.jpg',
+        followers: 42_000,
+        popularity: 61,
+        genres: ['indie pop', 'dream pop'],
+      },
+      handle: 'lunawaves',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    mockFetchArtistBySpotifyUrl.mockResolvedValue({
+      type: 'artist',
+      name: 'Luna Waves',
+      image: { url: 'https://i.scdn.co/image/luna-musicfetch.jpg' },
+      bio: '  Luna Waves makes late-night pop from Los Angeles.  ',
+      services: {},
+    });
+
+    setupMessageSelect();
+    setupExistingProfileSelect(null);
+    const [profileInsertValues] = queueProfileInsert({ id: 'profile_new' });
+    queuePostPersistWrites();
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).resolves.toEqual({
+      profileId: 'profile_new',
+      handle: 'lunawaves',
+      status: 'created',
+    });
+
+    expect(mockFetchArtistBySpotifyUrl).toHaveBeenCalledWith(
+      'https://open.spotify.com/artist/spotify_1'
+    );
+    expect(profileInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatarUrl: 'https://i.scdn.co/image/luna.jpg',
+        bio: 'Luna Waves makes late-night pop from Los Angeles.',
+        displayName: 'Luna Waves',
+        genres: ['indie pop', 'dream pop'],
+        isClaimed: true,
+        isPublic: true,
+        spotifyFollowers: 42_000,
+        spotifyId: 'spotify_1',
+        spotifyPopularity: 61,
+        spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
+      })
+    );
   });
 
   it('retries with a reserved handle when INSERT hits a username unique violation', async () => {

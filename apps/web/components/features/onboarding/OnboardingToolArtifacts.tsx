@@ -192,7 +192,7 @@ function StatusShell({
   return (
     <div
       className={cn(
-        'w-full max-w-[440px] px-1 py-2 text-primary-token',
+        'w-full max-w-110 px-1 py-2 text-primary-token',
         tone === 'error' && 'text-error'
       )}
       role={tone === 'error' ? 'alert' : 'status'}
@@ -208,11 +208,11 @@ function StatusShell({
           {icon}
         </span>
         <div className='min-w-0'>
-          <p className='text-[14px] font-semibold leading-5 tracking-[-0.01em]'>
+          <p className='text-sm font-semibold leading-5 tracking-[-0.01em]'>
             {title}
           </p>
           {body ? (
-            <p className='mt-1 text-[12.5px] leading-5 text-secondary-token'>
+            <p className='mt-1 text-xs leading-5 text-secondary-token'>
               {body}
             </p>
           ) : null}
@@ -244,7 +244,7 @@ function ArtistAvatar({
       <div
         className={cn(
           'relative shrink-0 overflow-hidden rounded-full border border-white/[0.08] bg-surface-0',
-          size === 'sm' ? 'h-8 w-8' : 'h-[42px] w-[42px]'
+          size === 'sm' ? 'h-8 w-8' : 'h-11 w-11'
         )}
       >
         <Image
@@ -262,8 +262,8 @@ function ArtistAvatar({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-[11px] font-semibold text-secondary-token',
-        size === 'sm' ? 'h-8 w-8' : 'h-[42px] w-[42px]'
+        'flex shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-2xs font-semibold text-secondary-token',
+        size === 'sm' ? 'h-8 w-8' : 'h-11 w-11'
       )}
       aria-hidden
     >
@@ -336,11 +336,11 @@ export function OnboardingSpotifyArtistPickerCard({
 
   return (
     <div
-      className='h-[168px] w-full max-w-[440px] px-1 py-1'
+      className='h-42 w-full max-w-110 px-1 py-1'
       data-testid='onboarding-artist-picker'
     >
       <div className='min-w-0 px-0.5'>
-        <p className='text-[14px] font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
+        <p className='text-sm font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
           Pick the exact Spotify artist
         </p>
       </div>
@@ -352,14 +352,14 @@ export function OnboardingSpotifyArtistPickerCard({
           value={query}
           onChange={event => setQuery(event.target.value)}
           placeholder='Search Spotify artists'
-          className='min-w-0 flex-1 bg-transparent text-[14px] leading-6 text-primary-token placeholder:text-quaternary-token focus:outline-none'
+          className='min-w-0 flex-1 bg-transparent text-sm leading-6 text-primary-token placeholder:text-quaternary-token focus:outline-none'
           disabled={disabled}
         />
       </label>
 
       <div className='mt-2 space-y-1'>
         {isSearching ? (
-          <div className='flex items-center gap-2 px-2 py-3 text-[12.5px] text-secondary-token'>
+          <div className='flex items-center gap-2 px-2 py-3 text-xs text-secondary-token'>
             <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
             Searching Spotify
           </div>
@@ -367,7 +367,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
         {!isSearching && artistSearch.error ? (
           <div
-            className='flex items-start gap-2 rounded-lg bg-surface-0 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
+            className='flex items-start gap-2 rounded-lg bg-surface-0 px-2.5 py-2.5 text-xs leading-5 text-secondary-token'
             role='alert'
           >
             <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0 text-warning' />
@@ -384,7 +384,7 @@ export function OnboardingSpotifyArtistPickerCard({
                 type='button'
                 onClick={() => searchImmediate(query.trim())}
                 disabled={disabled}
-                className='mt-0.5 shrink-0 rounded-full border border-subtle px-2 py-0.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none disabled:opacity-50'
+                className='mt-0.5 shrink-0 rounded-full border border-subtle px-2 py-0.5 text-2xs font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none disabled:opacity-50'
               >
                 Retry
               </button>
@@ -396,13 +396,13 @@ export function OnboardingSpotifyArtistPickerCard({
         !artistSearch.error &&
         hasQuery &&
         results.length === 0 ? (
-          <div className='px-2 py-3 text-[12.5px] leading-5 text-secondary-token'>
+          <div className='px-2 py-3 text-xs leading-5 text-secondary-token'>
             No exact match yet. Try the artist name from Spotify.
           </div>
         ) : null}
 
         {!isSearching && !hasQuery ? (
-          <div className='px-2 py-3 text-[12.5px] leading-5 text-secondary-token'>
+          <div className='px-2 py-3 text-xs leading-5 text-secondary-token'>
             Start with the artist name fans see on Spotify.
           </div>
         ) : null}
@@ -459,18 +459,18 @@ function ArtistResultRow({
     >
       <ArtistAvatar imageUrl={artist.imageUrl} name={artist.name} size='sm' />
       <span className='min-w-0 flex-1'>
-        <span className='block truncate text-[13.5px] font-medium leading-5 text-primary-token'>
+        <span className='block truncate text-app font-medium leading-5 text-primary-token'>
           {artist.name}
         </span>
         {meta ? (
-          <span className='block truncate text-[12px] leading-5 text-tertiary-token'>
+          <span className='block truncate text-xs leading-5 text-tertiary-token'>
             {meta}
           </span>
         ) : null}
       </span>
       <span
         className={cn(
-          'inline-flex h-7 shrink-0 items-center rounded-full border px-2 text-[11.5px] font-medium',
+          'inline-flex h-7 shrink-0 items-center rounded-full border px-2 text-2xs font-medium',
           selected
             ? 'border-green-500/20 text-green-500'
             : 'border-subtle text-secondary-token'
@@ -569,7 +569,7 @@ export function OnboardingHandleCheckCard({
   return (
     <div
       className={cn(
-        'w-full max-w-[440px] px-1 py-2 text-primary-token',
+        'w-full max-w-110 px-1 py-2 text-primary-token',
         available === false && 'text-error'
       )}
       data-testid='onboarding-handle-check'
@@ -593,7 +593,7 @@ export function OnboardingHandleCheckCard({
           )}
         </span>
         <div className='min-w-0 flex-1'>
-          <div className='flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[14px] leading-5 tracking-[-0.01em]'>
+          <div className='flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-sm leading-5 tracking-[-0.01em]'>
             <strong className='font-semibold text-primary-token'>
               @{normalizedDraft || handle}
             </strong>
@@ -606,7 +606,7 @@ export function OnboardingHandleCheckCard({
             </span>
           </div>
           <label className='mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
-            <span className='text-[13px] text-tertiary-token' aria-hidden>
+            <span className='text-app text-tertiary-token' aria-hidden>
               @
             </span>
             <span className='sr-only'>Edit proposed handle</span>
@@ -614,14 +614,14 @@ export function OnboardingHandleCheckCard({
               aria-label='Edit proposed handle'
               value={draftHandle}
               onChange={event => setDraftHandle(event.target.value)}
-              className='min-w-0 flex-1 bg-transparent px-0.5 text-[13.5px] leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
+              className='min-w-0 flex-1 bg-transparent px-0.5 text-app leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
               placeholder='handle'
               inputMode='text'
               autoCapitalize='none'
               spellCheck={false}
             />
           </label>
-          <p className='mt-1.5 text-[12.5px] leading-5 text-secondary-token'>
+          <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
             {error ??
               (available === false
                 ? 'Try a sharper variant.'

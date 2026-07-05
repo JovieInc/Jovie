@@ -7,7 +7,7 @@ describe('headerTextClass', () => {
     expect(result).toContain('text-sm');
     expect(result).toContain('font-medium');
     expect(result).toContain('leading-5');
-    expect(result).toContain('tracking-[-0.01em]');
+    expect(result).toContain('tracking-tight');
   });
 
   it('returns primary tone classes by default', () => {

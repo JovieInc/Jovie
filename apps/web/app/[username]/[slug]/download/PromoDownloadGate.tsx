@@ -197,7 +197,7 @@ export function PromoDownloadGate({
                 href={(file as DownloadFile).downloadUrl}
                 download={file.fileName}
                 aria-label={`Download ${file.title}`}
-                className='ml-2 shrink-0 rounded-md bg-white/10 px-2.5 py-1 text-2xs font-semibold text-white transition-colors hover:bg-white/20'
+                className='ml-2 shrink-0 rounded-md bg-white/10 px-2.5 py-1 text-2xs font-semibold text-white dark:text-white transition-colors hover:bg-white/20'
               >
                 <Icon
                   name='Download'
@@ -228,10 +228,10 @@ export function PromoDownloadGate({
               setEmail(e.target.value);
               setError(null);
             }}
-            placeholder='your@email.com'
+            placeholder='Your@email.com'
             required
             autoComplete='email'
-            className='text-foreground placeholder:text-muted-foreground/50 w-full rounded-lg border-0 bg-surface-1/50 px-3 py-2.5 text-sm ring-1 ring-inset ring-white/[0.12] focus:ring-white/30 focus:outline-none'
+            className='text-foreground placeholder:text-muted-foreground/50 w-full rounded-lg border-0 bg-surface-1/50 px-3 py-2.5 text-sm ring-1 ring-inset ring-white/[0.12] focus-visible:ring-white/30 focus:outline-none'
           />
           {/* Honeypot — hidden from humans, bots fill it */}
           <input
@@ -245,7 +245,7 @@ export function PromoDownloadGate({
           <button
             type='submit'
             disabled={loading || !email.trim()}
-            className='w-full rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-black transition-opacity disabled:opacity-50'
+            className='w-full rounded-lg bg-white dark:bg-surface-1 px-4 py-2.5 text-sm font-semibold text-black dark:text-white transition-opacity disabled:opacity-50'
           >
             {loading ? 'Sending...' : 'Get Download'}
           </button>

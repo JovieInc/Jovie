@@ -70,7 +70,7 @@ export function ReleaseDueBadge({
         <button
           type='button'
           onClick={onSetDate}
-          className='text-[10px] text-amber-500 hover:underline'
+          className='text-3xs text-amber-500 hover:underline'
         >
           Set date
         </button>

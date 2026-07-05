@@ -31,7 +31,7 @@ export function LyricsHeader({
   return (
     <div
       className={cn(
-        'shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-center gap-1.5 select-none text-[12.5px] font-caption',
+        'shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-center gap-1.5 select-none text-xs font-caption',
         className
       )}
     >
@@ -41,7 +41,7 @@ export function LyricsHeader({
           onClick={onArtistClick}
           className='inline-flex items-center no-underline hover:underline focus-visible:underline underline-offset-2 decoration-dotted text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-subtle truncate'
         >
-          {track.artist}
+          {track.artist || 'Unknown artist'}
         </button>
       ) : (
         <span className='text-tertiary-token truncate'>{track.artist}</span>

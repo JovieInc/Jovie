@@ -26,7 +26,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable auto-merge (squash) for patch and minor
+      - name: Add to Graphite merge queue (patch + minor)
         if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -34,7 +34,8 @@ jobs:
         run: |
           echo "Dependency: ${{ steps.meta.outputs.dependency-names }}"
           echo "Update type: ${{ steps.meta.outputs.update-type }}"
-          gh pr merge --auto --squash "$PR_URL"
+          # Graphite enqueues by label; native auto-merge retired
+          gh pr edit --add-label "merge-queue" "$PR_URL"
 
       - name: Note major bump requires manual review
         if: steps.meta.outputs.update-type == 'version-update:semver-major'

@@ -67,9 +67,7 @@ function MilestoneRow({
       </span>
       <div className='min-w-0'>
         <p className='text-app font-semibold text-primary-token'>{label}</p>
-        <p className='text-[12.5px] leading-5 text-secondary-token'>
-          {description}
-        </p>
+        <p className='text-xs leading-5 text-secondary-token'>{description}</p>
       </div>
     </li>
   );
@@ -228,7 +226,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             <p className='text-app leading-5 text-secondary-token'>
               {description}
             </p>
-            <p className='text-[12.5px] font-semibold text-primary-token'>
+            <p className='text-xs font-semibold text-primary-token'>
               {profileUrl}
             </p>
           </div>
@@ -237,7 +235,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             <MilestoneRow
               description='Use the tagged version so Instagram traffic stays attributable.'
               isComplete={hasCopiedLink}
-              label='Copy your Instagram bio link'
+              label='Copy Your Instagram Bio Link'
             />
             <MilestoneRow
               description='Open your Instagram profile settings and update the website field.'
@@ -251,7 +249,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
                   : 'Activation happens after the first Instagram-sourced visit lands on your profile.'
               }
               isComplete={false}
-              label='Waiting for first Instagram visit'
+              label='Waiting For First Instagram Visit'
             />
           </ul>
 

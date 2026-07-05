@@ -1,5 +1,9 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
+import {
+  clampRangeToRetention,
+  isAnalyticsRange,
+} from '@/lib/analytics/time-range';
 import { requireAuth } from '@/lib/auth/session';
 import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
@@ -9,40 +13,7 @@ import type { AnalyticsRange, DashboardAnalyticsView } from '@/types/analytics';
 
 type TimeRange = AnalyticsRange;
 
-/** Map a retention-days limit to the maximum allowed AnalyticsRange. */
-const RANGE_DAYS: Record<TimeRange, number> = {
-  '1d': 1,
-  '7d': 7,
-  '30d': 30,
-  '90d': 90,
-  all: 365,
-};
-
-/** Clamp the requested range to the user's plan retention limit. */
-function clampRange(requested: TimeRange, retentionDays: number): TimeRange {
-  const requestedDays = RANGE_DAYS[requested];
-  if (requestedDays <= retentionDays) return requested;
-
-  // Find the largest range that fits within retention
-  const ranges: TimeRange[] = ['1d', '7d', '30d', '90d', 'all'];
-  let best: TimeRange = '1d';
-  for (const r of ranges) {
-    if (RANGE_DAYS[r] <= retentionDays) best = r;
-  }
-  return best;
-}
-
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-function isRange(value: string): value is TimeRange {
-  return (
-    value === '1d' ||
-    value === '7d' ||
-    value === '30d' ||
-    value === '90d' ||
-    value === 'all'
-  );
-}
 
 function isView(value: string): value is DashboardAnalyticsView {
   return value === 'traffic' || value === 'full';
@@ -59,7 +30,7 @@ export async function GET(request: Request) {
     const refreshParam = searchParams.get('refresh');
 
     const rawRange: TimeRange =
-      rangeParam && isRange(rangeParam) ? rangeParam : '30d';
+      rangeParam && isAnalyticsRange(rangeParam) ? rangeParam : '30d';
     const view: DashboardAnalyticsView =
       viewParam && isView(viewParam) ? viewParam : 'full';
     const forceRefresh = refreshParam === '1';
@@ -82,7 +53,9 @@ export async function GET(request: Request) {
     );
     // null = unlimited (Max tier), skip clamping
     const range =
-      retentionDays === null ? rawRange : clampRange(rawRange, retentionDays);
+      retentionDays === null
+        ? rawRange
+        : clampRangeToRetention(rawRange, retentionDays);
 
     const key = `dashboard-analytics:${userId}:${view}:${range}`;
 
@@ -128,6 +101,7 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           profile_views: 0,
+          unique_views: 0,
           unique_users: 0,
           tip_link_visits: 0,
           top_cities: [],

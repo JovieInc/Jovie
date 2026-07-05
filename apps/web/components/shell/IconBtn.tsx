@@ -16,6 +16,7 @@ export interface IconBtnProps {
   readonly tooltipSide?: 'top' | 'bottom' | 'right' | 'left';
   readonly tone?: 'default' | 'ghost';
   readonly className?: string;
+  readonly testId?: string;
 }
 
 export function IconBtn({
@@ -27,6 +28,7 @@ export function IconBtn({
   tooltipSide = 'bottom',
   tone = 'default',
   className,
+  testId,
 }: IconBtnProps) {
   const isGhost = tone === 'ghost';
   return (
@@ -34,6 +36,7 @@ export function IconBtn({
       <button
         type='button'
         onClick={onClick}
+        data-testid={testId}
         className={cn(
           'h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle focus-ring-themed',
           isGhost

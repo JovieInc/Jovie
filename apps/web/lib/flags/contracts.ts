@@ -4,6 +4,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   IOS_APPLE_MUSIC_PRIORITY: 'feature_ios_apple_music_priority',
   SUBSCRIBE_CTA_EXPERIMENT: 'experiment_subscribe_cta_variant',
   PROFILE_ALERT_OPTIN_EXPERIMENT: 'profile_alert_optin_cta_variant',
+  PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT: 'profile_pac_variant_slots',
   SPOTIFY_OAUTH: 'feature_spotify_oauth',
   STRIPE_CONNECT_ENABLED: 'stripe-connect-enabled',
   SHOW_EXAMPLE_PROFILES_CAROUSEL: 'show_example_profiles_carousel',
@@ -19,10 +20,11 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   DESIGN_V1_ONBOARDING: 'design_v1_onboarding',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
-  IOS_APP_ALPHA_ACCESS: 'ios_app_alpha_access',
   MERCH_MVP: 'merch_mvp',
   BULK_PRESS_PHOTO_IMPORT: 'bulk_press_photo_import',
   APPLE_WALLET_PROFILE_PASS: 'apple_wallet_profile_pass',
+  TELEPROMPTER_RECORDING: 'teleprompter_recording',
+  TELEPROMPTER_SHOWCASE_EXPERIMENT: 'experiment_teleprompter_showcase',
 } as const;
 
 export type StatsigGateKey =
@@ -30,25 +32,27 @@ export type StatsigGateKey =
 
 export type SubscribeCTAVariant = 'two_step' | 'inline';
 export type ProfileAlertOptInVariant = 'button' | 'toggle';
+export type TeleprompterShowcaseVariant = 'interstitial' | 'direct';
 export interface StatsigFeatureFlagsBootstrap {
   gates: Record<string, boolean>;
 }
 
 export const APP_FLAG_DEFAULTS = {
-  BILLING_UPGRADE_DIRECT: false,
-  SMARTLINK_PRE_SAVE: false,
-  IOS_APPLE_MUSIC_PRIORITY: false,
-  SPOTIFY_OAUTH: false,
-  STRIPE_CONNECT_ENABLED: false,
-  PLAYLIST_ENGINE: false,
+  BILLING_UPGRADE_DIRECT: true,
+  SMARTLINK_PRE_SAVE: true,
+  IOS_APPLE_MUSIC_PRIORITY: true,
+  SPOTIFY_OAUTH: true,
+  STRIPE_CONNECT_ENABLED: true,
+  PLAYLIST_ENGINE: true,
   ALBUM_ART_GENERATION: true,
-  CHAT_JANK_MONITOR: false,
-  RELEASE_PLAN_DEMO: false,
-  AI_CONNECTORS_BETA: false,
-  IOS_APP_ALPHA_ACCESS: false,
-  MERCH_MVP: false,
-  BULK_PRESS_PHOTO_IMPORT: false,
-  APPLE_WALLET_PROFILE_PASS: false,
+  CHAT_JANK_MONITOR: true,
+  RELEASE_PLAN_DEMO: true,
+  RELEASE_TO_REVENUE_AUTOPILOT: true,
+  AI_CONNECTORS_BETA: true,
+  MERCH_MVP: true,
+  BULK_PRESS_PHOTO_IMPORT: true,
+  APPLE_WALLET_PROFILE_PASS: true,
+  TELEPROMPTER_RECORDING: true,
   // DESIGN_V1 and all its surface aliases are permanently enabled.
   // Statsig gate "design_v1" is also set to 100% rollout.
   // The true default here ensures the new design is on even if Statsig is
@@ -79,11 +83,12 @@ export const APP_FLAG_KEYS = {
   ALBUM_ART_GENERATION: 'album_art_generation',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   RELEASE_PLAN_DEMO: 'release_plan_demo',
+  RELEASE_TO_REVENUE_AUTOPILOT: 'release_to_revenue_autopilot',
   AI_CONNECTORS_BETA: 'ai_connectors_beta',
-  IOS_APP_ALPHA_ACCESS: 'ios_app_alpha_access',
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
   BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
   APPLE_WALLET_PROFILE_PASS: LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS,
+  TELEPROMPTER_RECORDING: LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING,
   DESIGN_V1: 'design_v1',
   SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_RELEASES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
@@ -105,11 +110,12 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
   CHAT_JANK_MONITOR: 'code:CHAT_JANK_MONITOR',
   RELEASE_PLAN_DEMO: 'code:RELEASE_PLAN_DEMO',
+  RELEASE_TO_REVENUE_AUTOPILOT: 'code:RELEASE_TO_REVENUE_AUTOPILOT',
   AI_CONNECTORS_BETA: 'code:AI_CONNECTORS_BETA',
-  IOS_APP_ALPHA_ACCESS: 'code:IOS_APP_ALPHA_ACCESS',
   MERCH_MVP: 'code:MERCH_MVP',
   BULK_PRESS_PHOTO_IMPORT: 'code:BULK_PRESS_PHOTO_IMPORT',
   APPLE_WALLET_PROFILE_PASS: 'code:APPLE_WALLET_PROFILE_PASS',
+  TELEPROMPTER_RECORDING: 'code:TELEPROMPTER_RECORDING',
   DESIGN_V1: 'code:DESIGN_V1',
   SHELL_CHAT_V1: 'code:DESIGN_V1',
   DESIGN_V1_RELEASES: 'code:DESIGN_V1',
@@ -129,10 +135,10 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
   CHAT_JANK_MONITOR: LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
   AI_CONNECTORS_BETA: LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA,
-  IOS_APP_ALPHA_ACCESS: LEGACY_STATSIG_GATE_KEYS.IOS_APP_ALPHA_ACCESS,
   MERCH_MVP: LEGACY_STATSIG_GATE_KEYS.MERCH_MVP,
   BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
   APPLE_WALLET_PROFILE_PASS: LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS,
+  TELEPROMPTER_RECORDING: LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
@@ -148,14 +154,17 @@ export const APP_FLAG_DESCRIPTIONS = {
   CHAT_JANK_MONITOR:
     'Chat jank instrumentation (message continuity + streaming)',
   RELEASE_PLAN_DEMO: 'Release plan demo page (YC wedge)',
+  RELEASE_TO_REVENUE_AUTOPILOT:
+    'Release-to-Revenue autopilot trigger for the single design-partner artist',
   AI_CONNECTORS_BETA:
     'AI Connectors v1 beta (Gmail booking extraction → calendar)',
-  IOS_APP_ALPHA_ACCESS: 'Internal iOS TestFlight alpha install access',
   MERCH_MVP: 'Jovie-owned merch creation, checkout, and Printful fulfillment',
   BULK_PRESS_PHOTO_IMPORT:
     'DSP bulk press-photo import after platform activation evidence passes',
   APPLE_WALLET_PROFILE_PASS:
     'First-party Apple Wallet profile pass for in-person sharing',
+  TELEPROMPTER_RECORDING:
+    'In-app teleprompter recording proposals and showcase interstitial',
   DESIGN_V1: 'New production design',
   SHELL_CHAT_V1: 'New production design alias for shell and chat',
   DESIGN_V1_RELEASES: 'New production design alias for releases',
@@ -190,9 +199,10 @@ export type DesignV1AliasFlagName = (typeof DESIGN_V1_ALIAS_FLAGS)[number];
  * justification, or the flag-registration-guardrail test will fail.
  */
 export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
-  'PLAYLIST_ENGINE', // early prototype; not ready for remote control
+  'PLAYLIST_ENGINE', // internal v1 default-on feature; no remote gate
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
-  'RELEASE_PLAN_DEMO', // YC wedge demo page; on by default in dev/preview, off in production — see registry.ts for env-aware decide()
+  'RELEASE_PLAN_DEMO', // internal v1 default-on feature; no remote gate
+  'RELEASE_TO_REVENUE_AUTOPILOT', // internal v1 default-on pilot surface; no remote gate
   'DESIGN_V1', // permanently enabled — new design is the only design
   'SHELL_CHAT_V1', // alias of DESIGN_V1 — permanently enabled
   'DESIGN_V1_RELEASES', // alias of DESIGN_V1 — permanently enabled

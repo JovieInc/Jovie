@@ -53,7 +53,7 @@ jobs:
       autofix_skip_reason: ${{ steps.decide.outputs.autofix_skip_reason }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Re-evaluate main CI health
         id: evaluate
@@ -217,7 +217,7 @@ jobs:
 
       - name: Checkout failing SHA
         if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.evaluate.outputs.failing_sha }}
           fetch-depth: 0
@@ -440,7 +440,7 @@ jobs:
       - name: Run Claude Code fallback
         if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == '' && steps.openrouter.outputs.fallback == 'true'
         id: claude
-        uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251 # v1
+        uses: anthropics/claude-code-action@a92e7c70a4da9793dc164451d829089dc057a464 # v1
         with:
           allowed_bots: 'github-merge-queue[bot],jovie-bot[bot]'
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -604,13 +604,14 @@ jobs:
           PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
           echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
 
-      - name: Enable auto-merge
+      - name: Add to Graphite merge queue
         if: steps.create-pr.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_URL: ${{ steps.create-pr.outputs.pr_url }}
         run: |
-          gh pr merge "$PR_URL" --auto --squash || echo "Auto-merge not available (branch protection may not be configured)"
+          # Graphite enqueues by label; native auto-merge retired
+          gh pr edit "$PR_URL" --add-label "merge-queue" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
 
       - name: Slack — PR opened
         if: steps.create-pr.outputs.has_changes == 'true' && env.SLACK_WEBHOOK_URL != ''

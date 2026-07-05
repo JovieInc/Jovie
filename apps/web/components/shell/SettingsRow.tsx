@@ -75,16 +75,14 @@ export function SettingsRow({
       <div className='flex-1 min-w-0'>
         <p
           className={cn(
-            'text-[13px] font-medium',
+            'text-app font-medium',
             tone === 'danger' ? 'text-rose-300/90' : 'text-primary-token'
           )}
         >
           {label}
         </p>
         {description && (
-          <p className='text-[11.5px] text-tertiary-token mt-0.5'>
-            {description}
-          </p>
+          <p className='text-2xs text-tertiary-token mt-0.5'>{description}</p>
         )}
       </div>
       <div className='shrink-0'>{control}</div>

@@ -45,7 +45,7 @@ describe('AvatarUploadable - Progress States', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     fireEvent.change(fileInput, { target: { files: [createMockFile()] } });
 
     await Promise.resolve();
@@ -85,7 +85,7 @@ describe('AvatarUploadable - Progress States', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const file = createMockFile();
 
     fireEvent.change(fileInput, { target: { files: [file] } });
@@ -109,7 +109,7 @@ describe('AvatarUploadable - Progress States', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const file = createMockFile();
 
     fireEvent.change(fileInput, { target: { files: [file] } });
@@ -146,7 +146,7 @@ describe('AvatarUploadable - Analytics Tracking', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const file = createMockFile('test.jpg', 'image/jpeg', 2048);
 
     fireEvent.change(fileInput, { target: { files: [file] } });
@@ -180,7 +180,7 @@ describe('AvatarUploadable - Analytics Tracking', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const invalidFile = createMockFile('document.pdf', 'application/pdf', 1024);
 
     fireEvent.change(fileInput, { target: { files: [invalidFile] } });

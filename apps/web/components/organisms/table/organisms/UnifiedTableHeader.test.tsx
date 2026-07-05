@@ -106,6 +106,14 @@ describe('UnifiedTableHeader', () => {
     expect(titleHeader).toHaveAttribute('aria-sort', 'descending');
   });
 
+  it('does not bake sort state into the header button accessible name', () => {
+    render(<Harness initialSort={[{ id: 'title', desc: true }]} />);
+    expect(screen.getByRole('button', { name: 'Title' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /sorted descending/i })
+    ).toBeNull();
+  });
+
   it('exposes aria-sort=none on sortable but unsorted columns', () => {
     render(<Harness />);
     const countHeader = screen

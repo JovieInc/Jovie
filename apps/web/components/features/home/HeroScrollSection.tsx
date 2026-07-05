@@ -13,7 +13,7 @@ export function HeroScrollSection() {
       <div className='hero-glow pointer-events-none absolute inset-0' />
 
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div className='hero-stagger'>
             <div className='max-w-[44rem] text-center lg:text-left'>
               <p className='homepage-section-eyebrow'>
@@ -33,7 +33,7 @@ export function HeroScrollSection() {
                 <ClaimHandleForm size='hero' />
               </div>
 
-              <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
+              <p className='mt-3.5 text-2xs tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
                 Private launch access with your artist page and next release
                 ready to go.
               </p>

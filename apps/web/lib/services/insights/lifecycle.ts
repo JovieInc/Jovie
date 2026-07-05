@@ -20,6 +20,27 @@ import type {
 } from '@/types/insights';
 import { GENERATION_COOLDOWN_HOURS } from './thresholds';
 
+const INSIGHT_PRIORITY_ORDER = drizzleSql`case ${aiInsights.priority} when 'high' then 0 when 'medium' then 1 when 'low' then 2 end`;
+
+// Keep in sync with INSIGHT_PRIORITY_ORDER so DB and JS ordering match.
+const INSIGHT_PRIORITY_RANK: Record<InsightPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+const INSIGHT_DEDUP_READ_LIMIT = 150;
+const INSIGHT_SUMMARY_CANDIDATE_LIMIT = 50;
+const FALLBACK_PRIORITY_RANK = 99;
+
+type InsightDedupCandidate = {
+  insightType: string;
+  category: InsightCategory;
+  title: string;
+  description: string;
+  dataSnapshot: unknown;
+};
+
 // ---------------------------------------------------------------------------
 // Insight Generation Runs
 // ---------------------------------------------------------------------------
@@ -110,13 +131,14 @@ export async function persistInsights(
   period: { start: Date; end: Date },
   comparisonPeriod: { start: Date; end: Date }
 ): Promise<number> {
-  if (insights.length === 0) return 0;
+  const dedupedInsights = prepareInsightsForPersistence(insights);
+  if (dedupedInsights.length === 0) return 0;
 
   const now = new Date();
   let persisted = 0;
 
   // Insert each insight individually to handle dedup gracefully
-  for (const insight of insights) {
+  for (const insight of dedupedInsights) {
     const expiresAt = new Date(now);
     expiresAt.setDate(expiresAt.getDate() + insight.expiresInDays);
 
@@ -208,28 +230,27 @@ export async function getActiveInsights(
 
   const whereClause = and(...conditions);
 
-  const [rows, countResult] = await Promise.all([
+  const candidateLimit = Math.min(limit * 3, INSIGHT_DEDUP_READ_LIMIT);
+
+  const [rows, totalRows] = await Promise.all([
     db
       .select()
       .from(aiInsights)
       .where(whereClause)
-      .orderBy(
-        drizzleSql`case ${aiInsights.priority} when 'high' then 0 when 'medium' then 1 when 'low' then 2 end`,
-        desc(aiInsights.createdAt)
-      )
-      .limit(limit)
+      .orderBy(INSIGHT_PRIORITY_ORDER, desc(aiInsights.createdAt))
+      .limit(candidateLimit)
       .offset(offset),
     db
-      .select({ count: drizzleSql<number>`count(*)::int` })
+      .select({ total: drizzleSql<number>`count(*)::int` })
       .from(aiInsights)
       .where(whereClause),
   ]);
-
-  const total = countResult[0]?.count ?? 0;
+  const dedupedRows = dedupeVisibleInsights(rows);
+  const pagedRows = dedupedRows.slice(0, limit);
 
   return {
-    insights: rows.map(formatInsightResponse),
-    total,
+    insights: pagedRows.map(formatInsightResponse),
+    total: totalRows[0]?.total ?? 0,
   };
 }
 
@@ -241,27 +262,19 @@ export async function getInsightsSummary(
 ): Promise<InsightsSummaryResponse> {
   const now = new Date();
 
-  const [insights, countResult, lastRun] = await Promise.all([
+  const activeWhereClause = and(
+    eq(aiInsights.creatorProfileId, creatorProfileId),
+    eq(aiInsights.status, 'active'),
+    gte(aiInsights.expiresAt, now)
+  );
+
+  const [insights, lastRun, totalRows] = await Promise.all([
     db
       .select()
       .from(aiInsights)
-      .where(
-        and(
-          eq(aiInsights.creatorProfileId, creatorProfileId),
-          eq(aiInsights.status, 'active'),
-          gte(aiInsights.expiresAt, now)
-        )
-      ),
-    db
-      .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(aiInsights)
-      .where(
-        and(
-          eq(aiInsights.creatorProfileId, creatorProfileId),
-          eq(aiInsights.status, 'active'),
-          gte(aiInsights.expiresAt, now)
-        )
-      ),
+      .orderBy(INSIGHT_PRIORITY_ORDER, desc(aiInsights.createdAt))
+      .where(activeWhereClause)
+      .limit(INSIGHT_SUMMARY_CANDIDATE_LIMIT),
     db
       .select({ createdAt: insightGenerationRuns.createdAt })
       .from(insightGenerationRuns)
@@ -273,15 +286,20 @@ export async function getInsightsSummary(
       )
       .orderBy(desc(insightGenerationRuns.createdAt))
       .limit(1),
+    db
+      .select({ total: drizzleSql<number>`count(*)::int` })
+      .from(aiInsights)
+      .where(activeWhereClause),
   ]);
 
+  const dedupedInsights = dedupeVisibleInsights(insights);
   const sortedInsights = sortInsightsForChat(
-    insights.map(formatInsightResponse)
+    dedupedInsights.map(formatInsightResponse)
   );
 
   return {
     insights: sortedInsights.slice(0, 3),
-    totalActive: countResult[0]?.count ?? 0,
+    totalActive: totalRows[0]?.total ?? 0,
     lastGeneratedAt: lastRun[0]?.createdAt
       ? toISOStringSafe(lastRun[0].createdAt)
       : null,
@@ -358,9 +376,39 @@ export async function getExistingInsightTypes(
   return rows.map(r => r.insightType);
 }
 
+export function prepareInsightsForPersistence(
+  insights: readonly GeneratedInsight[]
+): GeneratedInsight[] {
+  return dedupeVisibleInsights(
+    [...insights].sort(
+      (left, right) =>
+        getPriorityRank(left.priority) - getPriorityRank(right.priority) ||
+        right.confidence - left.confidence
+    )
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+export function dedupeVisibleInsights<T extends InsightDedupCandidate>(
+  insights: readonly T[]
+): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const insight of insights) {
+    const key = buildInsightDedupKey(insight);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(insight);
+  }
+
+  return deduped;
+}
 
 function formatInsightResponse(
   row: typeof aiInsights.$inferSelect
@@ -380,4 +428,113 @@ function formatInsightResponse(
     createdAt: toISOStringSafe(row.createdAt),
     expiresAt: toISOStringSafe(row.expiresAt),
   };
+}
+
+function buildInsightDedupKey(insight: InsightDedupCandidate): string {
+  const sourceKey = getInsightSourceKey(insight.dataSnapshot);
+  if (sourceKey) {
+    return `${insight.category}|${getInsightDedupFamily(insight.insightType)}|${sourceKey}`;
+  }
+
+  return `${insight.category}|${insight.insightType}|${normalizeInsightCopy(insight.title)}|${normalizeInsightCopy(insight.description)}`;
+}
+
+function getPriorityRank(priority: InsightPriority): number {
+  return INSIGHT_PRIORITY_RANK[priority] ?? FALLBACK_PRIORITY_RANK;
+}
+
+function getInsightDedupFamily(insightType: string): string {
+  switch (insightType) {
+    case 'city_growth':
+    case 'new_market':
+      return 'city_growth';
+    default:
+      return insightType;
+  }
+}
+
+function getInsightSourceKey(dataSnapshot: unknown): string | null {
+  if (!dataSnapshot || typeof dataSnapshot !== 'object') {
+    return null;
+  }
+
+  const snapshot = dataSnapshot as Record<string, unknown>;
+  const city = getSnapshotToken(snapshot, 'city', ['location', 'city']);
+  const country = getSnapshotToken(snapshot, 'country', [
+    'location',
+    'country',
+  ]);
+  if (city) {
+    return country ? `city:${city}|${country}` : `city:${city}`;
+  }
+
+  const market = getSnapshotToken(snapshot, 'market');
+  if (market) {
+    return `market:${market}`;
+  }
+
+  const release = getSnapshotToken(snapshot, 'release');
+  if (release) {
+    return `release:${release}`;
+  }
+
+  const referrer = getSnapshotToken(snapshot, 'referrer');
+  if (referrer) {
+    return `referrer:${referrer}`;
+  }
+
+  const spikeDate = getSnapshotToken(snapshot, 'spikeDate');
+  if (spikeDate) {
+    return `spikeDate:${spikeDate}`;
+  }
+
+  const deviceType = getSnapshotToken(snapshot, 'deviceType');
+  if (deviceType) {
+    return `deviceType:${deviceType}`;
+  }
+
+  const linkType = getSnapshotToken(snapshot, 'linkType');
+  if (linkType) {
+    return `linkType:${linkType}`;
+  }
+
+  return null;
+}
+
+function getSnapshotToken(
+  snapshot: Record<string, unknown>,
+  key: string,
+  nestedPath?: readonly string[]
+): string | null {
+  const topLevelValue = normalizeSnapshotToken(snapshot[key]);
+  if (topLevelValue) {
+    return topLevelValue;
+  }
+
+  if (!nestedPath) {
+    return null;
+  }
+
+  let value: unknown = snapshot;
+  for (const segment of nestedPath) {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    value = (value as Record<string, unknown>)[segment];
+  }
+
+  return normalizeSnapshotToken(value);
+}
+
+function normalizeSnapshotToken(value: unknown): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return null;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  return normalized ? normalized : null;
+}
+
+function normalizeInsightCopy(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }

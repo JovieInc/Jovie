@@ -104,7 +104,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               data-sidebar='sidebar'
-              className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-[var(--linear-app-shell-radius)] lg:shadow-[var(--linear-app-sidebar-shadow)] group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+              className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-(--linear-app-shell-radius) lg:shadow-(--linear-app-sidebar-shadow) group-data-[variant=floating]:rounded-sidebar-floating group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
             >
               {children}
             </div>

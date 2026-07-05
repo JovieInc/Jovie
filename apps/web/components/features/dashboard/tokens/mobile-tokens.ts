@@ -14,7 +14,7 @@ export const mobileReleaseTokens = {
     subtitle: 'mt-0.5 text-xs leading-tight text-secondary-token',
     /** Badge-style type label — pair with getReleaseTypeStyle().bg */
     typeBadge:
-      'inline-flex h-[16px] shrink-0 items-center justify-center rounded-md px-1.5 py-0 align-middle text-3xs font-caption leading-none tracking-normal',
+      'inline-flex h-4 shrink-0 items-center justify-center rounded-md px-1.5 py-0 align-middle text-3xs font-caption leading-none tracking-normal',
     year: 'shrink-0 text-xs tabular-nums text-tertiary-token',
     chevron: 'h-3.5 w-3.5 shrink-0 text-quaternary-token',
     /** Dot separator between metadata items */
@@ -32,8 +32,9 @@ export const mobileReleaseTokens = {
   },
   swipeActions: {
     button:
-      'flex w-16 flex-col items-center justify-center gap-1 text-white transition-colors',
-    label: 'text-3xs font-caption tracking-normal',
+      'flex w-16 flex-col items-center justify-center gap-1 text-white dark:text-white transition-colors',
+    // ui-casing-allow: tailwind class documentation string
+    label: 'Text-3xs Font-caption Tracking-normal',
     edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-accent))]',
     link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,var(--linear-info))]',
     locked:

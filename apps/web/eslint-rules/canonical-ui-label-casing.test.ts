@@ -39,6 +39,13 @@ ruleTester.run('canonical-ui-label-casing', rule, {
       code: `<CardDescription>Share your profile link on social media.</CardDescription>`,
     },
     {
+      // Multi-sentence sentence-case copy: words after a sentence boundary may
+      // legitimately be capitalized (regression for the layout.tsx metadata
+      // false-positive). "AI" is an approved abbreviation.
+      filename,
+      code: `<CardDescription>Share your profile link. Fans can subscribe and AI keeps it current.</CardDescription>`,
+    },
+    {
       filename,
       code: `<span aria-label="Copy Profile Link" />`,
     },
@@ -53,6 +60,10 @@ ruleTester.run('canonical-ui-label-casing', rule, {
     {
       filename,
       code: `<Button>LTV</Button>`,
+    },
+    {
+      filename,
+      code: `<Button>Install iOS Alpha</Button>`,
     },
     {
       filename,

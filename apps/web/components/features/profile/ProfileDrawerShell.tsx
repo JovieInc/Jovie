@@ -61,7 +61,7 @@ export function ProfileDrawerShell({
 
       <div className='relative z-10 shrink-0 px-5 pb-2.5 pt-3'>
         <div className='absolute inset-x-0 top-3 flex justify-center'>
-          <div className='h-[5px] w-10 rounded-full bg-white/[0.22]' />
+          <div className='h-1 w-10 rounded-full bg-white/[0.22]' />
         </div>
 
         {isSecondaryHeader ? (
@@ -198,7 +198,7 @@ export function ProfileDrawerShell({
           onClick={() => onOpenChange(false)}
         />
         <div
-          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-[430px] flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
+          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
           data-testid={dataTestId}
           role='dialog'
           aria-describedby={accessibleDescriptionId}

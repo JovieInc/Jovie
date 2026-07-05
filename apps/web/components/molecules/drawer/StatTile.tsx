@@ -7,13 +7,13 @@ export interface StatTileProps {
 export function StatTile({ label, value, hint }: StatTileProps) {
   return (
     <div className='space-y-0.5'>
-      <p className='text-[11.5px] font-caption tracking-normal text-secondary-token'>
+      <p className='text-2xs font-caption tracking-normal text-secondary-token'>
         {label}
       </p>
-      <p className='tabular-nums text-sm font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+      <p className='tabular-nums text-sm font-semibold leading-none tracking-tighter text-primary-token'>
         {value}
       </p>
-      {hint && <p className='text-[10px] text-tertiary-token'>{hint}</p>}
+      {hint && <p className='text-3xs text-tertiary-token'>{hint}</p>}
     </div>
   );
 }

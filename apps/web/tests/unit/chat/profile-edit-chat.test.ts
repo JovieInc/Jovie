@@ -50,6 +50,7 @@ vi.mock('ai', async importOriginal => {
 });
 
 vi.mock('@ai-sdk/gateway', () => ({
+  createGateway: vi.fn(() => vi.fn()),
   gateway: vi.fn(),
 }));
 

@@ -1,5 +1,6 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { ProfilePacAssignment } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -163,6 +164,7 @@ export interface ProfilePublicViewModel {
   readonly pressPhotos: PressPhoto[];
   readonly subscribeTwoStep: boolean;
   readonly alertOptInVariant: ProfileAlertOptInVariant;
+  readonly profilePacAssignment: ProfilePacAssignment;
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;

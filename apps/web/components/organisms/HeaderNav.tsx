@@ -10,6 +10,7 @@ import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
+import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
@@ -71,7 +72,7 @@ function PublicAuthActions({
         <Button
           asChild
           variant='whitePill'
-          className='focus-ring-themed hidden h-[36px] px-4 text-[13px] sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px]'
+          className='focus-ring-themed hidden h-9 px-4 text-app sm:inline-flex sm:h-10 sm:px-5 sm:text-sm'
         >
           <Link href={APP_ROUTES.SIGNIN}>Sign in</Link>
         </Button>
@@ -269,7 +270,7 @@ function getNavContainerVariantClass({
   }
 
   if (containerSize === 'homepage') {
-    return 'max-w-[var(--linear-content-max)] lg:px-0';
+    return 'max-w-linear-content lg:px-0';
   }
 
   return 'max-w-[calc(var(--linear-content-max)+3rem)]';
@@ -536,7 +537,7 @@ export function HeaderNav({
             isMarketingGlass,
           })
         )}
-        aria-label='Primary navigation'
+        aria-label='Primary Navigation'
       >
         <div className={containerClass}>
           {/* Logo section - left aligned with Linear padding */}
@@ -601,6 +602,7 @@ export function HeaderNav({
                 includePublicLogin={includePublicLoginInMobileNav}
                 publicCtaHref={mobilePublicCtaHref}
                 publicCtaLabel={mobilePublicCtaLabel}
+                authenticatedUserSlot={<UserButton />}
               />
             </div>
           )}

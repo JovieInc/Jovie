@@ -1,18 +1,18 @@
 name: SonarCloud
 
+# Tech-debt scan — runs NIGHTLY against main, not as a per-PR gate. SonarCloud
+# was pure noise on PRs (advisory failures on mechanical/codemod diffs). Debt it
+# surfaces is paid down by the tech-debt routine + ponytail, not by blocking PRs.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 7 * * *' # 07:00 UTC nightly (~midnight PT)
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
-  group: sonarcloud-${{ github.event.pull_request.number || github.ref }}
+  group: sonarcloud-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
         if: ${{ env.SONAR_SCAN_ENABLED != 'true' }}
         run: echo "SONAR_TOKEN is not configured; skipping SonarCloud scan."
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
         with:
           fetch-depth: 0
@@ -63,6 +63,6 @@ jobs:
 
       - name: SonarQube Scan
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
-        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
