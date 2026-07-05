@@ -23,6 +23,22 @@ private actor MutableAPIClient: APIClientProtocol {
     }
   }
 
+  func fetchAppleWalletProfilePass() async throws -> Data {
+    Data()
+  }
+
+  func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse {
+    .preview
+  }
+
+  func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse {
+    .preview
+  }
+
+  func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
+    .preview
+  }
+
   func updateMode(_ mode: Mode) {
     self.mode = mode
   }
@@ -58,6 +74,30 @@ struct MeRepositoryTests {
 
     #expect(staleResult.isStale == true)
     #expect(staleResult.response == .previewReady)
+  }
+
+  @Test func cachedSnapshotReturnsNilBeforeFirstLoad() async throws {
+    let defaults = UserDefaults(suiteName: "MeRepositoryTests-D")!
+    defaults.removePersistentDomain(forName: "MeRepositoryTests-D")
+    let cache = MeCache(defaults: defaults)
+    let apiClient = MutableAPIClient(mode: .success(.previewReady))
+    let repository = MeRepository(apiClient: apiClient, cache: cache)
+
+    #expect(await repository.cachedSnapshot(for: "user_d") == nil)
+  }
+
+  @Test func cachedSnapshotReturnsPersistedResponseWithoutNetwork() async throws {
+    let defaults = UserDefaults(suiteName: "MeRepositoryTests-E")!
+    defaults.removePersistentDomain(forName: "MeRepositoryTests-E")
+    let cache = MeCache(defaults: defaults)
+    let apiClient = MutableAPIClient(mode: .success(.previewReady))
+    let repository = MeRepository(apiClient: apiClient, cache: cache)
+
+    _ = try await repository.loadMe(for: "user_e")
+    // Network now fails — cachedSnapshot must still return the persisted copy.
+    await apiClient.updateMode(.failure(APIClientError.requestFailed(statusCode: 500)))
+
+    #expect(await repository.cachedSnapshot(for: "user_e") == .previewReady)
   }
 
   @Test func clearCachedUserRemovesSnapshot() async throws {

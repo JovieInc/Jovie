@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
+import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
@@ -21,13 +22,15 @@ export function SigninModalClient() {
     APP_ROUTES.DASHBOARD;
 
   return (
-    <AuthModalShell ariaLabel='Sign in to Jovie'>
-      <AuthShell
-        mode='sign-in'
-        compact
-        oppositeModeUrl={signUpUrl}
-        fallbackRedirectUrl={redirectUrl}
-      />
-    </AuthModalShell>
+    <AuthenticatedAuthEntryGuard>
+      <AuthModalShell ariaLabel='Sign in to Jovie'>
+        <AuthShell
+          mode='sign-in'
+          compact
+          oppositeModeUrl={signUpUrl}
+          fallbackRedirectUrl={redirectUrl}
+        />
+      </AuthModalShell>
+    </AuthenticatedAuthEntryGuard>
   );
 }

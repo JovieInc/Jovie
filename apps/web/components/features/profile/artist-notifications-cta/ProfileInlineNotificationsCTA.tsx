@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import { captureError } from '@/lib/error-tracking';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
@@ -68,6 +69,22 @@ function birthdayDigitsToStorage(digits: string): string {
 }
 
 const MAX_BIRTHDAY_AGE_YEARS = 120;
+const CAPTURE_SUCCESS_HOLD_MS = 1200;
+
+function maskCapturedContact(value: string, channel: 'email' | 'sms') {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (channel === 'sms') {
+    const digits = trimmed.replaceAll(/[^\d]/g, '');
+    return digits.length >= 4 ? `••• ${digits.slice(-4)}` : 'Your phone';
+  }
+
+  const [local = '', domain = ''] = trimmed.split('@');
+  if (!domain) return 'Your email';
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${local.length > 2 ? '•••' : '•'}@${domain}`;
+}
 
 function isValidBirthdayDigits(digits: string): boolean {
   if (digits.length !== 8) {
@@ -158,6 +175,7 @@ export function ProfileInlineNotificationsCTA({
     isResending,
     handleChannelChange,
     handleEmailChange,
+    handlePhoneChange,
     handleOtpChange,
     handleSubscribe,
     handleVerifyOtp,
@@ -167,6 +185,12 @@ export function ProfileInlineNotificationsCTA({
     subscribedChannels,
     openSubscription,
     hydrationStatus,
+    phoneInput,
+    country,
+    setCountry,
+    isCountryOpen,
+    setIsCountryOpen,
+    channel,
   } = useSubscriptionForm({
     artist,
     source,
@@ -193,6 +217,10 @@ export function ProfileInlineNotificationsCTA({
   const [nameInput, setNameInput] = useState('');
   const [birthdayInput, setBirthdayInput] = useState('');
   const [birthdayHintShown, setBirthdayHintShown] = useState(false);
+  const [successContactEcho, setSuccessContactEcho] = useState<string | null>(
+    null
+  );
+  const [captureSuppressed, setCaptureSuppressed] = useState(false);
   const [alertPrefs, setAlertPrefs] = useState<
     Record<NotificationContentType, boolean>
   >(() => {
@@ -212,6 +240,9 @@ export function ProfileInlineNotificationsCTA({
   const hasAutoOpenedRef = useRef(false);
   const activatedInCurrentFlowRef = useRef(false);
   const otpVerificationInFlightRef = useRef(false);
+  const captureSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const previousOtpLengthRef = useRef(otpCode.length);
   const pendingCompletedOtpRef = useRef<string | null>(null);
   const autoSubmittedOtpRef = useRef<string | null>(null);
@@ -229,7 +260,14 @@ export function ProfileInlineNotificationsCTA({
       subscriptionDetails.sms &&
       !hasEmailContact
   );
-  const flowChannel = isSmsOnlyManageFlow ? 'sms' : 'email';
+  const flowChannel =
+    flowOrigin === 'subscribe'
+      ? channel === 'sms'
+        ? 'sms'
+        : 'email'
+      : isSmsOnlyManageFlow
+        ? 'sms'
+        : 'email';
   const showArtistEmailSection = flowChannel === 'email';
   const primaryUserEmail = user?.primaryEmailAddress?.emailAddress ?? '';
   const resolvedSource = resolveNotificationSource(source, sourceContext);
@@ -263,6 +301,14 @@ export function ProfileInlineNotificationsCTA({
     setAlertPrefs(DEFAULT_ALERT_PREFS);
     onSubscriptionActivated?.();
   }, [onSubscriptionActivated]);
+
+  useEffect(() => {
+    return () => {
+      if (captureSuccessTimerRef.current) {
+        clearTimeout(captureSuccessTimerRef.current);
+      }
+    };
+  }, []);
 
   const syncPreferencesFromStatus = useCallback(() => {
     if (isSubscribed) {
@@ -336,6 +382,32 @@ export function ProfileInlineNotificationsCTA({
   useEffect(() => {
     onRegisterReveal?.(openFlow);
   }, [onRegisterReveal, openFlow]);
+
+  useEffect(() => {
+    if (isSubscribed) {
+      setCaptureSuppressed(false);
+      return;
+    }
+
+    let isActive = true;
+    fetch(`/api/profile/capture-dismissal?artist_id=${artist.id}`, {
+      cache: 'no-store',
+    })
+      .then(async response => {
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          readonly suppressed?: boolean;
+        };
+        if (isActive) {
+          setCaptureSuppressed(Boolean(data.suppressed));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isActive = false;
+    };
+  }, [artist.id, isSubscribed]);
 
   useEffect(() => {
     if (!isFlowOpen) return;
@@ -420,6 +492,8 @@ export function ProfileInlineNotificationsCTA({
       case 'email':
         handleClose();
         return;
+      case 'capture_success':
+        return;
       case 'otp':
         setStep('email');
         return;
@@ -449,19 +523,59 @@ export function ProfileInlineNotificationsCTA({
     }
 
     if (result === 'subscribed') {
+      const captureChannel = channel === 'sms' ? 'sms' : 'email';
+      const contactValue =
+        captureChannel === 'sms'
+          ? phoneInput
+          : (normalizeSubscriptionEmail(emailInput) ??
+            subscriptionDetails.email ??
+            emailInput);
       subscribedEmailRef.current =
         normalizeSubscriptionEmail(emailInput) ??
         subscriptionDetails.email ??
         '';
       markSubscriptionActivated();
-      setStep('name');
+      setSuccessContactEcho(maskCapturedContact(contactValue, captureChannel));
+      setStep('capture_success');
+      if (captureSuccessTimerRef.current) {
+        clearTimeout(captureSuccessTimerRef.current);
+      }
+      captureSuccessTimerRef.current = setTimeout(() => {
+        setStep('name');
+      }, CAPTURE_SUCCESS_HOLD_MS);
     }
   }, [
+    channel,
     emailInput,
     handleSubscribe,
     markSubscriptionActivated,
+    phoneInput,
     subscriptionDetails.email,
   ]);
+
+  const handleDismissCapture = useCallback(async () => {
+    try {
+      const response = await fetch('/api/profile/capture-dismissal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artist_id: artist.id,
+          source: resolvedSource,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Capture dismissal failed');
+      }
+
+      handleClose();
+    } catch (error) {
+      void captureError('Profile capture dismissal failed', error, {
+        artistId: artist.id,
+        artistHandle: artist.handle,
+      });
+    }
+  }, [artist.handle, artist.id, handleClose, resolvedSource]);
 
   const handleOtpSubmit = useCallback(async () => {
     if (otpVerificationInFlightRef.current) return;
@@ -705,6 +819,10 @@ export function ProfileInlineNotificationsCTA({
     return null;
   }
 
+  if (!isSubscribed && captureSuppressed) {
+    return null;
+  }
+
   const triggerLabel = isSubscribed
     ? 'Manage alerts'
     : (triggerLabelProp ?? 'Get alerts');
@@ -735,10 +853,13 @@ export function ProfileInlineNotificationsCTA({
         presentation={isInline ? 'inline' : presentation}
         artistName={artist.name}
         channel={flowChannel}
+        country={country}
         step={step}
         accentHex={accentHex}
         portalContainer={portalContainer}
         emailInput={emailInput}
+        phoneInput={phoneInput}
+        successContactEcho={successContactEcho}
         otpCode={otpCode}
         nameInput={nameInput}
         birthdayInput={birthdayInput}
@@ -750,6 +871,7 @@ export function ProfileInlineNotificationsCTA({
         birthdayHintShown={birthdayHintShown}
         resendCooldownEnd={resendCooldownEnd}
         isResending={isResending}
+        isCountryOpen={isCountryOpen}
         contentPrefs={alertPrefs}
         canEditPreferences={canEditPreferences}
         canGoBackFromPreferences={
@@ -761,8 +883,13 @@ export function ProfileInlineNotificationsCTA({
         showArtistEmailSection={showArtistEmailSection}
         onClose={handleClose}
         onBack={handleBack}
+        onChannelChange={handleChannelChange}
+        onCountryOpenChange={setIsCountryOpen}
+        onCountrySelect={setCountry}
         onEmailChange={handleEmailChange}
+        onPhoneChange={handlePhoneChange}
         onEmailSubmit={handleEmailSubmit}
+        onDismissCapture={handleDismissCapture}
         onOtpChange={handleOtpChange}
         onOtpComplete={handleOtpComplete}
         onOtpSubmit={handleOtpSubmit}

@@ -61,7 +61,7 @@ test('public profile renders core elements within budget', async ({ page }) => {
     .locator(
       [
         'a[aria-label^="View "]',
-        '[data-testid="latest-release-card"]',
+        '[data-testid="profile-home-carousel"] a',
         'a[href*="spotify"]',
         'a[href*="apple"]',
         'a[href*="music"]',
@@ -93,7 +93,7 @@ test('public profile renders core elements within budget', async ({ page }) => {
         'button:has-text("Subscribe")',
         'button:has-text("Support")',
         'button:has-text("Open support")',
-        'button[aria-label="Profile"]',
+        'button[aria-label="Home"]',
         'button[aria-label="Music"]',
         'button[aria-label="Events"]',
         'button[aria-label="Alerts"]',

@@ -138,7 +138,7 @@ export function ReleasesView({
           <div key={release.id}>
             {showHeader ? (
               <div
-                className='font-caption px-4 pb-2 pt-5 text-[11px] font-medium tracking-[0.02em] text-white/28'
+                className='font-caption px-4 pb-2 pt-5 text-2xs font-medium tracking-[0.02em] text-white/28'
                 data-testid='release-year-header'
               >
                 {year}
@@ -160,10 +160,10 @@ export function ReleasesView({
                   is_latest: index === 0,
                 })
               }
-              className='group flex min-h-[64px] items-center gap-3 border-t border-white/[0.075] px-4 py-2.5 first:border-t-0 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+              className='group flex min-h-16 items-center gap-3 border-t border-white/[0.075] px-4 py-2.5 first:border-t-0 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
               aria-label={getReleaseAriaLabel(release)}
             >
-              <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[7px] bg-white/[0.04]'>
+              <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-white/[0.04]'>
                 <ImageWithFallback
                   src={release.artworkUrl}
                   alt={release.title}
@@ -176,26 +176,26 @@ export function ReleasesView({
 
               <div className='min-w-0 flex-1 space-y-px'>
                 <div className='flex min-w-0 items-center gap-1.5'>
-                  <span className='truncate text-[15px] font-medium leading-tight tracking-[-0.028em] text-white'>
+                  <span className='truncate text-mid font-medium leading-tight tracking-[-0.028em] text-white dark:text-white'>
                     {release.title}
                   </span>
                   {index === 0 ? (
-                    <span className='inline-flex h-[16px] shrink-0 items-center rounded-full bg-white px-1.5 text-[8px] font-semibold tracking-normal text-black'>
+                    <span className='inline-flex h-4 shrink-0 items-center rounded-full bg-white dark:bg-surface-1 px-1.5 text-3xs font-semibold tracking-normal text-black dark:text-white'>
                       Latest
                     </span>
                   ) : null}
                   {release.releaseType === 'music_video' ? (
-                    <span className='inline-flex h-[16px] shrink-0 items-center rounded-full border border-white/8 bg-white/[0.04] px-1.5 text-[8px] font-semibold tracking-normal text-white/64'>
+                    <span className='inline-flex h-4 shrink-0 items-center rounded-full border border-white/8 bg-white/[0.04] px-1.5 text-3xs font-semibold tracking-normal text-white/64'>
                       Video
                     </span>
                   ) : null}
                 </div>
-                <p className='text-2xs truncate text-[11.5px] font-medium tracking-[-0.01em] text-white/42'>
+                <p className='text-2xs truncate text-2xs font-medium tracking-[-0.01em] text-white/42'>
                   {meta}
                 </p>
               </div>
 
-              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle group-hover:opacity-90'>
+              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white dark:bg-surface-1 text-black dark:text-white transition-opacity duration-subtle group-hover:opacity-90'>
                 <Play className='ml-0.5 h-3 w-3 fill-current' />
               </span>
             </a>

@@ -5,18 +5,16 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  * Layer A — Unauthenticated auth-UI smoke (no OAuth round-trip).
  *
  * Replaces the email/OTP signup canary that previously lived in
- * `synthetic-golden-path.spec.ts`. Jovie is SSO-only (Google + Apple via
- * Clerk) — see JOV-2446 — so the production canary should validate the
- * unauthenticated auth surface end-to-end without driving a real OAuth
- * flow (Google flags automation, MFA blocks it).
+ * `synthetic-golden-path.spec.ts`. Production auth intentionally supports
+ * Google + Apple SSO and email/identifier sign-in (JOV-2763) — see JOV-2446
+ * for the original SSO-only cutover context.
  *
  * What this catches:
  * - Broken Clerk JS bundle / FAPI proxy regression (/__clerk/*)
  * - Publishable/secret key mismatch on the active deploy
  * - Missing or misconfigured SSO provider
  * - CSP misconfig blocking Clerk
- * - Email/password silently re-enabled in the Clerk dashboard (the
- *   `clerk-config-audit` cron is the primary alarm; this is a secondary)
+ * - Auth surface failing to render live SSO + email controls
  *
  * What this does NOT cover (deferred to Sentry/RUM + the Layer B follow-up
  * Linear issue gated on a real incident):
@@ -36,7 +34,11 @@ const FRONT_DOOR_CONFIG_ERRORS = [
   'auth unavailable',
   'clerk is not configured',
   'turnstile is not configured',
+  'verification failed (110200)',
 ] as const;
+
+const EMAIL_IDENTIFIER_INPUT_SELECTOR =
+  'input[type="email"], input[name="identifier"], input[name="emailAddress"]';
 
 async function installSyntheticRouteStubs(page: Page) {
   await page.route('**/api/profile/view', route =>
@@ -66,31 +68,20 @@ async function assertNoFrontDoorConfigErrors(page: Page) {
   }
 }
 
-async function assertNoCredentialInputsRendered(page: Page) {
-  // Per JOV-2446 prevention contract: if any of these inputs render in
-  // production, the Clerk dashboard regressed email/password back on. The
-  // `clerk-config-audit` cron should also have fired by now — but this
-  // assertion is the user-visible canary.
+async function assertIntentionalEmailAuthSurface(page: Page) {
+  // Production intentionally renders an email/identifier input alongside SSO.
+  // Password must stay disabled — email OTP is the supported credential path.
   await expect(
-    page.locator('input[type="email"]'),
-    'No email input may render on the SSO-only auth surface'
-  ).toHaveCount(0);
+    page.locator(EMAIL_IDENTIFIER_INPUT_SELECTOR),
+    'Email/identifier input should render on the intentional email auth surface'
+  ).toHaveCount(1, { timeout: 15_000 });
   await expect(
     page.locator('input[type="password"]'),
-    'No password input may render on the SSO-only auth surface'
-  ).toHaveCount(0);
-  await expect(
-    page.locator('input[name="identifier"], input[name="emailAddress"]'),
-    'No Clerk identifier/email input may render on the SSO-only auth surface'
+    'No password input may render — email OTP is the supported credential path'
   ).toHaveCount(0);
   await expect(
     page.locator('input[name="password"]'),
-    'No Clerk password input may render on the SSO-only auth surface'
-  ).toHaveCount(0);
-  // Verification-step inputs must also stay hidden (defense in depth).
-  await expect(
-    page.locator('input[name="code"]'),
-    'No OTP verification code input may render on the SSO-only auth surface'
+    'No Clerk password input may render — email OTP is the supported credential path'
   ).toHaveCount(0);
 }
 
@@ -104,7 +95,16 @@ async function assertAuthShellReady(page: Page, expectedMode: string) {
   ).toBeVisible({ timeout: 30_000 });
 }
 
-test.describe('Synthetic Monitoring — Layer A (auth UI, SSO-only)', () => {
+async function assertClerkCaptchaMount(page: Page) {
+  const captcha = page.locator('#clerk-captcha[data-cl-size="invisible"]');
+  await expect(
+    captcha,
+    'Auth shell must mount the invisible Clerk Smart CAPTCHA element'
+  ).toHaveCount(1, { timeout: 15_000 });
+  await expect(captcha).toHaveAttribute('data-cl-theme', 'dark');
+}
+
+test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
   test.beforeEach(async () => {
     if (process.env.E2E_SYNTHETIC_MODE !== 'true') {
       test.skip(
@@ -114,7 +114,7 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO-only)', () => {
     }
   });
 
-  test('Sign-in surface renders SSO buttons only and starts Google OAuth on click', async ({
+  test('Sign-in surface renders SSO buttons and email auth; Google OAuth starts on click', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -130,9 +130,12 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO-only)', () => {
 
     await assertNoFrontDoorConfigErrors(page);
     await assertAuthShellReady(page, 'sign-in');
+    await assertClerkCaptchaMount(page);
 
-    console.log('[Synthetic][Layer A] Asserting no credential inputs render');
-    await assertNoCredentialInputsRendered(page);
+    console.log(
+      '[Synthetic][Layer A] Asserting intentional email auth surface'
+    );
+    await assertIntentionalEmailAuthSurface(page);
 
     console.log('[Synthetic][Layer A] Asserting SSO buttons render');
     const googleButton = page.getByRole('button', {
@@ -144,17 +147,6 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO-only)', () => {
     await expect(googleButton).toBeVisible({ timeout: 15_000 });
     await expect(appleButton).toBeVisible({ timeout: 15_000 });
     await expect(googleButton).toBeEnabled();
-
-    // Subtraction principle: the SSO-only surface no longer has an "or"
-    // divider — verify it stays gone.
-    const dividerText = (
-      await page
-        .locator('[data-auth-shell-mode="sign-in"]')
-        .innerText()
-        .catch(() => '')
-    ).toLowerCase();
-    expect(dividerText).not.toContain('\nor\n');
-    expect(dividerText).not.toMatch(/\s+or\s+/);
 
     console.log('[Synthetic][Layer A] Asserting Google button initiates OAuth');
     // Wait for the navigation that Clerk triggers to accounts.google.com.
@@ -178,7 +170,7 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO-only)', () => {
     console.log('[Synthetic][Layer A] Sign-in surface OK');
   });
 
-  test('Sign-up surface renders SSO buttons only (no credential inputs)', async ({
+  test('Sign-up surface renders SSO buttons and email auth', async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -194,7 +186,8 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO-only)', () => {
 
     await assertNoFrontDoorConfigErrors(page);
     await assertAuthShellReady(page, 'sign-up');
-    await assertNoCredentialInputsRendered(page);
+    await assertClerkCaptchaMount(page);
+    await assertIntentionalEmailAuthSurface(page);
 
     const googleButton = page.getByRole('button', {
       name: /continue with google/i,

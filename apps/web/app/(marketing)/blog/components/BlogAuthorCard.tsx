@@ -36,7 +36,7 @@ export function BlogAuthorCard({
           {author.profileUrl && (
             <Link
               href={author.profileUrl}
-              className='mt-4 text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200'
+              className='mt-4 text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-subtle'
             >
               View profile →
             </Link>
@@ -73,7 +73,7 @@ export function BlogAuthorCard({
       {author.profileUrl && (
         <Link
           href={author.profileUrl}
-          className='text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200 whitespace-nowrap self-start sm:self-center'
+          className='text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-subtle whitespace-nowrap self-start sm:self-center'
         >
           View profile →
         </Link>

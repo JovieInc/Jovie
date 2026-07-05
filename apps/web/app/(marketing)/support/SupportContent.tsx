@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ArrowRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { ArrowRight, BookOpen, Mail, Rocket } from 'lucide-react';
 import { useEffect } from 'react';
 import { MarketingContainer } from '@/components/marketing';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
@@ -15,6 +16,7 @@ const CHANNELS = [
     external: true,
     event: 'Support Docs Clicked',
     cta: 'Visit',
+    icon: BookOpen,
   },
   {
     title: 'Email Support',
@@ -23,6 +25,7 @@ const CHANNELS = [
     external: false,
     event: 'Support Email Clicked',
     cta: 'Send email',
+    icon: Mail,
   },
   {
     title: 'Getting Started',
@@ -31,8 +34,17 @@ const CHANNELS = [
     external: true,
     event: 'Support Getting Started Clicked',
     cta: 'Visit',
+    icon: Rocket,
   },
-] as const;
+] as const satisfies ReadonlyArray<{
+  readonly title: string;
+  readonly description: string;
+  readonly href: string;
+  readonly external: boolean;
+  readonly event: string;
+  readonly cta: string;
+  readonly icon: LucideIcon;
+}>;
 
 export function SupportChannels() {
   useEffect(() => {
@@ -44,38 +56,47 @@ export function SupportChannels() {
   return (
     <MarketingContainer width='prose' className='pb-16'>
       <section>
-        <h2 className='text-2xl font-semibold text-primary-token'>
+        <h2 className='marketing-h2-linear text-primary-token'>
           How can we help?
         </h2>
-        <div className='mt-6 grid gap-8 sm:grid-cols-3'>
-          {CHANNELS.map(channel => (
-            <div key={channel.title}>
-              <h3 className='font-medium text-primary-token'>
-                {channel.title}
-              </h3>
-              <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
-                {channel.description}
-              </p>
-              <Button
-                asChild
-                variant='ghost'
-                size='sm'
-                className='mt-3 px-0'
-                onClick={() => track(channel.event, { source: 'support_page' })}
+        <div className='mt-6 grid gap-6 sm:grid-cols-3'>
+          {CHANNELS.map(channel => {
+            const Icon = channel.icon;
+            return (
+              <article
+                key={channel.title}
+                className='rounded-2xl border border-subtle bg-surface-1 p-6'
               >
-                <a
-                  href={channel.href}
-                  className='public-action-inline'
-                  {...(channel.external
-                    ? { target: '_blank', rel: 'noopener noreferrer' }
-                    : {})}
+                <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
+                <h3 className='mt-4 font-medium text-primary-token'>
+                  {channel.title}
+                </h3>
+                <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
+                  {channel.description}
+                </p>
+                <Button
+                  asChild
+                  variant='ghost'
+                  size='sm'
+                  className='mt-3 px-0'
+                  onClick={() =>
+                    track(channel.event, { source: 'support_page' })
+                  }
                 >
-                  <span>{channel.cta}</span>
-                  <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
-                </a>
-              </Button>
-            </div>
-          ))}
+                  <a
+                    href={channel.href}
+                    className='public-action-inline'
+                    {...(channel.external
+                      ? { target: '_blank', rel: 'noopener noreferrer' }
+                      : {})}
+                  >
+                    <span>{channel.cta}</span>
+                    <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
+                  </a>
+                </Button>
+              </article>
+            );
+          })}
         </div>
       </section>
     </MarketingContainer>
@@ -86,7 +107,7 @@ export function SupportCta() {
   return (
     <MarketingContainer width='prose' className='pb-24'>
       <section>
-        <h2 className='text-2xl font-semibold text-primary-token'>
+        <h2 className='marketing-h2-linear text-primary-token'>
           Still need help?
         </h2>
         <p className='mt-4 text-base leading-relaxed text-secondary-token'>
@@ -94,6 +115,7 @@ export function SupportCta() {
         </p>
         <Button
           asChild
+          variant='secondary'
           className='mt-6'
           aria-label={`Send email to support team at ${SUPPORT_EMAIL}`}
           onClick={() =>
@@ -103,7 +125,10 @@ export function SupportCta() {
             })
           }
         >
-          <a href={`mailto:${SUPPORT_EMAIL}`} className='public-action-primary'>
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            className='public-action-secondary'
+          >
             Contact Support
           </a>
         </Button>

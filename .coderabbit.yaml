@@ -25,9 +25,11 @@ reviews:
     actionlint:
       enabled: true
 
+  # PR auto-review OFF (metered plan) — agents run CodeRabbit locally pre-commit
+  # (see .claude/rules/code-style.md). On a PR, on-demand: @coderabbitai review.
   auto_review:
-    enabled: true
-    drafts: true
+    enabled: false
+    drafts: false
     ignore_title_keywords:
       - "WIP"
       - "DO NOT MERGE"

@@ -7,6 +7,7 @@ import {
 import { NextResponse } from 'next/server';
 import { getRequestClerkClient } from '@/lib/auth/request-clerk-client';
 import { consumeStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -51,18 +52,18 @@ function createCodeChallenge(verifier: string): string {
 }
 
 function isProductionRuntimeEnvironment(): boolean {
-  const vercelEnv = process.env.VERCEL_ENV?.trim();
+  const vercelEnv = env.VERCEL_ENV?.trim();
   if (vercelEnv) {
     return vercelEnv === 'production';
   }
 
-  return process.env.NODE_ENV === 'production';
+  return env.NODE_ENV === 'production';
 }
 
 function isRealBrowserAuthHarnessEnabled(): boolean {
   return (
     !isProductionRuntimeEnvironment() &&
-    Boolean(process.env.JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN?.trim())
+    Boolean(env.JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN?.trim())
   );
 }
 
@@ -80,8 +81,19 @@ function isNotFoundError(error: unknown): boolean {
     return false;
   }
 
-  const record = error as { status?: unknown; statusCode?: unknown };
-  return record.status === 404 || record.statusCode === 404;
+  const record = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    message?: unknown;
+  };
+  if (record.status === 404 || record.statusCode === 404) {
+    return true;
+  }
+
+  return (
+    typeof record.message === 'string' &&
+    record.message.toLowerCase().includes('not found')
+  );
 }
 
 function hasClerkErrorCode(error: unknown, code: string): boolean {
@@ -104,7 +116,8 @@ function hasClerkErrorCode(error: unknown, code: string): boolean {
 
 function isIosSessionTokenUnavailableError(error: unknown): boolean {
   return (
-    isNotFoundError(error) ||
+    (isNotFoundError(error) &&
+      !hasClerkErrorCode(error, 'resource_not_found')) ||
     hasClerkErrorCode(error, 'request_invalid_for_environment')
   );
 }

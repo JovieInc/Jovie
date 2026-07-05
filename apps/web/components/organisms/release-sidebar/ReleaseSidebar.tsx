@@ -19,9 +19,9 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
+import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import {
   DrawerAsyncToggle,
   DrawerCardActionBar,
@@ -350,7 +350,7 @@ function ReleaseEntityHeader({
                   <DrawerMediaThumb
                     src={release.artworkUrl}
                     alt={artworkAlt}
-                    sizeClassName='h-[68px] w-[68px] rounded-[10px]'
+                    sizeClassName='h-17 w-17 rounded-xl'
                     sizes='68px'
                     fallback={
                       <Icon
@@ -369,7 +369,7 @@ function ReleaseEntityHeader({
                 disabled={!previewUrl}
                 aria-pressed={isPlaying}
                 className={cn(
-                  'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
+                  'absolute inset-0 flex items-center justify-center rounded-xl transition-[background-color,opacity] duration-subtle',
                   'bg-black/0 opacity-0',
                   'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                   'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
@@ -378,9 +378,9 @@ function ReleaseEntityHeader({
                 aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
               >
                 {isPlaying ? (
-                  <Pause className='h-5 w-5 text-white drop-shadow-sm' />
+                  <Pause className='h-5 w-5 text-white dark:text-white drop-shadow-sm' />
                 ) : (
-                  <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
+                  <Play className='h-5 w-5 translate-x-px text-white dark:text-white drop-shadow-sm' />
                 )}
               </button>
             </div>
@@ -411,6 +411,25 @@ function ReleaseEntityHeader({
   );
 }
 
+/**
+ * Default handler for the artwork-downloads toggle when the consumer does not
+ * supply its own. Routes through the thin POST /api/dashboard/releases/artwork-
+ * downloads endpoint instead of importing the server action directly, so this
+ * shared organism stays free of server-only imports (server-imports ratchet).
+ * Throws on failure so DrawerAsyncToggle reverts and shows its error toast.
+ */
+async function defaultToggleArtworkDownloads(value: boolean): Promise<void> {
+  const response = await fetch('/api/dashboard/releases/artwork-downloads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ allowDownloads: value }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update artwork downloads setting');
+  }
+}
+
 function ReleaseArtworkDownloadsSetting({
   allowDownloads,
   onToggleArtworkDownloads,
@@ -426,7 +445,7 @@ function ReleaseArtworkDownloadsSetting({
         label='Allow Downloads'
         ariaLabel='Allow artwork downloads on public pages'
         checked={allowDownloads}
-        onToggle={onToggleArtworkDownloads ?? updateAllowArtworkDownloads}
+        onToggle={onToggleArtworkDownloads ?? defaultToggleArtworkDownloads}
         successMessage={on =>
           on
             ? 'Artwork downloads enabled for visitors'
@@ -486,10 +505,10 @@ function ReleaseActivitySection({
               <Activity className='size-3' aria-hidden='true' />
             </span>
             <div className='min-w-0 flex-1'>
-              <p className='truncate text-[12px] font-caption text-primary-token'>
+              <p className='truncate text-xs font-caption text-primary-token'>
                 {row.label} Link updated
               </p>
-              <p className='mt-0.5 text-[10.5px] text-tertiary-token'>
+              <p className='mt-0.5 text-3xs text-tertiary-token'>
                 {formatTimeAgo(row.updatedAt)}
               </p>
             </div>
@@ -882,6 +901,24 @@ export function ReleaseSidebar({
               providerConfig={providerConfig}
             />
           ) : null}
+          <DrawerSection
+            title='Audio'
+            surface='plain'
+            defaultOpen
+            testId='release-audio-card'
+            contentClassName='space-y-3 p-3'
+          >
+            <ReleaseAudioAssetPanel
+              releaseId={release.id}
+              releaseTitle={release.title}
+              previewUrl={release.previewUrl}
+              durationMs={release.totalDurationMs}
+              isEditable={isEditable}
+              onUploaded={() => {
+                router.refresh();
+              }}
+            />
+          </DrawerSection>
           {isEditable ? (
             <DrawerSection
               title='Artwork'

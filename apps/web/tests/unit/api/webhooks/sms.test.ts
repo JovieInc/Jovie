@@ -10,8 +10,12 @@ const mockVerifyInboundSmsWebhook = vi.hoisted(() => vi.fn());
 const mockRecordWebhookEvent = vi.hoisted(() => vi.fn());
 const mockHandleVerifiedInbound = vi.hoisted(() => vi.fn());
 const mockMarkWebhookEventProcessed = vi.hoisted(() => vi.fn());
+const mockClaimWebhookEventForProcessing = vi.hoisted(() => vi.fn());
+const mockClearWebhookEventClaim = vi.hoisted(() => vi.fn());
+const mockSendOutboundSmsBestEffort = vi.hoisted(() => vi.fn());
 const mockEnv = vi.hoisted(() => ({
   NATIVE_SMS_ENABLED: 'true',
+  OUTBOUND_SMS_ENABLED: 'true',
   TWILIO_AUTH_TOKEN: 'test_primary_token',
   TWILIO_AUTH_TOKEN_SECONDARY: '',
   TWILIO_AUTH_TOKEN_SECONDARY_EXPIRES_AT: '',
@@ -25,11 +29,17 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: mockLogger,
 }));
 
+vi.mock('@/lib/notifications/providers/sms/outbound-sms', () => ({
+  sendOutboundSmsBestEffort: mockSendOutboundSmsBestEffort,
+}));
+
 vi.mock('@/lib/notifications/sms-webhook', () => ({
   verifyInboundSmsWebhook: mockVerifyInboundSmsWebhook,
   recordWebhookEvent: mockRecordWebhookEvent,
   handleVerifiedInbound: mockHandleVerifiedInbound,
   markWebhookEventProcessed: mockMarkWebhookEventProcessed,
+  claimWebhookEventForProcessing: mockClaimWebhookEventForProcessing,
+  clearWebhookEventClaim: mockClearWebhookEventClaim,
 }));
 
 vi.mock('@/lib/env-server', () => ({
@@ -77,6 +87,11 @@ describe('POST /api/webhooks/sms', () => {
     mockRecordWebhookEvent.mockReset();
     mockHandleVerifiedInbound.mockReset();
     mockMarkWebhookEventProcessed.mockReset();
+    mockClaimWebhookEventForProcessing.mockReset();
+    mockClearWebhookEventClaim.mockReset();
+    mockSendOutboundSmsBestEffort.mockReset();
+    mockClaimWebhookEventForProcessing.mockResolvedValue(true);
+    mockClearWebhookEventClaim.mockResolvedValue(undefined);
     mockCaptureCriticalError.mockReset();
     mockLogger.warn.mockReset();
     mockLogger.info.mockReset();
@@ -187,6 +202,33 @@ describe('POST /api/webhooks/sms', () => {
     );
   });
 
+  it('returns 200 processing when claim is not acquired (concurrent retry)', async () => {
+    mockVerifyInboundSmsWebhook.mockResolvedValue({
+      message: {
+        messageId: 'mid_busy',
+        fromPhone: '+15551234567',
+        body: 'STOP',
+        provider: 'twilio',
+      },
+      rawBody: 'test',
+      providerEventId: 'mid_busy',
+      keyUsed: 'primary',
+    });
+    mockRecordWebhookEvent.mockResolvedValue({
+      isFirstSeen: false,
+      alreadyProcessed: false,
+      webhookEventId: 'evt_busy',
+    });
+    mockClaimWebhookEventForProcessing.mockResolvedValue(false);
+
+    const { POST } = await import('@/app/api/webhooks/sms/route');
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, status: 'processing' });
+    expect(mockHandleVerifiedInbound).not.toHaveBeenCalled();
+  });
+
   it('returns 500 and does not mark processed on handler 5xx (fail-closed durable dedupe)', async () => {
     mockVerifyInboundSmsWebhook.mockResolvedValue({
       message: {
@@ -212,6 +254,48 @@ describe('POST /api/webhooks/sms', () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ ok: true, kind: 'error' });
     expect(mockMarkWebhookEventProcessed).not.toHaveBeenCalled();
+    expect(mockClearWebhookEventClaim).toHaveBeenCalledWith('evt_err');
+  });
+
+  it('enqueues outbound auto-reply post-commit when handler returns outboundReply', async () => {
+    mockVerifyInboundSmsWebhook.mockResolvedValue({
+      message: {
+        messageId: 'mid_stop',
+        fromPhone: '+15551234567',
+        body: 'STOP',
+        provider: 'twilio',
+      },
+      rawBody: 'test',
+      providerEventId: 'mid_stop',
+      keyUsed: 'primary',
+    });
+    mockRecordWebhookEvent.mockResolvedValue({
+      isFirstSeen: true,
+      alreadyProcessed: false,
+      webhookEventId: 'evt_stop',
+    });
+    mockHandleVerifiedInbound.mockResolvedValue({
+      status: 200,
+      kind: 'stop_applied',
+      outboundReply: {
+        to: '+15551234567',
+        body: 'Jovie: you are unsubscribed.',
+      },
+    });
+    mockMarkWebhookEventProcessed.mockResolvedValue(undefined);
+
+    const { POST } = await import('@/app/api/webhooks/sms/route');
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(mockMarkWebhookEventProcessed).toHaveBeenCalledWith('evt_stop');
+    expect(mockSendOutboundSmsBestEffort).toHaveBeenCalledWith({
+      to: '+15551234567',
+      body: 'Jovie: you are unsubscribed.',
+      source: 'sms_webhook_stop_applied',
+      providerEventId: 'mid_stop',
+      metadata: { kind: 'stop_applied' },
+    });
   });
 
   it('returns 500 on outer catch in recordWebhookEvent (real error shape, capture called)', async () => {

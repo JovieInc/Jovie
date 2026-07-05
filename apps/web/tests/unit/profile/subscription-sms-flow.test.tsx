@@ -113,6 +113,15 @@ function buildProfileNotifications(overrides: Record<string, unknown> = {}) {
 function buildFormState(overrides: Record<string, unknown> = {}) {
   return {
     emailInput: '',
+    phoneInput: '',
+    country: {
+      code: 'US',
+      name: 'United States',
+      dialCode: '+1',
+      flag: 'US',
+    },
+    isCountryOpen: false,
+    channel: 'email',
     error: null,
     otpCode: '',
     isSubmitting: false,
@@ -123,6 +132,9 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
     subscribedChannels: {},
     handleChannelChange: vi.fn(),
     handleEmailChange: vi.fn(),
+    handlePhoneChange: vi.fn(),
+    setCountry: vi.fn(),
+    setIsCountryOpen: vi.fn(),
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue(undefined),
     handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
@@ -165,7 +177,7 @@ describe('ArtistNotificationsCTA SMS manage flow', () => {
   it('removes the retired inline phone composer from the auto-open flow', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
     expect(screen.queryByTestId('country-selector')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay in the Loop')).not.toBeInTheDocument();
   });

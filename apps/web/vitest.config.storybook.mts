@@ -26,7 +26,11 @@ export default defineConfig({
     setupFiles: ['./.storybook/vitest.setup.ts'],
     // Retry once in CI to handle transient Vite browser-mode module serving failures
     // (Storybook's internal React 18 compat chunk occasionally fails to load)
-    retry: process.env.CI ? 2 : 0,
+    retry: process.env.CI ? 3 : 0,
+    fileParallelism: false,
+  },
+  esbuild: {
+    target: 'esnext',
   },
   resolve: {
     dedupe: [
@@ -37,6 +41,11 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
+    // Default Vite browser target (chrome87) cannot esbuild-prebundle modern ESM
+    // (destructuring, etc.) pulled in transitively by Storybook stories.
+    esbuildOptions: {
+      target: 'esnext',
+    },
     include: [
       // React core
       'react',
@@ -56,7 +65,6 @@ export default defineConfig({
       'motion/react',
       'vaul',
       'react-error-boundary',
-      'react-hook-form',
       // Radix UI primitives
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
@@ -71,7 +79,6 @@ export default defineConfig({
       '@radix-ui/react-switch',
       '@radix-ui/react-tabs',
       '@radix-ui/react-tooltip',
-      '@radix-ui/react-context-menu',
       // Data / state
       '@tanstack/react-query',
       '@tanstack/react-pacer',
@@ -95,27 +102,10 @@ export default defineConfig({
       'nuqs',
       'nuqs/adapters/next/app',
       'recharts',
-      // Auth / analytics
-      '@clerk/nextjs',
+      // Analytics
       '@vercel/analytics/react',
       // AI SDK (used by chat components)
       '@ai-sdk/react',
-      // Form + context menu (pulled in via @jovie/ui barrel exports)
-      'react-hook-form',
-      '@radix-ui/react-context-menu',
-      // Server-side deps (referenced by stories indirectly)
-      '@sentry/nextjs',
-      'isomorphic-dompurify',
-      'drizzle-orm',
-      'drizzle-orm/pg-core',
-      'drizzle-orm/neon-http',
-      'drizzle-zod',
-      'zod',
-      '@upstash/ratelimit',
-      '@upstash/redis',
-      '@neondatabase/serverless',
-      'jose',
-      'stripe',
     ],
   },
 });

@@ -30,7 +30,7 @@ export function HeroCinematic({
         <div className='hero-glow pointer-events-none absolute inset-0' />
 
         <Container size='homepage'>
-          <div className='mx-auto max-w-[1200px]'>
+          <div className='mx-auto max-w-300'>
             <div className='hero-stagger'>
               <div className='flex max-lg:flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16'>
                 <div className='max-w-[44rem] max-lg:text-center lg:flex-1 lg:text-left'>
@@ -42,7 +42,7 @@ export function HeroCinematic({
                     className='marketing-h1-linear hero-gradient-text mt-5 lg:text-left'
                     data-testid='hero-heading'
                   >
-                    The link your music deserves.
+                    The Link Your Music Deserves.
                   </h1>
 
                   <p className='marketing-lead-linear max-lg:mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
@@ -54,7 +54,7 @@ export function HeroCinematic({
                     {heroPrimaryAction}
                   </div>
 
-                  <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
+                  <p className='mt-3.5 text-2xs tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
                     Private launch access with your artist page and next release
                     ready to go.
                   </p>
@@ -113,7 +113,7 @@ export function HeroCinematic({
             {heroPrimaryAction}
           </div>
 
-          <p className='mt-2.5 text-[11px] tracking-[0.01em] text-quaternary-token sm:mt-3'>
+          <p className='mt-2.5 text-2xs tracking-[0.01em] text-quaternary-token sm:mt-3'>
             Private launch access with your artist page and next release ready
             to go.
           </p>
@@ -132,10 +132,10 @@ export function HeroCinematic({
                 className='marketing-h1-linear hero-gradient-text mt-3 max-w-[11ch] text-left sm:mt-4 lg:mt-5'
                 data-testid='hero-heading'
               >
-                The link your music deserves.
+                The Link Your Music Deserves.
               </h1>
 
-              <p className='marketing-lead-linear mt-2 max-w-[30rem] text-[15px] text-secondary-token sm:mt-3 sm:text-[18px] md:mt-4'>
+              <p className='marketing-lead-linear mt-2 max-w-[30rem] text-mid text-secondary-token sm:mt-3 sm:text-lg md:mt-4'>
                 Smart links, release automation, and fan insight that keep every
                 launch moving.
               </p>
@@ -144,7 +144,7 @@ export function HeroCinematic({
                 {heroPrimaryAction}
               </div>
 
-              <p className='mt-2.5 text-[11px] tracking-[0.01em] text-quaternary-token sm:mt-3'>
+              <p className='mt-2.5 text-2xs tracking-[0.01em] text-quaternary-token sm:mt-3'>
                 Private launch access with your artist page and next release
                 ready to go.
               </p>
@@ -166,12 +166,12 @@ export function HeroCinematic({
 
       <nav
         className='relative z-10 max-lg:hidden items-center justify-center gap-1 pb-5 lg:flex'
-        aria-label='Phone mode tabs'
+        aria-label='Phone Mode Tabs'
       >
         {['/profile', '/tour', '/tip', '/listen'].map((label, i) => (
           <span
             key={label}
-            className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-slower'
+            className='rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-colors duration-slower'
             style={{
               backgroundColor:
                 i === 0 ? 'var(--linear-bg-surface-2)' : 'transparent',

@@ -104,6 +104,7 @@ export type UseChatJankMonitorReturn = {
 };
 
 const STALL_TICK_INTERVAL_MS = 500;
+const STREAMING_SNAPSHOT_INTERVAL_MS = 200;
 
 export function useChatJankMonitor({
   conversationId,
@@ -143,11 +144,31 @@ export function useChatJankMonitor({
   }, [emitFn]);
 
   const snapshots = useMemo(() => toMessageSnapshots(messages), [messages]);
+  const snapshotsRef = useRef(snapshots);
+  snapshotsRef.current = snapshots;
+  const statusRef = useRef(status);
+  statusRef.current = status;
   const pendingTool = useMemo(() => hasActivePendingTool(messages), [messages]);
 
-  // ── Observe messages ─────────────────────────────────────────
+  // ── Observe messages (throttled while streaming) ─────────────
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || status !== 'streaming') return;
+
+    const observeLatest = () => {
+      monitor.observeMessages(
+        conversationId,
+        snapshotsRef.current,
+        statusRef.current
+      );
+    };
+
+    observeLatest();
+    const interval = setInterval(observeLatest, STREAMING_SNAPSHOT_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [enabled, conversationId, status, monitor]);
+
+  useEffect(() => {
+    if (!enabled || status === 'streaming') return;
     monitor.observeMessages(conversationId, snapshots, status);
   }, [enabled, conversationId, snapshots, status, monitor]);
 

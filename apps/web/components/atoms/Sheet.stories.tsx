@@ -1,13 +1,13 @@
-import { Button } from '@jovie/ui';
-import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
+  Button,
   Sheet,
   SheetContent,
   SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from './Sheet';
+} from '@jovie/ui';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 
 const meta: Meta<typeof Sheet> = {
   title: 'Atoms/Sheet',

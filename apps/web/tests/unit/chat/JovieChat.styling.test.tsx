@@ -79,15 +79,30 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
         serialized: '',
       },
     }),
-    useChatImageAttachments: () => ({
-      pendingImages: [],
+    useChatFileAttachments: () => ({
+      pendingFiles: [],
       isDragOver: false,
-      isProcessing: false,
+      isUploading: false,
+      hasReadyFiles: false,
       addFiles: vi.fn(),
-      removeImage: vi.fn(),
-      clearImages: vi.fn(),
+      removeFile: vi.fn(),
+      clearFiles: vi.fn(),
       toFileUIParts: () => [],
       dropZoneRef: { current: null },
+      accept: 'image/*,audio/*,video/*',
+      aggregate: {
+        total: 0,
+        done: 0,
+        uploading: 0,
+        queued: 0,
+        errors: 0,
+        duplicates: 0,
+        totalBytes: 0,
+        uploadedBytes: 0,
+        overallPct: 0,
+        speed: '—',
+        eta: '—',
+      },
     }),
   };
 });
@@ -177,9 +192,7 @@ describe('JovieChat styling regressions', () => {
       ?.parentElement?.parentElement;
 
     expect(composerDock?.className).toContain(CHAT_COMPOSER_DOCK_CLASSNAME);
-    expect(composerDock?.className).toContain(
-      'max-lg:pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
-    );
+    expect(composerDock?.className).toContain('system-b-chat-composer-dock');
   });
 
   it('marks runtime conversation loading shell as busy for assistive technology', () => {

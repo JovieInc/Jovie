@@ -59,11 +59,11 @@ function ListenContent() {
             >
               {dsp.icon}
             </div>
-            <span className='text-[13px] font-medium text-white/90'>
+            <span className='text-app font-medium text-white/90'>
               {dsp.name}
             </span>
           </div>
-          <span className='px-3 py-1 rounded-full text-[11px] font-medium bg-white text-black'>
+          <span className='px-3 py-1 rounded-full text-2xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white'>
             Play
           </span>
         </div>
@@ -75,7 +75,7 @@ function ListenContent() {
 function PayContent() {
   return (
     <div className='flex flex-col gap-2.5'>
-      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-white/40'>
+      <p className='text-3xs font-medium uppercase tracking-[0.15em] text-white/40'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
@@ -94,7 +94,7 @@ function PayContent() {
             }}
           >
             <span
-              className='text-[9px] font-medium uppercase tracking-wider'
+              className='text-3xs font-medium uppercase tracking-wider'
               style={{
                 color:
                   amt === '$10' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)',
@@ -108,7 +108,7 @@ function PayContent() {
           </div>
         ))}
       </div>
-      <div className='flex items-center justify-center rounded-xl px-4 py-2.5 text-[13px] font-medium bg-white text-black mt-1'>
+      <div className='flex items-center justify-center rounded-xl px-4 py-2.5 text-app font-medium bg-white dark:bg-surface-1 text-black dark:text-white mt-1'>
         Continue with Venmo
       </div>
     </div>
@@ -133,14 +133,14 @@ function TourContent() {
           }}
         >
           <div className='flex flex-col gap-0.5'>
-            <span className='text-[13px] font-medium text-white/90'>
+            <span className='text-app font-medium text-white/90'>
               {show.city}
             </span>
-            <span className='text-[11px] text-white/40'>
+            <span className='text-2xs text-white/40'>
               {show.date} · {show.venue}
             </span>
           </div>
-          <span className='px-3 py-1 rounded-full text-[11px] font-medium bg-white text-black'>
+          <span className='px-3 py-1 rounded-full text-2xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white'>
             Tickets
           </span>
         </div>
@@ -172,10 +172,10 @@ export function PhoneHeroDemo() {
             priority
           />
         </div>
-        <p className='mt-2.5 text-[15px] font-semibold text-white'>
+        <p className='mt-2.5 text-mid font-semibold text-white dark:text-white'>
           {PROFILE.name}
         </p>
-        <p className='mt-0.5 text-[11px] text-white/40 text-center px-4'>
+        <p className='mt-0.5 text-2xs text-white/40 text-center px-4'>
           {PROFILE.tagline}
         </p>
       </div>
@@ -193,7 +193,8 @@ export function PhoneHeroDemo() {
             width: `${100 / TABS.length}%`,
             transform: `translateX(${TABS.findIndex(t => t.id === activeTab) * 100}%)`,
             backgroundColor: 'rgba(255,255,255,0.08)',
-            transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition:
+              'transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing)',
           }}
         />
         {TABS.map(tab => (
@@ -201,7 +202,7 @@ export function PhoneHeroDemo() {
             key={tab.id}
             type='button'
             onClick={() => setActiveTab(tab.id)}
-            className='relative z-10 flex-1 py-2 text-[11px] font-medium text-center transition-colors'
+            className='relative z-10 flex-1 py-2 text-2xs font-medium text-center transition-colors'
             style={{
               color:
                 tab.id === activeTab

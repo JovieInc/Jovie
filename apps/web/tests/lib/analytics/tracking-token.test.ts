@@ -3,7 +3,7 @@
  * Validates HMAC-SHA256 signed request tokens for audience tracking endpoints
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   generateTrackingToken,
   getClientTrackingToken,
@@ -49,8 +49,8 @@ describe('Tracking Token', () => {
 
       const token = generateTrackingToken(profileId);
 
-      expect(token).toBeDefined();
-      const parts = token.split(':');
+      expect(token).not.toBeNull();
+      const parts = token!.split(':');
       expect(parts.length).toBe(3);
       expect(parts[0]).toBe(profileId);
       expect(parseInt(parts[1], 10)).toBeGreaterThan(0);
@@ -71,7 +71,7 @@ describe('Tracking Token', () => {
       const token = generateTrackingToken(profileId);
 
       const after = Date.now();
-      const timestamp = parseInt(token.split(':')[1], 10);
+      const timestamp = parseInt(token!.split(':')[1], 10);
 
       expect(timestamp).toBeGreaterThanOrEqual(before);
       expect(timestamp).toBeLessThanOrEqual(after);
@@ -87,7 +87,7 @@ describe('Tracking Token', () => {
       const profileId = 'test-profile-id';
       const token = generateTrackingToken(profileId);
 
-      const result = validateTrackingToken(token);
+      const result = validateTrackingToken(token!);
 
       expect(result.valid).toBe(true);
       expect(result.payload).toBeDefined();
@@ -98,7 +98,7 @@ describe('Tracking Token', () => {
       const profileId = 'test-profile-id';
       const token = generateTrackingToken(profileId);
 
-      const result = validateTrackingToken(token, profileId);
+      const result = validateTrackingToken(token!, profileId);
 
       expect(result.valid).toBe(true);
     });
@@ -106,7 +106,7 @@ describe('Tracking Token', () => {
     it('should reject token with mismatched profile ID', () => {
       const token = generateTrackingToken('profile-1');
 
-      const result = validateTrackingToken(token, 'profile-2');
+      const result = validateTrackingToken(token!, 'profile-2');
 
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Profile ID mismatch');
@@ -192,9 +192,74 @@ describe('Tracking Token', () => {
       const profileId = 'test-profile';
 
       const { token } = getClientTrackingToken(profileId);
-      const validation = validateTrackingToken(token, profileId);
+      const validation = validateTrackingToken(token!, profileId);
 
       expect(validation.valid).toBe(true);
+    });
+  });
+
+  describe('when TRACKING_TOKEN_SECRET is not configured', () => {
+    const originalSecret = process.env.TRACKING_TOKEN_SECRET;
+
+    afterEach(() => {
+      if (originalSecret) {
+        process.env.TRACKING_TOKEN_SECRET = originalSecret;
+      } else {
+        delete process.env.TRACKING_TOKEN_SECRET;
+      }
+      vi.unstubAllEnvs();
+      vi.clearAllMocks();
+    });
+
+    it('should return null instead of throwing in non-development environments', () => {
+      delete process.env.TRACKING_TOKEN_SECRET;
+      vi.stubEnv('NODE_ENV', 'production');
+
+      expect(() => generateTrackingToken('profile-id')).not.toThrow();
+      expect(generateTrackingToken('profile-id')).toBeNull();
+    });
+
+    it('should return null client token payload in non-development environments', () => {
+      delete process.env.TRACKING_TOKEN_SECRET;
+      vi.stubEnv('NODE_ENV', 'production');
+
+      expect(getClientTrackingToken('profile-id')).toEqual({
+        token: null,
+        expiresAt: null,
+      });
+    });
+
+    it('should return dev token in development without throwing', () => {
+      delete process.env.TRACKING_TOKEN_SECRET;
+      vi.stubEnv('NODE_ENV', 'development');
+
+      const token = generateTrackingToken('profile-id');
+
+      expect(token).toMatch(/^profile-id:\d+:dev$/);
+    });
+
+    it('should validate dev tokens in development', () => {
+      delete process.env.TRACKING_TOKEN_SECRET;
+      vi.stubEnv('NODE_ENV', 'development');
+
+      const token = generateTrackingToken('profile-id');
+      const validation = validateTrackingToken(token!, 'profile-id');
+
+      expect(validation.valid).toBe(true);
+      expect(validation.payload?.profileId).toBe('profile-id');
+    });
+
+    it('should reject validation when secret is unset outside development', () => {
+      delete process.env.TRACKING_TOKEN_SECRET;
+      vi.stubEnv('NODE_ENV', 'production');
+
+      const validation = validateTrackingToken(
+        'profile-id:123:dev',
+        'profile-id'
+      );
+
+      expect(validation.valid).toBe(false);
+      expect(validation.error).toBe('Token validation not configured');
     });
   });
 
@@ -207,8 +272,4 @@ describe('Tracking Token', () => {
       expect(error.message).toBe('test error');
     });
   });
-
-  // Note: Development mode tests removed as they require NODE_ENV manipulation
-  // which is read-only in TypeScript. The development mode behavior is tested
-  // implicitly through manual testing.
 });

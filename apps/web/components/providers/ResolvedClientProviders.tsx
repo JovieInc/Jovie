@@ -5,12 +5,14 @@ import type { ThemeMode } from '@/types';
 
 interface ResolvedClientProvidersProps {
   readonly children: React.ReactNode;
+  readonly forceBypassClerk?: boolean;
   readonly initialThemeMode?: ThemeMode;
   readonly skipCoreProviders?: boolean;
 }
 
 export async function ResolvedClientProviders({
   children,
+  forceBypassClerk = false,
   initialThemeMode,
   skipCoreProviders,
 }: ResolvedClientProvidersProps) {
@@ -22,6 +24,7 @@ export async function ResolvedClientProviders({
   return (
     <ClientProviders
       authBootstrap={authBootstrap}
+      forceBypassClerk={forceBypassClerk}
       initialThemeMode={initialThemeMode}
       publishableKey={publishableKey}
       skipCoreProviders={skipCoreProviders}

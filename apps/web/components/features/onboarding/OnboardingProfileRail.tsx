@@ -1,8 +1,7 @@
 'use client';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { PhoneFrame } from '@/components/molecules/PhoneFrame';
-import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
+import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -253,14 +252,14 @@ function DspMatchStrip({
 
   return (
     <fieldset
-      className='absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+      className='absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-white'
       data-testid='onboarding-dsp-match-strip'
-      aria-label='Matched music services'
+      aria-label='Matched Music Services'
     >
       {visible.map(match => (
         <span
           key={match.id}
-          className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-[0_6px_16px_rgba(0,0,0,0.18)]'
+          className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-[0_6px_16px_rgba(0,0,0,0.18)] dark:bg-white dark:text-black'
           title={match.label}
         >
           <SocialIcon
@@ -272,7 +271,7 @@ function DspMatchStrip({
         </span>
       ))}
       {overflow > 0 ? (
-        <span className='inline-flex h-7 items-center rounded-full bg-white px-2 text-[11.5px] font-semibold text-black'>
+        <span className='inline-flex h-7 items-center rounded-full bg-white px-2 text-2xs font-semibold text-black dark:bg-white dark:text-black'>
           +{overflow} others
         </span>
       ) : null}
@@ -306,8 +305,8 @@ export function OnboardingProfileRail({
       className={cn(
         'overflow-hidden bg-(--linear-app-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
-          ? 'relative z-0 w-full rounded-[22px] lg:hidden'
-          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-[380px] lg:border-l lg:border-(--linear-app-shell-border)'
+          ? 'relative z-0 w-full rounded-3xl lg:hidden'
+          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--linear-app-shell-border)'
       )}
       data-testid={
         isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'
@@ -318,64 +317,33 @@ export function OnboardingProfileRail({
       <div
         className={cn(
           'flex h-full min-h-0 items-center justify-center',
-          isInline ? 'px-0 py-2' : 'lg:w-[380px] lg:px-4 lg:py-4'
+          isInline ? 'px-0 py-2' : 'lg:w-95 lg:px-4 lg:py-4'
         )}
       >
-        <div
-          className={cn(
-            'relative flex w-full items-center justify-center overflow-hidden rounded-[28px] bg-[linear-gradient(145deg,#0A2A88_0%,#0B6CFF_52%,#7AC7FF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.26),0_30px_80px_rgba(0,48,160,0.34)]',
-            isInline
-              ? 'min-h-[456px] max-w-[342px] p-4'
-              : 'h-full min-h-[620px] max-h-[680px] max-w-[348px] p-5'
+        <ProfilePreviewBento
+          artist={previewArtist}
+          socialLinks={previewLinks}
+          genres={previewArtist.genres}
+          profileHref={profileHref}
+          dataTestId='onboarding-profile-bento'
+          phonePreviewTestId='onboarding-phone-preview'
+          surfaceTestId='onboarding-profile-compact-surface'
+          className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
+          heroStyle={{
+            background:
+              'linear-gradient(145deg,#0A2A88 0%,#0B6CFF 52%,#7AC7FF 100%)',
+            boxShadow:
+              'inset 0 1px 0 rgba(255,255,255,0.26), 0 30px 80px rgba(0,48,160,0.34)',
+          }}
+          heroClassName={cn(
+            'w-full rounded-3xl',
+            isInline ? 'min-h-114 p-4' : 'min-h-155 max-h-170 p-5'
           )}
-          data-testid='onboarding-profile-bento'
-        >
-          <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_42%,rgba(0,0,0,0.20)_100%)]' />
-          <PhoneFrame
-            className={cn(
-              'relative z-10',
-              isInline
-                ? 'h-[420px] w-[200px] sm:h-[480px] sm:w-[228px]'
-                : 'h-[592px] w-[282px]'
-            )}
-          >
-            <div
-              className='h-full w-full [--cover-height:45%] [--page-pad:18px]'
-              data-testid='onboarding-phone-preview'
-            >
-              <ProfileCompactSurface
-                renderMode='preview'
-                presentation='embedded'
-                artist={previewArtist}
-                socialLinks={previewLinks}
-                contacts={[]}
-                showPayButton={false}
-                genres={previewArtist.genres}
-                drawerOpen={false}
-                drawerView='menu'
-                activeMode='profile'
-                onDrawerOpenChange={() => {}}
-                onDrawerViewChange={() => {}}
-                onBack={() => {}}
-                onOpenMenu={() => {}}
-                onPlayClick={() => {}}
-                onShare={() => {}}
-                onModeSelect={() => {}}
-                profileHref={profileHref}
-                dataTestId='onboarding-profile-compact-surface'
-                isSubscribed
-                hideBackButton
-                hideJovieBranding
-                hideMoreMenu
-                renderInteractiveOverlays={false}
-                renderSemanticHeading={false}
-                headerSocialLinksOverride={[]}
-                resolveNearbyTour={false}
-              />
-            </div>
-          </PhoneFrame>
-          <DspMatchStrip matches={dspMatches} />
-        </div>
+          phoneFrameClassName={
+            isInline ? 'h-105 w-50 sm:h-120 sm:w-57' : 'h-148 w-71'
+          }
+          overlay={<DspMatchStrip matches={dspMatches} />}
+        />
       </div>
     </aside>
   );

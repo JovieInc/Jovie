@@ -31,7 +31,7 @@ const TRUST_LOGOS = [
 
 export function HomeV1Design() {
   return (
-    <div className='min-h-screen bg-[#06070a] text-white [color-scheme:dark]'>
+    <div className='min-h-screen bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
       <section
         className='relative isolate flex min-h-[100svh] overflow-hidden'
         aria-labelledby='home-hero-heading'
@@ -45,20 +45,20 @@ export function HomeV1Design() {
           className='absolute inset-x-0 bottom-0 h-[34%] bg-[linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:76px_76px] opacity-35 [mask-image:linear-gradient(to_bottom,transparent,black_32%,transparent_100%)]'
         />
 
-        <div className='relative z-10 mx-auto flex w-full max-w-[1180px] flex-col px-5 py-6 sm:px-8 lg:px-10'>
+        <div className='relative z-10 mx-auto flex w-full max-w-295 flex-col px-5 py-6 sm:px-8 lg:px-10'>
           <nav className='flex h-12 items-center justify-between'>
             <Link
               href={APP_ROUTES.HOME}
-              className='inline-flex items-center gap-2 text-white focus-ring-themed rounded-md'
-              aria-label='Jovie home'
+              className='inline-flex items-center gap-2 text-white dark:text-white focus-ring-themed rounded-md'
+              aria-label='Jovie Home'
             >
               <BrandLogo size={20} tone='white' aria-hidden />
-              <span className='text-[15px] font-semibold'>Jovie</span>
+              <span className='text-mid font-semibold'>Jovie</span>
             </Link>
             <div className='flex items-center gap-2'>
               <Link
                 href={APP_ROUTES.SIGNIN}
-                className='hidden h-9 items-center rounded-full px-3.5 text-[13px] font-medium text-white/58 transition-colors hover:text-white sm:inline-flex'
+                className='hidden h-9 items-center rounded-full px-3.5 text-app font-medium text-white/58 transition-colors hover:text-white sm:inline-flex'
               >
                 Sign In
               </Link>
@@ -66,7 +66,7 @@ export function HomeV1Design() {
                 href={buildHomepageStartHref(
                   HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT
                 )}
-                className='inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-black transition-colors hover:bg-white/90'
+                className='inline-flex h-9 items-center gap-1.5 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
               >
                 Request Access
                 <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.4} />
@@ -85,10 +85,10 @@ export function HomeV1Design() {
                 priority
               />
               <div className='min-w-0 pr-2'>
-                <p className='truncate text-[12px] font-semibold text-white'>
+                <p className='truncate text-xs font-semibold text-white dark:text-white'>
                   {TIM_WHITE_PROFILE.name}
                 </p>
-                <p className='truncate text-[11px] text-white/46'>
+                <p className='truncate text-2xs text-white/46'>
                   {TIM_WHITE_PROFILE.publicProfileDisplay}
                 </p>
               </div>
@@ -96,27 +96,27 @@ export function HomeV1Design() {
 
             <h1
               id='home-hero-heading'
-              className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white sm:text-[84px] lg:text-[116px] xl:text-[132px]'
+              className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white dark:text-white sm:text-[84px] lg:text-[116px] xl:text-[132px]'
             >
               Release Work, Finally Organized.
             </h1>
-            <p className='mt-6 max-w-[40rem] text-[17px] leading-7 text-white/62 sm:text-[19px]'>
+            <p className='mt-6 max-w-[40rem] text-base leading-7 text-white/62 sm:text-lg'>
               Request access to the private launch. Tell Jovie what you are
               working on, and we will save the context before opening the app.
             </p>
 
-            <div className='mt-10 w-full max-w-[760px] rounded-[28px] border border-white/[0.08] bg-[#0b0d11]/88 p-3 text-left shadow-[0_34px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl'>
-              <div className='flex items-start gap-3 rounded-[22px] bg-white/[0.035] px-4 py-4 ring-1 ring-white/[0.04] sm:px-5'>
+            <div className='mt-10 w-full max-w-190 rounded-3xl border border-white/[0.08] bg-(--color-bg-surface-0)/88 p-3 text-left shadow-[0_34px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl'>
+              <div className='flex items-start gap-3 rounded-3xl bg-white/[0.035] px-4 py-4 ring-1 ring-white/[0.04] sm:px-5'>
                 <Sparkles className='mt-1 h-4 w-4 shrink-0 text-cyan-200/70' />
-                <p className='text-[15px] leading-6 text-white/78'>
+                <p className='text-mid leading-6 text-white/78'>
                   Tell Jovie what you are releasing next. Your request becomes
                   the context we use to shape setup, profile work, and the
                   launch queue.
                 </p>
               </div>
 
-              <div className='mt-3 flex flex-col gap-3 rounded-[24px] border border-white/[0.07] bg-black/30 p-3 sm:flex-row sm:items-center'>
-                <div className='flex min-h-12 flex-1 items-center gap-3 rounded-full bg-white/[0.04] px-4 text-[14px] text-white/42'>
+              <div className='mt-3 flex flex-col gap-3 rounded-3xl border border-white/[0.07] bg-black/30 p-3 sm:flex-row sm:items-center'>
+                <div className='flex min-h-12 flex-1 items-center gap-3 rounded-full bg-white/[0.04] px-4 text-sm text-white/42'>
                   <Mic className='h-4 w-4 shrink-0' />
                   Tell Jovie what you are releasing next
                 </div>
@@ -124,7 +124,7 @@ export function HomeV1Design() {
                   href={buildHomepageStartHref(
                     HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT
                   )}
-                  className='inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold text-black transition-colors hover:bg-white/90'
+                  className='inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white dark:bg-surface-1 px-5 text-sm font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
                 >
                   Request Access
                   <ArrowRight className='h-4 w-4' strokeWidth={2.4} />
@@ -136,7 +136,7 @@ export function HomeV1Design() {
                   <Link
                     key={suggestion}
                     href={buildHomepageStartHref(suggestion)}
-                    className='rounded-full border border-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/56 transition-colors hover:border-white/16 hover:text-white'
+                    className='rounded-full border border-white/[0.08] px-3 py-1.5 text-xs font-medium text-white/56 transition-colors hover:border-white/16 hover:text-white'
                   >
                     {suggestion}
                   </Link>
@@ -146,7 +146,7 @@ export function HomeV1Design() {
           </div>
 
           <div className='grid gap-5 border-t border-white/[0.07] pt-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center'>
-            <p className='max-w-[30rem] text-[13px] leading-5 text-white/44'>
+            <p className='max-w-[30rem] text-app leading-5 text-white/44'>
               Built for artists and teams replacing scattered release work with
               one quiet operating surface.
             </p>

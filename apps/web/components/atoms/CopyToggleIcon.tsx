@@ -1,13 +1,16 @@
+'use client';
+
 import { CheckCircle2, Copy } from 'lucide-react';
+import { AnimatedIconSwap } from '@/components/atoms/AnimatedIconSwap';
 import { cn } from '@/lib/utils';
 
 /**
  * CopyToggleIcon — Copy ↔ Check icon swap for copy-to-clipboard buttons.
  *
  * Renders the lucide `Copy` icon when `copied === false`, and the
- * `CheckCircle2` icon (cyan-300) when `copied === true`. Swap is
- * instantaneous (no cross-fade) — the icon itself is the affordance, the
- * caller's tooltip + state timer is what makes it feel responsive.
+ * `CheckCircle2` icon (cyan-300) when `copied === true`. The swap morphs
+ * through the shared {@link AnimatedIconSwap} primitive (opacity + scale +
+ * blur on an interruptible spring) instead of snapping.
  *
  * Use inside a `<button>` whose `onClick` flips a `copied` flag for
  * ~1200ms then resets. Keeps the swap consistent across every
@@ -36,19 +39,23 @@ export function CopyToggleIcon({
   size,
   strokeWidth = 2.25,
 }: {
-  copied: boolean;
-  className?: string;
+  readonly copied: boolean;
+  readonly className?: string;
   /** Tailwind sizing classes. Defaults to `h-3 w-3` to match shell-v1 buttons. */
-  size?: string;
-  strokeWidth?: number;
+  readonly size?: string;
+  readonly strokeWidth?: number;
 }) {
   const sizing = size ?? 'h-3 w-3';
-  return copied ? (
-    <CheckCircle2
-      className={cn(sizing, 'text-cyan-300', className)}
-      strokeWidth={strokeWidth}
-    />
-  ) : (
-    <Copy className={cn(sizing, className)} strokeWidth={strokeWidth} />
+  return (
+    <AnimatedIconSwap activeKey={copied ? 'copied' : 'idle'}>
+      {copied ? (
+        <CheckCircle2
+          className={cn(sizing, 'text-cyan-300', className)}
+          strokeWidth={strokeWidth}
+        />
+      ) : (
+        <Copy className={cn(sizing, className)} strokeWidth={strokeWidth} />
+      )}
+    </AnimatedIconSwap>
   );
 }

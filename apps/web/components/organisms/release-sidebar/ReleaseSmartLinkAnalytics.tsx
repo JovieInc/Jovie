@@ -200,7 +200,7 @@ function ReleaseSmartLinkControl({
         />
       </div>
       {helperText ? (
-        <p className='px-2.5 text-[10px] leading-[14px] text-tertiary-token'>
+        <p className='px-2.5 text-3xs leading-[14px] text-tertiary-token'>
           {helperText}
         </p>
       ) : null}
@@ -270,13 +270,13 @@ export function ReleaseSmartLinkAnalytics({
     ? [
         {
           id: 'total-clicks',
-          label: 'Total clicks',
+          label: 'Total Clicks',
           value: numberFormatter.format(totalClicks),
           hint: topProviderLabel ? `Top: ${topProviderLabel}` : 'All time',
         },
         {
           id: 'last-click',
-          label: 'Last click',
+          label: 'Last Click',
           value: lastClickAt ? formatTimeAgo(lastClickAt) : '—',
           hint: `${numberFormatter.format(last7DaysClicks)} in last 7 days`,
         },

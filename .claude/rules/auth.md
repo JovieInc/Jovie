@@ -37,6 +37,21 @@ The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Cler
 3. Check CSP allows the decoded FAPI host in `connect-src`, `script-src`, `frame-src`
 4. If staging auth is broken, do not let `staging.jov.ie` fall back to production Clerk keys; fail closed to the auth-unavailable state instead
 
+## OAuth Console Redirect URIs (Google + Apple)
+
+Clerk hands Google/Apple a `redirect_uri` of `https://<fapi-host>/v1/oauth_callback`,
+where the FAPI host decodes from each instance's publishable key
+(`apps/web/lib/auth/decode-fapi-host.ts`). That URI **must** be registered in the
+Google OAuth client + Apple Service ID consoles, or sign-in fails with
+`Error 400: redirect_uri_mismatch` (the 2026-06-26 incident: the staging
+unification moved prod FAPI to `clerk.jov.ie` while the consoles still had the
+old `meetjovie` / `jov.ie/__clerk` callbacks).
+
+- **Single source of truth:** `apps/web/lib/auth/oauth-redirect-uris.expected.json`. Print/verify with `pnpm tsx scripts/auth-redirect-uris.ts [--verify prod|staging]`.
+- **These consoles have NO CLI/API.** To register/update redirect URIs, run the **`/auth-console-sync`** skill — it drives a logged-in browser (claude-in-chrome, not headless `/browse`). Do not ask the user to do it manually.
+- **If you change a Clerk instance / FAPI host** (unification, key rotation, new instance): update the snapshot JSON AND re-run `/auth-console-sync` **before shipping**. `apps/web/tests/unit/auth/fapi-host-snapshot.test.ts` fails on host drift to force this.
+- **Guardrails:** `apps/web/tests/e2e/oauth-providers.spec.ts` (`@production-smoke`) probes the Google/Apple authorize endpoints with the real redirect_uri. It runs in the canary (staging, pre-promote) and the `production-oauth-gate` (post-promote, **auto-rolls-back prod** on a confirmed rejection). Don't verify OAuth by clicking the in-app button — Clerk's invisible bot-protection gates automated clicks.
+
 ## Local Auth Bypass For Perf and E2E
 
 Local `/browse` auth is bypass-first, not Clerk-form-first.
@@ -180,3 +195,23 @@ clerk users delete <user_id>            # delete a user (irreversible — confir
 - Staging application (Account B): staging (`pk_live_...`) → staging.jov.ie
 
 Always confirm `clerk whoami` shows the correct instance before running write operations. For bulk E2E test-user cleanup, prefer `apps/web/scripts/cleanup-e2e-users.ts` over direct CLI deletion.
+
+### Clerk config automation (agents)
+
+For inspecting or safely mutating Clerk instance settings (redirect URLs, OAuth/native apps, allowed origins, webhooks, JWT templates), use the Doppler-wrapped automation script — not manual dashboard edits:
+
+```bash
+# Pull + auth-key preview
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts pull --instance dev
+
+# Diagnose iOS/native redirect gaps
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
+
+# Preview a patch (mutations require --dry-run first)
+doppler run --project jovie-web --config dev -- \
+  pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth":{"redirect_urls":["..."]}}'
+```
+
+Safety: `whoami` + audit logging always; `sk_live_` / prod patches refused without `--allow-prod`; staging/prod patches need explicit human review. Invoke the `/clerk-cli` skill for full workflows. See `docs/CLERK_CLI.md` and `scripts/clerk-config.ts --help`.

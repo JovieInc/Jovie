@@ -4,40 +4,30 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_DESCRIPTIONS,
   APP_FLAG_KEYS,
-  APP_FLAG_TO_STATSIG_GATE,
   type AppFlagName,
   type ProfileAlertOptInVariant,
   type SubscribeCTAVariant,
+  type TeleprompterShowcaseVariant,
 } from './contracts';
 import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+} from './profile-pac';
+import {
   getProfileAlertOptInVariantValue,
-  getStatsigGateValue,
+  getProfilePacAssignmentValue,
   getSubscribeCTAVariantValue,
+  getTeleprompterShowcaseVariantValue,
 } from './statsig';
-
-/**
- * RELEASE_PLAN_DEMO is the YC wedge demo page.
- * It is off by default in production but on in dev and preview so that
- * the demo recorder and QA passes can visit /app/dashboard/release-plan
- * without needing a localStorage override or Statsig gate.
- *
- * In production, the page stays hidden behind the default=false.
- * To enable it for a production demo session, set the localStorage override:
- *   localStorage.setItem('__ff_overrides', JSON.stringify({ 'code:RELEASE_PLAN_DEMO': true }))
- * or use the DevToolbar flag panel.
- */
-const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === 'production';
 
 type FlagEntities = {
   userId: string | null;
 };
 
-function buildBooleanFlag(flagName: AppFlagName): Flag<boolean, FlagEntities> {
+function buildBooleanFlag(flagName: AppFlagName): Flag<boolean> {
   const defaultValue = APP_FLAG_DEFAULTS[flagName];
-  const gateKey =
-    APP_FLAG_TO_STATSIG_GATE[flagName as keyof typeof APP_FLAG_TO_STATSIG_GATE];
 
-  return flag<boolean, FlagEntities>({
+  return flag<boolean>({
     key: APP_FLAG_KEYS[flagName],
     defaultValue,
     description: APP_FLAG_DESCRIPTIONS[flagName],
@@ -45,15 +35,8 @@ function buildBooleanFlag(flagName: AppFlagName): Flag<boolean, FlagEntities> {
       { label: 'Off', value: false },
       { label: 'On', value: true },
     ],
-    async decide({ entities }) {
-      if (!gateKey) {
-        return defaultValue;
-      }
-
-      return getStatsigGateValue(
-        flagName as keyof typeof APP_FLAG_TO_STATSIG_GATE,
-        entities?.userId ?? null
-      );
+    async decide() {
+      return defaultValue;
     },
   });
 }
@@ -67,23 +50,11 @@ export const APP_FLAG_REGISTRY = {
   PLAYLIST_ENGINE: buildBooleanFlag('PLAYLIST_ENGINE'),
   ALBUM_ART_GENERATION: buildBooleanFlag('ALBUM_ART_GENERATION'),
   CHAT_JANK_MONITOR: buildBooleanFlag('CHAT_JANK_MONITOR'),
-  IOS_APP_ALPHA_ACCESS: buildBooleanFlag('IOS_APP_ALPHA_ACCESS'),
-  // RELEASE_PLAN_DEMO is on by default in dev/preview so QA and the demo
-  // recorder can visit /app/dashboard/release-plan without a manual override.
-  // Production keeps it off (default=false) — enable via localStorage override
-  // or DevToolbar for live demo sessions.
-  RELEASE_PLAN_DEMO: flag<boolean, FlagEntities>({
-    key: APP_FLAG_KEYS.RELEASE_PLAN_DEMO,
-    defaultValue: APP_FLAG_DEFAULTS.RELEASE_PLAN_DEMO,
-    description: APP_FLAG_DESCRIPTIONS.RELEASE_PLAN_DEMO,
-    options: [
-      { label: 'Off', value: false },
-      { label: 'On', value: true },
-    ],
-    async decide() {
-      return !IS_VERCEL_PRODUCTION;
-    },
-  }),
+  APPLE_WALLET_PROFILE_PASS: buildBooleanFlag('APPLE_WALLET_PROFILE_PASS'),
+  RELEASE_PLAN_DEMO: buildBooleanFlag('RELEASE_PLAN_DEMO'),
+  RELEASE_TO_REVENUE_AUTOPILOT: buildBooleanFlag(
+    'RELEASE_TO_REVENUE_AUTOPILOT'
+  ),
   DESIGN_V1: buildBooleanFlag('DESIGN_V1'),
   SHELL_CHAT_V1: buildBooleanFlag('SHELL_CHAT_V1'),
   DESIGN_V1_RELEASES: buildBooleanFlag('DESIGN_V1_RELEASES'),
@@ -95,7 +66,9 @@ export const APP_FLAG_REGISTRY = {
   DESIGN_V1_ONBOARDING: buildBooleanFlag('DESIGN_V1_ONBOARDING'),
   AI_CONNECTORS_BETA: buildBooleanFlag('AI_CONNECTORS_BETA'),
   MERCH_MVP: buildBooleanFlag('MERCH_MVP'),
-} as const satisfies Record<AppFlagName, Flag<boolean, FlagEntities>>;
+  BULK_PRESS_PHOTO_IMPORT: buildBooleanFlag('BULK_PRESS_PHOTO_IMPORT'),
+  TELEPROMPTER_RECORDING: buildBooleanFlag('TELEPROMPTER_RECORDING'),
+} as const satisfies Record<AppFlagName, Flag<boolean>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<
   SubscribeCTAVariant,
@@ -120,6 +93,36 @@ export const PROFILE_ALERT_OPTIN_VARIANT_FLAG = flag<
   options: ['button', 'toggle'],
   async decide({ entities }) {
     return getProfileAlertOptInVariantValue(entities?.userId ?? null);
+  },
+});
+
+export const PROFILE_PAC_VARIANT_SLOTS_FLAG = flag<
+  ProfilePacAssignment,
+  FlagEntities
+>({
+  key: 'profile_pac_variant_slots',
+  defaultValue: {
+    ...DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  },
+  description:
+    'Public profile Primary Action Card variant slots: S1 copy arm, S1 trigger threshold, S2 monetization slot',
+  options: [{ label: 'Default', value: DEFAULT_PROFILE_PAC_ASSIGNMENT }],
+  async decide({ entities }) {
+    return getProfilePacAssignmentValue(entities?.userId ?? null);
+  },
+});
+
+export const TELEPROMPTER_SHOWCASE_VARIANT_FLAG = flag<
+  TeleprompterShowcaseVariant,
+  FlagEntities
+>({
+  key: 'experiment_teleprompter_showcase',
+  defaultValue: 'direct',
+  description:
+    'Teleprompter showcase interstitial A/B — direct recorder vs bento primer',
+  options: ['interstitial', 'direct'],
+  async decide({ entities }) {
+    return getTeleprompterShowcaseVariantValue(entities?.userId ?? null);
   },
 });
 

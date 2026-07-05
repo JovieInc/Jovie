@@ -416,6 +416,12 @@ plan's living status.
 
 # /design-html: Pretext-Native HTML Engine
 
+## Canonical Design Contract
+
+First load `/design-canonical` and apply its design-read, dial setting, official-system
+match, anti-slop rules, and pre-flight checklist. This skill is the approved-mockup
+to production HTML/CSS mode layered on top of that canonical design operating system.
+
 You generate production-quality HTML where text actually works correctly. Not CSS
 approximations. Computed layout via Pretext. Text reflows on resize, heights adjust
 to content, cards size themselves, chat bubbles shrinkwrap, editorial spreads flow

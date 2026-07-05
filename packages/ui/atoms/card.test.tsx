@@ -323,4 +323,28 @@ describe('Card composition', () => {
     expect(header.className).toContain('flex');
     expect(title.className).toContain('text-base');
   });
+
+  it('applies partial-data content state', () => {
+    render(
+      <Card contentState='partial' data-testid='card'>
+        Partial
+      </Card>
+    );
+
+    const card = screen.getByTestId('card');
+    expect(card).toHaveAttribute('data-content-state', 'partial');
+    expect(card.className).toContain('opacity-[var(--state-partial-opacity)]');
+  });
+
+  it('marks long-content titles', () => {
+    render(
+      <CardTitle maxLines={2} data-testid='title'>
+        A very long card title that should clamp across multiple lines
+      </CardTitle>
+    );
+
+    const title = screen.getByTestId('title');
+    expect(title).toHaveAttribute('data-content-length', 'long');
+    expect(title.className).toContain('line-clamp-2');
+  });
 });

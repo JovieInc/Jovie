@@ -105,7 +105,7 @@ export function createContactColumns(
             className='group flex items-center gap-1.5 text-secondary-token hover:text-primary-token transition-colors'
           >
             <Mail className='h-3.5 w-3.5 text-tertiary-token group-hover:text-primary-token' />
-            <span className='truncate max-w-[160px]'>{email}</span>
+            <span className='truncate max-w-40'>{email}</span>
           </button>
         );
       },
@@ -128,7 +128,7 @@ export function createContactColumns(
             className='group flex items-center gap-1.5 text-secondary-token hover:text-primary-token transition-colors'
           >
             <Phone className='h-3.5 w-3.5 text-tertiary-token group-hover:text-primary-token' />
-            <span className='truncate max-w-[120px]'>{phone}</span>
+            <span className='truncate max-w-30'>{phone}</span>
           </button>
         );
       },

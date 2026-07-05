@@ -130,6 +130,14 @@ export function isMaliciousProbePath(pathname: string): boolean {
  * content for the probe path.
  */
 export function createProbeDropResponse(): Response {
+  return createFastNotFoundResponse();
+}
+
+/**
+ * Minimal 404 for paths that must never render a soft-404 page or hit the DB.
+ * Shared by scanner probes and reserved catch-all handle segments.
+ */
+export function createFastNotFoundResponse(): Response {
   return new Response(null, {
     status: 404,
     headers: {

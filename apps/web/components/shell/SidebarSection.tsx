@@ -86,7 +86,7 @@ export function SidebarSection({
           )}
           strokeWidth={2.25}
         />
-        <span className='text-[13px] font-caption truncate text-primary-token'>
+        <span className='text-app font-caption truncate text-primary-token'>
           {name}
         </span>
       </button>

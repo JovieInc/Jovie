@@ -69,10 +69,10 @@ export function ChatProposeNextStepCard({
       elements: {
         rootBox: 'w-full',
         card: 'bg-transparent shadow-none border-0 p-0',
-        headerTitle: 'text-primary-token text-[18px] font-semibold',
-        headerSubtitle: 'text-secondary-token text-[13px]',
+        headerTitle: 'text-primary-token text-lg font-semibold',
+        headerSubtitle: 'text-secondary-token text-app',
         formButtonPrimary:
-          'bg-white text-black hover:bg-white/90 font-semibold',
+          'bg-white text-black dark:text-white hover:bg-white/90 font-semibold',
         socialButtonsBlockButton:
           'bg-surface-1 border-subtle text-primary-token hover:bg-surface-2',
         formFieldInput:
@@ -103,7 +103,7 @@ export function ChatProposeNextStepCard({
   if (kind === 'waitlist') {
     return (
       <div className='px-1 py-1'>
-        <p className='text-[15px] leading-7 text-primary-token'>
+        <p className='text-mid leading-7 text-primary-token'>
           {`You're on the list. I'll email you when you're up. We can pick up right here.`}
         </p>
       </div>
@@ -117,7 +117,7 @@ export function ChatProposeNextStepCard({
     // shell will fire and bounce them to checkout.
     return (
       <div className='px-1 py-1'>
-        <p className='text-[15px] leading-7 text-primary-token'>
+        <p className='text-mid leading-7 text-primary-token'>
           {`You're already signed in. Linking this conversation to your account.`}
         </p>
       </div>
@@ -127,7 +127,7 @@ export function ChatProposeNextStepCard({
   if (!canRenderClerkUi) {
     return (
       <div className='px-1 py-1'>
-        <p className='text-[15px] leading-7 text-primary-token'>
+        <p className='text-mid leading-7 text-primary-token'>
           {`You're in. Create your account to keep this conversation and finish your profile.`}
         </p>
       </div>
@@ -136,7 +136,7 @@ export function ChatProposeNextStepCard({
 
   return (
     <div className='space-y-3 px-1 py-1'>
-      <p className='mb-3 text-[15px] leading-7 text-primary-token'>
+      <p className='mb-3 text-mid leading-7 text-primary-token'>
         {`You're in. Add an email to keep going. I'll save this conversation to your account so we don't lose it.`}
       </p>
       <SignUp

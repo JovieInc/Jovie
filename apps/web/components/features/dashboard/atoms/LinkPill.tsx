@@ -143,7 +143,7 @@ export function LinkPill({
               ref={setFloatingRef}
               tabIndex={-1}
               style={floatingStyles}
-              className={cn('z-100 min-w-[176px]', dropdownMenuContentClasses)}
+              className={cn('z-100 min-w-44', dropdownMenuContentClasses)}
               {...getFloatingProps()}
             >
               {menuItems.map((item, index) => (

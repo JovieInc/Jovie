@@ -56,6 +56,16 @@ describe('@critical GET /api/health/build-info', () => {
     expect(body.commitSha).toBe('abcdef1');
   });
 
+  it('marks build info as no-store so desktop reload polling sees fresh deploys', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = GET();
+
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
   it('returns development build id without warning in development', async () => {
     vi.stubEnv('NODE_ENV', 'development');
 

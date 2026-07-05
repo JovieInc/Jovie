@@ -97,7 +97,9 @@ function LinkItem({
           getCheckboxStyles(isDisabled, isChecked)
         )}
       >
-        {isChecked && <Icon name='Check' className='h-3 w-3 text-white' />}
+        {isChecked && (
+          <Icon name='Check' className='h-3 w-3 text-white dark:text-white' />
+        )}
       </div>
 
       {/* Platform icon */}
@@ -197,7 +199,7 @@ export function MultiLinkPasteDialog({
           onClick={onConfirm}
           disabled={!hasSelectableLinks}
         >
-          Add {selectableCount} link{selectableCount === 1 ? '' : 's'}
+          Add {selectableCount} Link{selectableCount === 1 ? '' : 's'}
         </Button>
       </DialogActions>
     </Dialog>

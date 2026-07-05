@@ -22,7 +22,23 @@ vi.mock('motion/react', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  Button: ({
+    children,
+    size,
+    variant,
+    ...props
+  }: ComponentProps<'button'> & { size?: string; variant?: string }) => (
+    <button data-size={size} data-variant={variant} {...props}>
+      {children}
+    </button>
+  ),
   SimpleTooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: ReactNode; href: string }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 vi.mock('next/dynamic', () => ({
@@ -99,6 +115,13 @@ describe('ChatMessage analytics cards', () => {
     expect(signalCard).toBeTruthy();
     expect(signalCard.className).toContain('min-w-[min(20rem,84vw)]');
     expect(screen.getByText('Top signals')).toBeTruthy();
+    expect(screen.getByTestId('chat-analytics-signal-count')).toHaveTextContent(
+      'Showing 1 of 2 active signals'
+    );
+    expect(screen.getByRole('link', { name: /View all/i })).toHaveAttribute(
+      'href',
+      '/app/insights'
+    );
     expect(
       screen.getByText('Subscribers are picking up in Chicago')
     ).toBeTruthy();

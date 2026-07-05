@@ -25,6 +25,7 @@ const DEV_TOOLBAR_SUPPRESSED_PATHS = new Set([
   '/demovideo',
   '/demo',
   '/demo/video',
+  '/start',
 ]);
 const DEV_TOOLBAR_SUPPRESSED_PREFIXES = ['/demo/'];
 

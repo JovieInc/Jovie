@@ -71,9 +71,9 @@ function resolveFooterVariant(
 const markLinkClassName =
   '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-subtle hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLinkClassName =
-  'mf-link inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-link inline-flex w-fit rounded-md text-mid leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
-  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-tight text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
@@ -112,7 +112,7 @@ export function MarketingFooter({
     >
       <div
         className={cn(
-          'mx-auto w-full max-w-[var(--linear-content-max)] px-[clamp(1.25rem,2.2vw,2rem)]',
+          'mx-auto w-full max-w-linear-content px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
             ? 'pt-[clamp(3rem,5vw,4.5rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
             : shouldShowCta
@@ -130,7 +130,7 @@ export function MarketingFooter({
           <Link
             href={APP_ROUTES.HOME}
             prefetch={false}
-            aria-label='Jovie home'
+            aria-label='Jovie Home'
             className={markLinkClassName}
           >
             <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
@@ -141,7 +141,7 @@ export function MarketingFooter({
               <Link
                 href={APP_ROUTES.HOME}
                 prefetch={false}
-                aria-label='Jovie home'
+                aria-label='Jovie Home'
                 className={markLinkClassName}
               >
                 <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
@@ -183,7 +183,7 @@ export function MarketingFooter({
           )}
           style={isMinimal ? { marginTop: '1.75rem' } : undefined}
         >
-          <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.5]'>
+          <span className='text-xs leading-[1.45] tracking-[-0.005em] text-white/[0.5]'>
             © {new Date().getFullYear()} Jovie Technology Inc.
           </span>
           <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>

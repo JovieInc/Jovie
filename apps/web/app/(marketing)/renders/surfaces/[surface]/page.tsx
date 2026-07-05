@@ -33,7 +33,7 @@ export default async function MarketingSurfaceRenderPage({
 
   return (
     <div
-      className='flex min-h-screen items-center justify-center bg-black'
+      className='flex min-h-screen items-center justify-center bg-black dark:bg-black'
       style={{ padding: '2rem' }}
     >
       <div

@@ -73,7 +73,7 @@ export function computeMemberTitle(
   if (!member || member.type === 'anonymous') {
     return 'Anonymous user';
   }
-  return member.displayName || member.email || member.phone || 'Visitor';
+  return member.displayName || member.email || member.phone || 'Fan';
 }
 
 /**
@@ -83,7 +83,7 @@ export function computeMemberSubtitle(
   member: { type: string; email?: string | null; phone?: string | null } | null
 ): string {
   if (!member || member.type === 'anonymous') {
-    return 'Visitor';
+    return 'Anonymous fan';
   }
 
   switch (member.type) {
@@ -96,7 +96,7 @@ export function computeMemberSubtitle(
     case 'customer':
       return 'Customer';
     default:
-      return 'Visitor';
+      return 'Fan';
   }
 }
 

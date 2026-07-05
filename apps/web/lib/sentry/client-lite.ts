@@ -29,9 +29,22 @@ import {
 let isInitialized = false;
 
 /**
- * Integration type - inferred from Sentry's breadcrumbsIntegration return type
+ * Integration type. SDK v10 no longer exports `Integration` from @sentry/nextjs's
+ * isomorphic surface, so derive it from the init() options' integrations array.
  */
-type SentryIntegration = ReturnType<typeof Sentry.breadcrumbsIntegration>;
+type SentryIntegration = Extract<
+  NonNullable<NonNullable<Parameters<typeof Sentry.init>[0]>['integrations']>,
+  readonly unknown[]
+>[number];
+
+/**
+ * breadcrumbsIntegration is a client-only export that exists on @sentry/nextjs
+ * at runtime in the browser build but is absent from its isomorphic type surface
+ * in SDK v10. Cast to a typed view of the client-only factory this module calls.
+ */
+const clientSentry = Sentry as typeof Sentry & {
+  breadcrumbsIntegration: () => SentryIntegration;
+};
 
 /**
  * Lite Sentry configuration options.
@@ -66,7 +79,7 @@ export interface LiteSentryConfig {
  */
 export function getLiteClientConfig(
   options: LiteSentryConfig = {}
-): Sentry.BrowserOptions {
+): NonNullable<Parameters<typeof Sentry.init>[0]> {
   const baseConfig = getBaseClientConfig();
   const {
     tracesSampleRate = TRACES_SAMPLE_RATE,
@@ -79,7 +92,7 @@ export function getLiteClientConfig(
 
   // Add breadcrumb integration if enabled (default behavior)
   if (enableBreadcrumbs) {
-    integrations.push(Sentry.breadcrumbsIntegration());
+    integrations.push(clientSentry.breadcrumbsIntegration());
   }
 
   // Add any custom lightweight integrations

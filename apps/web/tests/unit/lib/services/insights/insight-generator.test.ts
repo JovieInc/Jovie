@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { INSIGHT_MODEL } from '@/lib/constants/ai-models';
 import type { MetricSnapshot } from '@/types/insights';
 
-const { mockGenerateObject, mockGateway } = vi.hoisted(() => ({
+const { mockGenerateObject, mockGatewayModel } = vi.hoisted(() => ({
   mockGenerateObject: vi.fn(),
-  mockGateway: vi.fn(),
+  mockGatewayModel: vi.fn(),
 }));
 
 vi.mock('ai', () => ({
@@ -13,7 +13,8 @@ vi.mock('ai', () => ({
 }));
 
 vi.mock('@ai-sdk/gateway', () => ({
-  gateway: mockGateway,
+  createGateway: vi.fn(() => mockGatewayModel),
+  gateway: vi.fn(),
 }));
 
 vi.mock('@/lib/services/insights/prompts', () => ({
@@ -100,7 +101,7 @@ const metricSnapshotFixture: MetricSnapshot = {
 describe('insight-generator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGateway.mockReturnValue('gateway-model');
+    mockGatewayModel.mockReturnValue('gateway-model');
   });
 
   it('calls AI gateway without anthropic provider options', async () => {
@@ -129,7 +130,7 @@ describe('insight-generator', () => {
 
     await generateInsights(metricSnapshotFixture, []);
 
-    expect(mockGateway).toHaveBeenCalledWith(INSIGHT_MODEL);
+    expect(mockGatewayModel).toHaveBeenCalledWith(INSIGHT_MODEL);
     expect(mockGenerateObject).toHaveBeenCalledTimes(1);
 
     const generateObjectArg = mockGenerateObject.mock.calls[0]?.[0];

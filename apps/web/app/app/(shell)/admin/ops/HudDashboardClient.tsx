@@ -21,15 +21,21 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
+import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
+import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
+import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
+import { WhatShipped } from '@/components/features/admin/WhatShipped';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
+import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
+import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
 import {
   getDefaultStatusTone,
   getDeploymentLabel,
@@ -43,6 +49,7 @@ import type {
   HudMetrics,
 } from '@/types/hud';
 import { HudClockClient } from './HudClockClient';
+import { HudMetricSourceTrust } from './HudMetricSourceTrust';
 import { HudStatusPill } from './HudStatusPill';
 import { useHudMetricsQuery } from './useHudMetricsQuery';
 
@@ -112,6 +119,105 @@ function formatReliabilitySubtitle(
   return `${reliability.unresolvedSentryIssues24h.toLocaleString('en-US')} unresolved | p95 ${p95}`;
 }
 
+function formatTestingQuarantineSubtitle(
+  quarantine: HudMetrics['testing']['quarantine']
+): string {
+  const budget = `${quarantine.estimatedRetryAttemptsPerRun}/${quarantine.retryBudgetCap} retries`;
+  const mix = `${quarantine.unitCount} unit | ${quarantine.e2eCount} e2e`;
+  if (!quarantine.isValid) {
+    return `Ledger invalid | ${budget}`;
+  }
+  if (!quarantine.withinRetryBudget) {
+    return `Over budget | ${mix}`;
+  }
+  if (quarantine.expiredCount > 0) {
+    return `${quarantine.expiredCount} expired | ${budget}`;
+  }
+  return `${mix} | ${budget}`;
+}
+
+function HudHealthMetricCards({
+  metrics,
+  secondaryValueClass,
+  databaseSource,
+  sentrySource,
+  handleSourceRetry,
+}: Readonly<{
+  readonly metrics: HudMetrics;
+  readonly secondaryValueClass: string;
+  readonly databaseSource: HudMetrics['sources']['database'];
+  readonly sentrySource: HudMetrics['sources']['sentry'];
+  readonly handleSourceRetry: () => void;
+}>) {
+  return (
+    <>
+      <ContentMetricCard
+        label='Operations'
+        value={metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'}
+        subtitle={metricSubtitleWithTrust(
+          metrics.operations.dbLatencyMs === null
+            ? 'DB latency —'
+            : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`,
+          databaseSource,
+          handleSourceRetry
+        )}
+        className='p-3'
+        valueClassName={secondaryValueClass}
+      />
+      <ContentMetricCard
+        label='Reliability'
+        value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
+        subtitle={metricSubtitleWithTrust(
+          formatReliabilitySubtitle(metrics.reliability),
+          sentrySource,
+          handleSourceRetry
+        )}
+        className='p-3'
+        valueClassName={secondaryValueClass}
+      />
+      <ContentMetricCard
+        label='Flaky Quarantine'
+        value={metrics.testing.quarantine.activeCount.toLocaleString('en-US')}
+        subtitle={formatTestingQuarantineSubtitle(metrics.testing.quarantine)}
+        className='p-3'
+        valueClassName={secondaryValueClass}
+        data-testid='hud-flaky-quarantine-card'
+      />
+    </>
+  );
+}
+
+function HudDeploymentsSurfaceCard({
+  metrics,
+  deploymentDetail,
+  githubSource,
+  handleSourceRetry,
+}: Readonly<{
+  readonly metrics: HudMetrics;
+  readonly deploymentDetail: string;
+  readonly githubSource: HudMetrics['sources']['github'];
+  readonly handleSourceRetry: () => void;
+}>) {
+  return (
+    <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
+      <div className='flex items-center justify-between gap-3'>
+        <SectionLabel>Deployments</SectionLabel>
+        <p className='text-xs text-secondary-token'>{deploymentDetail}</p>
+      </div>
+      {metrics.deployments.recent.length > 0 ? (
+        <div className='grid gap-2'>
+          {metrics.deployments.recent.slice(0, 5).map(run => (
+            <DeploymentRow key={run.id} run={run} />
+          ))}
+        </div>
+      ) : (
+        <p className='text-app text-secondary-token'>No recent runs.</p>
+      )}
+      <HudMetricSourceTrust source={githubSource} onRetry={handleSourceRetry} />
+    </ContentSurfaceCard>
+  );
+}
+
 function formatDefaultStatusLabel(
   status: HudMetrics['overview']['defaultStatus']
 ): string {
@@ -135,6 +241,10 @@ const DEPLOYMENT_STATE_DOT_CLASSNAMES: Record<HudDeploymentState, string> = {
   unknown: 'bg-tertiary-token',
   not_configured: 'bg-tertiary-token',
 };
+
+const DISPATCH_SOURCE_PLACEHOLDER = 'Linear, GitHub, or Sentry URL';
+const RUNWAY_BURN_LABEL = 'Burn (30d)';
+const OVERVIEW_BURN_LABEL = 'Burn (30d)';
 
 function getAiOpsTone(aiOps: HudMetrics['aiOps']): HudTone {
   if (aiOps.counts.failed > 0 || aiOps.counts.blocked > 0) return 'bad';
@@ -193,7 +303,7 @@ function DeploymentActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          aria-label='Deployment actions'
+          aria-label='Deployment Actions'
           className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
         >
           <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
@@ -247,24 +357,24 @@ function CompactDeploymentRow({
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${DEPLOYMENT_STATE_DOT_CLASSNAMES[run.status]}`}
             aria-hidden='true'
           />
-          <p className='truncate text-[13px] font-[590] text-primary-token'>
+          <p className='truncate text-app font-semibold text-primary-token'>
             {DEPLOYMENT_STATE_LABELS[run.status]}
           </p>
         </div>
         <div className='flex shrink-0 items-center gap-1.5'>
-          <p className='text-[12px] font-[560] tabular-nums text-primary-token'>
+          <p className='text-xs font-[560] tabular-nums text-primary-token'>
             #{run.runNumber}
           </p>
           <DeploymentActionsMenu run={run} />
         </div>
       </div>
       <p
-        className='truncate text-[12px] leading-4 text-secondary-token'
+        className='truncate text-xs leading-4 text-secondary-token'
         title={run.branch ?? undefined}
       >
         {run.branch ?? '\u2014'}
       </p>
-      <p className='text-[11px] text-tertiary-token'>
+      <p className='text-2xs text-tertiary-token'>
         {formatDeploymentTime(run.createdAtIso)}
       </p>
     </ShellListRowFrame>
@@ -279,7 +389,7 @@ function DeploymentRow({
   return (
     <ShellListRowFrame className='flex items-center justify-between gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
-        <p className='truncate text-[13px] font-semibold text-primary-token'>
+        <p className='truncate text-app font-semibold text-primary-token'>
           #{run.runNumber}
           <span className='ml-2 font-normal text-secondary-token'>
             {run.branch ?? '\u2014'}
@@ -288,10 +398,10 @@ function DeploymentRow({
       </div>
       <div className='flex shrink-0 items-center gap-2'>
         <div className='text-right'>
-          <p className='text-[11px] text-tertiary-token'>
+          <p className='text-2xs text-tertiary-token'>
             {formatDeploymentTime(run.createdAtIso)}
           </p>
-          <p className='mt-0.5 text-[11px] font-medium text-secondary-token'>
+          <p className='mt-0.5 text-2xs font-medium text-secondary-token'>
             {DEPLOYMENT_STATE_LABELS[run.status]}
           </p>
         </div>
@@ -314,10 +424,8 @@ function DeploymentsPanel({
       data-testid='ops-deployments-panel'
     >
       <div className='flex items-center justify-between gap-3'>
-        <p className='text-[12.5px] font-[560] text-primary-token'>
-          Deployments
-        </p>
-        <p className='truncate text-[11px] text-tertiary-token' title={detail}>
+        <p className='text-xs font-[560] text-primary-token'>Deployments</p>
+        <p className='truncate text-2xs text-tertiary-token' title={detail}>
           {detail}
         </p>
       </div>
@@ -328,8 +436,27 @@ function DeploymentsPanel({
           ))}
         </div>
       ) : (
-        <p className='text-[13px] text-secondary-token'>No recent runs.</p>
+        <p className='text-app text-secondary-token'>No recent runs.</p>
       )}
+    </div>
+  );
+}
+
+function DeploymentsPanelWithTrust({
+  deployments,
+  detail,
+  githubSource,
+  onRetry,
+}: Readonly<{
+  readonly deployments: HudMetrics['deployments'];
+  readonly detail: string;
+  readonly githubSource: HudMetrics['sources']['github'];
+  readonly onRetry?: () => void;
+}>) {
+  return (
+    <div className='space-y-2'>
+      <DeploymentsPanel deployments={deployments} detail={detail} />
+      <HudMetricSourceTrust source={githubSource} onRetry={onRetry} />
     </div>
   );
 }
@@ -348,21 +475,21 @@ function AiOpsItemRow({
   return (
     <ShellListRowFrame className='flex items-start justify-between gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
-        <p className='truncate text-[13px] font-semibold text-primary-token'>
+        <p className='truncate text-app font-semibold text-primary-token'>
           {item.summary}
         </p>
-        <p className='mt-1 text-[11px] text-tertiary-token'>
+        <p className='mt-1 text-2xs text-tertiary-token'>
           {formatMetaLabel(item.source)} / {formatMetaLabel(item.status)}
         </p>
       </div>
-      <div className='flex shrink-0 items-center gap-1.5 text-right text-[11px] text-tertiary-token'>
+      <div className='flex shrink-0 items-center gap-1.5 text-right text-2xs text-tertiary-token'>
         <p>{formatDeploymentTime(item.updatedAt)}</p>
         {isDismissed && onUndismiss ? (
           <button
             type='button'
             onClick={onUndismiss}
-            aria-label='Restore item'
-            className='rounded px-1 py-0.5 text-[11px] text-tertiary-token hover:text-primary-token'
+            aria-label='Restore Item'
+            className='rounded px-1 py-0.5 text-2xs text-tertiary-token hover:text-primary-token'
           >
             Undo
           </button>
@@ -370,7 +497,7 @@ function AiOpsItemRow({
           <button
             type='button'
             onClick={onDismiss}
-            aria-label='Dismiss item'
+            aria-label='Dismiss Item'
             className='rounded p-0.5 text-tertiary-token hover:text-primary-token'
           >
             <X className='h-3.5 w-3.5' aria-hidden='true' />
@@ -396,7 +523,7 @@ function HermesDispatchControls({
 
   if (!aiOps.dispatch.available) {
     return (
-      <p className='text-[13px] leading-5 text-secondary-token'>
+      <p className='text-app leading-5 text-secondary-token'>
         {aiOps.dispatch.unavailableReason ??
           'Hermes dispatch is not configured.'}
       </p>
@@ -461,13 +588,13 @@ function HermesDispatchControls({
           type='url'
           value={sourceUrl}
           onChange={event => setSourceUrl(event.target.value)}
-          placeholder='Linear, GitHub, or Sentry URL'
-          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+          placeholder={DISPATCH_SOURCE_PLACEHOLDER}
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-app text-primary-token outline-none'
         />
         <select
           value={runtime}
           onChange={event => setRuntime(event.target.value as HermesCliRuntime)}
-          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-app text-primary-token outline-none'
         >
           {aiOps.dispatch.runtimes.map(option => (
             <option key={option} value={option}>
@@ -478,7 +605,7 @@ function HermesDispatchControls({
         <select
           value={kind}
           onChange={event => setKind(event.target.value as HermesDispatchKind)}
-          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-app text-primary-token outline-none'
         >
           <option value='investigation'>investigation</option>
           <option value='bug_patch'>bug_patch</option>
@@ -493,7 +620,7 @@ function HermesDispatchControls({
           type='button'
           onClick={() => void dispatchWorker(false)}
           disabled={isDispatching}
-          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-primary px-3 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60'
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-app font-semibold text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isDispatching ? (
             <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
@@ -506,13 +633,13 @@ function HermesDispatchControls({
           type='button'
           onClick={() => void dispatchWorker(true)}
           disabled={isDispatching}
-          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] font-semibold text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-app font-semibold text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
         >
           Dry run
         </button>
       </div>
       {message ? (
-        <p className='text-[13px] leading-5 text-secondary-token'>{message}</p>
+        <p className='text-app leading-5 text-secondary-token'>{message}</p>
       ) : null}
     </div>
   );
@@ -539,10 +666,38 @@ export interface HudDashboardClientProps {
   readonly initialShippingData?: DailyBucket[];
   /** ISO timestamp of when shipping data was last cached. */
   readonly initialShippingCachedAt?: string;
+  /** When true and agentRuns empty, show dev fixtures on Agent OS panel. */
+  readonly useFixtureAgentRuns?: boolean;
+}
+
+function resolveAgentOsArtifacts(
+  metrics: HudMetrics,
+  useFixtureAgentRuns: boolean
+): AgentRunArtifact[] {
+  if (metrics.agentRuns.length > 0) {
+    return [...metrics.agentRuns];
+  }
+  if (useFixtureAgentRuns) {
+    return [...AGENT_OS_ADMIN_FIXTURE_ARTIFACTS];
+  }
+  return [];
 }
 
 function makeItemKey(item: HudMetrics['aiOps']['blockers'][number]): string {
   return `${item.source}|${item.summary}|${item.updatedAt}`;
+}
+
+function metricSubtitleWithTrust(
+  body: ReactNode,
+  source: HudMetrics['sources'][keyof HudMetrics['sources']],
+  onRetry?: () => void
+): ReactNode {
+  return (
+    <>
+      {body}
+      <HudMetricSourceTrust source={source} onRetry={onRetry} />
+    </>
+  );
 }
 
 export function HudDashboardClient({
@@ -553,10 +708,15 @@ export function HudDashboardClient({
   kioskToken = null,
   initialShippingData,
   initialShippingCachedAt,
+  useFixtureAgentRuns = false,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
     initialMetrics,
     kioskToken
+  );
+  const agentOsArtifacts = resolveAgentOsArtifacts(
+    metrics,
+    useFixtureAgentRuns
   );
 
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
@@ -579,6 +739,14 @@ export function HudDashboardClient({
   const deploymentDetail = getDeploymentDetail(metrics.deployments);
   const aiOpsTone = getAiOpsTone(metrics.aiOps);
   const aiOpsLabel = getAiOpsLabel(metrics.aiOps);
+  const stripeSource = metrics.sources.stripe;
+  const mercurySource = metrics.sources.mercury;
+  const databaseSource = metrics.sources.database;
+  const sentrySource = metrics.sources.sentry;
+  const githubSource = metrics.sources.github;
+  const handleSourceRetry = () => {
+    refetch().catch(() => {});
+  };
 
   const isShell = density === 'shell';
   const showDispatch = presentationMode !== 'token';
@@ -596,13 +764,13 @@ export function HudDashboardClient({
   // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
   // TV-readable 44/56/72 ramp.
   const mrrValueClass = isShell
-    ? 'text-[28px] font-[620] leading-none tracking-[-0.03em] sm:text-[32px]'
-    : 'text-[44px] font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
+    ? 'text-3xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
+    : 'text-5xl font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
 
   // Operations / Reliability / Runway KPIs likewise scale down in shell.
   const secondaryValueClass = isShell
-    ? 'text-[24px] font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
-    : 'text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
+    ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
+    : 'text-4xl font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
 
   const aiOpsSummary = (
     <span>
@@ -619,18 +787,29 @@ export function HudDashboardClient({
   if (isShell) {
     return (
       <div className={outerClass}>
+        <WhatShipped kioskToken={kioskToken} />
         <TimActionRequiredSection />
+        <HudKpiSubgrid metrics={metrics} />
+        <HudSystemHealthStrip metrics={metrics} />
+        <DesignProposalReviewPanel />
 
         <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
           <ContentMetricCard
             label='MRR'
-            value={formatUsd(metrics.overview.mrrUsd)}
-            subtitle={
-              <span>
-                {metrics.overview.activeSubscribers.toLocaleString('en-US')}{' '}
-                subscribers
-              </span>
+            value={
+              isHudMetricValueAvailable(stripeSource)
+                ? formatUsd(metrics.overview.mrrUsd)
+                : '\u2014'
             }
+            subtitle={metricSubtitleWithTrust(
+              <span>
+                {isHudMetricValueAvailable(stripeSource)
+                  ? `${metrics.overview.activeSubscribers.toLocaleString('en-US')} subscribers`
+                  : 'Stripe data unavailable'}
+              </span>,
+              stripeSource,
+              handleSourceRetry
+            )}
             headerRight={
               <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
             }
@@ -640,58 +819,51 @@ export function HudDashboardClient({
           <ContentMetricCard
             label='Runway'
             value={
-              metrics.overview.financialDataAvailable
+              isHudMetricValueAvailable(mercurySource)
                 ? formatRunway(metrics.overview.runwayMonths)
                 : '\u2014'
             }
-            subtitle={
-              metrics.overview.financialDataAvailable ? (
-                <div className='mt-2 grid gap-1.5'>
+            subtitle={metricSubtitleWithTrust(
+              isHudMetricValueAvailable(mercurySource) ? (
+                <div className='grid gap-1.5'>
                   <ContentMetricRow
                     label='Cash'
                     value={formatUsd(metrics.overview.balanceUsd)}
                   />
                   <ContentMetricRow
-                    label='Burn (30d)'
+                    label={RUNWAY_BURN_LABEL}
                     value={formatUsd(metrics.overview.burnRateUsd)}
                   />
                 </div>
               ) : (
-                'Unavailable'
-              )
-            }
+                <span>Mercury data unavailable</span>
+              ),
+              mercurySource,
+              handleSourceRetry
+            )}
             className='p-3'
             valueClassName={secondaryValueClass}
           />
-          <ContentMetricCard
-            label='Operations'
-            value={metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'}
-            subtitle={
-              metrics.operations.dbLatencyMs === null
-                ? 'DB latency -'
-                : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`
-            }
-            className='p-3'
-            valueClassName={secondaryValueClass}
-          />
-          <ContentMetricCard
-            label='Reliability'
-            value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
-            subtitle={formatReliabilitySubtitle(metrics.reliability)}
-            className='p-3'
-            valueClassName={secondaryValueClass}
+          <HudHealthMetricCards
+            metrics={metrics}
+            secondaryValueClass={secondaryValueClass}
+            databaseSource={databaseSource}
+            sentrySource={sentrySource}
+            handleSourceRetry={handleSourceRetry}
           />
         </div>
 
         {metrics.accessMode === 'admin' ? (
           <AgentOsRunsPanel
-            artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS}
+            artifacts={agentOsArtifacts}
             summary={aiOpsSummary}
             status={<HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />}
             deploymentsPanel={
-              <DeploymentsPanel
+              <DeploymentsPanelWithTrust
                 deployments={metrics.deployments}
                 detail={deploymentDetail}
+                githubSource={githubSource}
+                onRetry={handleSourceRetry}
               />
             }
           />
@@ -714,10 +886,10 @@ export function HudDashboardClient({
             <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
               <div className='space-y-2'>
                 <SectionLabel>Default status</SectionLabel>
-                <p className='text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'>
+                <p className='text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'>
                   {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
                 </p>
-                <p className='max-w-4xl text-[13px] leading-6 text-secondary-token'>
+                <p className='max-w-4xl text-app leading-6 text-secondary-token'>
                   {metrics.overview.defaultStatusDetail}
                 </p>
               </div>
@@ -740,7 +912,7 @@ export function HudDashboardClient({
           className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
         >
           <div className='flex items-center gap-3'>
-            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
+            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-subtle bg-surface-0'>
               <Image
                 src='/brand/Jovie-Logo-Icon-White.svg'
                 alt='Jovie'
@@ -752,21 +924,23 @@ export function HudDashboardClient({
             </div>
             <div className='min-w-0'>
               <SectionLabel>HUD</SectionLabel>
-              <h1 className='mt-1 truncate text-[22px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[24px]'>
+              <h1 className='mt-1 truncate text-xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-2xl'>
                 {metrics.branding.startupName}
               </h1>
             </div>
           </div>
           <div className='flex flex-col items-start gap-1 sm:items-end'>
-            <div className='text-[18px] font-[620] tracking-[-0.03em] text-primary-token sm:text-[20px]'>
+            <div className='text-lg font-[620] tracking-[-0.03em] text-primary-token sm:text-xl'>
               <HudClockClient />
             </div>
-            <p className='text-[12px] text-secondary-token'>
+            <p className='text-xs text-secondary-token'>
               Updated {formatUpdatedTime(metrics.generatedAtIso)}
             </p>
           </div>
         </ContentSurfaceCard>
       ) : null}
+
+      <WhatShipped kioskToken={kioskToken} />
 
       {/* Tim Action Required — personal manual items, surfaces above everything else */}
       {/* ContentSurfaceCard is rendered by TimActionRequiredSection itself so it can self-hide */}
@@ -786,14 +960,21 @@ export function HudDashboardClient({
         {/* MRR + small metric tiles */}
         <div className='grid gap-3 content-start'>
           <ContentMetricCard
-            label='Monthly recurring revenue'
-            value={formatUsd(metrics.overview.mrrUsd)}
-            subtitle={
-              <span className='text-[14px] text-secondary-token'>
-                {metrics.overview.activeSubscribers.toLocaleString('en-US')}{' '}
-                subscribers
-              </span>
+            label='Monthly Recurring Revenue'
+            value={
+              isHudMetricValueAvailable(stripeSource)
+                ? formatUsd(metrics.overview.mrrUsd)
+                : '\u2014'
             }
+            subtitle={metricSubtitleWithTrust(
+              <span className='text-sm text-secondary-token'>
+                {isHudMetricValueAvailable(stripeSource)
+                  ? `${metrics.overview.activeSubscribers.toLocaleString('en-US')} subscribers`
+                  : 'Stripe data unavailable'}
+              </span>,
+              stripeSource,
+              handleSourceRetry
+            )}
             headerRight={
               <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
             }
@@ -805,48 +986,37 @@ export function HudDashboardClient({
             <ContentMetricCard
               label='Runway'
               value={
-                metrics.overview.financialDataAvailable
+                isHudMetricValueAvailable(mercurySource)
                   ? formatRunway(metrics.overview.runwayMonths)
-                  : '—'
+                  : '\u2014'
               }
-              subtitle={
-                metrics.overview.financialDataAvailable ? (
-                  <div className='mt-2 grid gap-1.5'>
+              subtitle={metricSubtitleWithTrust(
+                isHudMetricValueAvailable(mercurySource) ? (
+                  <div className='grid gap-1.5'>
                     <ContentMetricRow
                       label='Cash'
                       value={formatUsd(metrics.overview.balanceUsd)}
                     />
                     <ContentMetricRow
-                      label='Burn (30d)'
+                      label={OVERVIEW_BURN_LABEL}
                       value={formatUsd(metrics.overview.burnRateUsd)}
                     />
                   </div>
                 ) : (
-                  'Unavailable'
-                )
-              }
+                  <span>Mercury data unavailable</span>
+                ),
+                mercurySource,
+                handleSourceRetry
+              )}
               className='p-3'
               valueClassName={secondaryValueClass}
             />
-            <ContentMetricCard
-              label='Operations'
-              value={
-                metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'
-              }
-              subtitle={
-                metrics.operations.dbLatencyMs === null
-                  ? 'DB latency —'
-                  : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`
-              }
-              className='p-3'
-              valueClassName={secondaryValueClass}
-            />
-            <ContentMetricCard
-              label='Reliability'
-              value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
-              subtitle={formatReliabilitySubtitle(metrics.reliability)}
-              className='p-3 col-span-2'
-              valueClassName={secondaryValueClass}
+            <HudHealthMetricCards
+              metrics={metrics}
+              secondaryValueClass={secondaryValueClass}
+              databaseSource={databaseSource}
+              sentrySource={sentrySource}
+              handleSourceRetry={handleSourceRetry}
             />
           </div>
         </div>
@@ -855,66 +1025,42 @@ export function HudDashboardClient({
       {/* Deployments + optional QR panel */}
       {showQrPanel ? (
         <div className='grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'>
-          <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
-            <div className='flex items-center justify-between gap-3'>
-              <SectionLabel>Deployments</SectionLabel>
-              <p className='text-[12px] text-secondary-token'>
-                {deploymentDetail}
-              </p>
-            </div>
-            {metrics.deployments.recent.length > 0 ? (
-              <div className='grid gap-2'>
-                {metrics.deployments.recent.slice(0, 5).map(run => (
-                  <DeploymentRow key={run.id} run={run} />
-                ))}
-              </div>
-            ) : (
-              <p className='text-[13px] text-secondary-token'>
-                No recent runs.
-              </p>
-            )}
-          </ContentSurfaceCard>
+          <HudDeploymentsSurfaceCard
+            metrics={metrics}
+            deploymentDetail={deploymentDetail}
+            githubSource={githubSource}
+            handleSourceRetry={handleSourceRetry}
+          />
 
           <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
             <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
               <div className='space-y-1'>
                 <SectionLabel>Open on phone</SectionLabel>
-                <p className='text-[20px] font-[620] tracking-[-0.03em] text-primary-token'>
+                <p className='text-xl font-[620] tracking-[-0.03em] text-primary-token'>
                   Scan to view
                 </p>
-                <p className='max-w-[28ch] text-[13px] leading-5 text-secondary-token'>
+                <p className='max-w-[28ch] text-app leading-5 text-secondary-token'>
                   Open the live HUD on another device using this kiosk link.
                 </p>
               </div>
-              <div className='rounded-[12px] border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+              <div className='rounded-xl border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
                 <QRCode
                   data={hudUrl ?? ''}
                   size={196}
-                  label='HUD link'
-                  className='rounded-lg bg-white'
+                  label='HUD Link'
+                  className='rounded-lg bg-white dark:bg-white'
                 />
               </div>
             </div>
           </ContentSurfaceCard>
         </div>
       ) : (
-        <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
-          <div className='flex items-center justify-between gap-3'>
-            <SectionLabel>Deployments</SectionLabel>
-            <p className='text-[12px] text-secondary-token'>
-              {deploymentDetail}
-            </p>
-          </div>
-          {metrics.deployments.recent.length > 0 ? (
-            <div className='grid gap-2'>
-              {metrics.deployments.recent.slice(0, 5).map(run => (
-                <DeploymentRow key={run.id} run={run} />
-              ))}
-            </div>
-          ) : (
-            <p className='text-[13px] text-secondary-token'>No recent runs.</p>
-          )}
-        </ContentSurfaceCard>
+        <HudDeploymentsSurfaceCard
+          metrics={metrics}
+          deploymentDetail={deploymentDetail}
+          githubSource={githubSource}
+          handleSourceRetry={handleSourceRetry}
+        />
       )}
 
       {/* AI Ops / Hermes control plane */}
@@ -922,10 +1068,10 @@ export function HudDashboardClient({
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='space-y-1'>
             <SectionLabel>AI ops</SectionLabel>
-            <p className='text-[24px] font-[620] leading-none text-primary-token sm:text-[28px]'>
+            <p className='text-2xl font-[620] leading-none text-primary-token sm:text-3xl'>
               Hermes control plane
             </p>
-            <p className='text-[13px] leading-5 text-secondary-token'>
+            <p className='text-app leading-5 text-secondary-token'>
               {metrics.aiOps.mergeQueue.openAgentPrs} /{' '}
               {metrics.aiOps.mergeQueue.openAgentPrThreshold} agent PRs open
             </p>
@@ -964,7 +1110,7 @@ export function HudDashboardClient({
           <div className='space-y-3'>
             <div className='flex items-center justify-between gap-3'>
               <SectionLabel>Blockers</SectionLabel>
-              <p className='text-[12px] text-secondary-token'>
+              <p className='text-xs text-secondary-token'>
                 {metrics.aiOps.availability}
               </p>
             </div>
@@ -989,13 +1135,13 @@ export function HudDashboardClient({
                       ))}
                     </div>
                   ) : (
-                    <p className='text-[13px] text-secondary-token'>
+                    <p className='text-app text-secondary-token'>
                       No blocked worker runs or agent PRs.
                     </p>
                   )}
                   {dismissed.length > 0 ? (
                     <details className='group'>
-                      <summary className='cursor-pointer list-none text-[11px] font-medium text-tertiary-token hover:text-secondary-token'>
+                      <summary className='cursor-pointer list-none text-2xs font-medium text-tertiary-token hover:text-secondary-token'>
                         Dismissed ({dismissed.length})
                       </summary>
                       <div className='mt-2 grid gap-2'>
@@ -1025,7 +1171,7 @@ export function HudDashboardClient({
                 }}
               />
             ) : (
-              <p className='text-[13px] leading-5 text-secondary-token'>
+              <p className='text-app leading-5 text-secondary-token'>
                 {showDispatch
                   ? 'Admin access required for worker dispatch.'
                   : 'Dispatch is hidden on the TV/wallboard view.'}
@@ -1059,13 +1205,13 @@ export function HudDashboardClient({
                   ))}
                 </div>
               ) : (
-                <p className='mt-2 text-[13px] text-secondary-token'>
+                <p className='mt-2 text-app text-secondary-token'>
                   All next actions dismissed.
                 </p>
               )}
               {dismissedRecs.length > 0 ? (
                 <details className='mt-2'>
-                  <summary className='cursor-pointer list-none text-[11px] font-medium text-tertiary-token hover:text-secondary-token'>
+                  <summary className='cursor-pointer list-none text-2xs font-medium text-tertiary-token hover:text-secondary-token'>
                     Dismissed ({dismissedRecs.length})
                   </summary>
                   <div className='mt-2 grid gap-2'>
@@ -1086,7 +1232,7 @@ export function HudDashboardClient({
       </ContentSurfaceCard>
 
       {isShell && metrics.accessMode === 'admin' ? (
-        <AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />
+        <AgentOsRunsPanel artifacts={agentOsArtifacts} />
       ) : null}
 
       <ContentSurfaceCard
@@ -1100,8 +1246,8 @@ export function HudDashboardClient({
             <p
               className={
                 isShell
-                  ? 'text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'
-                  : 'text-[40px] font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-[52px]'
+                  ? 'text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'
+                  : 'text-4xl font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-5xl'
               }
             >
               {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
@@ -1109,8 +1255,8 @@ export function HudDashboardClient({
             <p
               className={
                 isShell
-                  ? 'max-w-4xl text-[13px] leading-6 text-secondary-token'
-                  : 'max-w-4xl text-[15px] leading-7 text-secondary-token'
+                  ? 'max-w-4xl text-app leading-6 text-secondary-token'
+                  : 'max-w-4xl text-mid leading-7 text-secondary-token'
               }
             >
               {metrics.overview.defaultStatusDetail}

@@ -29,11 +29,13 @@ describe('CopyLinkInput System B source contract', () => {
 
     for (const className of [
       'system-b-copy-link-input',
-      'system-b-copy-link-button',
       'system-b-copy-link-icon',
     ]) {
       expect(source).toContain(className);
     }
+
+    expect(source).toContain("variant='ghost'");
+    expect(source).not.toContain('system-b-copy-link-button');
 
     expect(source).toContain('data-copied');
     expect(source).toContain('data-visible');
@@ -43,6 +45,7 @@ describe('CopyLinkInput System B source contract', () => {
       'h-7',
       'h-9',
       'right-1.5',
+      'inset-y-0',
       'p-1',
       'h-3.5 w-3.5',
     ]) {
@@ -59,12 +62,12 @@ describe('CopyLinkInput System B source contract', () => {
     for (const selector of [
       '.system-b-copy-link-input',
       '.system-b-copy-link-input[data-copied="true"]',
-      '.system-b-copy-link-button',
-      '.system-b-copy-link-button[data-copied="true"]',
       '.system-b-copy-link-icon',
       '.system-b-copy-link-icon[data-visible="true"]',
     ]) {
       expect(styles).toContain(selector);
     }
+
+    expect(styles).not.toContain('system-b-copy-link-button');
   });
 });

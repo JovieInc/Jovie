@@ -93,10 +93,10 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
               )}
             </div>
             <div className='min-w-0'>
-              <div className='truncate text-[13px] font-caption text-primary-token leading-tight'>
+              <div className='truncate text-app font-caption text-primary-token leading-tight'>
                 {trackTitle}
               </div>
-              <div className='truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
+              <div className='truncate text-2xs text-tertiary-token leading-tight mt-0.5'>
                 {artistName}
               </div>
             </div>
@@ -118,7 +118,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-9 w-9 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -150,16 +150,16 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
           </div>
 
           <div className='flex items-center gap-2 min-w-0'>
-            <span className='text-[10px] tabular-nums text-quaternary-token w-8 text-right shrink-0'>
+            <span className='text-3xs tabular-nums text-quaternary-token w-8 text-right shrink-0'>
               {formatTime(safeTime)}
             </span>
-            <div className='relative flex-1 h-[3px] rounded-full bg-tertiary-token/30 overflow-hidden'>
+            <div className='relative flex-1 h-1 rounded-full bg-tertiary-token/30 overflow-hidden'>
               <div
                 className='absolute inset-y-0 left-0 bg-primary-token rounded-full'
                 style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
               />
             </div>
-            <span className='text-[10px] tabular-nums text-quaternary-token w-8 shrink-0'>
+            <span className='text-3xs tabular-nums text-quaternary-token w-8 shrink-0'>
               {formatTime(safeDuration)}
             </span>
           </div>

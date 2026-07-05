@@ -4,7 +4,9 @@ import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { isMobileChatEnabled } from '@/lib/mobile/chat/access';
 import { getMobileSessionUserId } from '@/lib/mobile/session-auth';
+import { isAppleWalletProfilePassAvailable } from '@/lib/wallet/apple/profile-pass';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +18,8 @@ export interface MobileMeResponse {
   qrPayload: string | null;
   avatarUrl: string | null;
   continueOnWebUrl: string;
+  appleWalletProfilePassAvailable: boolean;
+  chatEnabled: boolean;
 }
 
 function buildNeedsOnboardingResponse(): NextResponse {
@@ -27,6 +31,8 @@ function buildNeedsOnboardingResponse(): NextResponse {
     qrPayload: null,
     avatarUrl: null,
     continueOnWebUrl: getAppUrl(),
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: false,
   };
 
   return NextResponse.json(payload, {
@@ -90,6 +96,17 @@ export async function GET(request: Request) {
     }
 
     const publicProfileUrl = getProfileUrl(profile.username!);
+    const appleWalletProfilePassAvailable =
+      await isAppleWalletProfilePassAvailable(userId, {
+        id: profile.id,
+        username: profile.username!,
+        usernameNormalized: profile.usernameNormalized!,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        isPublic: profile.isPublic,
+        onboardingCompletedAt: profile.onboardingCompletedAt,
+      });
+    const chatEnabled = await isMobileChatEnabled(userId);
     const payload: MobileMeResponse = {
       state: 'ready',
       displayName: profile.displayName,
@@ -98,6 +115,8 @@ export async function GET(request: Request) {
       qrPayload: publicProfileUrl,
       avatarUrl: profile.avatarUrl,
       continueOnWebUrl: getAppUrl(),
+      appleWalletProfilePassAvailable,
+      chatEnabled,
     };
 
     return NextResponse.json(payload, {

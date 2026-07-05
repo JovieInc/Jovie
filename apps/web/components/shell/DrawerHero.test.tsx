@@ -8,6 +8,25 @@ describe('DrawerHero', () => {
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
   });
 
+  it('exposes the full title on hover when line clamping is enabled', () => {
+    render(
+      <DrawerHero
+        title='A Very Long Release Title That Should Still Be Discoverable'
+        stableLayout
+        titleLineClamp={2}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'A Very Long Release Title That Should Still Be Discoverable',
+      })
+    ).toHaveAttribute(
+      'title',
+      'A Very Long Release Title That Should Still Be Discoverable'
+    );
+  });
+
   it('renders subtitle when provided', () => {
     render(<DrawerHero title='Lost in the Light' subtitle='Bahamas' />);
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
@@ -77,11 +96,11 @@ describe('DrawerHero', () => {
 
     expect(screen.getByRole('heading', { name: 'Test' })).toHaveClass(
       'line-clamp-2',
-      'min-h-[44px]'
+      'min-h-11'
     );
     expect(screen.getByTestId('drawer-hero-subtitle-slot')).toHaveClass(
       'invisible',
-      'min-h-[16px]'
+      'min-h-4'
     );
     expect(screen.getByTestId('drawer-hero-meta-slot')).toHaveClass(
       'invisible'

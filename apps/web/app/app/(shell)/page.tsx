@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { OnboardingInterviewModal } from '@/components/onboarding/OnboardingInterviewModal';
-// Must render the same chat UI as /app/chat — see AGENTS.md guardrail #16
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState } from '@/lib/queries/server';
-import { DeferredChatPageClient } from './chat/DeferredChatPageClient';
+import { OpportunityInboxRoute } from './OpportunityInboxRoute';
 
-const DASHBOARD_DESCRIPTION = 'Start a new chat with Jovie AI';
-const DASHBOARD_TITLE = 'Home | Jovie';
+const DASHBOARD_DESCRIPTION =
+  'Review Jovie suggestions, approve actions, and send feedback from your inbox.';
+const DASHBOARD_TITLE = 'Home';
 
 export function generateMetadata(): Metadata {
   return {
@@ -35,7 +35,7 @@ export default async function AppRootPage({
 
   return (
     <HydrateClient state={getDehydratedState()}>
-      <DeferredChatPageClient />
+      <OpportunityInboxRoute />
       <OnboardingInterviewModal initialRequested={interviewRequested} />
     </HydrateClient>
   );

@@ -50,7 +50,7 @@ describe('SettingsUsageStatsSection', () => {
     render(<SettingsUsageStatsSection />);
 
     expect(screen.getByTestId('settings-usage-panel').className).toContain(
-      'min-h-[342px]'
+      'min-h-86'
     );
   });
 
@@ -65,7 +65,7 @@ describe('SettingsUsageStatsSection', () => {
 
     expect(screen.getByText('No usage recorded')).toBeInTheDocument();
     expect(screen.getByTestId('settings-usage-panel').className).toContain(
-      'min-h-[342px]'
+      'min-h-86'
     );
   });
 
@@ -80,7 +80,7 @@ describe('SettingsUsageStatsSection', () => {
 
     expect(screen.getByText('Usage unavailable')).toBeInTheDocument();
     expect(screen.getByTestId('settings-usage-panel').className).toContain(
-      'min-h-[342px]'
+      'min-h-86'
     );
   });
 
@@ -114,6 +114,26 @@ describe('SettingsUsageStatsSection', () => {
     );
     expect(screen.getByText('6 left')).toBeInTheDocument();
     expect(screen.getByText('286 left')).toBeInTheDocument();
+  });
+
+  it('surfaces a stale warning when usage data is degraded', () => {
+    mockUseChatUsageQuery.mockReturnValue({
+      data: {
+        ...baseUsage,
+        plan: 'pro',
+        dailyLimit: 100,
+        _stale: true,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<SettingsUsageStatsSection />);
+
+    expect(
+      screen.getByText(/usage counts may be cached while billing syncs/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText('Pro')).toBeInTheDocument();
   });
 
   it('renders pro plan state and plan action when near the limit', () => {

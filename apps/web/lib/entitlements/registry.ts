@@ -57,7 +57,8 @@ export type NumericEntitlement =
   | 'smartLinksLimit'
   | 'aiDailyMessageLimit'
   | 'aiPitchGenPerRelease'
-  | 'aiRetouchDailyLimit';
+  | 'aiRetouchDailyLimit'
+  | 'chatFileUploadLimit';
 
 // ---------------------------------------------------------------------------
 // Plan entitlements shape
@@ -73,6 +74,8 @@ export interface PlanEntitlements {
     aiPitchGenPerRelease: number | null;
     /** Max AI retouch operations per day. Null = no access (free). */
     aiRetouchDailyLimit: number | null;
+    /** Max files per chat upload batch. Null = unlimited. */
+    chatFileUploadLimit: number | null;
   };
   marketing: {
     displayName: string;
@@ -124,6 +127,7 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
   aiDailyMessageLimit: 100,
   aiPitchGenPerRelease: 5,
   aiRetouchDailyLimit: 10,
+  chatFileUploadLimit: null,
 };
 
 const PRO_FEATURES: readonly string[] = [
@@ -145,6 +149,7 @@ const PRO_FEATURES: readonly string[] = [
   'Ad pixel tracking',
   'Verified badge',
   'AI assistant (100 messages/day)',
+  'Unlimited chat file uploads',
   'AI pitch generation (5 per release)',
   'Priority support',
 ];
@@ -192,6 +197,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       aiDailyMessageLimit: 10,
       aiPitchGenPerRelease: 1,
       aiRetouchDailyLimit: null,
+      chatFileUploadLimit: 5,
     },
     marketing: {
       displayName: 'Free',
@@ -218,6 +224,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Up to 100 contacts',
         'AI assistant (10 msgs/day)',
         '1 AI pitch generation per release',
+        'Chat file uploads (5 files/batch)',
       ],
       price: null,
     },
@@ -273,6 +280,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       aiDailyMessageLimit: 500,
       aiPitchGenPerRelease: null,
       aiRetouchDailyLimit: 50,
+      chatFileUploadLimit: null,
     },
     marketing: {
       displayName: 'Max',
@@ -285,14 +293,11 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'AI assistant (500 messages/day)',
         'Unlimited AI pitch generation',
         'Stripe Connect payouts',
-        'Fan subscriptions',
         'Email campaigns',
         'API access',
-        'Team management',
         'Webhooks',
-        'White-label / custom domain',
-        'A/B testing',
         'AI merch creation',
+        'Unlimited chat file uploads',
       ],
       price: {
         monthly: PLAN_PRICES.max.monthly,
@@ -311,6 +316,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       aiDailyMessageLimit: 25,
       aiPitchGenPerRelease: 3,
       aiRetouchDailyLimit: 10,
+      chatFileUploadLimit: 15,
     },
     marketing: {
       displayName: 'Pro Trial',
@@ -429,12 +435,6 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         max: true,
       },
       { name: 'Verified badge', free: false, pro: true, max: true },
-      {
-        name: 'White-label / custom domain',
-        free: false,
-        pro: false,
-        max: true,
-      },
     ],
   },
   {
@@ -472,12 +472,6 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       },
       { name: 'AI-powered insights', free: false, pro: true, max: true },
       { name: 'Ad pixel tracking', free: false, pro: true, max: true },
-      {
-        name: 'A/B testing',
-        free: false,
-        pro: false,
-        max: true,
-      },
     ],
   },
   {
@@ -521,7 +515,6 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       { name: 'Earnings dashboard', free: false, pro: true, max: true },
       { name: 'AI merch creation', free: false, pro: true, max: true },
       { name: 'Stripe Connect payouts', free: false, pro: false, max: true },
-      { name: 'Fan subscriptions', free: false, pro: false, max: true },
     ],
   },
   {
@@ -548,7 +541,6 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       { name: 'Email support', free: true, pro: true, max: true },
       { name: 'Priority support', free: false, pro: true, max: true },
       { name: 'API access', free: false, pro: false, max: true },
-      { name: 'Team management', free: false, pro: false, max: true },
       { name: 'Webhooks', free: false, pro: false, max: true },
     ],
   },

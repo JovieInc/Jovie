@@ -8,7 +8,9 @@ describe('public playlist CTA style guard', () => {
     expect(source).not.toContain('rounded-full bg-[#1DB954]');
     expect(source).not.toContain('transition-opacity hover:opacity-90');
     expect(source).toContain('rounded-full bg-white');
-    expect(source).toContain('text-black transition-colors hover:bg-white/90');
+    expect(source).toContain(
+      'text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
+    );
     expect(source).toContain("className='h-5 w-5 text-[#1DB954]'");
   });
 });

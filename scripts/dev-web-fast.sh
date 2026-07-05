@@ -29,7 +29,7 @@ PORT_STATUS=$?
 set -e
 
 if [ "$PORT_STATUS" -eq 42 ]; then
-  echo "Port $PORT is already in use. Stop that server or run: PORT=$((PORT + 1)) pnpm run dev:web:fast" >&2
+  echo "Port $PORT is already in use. Stop that server, run: pnpm run dev:cleanup, or use PORT=$((PORT + 1)) pnpm dev" >&2
   exit 1
 fi
 if [ "$PORT_STATUS" -ne 0 ]; then
@@ -78,8 +78,9 @@ DEV_ENV_ARGS=(
   pnpm --filter @jovie/web run dev:fast
 )
 
-# macOS ships Bash 3.2; with `set -u`, expanding an empty ENV_UNSET_ARGS array
-# makes `env` fail before the dev server starts. Only pass -u flags when present.
+# JOV-2741: macOS ships Bash 3.2; with `set -u`, expanding an empty ENV_UNSET_ARGS
+# array makes `env` fail on fresh worktrees before the dev server starts. Only pass
+# -u flags when eval isolation opts in.
 if [ "${#ENV_UNSET_ARGS[@]}" -gt 0 ]; then
   doppler run --project jovie-web --config dev -- env \
     "${ENV_UNSET_ARGS[@]}" \

@@ -32,7 +32,7 @@ export function PublicProfileLayoutShell({
   const hasAmbientBg = Boolean(heroImageUrl && !heroImageError);
   return (
     <div
-      className='profile-viewport relative overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'
+      className='profile-viewport relative overflow-hidden bg-(--profile-stage-bg) text-primary-token'
       style={{
         ...profileAccentStyle,
         height: 'calc(100dvh - var(--cookie-banner-h, 0px))',

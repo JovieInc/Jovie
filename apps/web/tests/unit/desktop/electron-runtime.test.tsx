@@ -11,7 +11,7 @@ import {
 function resetElectronRuntime() {
   document.documentElement.removeAttribute('data-desktop-runtime');
   document.documentElement.removeAttribute('data-electron-platform');
-  delete (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
+  Reflect.deleteProperty(window, 'electronAPI');
 }
 
 function setElectronAPI(api: ElectronAPI) {
@@ -135,6 +135,6 @@ describe('PWA install prompt in Electron', () => {
 
     expect(screen.getByText('hidden:not-installed:not-ios')).toBeVisible();
     expect(registerServiceWorker).not.toHaveBeenCalled();
-    expect(unregisterServiceWorker).not.toHaveBeenCalled();
+    expect(unregisterServiceWorker).toHaveBeenCalledTimes(1);
   });
 });

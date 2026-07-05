@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
+import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
@@ -14,6 +15,7 @@ import {
   OnboardingProfileRail,
 } from './OnboardingProfileRail';
 import {
+  isOnboardingTurnstilePanelVisible,
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
@@ -110,6 +112,11 @@ export function OnboardingShell({
       resetSignal={turnstileResetSignal}
     />
   );
+  const turnstilePanelVisible = isOnboardingTurnstilePanelVisible(
+    turnstileState,
+    turnstileInstruction,
+    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  );
 
   const isTurnstileUnavailable =
     turnstileState.status === 'error' ||
@@ -139,6 +146,10 @@ export function OnboardingShell({
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
+  const sideProfileRail = profileBuilderState.artist ? (
+    <OnboardingProfileRail state={profileBuilderState} />
+  ) : null;
+
   return (
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
@@ -159,6 +170,7 @@ export function OnboardingShell({
               turnstileToken={turnstileToken}
               turnstileStatus={turnstileState.status}
               turnstilePanel={turnstilePanel}
+              turnstilePanelVisible={turnstilePanelVisible}
               onTurnstileRequired={handleTurnstileRequired}
               onTurnstileRejected={handleTurnstileRejected}
             />
@@ -175,7 +187,7 @@ export function OnboardingShell({
             />
           </div>
         }
-        rightPanel={<OnboardingProfileRail state={profileBuilderState} />}
+        rightPanel={sideProfileRail}
       />
     </SidebarProvider>
   );
@@ -210,7 +222,7 @@ function OnboardingShellStatus({
   return (
     <p
       className={cn(
-        'pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border bg-surface-0 px-3 py-1.5 text-[12px] leading-5 shadow-card sm:right-4 sm:top-4',
+        'pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border bg-surface-0 px-3 py-1.5 text-xs leading-5 shadow-card sm:right-4 sm:top-4',
         'border-red-500/20 text-error'
       )}
       role='alert'

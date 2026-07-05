@@ -44,6 +44,7 @@ export const queryKeys = {
         'analytics',
         ...(range === undefined ? [] : [range]),
       ] as const,
+    aiCrawlers: () => [...queryKeys.dashboard.all, 'ai-crawlers'] as const,
     monetizationSummary: () =>
       [...queryKeys.dashboard.all, 'monetization-summary'] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
@@ -63,6 +64,12 @@ export const queryKeys = {
       [
         ...queryKeys.dashboard.all,
         'activity-feed',
+        ...(profileId === undefined ? [] : [{ profileId, range }]),
+      ] as const,
+    jovieWorkFeed: (profileId?: string, range?: string) =>
+      [
+        ...queryKeys.dashboard.all,
+        'jovie-work-feed',
         ...(profileId === undefined ? [] : [{ profileId, range }]),
       ] as const,
   },

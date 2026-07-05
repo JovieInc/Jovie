@@ -35,6 +35,7 @@ export const ServerEnvSchema = z.object({
     .enum(['development', 'production', 'test'])
     .optional()
     .default('development'),
+  CI: z.string().optional(),
   VITEST: z.string().optional(),
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
   NEXT_PUBLIC_APP_VERSION: z.string().optional(),
@@ -51,6 +52,12 @@ export const ServerEnvSchema = z.object({
     .optional(),
   VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
   PUBLIC_NOAUTH_SMOKE: z.string().optional(),
+  /**
+   * E2E-only: lets tests force the onboarding LLM path to fail so the
+   * deterministic fallback can be exercised. Hard-ignored on production
+   * deploys regardless of value (see onboarding-handler.ts).
+   */
+  CHAT_LLM_FAILURE_INJECTION: z.string().optional(),
 
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
@@ -70,6 +77,8 @@ export const ServerEnvSchema = z.object({
 
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
+  /** Opt-in pool-level PostgreSQL statement_timeout in milliseconds. */
+  DB_STATEMENT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
 
   // Server or build-time envs (may be undefined locally)
   SPOTIFY_CLIENT_ID: z.string().optional(),
@@ -78,11 +87,25 @@ export const ServerEnvSchema = z.object({
   APPLE_MUSIC_DEVELOPER_TOKEN: z.string().optional(),
   IOS_TESTFLIGHT_PUBLIC_LINK: z.string().url().optional(),
 
+  // Apple Wallet profile passes (PassKit)
+  APPLE_WALLET_PASS_TYPE_IDENTIFIER: z.string().optional(),
+  APPLE_WALLET_TEAM_IDENTIFIER: z.string().optional(),
+  APPLE_WALLET_SIGNER_CERT_PEM: z.string().optional(),
+  APPLE_WALLET_SIGNER_KEY_PEM: z.string().optional(),
+  APPLE_WALLET_SIGNER_KEY_PASSPHRASE: z.string().optional(),
+  APPLE_WALLET_WWDR_CERT_PEM: z.string().optional(),
+  APPLE_WALLET_AUTH_TOKEN_SECRET: z.string().min(32).optional(),
+  APPLE_WALLET_APNS_PRODUCTION: z.enum(['true', 'false']).optional(),
+
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
 
   // Vercel Blob
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+
+  // Telegram Bot (for asset ingestion webhook)
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
 
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -97,6 +120,9 @@ export const ServerEnvSchema = z.object({
   PRINTFUL_API_BASE_URL: z.string().url().optional(),
   PRINTFUL_STORE_ID: z.string().optional(),
   PRINTFUL_WEBHOOK_SECRET: z.string().optional(),
+
+  // Retired founding tier — webhook lookup only (founding -> pro entitlements)
+  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
 
   // Stripe price IDs for Pro tier (amounts in lib/config/plan-prices.ts)
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
@@ -142,6 +168,8 @@ export const ServerEnvSchema = z.object({
   HUD_GITHUB_OWNER: z.string().optional(),
   HUD_GITHUB_REPO: z.string().optional(),
   HUD_GITHUB_WORKFLOW: z.string().optional(),
+  GBRAIN_API_URL: z.string().optional(),
+  GBRAIN_API_KEY: z.string().optional(),
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
@@ -197,23 +225,58 @@ export const ServerEnvSchema = z.object({
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
 
-  // Voice pipeline (ElevenLabs async webhooks + cron processor) (gh-9810)
-  ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
-
   // GitHub dispatch (Sentry autofix pipeline)
   GH_DISPATCH_TOKEN: z.string().optional(),
   // Vercel-injected Git metadata (used to target the dispatch repo)
   VERCEL_GIT_REPO_OWNER: z.string().optional(),
   VERCEL_GIT_REPO_SLUG: z.string().optional(),
 
+  // Vercel deploy admin (promote/status endpoints)
+  VERCEL_API_TOKEN: z.string().optional(),
+  VERCEL_PROJECT_ID: z.string().optional(),
+  VERCEL_TEAM_ID: z.string().optional(),
+  VERCEL_PRODUCTION_DEPLOY_HOOK: z.string().url().optional(),
+
   // Statsig server-side (feature flags)
   STATSIG_SERVER_SECRET: z.string().optional(),
 
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
+  /** Optional Helicone proxy base URL (e.g. Cloudflare Worker) for cost/rate observability. */
+  HELICONE_GATEWAY_BASE_URL: z.string().url().optional(),
+  /** Helicone API key sent as `Helicone-Auth` when routing through the proxy. */
+  HELICONE_API_KEY: z.string().optional(),
+  // Hermes HUD events ingest authentication
+  HERMES_HUD_API_KEY: z.string().optional(),
+  HUD_AGENT_RUNS_FIXTURES: z
+    .string()
+    .optional()
+    .describe(
+      'Set to 1 to show fixture Agent OS runs when live ingest is empty'
+    ),
 
-  // Braintrust observability (LLM tracing + evals)
-  BRAINTRUST_API_KEY: z.string().optional(),
+  // OpenAI (for vision model fallback in asset extraction)
+  OPENAI_API_KEY: z.string().optional(),
+
+  // ElevenLabs (voice clone, promo TTS, voice pipeline webhooks)
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
+
+  /** Set to `1` to allow local Sentry bootstrap in dev/test/E2E. */
+  JOVIE_ENABLE_LOCAL_SENTRY: z.enum(['0', '1']).optional(),
+
+  // Agnost AI analytics (Vercel AI SDK telemetry via OpenTelemetry)
+  AGNOST_ORG_ID: z.string().uuid().optional(),
+  /** Set to `1` to export Agnost traces in local development. */
+  JOVIE_ENABLE_AGNOST: z.enum(['0', '1']).optional(),
+
+  // Langfuse LLM tracing + prompt registry delivery (Langfuse Cloud)
+  LANGFUSE_SECRET_KEY: z.string().optional(),
+  LANGFUSE_PUBLIC_KEY: z.string().optional(),
+  /** Defaults to https://cloud.langfuse.com when unset. */
+  LANGFUSE_BASE_URL: z.string().url().optional(),
+  /** Set to `1` to export Langfuse traces in local development. */
+  JOVIE_ENABLE_LANGFUSE: z.enum(['0', '1']).optional(),
 
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
@@ -235,10 +298,17 @@ export const ServerEnvSchema = z.object({
   GMAIL_HISTORY_WINDOW_DAYS: z.string().optional(),
   /** Per-user per-day Gateway token budget for AI Connector extraction (default: 100000) */
   AI_CONNECTORS_DAILY_TOKEN_BUDGET: z.string().optional(),
+  /** Optional override for the Release-to-Revenue design-partner creator username */
+  RELEASE_TO_REVENUE_DESIGN_PARTNER_USERNAME: z.string().optional(),
+
+  // Cloudflare zone analytics (AI crawler intelligence — GH-12748)
+  CLOUDFLARE_ZONE_ID: z.string().optional(),
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
   JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED: z.string().optional(),
+  /** Dev/E2E token for iOS real-browser auth harness rate-limit bypass */
+  JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN: z.string().optional(),
 
   // Instantly (outreach email campaigns)
   INSTANTLY_API_KEY: z.string().optional(),
@@ -261,7 +331,6 @@ export const ServerEnvSchema = z.object({
   E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
   E2E_CLERK_USER_ID: z.string().optional(),
   E2E_CLERK_USER_USERNAME: z.string().optional(),
-  E2E_SYNTHETIC_MODE: z.string().optional(),
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
   E2E_PROD_MAILBOX_PROVIDER: z
@@ -292,6 +361,12 @@ export const ServerEnvSchema = z.object({
    */
   NATIVE_SMS_ENABLED: z.string().optional(),
   /**
+   * Master gate for outbound SMS provider POSTs (release alerts + webhook
+   * auto-replies). When 'false' (or unset), sends short-circuit before
+   * Twilio. Inbound STOP/HELP still process regardless (TCPA mandate).
+   */
+  OUTBOUND_SMS_ENABLED: z.string().optional(),
+  /**
    * Demo override that bypasses the existing SMS Pro-gating in
    * subscribeToNotificationsDomain when set to 'true'. Off by default;
    * intended for the YC demo window only. See autoplan decision row #32 / F7.
@@ -305,6 +380,7 @@ export const ServerEnvSchema = z.object({
  */
 export const ENV_KEYS = [
   'NODE_ENV',
+  'CI',
   'VITEST',
   'VERCEL_ENV',
   'NEXT_PUBLIC_APP_VERSION',
@@ -314,6 +390,7 @@ export const ENV_KEYS = [
   'VERCEL_URL',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'PUBLIC_NOAUTH_SMOKE',
+  'CHAT_LLM_FAILURE_INJECTION',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
   'CLERK_PUBLISHABLE_KEY_STAGING',
@@ -325,13 +402,24 @@ export const ENV_KEYS = [
   'RESEND_INBOUND_WEBHOOK_SECRET',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
+  'DB_STATEMENT_TIMEOUT_MS',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
   'JOVIE_SYSTEM_CLERK_USER_ID',
   'APPLE_MUSIC_DEVELOPER_TOKEN',
   'IOS_TESTFLIGHT_PUBLIC_LINK',
+  'APPLE_WALLET_PASS_TYPE_IDENTIFIER',
+  'APPLE_WALLET_TEAM_IDENTIFIER',
+  'APPLE_WALLET_SIGNER_CERT_PEM',
+  'APPLE_WALLET_SIGNER_KEY_PEM',
+  'APPLE_WALLET_SIGNER_KEY_PASSPHRASE',
+  'APPLE_WALLET_WWDR_CERT_PEM',
+  'APPLE_WALLET_AUTH_TOKEN_SECRET',
+  'APPLE_WALLET_APNS_PRODUCTION',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
@@ -342,6 +430,7 @@ export const ENV_KEYS = [
   'PRINTFUL_API_BASE_URL',
   'PRINTFUL_STORE_ID',
   'PRINTFUL_WEBHOOK_SECRET',
+  'STRIPE_PRICE_FOUNDING_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
@@ -363,6 +452,8 @@ export const ENV_KEYS = [
   'HUD_GITHUB_OWNER',
   'HUD_GITHUB_REPO',
   'HUD_GITHUB_WORKFLOW',
+  'GBRAIN_API_URL',
+  'GBRAIN_API_KEY',
   'REVALIDATE_SECRET',
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
@@ -380,7 +471,6 @@ export const ENV_KEYS = [
   'UPSTASH_REDIS_REST_TOKEN',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
-  'E2E_SYNTHETIC_MODE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',
@@ -402,13 +492,29 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
-  'ELEVENLABS_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'VERCEL_GIT_REPO_OWNER',
   'VERCEL_GIT_REPO_SLUG',
+  'VERCEL_API_TOKEN',
+  'VERCEL_PROJECT_ID',
+  'VERCEL_TEAM_ID',
+  'VERCEL_PRODUCTION_DEPLOY_HOOK',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
-  'BRAINTRUST_API_KEY',
+  'HELICONE_GATEWAY_BASE_URL',
+  'HELICONE_API_KEY',
+  'HERMES_HUD_API_KEY',
+  'HUD_AGENT_RUNS_FIXTURES',
+  'OPENAI_API_KEY',
+  'ELEVENLABS_API_KEY',
+  'ELEVENLABS_WEBHOOK_SECRET',
+  'JOVIE_ENABLE_LOCAL_SENTRY',
+  'AGNOST_ORG_ID',
+  'JOVIE_ENABLE_AGNOST',
+  'LANGFUSE_SECRET_KEY',
+  'LANGFUSE_PUBLIC_KEY',
+  'LANGFUSE_BASE_URL',
+  'JOVIE_ENABLE_LANGFUSE',
   'AGENT_OS_WORKFLOWS_ENABLED',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',
@@ -416,6 +522,7 @@ export const ENV_KEYS = [
   'ALBUM_ART_GENERATION_BURST_LIMIT',
   'JOVIE_DEV_MEMORY_MONITOR',
   'JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED',
+  'JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
   'SERPAPI_API_KEY',
@@ -440,6 +547,7 @@ export const ENV_KEYS = [
   'TWILIO_MESSAGING_SERVICE_SID',
   'TWILIO_FROM_NUMBER',
   'NATIVE_SMS_ENABLED',
+  'OUTBOUND_SMS_ENABLED',
   'SMS_DEMO_BYPASS_PRO_GATE',
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',

@@ -16,18 +16,18 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
 
 const RequestSchema = z.object({
   plan: z.enum(['free', 'founding', 'pro', 'max']),
 });
 
 export async function POST(req: Request) {
-  // Hard gate: never allow in production
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'Not available in production' },
-      { status: 403 }
-    );
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson();
   }
 
   const { userId } = await getCachedAuth();

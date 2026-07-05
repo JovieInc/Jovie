@@ -87,6 +87,28 @@ vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
   ProfileContactSidebar: () => <div data-testid='profile-contact-sidebar' />,
 }));
 
+vi.mock('next/link', () => ({
+  default: ({
+    children,
+    href,
+    ...props
+  }: {
+    readonly children: React.ReactNode;
+    readonly href: string;
+    readonly [key: string]: unknown;
+  }) => React.createElement('a', { href, ...props }, children),
+}));
+
+vi.mock('@/components/atoms/ImageWithFallback', () => ({
+  ImageWithFallback: ({
+    alt,
+    src,
+  }: {
+    readonly alt: string;
+    readonly src: string;
+  }) => React.createElement('img', { alt, src }),
+}));
+
 function OpenReleaseTarget() {
   const { open } = useChatEntityPanel();
 
@@ -159,6 +181,50 @@ function UpsertReleaseContext() {
       focusKey: 'message-1:release-1',
     });
   }, [upsertContext]);
+  return null;
+}
+
+function UpsertTourDateContext() {
+  const { upsertContext } = useChatEntityPanel();
+  useEffect(() => {
+    upsertContext({
+      kind: 'tour-date',
+      id: 'evt_brooklyn',
+      label: 'Brooklyn Steel',
+      source: 'message',
+      focusKey: 'message-1:evt_brooklyn',
+    });
+  }, [upsertContext]);
+  return null;
+}
+
+function UpsertTemplatePlaceholderContexts() {
+  const { upsertContexts } = useChatEntityPanel();
+  useEffect(() => {
+    upsertContexts([
+      {
+        kind: 'release',
+        id: 'release-1',
+        label: '<title>',
+        source: 'message',
+        focusKey: 'message-1:release-1',
+      },
+      {
+        kind: 'artist',
+        id: 'artist-1',
+        label: '<name>',
+        source: 'message',
+        focusKey: 'message-1:artist-1',
+      },
+      {
+        kind: 'track',
+        id: 'track-1',
+        label: '<title>',
+        source: 'message',
+        focusKey: 'message-1:track-1',
+      },
+    ]);
+  }, [upsertContexts]);
   return null;
 }
 
@@ -243,7 +309,7 @@ describe('ChatEntityRightPanelHost', () => {
     });
   });
 
-  it('registers no right panel when preview is closed', () => {
+  it('does not register the profile sidebar when preview is closed', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
 
@@ -253,7 +319,8 @@ describe('ChatEntityRightPanelHost', () => {
       </ChatEntityPanelProvider>
     );
 
-    expect(mockUseRegisterRightPanel).toHaveBeenLastCalledWith(null);
+    const lastCall = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(lastCall).toBeNull();
   });
 
   it('registers the profile sidebar when preview is open', () => {
@@ -270,7 +337,7 @@ describe('ChatEntityRightPanelHost', () => {
     expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
   });
 
-  it('registers the profile bento rail when preview opens with profile context', () => {
+  it('registers the live profile sidebar when preview opens with profile context', () => {
     mockPreviewPanelOpen = true;
     mockUseRegisterRightPanel.mockClear();
 
@@ -295,12 +362,7 @@ describe('ChatEntityRightPanelHost', () => {
     expect(registeredPanel).not.toBeNull();
     render(registeredPanel as React.ReactElement);
 
-    expect(screen.getByTestId('chat-profile-bento-panel')).toBeInTheDocument();
-    expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
-    expect(screen.getByText('72% Complete')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Open Public Profile' })
-    ).toHaveAttribute('href', '/tim');
+    expect(screen.getByTestId('dynamic-import-stub')).toBeInTheDocument();
   });
 
   it('tracks chat-owned entity targets through the provider', () => {
@@ -399,6 +461,126 @@ describe('ChatEntityRightPanelHost', () => {
     expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
     expect(screen.getByText('64% Complete')).toBeInTheDocument();
     expect(screen.queryByTestId('profile-contact-sidebar')).toBeNull();
+  });
+
+  it('renders release context cards with the shared EntityCard compact treatment', async () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({
+      data: {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        releaseType: 'single',
+        status: 'released',
+        slug: 'lost-in-the-light',
+        smartLinkPath: '/r/lost-in-the-light',
+        profileId: 'profile-1',
+        totalTracks: 1,
+        providers: [],
+      },
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <UpsertReleaseContext />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    });
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    render(registeredPanel as React.ReactElement);
+
+    expect(
+      screen.getByTestId('chat-rail-entity-card-release')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Single Context')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Dismiss Release Context' })
+    ).toBeInTheDocument();
+  });
+
+  it('never renders raw template placeholder tokens on context cards', async () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({ data: null, isLoading: false });
+
+    render(
+      <ChatEntityPanelProvider>
+        <UpsertTemplatePlaceholderContexts />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    });
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    render(registeredPanel as React.ReactElement);
+
+    expect(screen.getByText('Release')).toBeInTheDocument();
+    expect(screen.getByText('Artist')).toBeInTheDocument();
+    expect(screen.getByText('Track')).toBeInTheDocument();
+    expect(screen.queryByText('<title>')).toBeNull();
+    expect(screen.queryByText('<name>')).toBeNull();
+  });
+
+  it('renders tour-date context cards with the shared EntityCard compact treatment', async () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseEventsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'evt_brooklyn',
+          title: 'Brooklyn Steel',
+          subtitle: 'Brooklyn, NY · Bandsintown',
+          eventDate: '2026-06-12T23:30:00.000Z',
+          eventType: 'tour',
+          venue: 'Brooklyn Steel',
+          city: 'Brooklyn, NY',
+          provider: 'Bandsintown',
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <UpsertTourDateContext />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    });
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    render(registeredPanel as React.ReactElement);
+
+    expect(
+      screen.getByTestId('chat-rail-entity-card-tour-date')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Tour Date Context')).toBeInTheDocument();
+    expect(screen.getByText('Jun')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
   });
 
   it('stacks compact context cards above an open child entity panel', async () => {
@@ -557,6 +739,128 @@ describe('ChatEntityRightPanelHost', () => {
       screen.getByTestId('chat-tour-date-entity-panel')
     ).toBeInTheDocument();
     expect(screen.getByText('Brooklyn Steel')).toBeInTheDocument();
+  });
+
+  it('entity panel eyebrows carry the EntityCard-aligned CSS class on release panels', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({
+      data: {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        releaseType: 'single',
+        status: 'released',
+        slug: 'lost-in-the-light',
+        smartLinkPath: '/r/lost-in-the-light',
+        profileId: 'profile-1',
+        totalTracks: 1,
+        providers: [],
+      },
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenReleaseTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    const eyebrow = screen
+      .getByTestId('chat-release-entity-panel')
+      .querySelector('.system-b-chat-entity-panel-eyebrow');
+    expect(eyebrow).not.toBeNull();
+    expect(eyebrow?.textContent).toBe('Release');
+  });
+
+  it('entity panel eyebrows carry the EntityCard-aligned CSS class on contact panels', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseContactsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'contact-1',
+          creatorProfileId: 'profile-1',
+          role: 'manager',
+          personName: 'Pat Manager',
+          territories: ['NA'],
+          email: 'pat@example.com',
+          isActive: true,
+          sortOrder: 0,
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenContactTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    const eyebrow = screen
+      .getByTestId('chat-contact-entity-panel')
+      .querySelector('.system-b-chat-entity-panel-eyebrow');
+    expect(eyebrow).not.toBeNull();
+    expect(eyebrow?.textContent).toBe('Contact');
+  });
+
+  it('entity panel eyebrows carry the EntityCard-aligned CSS class on tour-date panels', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseEventsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'evt_brooklyn',
+          title: 'Brooklyn Steel',
+          subtitle: 'Brooklyn, NY · Bandsintown',
+          eventDate: '2026-06-12T23:30:00.000Z',
+          eventType: 'tour',
+          venue: 'Brooklyn Steel',
+          city: 'Brooklyn, NY',
+          provider: 'Bandsintown',
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenTourDateTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    const eyebrow = screen
+      .getByTestId('chat-tour-date-entity-panel')
+      .querySelector('.system-b-chat-entity-panel-eyebrow');
+    expect(eyebrow).not.toBeNull();
+    expect(eyebrow?.textContent).toBe('Tour date');
   });
 
   it('keeps the right rail empty when flag is off (no panel for contact target)', () => {

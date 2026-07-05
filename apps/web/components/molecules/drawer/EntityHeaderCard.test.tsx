@@ -20,7 +20,7 @@ describe('EntityHeaderCard', () => {
 
     expect(screen.getByText('Long entity name')).toHaveClass(
       'line-clamp-1',
-      'min-h-[22px]'
+      'min-h-6'
     );
     expect(screen.getByTestId('entity-header-meta-slot')).toHaveClass(
       'invisible'
@@ -61,7 +61,7 @@ describe('EntityHeaderCard', () => {
     expect(title).toBeInTheDocument();
     expect(title.parentElement?.nextElementSibling).toHaveClass(
       'invisible',
-      'min-h-[16px]'
+      'min-h-4'
     );
   });
 });

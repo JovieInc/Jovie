@@ -1,5 +1,7 @@
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { writeDailyProfileViews } from '@/lib/analytics/daily-profile-views';
+import { shouldExcludeSelfByProfileId } from '@/lib/analytics/self-exclusion';
 import {
   checkVisitRateLimit,
   getRateLimitHeaders,
@@ -15,13 +17,10 @@ import {
   db,
   doesColumnExist,
   doesTableExist,
+  invalidateColumnExistenceCache,
 } from '@/lib/db';
-import { unwrapPgError } from '@/lib/db/errors';
-import {
-  audienceMembers,
-  audienceReferrers,
-  dailyProfileViews,
-} from '@/lib/db/schema/analytics';
+import { isMissingColumnError, unwrapPgError } from '@/lib/db/errors';
+import { audienceMembers, audienceReferrers } from '@/lib/db/schema/analytics';
 import {
   creatorDistributionEvents,
   creatorProfiles,
@@ -32,6 +31,7 @@ import {
   getInstagramReferrerHost,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
   isInstagramActivationSource,
+  isMissingCreatorDistributionEventsTableError,
 } from '@/lib/distribution/instagram-activation';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -60,6 +60,74 @@ interface AudienceVisitSchemaCompatibility {
   hasAudienceReferrersTable: boolean;
   hasCreatorDistributionEventsTable: boolean;
   hasDailyProfileViewsTable: boolean;
+}
+
+const AUDIENCE_MEMBER_SUMMARY_COLUMNS = [
+  'latest_referrer_url',
+  'latest_action_label',
+] as const;
+
+type AudienceMemberSummaryColumn =
+  (typeof AUDIENCE_MEMBER_SUMMARY_COLUMNS)[number];
+
+function getMissingAudienceMemberSummaryColumn(
+  error: unknown
+): AudienceMemberSummaryColumn | null {
+  for (const columnName of AUDIENCE_MEMBER_SUMMARY_COLUMNS) {
+    if (isMissingColumnError(error, columnName)) {
+      return columnName;
+    }
+  }
+
+  return null;
+}
+
+function downgradeAudienceVisitSchemaCompatibility(
+  compatibility: AudienceVisitSchemaCompatibility,
+  missingColumn: AudienceMemberSummaryColumn
+): AudienceVisitSchemaCompatibility {
+  if (missingColumn === 'latest_referrer_url') {
+    return {
+      ...compatibility,
+      hasAudienceMemberLatestReferrerUrlColumn: false,
+    };
+  }
+
+  return {
+    ...compatibility,
+    hasAudienceMemberLatestActionLabelColumn: false,
+  };
+}
+
+async function persistAudienceVisitWithSchemaFallback(
+  initialCompatibility: AudienceVisitSchemaCompatibility,
+  persist: (compatibility: AudienceVisitSchemaCompatibility) => Promise<void>
+): Promise<void> {
+  let compatibility = initialCompatibility;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await persist(compatibility);
+      return;
+    } catch (error) {
+      const missingColumn = getMissingAudienceMemberSummaryColumn(error);
+      if (attempt > 0 || !missingColumn) {
+        throw error;
+      }
+
+      invalidateColumnExistenceCache('audience_members', missingColumn);
+      compatibility = downgradeAudienceVisitSchemaCompatibility(
+        compatibility,
+        missingColumn
+      );
+
+      await captureWarning(
+        '[audience/visit] audience_members summary column missing; retrying without optional column writes',
+        error,
+        { column: missingColumn }
+      );
+    }
+  }
 }
 
 async function resolveAudienceVisitSchemaCompatibility(): Promise<AudienceVisitSchemaCompatibility> {
@@ -191,26 +259,6 @@ async function writeReferrer(
   }
 }
 
-async function writeDailyProfileViews(
-  tx: DbOrTransaction,
-  profileId: string,
-  viewDate: string,
-  now: Date
-): Promise<void> {
-  try {
-    await incrementDailyProfileViews(tx, profileId, viewDate, now);
-  } catch (error) {
-    if (!isMissingDailyProfileViewsTableError(error)) {
-      throw error;
-    }
-    await captureWarning(
-      '[audience/visit] daily_profile_views table missing; skipping aggregate write',
-      error,
-      { profileId, viewDate }
-    );
-  }
-}
-
 async function writeInstagramActivation(
   tx: DbOrTransaction,
   profileId: string,
@@ -252,94 +300,6 @@ async function writeInstagramActivation(
       { profileId }
     );
   }
-}
-
-async function incrementDailyProfileViews(
-  tx: DbOrTransaction,
-  profileId: string,
-  viewDate: string,
-  now: Date
-): Promise<void> {
-  const values = {
-    creatorProfileId: profileId,
-    viewDate,
-    viewCount: 1,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  try {
-    await tx
-      .insert(dailyProfileViews)
-      .values(values)
-      .onConflictDoUpdate({
-        target: [
-          dailyProfileViews.creatorProfileId,
-          dailyProfileViews.viewDate,
-        ],
-        set: {
-          viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-          updatedAt: now,
-        },
-      });
-    return;
-  } catch (error) {
-    const isMissingConflictTarget =
-      error instanceof Error &&
-      (error.message.includes('42P10') ||
-        error.message.includes(
-          'there is no unique or exclusion constraint matching the ON CONFLICT specification'
-        ));
-
-    if (!isMissingConflictTarget) {
-      throw error;
-    }
-
-    logger.warn(
-      '[Audience Visit] Missing conflict target for daily_profile_views upsert, using safe fallback update path'
-    );
-  }
-
-  const [updatedExisting] = await tx
-    .update(dailyProfileViews)
-    .set({
-      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(dailyProfileViews.creatorProfileId, profileId),
-        eq(dailyProfileViews.viewDate, viewDate)
-      )
-    )
-    .returning({ id: dailyProfileViews.id });
-
-  if (updatedExisting) {
-    return;
-  }
-
-  await tx.insert(dailyProfileViews).values(values).onConflictDoNothing();
-
-  await tx
-    .update(dailyProfileViews)
-    .set({
-      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(dailyProfileViews.creatorProfileId, profileId),
-        eq(dailyProfileViews.viewDate, viewDate)
-      )
-    );
-}
-
-function isMissingDailyProfileViewsTableError(error: unknown): boolean {
-  return unwrapPgError(error).code === '42P01';
-}
-
-function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
-  return unwrapPgError(error).code === '42P01';
 }
 
 function isMissingAudienceReferrersTableError(error: unknown): boolean {
@@ -418,7 +378,6 @@ export async function POST(request: NextRequest) {
     const botResult = detectBot(request, '/api/audience/visit', {
       userAgent: resolvedUserAgent,
     });
-    const audienceTags = botResult.isBot ? ['bot'] : [];
     // Use the client-provided referrer (document.referrer) if available.
     // The HTTP Referer header on same-origin fetch() is the current page URL,
     // NOT the external referrer, so we filter out self-referrals from the fallback.
@@ -487,6 +446,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (await shouldExcludeSelfByProfileId(profileId)) {
+      return NextResponse.json(
+        { success: true, fingerprint: 'self-filtered' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const fingerprint = createFingerprint(resolvedIpAddress, resolvedUserAgent);
 
     // Block check: reject visits from blocked fingerprints
@@ -515,222 +481,299 @@ export async function POST(request: NextRequest) {
       ? [{ url: resolvedReferrer.trim(), timestamp: now.toISOString() }]
       : [];
 
-    try {
-      const schemaCompatibility =
-        await resolveAudienceVisitSchemaCompatibility();
+    const schemaCompatibility = await resolveAudienceVisitSchemaCompatibility();
 
-      await withSystemIngestionSession(async tx => {
-        const viewDate = now.toISOString().slice(0, 10);
+    await persistAudienceVisitWithSchemaFallback(
+      schemaCompatibility,
+      async compatibility => {
+        await withSystemIngestionSession(async tx => {
+          const viewDate = now.toISOString().slice(0, 10);
 
-        const [existing] = await tx
-          .select({
-            id: audienceMembers.id,
-            visits: audienceMembers.visits,
-            latestActions: audienceMembers.latestActions,
-            referrerHistory: audienceMembers.referrerHistory,
-            engagementScore: audienceMembers.engagementScore,
-            geoCity: audienceMembers.geoCity,
-            geoCountry: audienceMembers.geoCountry,
-            deviceType: audienceMembers.deviceType,
-            utmParams: audienceMembers.utmParams,
-            tags: audienceMembers.tags,
-          })
-          .from(audienceMembers)
-          .where(
-            and(
-              eq(audienceMembers.creatorProfileId, profileId),
-              eq(audienceMembers.fingerprint, fingerprint)
-            )
-          )
-          .limit(1);
-
-        const mergedTags = mergeAudienceTags(existing?.tags, audienceTags);
-        const isBotAudienceMember = mergedTags.includes('bot');
-        const updatedVisits = isBotAudienceMember
-          ? (existing?.visits ?? 0)
-          : (existing?.visits ?? 0) + 1;
-        const actionCount = Array.isArray(existing?.latestActions)
-          ? existing.latestActions.length
-          : 0;
-        const updatedIntent = isBotAudienceMember
-          ? 'low'
-          : deriveIntentLevel(updatedVisits, actionCount);
-        const updatedScore = isBotAudienceMember
-          ? (existing?.engagementScore ?? 0)
-          : (existing?.engagementScore ?? 0) + 1;
-        const previousReferrers = Array.isArray(existing?.referrerHistory)
-          ? existing.referrerHistory
-          : [];
-        const referrerHistory = trimHistory(
-          [...referrerEntry, ...previousReferrers],
-          3
-        );
-        const geoCityValue = resolvedGeoCity ?? existing?.geoCity ?? null;
-        const geoCountryValue =
-          resolvedGeoCountry ?? existing?.geoCountry ?? null;
-
-        // Merge UTM params: new visit's UTM overwrites if present, else keep existing
-        const hasUtmParams =
-          !!utmParams &&
-          Object.values(utmParams).some(
-            value => typeof value === 'string' && value.length > 0
-          );
-        const resolvedUtmParams = hasUtmParams
-          ? utmParams
-          : (existing?.utmParams ?? {});
-        const instagramReferrerHost =
-          getInstagramReferrerHost(resolvedReferrer);
-
-        if (
-          schemaCompatibility.hasDailyProfileViewsTable &&
-          !isBotAudienceMember
-        ) {
-          await writeDailyProfileViews(tx, profileId, viewDate, now);
-        }
-
-        if (
-          schemaCompatibility.hasCreatorDistributionEventsTable &&
-          shouldTrackInstagramActivation &&
-          !isBotAudienceMember
-        ) {
-          await writeInstagramActivation(
-            tx,
-            profileId,
-            instagramReferrerHost,
-            utmParams,
-            now
-          );
-        }
-
-        // Summary column value for fast list views
-        const latestReferrerUrl = resolvedReferrer?.trim() ?? null;
-        const recordProfileVisitEvent = async (audienceMemberId: string) => {
-          if (!schemaCompatibility.canWriteAudienceActions) return;
-
-          await recordAudienceEvent(
-            tx,
-            {
-              creatorProfileId: profileId,
-              audienceMemberId,
-              eventType: 'profile_visited',
-              verb: 'visited',
-              confidence: 'observed',
-              sourceKind: resolveVisitSourceKind(utmParams, latestReferrerUrl),
-              sourceLabel: resolveVisitSourceLabel(
-                utmParams,
-                latestReferrerUrl
-              ),
-              objectType: 'profile',
-              objectId: profileId,
-              objectLabel: 'Profile',
-              properties: {
-                referrer: latestReferrerUrl,
-                utmParams: resolvedUtmParams,
-              },
-              timestamp: now,
-            },
-            {
-              includeLatestActionLabel:
-                schemaCompatibility.hasAudienceMemberLatestActionLabelColumn,
-            }
-          );
-        };
-
-        if (existing) {
-          await tx
-            .update(audienceMembers)
-            .set({
-              visits: updatedVisits,
-              lastSeenAt: now,
-              updatedAt: now,
-              engagementScore: updatedScore,
-              intentLevel: updatedIntent,
-              geoCity: geoCityValue,
-              geoCountry: geoCountryValue,
-              deviceType: normalizedDevice,
-              referrerHistory,
-              tags: mergedTags,
-              ...(schemaCompatibility.hasAudienceMemberLatestReferrerUrlColumn &&
-                latestReferrerUrl && { latestReferrerUrl }),
-              ...(utmParams && { utmParams: resolvedUtmParams }),
+          const [existing] = await tx
+            .select({
+              id: audienceMembers.id,
+              visits: audienceMembers.visits,
+              latestActions: audienceMembers.latestActions,
+              referrerHistory: audienceMembers.referrerHistory,
+              engagementScore: audienceMembers.engagementScore,
+              geoCity: audienceMembers.geoCity,
+              geoCountry: audienceMembers.geoCountry,
+              deviceType: audienceMembers.deviceType,
+              utmParams: audienceMembers.utmParams,
+              tags: audienceMembers.tags,
             })
-            .where(eq(audienceMembers.id, existing.id));
+            .from(audienceMembers)
+            .where(
+              and(
+                eq(audienceMembers.creatorProfileId, profileId),
+                eq(audienceMembers.fingerprint, fingerprint)
+              )
+            )
+            .limit(1);
+
+          const actionCount = Array.isArray(existing?.latestActions)
+            ? existing.latestActions.length
+            : 0;
+          const velocityBotResult = detectBot(request, '/api/audience/visit', {
+            userAgent: resolvedUserAgent,
+            memberVisits: existing?.visits ?? 0,
+            memberConversions: actionCount,
+          });
+          const effectiveAudienceTags =
+            botResult.isBot || velocityBotResult.isBot ? ['bot'] : [];
+          const mergedTags = mergeAudienceTags(
+            existing?.tags,
+            effectiveAudienceTags
+          );
+          const isBotAudienceMember = mergedTags.includes('bot');
+          const updatedVisits = isBotAudienceMember
+            ? (existing?.visits ?? 0)
+            : (existing?.visits ?? 0) + 1;
+          const updatedIntent = isBotAudienceMember
+            ? 'low'
+            : deriveIntentLevel(updatedVisits, actionCount);
+          const updatedScore = isBotAudienceMember
+            ? (existing?.engagementScore ?? 0)
+            : (existing?.engagementScore ?? 0) + 1;
+          const previousReferrers = Array.isArray(existing?.referrerHistory)
+            ? existing.referrerHistory
+            : [];
+          const referrerHistory = trimHistory(
+            [...referrerEntry, ...previousReferrers],
+            3
+          );
+          const geoCityValue = resolvedGeoCity ?? existing?.geoCity ?? null;
+          const geoCountryValue =
+            resolvedGeoCountry ?? existing?.geoCountry ?? null;
+
+          // Merge UTM params: new visit's UTM overwrites if present, else keep existing
+          const hasUtmParams =
+            !!utmParams &&
+            Object.values(utmParams).some(
+              value => typeof value === 'string' && value.length > 0
+            );
+          const resolvedUtmParams = hasUtmParams
+            ? utmParams
+            : (existing?.utmParams ?? {});
+          const instagramReferrerHost =
+            getInstagramReferrerHost(resolvedReferrer);
+
+          // Summary column value for fast list views
+          const latestReferrerUrl = resolvedReferrer?.trim() ?? null;
+          const recordProfileVisitEvent = async (audienceMemberId: string) => {
+            if (!compatibility.canWriteAudienceActions) return;
+
+            await recordAudienceEvent(
+              tx,
+              {
+                creatorProfileId: profileId,
+                audienceMemberId,
+                eventType: 'profile_visited',
+                verb: 'visited',
+                confidence: 'observed',
+                sourceKind: resolveVisitSourceKind(
+                  utmParams,
+                  latestReferrerUrl
+                ),
+                sourceLabel: resolveVisitSourceLabel(
+                  utmParams,
+                  latestReferrerUrl
+                ),
+                objectType: 'profile',
+                objectId: profileId,
+                objectLabel: 'Profile',
+                properties: {
+                  referrer: latestReferrerUrl,
+                  utmParams: resolvedUtmParams,
+                },
+                timestamp: now,
+              },
+              {
+                includeLatestActionLabel:
+                  compatibility.hasAudienceMemberLatestActionLabelColumn,
+              }
+            );
+          };
+
+          let audienceMemberId: string | null = null;
+          let visitRecorded = false;
+
+          if (existing) {
+            await tx
+              .update(audienceMembers)
+              .set({
+                visits: updatedVisits,
+                lastSeenAt: now,
+                updatedAt: now,
+                engagementScore: updatedScore,
+                intentLevel: updatedIntent,
+                geoCity: geoCityValue,
+                geoCountry: geoCountryValue,
+                deviceType: normalizedDevice,
+                referrerHistory,
+                tags: mergedTags,
+                ...(compatibility.hasAudienceMemberLatestReferrerUrlColumn &&
+                  latestReferrerUrl && { latestReferrerUrl }),
+                ...(utmParams && { utmParams: resolvedUtmParams }),
+              })
+              .where(eq(audienceMembers.id, existing.id));
+
+            audienceMemberId = existing.id;
+            visitRecorded = !isBotAudienceMember;
+          } else {
+            const [inserted] = await tx
+              .insert(audienceMembers)
+              .values({
+                creatorProfileId: profileId,
+                fingerprint,
+                type: 'anonymous',
+                displayName: 'Visitor',
+                firstSeenAt: now,
+                lastSeenAt: now,
+                visits: updatedVisits,
+                engagementScore: updatedScore,
+                intentLevel: updatedIntent,
+                geoCity: geoCityValue,
+                geoCountry: geoCountryValue,
+                deviceType: normalizedDevice,
+                referrerHistory,
+                utmParams: resolvedUtmParams,
+                tags: mergedTags,
+                latestActions: [],
+                ...(compatibility.hasAudienceMemberLatestReferrerUrlColumn &&
+                  latestReferrerUrl && { latestReferrerUrl }),
+                updatedAt: now,
+                createdAt: now,
+              })
+              .onConflictDoNothing({
+                target: [
+                  audienceMembers.creatorProfileId,
+                  audienceMembers.fingerprint,
+                ],
+              })
+              .returning({ id: audienceMembers.id });
+
+            if (inserted) {
+              audienceMemberId = inserted.id;
+              visitRecorded = !isBotAudienceMember;
+            } else {
+              const [racedMember] = await tx
+                .select({
+                  id: audienceMembers.id,
+                  visits: audienceMembers.visits,
+                  latestActions: audienceMembers.latestActions,
+                  referrerHistory: audienceMembers.referrerHistory,
+                  engagementScore: audienceMembers.engagementScore,
+                  geoCity: audienceMembers.geoCity,
+                  geoCountry: audienceMembers.geoCountry,
+                  deviceType: audienceMembers.deviceType,
+                  utmParams: audienceMembers.utmParams,
+                  tags: audienceMembers.tags,
+                })
+                .from(audienceMembers)
+                .where(
+                  and(
+                    eq(audienceMembers.creatorProfileId, profileId),
+                    eq(audienceMembers.fingerprint, fingerprint)
+                  )
+                )
+                .limit(1);
+
+              if (racedMember) {
+                const racedTags = mergeAudienceTags(
+                  racedMember.tags,
+                  effectiveAudienceTags
+                );
+                const racedIsBot = racedTags.includes('bot');
+                const racedActionCount = Array.isArray(
+                  racedMember.latestActions
+                )
+                  ? racedMember.latestActions.length
+                  : 0;
+                const racedVisits = racedIsBot
+                  ? racedMember.visits
+                  : racedMember.visits + 1;
+                const racedScore = racedIsBot
+                  ? racedMember.engagementScore
+                  : racedMember.engagementScore + 1;
+                const racedIntent = racedIsBot
+                  ? 'low'
+                  : deriveIntentLevel(racedVisits, racedActionCount);
+                const racedReferrers = Array.isArray(
+                  racedMember.referrerHistory
+                )
+                  ? racedMember.referrerHistory
+                  : [];
+                const racedReferrerHistory = trimHistory(
+                  [...referrerEntry, ...racedReferrers],
+                  3
+                );
+                const racedUtmParams = hasUtmParams
+                  ? utmParams
+                  : (racedMember.utmParams ?? {});
+
+                await tx
+                  .update(audienceMembers)
+                  .set({
+                    visits: racedVisits,
+                    lastSeenAt: now,
+                    updatedAt: now,
+                    engagementScore: racedScore,
+                    intentLevel: racedIntent,
+                    geoCity: resolvedGeoCity ?? racedMember.geoCity ?? null,
+                    geoCountry:
+                      resolvedGeoCountry ?? racedMember.geoCountry ?? null,
+                    deviceType: normalizedDevice,
+                    referrerHistory: racedReferrerHistory,
+                    tags: racedTags,
+                    ...(compatibility.hasAudienceMemberLatestReferrerUrlColumn &&
+                      latestReferrerUrl && { latestReferrerUrl }),
+                    ...(utmParams && { utmParams: racedUtmParams }),
+                  })
+                  .where(eq(audienceMembers.id, racedMember.id));
+
+                audienceMemberId = racedMember.id;
+                visitRecorded = !racedIsBot;
+              }
+            }
+          }
+
+          if (visitRecorded && compatibility.hasDailyProfileViewsTable) {
+            await writeDailyProfileViews(tx, profileId, viewDate, now, {
+              route: 'audience/visit',
+            });
+          }
 
           if (
-            schemaCompatibility.hasAudienceReferrersTable &&
-            latestReferrerUrl
+            visitRecorded &&
+            compatibility.hasCreatorDistributionEventsTable &&
+            shouldTrackInstagramActivation
           ) {
-            await writeReferrer(tx, existing.id, latestReferrerUrl, now);
+            await writeInstagramActivation(
+              tx,
+              profileId,
+              instagramReferrerHost,
+              utmParams,
+              now
+            );
           }
-          await recordProfileVisitEvent(existing.id);
-          return;
-        }
 
-        const [inserted] = await tx
-          .insert(audienceMembers)
-          .values({
-            creatorProfileId: profileId,
-            fingerprint,
-            type: 'anonymous',
-            displayName: 'Visitor',
-            firstSeenAt: now,
-            lastSeenAt: now,
-            visits: updatedVisits,
-            engagementScore: updatedScore,
-            intentLevel: updatedIntent,
-            geoCity: geoCityValue,
-            geoCountry: geoCountryValue,
-            deviceType: normalizedDevice,
-            referrerHistory,
-            utmParams: resolvedUtmParams,
-            tags: mergedTags,
-            latestActions: [],
-            ...(schemaCompatibility.hasAudienceMemberLatestReferrerUrlColumn &&
-              latestReferrerUrl && { latestReferrerUrl }),
-            updatedAt: now,
-            createdAt: now,
-          })
-          .onConflictDoNothing({
-            target: [
-              audienceMembers.creatorProfileId,
-              audienceMembers.fingerprint,
-            ],
-          })
-          .returning({ id: audienceMembers.id });
+          if (!audienceMemberId) {
+            return;
+          }
 
-        if (
-          inserted &&
-          schemaCompatibility.hasAudienceReferrersTable &&
-          latestReferrerUrl
-        ) {
-          await writeReferrer(tx, inserted.id, latestReferrerUrl, now);
-        }
-        if (inserted) {
-          await recordProfileVisitEvent(inserted.id);
-        }
-      });
+          if (compatibility.hasAudienceReferrersTable && latestReferrerUrl) {
+            await writeReferrer(tx, audienceMemberId, latestReferrerUrl, now);
+          }
+          await recordProfileVisitEvent(audienceMemberId);
+        });
+      }
+    );
 
-      return NextResponse.json(
-        { success: true, fingerprint },
-        { headers: NO_STORE_HEADERS }
-      );
-    } catch (error) {
-      logger.warn('[Audience Visit] Optional persistence degraded', {
-        error,
-        fingerprint,
-        profileId,
-      });
-      await captureWarning('Audience visit persistence degraded', error, {
-        route: '/api/audience/visit',
-        method: 'POST',
-        fingerprint,
-        profileId,
-      });
-      return NextResponse.json(
-        { success: true, fingerprint, degraded: true },
-        { headers: NO_STORE_HEADERS }
-      );
-    }
+    return NextResponse.json(
+      { success: true, fingerprint },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     logger.error('[Audience Visit] Error', error);
     await captureError('Audience visit tracking failed', error, {

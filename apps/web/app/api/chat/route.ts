@@ -36,10 +36,9 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   tool,
-  type UIMessage,
   type UIMessageChunk,
 } from 'ai';
-import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
@@ -56,25 +55,48 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { extractLastUserText } from '@/lib/chat/message-text';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
+import {
+  updateOwnedReleaseGeneratedPitches,
+  updateOwnedReleaseMetadata,
+} from '@/lib/chat/release-writes';
+import { fetchReleasesForChat } from '@/lib/chat/releases';
+import {
+  extractUIMessageText,
+  parseChatRequestBody,
+} from '@/lib/chat/request-validation';
+import {
+  buildRetouchUnavailableAssistantMessage,
+  detectRetouchIntent,
+  resolveRetouchCapability,
+} from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
   canUsePaidChatTools,
   resolveChatTurnPlanLimits,
 } from '@/lib/chat/tool-access';
 import {
   decodeToolEvents,
-  encodeToolEvents,
   type PersistedToolEvent,
+  preparePersistedToolEventsForTurnFinish,
+  resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
+import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
+  createMerchAlternativeTool,
   createMerchGenerateTool,
   createMerchPreviewTool,
   createMerchSelectTool,
 } from '@/lib/chat/tools/merch-tools';
+import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
+import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
+  recordChatTurnModel,
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
@@ -84,17 +106,17 @@ import {
   type ChatTelemetry,
   type ReleaseContext,
 } from '@/lib/chat/types';
+import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
-import { discogReleases } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { checkGateForUser } from '@/lib/flags/server';
+import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
+import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -106,7 +128,6 @@ import { formatMerchMoney } from '@/lib/merch/pricing';
 import {
   createMerchGeneration,
   optimizeMerchCards,
-  publishMerchCard,
   reorderMerchCards,
   selectMerchDesign,
   showArtistPayouts,
@@ -142,7 +163,6 @@ import type {
 } from '@/lib/services/album-art/types';
 import {
   buildCanvasMetadata,
-  getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
@@ -155,18 +175,11 @@ import {
   resolvePitchDestination,
 } from '@/lib/services/pitch';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { toISOStringOrNull } from '@/lib/utils/date';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 export const dynamic = 'force-dynamic';
 
 export const maxDuration = 60;
-
-/** Maximum allowed message length (characters) */
-const MAX_MESSAGE_LENGTH = 4000;
-
-/** Maximum allowed messages per request */
-const MAX_MESSAGES_PER_REQUEST = 50;
 
 /**
  * Statsig gate keys for the chat kill switch. Declared as const so typos fail
@@ -363,36 +376,6 @@ function formatAvailableReleases(releases: ReleaseContext[]): string {
 }
 
 /**
- * Fetches release data for the chat context.
- * Used by creative tools (canvas, social ads, related artists).
- */
-async function fetchReleasesForChat(
-  profileId: string
-): Promise<ReleaseContext[]> {
-  const releases = await db
-    .select({
-      id: discogReleases.id,
-      title: discogReleases.title,
-      releaseType: discogReleases.releaseType,
-      releaseDate: discogReleases.releaseDate,
-      artworkUrl: discogReleases.artworkUrl,
-      spotifyPopularity: discogReleases.spotifyPopularity,
-      totalTracks: discogReleases.totalTracks,
-      metadata: discogReleases.metadata,
-    })
-    .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, profileId))
-    .orderBy(desc(discogReleases.releaseDate))
-    .limit(50);
-
-  return releases.map(r => ({
-    ...r,
-    releaseDate: toISOStringOrNull(r.releaseDate),
-    canvasStatus: getCanvasStatusFromMetadata(r.metadata),
-  }));
-}
-
-/**
  * Resolves artist context from profileId (server-side) or client-provided data.
  * Returns { context } on success or { error } with a NextResponse on failure.
  */
@@ -434,80 +417,6 @@ async function resolveArtistContext(
   return { context: parseResult.data };
 }
 
-/**
- * Extracts text content from a UIMessage's parts array.
- */
-function extractUIMessageText(
-  parts: Array<{ type: string; text?: string }>
-): string {
-  return parts
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('');
-}
-
-/**
- * Validates a single UIMessage object.
- * AI SDK v6 UIMessages have { id, role, parts } instead of { role, content }.
- * Returns an error message string if invalid, null if valid.
- */
-function validateMessage(message: unknown): string | null {
-  if (typeof message !== 'object' || message === null || !('role' in message)) {
-    return 'Invalid message format';
-  }
-
-  const msg = message as Record<string, unknown>;
-
-  if (msg.role !== 'user' && msg.role !== 'assistant') {
-    return 'Invalid message role';
-  }
-
-  // UIMessages must have a parts array
-  if (!('parts' in msg) || !Array.isArray(msg.parts)) {
-    return 'Invalid message format';
-  }
-
-  // Validate content length for user messages
-  if (msg.role === 'user') {
-    const contentStr = extractUIMessageText(
-      msg.parts as Array<{ type: string; text?: string }>
-    );
-    if (contentStr.length > MAX_MESSAGE_LENGTH) {
-      return `Message too long. Maximum is ${MAX_MESSAGE_LENGTH} characters`;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Validates the messages array (UIMessage format).
- * Returns an error message string if invalid, null if valid.
- */
-function validateMessagesArray(messages: unknown): string | null {
-  if (!Array.isArray(messages)) {
-    return 'Messages must be an array';
-  }
-  if (messages.length === 0) {
-    return 'Messages array cannot be empty';
-  }
-  if (messages.length > MAX_MESSAGES_PER_REQUEST) {
-    return `Too many messages. Maximum is ${MAX_MESSAGES_PER_REQUEST}`;
-  }
-
-  for (const message of messages) {
-    const error = validateMessage(message);
-    if (error) {
-      return error;
-    }
-  }
-
-  return null;
-}
-
 function extractRequestId(req: Request): string {
   const incomingRequestId = req.headers.get('x-request-id')?.trim();
   if (incomingRequestId) return incomingRequestId.slice(0, 120);
@@ -532,14 +441,6 @@ function safeSetSentryContext(callback: () => void): void {
   } catch {
     // Observability must never break the chat request path.
   }
-}
-
-function extractLastUserText(uiMessages: UIMessage[]): string {
-  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return '';
-  return extractUIMessageText(
-    lastUserMsg.parts as Array<{ type: string; text?: string }>
-  ).trim();
 }
 
 function normalizeChatTurnSource(value: unknown): ChatTurnSource {
@@ -699,11 +600,18 @@ function buildChatTurnMetadata(input: {
   readonly conversationId: string;
   readonly turnId: string;
   readonly requestId: string;
+  readonly toolStepCapExhausted?: boolean;
+  /** Resolved model id that produced the turn (feedback attribution). */
+  readonly model?: string;
 }) {
   return {
     conversationId: input.conversationId,
     turnId: input.turnId,
     requestId: input.requestId,
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.toolStepCapExhausted
+      ? { toolStepCapExhausted: true as const }
+      : {}),
   };
 }
 
@@ -715,7 +623,7 @@ function createAvatarUploadTool() {
   return tool({
     description:
       'Show a profile photo upload widget in the chat. Use this when the artist wants to change, update, or set their profile photo. Do not describe how to upload — just call this tool.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       return { success: true, action: 'avatar_upload' as const };
     },
@@ -730,7 +638,7 @@ function createSocialLinkTool() {
   return tool({
     description:
       'Propose adding a social link to the artist profile. Pass the full URL. The client will show a confirmation card with the detected platform. Use this when the artist asks to add a link or social profile URL.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       url: z
         .string()
         .describe(
@@ -771,7 +679,7 @@ function createSocialLinkRemovalTool(profileId: string | null) {
   return tool({
     description:
       'Propose removing a social link from the artist profile. Use this when the artist asks to remove or delete a link. Returns a confirmation card with link details. You must specify the platform name (e.g. "instagram", "spotify", "twitter") to identify which link to remove.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       platform: z
         .string()
         .describe(
@@ -837,11 +745,14 @@ function createSocialLinkRemovalTool(profileId: string | null) {
  * Creates the checkCanvasStatus tool for querying release canvas status.
  * Fetches release data and reports which releases need canvas videos.
  */
-function createCheckCanvasStatusTool(profileId: string | null) {
+function createCheckCanvasStatusTool(
+  profileId: string | null,
+  releases: ReleaseContext[]
+) {
   return tool({
     description:
       "Check which of the artist's releases have Spotify Canvas videos set and which are missing them. Use this when the artist asks about canvas videos or wants to generate them.",
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       includeAll: z
         .boolean()
         .optional()
@@ -856,8 +767,6 @@ function createCheckCanvasStatusTool(profileId: string | null) {
           error: 'Profile ID required for release data',
         };
       }
-
-      const releases = await fetchReleasesForChat(profileId);
 
       if (releases.length === 0) {
         return {
@@ -913,7 +822,7 @@ function createSuggestRelatedArtistsTool(context: ArtistContext) {
   return tool({
     description:
       "Suggest related artists for playlist pitching, ad targeting, and collaboration based on the artist's genre, style, and popularity level. Returns advice on which artists to target.",
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       purpose: z
         .enum(['playlist_pitching', 'ad_targeting', 'collaboration', 'all'])
         .describe('What the related artists will be used for'),
@@ -948,11 +857,14 @@ function createSuggestRelatedArtistsTool(context: ArtistContext) {
  * Creates the generateCanvasPlan tool.
  * Helps the artist plan a canvas video generation from their album artwork.
  */
-function createGenerateCanvasPlanTool(profileId: string | null) {
+function createGenerateCanvasPlanTool(
+  profileId: string | null,
+  releases: ReleaseContext[]
+) {
   return tool({
     description:
       'Generate a detailed plan for creating a Spotify Canvas video from album artwork. Includes artwork processing steps, animation style recommendations, and technical specs. Use this when an artist wants to create a canvas for a specific release.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .describe('The title of the release to generate canvas for'),
@@ -968,7 +880,6 @@ function createGenerateCanvasPlanTool(profileId: string | null) {
         return { success: false, error: 'Profile ID required' };
       }
 
-      const releases = await fetchReleasesForChat(profileId);
       const release = findReleaseByTitle(releases, releaseTitle);
 
       if (!release) {
@@ -988,11 +899,12 @@ function createGenerateAlbumArtTool(params: {
   readonly clerkUserId: string;
   readonly artistName: string;
   readonly canGenerateAlbumArt: boolean;
+  readonly releases: ReleaseContext[];
 }) {
   return tool({
     description:
       'Generate three album art options for a release. Use this when the artist asks to generate, create, or design album artwork or cover art. If no matching release exists, return a target-selection result so the client can ask whether to create a release or attach the art to an existing release.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .max(200)
@@ -1037,6 +949,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROFILE_REQUIRED' as const,
           error: 'Profile ID required',
         };
       }
@@ -1044,6 +957,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PLAN_UNAVAILABLE' as const,
           error: 'Album art generation requires a Pro plan.',
         };
       }
@@ -1052,12 +966,12 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROVIDER_UNAVAILABLE' as const,
           error: 'Album art generation is temporarily unavailable.',
         };
       }
 
-      const releases = await fetchReleasesForChat(params.profileId);
-      const target = resolveAlbumArtReleaseTarget(releases, {
+      const target = resolveAlbumArtReleaseTarget(params.releases, {
         releaseId,
         releaseTitle,
       });
@@ -1090,6 +1004,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             burstLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -1103,6 +1018,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             dailyLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -1202,6 +1118,7 @@ function createGenerateAlbumArtTool(params: {
           return {
             success: false as const,
             retryable: false,
+            errorCode: 'PROVIDER_UNAVAILABLE' as const,
             error: 'Album art generation is temporarily unavailable.',
           };
         }
@@ -1212,6 +1129,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'TOOL_EXECUTION_FAILED' as const,
           error: 'Unable to generate album art. Please try again.',
         };
       }
@@ -1229,7 +1147,7 @@ function _createMerchGenerationTool(params: {
   return tool({
     description:
       'Generate exactly three premium merch design options for the current artist. Use for make merch, create a tee, create a hoodie, or make something that would sell.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       prompt: z.string().max(500).optional(),
       itemType: z.string().max(80).optional(),
       makeLive: z.boolean().optional(),
@@ -1316,8 +1234,8 @@ function createMerchStatusTool(params: {
 }) {
   return tool({
     description:
-      'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove.',
-    inputSchema: z.object({
+      'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove. Publish, unpause, and archive require user confirmation — they return a confirmation card and do not write immediately.',
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
     execute: async ({ merchCardId }) => {
@@ -1325,18 +1243,16 @@ function createMerchStatusTool(params: {
         return { success: false as const, error: 'Profile ID required' };
       }
 
-      if (params.action === 'publish') {
-        const card = await publishMerchCard({
-          cardId: merchCardId,
+      if (
+        params.action === 'publish' ||
+        params.action === 'unpause' ||
+        params.action === 'archive'
+      ) {
+        return proposeMerchAction({
+          action: params.action,
+          merchCardId,
           profileId: params.profileId,
-          clerkUserId: params.clerkUserId,
         });
-        return {
-          success: true as const,
-          merchCardId: card.id,
-          status: card.status,
-          title: card.title,
-        };
       }
 
       const status = getMerchCardUpdateStatus(params.action);
@@ -1363,7 +1279,7 @@ function createMerchUpdateTool(params: {
   return tool({
     description:
       'Update a merch card name, description, image URL, or retail price. If asked to make it live, run the merch safety guard before publishing.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
       title: z.string().min(1).max(120).optional(),
       description: z.string().min(1).max(500).optional(),
@@ -1384,15 +1300,27 @@ function createMerchUpdateTool(params: {
         description: input.description,
         primaryImageUrl: input.primaryImageUrl,
         retailPriceCents: input.retailPriceCents,
-        makeLive: input.makeLive,
+        makeLive: false,
       });
-      return {
+
+      const result = {
         success: true as const,
         merchCardId: card.id,
         status: card.status,
         title: card.title,
         retailPrice: formatMerchMoney(card.retailPriceCents),
       };
+
+      if (input.makeLive === true) {
+        const publishProposal = await proposeMerchAction({
+          action: 'publish',
+          merchCardId: card.id,
+          profileId: params.profileId,
+        });
+        return { ...result, publishProposal };
+      }
+
+      return result;
     },
   });
 }
@@ -1400,7 +1328,7 @@ function createMerchUpdateTool(params: {
 function createMerchSalesTool(profileId: string | null) {
   return tool({
     description: 'Show merch revenue and purchase counts for this artist.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
         return { success: false as const, error: 'Profile ID required' };
@@ -1420,7 +1348,7 @@ function createMerchPayoutsTool(profileId: string | null) {
   return tool({
     description:
       'Show manual merch payout liability for this artist. MVP payouts are not automatic.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
         return { success: false as const, error: 'Profile ID required' };
@@ -1502,12 +1430,13 @@ function buildCanvasPlan(
  */
 function createPromoStrategyTool(
   context: ArtistContext,
-  profileId: string | null
+  profileId: string | null,
+  releases: ReleaseContext[]
 ) {
   return tool({
     description:
       'Create a comprehensive promotion strategy for a release, including social media video ads, TikTok strategy, Spotify Canvas, and ad targeting recommendations. Use this when an artist asks for help promoting their music.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .optional()
@@ -1528,14 +1457,11 @@ function createPromoStrategyTool(
         .describe('Target platforms for the promotion'),
     }),
     execute: async ({ releaseTitle, budget, platforms }) => {
-      let targetRelease: ReleaseContext | null = null;
-
-      if (profileId) {
-        const releases = await fetchReleasesForChat(profileId);
-        targetRelease = releaseTitle
+      const targetRelease = profileId
+        ? releaseTitle
           ? findReleaseByTitle(releases, releaseTitle)
-          : (releases[0] ?? null);
-      }
+          : (releases[0] ?? null)
+        : null;
 
       return {
         success: true,
@@ -1569,7 +1495,7 @@ function createShowTopInsightsTool(profileId: string | null) {
   return tool({
     description:
       'Show the artist their top audience, release, track, and monetization signals as structured insight cards. Use this when they ask what is working, what to focus on, or how their audience and releases are performing.',
-    inputSchema: z.object({}),
+    inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
         return {
@@ -1596,11 +1522,14 @@ function createShowTopInsightsTool(profileId: string | null) {
  * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
  * Since Spotify has no public API for canvas status, this is the only reliable way to track it.
  */
-function createMarkCanvasUploadedTool(profileId: string | null) {
+function createMarkCanvasUploadedTool(
+  profileId: string | null,
+  releases: ReleaseContext[]
+) {
   return tool({
     description:
       "Mark a release as having a Spotify Canvas video uploaded. Use this when the artist confirms they've already set a canvas for a track/release in Spotify for Artists, or when they tell you a canvas is already uploaded.",
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .describe('The title of the release that has a canvas uploaded'),
@@ -1610,7 +1539,6 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
         return { success: false, error: 'Profile ID required' };
       }
 
-      const releases = await fetchReleasesForChat(profileId);
       const release = findReleaseByTitle(releases, releaseTitle);
 
       if (!release) {
@@ -1620,17 +1548,21 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
         };
       }
 
-      // Update the release metadata with canvas status
-      await db
-        .update(discogReleases)
-        .set({
-          metadata: {
-            ...release.metadata,
-            ...buildCanvasMetadata('uploaded'),
-          },
-          updatedAt: new Date(),
-        })
-        .where(eq(discogReleases.id, release.id));
+      const updated = await updateOwnedReleaseMetadata({
+        releaseId: release.id,
+        creatorProfileId: profileId,
+        metadata: {
+          ...release.metadata,
+          ...buildCanvasMetadata('uploaded'),
+        },
+      });
+
+      if (!updated) {
+        return {
+          success: false,
+          error: 'Release not found or unauthorized',
+        };
+      }
 
       return {
         success: true,
@@ -1650,7 +1582,7 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
  * This tool directly creates the release in the database and returns the result.
  */
 function createReleaseTool(resolvedProfileId: string) {
-  const createReleaseSchema = z.object({
+  const createReleaseSchema = chatToolSchema({
     title: z.string().min(1).max(200).describe('The title of the release'),
     releaseType: z
       .enum([
@@ -1739,12 +1671,13 @@ function createReleaseTool(resolvedProfileId: string) {
  */
 function createWorldClassBioTool(
   context: ArtistContext,
-  profileId: string | null
+  profileId: string | null,
+  releases: ReleaseContext[]
 ) {
   return tool({
     description:
       'Write a world-class artist bio in an editorial style suitable for Spotify, Apple Music, and press use. Uses real artist context from profile + DSP metadata.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       goal: z
         .enum(['spotify', 'apple_music', 'press_kit', 'general'])
         .optional()
@@ -1762,12 +1695,6 @@ function createWorldClassBioTool(
         .describe('Maximum words for the returned draft (default 180)'),
     }),
     execute: async ({ goal, tone, maxWords }) => {
-      let releases: Awaited<ReturnType<typeof fetchReleasesForChat>> = [];
-      try {
-        releases = profileId ? await fetchReleasesForChat(profileId) : [];
-      } catch {
-        // Non-fatal: proceed with empty releases rather than failing the tool
-      }
       const wordLimit = maxWords ?? 180;
       const draftPackage = buildArtistBioDraft({
         artistName: context.displayName,
@@ -1814,7 +1741,7 @@ function createLyricsFormatTool() {
   return tool({
     description:
       'Format lyrics to Apple Music guidelines. Applies deterministic rules: removes section labels like [Verse]/[Chorus], straightens curly quotes, normalizes punctuation, collapses blank lines, and trims whitespace. Use when an artist asks to clean up or format lyrics.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       lyrics: z
         .string()
         .min(1)
@@ -1863,7 +1790,7 @@ function createSubmitFeedbackTool(clerkUserId: string) {
   return tool({
     description:
       'Submit product feedback from the artist. Use this when the artist wants to share feedback, report a bug, or request a feature. Collect their feedback message first, then call this tool with the full text.',
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       message: z
         .string()
         .min(5)
@@ -1885,10 +1812,14 @@ function createSubmitFeedbackTool(clerkUserId: string) {
  * Creates the generateReleasePitch tool for chat-first release pitching.
  * Saves the latest generated draft to the release's generatedPitches field.
  */
-function createGenerateReleasePitchTool(resolvedProfileId: string) {
+function createGenerateReleasePitchTool(
+  resolvedProfileId: string,
+  identity: { clerkUserId: string; conversationId: string | null },
+  releases: ReleaseContext[]
+) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions.`,
-    inputSchema: z.object({
+    inputSchema: chatToolSchema({
       releaseTitle: z
         .string()
         .max(200)
@@ -1937,8 +1868,6 @@ function createGenerateReleasePitchTool(resolvedProfileId: string) {
       instructions,
     }) => {
       try {
-        const releases = await fetchReleasesForChat(resolvedProfileId);
-
         if (releases.length === 0) {
           return {
             success: false as const,
@@ -1985,12 +1914,24 @@ function createGenerateReleasePitchTool(resolvedProfileId: string) {
           input: pitchInput,
           destination,
           instructions,
+          identity: {
+            userId: identity.clerkUserId,
+            sessionId: identity.conversationId,
+          },
         });
 
-        await db
-          .update(discogReleases)
-          .set({ generatedPitches: result.pitch })
-          .where(eq(discogReleases.id, release.id));
+        const updated = await updateOwnedReleaseGeneratedPitches({
+          releaseId: release.id,
+          creatorProfileId: resolvedProfileId,
+          generatedPitches: result.pitch,
+        });
+
+        if (!updated) {
+          return {
+            success: false as const,
+            error: 'Release not found or unauthorized',
+          };
+        }
 
         return {
           success: true as const,
@@ -2041,11 +1982,19 @@ function buildFreeChatTools(
 function buildChatTools(
   artistContext: ArtistContext,
   resolvedProfileId: string | null,
+  releases: ReleaseContext[],
   insightsEnabled: boolean,
   clerkUserId: string,
   canGenerateAlbumArt: boolean,
   albumArtEnabled: boolean,
   canAccessMerchCreation: boolean,
+  canAccessAiRetouching: boolean,
+  teleprompterRecordingEnabled: boolean,
+  userEntitlements: Awaited<
+    ReturnType<
+      typeof import('@/lib/entitlements/server').getCurrentUserEntitlements
+    >
+  >,
   reservedTurn?: {
     readonly conversationId: string;
     readonly turnId: string;
@@ -2057,13 +2006,17 @@ function buildChatTools(
       : {}),
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
-    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
+    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
     suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(
       artistContext,
-      resolvedProfileId
+      resolvedProfileId,
+      releases
     ),
-    generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
+    generateCanvasPlan: createGenerateCanvasPlanTool(
+      resolvedProfileId,
+      releases
+    ),
     ...(albumArtEnabled && canGenerateAlbumArt
       ? {
           generateAlbumArt: createGenerateAlbumArtTool({
@@ -2071,12 +2024,22 @@ function buildChatTools(
             clerkUserId,
             artistName: artistContext.displayName,
             canGenerateAlbumArt,
+            releases,
+          }),
+        }
+      : {}),
+    ...(canAccessAiRetouching
+      ? {
+          retouchImage: createRetouchImageTool({
+            profileId: resolvedProfileId,
+            entitlements: userEntitlements,
           }),
         }
       : {}),
     createPromoStrategy: createPromoStrategyTool(
       artistContext,
-      resolvedProfileId
+      resolvedProfileId,
+      releases
     ),
     // gh-9808 HOT ZONE: voice promo audio generation from cloned voice (premium, 11Labs)
     // "clone my voice" / "voice promo" / "radio drop" intent loads via system prompt
@@ -2084,13 +2047,22 @@ function buildChatTools(
       profileId: resolvedProfileId ?? '',
       artistName: artistContext.displayName,
     }),
-    markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
+    markCanvasUploaded: createMarkCanvasUploadedTool(
+      resolvedProfileId,
+      releases
+    ),
     formatLyrics: createLyricsFormatTool(),
     ...(resolvedProfileId
       ? {
           createRelease: createReleaseTool(resolvedProfileId),
-          generateReleasePitch:
-            createGenerateReleasePitchTool(resolvedProfileId),
+          generateReleasePitch: createGenerateReleasePitchTool(
+            resolvedProfileId,
+            {
+              clerkUserId,
+              conversationId: reservedTurn?.conversationId ?? null,
+            },
+            releases
+          ),
         }
       : {}),
     ...(canAccessMerchCreation
@@ -2110,6 +2082,12 @@ function buildChatTools(
           selectMerchDesign: createMerchSelectTool({
             profileId: resolvedProfileId,
             clerkUserId,
+          }),
+          createMerchAlternativeItem: createMerchAlternativeTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+            conversationId: reservedTurn?.conversationId ?? null,
+            turnId: reservedTurn?.turnId ?? null,
           }),
           updateMerchCard: createMerchUpdateTool({
             profileId: resolvedProfileId,
@@ -2138,7 +2116,7 @@ function buildChatTools(
           reorderMerchCards: tool({
             description:
               'Record the desired order for merch cards. Use only when the artist gives explicit card IDs.',
-            inputSchema: z.object({
+            inputSchema: chatToolSchema({
               merchCardIds: z.array(z.string().uuid()).min(1).max(12),
             }),
             execute: async ({ merchCardIds }) => {
@@ -2163,7 +2141,7 @@ function buildChatTools(
           optimizeMerchCards: tool({
             description:
               'Optimize merch card ranking using current conversion, revenue, margin, and recency signals.',
-            inputSchema: z.object({}),
+            inputSchema: chatToolSchema({}),
             execute: async () => {
               if (!resolvedProfileId) {
                 return {
@@ -2181,6 +2159,13 @@ function buildChatTools(
           }),
           showMerchSales: createMerchSalesTool(resolvedProfileId),
           showArtistPayouts: createMerchPayoutsTool(resolvedProfileId),
+        }
+      : {}),
+    ...(teleprompterRecordingEnabled
+      ? {
+          proposeVideoRecording: createProposeVideoRecordingTool({
+            clerkUserId,
+          }),
         }
       : {}),
   };
@@ -2241,24 +2226,14 @@ function buildChatErrorResponse(
 }
 
 async function tryRouteViaIntent(
-  uiMessages: UIMessage[],
+  userText: string,
   profileId: unknown,
   userId: string,
   corsHeaders: Record<string, string>,
   requestId: string,
   reservedTurn?: { conversationId: string; turnId: string } | null
 ): Promise<Response | null> {
-  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return null;
-
-  const userText = lastUserMsg.parts
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('')
-    .trim();
+  if (!userText) return null;
 
   const intent = classifyIntent(userText);
   if (!isDeterministicIntent(intent)) return null;
@@ -2400,11 +2375,10 @@ export async function POST(req: Request) {
   // light model without a code change. Defaults (both false) = normal behavior.
   // Keys are const-declared so a typo fails at compile time rather than
   // silently falling back to the default.
-  const chatDisabled = await checkGateForUser(
-    userId,
-    CHAT_KILL_SWITCH_GATES.DISABLED,
-    false
-  );
+  const [chatDisabled, forceLightModel] = await checkGatesForUser(userId, [
+    { key: CHAT_KILL_SWITCH_GATES.DISABLED, defaultValue: false },
+    { key: CHAT_KILL_SWITCH_GATES.FORCE_LIGHT, defaultValue: false },
+  ]);
   if (chatDisabled) {
     return NextResponse.json(
       {
@@ -2417,32 +2391,16 @@ export async function POST(req: Request) {
       { status: 503, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const forceLightModel = await checkGateForUser(
-    userId,
-    CHAT_KILL_SWITCH_GATES.FORCE_LIGHT,
-    false
-  );
-  // Parse and validate request body
-  let body: {
-    messages?: unknown;
-    profileId?: unknown;
-    conversationId?: unknown;
-    artistContext?: unknown;
-    clientTurnId?: unknown;
-    clientMessageId?: unknown;
-    source?: unknown;
-    toolIntent?: unknown;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'Invalid JSON body', requestId },
-      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
-    );
+  const parsedRequest = await parseChatRequestBody(req, {
+    corsHeaders,
+    requestId,
+  });
+  if (!parsedRequest.ok) {
+    return parsedRequest.response;
   }
 
-  const { messages, profileId, conversationId } = body;
+  const { body, uiMessages } = parsedRequest;
+  const { profileId, conversationId } = body;
 
   // Validate that either profileId or artistContext is provided
   if (
@@ -2454,18 +2412,6 @@ export async function POST(req: Request) {
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-
-  // Validate messages array and individual messages
-  const messagesError = validateMessagesArray(messages);
-  if (messagesError) {
-    return NextResponse.json(
-      { error: messagesError, requestId },
-      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
-    );
-  }
-
-  // After validation, we know messages is a valid UIMessage array
-  const uiMessages = messages as UIMessage[];
   const userText = extractLastUserText(uiMessages);
   const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
@@ -2473,9 +2419,19 @@ export async function POST(req: Request) {
   const toolIntent = normalizeToolIntent(body.toolIntent);
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
+  const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
+    userId,
+  });
+  const teleprompterRecordingEnabled = await getAppFlagValue(
+    'TELEPROMPTER_RECORDING',
+    { userId }
+  );
   const albumArtCapability = resolveAlbumArtCapability({
-    featureEnabled: FEATURE_FLAGS.ALBUM_ART_GENERATION,
+    featureEnabled: albumArtFeatureEnabled,
     providerConfigured: isXaiConfigured(),
+    entitlements: currentUserEntitlements,
+  });
+  const retouchCapability = resolveRetouchCapability({
     entitlements: currentUserEntitlements,
   });
 
@@ -2548,8 +2504,14 @@ export async function POST(req: Request) {
         .reverse()
         .find(message => message.role === 'assistant');
       const assistantToolCalls = assistantMessage?.toolCalls;
-      const hasPersistedToolState =
-        decodeToolEvents(assistantToolCalls).events.length > 0;
+      const resolvedToolCalls = resolvePersistedToolEventsForDisplay(
+        decodeToolEvents(assistantToolCalls).events,
+        {
+          messageCreatedAt: assistantMessage?.createdAt,
+          turnStatus: reservation.turn.status,
+        }
+      );
+      const hasPersistedToolState = resolvedToolCalls.length > 0;
       const replayText =
         assistantMessage?.content ||
         (hasPersistedToolState
@@ -2557,7 +2519,8 @@ export async function POST(req: Request) {
           : 'This chat action already finished. Please send a new message if you need anything else.');
       return createAssistantReplayStreamResponse({
         text: replayText,
-        toolCalls: assistantToolCalls,
+        toolCalls:
+          resolvedToolCalls.length > 0 ? resolvedToolCalls : assistantToolCalls,
         requestId,
         corsHeaders,
         headers: {
@@ -2599,6 +2562,38 @@ export async function POST(req: Request) {
         corsHeaders,
         headers: {
           'x-chat-preflight': 'album-art-unavailable',
+          'x-conversation-id': reservation.conversationId,
+          'x-chat-turn-id': reservation.turn.id,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+          requestId,
+        }),
+      });
+    }
+
+    if (
+      retouchCapability.availability !== 'available' &&
+      detectRetouchIntent({ text: userText, toolIntent })
+    ) {
+      const replyText =
+        buildRetouchUnavailableAssistantMessage(retouchCapability);
+      await persistTerminalAssistantMessage({
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        status: 'failed_tool_unavailable',
+        content: replyText,
+        errorCode: retouchCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
+        errorMessage: retouchCapability.reason,
+      });
+
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'retouch-unavailable',
           'x-conversation-id': reservation.conversationId,
           'x-chat-turn-id': reservation.turn.id,
         },
@@ -2672,7 +2667,7 @@ export async function POST(req: Request) {
 
   // --- Deterministic intent routing (skip AI for simple CRUD) ---
   const intentResponse = await tryRouteViaIntent(
-    uiMessages,
+    userText,
     profileId,
     userId,
     corsHeaders,
@@ -2727,7 +2722,7 @@ export async function POST(req: Request) {
     reservedTurn?.conversationId ?? resolvedConversationId;
 
   try {
-    const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
+    const albumArtEnabled = albumArtFeatureEnabled;
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(
       resolvedProfileId,
@@ -2741,11 +2736,15 @@ export async function POST(req: Request) {
           ...buildChatTools(
             artistContext,
             resolvedProfileId,
+            releases,
             insightsEnabled,
             userId,
             albumArtCapability.availability === 'available',
             albumArtEnabled,
             planLimits.booleans.canAccessMerchCreation,
+            planLimits.booleans.canAccessAiRetouching,
+            teleprompterRecordingEnabled,
+            currentUserEntitlements,
             reservedTurn
           ),
         }
@@ -2757,6 +2756,15 @@ export async function POST(req: Request) {
       setTags: tags => safeSetSentryContext(() => Sentry.setTags(tags)),
       setExtra: (key, value) =>
         safeSetSentryContext(() => Sentry.setExtra(key, value)),
+      addBreadcrumb: breadcrumb =>
+        safeSetSentryContext(() =>
+          Sentry.addBreadcrumb({
+            category: breadcrumb.category,
+            message: breadcrumb.message,
+            level: breadcrumb.level,
+            data: breadcrumb.data,
+          })
+        ),
       captureException: (error, context) =>
         Sentry.captureException(error, context),
     };
@@ -2796,12 +2804,32 @@ export async function POST(req: Request) {
       accountContext,
       insightsEnabled,
       forceLightModel,
-      tools,
+      lastUserText: userText,
+      tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,
       telemetry,
       onStreamError: persistStreamFailure,
     });
+
+    // Record the producing model on the turn row (fire-and-forget) so 👍/👎
+    // feedback votes can attribute this output to a model server-side, even
+    // when the vote arrives after a page reload (JOV #11460).
+    if (reservedTurn) {
+      recordChatTurnModel(reservedTurn.turnId, turn.selectedModel).catch(
+        error => {
+          Sentry.addBreadcrumb({
+            category: 'ai-chat',
+            message: 'chat_turn_model_record_failed',
+            level: 'warning',
+            data: {
+              turnId: reservedTurn.turnId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+        }
+      );
+    }
 
     return turn.streamResult.toUIMessageStreamResponse({
       headers: {
@@ -2820,26 +2848,50 @@ export async function POST(req: Request) {
               conversationId: reservedTurn.conversationId,
               turnId: reservedTurn.turnId,
               requestId,
+              model: turn.selectedModel,
+              toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,
-      onFinish: async ({ responseMessage }) => {
+      onFinish: async ({ responseMessage, isAborted }) => {
         if (!reservedTurn || streamFailurePersisted) return;
 
-        const assistantText = extractUIMessageText(
-          responseMessage.parts as Array<{ type: string; text?: string }>
-        );
-        const toolCalls = encodeToolEvents(responseMessage.parts);
+        const assistantText = sanitizeAssistantResponse(
+          extractUIMessageText(
+            responseMessage.parts as Array<{ type: string; text?: string }>
+          )
+        ).text;
+        const toolCalls = preparePersistedToolEventsForTurnFinish({
+          parts: responseMessage.parts,
+          isAborted,
+        });
         await persistTerminalAssistantMessage({
           conversationId: reservedTurn.conversationId,
           turnId: reservedTurn.turnId,
-          status: 'completed',
-          content:
-            assistantText ||
-            (toolCalls && toolCalls.length > 0
-              ? ''
-              : 'Done. What would you like to do next?'),
+          status: isAborted ? 'canceled' : 'completed',
+          content: isAborted
+            ? 'This response was canceled before Jovie could finish. Retry when you are ready.'
+            : assistantText ||
+              (toolCalls && toolCalls.length > 0
+                ? ''
+                : 'Done. What would you like to do next?'),
           toolCalls,
+          ...(isAborted
+            ? {
+                errorCode: 'CLIENT_DISCONNECTED',
+                errorMessage: 'Client disconnected',
+              }
+            : {}),
         });
+
+        if (!isAborted && assistantText.trim().length > 0) {
+          scheduleOnlineScoring({
+            traceId: requestId,
+            caseName: `prod:${requestId}`,
+            userPrompt: userText,
+            assistantResponse: assistantText,
+            plan: userPlan,
+          });
+        }
       },
       onError: () => {
         return 'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.';

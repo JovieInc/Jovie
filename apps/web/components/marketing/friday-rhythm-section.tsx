@@ -198,8 +198,8 @@ export function FridayRhythmSection() {
   return (
     <section
       ref={sectionRef}
-      aria-label='Make every Friday count.'
-      className='homepage-friday-rhythm-section relative isolate bg-[#020303]'
+      aria-label='Make Every Friday Count.'
+      className='homepage-friday-rhythm-section relative isolate bg-(--color-bg-hover)'
       data-testid='friday-rhythm-section'
     >
       <RhythmAtmosphere
@@ -256,11 +256,11 @@ function FridayRhythmContent({
   return (
     <div className='homepage-friday-rhythm-content mx-auto w-full max-w-[var(--homepage-section-max)] px-[var(--homepage-page-gutter)] py-20 sm:py-24 md:py-0'>
       <div className='homepage-friday-rhythm-copy max-w-[45rem] text-left'>
-        <h2 className='homepage-friday-rhythm-title text-white'>
+        <h2 className='homepage-friday-rhythm-title text-white dark:text-white'>
           <span className='block'>Make Every Friday</span>
           <span className='block'>Count</span>
         </h2>
-        <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-[16px]'>
+        <p className='mt-5 max-w-[34rem] text-mid leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-base'>
           Jovie turns each release week into a command center for singles,
           presaves, merch, videos, recaps, and follow-up.
         </p>
@@ -304,9 +304,9 @@ function FridayRhythmContent({
       <div className='mx-auto mt-10 flex flex-col items-center gap-5 text-center'>
         <p
           aria-live={mode === 'mobile' ? 'polite' : 'off'}
-          className='text-[15px] leading-6 text-white/56'
+          className='text-mid leading-6 text-white/56'
         >
-          <span className='font-medium text-white'>
+          <span className='font-medium text-white dark:text-white'>
             {activeFridays} Fridays.
           </span>{' '}
           Singles, merch, remixes, videos, and recaps.
@@ -325,14 +325,14 @@ function FridayRhythmContent({
 function RhythmReleaseKey() {
   return (
     <ul
-      aria-label='Friday release mix'
-      className='relative z-10 mx-auto mt-5 flex max-w-[44rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] leading-none text-white/38'
+      aria-label='Friday Release Mix'
+      className='relative z-10 mx-auto mt-5 flex max-w-[44rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 text-2xs leading-none text-white/38'
     >
       {FRIDAY_RELEASE_KINDS.map(kind => (
         <li key={kind.key} className='flex items-center gap-1.5'>
           <span
             aria-hidden='true'
-            className='h-2 w-2 rounded-[2px]'
+            className='h-2 w-2 rounded-xs'
             style={{
               backgroundColor: kind.accentColor,
               opacity: kind.muted ? 0.68 : 1,
@@ -381,7 +381,7 @@ function RhythmAtmosphere({
         return (
           <span
             key={`rhythm-star-${x}-${y}`}
-            className='absolute h-1 w-1 rounded-full bg-white'
+            className='absolute h-1 w-1 rounded-full bg-white dark:bg-surface-1'
             style={{
               left: `${x}%`,
               top: `${y}%`,
@@ -470,8 +470,10 @@ function RhythmModeButton({
     <button
       aria-pressed={active}
       className={cn(
-        'rounded-full px-4 py-2 text-[12px] font-medium transition-colors duration-subtle',
-        active ? 'bg-white text-black' : 'text-white/58 hover:text-white'
+        'rounded-full px-4 py-2 text-xs font-medium transition-colors duration-subtle',
+        active
+          ? 'bg-white dark:bg-surface-1 text-black dark:text-white'
+          : 'text-white/58 hover:text-white'
       )}
       onClick={onClick}
       type='button'

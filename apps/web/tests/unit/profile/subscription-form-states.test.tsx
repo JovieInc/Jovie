@@ -113,6 +113,15 @@ function buildProfileNotifications(overrides: Record<string, unknown> = {}) {
 function buildFormState(overrides: Record<string, unknown> = {}) {
   return {
     emailInput: '',
+    phoneInput: '',
+    country: {
+      code: 'US',
+      name: 'United States',
+      dialCode: '+1',
+      flag: 'US',
+    },
+    isCountryOpen: false,
+    channel: 'email',
     error: null,
     otpCode: '',
     isSubmitting: false,
@@ -123,6 +132,9 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
     subscribedChannels: {},
     handleChannelChange: vi.fn(),
     handleEmailChange: vi.fn(),
+    handlePhoneChange: vi.fn(),
+    setCountry: vi.fn(),
+    setIsCountryOpen: vi.fn(),
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue(undefined),
     handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
@@ -187,7 +199,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
   it('opens directly to email entry for unsubscribed fans', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toHaveAttribute(
       'type',
       'email'
@@ -207,9 +219,9 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await screen.findByText('Email Alerts');
+    await screen.findByText('Get Updates');
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
 
     expect(handleSubscribe).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
@@ -244,8 +256,8 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await screen.findByText('Email Alerts');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByText('Get Updates');
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
     await screen.findByText('Enter the code');
     await user.click(screen.getByRole('button', { name: 'Verify' }));
 

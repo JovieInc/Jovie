@@ -10,7 +10,7 @@ Provider-neutral chat-turn pipeline. Wraps the Vercel AI SDK with Jovie-specific
 2. **System prompt** — `system-prompt.ts:buildSystemPrompt()` composes artist context, discography summary, plan capabilities, and tool docs.
 3. **Message conversion** — UIMessage history → AI SDK ModelMessage format.
 4. **Model selection** — frontier model by default; `forceLightModel` (Statsig kill-switch) routes to the cheaper/faster model. Free-tier short-intent traffic also routes light.
-5. **`streamText()`** — AI SDK call with system prompt, messages, and tools.
+5. **`streamText()`** — AI SDK call with system prompt, messages, tools, and a plan-aware `stopWhen: stepCountIs(N)` cap (8 paid / 3 free) to guard in-turn tool loops.
 6. **Streaming** — return a UIMessage stream the route hands directly to the client.
 
 Key files:
@@ -31,13 +31,13 @@ Tools are NOT defined here. They are built in the route (`buildFreeChatTools`, `
 - **Free tier** (always available): photo upload, social link add/remove, feedback
 - **Paid tier**: profile edits, bio writing, canvas planning, album art generation, pitch generation, promo strategy, release creation, analytics insights
 
-## Observability (Braintrust)
+## AI SDK Entry Point
 
-`streamText`, `generateText`, `generateObject`, and `streamObject` are re-exported from `@/lib/ai/sdk` (wrapped by `braintrust.wrapAISDK`). Any new AI SDK caller must import from `@/lib/ai/sdk`, not directly from `'ai'`, so traces flow into the Braintrust "Jovie" project. Direct Anthropic SDK callers use `getAnthropicClient()` from `@/lib/ai/anthropic`. Tracing only runs when `BRAINTRUST_API_KEY` is set; the wrapper is a no-op otherwise.
+`streamText`, `generateText`, `generateObject`, and `streamObject` are re-exported from `@/lib/ai/sdk` (leak-guard wrapped). Any new AI SDK caller must import from `@/lib/ai/sdk`, not directly from `'ai'`, so leak-guard output filtering applies uniformly. Direct Anthropic SDK callers use `getAnthropicClient()` from `@/lib/ai/anthropic`.
 
 ## Telemetry contract
 
-`types.ts` defines `ChatTelemetry` with `setTags`, `setExtra`, `captureException`. The route binds Sentry; eval scripts pass a no-op. The pipeline never imports `@sentry/nextjs` directly.
+`types.ts` defines `ChatTelemetry` with `setTags`, `setExtra`, `addBreadcrumb`, `captureException`. The route binds Sentry; eval scripts pass a no-op. The pipeline never imports `@sentry/nextjs` directly.
 
 ## Adding a new tool
 

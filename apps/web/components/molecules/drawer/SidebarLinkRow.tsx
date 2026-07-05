@@ -19,7 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const SWIPE_ACTION_BUTTON_CLASS =
-  'flex h-full items-center justify-center px-4 text-white transition-colors active:opacity-80';
+  'flex h-full items-center justify-center px-4 text-white dark:text-white transition-colors active:opacity-80';
 
 export interface SidebarLinkRowProps {
   readonly deepLinkPlatform?: string;
@@ -152,11 +152,11 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex min-h-[32px] items-center justify-between bg-transparent',
+          'group flex min-h-8 items-center justify-between bg-transparent',
           isTrackVariant
-            ? 'rounded-[10px] border border-transparent px-2 py-1.5 shadow-none active:bg-surface-0 lg:hover:bg-surface-0 focus-within:bg-surface-0'
-            : 'rounded-[6px] px-2 py-1 lg:px-2 lg:py-1 active:bg-surface-1 lg:hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
-          'transition-[background-color,box-shadow,border-color] duration-150',
+            ? 'rounded-lg border border-transparent px-2 py-1.5 shadow-none active:bg-surface-0 lg:hover:bg-surface-0 focus-within:bg-surface-0'
+            : 'rounded-md px-2 py-1 lg:px-2 lg:py-1 active:bg-surface-1 lg:hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
+          'transition-[background-color,box-shadow,border-color] duration-subtle',
           !isVisible && 'opacity-60',
           className
         )}
@@ -173,7 +173,7 @@ export function SidebarLinkRow({
             {label}
           </span>
           {badge && (
-            <span className='shrink-0 text-[10px] text-tertiary-token'>
+            <span className='shrink-0 text-3xs text-tertiary-token'>
               {badge}
             </span>
           )}
@@ -187,9 +187,9 @@ export function SidebarLinkRow({
               <button
                 type='button'
                 className={cn(
-                  'rounded-[6px] border border-transparent p-1 text-tertiary-token',
+                  'rounded-md border border-transparent p-1 text-tertiary-token',
                   'hover:border-subtle hover:bg-surface-0 hover:text-primary-token',
-                  'transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
+                  'transition-[background-color,border-color,color,box-shadow] duration-subtle focus-visible:outline-none',
                   'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 )}
                 aria-label={`Actions for ${label}`}

@@ -76,13 +76,13 @@ describe('PaySelector', () => {
       screen.getByRole('button', { name: /Select \$5 payment amount/i })
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Custom amount/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Custom Amount/i }));
 
     expect(amountSlot).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Select \$5 payment amount/i })
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Custom amount')).toBeInTheDocument();
+    expect(screen.getByLabelText('Custom Amount')).toBeInTheDocument();
   });
 
   it('continues with a custom amount in the drawer presentation', () => {
@@ -97,8 +97,8 @@ describe('PaySelector', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Custom amount/i }));
-    fireEvent.change(screen.getByLabelText('Custom amount'), {
+    fireEvent.click(screen.getByRole('button', { name: /Custom Amount/i }));
+    fireEvent.change(screen.getByLabelText('Custom Amount'), {
       target: { value: '42.50' },
     });
     fireEvent.click(

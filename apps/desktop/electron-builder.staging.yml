@@ -19,6 +19,10 @@ mac:
   extendInfo:
     NSAppTransportSecurity:
       NSAllowsArbitraryLoads: false
+    CFBundleURLTypes:
+      - CFBundleURLName: Jovie Staging Auth
+        CFBundleURLSchemes:
+          - jovie-staging
   notarize: true
   target:
     - target: dmg

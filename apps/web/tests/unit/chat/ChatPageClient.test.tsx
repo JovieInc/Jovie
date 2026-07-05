@@ -57,13 +57,15 @@ vi.mock('next/dynamic', () => ({
     },
 }));
 
+const mockRouter = {
+  push: vi.fn(),
+  replace: mockReplace,
+  back: vi.fn(),
+  refresh: vi.fn(),
+};
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: mockReplace,
-    back: vi.fn(),
-    refresh: vi.fn(),
-  }),
+  useRouter: () => mockRouter,
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/app/chat',
 }));
@@ -380,29 +382,38 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('does not register chat header actions on the new-chat route', () => {
+  it('registers the artist profile rail toggle on the new-chat route', () => {
     renderChatPage();
 
-    expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
+    const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
+    expect(headerActions).not.toBeNull();
+    expect(headerActions).toEqual(
+      expect.objectContaining({
+        type: expect.anything(),
+      })
+    );
   });
 
-  it('does not hydrate the profile right panel from ambient preview state without a panel query', () => {
+  it('hydrates preview data on chat and registers the live profile panel when preview is open', () => {
     mockPreviewPanelState.isOpen = true;
 
     renderChatPage();
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
-    expect(hasRegisteredRightPanel()).toBe(false);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
+    expect(hasRegisteredRightPanel()).toBe(true);
+    expect(mockSetPreviewData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'testartist',
+      })
+    );
   });
 
-  it('clears preview data while profile panel hydration is inactive', () => {
+  it('does not register a right panel when the preview panel is closed', () => {
     mockPreviewPanelState.isOpen = false;
 
     renderChatPage();
 
     expect(hasRegisteredRightPanel()).toBe(false);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
   });
 
   it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {
@@ -531,5 +542,30 @@ describe('ChatPageClient', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Starting your onboarding chat.'
     );
+  });
+
+  it('does not show a destructive toast after welcome chat bootstrap retries exhaust', async () => {
+    vi.useFakeTimers();
+    mockSearchParams = new URLSearchParams('from=onboarding');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(null, {
+            status: 503,
+            statusText: 'Service Unavailable',
+          })
+        )
+      )
+    );
+
+    renderChatPage();
+
+    // 1500 + 3000 + 5000ms retry delays, plus buffer for fetch microtasks.
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(mockErrorNotification).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

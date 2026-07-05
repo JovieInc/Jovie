@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
-import { isEnabled } from '@/lib/feature-flags';
+import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
 export type AppShellFrameVariant = 'legacy' | 'shellChatV1';
@@ -16,8 +17,9 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
-  readonly isTableRoute?: boolean;
   readonly variant?: AppShellFrameVariant;
+  /** When true (desktop), sidebar dims and right rail slides partially off-screen. */
+  readonly composerFocusActive?: boolean;
 }
 
 /**
@@ -38,11 +40,11 @@ export const AppShellFrame = memo(function AppShellFrame({
   mobileBottomNav,
   contentClassName,
   containerClassName,
-  isTableRoute = false,
   // Default to 'legacy' so callers that don't pass `variant` (AppShellSkeleton,
   // DemoShell, future surfaces) match the current production state. AuthShell
   // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
   variant = 'legacy',
+  composerFocusActive = false,
 }: Readonly<AppShellFrameProps>) {
   const isShellChatV1 = variant === 'shellChatV1';
 
@@ -50,6 +52,7 @@ export const AppShellFrame = memo(function AppShellFrame({
     <div
       data-app-shell-frame='true'
       data-shell-design={variant}
+      data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
         'relative flex h-full w-full flex-col overflow-hidden',
         isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
@@ -67,18 +70,23 @@ export const AppShellFrame = memo(function AppShellFrame({
             'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
         )}
       >
-        {sidebar}
+        <div
+          data-testid='app-shell-sidebar-mount'
+          className='transition-opacity duration-cinematic ease-cinematic motion-reduce:transition-none'
+        >
+          {sidebar}
+        </div>
 
         <main
           id='main-content'
           className={cn(
             'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
             isShellChatV1
-              ? 'lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'
+              ? 'lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'
               : 'lg:border-l lg:border-subtle'
           )}
         >
-          {isEnabled('CANVAS_GRAIN') && <CanvasGrain />}
+          {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
           {header}
           <div
             className={cn(
@@ -89,16 +97,19 @@ export const AppShellFrame = memo(function AppShellFrame({
             <div
               data-testid='app-shell-scroll'
               className={cn(
-                'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',
-                isTableRoute
-                  ? 'overflow-hidden overflow-x-auto overscroll-contain'
-                  : 'overflow-y-auto overflow-x-hidden overscroll-contain',
+                // Shell-level pane never owns vertical scroll — routes and table
+                // surfaces scroll inside this clip so the right rail stays fixed.
+                'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
                 contentClassName
               )}
             >
               {main}
             </div>
-            {rightPanel}
+            {rightPanel ? (
+              <AppShellRightRail variant={variant}>
+                {rightPanel}
+              </AppShellRightRail>
+            ) : null}
           </div>
           {audioPlayer}
         </main>

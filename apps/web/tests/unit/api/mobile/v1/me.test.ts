@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   captureErrorMock: vi.fn(),
@@ -7,6 +7,7 @@ const hoisted = vi.hoisted(() => ({
   getMobileSessionUserIdMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   isProfileCompleteMock: vi.fn(),
+  isAppleWalletProfilePassAvailableMock: vi.fn(),
 }));
 
 vi.mock('@/constants/domains', () => ({
@@ -35,6 +36,11 @@ vi.mock('@/lib/mobile/session-auth', () => ({
   getMobileSessionUserId: hoisted.getMobileSessionUserIdMock,
 }));
 
+vi.mock('@/lib/wallet/apple/profile-pass', () => ({
+  isAppleWalletProfilePassAvailable:
+    hoisted.isAppleWalletProfilePassAvailableMock,
+}));
+
 const routeModulePromise = import('@/app/api/mobile/v1/me/route');
 
 function makeRequest() {
@@ -54,6 +60,12 @@ describe('GET /api/mobile/v1/me', () => {
       (handle: string) => `https://jov.ie/${handle}`
     );
     hoisted.isProfileCompleteMock.mockReturnValue(true);
+    hoisted.isAppleWalletProfilePassAvailableMock.mockResolvedValue(true);
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', 'true');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -93,6 +105,7 @@ describe('GET /api/mobile/v1/me', () => {
         userStatus: 'active',
       },
       profile: {
+        id: 'profile_123',
         username: 'djshadow',
         usernameNormalized: 'djshadow',
         displayName: 'DJ Shadow',
@@ -116,6 +129,8 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: 'https://jov.ie/djshadow',
       avatarUrl: 'https://cdn.jov.ie/avatar.png',
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: true,
+      chatEnabled: true,
     });
     expect(hoisted.isProfileCompleteMock).toHaveBeenCalledWith({
       username: 'djshadow',
@@ -124,6 +139,33 @@ describe('GET /api/mobile/v1/me', () => {
       isPublic: true,
       onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
     });
+  });
+
+  it('reports chatEnabled for complete authenticated profiles without rollout env', async () => {
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', '');
+    vi.stubEnv('MOBILE_CHAT_ALPHA_GATE_ENABLED', 'true');
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: {
+        userStatus: 'active',
+        isAdmin: false,
+      },
+      profile: {
+        id: 'profile_123',
+        username: 'djshadow',
+        usernameNormalized: 'djshadow',
+        displayName: 'DJ Shadow',
+        avatarUrl: null,
+        isPublic: true,
+        onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    });
+
+    const { GET } = await routeModulePromise;
+    const response = await GET(makeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.chatEnabled).toBe(true);
   });
 
   it('returns needs_onboarding when the DB user is missing', async () => {
@@ -144,6 +186,8 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: null,
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
     });
   });
 
@@ -168,6 +212,8 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: null,
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
     });
   });
 
@@ -178,6 +224,7 @@ describe('GET /api/mobile/v1/me', () => {
         userStatus: 'active',
       },
       profile: {
+        id: 'profile_123',
         username: 'djshadow',
         usernameNormalized: 'djshadow',
         displayName: 'DJ Shadow',
@@ -200,6 +247,8 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: null,
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
     });
   });
 

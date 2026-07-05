@@ -63,7 +63,7 @@ export function UniversalLinkInputPlatformSelector({
             <DropdownMenuItem
               key={platform.id}
               onSelect={() => onArtistSearchSelect(platform.provider)}
-              className='flex min-h-[44px] items-center gap-2.5 cursor-pointer py-2 text-sm'
+              className='flex min-h-11 items-center gap-2.5 cursor-pointer py-2 text-sm'
             >
               <div
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'
@@ -92,7 +92,7 @@ export function UniversalLinkInputPlatformSelector({
             <DropdownMenuItem
               key={platform.id}
               onSelect={() => onPlatformSelect(platform)}
-              className='flex min-h-[44px] items-center gap-2.5 cursor-pointer py-2 text-sm'
+              className='flex min-h-11 items-center gap-2.5 cursor-pointer py-2 text-sm'
             >
               <div
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'

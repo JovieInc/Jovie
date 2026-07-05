@@ -191,3 +191,63 @@ export function canAccessOnboarding(state: CanonicalUserState): boolean {
 export function requiresRedirect(state: CanonicalUserState): boolean {
   return state !== CanonicalUserState.ACTIVE;
 }
+
+// ---------------------------------------------------------------------------
+// Proxy / middleware projection
+// ---------------------------------------------------------------------------
+
+/**
+ * Lightweight projection of canonical state for edge middleware (proxy.ts).
+ * Keeps proxy-state.ts aligned with the same state machine as gate.ts.
+ */
+export interface ProxyUserStateProjection {
+  needsWaitlist: boolean;
+  needsOnboarding: boolean;
+  isActive: boolean;
+  isBanned: boolean;
+}
+
+export function toProxyUserState(
+  state: CanonicalUserState
+): ProxyUserStateProjection {
+  switch (state) {
+    case CanonicalUserState.ACTIVE:
+      return {
+        needsWaitlist: false,
+        needsOnboarding: false,
+        isActive: true,
+        isBanned: false,
+      };
+    case CanonicalUserState.NEEDS_ONBOARDING:
+    case CanonicalUserState.NEEDS_DB_USER:
+    case CanonicalUserState.USER_CREATION_FAILED:
+      return {
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+        isBanned: false,
+      };
+    case CanonicalUserState.WAITLIST_PENDING:
+    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
+      return {
+        needsWaitlist: true,
+        needsOnboarding: false,
+        isActive: false,
+        isBanned: false,
+      };
+    case CanonicalUserState.BANNED:
+      return {
+        needsWaitlist: false,
+        needsOnboarding: false,
+        isActive: false,
+        isBanned: true,
+      };
+    default:
+      return {
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+        isBanned: false,
+      };
+  }
+}

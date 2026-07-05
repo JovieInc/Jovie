@@ -179,11 +179,11 @@ export function KeyboardShortcutsSheet() {
               size='icon'
               className='h-8 w-8 shrink-0'
               onClick={close}
-              aria-label='Close keyboard shortcuts'
+              aria-label='Close Keyboard Shortcuts'
             >
               <ChevronLeft className='h-4 w-4' />
             </Button>
-            <SheetTitle className='text-app font-medium tracking-[-0.01em]'>
+            <SheetTitle className='text-app font-medium tracking-tight'>
               Keyboard Shortcuts
             </SheetTitle>
             <Button
@@ -215,7 +215,7 @@ export function KeyboardShortcutsSheet() {
                   size='icon'
                   className='absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2'
                   onClick={() => setSearchQuery('')}
-                  aria-label='Clear search'
+                  aria-label='Clear Search'
                 >
                   <X className='h-3 w-3' />
                 </Button>

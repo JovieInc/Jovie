@@ -71,6 +71,27 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
         },
         {
+          find: '@/app/app/(shell)/dashboard/actions/dashboard-data',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/actions/creator-profile',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions/connect-spotify',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions/update-profile',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions/enrich-profile',
+          replacement: require.resolve('./enrich-profile-mock.ts'),
+        },
+
+        {
           find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
@@ -166,11 +187,15 @@ const config: StorybookConfig = {
           replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
         },
         // Project aliases
-        { find: '@', replacement: path.resolve(__dirname, '..') },
+        {
+          find: '@/features',
+          replacement: path.resolve(__dirname, '../components/features'),
+        },
         {
           find: '@jovie/ui',
-          replacement: path.resolve(__dirname, '../packages/ui'),
+          replacement: path.resolve(__dirname, '../../../packages/ui'),
         },
+        { find: '@', replacement: path.resolve(__dirname, '..') },
         ...normalizedAlias,
       ],
     };

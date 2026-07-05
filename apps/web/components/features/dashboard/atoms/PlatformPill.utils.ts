@@ -26,7 +26,7 @@ export interface PillClassNameParams {
  * Base classes applied to all pills
  */
 const BASE_CLASSES = [
-  'group/pill relative min-w-0 border text-xs font-caption tracking-[-0.01em]',
+  'group/pill relative min-w-0 border text-xs font-caption tracking-tight',
   'border-(--pill-border) hover:border-(--pill-border-hover)',
   'bg-(--linear-app-content-surface) hover:bg-(--pill-bg-hover)',
   'text-secondary-token hover:text-primary-token',
@@ -53,14 +53,13 @@ function getLayoutClasses(
 ): string {
   if (collapsed) {
     return cn(
-      'inline-grid max-w-[24px] grid-cols-[18px_0fr] items-center gap-0.5 overflow-hidden rounded-lg px-[3px] py-[3px]',
+      'inline-grid max-w-6 grid-cols-[18px_0fr] items-center gap-0.5 overflow-hidden rounded-lg px-1 py-1',
       !defaultExpanded &&
-        'group-hover/pill:max-w-[132px] group-hover/pill:grid-cols-[18px_minmax(0,1fr)] group-focus-visible/pill:max-w-[132px] group-focus-visible/pill:grid-cols-[18px_minmax(0,1fr)] lg:group-hover/pill:max-w-[164px] lg:group-focus-visible/pill:max-w-[164px]',
-      defaultExpanded &&
-        'max-w-[132px] grid-cols-[18px_minmax(0,1fr)] lg:max-w-[164px]'
+        'group-hover/pill:max-w-33 group-hover/pill:grid-cols-[18px_minmax(0,1fr)] group-focus-visible/pill:max-w-33 group-focus-visible/pill:grid-cols-[18px_minmax(0,1fr)] lg:group-hover/pill:max-w-41 lg:group-focus-visible/pill:max-w-41',
+      defaultExpanded && 'max-w-33 grid-cols-[18px_minmax(0,1fr)] lg:max-w-41'
     );
   }
-  return 'inline-flex min-h-[24px] max-w-full items-center gap-1.5 rounded-lg px-2 py-[3px]';
+  return 'inline-flex min-h-6 max-w-full items-center gap-1.5 rounded-lg px-2 py-1';
 }
 
 /**

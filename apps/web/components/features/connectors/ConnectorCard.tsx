@@ -10,20 +10,21 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/atoms/Badge';
+import {
+  type ConnectorIconKey,
+  type ConnectorProviderId,
+  type ConnectorStatus,
+  getConnectorDefinition,
+} from '@/lib/connectors/registry';
 import { cn } from '@/lib/utils';
 
-export type ConnectorStatus =
-  | 'not_connected'
-  | 'connected'
-  | 'syncing'
-  | 'error'
-  | 'needs_reauth'
-  | 'disabled';
-
-export type ConnectorProvider = 'gmail' | 'google_calendar';
+export type {
+  ConnectorProviderId as ConnectorProvider,
+  ConnectorStatus,
+} from '@/lib/connectors/registry';
 
 interface ConnectorCardProps {
-  readonly provider: ConnectorProvider;
+  readonly provider: ConnectorProviderId;
   readonly status: ConnectorStatus;
   readonly email?: string;
   readonly errorMessage?: string;
@@ -32,18 +33,10 @@ interface ConnectorCardProps {
   readonly className?: string;
 }
 
-const PROVIDER_META = {
-  gmail: {
-    label: 'Gmail',
-    description: 'Scan booking emails for tour confirmation signals.',
-    Icon: Mail,
-  },
-  google_calendar: {
-    label: 'Google Calendar',
-    description: 'Read events to detect conflicts and write approved bookings.',
-    Icon: Calendar,
-  },
-} as const;
+const CONNECTOR_ICONS = {
+  mail: Mail,
+  calendar: Calendar,
+} as const satisfies Record<ConnectorIconKey, typeof Mail>;
 
 const STATUS_BADGE: Record<
   ConnectorStatus,
@@ -52,11 +45,11 @@ const STATUS_BADGE: Record<
     variant: 'default' | 'secondary' | 'destructive' | 'outline';
   }
 > = {
-  not_connected: { label: 'Not connected', variant: 'outline' },
+  not_connected: { label: 'Not Connected', variant: 'outline' },
   connected: { label: 'Connected', variant: 'default' },
   syncing: { label: 'Syncing', variant: 'secondary' },
   error: { label: 'Error', variant: 'destructive' },
-  needs_reauth: { label: 'Reconnect needed', variant: 'destructive' },
+  needs_reauth: { label: 'Reconnect Needed', variant: 'destructive' },
   disabled: { label: 'Disconnected', variant: 'outline' },
 };
 
@@ -69,7 +62,8 @@ export function ConnectorCard({
   onDisconnect,
   className,
 }: ConnectorCardProps) {
-  const { label, description, Icon } = PROVIDER_META[provider];
+  const definition = getConnectorDefinition(provider);
+  const Icon = CONNECTOR_ICONS[definition.iconKey];
   const { label: statusLabel, variant: statusVariant } = STATUS_BADGE[status];
   const isConnected = status === 'connected' || status === 'syncing';
 
@@ -83,7 +77,9 @@ export function ConnectorCard({
         </div>
         <div className='space-y-0.5'>
           <div className='flex items-center gap-2'>
-            <span className='text-sm font-medium text-primary'>{label}</span>
+            <span className='text-sm font-medium text-primary'>
+              {definition.label}
+            </span>
             <Badge variant={statusVariant} className='text-xs'>
               {status === 'syncing' && (
                 <Loader2 className='mr-1 h-3 w-3 animate-spin' />
@@ -98,7 +94,7 @@ export function ConnectorCard({
               {statusLabel}
             </Badge>
           </div>
-          <p className='text-xs text-secondary'>{description}</p>
+          <p className='text-xs text-secondary'>{definition.description}</p>
           {email && isConnected && (
             <p className='text-xs text-tertiary'>{email}</p>
           )}

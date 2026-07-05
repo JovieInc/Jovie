@@ -1,22 +1,32 @@
 'use client';
 
+import { Skeleton } from '@jovie/ui';
+import { useReducedMotion } from 'motion/react';
 import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
 import { cn } from '@/lib/utils';
+import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
 /**
- * Cloudflare Turnstile widget for the onboarding chat (JOV-2132 PR 3).
+ * Cloudflare Turnstile widget for the onboarding chat.
  *
- * Loads the Turnstile script and mounts a Managed widget inside the onboarding
- * composer security panel. The resulting token is passed back via `onToken`,
- * then consumed by the chat client on the first /api/chat POST in
- * `mode='onboarding'`. Subsequent messages within the same session rely on the
- * signed session cookie + the session-lifetime rate limiter and do NOT
- * re-verify.
+ * Mounts a fully invisible (`appearance: 'execute'`) Turnstile widget. On the
+ * happy path it renders NOTHING the user can see — the token is minted silently
+ * and handed back via `onToken`, then consumed by the chat client on the first
+ * `/api/chat` POST. Subsequent messages rely on the signed session cookie and do
+ * not re-verify.
  *
- * In local development, the widget short-circuits and the chat handler's
- * dev-mode skip kicks in.
+ * The visible "Security Check" panel, the headings, the "Verified" celebration
+ * beat, and the misconfig wall were removed (JOV-3563). The only thing this
+ * component ever shows is the bare Cloudflare widget itself, and ONLY when
+ * Cloudflare genuinely requires interaction. Hard failures (error / timeout /
+ * unsupported / unconfigured) and expiry surface through `onStateChange`, which
+ * `OnboardingShell` routes to a single compact toast — never an inline card.
+ * Expiry/timeout silently re-issue so an in-progress chat is never re-walled.
+ *
+ * In local development / E2E the widget short-circuits and the chat handler's
+ * dev-mode skip owns trust.
  */
 
 declare global {
@@ -69,49 +79,28 @@ interface OnboardingTurnstileProps {
 }
 
 const LOCAL_DEV_BYPASS_TOKEN = 'local-dev-turnstile-bypass';
-const DEFAULT_STATE: OnboardingTurnstileState = {
-  status: 'loading',
-  message: 'Checking your browser before your first message.',
-};
+const DEFAULT_STATE: OnboardingTurnstileState = { status: 'loading' };
+/** How long execute-mode can stay token-less before we retry the widget. */
+export const ONBOARDING_TURNSTILE_LOADING_STALL_MS = 10_000;
+/** Retries before surfacing a hard failure toast in OnboardingShell. */
+export const ONBOARDING_TURNSTILE_MAX_LOADING_STALL_RETRIES = 2;
 
 function getTurnstile() {
   return globalThis.window.turnstile;
 }
 
-function getStateCopy(state: OnboardingTurnstileState) {
-  if (state.message) return state.message;
-  switch (state.status) {
-    case 'interactive':
-      return 'Required before your first message.';
-    case 'verified':
-      return 'Verification complete.';
-    case 'expired':
-      return 'Verification expired. Complete the check again to send.';
-    case 'timeout':
-      return 'Verification timed out. Retry the check to send.';
-    case 'error':
-      return 'Verification failed. Retry the check or refresh the page.';
-    case 'unsupported':
-      return 'This browser cannot complete the security check. Try another browser or disable restrictive extensions.';
-    case 'unconfigured':
-      return 'Turnstile is not configured.';
-    case 'bypassed':
-      return 'Local development verification bypassed.';
-    case 'loading':
-    default:
-      return DEFAULT_STATE.message;
-  }
-}
-
-function getHeading(status: OnboardingTurnstileStatus) {
-  if (status === 'verified' || status === 'bypassed') return 'Verified';
-  if (status === 'error' || status === 'timeout' || status === 'expired') {
-    return 'Verification Needed';
-  }
-  if (status === 'unsupported' || status === 'unconfigured') {
-    return 'Verification Unavailable';
-  }
-  return 'Security Check';
+/**
+ * Whether the chat should reserve inline space for the widget. True when
+ * Cloudflare needs interaction or the user already tried to send while the
+ * silent execute pass is still warming up.
+ */
+export function isOnboardingTurnstilePanelVisible(
+  state: OnboardingTurnstileState,
+  instruction?: string | null,
+  _siteKey?: string | null
+): boolean {
+  if (instruction && state.status === 'loading') return true;
+  return state.status === 'interactive';
 }
 
 export function OnboardingTurnstile({
@@ -122,17 +111,37 @@ export function OnboardingTurnstile({
   resetSignal = 0,
 }: OnboardingTurnstileProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const panelRef = useRef<HTMLElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const lastResetSignalRef = useRef(resetSignal);
+  const loadingStallRetryCountRef = useRef(0);
+  const lastInstructionNudgeRef = useRef<string | null>(null);
   const widgetDomId = useId();
-  const headingId = useId();
+  const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
+  const [localAutomationBypass, setLocalAutomationBypass] = useState<
+    boolean | null
+  >(null);
+  const [interactiveChallengeRequested, setInteractiveChallengeRequested] =
+    useState(false);
+  const [interactiveChallengeVisible, setInteractiveChallengeVisible] =
+    useState(false);
   const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const shouldBypassTurnstile =
+  const hasStaticBypass =
     process.env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
     publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1';
+  const shouldBypassTurnstile =
+    hasStaticBypass || localAutomationBypass === true;
+  const isRuntimeBypassPending =
+    !hasStaticBypass && localAutomationBypass === null;
+  const awaitingSendVerification =
+    Boolean(instruction) && state.status === 'loading';
+  void reducedMotion;
+  void focusSignal;
+
+  useEffect(() => {
+    setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
+  }, []);
 
   const commitState = useCallback(
     (nextState: OnboardingTurnstileState) => {
@@ -142,27 +151,24 @@ export function OnboardingTurnstile({
     [onStateChange]
   );
 
-  const resetWidget = useCallback(
-    (message = 'Verification reset. Complete the check to retry.') => {
-      const widgetId = widgetIdRef.current;
-      const turnstile = getTurnstile();
-      if (widgetId && turnstile) {
-        try {
-          turnstile.reset(widgetId);
-          commitState({ status: 'loading', message });
-          return;
-        } catch (err) {
-          widgetIdRef.current = null;
-          console.error('[onboarding] turnstile reset error', err);
-        }
+  const clearWidget = useCallback(() => {
+    const widgetId = widgetIdRef.current;
+    const turnstile = getTurnstile();
+    if (widgetId && turnstile) {
+      try {
+        turnstile.remove(widgetId);
+      } catch (err) {
+        console.error('[onboarding] turnstile remove error', err);
       }
-      commitState({ status: 'loading', message });
-    },
-    [commitState]
-  );
+    }
+    widgetIdRef.current = null;
+    if (containerRef.current) {
+      containerRef.current.replaceChildren();
+    }
+  }, []);
 
   const render = useCallback(() => {
-    if (shouldBypassTurnstile || !siteKey) return; // local fallback handled server-side
+    if (isRuntimeBypassPending || shouldBypassTurnstile || !siteKey) return;
     const turnstile = getTurnstile();
     if (!containerRef.current || !turnstile) return;
     if (widgetIdRef.current) return; // already rendered
@@ -170,48 +176,48 @@ export function OnboardingTurnstile({
       commitState(DEFAULT_STATE);
       widgetIdRef.current = turnstile.render(containerRef.current, {
         sitekey: siteKey,
-        appearance: 'interaction-only',
+        appearance: 'execute',
         size: 'flexible',
         theme: 'dark',
         callback: token => {
           onToken(token);
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           commitState({ status: 'verified' });
         },
-        'error-callback': code =>
+        'error-callback': code => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'error',
-            message: `Verification failed (${code}). Retry the check or refresh the page.`,
-          }),
-        'expired-callback': () => {
-          commitState({
-            status: 'expired',
-            message: 'Verification expired. Complete the check again to send.',
+            message: `Verification failed (${code}). Refresh the page to try again.`,
           });
-          resetWidget(
-            'Verification expired. Complete the check again to send.'
-          );
         },
-        'timeout-callback': () =>
-          commitState({
-            status: 'timeout',
-            message: 'Verification timed out. Retry the check to send.',
-          }),
-        'unsupported-callback': () =>
+        'expired-callback': () => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
+          commitState({ status: 'expired' });
+        },
+        'timeout-callback': () => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
+          commitState({ status: 'timeout' });
+        },
+        'unsupported-callback': () => {
+          setInteractiveChallengeRequested(false);
+          setInteractiveChallengeVisible(false);
           commitState({
             status: 'unsupported',
             message:
               'This browser cannot complete the security check. Try another browser or disable restrictive extensions.',
-          }),
-        'before-interactive-callback': () =>
-          commitState({
-            status: 'interactive',
-            message: 'Required before your first message.',
-          }),
-        'after-interactive-callback': () =>
-          commitState({
-            status: 'loading',
-            message: 'Finishing verification...',
-          }),
+          });
+        },
+        'before-interactive-callback': () => {
+          setInteractiveChallengeRequested(true);
+          setInteractiveChallengeVisible(false);
+          commitState({ status: 'interactive' });
+        },
+        'after-interactive-callback': () => commitState({ status: 'loading' }),
       });
     } catch (err) {
       commitState({
@@ -220,9 +226,24 @@ export function OnboardingTurnstile({
       });
       console.error('[onboarding] turnstile render error', err);
     }
-  }, [commitState, onToken, resetWidget, shouldBypassTurnstile, siteKey]);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    onToken,
+    shouldBypassTurnstile,
+    siteKey,
+  ]);
+
+  const resetWidget = useCallback(() => {
+    clearWidget();
+    setInteractiveChallengeRequested(false);
+    setInteractiveChallengeVisible(false);
+    commitState({ status: 'loading' });
+    render();
+  }, [clearWidget, commitState, render]);
 
   useEffect(() => {
+    if (isRuntimeBypassPending) return;
     if (shouldBypassTurnstile) {
       onToken(LOCAL_DEV_BYPASS_TOKEN);
       commitState({ status: 'bypassed' });
@@ -249,39 +270,135 @@ export function OnboardingTurnstile({
         }
       }
     };
-  }, [commitState, onToken, render, shouldBypassTurnstile, siteKey]);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    onToken,
+    render,
+    shouldBypassTurnstile,
+    siteKey,
+  ]);
 
   useEffect(() => {
     if (lastResetSignalRef.current === resetSignal) return;
     lastResetSignalRef.current = resetSignal;
-    resetWidget('Verification reset. Complete the check to retry.');
+    resetWidget();
   }, [resetSignal, resetWidget]);
 
   useEffect(() => {
-    if (focusSignal <= 0) return;
-    panelRef.current?.scrollIntoView({ block: 'nearest' });
-    panelRef.current?.focus({ preventScroll: true });
-  }, [focusSignal]);
+    if (!instruction || shouldBypassTurnstile || isRuntimeBypassPending) return;
+    if (state.status !== 'loading') return;
+    if (lastInstructionNudgeRef.current === instruction) return;
+    lastInstructionNudgeRef.current = instruction;
+    resetWidget();
+  }, [
+    instruction,
+    isRuntimeBypassPending,
+    resetWidget,
+    shouldBypassTurnstile,
+    state.status,
+  ]);
 
-  if (shouldBypassTurnstile) {
+  useEffect(() => {
+    if (shouldBypassTurnstile || isRuntimeBypassPending || !siteKey) return;
+    if (state.status !== 'loading') {
+      loadingStallRetryCountRef.current = 0;
+      return;
+    }
+
+    const timer = globalThis.setTimeout(() => {
+      if (
+        loadingStallRetryCountRef.current <
+        ONBOARDING_TURNSTILE_MAX_LOADING_STALL_RETRIES
+      ) {
+        loadingStallRetryCountRef.current += 1;
+        resetWidget();
+        return;
+      }
+
+      commitState({
+        status: 'error',
+        message:
+          'Security check is taking longer than expected. Refresh the page or try another browser.',
+      });
+    }, ONBOARDING_TURNSTILE_LOADING_STALL_MS);
+
+    return () => globalThis.clearTimeout(timer);
+  }, [
+    commitState,
+    isRuntimeBypassPending,
+    resetWidget,
+    shouldBypassTurnstile,
+    siteKey,
+    state.status,
+  ]);
+
+  useEffect(() => {
+    if (!focusSignal || !containerRef.current) return;
+    containerRef.current.scrollIntoView({
+      block: 'nearest',
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  }, [focusSignal, reducedMotion]);
+
+  // Expiry/timeout silently re-issue a token so an in-progress chat is never
+  // re-walled with a visible challenge. A fresh execute pass usually resolves
+  // silently; only a genuine interactive requirement re-surfaces the widget.
+  useEffect(() => {
+    if (state.status !== 'expired' && state.status !== 'timeout') return;
+    resetWidget();
+  }, [state.status, resetWidget]);
+
+  // Reveal the Cloudflare widget only once it has actually painted content,
+  // and only for a genuine interactive challenge. Until then it stays
+  // visually hidden so no empty box flashes.
+  useEffect(() => {
+    if (!interactiveChallengeRequested || interactiveChallengeVisible) return;
+    const target = containerRef.current;
+    if (!target) return;
+
+    let frameId: number | null = null;
+    let observer: MutationObserver | null = null;
+
+    const revealAfterPaint = () => {
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        setInteractiveChallengeVisible(true);
+      });
+    };
+
+    if (target.firstElementChild) {
+      revealAfterPaint();
+    } else {
+      observer = new MutationObserver(() => {
+        if (target.firstElementChild) {
+          observer?.disconnect();
+          observer = null;
+          revealAfterPaint();
+        }
+      });
+      observer.observe(target, { childList: true });
+    }
+
+    return () => {
+      observer?.disconnect();
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
+  }, [interactiveChallengeRequested, interactiveChallengeVisible]);
+
+  if (isRuntimeBypassPending || shouldBypassTurnstile) {
     // No Turnstile UI in dev. The server-side dev-mode skip still owns trust.
     return null;
   }
 
-  const panelCopy = instruction ?? getStateCopy(state);
-  const isActionable =
-    state.status === 'error' ||
-    state.status === 'expired' ||
-    state.status === 'timeout';
-  const shouldShowPanel =
-    !siteKey ||
-    state.status === 'loading' ||
-    state.status === 'interactive' ||
-    state.status === 'error' ||
-    state.status === 'expired' ||
-    state.status === 'timeout' ||
-    state.status === 'unsupported' ||
-    Boolean(instruction);
+  // Interactive challenges and send-while-loading both reserve inline space.
+  // The silent happy path keeps a sized off-screen mount so execute mode can
+  // actually run (zero-height containers can stall token minting in prod).
+  const showInteractiveWidget =
+    Boolean(siteKey) &&
+    (state.status === 'interactive' || awaitingSendVerification);
+  const showWidgetContent =
+    interactiveChallengeVisible || awaitingSendVerification;
 
   return (
     <>
@@ -292,53 +409,36 @@ export function OnboardingTurnstile({
           onLoad={() => render()}
         />
       ) : null}
-      <section
-        ref={panelRef}
-        aria-labelledby={headingId}
-        tabIndex={-1}
-        hidden={!shouldShowPanel}
-        data-testid='onboarding-turnstile-panel'
-        data-turnstile-status={state.status}
-        className={cn(
-          'px-3 py-2.5 text-primary-token outline-none sm:px-3.5 sm:py-3',
-          'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-        )}
-      >
-        <div className='flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between'>
-          <div className='min-w-0'>
-            <p
-              id={headingId}
-              className='text-app font-medium leading-5 text-primary-token'
-            >
-              {getHeading(state.status)}
-            </p>
-            <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
-              {panelCopy}
-            </p>
-          </div>
-          {isActionable ? (
-            <button
-              type='button'
-              onClick={() => resetWidget()}
-              className='h-7 shrink-0 rounded-full border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-            >
-              Retry Verification
-            </button>
-          ) : null}
-        </div>
-        {siteKey ? (
-          <div
-            className='mt-2.5 overflow-hidden rounded-[10px] border border-subtle bg-surface-0'
-            data-testid='onboarding-turnstile-widget-frame'
-          >
-            <div
-              ref={containerRef}
-              id={`cf-turnstile-${widgetDomId}`}
-              className='min-h-[64px]'
+      {siteKey ? (
+        <div
+          className={cn(
+            showInteractiveWidget
+              ? 'relative mt-2 overflow-hidden rounded-lg border border-subtle bg-surface-0 p-1.5'
+              : 'pointer-events-none fixed top-0 -left-full -z-10 h-16 w-80 overflow-hidden opacity-0'
+          )}
+          data-testid='onboarding-turnstile-widget-frame'
+          data-turnstile-mount={showInteractiveWidget ? 'inline' : 'silent'}
+          data-turnstile-status={state.status}
+          aria-hidden={showInteractiveWidget ? undefined : 'true'}
+        >
+          {showInteractiveWidget && !showWidgetContent ? (
+            <Skeleton
+              aria-hidden='true'
+              data-testid='onboarding-turnstile-widget-skeleton'
+              rounded='md'
+              className='pointer-events-none absolute inset-1.5'
             />
-          </div>
-        ) : null}
-      </section>
+          ) : null}
+          <div
+            ref={containerRef}
+            id={`cf-turnstile-${widgetDomId}`}
+            className={cn(
+              'relative min-h-16',
+              showWidgetContent ? '[&>div]:visible' : '[&>div]:invisible'
+            )}
+          />
+        </div>
+      ) : null}
     </>
   );
 }

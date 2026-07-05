@@ -7,10 +7,16 @@
  * Default timeouts:
  * - Dashboard queries: 8 seconds (must stay under Neon's 20s idle timeout)
  * - API queries: 5 seconds
+ *
+ * PostgreSQL statement_timeout:
+ * - Pool-level opt-in: set `DB_STATEMENT_TIMEOUT_MS` to apply on every new
+ *   Neon pool connection (see `resolvePoolConfig` in `lib/db/client/connection.ts`).
+ * - Query-wrapper opt-in: pass `{ db }` to `dashboardQuery` / `apiQuery` /
+ *   `executeWithTimeout` to SET statement_timeout on that client before the query.
  */
 
 import { sql as drizzleSql } from 'drizzle-orm';
-import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
+import type { DbOrTransaction } from './client/types';
 
 // Timeout configuration in milliseconds
 export const QUERY_TIMEOUTS = {
@@ -20,6 +26,16 @@ export const QUERY_TIMEOUTS = {
 } as const;
 
 export type TimeoutType = keyof typeof QUERY_TIMEOUTS;
+
+export type QueryTimeoutOptions = {
+  /**
+   * Apply PostgreSQL statement_timeout on this client before the query.
+   * Pass a transaction handle when queries run inside `db.transaction()`.
+   */
+  db?: DbOrTransaction;
+  /** Override the JS/PG timeout (ms). Defaults to QUERY_TIMEOUTS[type]. */
+  timeoutMs?: number;
+};
 
 /**
  * Wraps a promise with a timeout
@@ -61,17 +77,31 @@ export class QueryTimeoutError extends Error {
   }
 }
 
+function assertPositiveTimeoutMs(timeoutMs: number): number {
+  const safeMs = Math.floor(timeoutMs);
+  if (!Number.isFinite(safeMs) || safeMs <= 0) {
+    throw new Error(`Invalid statement_timeout ms: ${timeoutMs}`);
+  }
+
+  return safeMs;
+}
+
 /**
  * Sets the PostgreSQL statement timeout for the current session.
- * Uses SET (session-scoped) instead of SET LOCAL, because SET LOCAL is a
- * no-op outside a transaction block and the Neon HTTP driver does not
- * support transactions.
+ *
+ * Uses parameterized `set_config` instead of `SET statement_timeout = $1`.
+ * PostgreSQL rejects bind parameters on SET, which surfaced in production as
+ * "Failed query: SET statement_timeout = $1".
  */
 export async function setStatementTimeout(
-  db: NeonDatabase,
+  db: DbOrTransaction,
   timeoutMs: number
 ): Promise<void> {
-  await db.execute(drizzleSql`SET statement_timeout = ${timeoutMs}`);
+  const safeMs = assertPositiveTimeoutMs(timeoutMs);
+
+  await db.execute(
+    drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, false)`
+  );
 }
 
 /**
@@ -83,9 +113,15 @@ export async function setStatementTimeout(
 export async function executeWithTimeout<T>(
   queryFn: () => Promise<T>,
   type: TimeoutType = 'default',
-  context: string = 'Query'
+  context: string = 'Query',
+  options?: QueryTimeoutOptions
 ): Promise<T> {
-  const timeout = QUERY_TIMEOUTS[type];
+  const timeout = options?.timeoutMs ?? QUERY_TIMEOUTS[type];
+
+  if (options?.db) {
+    await setStatementTimeout(options.db, timeout);
+  }
+
   return withTimeout(queryFn(), timeout, context);
 }
 
@@ -94,9 +130,10 @@ export async function executeWithTimeout<T>(
  */
 export async function dashboardQuery<T>(
   queryFn: () => Promise<T>,
-  context: string = 'Dashboard query'
+  context: string = 'Dashboard query',
+  options?: QueryTimeoutOptions
 ): Promise<T> {
-  return executeWithTimeout(queryFn, 'dashboard', context);
+  return executeWithTimeout(queryFn, 'dashboard', context, options);
 }
 
 /**
@@ -104,9 +141,10 @@ export async function dashboardQuery<T>(
  */
 export async function apiQuery<T>(
   queryFn: () => Promise<T>,
-  context: string = 'API query'
+  context: string = 'API query',
+  options?: QueryTimeoutOptions
 ): Promise<T> {
-  return executeWithTimeout(queryFn, 'api', context);
+  return executeWithTimeout(queryFn, 'api', context, options);
 }
 
 /**

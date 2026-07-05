@@ -78,7 +78,7 @@ describe('AudienceActionCell', () => {
     expect(rowClick).not.toHaveBeenCalled();
   });
 
-  it('disables the button when no contact channel is available', () => {
+  it('hides the message button when no contact channel is available', () => {
     const ctx = makeStableContext();
     render(
       <AudienceTableStableProvider value={ctx}>
@@ -87,18 +87,17 @@ describe('AudienceActionCell', () => {
         />
       </AudienceTableStableProvider>
     );
-    expect(screen.getByRole('button')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
   });
 
-  it('disables the button when the only contact is a gated email', () => {
-    // Greptile-flagged: emailVisibleToArtist=false must not let Message
-    // fire with a hidden email present.
+  it('hides the message button for anonymous fans', () => {
     const ctx = makeStableContext();
     render(
       <AudienceTableStableProvider value={ctx}>
         <AudienceActionCell
           member={{
             ...baseMember,
+            displayName: null,
             email: 'hidden@example.com',
             emailVisibleToArtist: false,
             phone: null,
@@ -106,6 +105,6 @@ describe('AudienceActionCell', () => {
         />
       </AudienceTableStableProvider>
     );
-    expect(screen.getByRole('button')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /message/i })).toBeNull();
   });
 });

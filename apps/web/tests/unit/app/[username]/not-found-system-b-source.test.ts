@@ -32,10 +32,10 @@ describe('public profile not-found System B source tokens', () => {
     expect(source).not.toContain('style={{');
     expect(source).toContain("headerVariant='minimal'");
     expect(source).toContain('system-b-public-profile-not-found-main');
-    expect(source).toContain('system-b-public-profile-not-found-action');
-    expect(
-      source.match(/system-b-public-profile-not-found-action/g)
-    ).toHaveLength(1);
+    expect(source).toContain('NotFoundPageContent');
+    expect(source).not.toContain('next/headers');
+    expect(source).toContain("variant = 'profile-miss'");
+    expect(source).not.toContain('resolveNotFoundPathname');
   });
 
   it('backs the public profile not-found primitives with System B profile tokens', async () => {
@@ -51,6 +51,10 @@ describe('public profile not-found System B source tokens', () => {
     expect(block).toContain('var(--system-b-text-primary)');
     expect(block).toContain('var(--profile-pearl-primary-bg)');
     expect(block).toContain('var(--profile-pearl-primary-fg)');
+    expect(block).toContain('system-b-public-profile-not-found-actions');
+    expect(block).toContain(
+      'system-b-public-profile-not-found-action-secondary'
+    );
     expect(block).toContain('var(--space-16)');
     expect(block).not.toMatch(hardcodedHashColorPattern);
     expect(block).not.toMatch(rawAlphaColorPattern);

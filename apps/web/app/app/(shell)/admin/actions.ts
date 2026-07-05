@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import { invalidateBanStatusCache } from '@/lib/auth/ban-check';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
@@ -561,9 +562,12 @@ export async function banUserAction(formData: FormData): Promise<void> {
   }
 
   try {
-    await invalidateProxyUserStateCache(result.clerkId);
+    await Promise.all([
+      invalidateProxyUserStateCache(result.clerkId),
+      invalidateBanStatusCache(result.clerkId),
+    ]);
   } catch (error) {
-    captureError('Failed to invalidate proxy cache after ban', error, {
+    captureError('Failed to invalidate auth caches after ban', error, {
       userId,
       clerkId: result.clerkId,
     });
@@ -691,9 +695,12 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
   }
 
   try {
-    await invalidateProxyUserStateCache(result.clerkId);
+    await Promise.all([
+      invalidateProxyUserStateCache(result.clerkId),
+      invalidateBanStatusCache(result.clerkId),
+    ]);
   } catch (error) {
-    captureError('Failed to invalidate proxy cache after unban', error, {
+    captureError('Failed to invalidate auth caches after unban', error, {
       userId,
       clerkId: result.clerkId,
     });

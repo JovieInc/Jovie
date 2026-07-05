@@ -83,6 +83,8 @@ export interface MerchLearningSnapshot {
   motifs: string[];
   selectedOverOptionIds: string[];
   rejectedAttributes: string[];
+  /** Image model that produced this design's graphic — feeds the A/B bias. */
+  imageModelKey?: string;
 }
 
 export interface MerchVisibilityRules {

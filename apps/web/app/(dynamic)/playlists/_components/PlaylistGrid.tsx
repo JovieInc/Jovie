@@ -51,7 +51,7 @@ export function PlaylistGrid({
               </div>
             )}
           </div>
-          <h2 className='mt-2 text-[13px] font-[450] leading-[1.3] text-white/80 group-hover:text-white'>
+          <h2 className='mt-2 text-[13px] font-book leading-[1.3] text-white/80 group-hover:text-white'>
             {playlist.title}
           </h2>
           <p className='text-[11px] text-white/40'>

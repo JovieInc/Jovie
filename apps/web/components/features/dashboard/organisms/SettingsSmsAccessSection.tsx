@@ -19,24 +19,17 @@ export function SettingsSmsAccessSection({
 
   const hasRequested = alreadyRequested || isSuccess;
 
-  let statusPill: React.ReactNode = null;
-  if (isPending) {
-    statusPill = (
-      <SettingsStatusPill
-        status={{ saving: true, success: null, error: null }}
-      />
-    );
-  } else if (isError) {
-    statusPill = (
-      <SettingsStatusPill
-        status={{
-          saving: false,
-          success: null,
-          error: error?.message ?? 'Request failed',
-        }}
-      />
-    );
-  }
+  // Always mounted so the header layout never shifts when the request
+  // starts or fails; the pill reserves its own space while idle.
+  const statusPill = (
+    <SettingsStatusPill
+      status={{
+        saving: isPending,
+        success: null,
+        error: isError ? (error?.message ?? 'Request failed') : null,
+      }}
+    />
+  );
 
   return (
     <SettingsPanel
@@ -74,7 +67,7 @@ export function SettingsSmsAccessSection({
                   type='button'
                   onClick={() => mutate()}
                   disabled={isPending}
-                  className='inline-flex items-center gap-1.5 rounded-lg bg-primary-token px-3 py-1.5 text-sm font-medium text-primary-token-inverse transition-opacity hover:opacity-90 disabled:opacity-50'
+                  className='inline-flex items-center gap-1.5 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 py-1.5 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
                 >
                   {isPending ? 'Requesting...' : 'Request SMS Access'}
                 </button>

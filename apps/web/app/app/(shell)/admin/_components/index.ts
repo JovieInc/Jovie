@@ -7,6 +7,10 @@ export {
   AdminConversionFunnelSectionSkeleton,
 } from './AdminConversionFunnelSection';
 export {
+  AdminFounderHudSection,
+  AdminFounderHudSectionSkeleton,
+} from './AdminFounderHudSection';
+export {
   AdminKpiSection,
   AdminKpiSectionSkeleton,
 } from './AdminKpiSection';

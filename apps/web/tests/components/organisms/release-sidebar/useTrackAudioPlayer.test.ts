@@ -225,6 +225,83 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.activeTrackId).toBe('track-1');
   });
 
+  it('stores queue metadata and advances to the next queued track on ended', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    const queue = [
+      {
+        id: 'track-1',
+        title: 'First Song',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      },
+      {
+        id: 'track-2',
+        title: 'Second Song',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      },
+    ];
+
+    await act(async () => {
+      await result.current.toggleTrack(queue[0], { queue });
+    });
+    act(() => {
+      fireAudioEvent('play');
+    });
+
+    expect(result.current.playbackState.queueLength).toBe(2);
+    expect(result.current.playbackState.queueIndex).toBe(0);
+    expect(result.current.playbackState.hasNext).toBe(true);
+    expect(result.current.playbackState.hasPrevious).toBe(false);
+
+    await act(async () => {
+      fireAudioEvent('ended');
+    });
+
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(result.current.playbackState.trackTitle).toBe('Second Song');
+    expect(result.current.playbackState.queueIndex).toBe(1);
+    expect(result.current.playbackState.hasNext).toBe(false);
+    expect(result.current.playbackState.hasPrevious).toBe(true);
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+  });
+
+  it('moves to the previous queued track when playPrevious is called', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    const queue = [
+      {
+        id: 'track-1',
+        title: 'First Song',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      },
+      {
+        id: 'track-2',
+        title: 'Second Song',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      },
+    ];
+
+    await act(async () => {
+      await result.current.toggleTrack(queue[1], { queue });
+    });
+    act(() => {
+      fireAudioEvent('play');
+    });
+
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(result.current.playbackState.hasPrevious).toBe(true);
+
+    await act(async () => {
+      await result.current.playPrevious();
+    });
+
+    expect(result.current.playbackState.activeTrackId).toBe('track-1');
+    expect(result.current.playbackState.trackTitle).toBe('First Song');
+    expect(mockAudio.src).toBe('https://cdn.example.com/first.mp3');
+  });
+
   it('resets state and notifies listeners when play() rejects', async () => {
     nextPlayMock = vi.fn().mockRejectedValue(new Error('Playback blocked'));
 

@@ -1,6 +1,16 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  MoreVertical,
+  Pencil,
+  Plus,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -28,6 +38,13 @@ import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurf
 import { useEmailSignatureMenuAction } from '@/features/dashboard/molecules/useEmailSignatureMenuAction';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
+import { UtmBuilderDialog } from '@/features/profile/UtmBuilderDialog';
+import {
+  buildPreviewArtistFromProfile,
+  buildProfilePreviewLinks,
+} from '@/features/profile/view-models';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import {
   useDeletePressPhotoMutation,
@@ -40,6 +57,7 @@ import {
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import type { LegacySocialLink } from '@/types/db';
 import { ProfileAboutTab } from './ProfileAboutTab';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
@@ -136,15 +154,159 @@ async function confirmLinkOnServer(
   return linkId;
 }
 
+/** Convert preview-panel links into the LegacySocialLink shape the public surface expects. */
+function toPreviewSocialLinks(
+  links: PreviewPanelData['links']
+): LegacySocialLink[] {
+  const now = new Date().toISOString();
+  return buildProfilePreviewLinks(links).map(link => ({
+    id: link.id,
+    platform: link.platform,
+    url: link.url,
+    title: link.title,
+    order: 0,
+    is_visible: link.isVisible,
+    created_at: now,
+    updated_at: now,
+    artist_id: 'preview',
+    clicks: 0,
+  }));
+}
+
+/**
+ * Read-only "show off your profile" view: the shared phone-preview bento with a
+ * Live badge, a More dropdown (open / copy / UTM builder), live view/click stats
+ * + copy URL, and an Edit profile button that flips the rail into edit mode.
+ */
+function ProfileBentoView({
+  previewData,
+  profileUrl,
+  onClose,
+  onEditProfile,
+}: Readonly<{
+  previewData: PreviewPanelData;
+  profileUrl: string;
+  onClose: () => void;
+  onEditProfile: () => void;
+}>) {
+  const [utmOpen, setUtmOpen] = useState(false);
+
+  const artist = buildPreviewArtistFromProfile({
+    username: previewData.username,
+    displayName: previewData.displayName,
+    avatarUrl: previewData.avatarUrl,
+    bio: previewData.bio,
+  });
+  const socialLinks = toPreviewSocialLinks(previewData.links);
+
+  const handleCopyLink = useCallback(async () => {
+    const copied = await copyToClipboard(profileUrl);
+    if (copied) {
+      toast.success('Profile link copied');
+      return;
+    }
+    toast.error('Failed to copy link');
+  }, [profileUrl]);
+
+  const menuItems: CommonDropdownItem[] = [
+    {
+      type: 'action',
+      id: 'open-link',
+      label: 'Open Link',
+      icon: <ExternalLink className='h-3.5 w-3.5' />,
+      onClick: () =>
+        globalThis.open(profileUrl, '_blank', 'noopener,noreferrer'),
+    },
+    {
+      type: 'action',
+      id: 'copy-link',
+      label: 'Copy Link',
+      icon: <Copy className='h-3.5 w-3.5' />,
+      onClick: handleCopyLink,
+    },
+    {
+      type: 'action',
+      id: 'utm-builder',
+      label: 'UTM Builder',
+      icon: <SlidersHorizontal className='h-3.5 w-3.5' />,
+      onClick: () => setUtmOpen(true),
+    },
+    { type: 'separator', id: 'profile-actions-separator' },
+    {
+      type: 'action',
+      id: 'close-preview',
+      label: 'Close',
+      icon: <X className='h-3.5 w-3.5' />,
+      onClick: onClose,
+    },
+  ];
+
+  return (
+    <div className='flex min-h-0 flex-1 flex-col overflow-y-auto'>
+      <ProfilePreviewBento
+        artist={artist}
+        socialLinks={socialLinks}
+        genres={previewData.genres}
+        profileHref={previewData.profilePath}
+        showLiveBadge
+        caption='Your Live Profile'
+        phoneAlign='top'
+        showBottomFade
+        className='shrink-0'
+        heroClassName='h-115'
+        topRight={
+          <CommonDropdown
+            items={menuItems}
+            align='end'
+            aria-label='Profile Actions'
+            trigger={
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                aria-label='Profile Actions'
+                className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
+              >
+                <MoreVertical className='h-3.5 w-3.5' />
+              </Button>
+            }
+          />
+        }
+        footer={
+          <div className='space-y-2 pt-1.5'>
+            <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
+            <Button
+              type='button'
+              variant='primary'
+              onClick={onEditProfile}
+              className='h-10 w-full rounded-xl text-xs font-caption tracking-tight'
+            >
+              <Pencil className='mr-2 h-3.5 w-3.5' aria-hidden='true' />
+              Edit Profile
+            </Button>
+          </div>
+        }
+      />
+      <UtmBuilderDialog
+        open={utmOpen}
+        onClose={() => setUtmOpen(false)}
+        baseUrl={profileUrl}
+      />
+    </div>
+  );
+}
+
 function ProfileSidebarHeaderCard({
   previewData,
   profileUrl,
   onClose,
+  onDone,
   overflowActions,
 }: Readonly<{
   previewData: PreviewPanelData;
   profileUrl: string;
   onClose: () => void;
+  onDone?: () => void;
   overflowActions: ReturnType<typeof useProfileHeaderParts>['overflowActions'];
 }>) {
   const primaryLabel =
@@ -168,7 +330,18 @@ function ProfileSidebarHeaderCard({
       <div className='relative'>
         <div className='absolute right-2.5 top-2.5 z-10'>
           <DrawerHeaderActions
-            primaryActions={[]}
+            primaryActions={
+              onDone
+                ? [
+                    {
+                      id: 'done',
+                      label: 'Done',
+                      icon: Check,
+                      onClick: onDone,
+                    },
+                  ]
+                : []
+            }
             overflowActions={overflowActions}
             onClose={onClose}
           />
@@ -186,7 +359,7 @@ function ProfileSidebarHeaderCard({
             <DrawerMediaThumb
               src={previewData.avatarUrl}
               alt={primaryLabel}
-              sizeClassName='h-[60px] w-[60px] rounded-[14px]'
+              sizeClassName='h-15 w-15 rounded-xl'
               sizes='60px'
               fallback={
                 <span className='text-lg font-semibold text-secondary-token'>
@@ -214,6 +387,11 @@ export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+
+  // Rail mode: 'view' shows the phone-preview bento (default — "show off" /
+  // "give me my link"); 'edit' shows the link-editing tabs. The Edit profile
+  // button flips to edit; Done flips back.
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -673,11 +851,11 @@ export function ProfileContactSidebar() {
           <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
-                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-2 w-12 rounded skeleton' />
                 <div className='h-4 w-8 rounded skeleton' />
               </div>
               <div className='space-y-1'>
-                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-2 w-12 rounded skeleton' />
                 <div className='h-4 w-8 rounded skeleton' />
               </div>
             </div>
@@ -693,7 +871,7 @@ export function ProfileContactSidebar() {
             {[1, 2, 3, 4, 5].map(i => (
               <div
                 key={i}
-                className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
+                className='flex items-center gap-3 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
               >
                 <div className='h-8 w-8 shrink-0 rounded-lg skeleton' />
                 <div className='flex-1 h-4 rounded skeleton' />
@@ -724,17 +902,38 @@ export function ProfileContactSidebar() {
     profileSettingsRaw.allowProfilePhotoDownloads === true;
   const showOldReleases = profileSettingsRaw.showOldReleases === true;
 
+  if (mode === 'view') {
+    return (
+      <EntitySidebarShell
+        isOpen={isOpen}
+        ariaLabel='Profile Preview'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+      >
+        {emailSignatureModal}
+        <ProfileBentoView
+          previewData={previewData}
+          profileUrl={profileUrl}
+          onClose={close}
+          onEditProfile={() => setMode('edit')}
+        />
+      </EntitySidebarShell>
+    );
+  }
+
   return (
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       headerMode='minimal'
       hideMinimalHeaderBar
+      entityHeaderSurface='flat'
       entityHeader={
         <ProfileSidebarHeaderCard
           previewData={previewData}
           profileUrl={profileUrl}
           onClose={close}
+          onDone={() => setMode('view')}
           overflowActions={overflowActions}
         />
       }
@@ -756,14 +955,14 @@ export function ProfileContactSidebar() {
                 <AppIconButton
                   type='button'
                   onClick={() => handleAddLink(resolvedCategory)}
-                  className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
+                  className='h-7 w-7 rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
                   ariaLabel={`Add ${PROFILE_TAB_OPTIONS_BASE.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
                 >
                   <Plus className='h-3.5 w-3.5' />
                 </AppIconButton>
               ) : undefined
             }
-            actionsClassName='h-[26px] w-[26px]'
+            actionsClassName='h-7 w-7'
             overflowMode='scroll'
             distribution='fill'
           />

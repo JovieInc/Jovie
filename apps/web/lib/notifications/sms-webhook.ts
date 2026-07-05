@@ -46,6 +46,7 @@ import { logger } from '@/lib/utils/logger';
 import { logSafeCode, logSafePhone } from '@/lib/utils/pii';
 
 const SMS_NATIVE_INTENT_SOURCE = 'sms_native_intent';
+const STALE_WEBHOOK_CLAIM_MS = 10 * 60 * 1000;
 
 export interface WebhookHandleResult {
   /** HTTP status to return to the provider. */
@@ -230,6 +231,49 @@ export async function markWebhookEventProcessed(
     .update(webhookEvents)
     .set({ processed: true, processedAt: new Date() })
     .where(eq(webhookEvents.id, webhookEventId));
+}
+
+/**
+ * Claim an unprocessed webhook row for exclusive handling. Uses processedAt as a
+ * short-lived lease while processed=false (same pattern as stripe-merch webhooks).
+ * Returns false when another worker already holds a fresh claim.
+ */
+export async function claimWebhookEventForProcessing(
+  webhookEventId: string
+): Promise<boolean> {
+  if (!webhookEventId) return false;
+
+  const now = new Date();
+  const staleBefore = new Date(now.getTime() - STALE_WEBHOOK_CLAIM_MS);
+  const [claimed] = await db
+    .update(webhookEvents)
+    .set({ processedAt: now })
+    .where(
+      and(
+        eq(webhookEvents.id, webhookEventId),
+        eq(webhookEvents.processed, false),
+        drizzleSql`(${webhookEvents.processedAt} IS NULL OR ${webhookEvents.processedAt} < ${staleBefore})`
+      )
+    )
+    .returning({ id: webhookEvents.id });
+
+  return Boolean(claimed);
+}
+
+/** Release a processing lease after a handler failure so provider retries can reclaim. */
+export async function clearWebhookEventClaim(
+  webhookEventId: string
+): Promise<void> {
+  if (!webhookEventId) return;
+  await db
+    .update(webhookEvents)
+    .set({ processedAt: null })
+    .where(
+      and(
+        eq(webhookEvents.id, webhookEventId),
+        eq(webhookEvents.processed, false)
+      )
+    );
 }
 
 /**

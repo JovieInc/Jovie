@@ -14,9 +14,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { env } from '@/lib/env-server';
+import { env } from '@/lib/env';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import { isTransientInfraHttpIssue } from '@/lib/sentry/non-actionable-issues';
 import { logger } from '@/lib/utils/logger';
 import {
   acquireRecentDispatch,
@@ -148,6 +149,17 @@ export async function POST(request: NextRequest) {
     const message = issue.metadata?.value || issue.message || '';
     const url = issue.permalink || `https://sentry.io/issues/${issueId}/`;
 
+    if (isTransientInfraHttpIssue({ title, culprit })) {
+      logger.info(
+        '[Sentry Webhook] Skipping autofix for transient infra HTTP issue',
+        { issueId, title, culprit }
+      );
+      return NextResponse.json(
+        { received: true, skipped: true, reason: 'transient-infra-http' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Extract stack trace from first exception if available
     const frames: SentryFrame[] | undefined =
       issue.metadata?.stacktrace?.frames ||
@@ -163,8 +175,8 @@ export async function POST(request: NextRequest) {
       : '';
 
     // Fire GitHub repository_dispatch
-    const owner = process.env.VERCEL_GIT_REPO_OWNER || 'TheBlackFuture';
-    const repo = process.env.VERCEL_GIT_REPO_SLUG || 'Jovie';
+    const owner = env.VERCEL_GIT_REPO_OWNER || 'TheBlackFuture';
+    const repo = env.VERCEL_GIT_REPO_SLUG || 'Jovie';
 
     const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,

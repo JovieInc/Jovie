@@ -69,7 +69,12 @@ export interface ChatActionCard {
 
 export type ChatConversationCreatePhase = 'reserved' | 'completed';
 
-export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
+export type ChatErrorType =
+  | 'network'
+  | 'rate_limit'
+  | 'server'
+  | 'tool'
+  | 'unknown';
 
 export interface ChatError {
   readonly type: ChatErrorType;
@@ -78,6 +83,8 @@ export interface ChatError {
   readonly errorCode?: string;
   readonly requestId?: string;
   readonly failedMessage?: string;
+  /** Tool-only failures stay inline in the thread and should not pause the composer. */
+  readonly suppressComposerPause?: boolean;
 }
 
 /** Maximum allowed message length */
@@ -276,32 +283,27 @@ export interface StarterSuggestionContext {
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Disc3',
-    label: 'Plan a release',
+    label: 'Plan A Release',
     prompt: 'Help me plan my next release.',
     accent: 'green',
   },
   {
     icon: 'Camera',
-    label: 'Generate album art',
+    label: 'Generate Album Art',
     prompt: 'Generate album art for my latest release.',
     accent: 'purple',
   },
   {
-    icon: 'Music',
-    label: 'Generate pitch',
-    prompt: 'Generate a pitch for my latest release.',
-    accent: 'blue',
-  },
-  {
     icon: 'Eye',
-    label: 'Build artist profile',
+    label: 'Build Artist Profile',
     prompt: 'Help me polish my artist profile.',
     accent: 'purple',
   },
   {
     icon: 'Link2',
-    label: 'Analyze momentum',
-    prompt: 'Analyze my audience momentum this week.',
+    label: "What's Working For Me Right Now?",
+    prompt:
+      "What's working for me right now? Help me see what's gaining traction.",
     accent: 'blue',
   },
 ] as const;
@@ -312,7 +314,7 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
  */
 export const PITCH_SUGGESTION: ChatSuggestion = {
   icon: 'Music',
-  label: 'Generate pitch',
+  label: 'Generate Pitch',
   prompt: 'Generate a pitch for my latest release.',
   accent: 'blue',
 };
@@ -323,7 +325,7 @@ export const PITCH_SUGGESTION: ChatSuggestion = {
  */
 export const FEEDBACK_SUGGESTION: ChatSuggestion = {
   icon: 'MessageSquare',
-  label: 'Share feedback',
+  label: 'Share Feedback',
   prompt: "I'd like to share some feedback about Jovie.",
   accent: 'orange',
 };
@@ -331,25 +333,25 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Disc3',
-    label: 'Plan a release',
+    label: 'Plan A Release',
     prompt: 'Help me plan my first release.',
     accent: 'green',
   },
   {
     icon: 'Camera',
-    label: 'Generate album art',
+    label: 'Generate Album Art',
     prompt: 'Generate album art for my next release.',
     accent: 'purple',
   },
   {
     icon: 'Music',
-    label: 'Generate pitch',
+    label: 'Generate Pitch',
     prompt: 'Walk me through pitching my music.',
     accent: 'blue',
   },
   {
     icon: 'Eye',
-    label: 'Build artist profile',
+    label: 'Build Artist Profile',
     prompt: 'Help me build my artist profile.',
     accent: 'purple',
   },

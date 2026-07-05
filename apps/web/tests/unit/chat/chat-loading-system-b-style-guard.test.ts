@@ -37,9 +37,9 @@ function expectNoLocalChrome(source: string, label: string) {
 
 function extractConversationLoadingBranch(source: string) {
   const start = source.indexOf(
-    '// Show skeleton while fetching existing conversation'
+    'export function ChatLoadingConversationSkeleton'
   );
-  const end = source.indexOf('// Shared ChatInput props for both views');
+  const end = source.indexOf('CHAT_COMPOSER_DOCK_CLASSNAME,', start);
 
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
@@ -69,13 +69,18 @@ describe('chat and profile loading System B style guard', () => {
       expect(source).toContain('system-b-chat-conversation-loading-composer');
     }
 
-    const jovieChatSource = readFileSync(
-      path.join(webRoot, 'components/jovie/JovieChat.tsx'),
+    const jovieChatSectionsSource = readFileSync(
+      path.join(webRoot, 'components/jovie/JovieChatSections.tsx'),
       'utf8'
     );
-    const loadingBranch = extractConversationLoadingBranch(jovieChatSource);
+    const loadingBranch = extractConversationLoadingBranch(
+      jovieChatSectionsSource
+    );
 
-    expectNoLocalChrome(loadingBranch, 'JovieChat conversation loading branch');
+    expectNoLocalChrome(
+      loadingBranch,
+      'ChatLoadingConversationSkeleton conversation loading branch'
+    );
     expect(loadingBranch).toContain('system-b-chat-conversation-loading');
     expect(loadingBranch).toContain(
       'system-b-chat-conversation-loading-viewport'

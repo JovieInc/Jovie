@@ -17,6 +17,7 @@ import {
   expireStaleInsights,
   getExistingInsightTypes,
   persistInsights,
+  prepareInsightsForPersistence,
 } from '@/lib/services/insights/lifecycle';
 import {
   INSIGHTS_CRON_CONCURRENCY,
@@ -55,12 +56,15 @@ async function processProfile(
   }
 
   const existingTypes = await getExistingInsightTypes(profileId);
-  const result = await generateInsights(metrics, existingTypes);
+  const result = await generateInsights(metrics, existingTypes, {
+    sessionId: profileId,
+  });
+  const dedupedInsights = prepareInsightsForPersistence(result.insights);
 
   const persisted = await persistInsights(
     profileId,
     run.id,
-    result.insights,
+    dedupedInsights,
     metrics.period,
     metrics.comparisonPeriod
   );

@@ -9,7 +9,7 @@
  *  - Tab click handler calls onTabSelect with correct mode
  *  - Grid column count matches visible tab count
  *  - No horizontal overflow at narrow viewports (320px) — structural check
- *  - 44×44pt touch target minimum via min-h-[50px] class
+ *  - 44×44pt touch target minimum via min-h-13 class
  *  - Empty Events tabs remain reachable so the surface can show alert signup
  */
 
@@ -39,7 +39,7 @@ function makeProps(overrides?: Partial<BottomTabBarProps>): BottomTabBarProps {
 describe('BottomTabBar — tab rendering', () => {
   it('renders all four primary tabs when hasTourDates is true', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: true })} />);
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe('BottomTabBar — tab rendering', () => {
 
   it('keeps the Events tab when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('BottomTabBar — tab rendering', () => {
   it('renders the nav with accessible label', () => {
     render(<BottomTabBar {...makeProps()} />);
     expect(
-      screen.getByRole('navigation', { name: 'Profile navigation' })
+      screen.getByRole('navigation', { name: 'Profile Navigation' })
     ).toBeInTheDocument();
   });
 });
@@ -83,7 +83,7 @@ describe('BottomTabBar — active state', () => {
 
   it('does not mark inactive tabs with aria-current', () => {
     render(<BottomTabBar {...makeProps({ activeTab: 'listen' })} />);
-    const homeBtn = screen.getByRole('button', { name: 'Profile' });
+    const homeBtn = screen.getByRole('button', { name: 'Home' });
     expect(homeBtn).not.toHaveAttribute('aria-current', 'page');
     expect(homeBtn.getAttribute('aria-current')).toBeNull();
   });
@@ -106,7 +106,7 @@ describe('BottomTabBar — active state', () => {
 
   it('marks the profile tab active by default', () => {
     render(<BottomTabBar {...makeProps({ activeTab: 'profile' })} />);
-    expect(screen.getByRole('button', { name: 'Profile' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -131,10 +131,10 @@ describe('BottomTabBar — active state', () => {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — interaction handlers', () => {
-  it('calls onTabSelect with "profile" when Profile is clicked', () => {
+  it('calls onTabSelect with "profile" when Home is clicked', () => {
     const onTabSelect = vi.fn();
     render(<BottomTabBar {...makeProps({ onTabSelect })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }));
     expect(onTabSelect).toHaveBeenCalledTimes(1);
     expect(onTabSelect).toHaveBeenCalledWith('profile');
   });
@@ -184,11 +184,11 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('all primary tab buttons have min-h-[50px] for 44pt touch target compliance', () => {
+  it('all primary tab buttons have min-h-13 for 44pt touch target compliance', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const buttons = container.querySelectorAll('button');
     for (const btn of buttons) {
-      expect(btn.className).toContain('min-h-[50px]');
+      expect(btn.className).toContain('min-h-13');
     }
   });
 
