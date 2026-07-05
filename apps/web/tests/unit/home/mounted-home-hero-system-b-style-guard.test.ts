@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
+const heroComponentPath = 'components/marketing/MarketingHero.tsx';
 const cssPath = 'app/(home)/home.css';
 
 const forbiddenPageChromePatterns = [
@@ -42,48 +43,49 @@ function extractMountedHeroCss(source: string): string {
 }
 
 function extractMountedHeroPageSource(source: string): string {
-  const actionsStart = source.indexOf('function HomepageHeroActions');
-  const actionsEnd = source.indexOf('function HomepageProductStatement');
-  const heroStart = source.indexOf(
-    "className='homepage-hero-stage system-b-mounted-home-hero-stage'"
-  );
-  const heroEnd = source.indexOf('homepage-trust-section', heroStart);
+  const heroStart = source.indexOf('function HomepageHero()');
+  const heroEnd = source.indexOf('function HomepageProductStatement');
 
-  expect(actionsStart, 'hero actions source exists').toBeGreaterThanOrEqual(0);
-  expect(actionsEnd, 'hero actions source is bounded').toBeGreaterThan(
-    actionsStart
-  );
-  expect(heroStart, 'mounted hero source exists').toBeGreaterThanOrEqual(0);
-  expect(heroEnd, 'mounted hero source is bounded').toBeGreaterThan(heroStart);
+  expect(heroStart, 'homepage hero source exists').toBeGreaterThanOrEqual(0);
+  expect(heroEnd, 'homepage hero source is bounded').toBeGreaterThan(heroStart);
 
-  return `${source.slice(actionsStart, actionsEnd)}\n${source.slice(
-    heroStart,
-    heroEnd
-  )}`;
+  return source.slice(heroStart, heroEnd);
 }
 
 describe('mounted homepage hero System B source contract', () => {
   it('keeps mounted hero markup on named System B primitives', () => {
-    const source = extractMountedHeroPageSource(
+    const pageSource = extractMountedHeroPageSource(
       readFileSync(path.join(webRoot, pagePath), 'utf8')
+    );
+    const heroComponentSource = readFileSync(
+      path.join(webRoot, heroComponentPath),
+      'utf8'
     );
 
     for (const pattern of forbiddenPageChromePatterns) {
-      expect(source, `${pagePath} leaked ${pattern}`).not.toMatch(pattern);
+      expect(pageSource, `${pagePath} leaked ${pattern}`).not.toMatch(pattern);
+      expect(
+        heroComponentSource,
+        `${heroComponentPath} leaked ${pattern}`
+      ).not.toMatch(pattern);
     }
 
+    // The homepage hero renders through the canonical MarketingHero with the
+    // trust strip as its proof element (no numeric social-proof stats).
+    expect(pageSource).toContain('<MarketingHero');
+    expect(pageSource).toContain('homepage-trust-section');
+    expect(pageSource).not.toMatch(/statsRow|stats=\{/);
+
     for (const className of [
-      'system-b-mounted-home-hero-stage',
-      'system-b-mounted-home-hero-shell',
-      'system-b-mounted-home-hero-inner',
-      'system-b-mounted-home-hero-copy',
-      'system-b-mounted-home-hero-headline',
-      'system-b-mounted-home-hero-subhead',
-      'system-b-mounted-home-hero-actions',
-      'system-b-mounted-home-hero-primary',
-      'system-b-mounted-home-hero-secondary',
+      'marketing-hero',
+      'marketing-hero-inner',
+      'marketing-hero-copy',
+      'marketing-hero-headline',
+      'marketing-hero-subtitle',
+      'marketing-hero-actions',
+      'marketing-hero-logos',
     ]) {
-      expect(source).toContain(className);
+      expect(heroComponentSource).toContain(className);
     }
   });
 
