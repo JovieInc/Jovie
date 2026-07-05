@@ -22,14 +22,18 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
+import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
+import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
+import { WhatShipped } from '@/components/features/admin/WhatShipped';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
+import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
 import {
@@ -353,7 +357,7 @@ function CompactDeploymentRow({
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${DEPLOYMENT_STATE_DOT_CLASSNAMES[run.status]}`}
             aria-hidden='true'
           />
-          <p className='truncate text-app font-[590] text-primary-token'>
+          <p className='truncate text-app font-semibold text-primary-token'>
             {DEPLOYMENT_STATE_LABELS[run.status]}
           </p>
         </div>
@@ -420,9 +424,7 @@ function DeploymentsPanel({
       data-testid='ops-deployments-panel'
     >
       <div className='flex items-center justify-between gap-3'>
-        <p className='text-[12.5px] font-[560] text-primary-token'>
-          Deployments
-        </p>
+        <p className='text-xs font-[560] text-primary-token'>Deployments</p>
         <p className='truncate text-2xs text-tertiary-token' title={detail}>
           {detail}
         </p>
@@ -664,6 +666,21 @@ export interface HudDashboardClientProps {
   readonly initialShippingData?: DailyBucket[];
   /** ISO timestamp of when shipping data was last cached. */
   readonly initialShippingCachedAt?: string;
+  /** When true and agentRuns empty, show dev fixtures on Agent OS panel. */
+  readonly useFixtureAgentRuns?: boolean;
+}
+
+function resolveAgentOsArtifacts(
+  metrics: HudMetrics,
+  useFixtureAgentRuns: boolean
+): AgentRunArtifact[] {
+  if (metrics.agentRuns.length > 0) {
+    return [...metrics.agentRuns];
+  }
+  if (useFixtureAgentRuns) {
+    return [...AGENT_OS_ADMIN_FIXTURE_ARTIFACTS];
+  }
+  return [];
 }
 
 function makeItemKey(item: HudMetrics['aiOps']['blockers'][number]): string {
@@ -691,10 +708,15 @@ export function HudDashboardClient({
   kioskToken = null,
   initialShippingData,
   initialShippingCachedAt,
+  useFixtureAgentRuns = false,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
     initialMetrics,
     kioskToken
+  );
+  const agentOsArtifacts = resolveAgentOsArtifacts(
+    metrics,
+    useFixtureAgentRuns
   );
 
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
@@ -742,12 +764,12 @@ export function HudDashboardClient({
   // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
   // TV-readable 44/56/72 ramp.
   const mrrValueClass = isShell
-    ? 'text-[28px] font-[620] leading-none tracking-[-0.03em] sm:text-[32px]'
-    : 'text-[44px] font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
+    ? 'text-3xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
+    : 'text-5xl font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
 
   // Operations / Reliability / Runway KPIs likewise scale down in shell.
   const secondaryValueClass = isShell
-    ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
+    ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
     : 'text-4xl font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
 
   const aiOpsSummary = (
@@ -765,7 +787,10 @@ export function HudDashboardClient({
   if (isShell) {
     return (
       <div className={outerClass}>
+        <WhatShipped kioskToken={kioskToken} />
         <TimActionRequiredSection />
+        <HudKpiSubgrid metrics={metrics} />
+        <HudSystemHealthStrip metrics={metrics} />
         <DesignProposalReviewPanel />
 
         <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
@@ -830,7 +855,7 @@ export function HudDashboardClient({
 
         {metrics.accessMode === 'admin' ? (
           <AgentOsRunsPanel
-            artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS}
+            artifacts={agentOsArtifacts}
             summary={aiOpsSummary}
             status={<HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />}
             deploymentsPanel={
@@ -861,7 +886,7 @@ export function HudDashboardClient({
             <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
               <div className='space-y-2'>
                 <SectionLabel>Default status</SectionLabel>
-                <p className='text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'>
+                <p className='text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'>
                   {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
                 </p>
                 <p className='max-w-4xl text-app leading-6 text-secondary-token'>
@@ -887,7 +912,7 @@ export function HudDashboardClient({
           className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
         >
           <div className='flex items-center gap-3'>
-            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
+            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-subtle bg-surface-0'>
               <Image
                 src='/brand/Jovie-Logo-Icon-White.svg'
                 alt='Jovie'
@@ -899,7 +924,7 @@ export function HudDashboardClient({
             </div>
             <div className='min-w-0'>
               <SectionLabel>HUD</SectionLabel>
-              <h1 className='mt-1 truncate text-[22px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-2xl'>
+              <h1 className='mt-1 truncate text-xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-2xl'>
                 {metrics.branding.startupName}
               </h1>
             </div>
@@ -914,6 +939,8 @@ export function HudDashboardClient({
           </div>
         </ContentSurfaceCard>
       ) : null}
+
+      <WhatShipped kioskToken={kioskToken} />
 
       {/* Tim Action Required — personal manual items, surfaces above everything else */}
       {/* ContentSurfaceCard is rendered by TimActionRequiredSection itself so it can self-hide */}
@@ -1016,12 +1043,12 @@ export function HudDashboardClient({
                   Open the live HUD on another device using this kiosk link.
                 </p>
               </div>
-              <div className='rounded-[12px] border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+              <div className='rounded-xl border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
                 <QRCode
                   data={hudUrl ?? ''}
                   size={196}
                   label='HUD Link'
-                  className='rounded-lg bg-white'
+                  className='rounded-lg bg-white dark:bg-white'
                 />
               </div>
             </div>
@@ -1041,7 +1068,7 @@ export function HudDashboardClient({
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='space-y-1'>
             <SectionLabel>AI ops</SectionLabel>
-            <p className='text-2xl font-[620] leading-none text-primary-token sm:text-[28px]'>
+            <p className='text-2xl font-[620] leading-none text-primary-token sm:text-3xl'>
               Hermes control plane
             </p>
             <p className='text-app leading-5 text-secondary-token'>
@@ -1205,7 +1232,7 @@ export function HudDashboardClient({
       </ContentSurfaceCard>
 
       {isShell && metrics.accessMode === 'admin' ? (
-        <AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />
+        <AgentOsRunsPanel artifacts={agentOsArtifacts} />
       ) : null}
 
       <ContentSurfaceCard
@@ -1219,8 +1246,8 @@ export function HudDashboardClient({
             <p
               className={
                 isShell
-                  ? 'text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'
-                  : 'text-[40px] font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-[52px]'
+                  ? 'text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'
+                  : 'text-4xl font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-5xl'
               }
             >
               {formatDefaultStatusLabel(metrics.overview.defaultStatus)}

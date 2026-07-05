@@ -62,25 +62,29 @@ export function ChatLinkRemovalCard({
   const handleRemove = useCallback(() => {
     setErrorMessage(null);
     setState('removing');
+
+    // Optimistically drop the link from the live profile preview so the bento
+    // updates immediately; restore the snapshot if the server rejects it.
+    const snapshot = previewPanel?.previewData ?? null;
+    if (snapshot) {
+      previewPanel?.setPreviewData({
+        ...snapshot,
+        links: snapshot.links.filter(l => l.id !== linkId),
+      });
+    }
+
     removeLink.mutate(
       { profileId, linkId },
       {
         onSuccess: () => {
           setState('removed');
-
-          // Instantly update sidebar preview by removing the link
-          if (previewPanel?.previewData) {
-            previewPanel.setPreviewData({
-              ...previewPanel.previewData,
-              links: previewPanel.previewData.links.filter(
-                l => l.id !== linkId
-              ),
-            });
-          }
         },
         onError: () => {
           setState('pending');
           setErrorMessage('Unable to remove link. Please try again.');
+          if (snapshot) {
+            previewPanel?.setPreviewData(snapshot);
+          }
         },
       }
     );
@@ -160,7 +164,7 @@ export function ChatLinkRemovalCard({
               'text-secondary-token hover:bg-surface-0 hover:text-primary-token',
               'disabled:opacity-50 transition-colors'
             )}
-            aria-label='Cancel removal'
+            aria-label='Cancel Removal'
           >
             <X className='h-3.5 w-3.5' />
           </button>

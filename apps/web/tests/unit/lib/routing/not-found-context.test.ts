@@ -3,7 +3,7 @@ import {
   getNotFoundCopy,
   NOT_FOUND_COPY,
   resolveNotFoundVariant,
-} from '@/lib/routing/not-found-context';
+} from '@/lib/routing/not-found-copy';
 
 describe('resolveNotFoundVariant', () => {
   it('treats valid single-segment handle misses as profile misses', () => {

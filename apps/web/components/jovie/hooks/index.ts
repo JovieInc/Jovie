@@ -1,4 +1,11 @@
 export { useChatAudioAttachments } from './useChatAudioAttachments';
+export type {
+  FileKind,
+  FileUploadStatus,
+  PendingFile,
+  UseChatFileAttachmentsReturn,
+} from './useChatFileAttachments';
+export { useChatFileAttachments } from './useChatFileAttachments';
 export { useChatImageAttachments } from './useChatImageAttachments';
 export { useChatJankMonitor } from './useChatJankMonitor';
 export { useJovieChat } from './useJovieChat';

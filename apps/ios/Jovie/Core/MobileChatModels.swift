@@ -67,6 +67,57 @@ struct CachedChatSnapshot: Codable, Equatable, Sendable {
   let cachedAt: Date
 }
 
+/// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
+/// (JOV-3608). Exercises entity mentions (all four kinds), a skill
+/// invocation, and a user-authored turn containing a mention, so UI tests can
+/// assert chips render as label text with no raw `@kind:id[...]` / `/skill:`
+/// wire syntax visible -- the JOV-3608 regression symptom.
+/// Resolves optional thumbnail URLs for inline entity chips (GH-12708 v2).
+/// Mirrors the web `EntityResolutionProvider` cache-only contract: degrade to
+/// accent-dot fallback when no artwork is known. Fixture IDs used by
+/// `MobileChatEntityFixture` map to stable placeholder URLs so UI tests can
+/// exercise the thumbnail slot without a live discography cache on iOS yet.
+enum MobileChatEntityThumbnailResolver {
+  private static let fixtureThumbnails: [String: URL] = [
+    "release:rel_1": URL(string: "https://cdn.example/ios-fixture/rel_1.jpg")!,
+    "artist:art_1": URL(string: "https://cdn.example/ios-fixture/art_1.jpg")!,
+    "track:trk_1": URL(string: "https://cdn.example/ios-fixture/trk_1.jpg")!,
+  ]
+
+  static func thumbnailURL(kind: MobileChatEntityKind, id: String) -> URL? {
+    fixtureThumbnails["\(kind.rawValue):\(id)"]
+  }
+}
+
+enum MobileChatEntityFixture {
+  static let conversationID = "conv_ui_testing_entity_fixture"
+
+  static let `default`: [MobileChatTimelineItem] = [
+    MobileChatTimelineItem(
+      id: "msg_fixture_user_1",
+      role: .user,
+      content: "What's next for @artist:art_1[Porter Robinson]?",
+      status: .completed,
+      clientTurnId: "turn_fixture_1",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+    MobileChatTimelineItem(
+      id: "msg_fixture_assistant_1",
+      role: .assistant,
+      content: """
+      Your release @release:rel_1[Midnight Drive] is picking up momentum, and \
+      @track:trk_1[Opus] is the standout. Consider /skill:generateAlbumArt for \
+      the next drop, and don't miss @event:evt_1[Coachella 2027].
+      """,
+      status: .completed,
+      clientTurnId: "turn_fixture_1",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+  ]
+}
+
 struct MobileChatTurnRequest: Encodable, Sendable {
   let conversationId: String?
   let clientTurnId: String

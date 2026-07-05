@@ -33,7 +33,7 @@ function SummaryCard({
   description,
 }: Readonly<SummaryCardProps>) {
   return (
-    <div className='min-h-[116px] rounded-md border border-subtle bg-surface-0 px-3 py-3'>
+    <div className='min-h-29 rounded-md border border-subtle bg-surface-0 px-3 py-3'>
       <p className='text-xl font-semibold text-primary-token'>{value}</p>
       <p className='text-xs font-medium text-tertiary-token'>{label}</p>
       <p className='mt-1 text-app leading-5 text-secondary-token'>
@@ -83,7 +83,7 @@ function renderAttributionContent(
     }
 
     return (
-      <div className='flex min-h-[92px] flex-col justify-center'>
+      <div className='flex min-h-23 flex-col justify-center'>
         <p className='text-app font-medium text-primary-token'>
           No attributed subscribers yet
         </p>
@@ -141,7 +141,7 @@ function AttributionStatsCard() {
 
   return (
     <SettingsPanel
-      className='min-h-[156px]'
+      className='min-h-39'
       cardClassName='p-4'
       title='Retargeting attribution'
       description='Subscribers attributed to these ads this month.'

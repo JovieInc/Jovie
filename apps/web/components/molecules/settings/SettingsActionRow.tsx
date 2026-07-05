@@ -38,7 +38,7 @@ export function SettingsActionRow({
         <div className='min-w-0'>
           <p
             className={cn(
-              'text-app font-[540] tracking-[-0.02em] text-primary-token',
+              'text-app font-[540] tracking-tighter text-primary-token',
               titleClassName
             )}
           >

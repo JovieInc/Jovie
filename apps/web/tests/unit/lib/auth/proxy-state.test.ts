@@ -112,35 +112,52 @@ describe('proxy-state.ts', () => {
 
   describe('getUserState', () => {
     it('fetches waitlist gate in parallel with the DB query on cache miss', async () => {
-      let gateLookupStarted = false;
-      let dbLookupStarted = false;
+      let releaseGate!: () => void;
+      let releaseDb!: () => void;
 
-      mockIsWaitlistGateEnabled.mockImplementation(async () => {
-        gateLookupStarted = true;
-        expect(dbLookupStarted).toBe(true);
-        return true;
+      const gateBlocker = new Promise<boolean>(resolve => {
+        releaseGate = () => resolve(true);
+      });
+      const dbBlocker = new Promise<never[]>(resolve => {
+        releaseDb = () => resolve([]);
+      });
+
+      let gateInFlight = false;
+      let dbInFlight = false;
+
+      mockIsWaitlistGateEnabled.mockImplementation(() => {
+        gateInFlight = true;
+        return gateBlocker;
       });
 
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockImplementation(async () => {
-                dbLookupStarted = true;
-                expect(gateLookupStarted).toBe(true);
-                return [];
+              limit: vi.fn().mockImplementation(() => {
+                dbInFlight = true;
+                return dbBlocker;
               }),
             }),
           }),
         }),
       });
 
-      await getUserState('clerk_parallel_gate');
+      const pending = getUserState('clerk_parallel_gate');
+
+      // Promise.all starts both operations; neither should complete before both are in flight.
+      await Promise.resolve();
+      expect(gateInFlight).toBe(true);
+      expect(dbInFlight).toBe(true);
+
+      releaseGate();
+      releaseDb();
+      await pending;
 
       expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
     });
 
-    it('returns needsWaitlist when no DB user exists', async () => {
+    it('returns needsOnboarding when no DB user exists', async () => {
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
@@ -154,14 +171,14 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });
     });
 
-    it('returns needsWaitlist when dbUserId is null', async () => {
+    it('returns needsOnboarding when dbUserId is null', async () => {
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           leftJoin: vi.fn().mockReturnValue({
@@ -175,8 +192,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });
@@ -434,10 +451,12 @@ describe('proxy-state.ts', () => {
 
       const result = await getUserState('clerk_123');
 
-      // Should return safe fallback (onboarding — waitlist gate is disabled)
+      // Should return fail-closed fallback (waitlist) on database error.
+      // This prevents waitlist-pending users from bypassing the gate
+      // during a DB outage.
       expect(result).toEqual({
-        needsWaitlist: false,
-        needsOnboarding: true,
+        needsWaitlist: true,
+        needsOnboarding: false,
         isActive: false,
         isBanned: false,
       });
@@ -562,8 +581,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: false,
-        needsOnboarding: true,
+        needsWaitlist: true,
+        needsOnboarding: false,
         isActive: false,
         isBanned: false,
       });
@@ -611,8 +630,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: false,
-        needsOnboarding: true,
+        needsWaitlist: true,
+        needsOnboarding: false,
         isActive: false,
         isBanned: false,
       });

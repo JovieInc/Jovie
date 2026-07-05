@@ -90,7 +90,7 @@ function PlatformSection({
         href={helpUrl}
         target='_blank'
         rel='noopener noreferrer'
-        className='inline-flex items-center gap-1.5 text-[12.5px] font-caption text-secondary-token transition-colors hover:text-primary-token'
+        className='inline-flex items-center gap-1.5 text-xs font-caption text-secondary-token transition-colors hover:text-primary-token'
       >
         {helpText}
         <ExternalLink className='h-3.5 w-3.5' />

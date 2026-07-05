@@ -40,10 +40,10 @@ describe('AvatarUploadable - Accessibility', () => {
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('aria-label', 'Upload profile photo');
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     expect(fileInput).toHaveAttribute(
       'aria-label',
-      'Choose profile photo file'
+      'Choose Profile Photo File'
     );
   });
 
@@ -61,7 +61,7 @@ describe('AvatarUploadable - Accessibility', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const file = createMockFile();
 
     // Trigger file selection

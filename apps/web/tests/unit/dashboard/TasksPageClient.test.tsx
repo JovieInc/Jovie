@@ -626,7 +626,7 @@ function getLatestTableProps() {
 
 function openDesktopTaskSearch() {
   fireEvent.click(screen.getByRole('button', { name: /filter tasks/i }));
-  return screen.getByRole('combobox', { name: 'Filter tasks' });
+  return screen.getByRole('combobox', { name: 'Filter Tasks' });
 }
 
 function enableDesignV1Tasks() {
@@ -710,7 +710,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByTestId('mock-board-card-task-2'));
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
   it('uses board data for subview counts when the list query is not loaded', () => {
@@ -746,9 +746,9 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByTestId('task-document-pane')).toBeVisible();
     expect(
-      screen.getByText('Pick a task from the list to see what it needs.')
+      screen.getByText('Pick A Task From The List To See What It Needs.')
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
   });
 
   it('submits board moves through the move mutation', () => {
@@ -798,15 +798,15 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByTestId('task-document-pane')).toBeInTheDocument();
     expect(
-      screen.getByText('Pick a task from the list to see what it needs.')
+      screen.getByText('Pick A Task From The List To See What It Needs.')
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
     act(() => {
       getLatestTableProps()?.onRowClick?.(mockTaskTwo);
     });
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
   it('marks the opened DESIGN_V1 task with the shared selected row state', () => {
@@ -839,13 +839,13 @@ describe('TasksPageClient', () => {
     act(() => {
       getLatestTableProps()?.onRowClick?.(mockTaskTwo);
     });
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
 
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(
-      screen.getByText('Pick a task from the list to see what it needs.')
+      screen.getByText('Pick A Task From The List To See What It Needs.')
     ).toBeInTheDocument();
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
@@ -886,13 +886,13 @@ describe('TasksPageClient', () => {
     renderPage();
     openTask();
 
-    const titleEditor = screen.getByLabelText('Task title');
+    const titleEditor = screen.getByLabelText('Task Title');
     expect(titleEditor.tagName).toBe('TEXTAREA');
     expect(titleEditor).toHaveValue(mockTaskTwo.title);
     expect(titleEditor.className).toContain('focus-visible:bg-');
     expect(titleEditor).toHaveStyle({ boxShadow: 'none' });
 
-    const descriptionEditor = screen.getByLabelText('Task description');
+    const descriptionEditor = screen.getByLabelText('Task Description');
     expect(descriptionEditor.className).toContain('focus-visible:bg-');
     expect(descriptionEditor).toHaveStyle({ boxShadow: 'none' });
   });
@@ -965,6 +965,13 @@ describe('TasksPageClient', () => {
     expect(
       screen.queryByText('Your Task List Is Empty')
     ).not.toBeInTheDocument();
+
+    const loadingRows = screen.getAllByTestId('task-loading-row');
+    expect(loadingRows.length).toBeGreaterThan(0);
+    for (const row of loadingRows) {
+      expect(row.className).toContain('flex');
+      expect(row.className).not.toContain('grid-cols-');
+    }
   });
 
   it('renders the shared retry state when the task query fails', () => {
@@ -1019,7 +1026,7 @@ describe('TasksPageClient', () => {
       screen.queryByRole('button', { name: /save task/i })
     ).not.toBeInTheDocument();
 
-    const titleEditor = screen.getByLabelText('Task title');
+    const titleEditor = screen.getByLabelText('Task Title');
     fireEvent.change(titleEditor, {
       target: { value: 'Updated release handoff title' },
     });
@@ -1046,7 +1053,7 @@ describe('TasksPageClient', () => {
     const view = renderPage();
     openTask();
 
-    const titleEditor = screen.getByLabelText('Task title');
+    const titleEditor = screen.getByLabelText('Task Title');
     fireEvent.change(titleEditor, {
       target: { value: 'Unsaved metadata-safe title' },
     });
@@ -1069,7 +1076,7 @@ describe('TasksPageClient', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(
+    expect(screen.getByLabelText('Task Title')).toHaveValue(
       'Unsaved metadata-safe title'
     );
 
@@ -1111,7 +1118,7 @@ describe('TasksPageClient', () => {
     expect(
       screen.queryByTestId('task-description-helper')
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Task description')).toHaveValue(
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
       mockTaskTwo.description
     );
   });
@@ -1134,7 +1141,7 @@ describe('TasksPageClient', () => {
     expect(
       screen.queryByTestId('task-description-helper')
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Task description')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Description')).toBeInTheDocument();
   });
 
   it('hides the helper when the user clicks into the helper body', () => {
@@ -1148,7 +1155,7 @@ describe('TasksPageClient', () => {
     expect(
       screen.queryByTestId('task-description-helper')
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Task description')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Description')).toBeInTheDocument();
   });
 
   it('shows the helper for existing release tasks without helper metadata', () => {
@@ -1175,7 +1182,7 @@ describe('TasksPageClient', () => {
     renderPage();
     openTask(mockHelperTask);
 
-    fireEvent.focus(screen.getByLabelText('Task description'));
+    fireEvent.focus(screen.getByLabelText('Task Description'));
 
     expect(
       screen.queryByTestId('task-description-helper')
@@ -1188,7 +1195,7 @@ describe('TasksPageClient', () => {
     renderPage();
     openTask(mockHelperTask);
 
-    const editor = screen.getByLabelText('Task description');
+    const editor = screen.getByLabelText('Task Description');
 
     fireEvent.focus(editor);
     fireEvent.change(editor, {
@@ -1200,7 +1207,7 @@ describe('TasksPageClient', () => {
     expect(
       screen.queryByTestId('task-description-helper')
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Task description')).toHaveValue('H');
+    expect(screen.getByLabelText('Task Description')).toHaveValue('H');
   });
 
   it('hides the helper before pasted text is written into the editor', () => {
@@ -1209,7 +1216,7 @@ describe('TasksPageClient', () => {
     renderPage();
     openTask(mockHelperTask);
 
-    const editor = screen.getByLabelText('Task description');
+    const editor = screen.getByLabelText('Task Description');
 
     fireEvent.focus(editor);
     fireEvent.paste(editor, {
@@ -1226,7 +1233,7 @@ describe('TasksPageClient', () => {
     expect(
       screen.queryByTestId('task-description-helper')
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Task description')).toHaveValue('Press copy');
+    expect(screen.getByLabelText('Task Description')).toHaveValue('Press copy');
   }, 10000);
 
   it('does not dirty the editor when a helper link is clicked', () => {
@@ -1240,7 +1247,7 @@ describe('TasksPageClient', () => {
     );
 
     expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
-    expect(screen.getByLabelText('Task description')).toHaveValue('');
+    expect(screen.getByLabelText('Task Description')).toHaveValue('');
   });
 
   it('renders previous and next task navigation controls', () => {
@@ -1264,7 +1271,7 @@ describe('TasksPageClient', () => {
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create task',
+        name: 'Create Task',
       })
     ).toBeInTheDocument();
   }, 10000);
@@ -1273,13 +1280,13 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      screen.queryByRole('combobox', { name: 'Filter tasks' })
+      screen.queryByRole('combobox', { name: 'Filter Tasks' })
     ).not.toBeInTheDocument();
 
     openDesktopTaskSearch();
 
     expect(
-      screen.getByRole('combobox', { name: 'Filter tasks' })
+      screen.getByRole('combobox', { name: 'Filter Tasks' })
     ).toBeInTheDocument();
   });
 
@@ -1336,7 +1343,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create task',
+        name: 'Create Task',
       })
     );
 
@@ -1405,7 +1412,7 @@ describe('TasksPageClient', () => {
       deleteItem?.onClick?.();
     });
 
-    const dialog = screen.getByRole('alertdialog');
+    const dialog = screen.getByRole('dialog', { name: 'Delete task?' });
     expect(dialog).toHaveTextContent('Delete task?');
     expect(dialog).toHaveTextContent(mockTaskTwo.title);
 
@@ -1449,17 +1456,17 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      screen.getByText('Pick a task from the list to see what it needs.')
+      screen.getByText('Pick A Task From The List To See What It Needs.')
     ).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'j' });
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
 
     fireEvent.keyDown(window, { key: 'j' });
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTask.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTask.title);
 
     fireEvent.keyDown(window, { key: 'k' });
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
   it('lets keyboard navigation intentionally open the first DESIGN_V1 task from empty detail', () => {
@@ -1467,11 +1474,11 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'j' });
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
   it('closes the DESIGN_V1 task detail with Escape from the ambient task surface', () => {
@@ -1482,13 +1489,13 @@ describe('TasksPageClient', () => {
     act(() => {
       getLatestTableProps()?.onRowClick?.(mockTaskTwo);
     });
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
 
     fireEvent.keyDown(window, { key: 'Escape' });
 
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(
-      screen.getByText('Pick a task from the list to see what it needs.')
+      screen.getByText('Pick A Task From The List To See What It Needs.')
     ).toBeInTheDocument();
   });
 
@@ -1496,11 +1503,11 @@ describe('TasksPageClient', () => {
     renderPage();
     openTask();
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
 
-    fireEvent.keyDown(screen.getByLabelText('Task title'), { key: 'j' });
+    fireEvent.keyDown(screen.getByLabelText('Task Title'), { key: 'j' });
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+    expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
   it('does not auto-select a task on narrower layouts', () => {
@@ -1508,7 +1515,7 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
   });
 
@@ -1519,7 +1526,7 @@ describe('TasksPageClient', () => {
 
     expect(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create task',
+        name: 'Create Task',
       })
     ).toBeInTheDocument();
   });
@@ -1531,7 +1538,7 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByText('2 total tasks')).toBeInTheDocument();
     expect(
-      screen.queryByRole('combobox', { name: 'Filter tasks' })
+      screen.queryByRole('combobox', { name: 'Filter Tasks' })
     ).not.toBeInTheDocument();
 
     const firstMobileRow = screen.getAllByTestId('mobile-task-row')[0]!;
@@ -1539,7 +1546,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(firstMobileRow);
 
-    expect(screen.getByLabelText('Task title')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Title')).toBeInTheDocument();
   });
 
   it('filters mobile task scopes without opening a detail pane', () => {
@@ -1557,7 +1564,7 @@ describe('TasksPageClient', () => {
     expect(screen.getByText(mockTaskTwo.title)).toBeInTheDocument();
     expect(screen.getByText(mockJovieTask.title)).toBeInTheDocument();
     expect(screen.queryByText(mockTask.title)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(1);
@@ -1578,15 +1585,15 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByTestId('mobile-task-row'));
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(
+    expect(screen.getByLabelText('Task Title')).toHaveValue(
       mockJovieTask.title
     );
     expect(screen.getByTestId('task-list-pane')).toHaveClass('hidden');
     expect(screen.getByTestId('task-document-pane')).toHaveClass('flex');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back to task list' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back To Task List' }));
 
-    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
   });
 });

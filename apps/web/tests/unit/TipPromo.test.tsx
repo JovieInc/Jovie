@@ -10,28 +10,31 @@ describe('PayPromo', () => {
 
   afterEach(() => {
     // Clean up environment variable mocks
-    delete process.env.NEXT_PUBLIC_FEATURE_TIPS;
+    vi.unstubAllEnvs();
   });
 
-  it('renders null when NEXT_PUBLIC_FEATURE_TIPS is not "true"', () => {
-    // Test with undefined
-    delete process.env.NEXT_PUBLIC_FEATURE_TIPS;
+  it('renders the component when NEXT_PUBLIC_FEATURE_TIPS is absent', () => {
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', undefined);
     render(<PayPromo />);
-    expect(screen.queryByText('Pay, instantly.')).not.toBeInTheDocument();
 
-    // Test with "false"
-    process.env.NEXT_PUBLIC_FEATURE_TIPS = 'false';
-    render(<PayPromo />);
-    expect(screen.queryByText('Pay, instantly.')).not.toBeInTheDocument();
+    expect(screen.getByText('Pay,')).toBeInTheDocument();
+    expect(screen.getByText('instantly.')).toBeInTheDocument();
+  });
 
-    // Test with empty string
-    process.env.NEXT_PUBLIC_FEATURE_TIPS = '';
+  it('renders null when NEXT_PUBLIC_FEATURE_TIPS is false', () => {
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'false');
     render(<PayPromo />);
-    expect(screen.queryByText('Pay, instantly.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pay,')).not.toBeInTheDocument();
+  });
+
+  it('renders null when NEXT_PUBLIC_FEATURE_TIPS is an empty string', () => {
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', '');
+    render(<PayPromo />);
+    expect(screen.queryByText('Pay,')).not.toBeInTheDocument();
   });
 
   it('renders the component when NEXT_PUBLIC_FEATURE_TIPS is "true"', () => {
-    process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
 
     render(<PayPromo />);
 
@@ -53,7 +56,7 @@ describe('PayPromo', () => {
   });
 
   it('has correct styling classes when rendered', () => {
-    process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
 
     render(<PayPromo />);
 
@@ -68,7 +71,7 @@ describe('PayPromo', () => {
   });
 
   it('contains "Pay, instantly." heading when feature flag is enabled', () => {
-    process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
 
     render(<PayPromo />);
 
@@ -78,7 +81,7 @@ describe('PayPromo', () => {
   });
 
   it('has responsive design classes', () => {
-    process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
 
     render(<PayPromo />);
 
@@ -92,7 +95,7 @@ describe('PayPromo', () => {
   });
 
   it('has the correct link destination', () => {
-    process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
 
     render(<PayPromo />);
 

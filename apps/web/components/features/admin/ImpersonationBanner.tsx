@@ -112,7 +112,7 @@ export function ImpersonationBanner({
           variant='primary'
           size='sm'
           onClick={() => setMinimized(false)}
-          className='flex items-center gap-2 bg-amber-500 text-black hover:bg-amber-400'
+          className='flex items-center gap-2 bg-amber-500 text-black dark:text-white hover:bg-amber-400'
         >
           <Eye className='size-4' />
           <span>Impersonating</span>
@@ -126,7 +126,7 @@ export function ImpersonationBanner({
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 z-9999 border-b-2 border-amber-500 bg-amber-500/95 px-4 py-2 text-black backdrop-blur ${className}`}
+      className={`fixed inset-x-0 top-0 z-9999 border-b-2 border-amber-500 bg-amber-500/95 px-4 py-2 text-black dark:text-white backdrop-blur ${className}`}
       role='alert'
       aria-live='polite'
       data-testid='impersonation-banner'
@@ -159,7 +159,7 @@ export function ImpersonationBanner({
             variant='ghost'
             size='sm'
             onClick={() => setMinimized(true)}
-            className='text-amber-900 hover:bg-amber-600/30 hover:text-black'
+            className='text-amber-900 hover:bg-amber-600/30 hover:text-black dark:text-white'
             aria-label='Minimize Impersonation Banner'
           >
             <EyeOff className='size-4' />

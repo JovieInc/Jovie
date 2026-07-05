@@ -69,7 +69,12 @@ export interface ChatActionCard {
 
 export type ChatConversationCreatePhase = 'reserved' | 'completed';
 
-export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
+export type ChatErrorType =
+  | 'network'
+  | 'rate_limit'
+  | 'server'
+  | 'tool'
+  | 'unknown';
 
 export interface ChatError {
   readonly type: ChatErrorType;
@@ -78,6 +83,8 @@ export interface ChatError {
   readonly errorCode?: string;
   readonly requestId?: string;
   readonly failedMessage?: string;
+  /** Tool-only failures stay inline in the thread and should not pause the composer. */
+  readonly suppressComposerPause?: boolean;
 }
 
 /** Maximum allowed message length */

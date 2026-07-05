@@ -42,7 +42,7 @@ export const PAGE_SUBTITLES = {
   contact: 'Contact',
 } as const;
 
-// Legacy FEATURE_FLAGS removed (waitlist deprecated). Use `lib/feature-flags.ts`.
+// Marketing flags: `lib/flags/marketing-static.ts`. Env code flags: `lib/flags/code-flags.ts`.
 
 export const LEGAL = {
   privacyPath: '/legal/privacy',

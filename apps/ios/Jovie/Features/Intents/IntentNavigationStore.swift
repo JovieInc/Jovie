@@ -9,10 +9,14 @@ import Observation
 enum IntentNavigationRequest: Equatable, Sendable {
   /// Open the chat surface.
   case openChat
-  /// Open chat and pre-fill the composer with the given text ("Ask Jovie …").
-  case sendMessage(String)
+  /// Open chat with the given text. When `autoSend` is true, dispatch the turn immediately.
+  case sendMessage(text: String, autoSend: Bool)
+  /// Open chat and start listening.
+  case startVoiceCapture
   /// Open chat and resume the most recent conversation.
   case continueLastConversation
+  /// Open chat and load a specific conversation (Spotlight / Siri Suggestions).
+  case openConversation(String)
 }
 
 @MainActor

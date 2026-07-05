@@ -15,6 +15,7 @@
 
 @import "tailwindcss";
 @import "../styles/design-system.css";
+@import "../styles/chat-file-upload.css";
 @import "../styles/theme.css";
 @import "tw-animate-css";
 @import "streamdown/styles.css";
@@ -518,6 +519,10 @@ body {
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   /* Linear Typography Features - apply font features globally */
   body {
     font-feature-settings:
@@ -529,6 +534,7 @@ body {
        Nav items, buttons, and labels should have normal tracking.
        Body text classes (.text-linear, .marketing-lead-linear) apply their own. */
     text-rendering: optimizelegibility;
+    text-wrap: pretty;
   }
 }
 
@@ -539,6 +545,11 @@ body {
   --text-2xs: 0.6875rem;
   --text-app: 0.8125rem;
   --text-mid: 0.9375rem;
+  /* Profile composition shapes (#11899, lib/profile/composition.ts):
+     aspect-hero = fixed hero banner crop; aspect-card-standard = the default
+     4:5 portrait card. 1:1 / 16:9 use built-in aspect-square / aspect-video. */
+  --aspect-hero: 16 / 7;
+  --aspect-card-standard: 4 / 5;
   /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
     var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
@@ -716,10 +727,15 @@ body {
   .focus-ring-transparent-offset {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-transparent;
   }
+  /* Tactile press — transform only; never transition:all (DESIGN.md / JOV-3368) */
+  .interactive-press {
+    @apply transition-transform duration-subtle ease-subtle active:scale-[0.96];
+  }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-[background-color,transform] duration-normal ease-subtle disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
+    @apply active:scale-[0.96];
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -828,6 +844,7 @@ body {
     /* Discrete breakpoints matching Linear.app (verified 2026-03-23):
        375px: 38px/1.1  |  768px: 56px/1.08  |  1280px+: 64px/1.06
        Linear caps at 64px — never goes to 76px at any viewport width */
+    font-family: var(--font-display);
     font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
@@ -899,6 +916,7 @@ body {
     letter-spacing: -0.011em;
     /* -0.165px at 15px = -0.011em */
     line-height: 1.65;
+    text-wrap: pretty;
   }
   .marketing-kicker {
     display: inline-flex;
@@ -1188,7 +1206,11 @@ body {
     padding: 0.375rem 0.75rem;
     text-align: left;
     font-size: 0.875rem;
-    color: var(--color-text-tertiary-token);
+    color: color-mix(
+      in oklab,
+      var(--color-text-primary-token) 64%,
+      transparent
+    );
     overflow-wrap: anywhere;
     transition:
       background-color 150ms var(--ease-interactive),
@@ -1210,6 +1232,48 @@ body {
     background: var(--color-bg-surface-1);
     color: var(--color-text-primary-token);
     font-weight: var(--linear-font-weight-medium);
+  }
+  .public-legal-shell [data-testid="header-nav"] a[href="/signin"] {
+    color: rgb(64 64 64) !important;
+  }
+  .public-legal-shell [data-testid="header-nav"] a[href="/signin"]:hover {
+    color: rgb(10 10 10) !important;
+  }
+  .public-legal-shell .public-doc-nav-item {
+    color: rgb(75 85 99) !important;
+  }
+  .public-legal-shell .public-doc-nav-item:hover,
+  .public-legal-shell .public-doc-nav-item-active {
+    background: rgb(244 244 245);
+    color: rgb(17 24 39) !important;
+  }
+  html:not(.dark)
+    .public-legal-shell
+    [data-testid="header-nav"]
+    a[href="/signin"],
+  html:not(.dark) .public-legal-shell .public-doc-nav-item {
+    transition: none !important;
+  }
+  html.dark .public-legal-shell [data-testid="header-nav"] a[href="/signin"] {
+    color: rgb(236 236 236 / 0.6) !important;
+  }
+  html.dark
+    .public-legal-shell
+    [data-testid="header-nav"]
+    a[href="/signin"]:hover {
+    color: rgb(236 236 236 / 0.9) !important;
+  }
+  html.dark .public-legal-shell .public-doc-nav-item {
+    color: color-mix(
+      in oklab,
+      var(--color-text-primary-token) 64%,
+      transparent
+    ) !important;
+  }
+  html.dark .public-legal-shell .public-doc-nav-item:hover,
+  html.dark .public-legal-shell .public-doc-nav-item-active {
+    background: var(--color-bg-surface-1);
+    color: var(--color-text-primary-token) !important;
   }
 
   /* Hero stagger entrance — children fade up in sequence */
@@ -1258,7 +1322,10 @@ body {
     border: 1px solid var(--linear-border-subtle);
     border-radius: var(--linear-radius-sm, 8px);
     cursor: pointer;
-    transition: all var(--linear-duration-fast) var(--linear-ease);
+    transition:
+      background-color var(--linear-duration-fast) var(--linear-ease),
+      border-color var(--linear-duration-fast) var(--linear-ease),
+      color var(--linear-duration-fast) var(--linear-ease);
     letter-spacing: -0.011em;
   }
   .accordion-trigger:hover {
@@ -1538,7 +1605,13 @@ body {
     box-shadow:
       var(--shadow-button-inset),
       0 1px 1px rgba(0, 0, 0, 0.14);
-    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+      background-color var(--ds-motion-subtle-duration)
+      var(--ds-motion-subtle-easing),
+      border-color var(--ds-motion-subtle-duration)
+      var(--ds-motion-subtle-easing),
+      box-shadow var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
+      color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
     &:hover {
       background-color: var(--color-btn-primary-hover);
     }
@@ -1958,6 +2031,17 @@ body {
   h5,
   h6 {
     @apply font-semibold tracking-tight;
+    text-wrap: balance;
+  }
+  /* Dynamic numerals — tabular figures for counters, timestamps, badges */
+  :where(.tabular-nums, time, [data-tabular-nums], kbd) {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Subtle 1px image edge — prevents floating assets on dark surfaces */
+  :where(img:not([role="presentation"]):not([aria-hidden="true"])) {
+    outline: 1px solid
+      color-mix(in oklab, var(--color-border-subtle) 55%, transparent);
+    outline-offset: -1px;
   }
   h1 {
     @apply text-4xl lg:text-5xl;
@@ -1976,6 +2060,23 @@ body {
   }
   h6 {
     @apply text-base lg:text-lg;
+  }
+  /* Interactive controls — tactile press via transform only (no transition:all) */
+  :where(
+    button:not(:disabled):not([data-static="true"]),
+    [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
+    summary
+  ) {
+    transition: transform var(--duration-subtle) var(--ease-subtle);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where(
+        button:not(:disabled):not([data-static="true"]),
+        [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
+        summary
+      ):active {
+      transform: scale(0.96);
+    }
   }
 }
 
@@ -2090,7 +2191,7 @@ body {
     @apply transition-shadow duration-subtle ease-subtle hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
   }
   .input-focus-glow {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-slow;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-[box-shadow,border-color] duration-slow;
     --tw-ring-color: color-mix(
       in oklab,
       var(--color-focus-ring) 40%,
@@ -2098,7 +2199,7 @@ body {
     );
   }
   .btn-press {
-    @apply transition-opacity duration-subtle ease-subtle active:opacity-80;
+    @apply transition-transform duration-subtle ease-subtle active:scale-[0.96];
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {
@@ -2239,6 +2340,15 @@ body {
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
   }
 }
 
@@ -2679,28 +2789,28 @@ body {
 @keyframes pb-eq-a {
   0%,
   100% {
-    height: 50%;
+    transform: scaleY(0.5);
   }
   50% {
-    height: 80%;
+    transform: scaleY(0.8);
   }
 }
 @keyframes pb-eq-b {
   0%,
   100% {
-    height: 70%;
+    transform: scaleY(0.7);
   }
   50% {
-    height: 42%;
+    transform: scaleY(0.42);
   }
 }
 @keyframes pb-eq-c {
   0%,
   100% {
-    height: 55%;
+    transform: scaleY(0.55);
   }
   50% {
-    height: 78%;
+    transform: scaleY(0.78);
   }
 }
 

@@ -63,13 +63,23 @@ export const AUTH_SURFACE = {
 export const AUTH_CLASSES = {
   /** Error message styling with fade-in animation */
   fieldError:
-    'text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200',
+    'text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
   /** Step transition animation for multi-step forms */
   stepTransition:
-    'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out',
+    'animate-in fade-in-0 slide-in-from-bottom-2 duration-cinematic ease-out',
   /** OAuth button touch optimization for mobile */
   oauthButtonMobile:
     'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] transition-[opacity] duration-subtle active:opacity-[0.92]',
+  /**
+   * Full-width auth CTA overlay for the canonical `@jovie/ui` Button.
+   * Preserves the legacy AuthButton geometry (full-width pill at
+   * `--linear-button-height-md` with a 40px floor and 16px padding), mobile
+   * touch behavior, and the System B non-positional press feedback. Pair
+   * with the Button `static` prop so press feedback stays opacity-based,
+   * never transform.
+   */
+  authCta:
+    'w-full h-(--linear-button-height-md) min-h-10 px-4 select-none touch-manipulation [-webkit-tap-highlight-color:transparent] active:opacity-90 disabled:opacity-70',
 } as const;
 
 /**

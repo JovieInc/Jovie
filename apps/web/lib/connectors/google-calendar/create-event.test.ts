@@ -71,7 +71,7 @@ function makeAcceptedRow() {
   return [
     {
       id: ACTION_ID,
-      status: 'accepted' as const,
+      status: 'approved' as const,
       userId: USER_A,
       idempotencyKey: IDEMPOTENCY_KEY,
     },
@@ -139,7 +139,7 @@ describe('createCalendarEvent — approval gate', () => {
     mockDbSelect.mockResolvedValue([
       {
         id: ACTION_ID,
-        status: 'accepted' as const,
+        status: 'approved' as const,
         userId: USER_B, // belongs to B
         idempotencyKey: IDEMPOTENCY_KEY,
       },
@@ -178,11 +178,11 @@ describe('createCalendarEvent — approval gate', () => {
     ).rejects.toMatchObject({ reason: 'not_accepted' });
   });
 
-  it('throws ApprovalRequiredError with reason=not_accepted for dismissed row', async () => {
+  it('throws ApprovalRequiredError with reason=not_accepted for rejected row', async () => {
     mockDbSelect.mockResolvedValue([
       {
         id: ACTION_ID,
-        status: 'dismissed' as const,
+        status: 'rejected' as const,
         userId: USER_A,
         idempotencyKey: IDEMPOTENCY_KEY,
       },
@@ -229,7 +229,7 @@ describe('createCalendarEvent — happy path', () => {
     expect(result.idempotent).toBe(false);
   });
 
-  it('CAS-transitions accepted → completed on success', async () => {
+  it('CAS-transitions approved → executed on success', async () => {
     await createCalendarEvent({
       approvalId: ACTION_ID,
       userId: USER_A,

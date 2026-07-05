@@ -36,6 +36,7 @@ const CHAT_ROUTE_TOOL_NAMES = [
   'formatLyrics',
   'createRelease',
   'generateReleasePitch',
+  'proposeVideoRecording',
 ] as const;
 
 describe('tool event contract', () => {

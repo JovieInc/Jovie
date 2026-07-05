@@ -233,7 +233,7 @@ export default function PromoDownloadsPage() {
                 }}
                 onDrop={handleDrop}
                 className={cn(
-                  'flex min-h-[154px] flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-4 py-6 text-center transition-[background-color,border-color,box-shadow]',
+                  'flex min-h-39 flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-4 py-6 text-center transition-[background-color,border-color,box-shadow]',
                   isDragging && 'border-focus bg-surface-1 ring-2 ring-focus/20'
                 )}
                 data-testid='promo-download-dropzone'

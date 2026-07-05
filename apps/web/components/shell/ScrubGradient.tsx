@@ -11,8 +11,7 @@ const WAVE_H = SCRUB_H - WAVE_TOP;
 const WAVE_CY = WAVE_TOP + WAVE_H / 2;
 const WAVE_AMP = WAVE_H / 2 - 1;
 
-const TIME_LABEL =
-  'text-[10px] tabular-nums text-quaternary-token w-8 shrink-0';
+const TIME_LABEL = 'text-3xs tabular-nums text-quaternary-token w-8 shrink-0';
 
 export interface ScrubCue {
   /** Position as a percent (0–100) of the track duration. */
@@ -132,7 +131,7 @@ export function ScrubGradient({
       <span className={cn(TIME_LABEL, 'text-right')}>
         {formatTime(safeCurrent)}
       </span>
-      <div className='relative flex-1 min-w-[60px] h-8 rounded-sm focus-within:ring-1 focus-within:ring-(--linear-border-focus)'>
+      <div className='relative flex-1 min-w-15 h-8 rounded-sm focus-within:ring-1 focus-within:ring-(--linear-border-focus)'>
         <svg
           viewBox={`0 0 ${SCRUB_W} ${SCRUB_H}`}
           className='w-full h-full overflow-visible'
@@ -224,7 +223,7 @@ export function ScrubGradient({
             step='any'
             value={safeDuration > 0 ? Math.min(safeCurrent, safeDuration) : 0}
             onChange={event => onSeek(Number(event.target.value))}
-            aria-label='Seek track waveform'
+            aria-label='Seek Track Waveform'
             aria-valuetext={`${formatTime(safeCurrent)} of ${formatTime(safeDuration)}`}
             disabled={safeDuration <= 0}
             className='absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-default'

@@ -22,13 +22,13 @@ const CUBIC_BEZIER_REGEX = /cubic-bezier\s*\(/;
 const TRANSITION_ALL_REGEX = /\btransition-all\b/;
 const NUMERIC_DURATION_CLASS_REGEX = /\bduration-\d+\b/;
 const NUMERIC_EASE_CLASS_REGEX = /\bease-\[/;
-// Decorative hover/press motion is banned (.claude/rules/ui.md → "No Decorative
-// Hover Motion"). Flag lift (translate-y) and scale on interaction states.
+// Decorative hover motion is banned (.claude/rules/ui.md → "No Decorative
+// Hover Motion"). Press/click and menu/panel/sidebar open/close motion are allowed
+// when intentional, so only hover-triggered translate/scale is flagged here.
 // `scale-100` is a no-op reset and is intentionally exempt.
-const DECORATIVE_LIFT_REGEX =
-  /\b(?:hover|active|focus|focus-visible|group-hover):-?translate-y-/;
+const DECORATIVE_LIFT_REGEX = /\b(?:hover|group-hover):-?translate(?:-[xy])?-/;
 const DECORATIVE_SCALE_REGEX =
-  /\b(?:hover|active|focus|focus-visible|group-hover):scale-(?!100\b)(?:\[|\d)/;
+  /\b(?:hover|group-hover):scale-(?!100\b)(?:\[|\d)/;
 
 const ALLOWED_PATH_FRAGMENTS = [
   '/apps/web/styles/',
@@ -198,7 +198,7 @@ module.exports = {
       arbitraryEaseClass:
         'Arbitrary ease class bypasses the DS motion taxonomy. Use `ease-subtle` or `ease-cinematic` instead.',
       decorativeHoverMotion:
-        'Decorative hover/press motion (translate/scale) is banned. Use color, border, shadow, or opacity feedback instead (see .claude/rules/ui.md → "No Decorative Hover Motion").',
+        'Decorative hover motion (translate/scale) is banned. Use color, border, shadow, or opacity feedback instead (see .claude/rules/ui.md → "No Decorative Hover Motion").',
       rawMsDuration:
         'Raw `{{value}}` duration in inline style bypasses the DS motion tokens. Use `var(--ds-motion-subtle-duration)` or `var(--ds-motion-cinematic-duration)`.',
       rawCubicBezier:

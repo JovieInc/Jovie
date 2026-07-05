@@ -28,6 +28,8 @@ import {
   StaticAnalyticsSidebar,
 } from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
+import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
+import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { captureError } from '@/lib/error-tracking';
@@ -756,6 +758,9 @@ export const DashboardAudienceTableUnified = memo(
 
         return <AnalyticsSidebar isOpen onClose={handleClosePanel} />;
       }
+      if (panelMode === 'ai-crawlers') {
+        return <AiCrawlerDetailPanel isOpen onClose={handleClosePanel} />;
+      }
       // Panel closed — render closed drawer to animate out
       return (
         <AudienceMemberSidebar
@@ -868,6 +873,13 @@ export const DashboardAudienceTableUnified = memo(
               <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
               <div className='flex-1 min-h-0 flex flex-col'>
+                <div className='shrink-0 border-b border-subtle px-4 py-3'>
+                  <AiCrawlerIntelligenceCard
+                    onOpenDetail={() => {
+                      openPanel('ai-crawlers');
+                    }}
+                  />
+                </div>
                 {/* Scrollable content area */}
                 <div className='flex-1 min-h-0 overflow-auto'>
                   {rows.length === 0 ? (

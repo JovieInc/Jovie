@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 /**
- * Contrast ratchet guard — static source-file lint (JOV-11038).
+ * Contrast ratchet guard — static source-file lint (JOV-11026/11038).
  *
- * Counts hardcoded Tailwind color classes that cause black-on-black or
- * white-on-white contrast failures when the app renders in the opposite theme:
+ * Counts raw-color Tailwind class utilities that bypass the System B token
+ * layer and cause invisible-text contrast failures across themes:
  *
- *   bareTextBlack — `text-black` without a `dark:text-*` counterpart on the
- *                   same source line.  In dark mode, black text on a dark
- *                   surface is invisible.
+ *   bareTextBlack — `text-black` without `dark:text-*` on same line
+ *   bareBgWhite   — `bg-white`   without `dark:bg-*`   on same line
+ *   bareTextWhite — `text-white` without `dark:text-*` on same line
+ *   bareBgBlack   — `bg-black`   without `dark:bg-*`   on same line
+ *   arbitraryHex  — `text-[#hex]`, `bg-[#hex]`, `border-[#hex]` (always banned)
  *
- *   bareBgWhite   — `bg-white` without a `dark:bg-*` counterpart on the same
- *                   source line.  A bare white background in dark mode can
- *                   trap any dark text that was already on the surface.
+ * Opacity-modified variants (e.g. `text-black/20`, `bg-white/5`) are
+ * intentional overlay patterns and are excluded from counting.
  *
  * Rules:
  *   - Count must NEVER exceed the baseline in contrast-ratchet.baseline.json.
@@ -70,12 +71,22 @@ function walkDir(dir, files = []) {
 }
 
 /**
- * Count lines that contain a bare `text-black` (no `dark:text-` on same line)
- * or a bare `bg-white` (no `dark:bg-` on same line), excluding tests/stories.
+ * Returns true if the line contains `token/` (opacity-modified variant).
+ * e.g. text-black/20 → intentional overlay, not an absolute color.
+ */
+function lineHasOpacityVariant(line, token) {
+  return line.includes(`${token}/`);
+}
+
+/**
+ * Count all raw-color violation categories across the scanned source files.
  */
 function countViolations(files) {
   let bareTextBlack = 0;
   let bareBgWhite = 0;
+  let bareTextWhite = 0;
+  let bareBgBlack = 0;
+  let arbitraryHex = 0;
 
   for (const filePath of files) {
     let content;
@@ -90,6 +101,7 @@ function countViolations(files) {
 
       // text-black as a standalone class token (not text-black/XX opacity variant)
       if (
+        !lineHasOpacityVariant(line, 'text-black') &&
         /(?:^|[\s"'`])text-black(?:[\s"'`]|$)/.test(line) &&
         !line.includes('dark:text-')
       ) {
@@ -98,15 +110,45 @@ function countViolations(files) {
 
       // bg-white as a standalone class token (not bg-white/XX opacity variant)
       if (
+        !lineHasOpacityVariant(line, 'bg-white') &&
         /(?:^|[\s"'`])bg-white(?:[\s"'`]|$)/.test(line) &&
         !line.includes('dark:bg-')
       ) {
         bareBgWhite += 1;
       }
+
+      // text-white as a standalone class token (not text-white/XX opacity variant)
+      if (
+        !lineHasOpacityVariant(line, 'text-white') &&
+        /(?:^|[\s"'`])text-white(?:[\s"'`]|$)/.test(line) &&
+        !line.includes('dark:text-')
+      ) {
+        bareTextWhite += 1;
+      }
+
+      // bg-black as a standalone class token (not bg-black/XX opacity variant)
+      if (
+        !lineHasOpacityVariant(line, 'bg-black') &&
+        /(?:^|[\s"'`])bg-black(?:[\s"'`]|$)/.test(line) &&
+        !line.includes('dark:bg-')
+      ) {
+        bareBgBlack += 1;
+      }
+
+      // Arbitrary hex: text-[#hex], bg-[#hex], border-[#hex] — always banned
+      if (/(?:text|bg|border)-\[#[0-9a-fA-F]/.test(line)) {
+        arbitraryHex += 1;
+      }
     }
   }
 
-  return { bareTextBlack, bareBgWhite };
+  return {
+    bareTextBlack,
+    bareBgWhite,
+    bareTextWhite,
+    bareBgBlack,
+    arbitraryHex,
+  };
 }
 
 // ── main ───────────────────────────────────────────────────────────────────
@@ -128,18 +170,15 @@ for (const dir of SCAN_DIRS) {
 const counts = countViolations(allFiles);
 
 console.log(`[contrast-ratchet] Scanned ${allFiles.length} files`);
-console.log(
-  `[contrast-ratchet] bareTextBlack: ${counts.bareTextBlack} (baseline: ${baseline.bareTextBlack})`
-);
-console.log(
-  `[contrast-ratchet] bareBgWhite:   ${counts.bareBgWhite} (baseline: ${baseline.bareBgWhite})`
-);
+for (const key of Object.keys(counts)) {
+  const base = baseline[key] ?? 0;
+  console.log(`[contrast-ratchet] ${key}: ${counts[key]} (baseline: ${base})`);
+}
 
 if (isUpdate) {
   const updated = {
     ...baseline,
-    bareTextBlack: counts.bareTextBlack,
-    bareBgWhite: counts.bareBgWhite,
+    ...Object.fromEntries(Object.entries(counts)),
   };
   writeFileSync(BASELINE_PATH, `${JSON.stringify(updated, null, 2)}\n`);
   console.log(`[contrast-ratchet] ✓ Baseline updated → ${BASELINE_PATH}`);
@@ -147,21 +186,18 @@ if (isUpdate) {
 }
 
 const errors = [];
-if (counts.bareTextBlack > baseline.bareTextBlack) {
-  errors.push(
-    `bareTextBlack regression: ${counts.bareTextBlack} > baseline ${baseline.bareTextBlack}\n` +
-      `  New \`text-black\` classes were added without a \`dark:text-*\` counterpart.\n` +
-      `  Fix: use a semantic token (text-primary-token) or add \`dark:text-white\`.\n` +
-      `  Once violations are fixed, lower the baseline: node scripts/lint-contrast-ratchet.mjs --update`
-  );
-}
-if (counts.bareBgWhite > baseline.bareBgWhite) {
-  errors.push(
-    `bareBgWhite regression: ${counts.bareBgWhite} > baseline ${baseline.bareBgWhite}\n` +
-      `  New \`bg-white\` classes were added without a \`dark:bg-*\` counterpart.\n` +
-      `  Fix: use a semantic token (bg-surface-1) or add \`dark:bg-{dark-surface}\`.\n` +
-      `  Once violations are fixed, lower the baseline: node scripts/lint-contrast-ratchet.mjs --update`
-  );
+
+for (const [key, count] of Object.entries(counts)) {
+  const base = baseline[key] ?? 0;
+  if (count > base) {
+    errors.push(
+      `${key} regression: ${count} > baseline ${base}\n` +
+        `  New raw-color violations introduced. Use a semantic token instead\n` +
+        `  (text-foreground, bg-background, bg-surface-1, border-border, etc.).\n` +
+        `  See DESIGN.md → "Use tokens, not raw colors".\n` +
+        `  Once violations are fixed, lower the baseline: node scripts/lint-contrast-ratchet.mjs --update`
+    );
+  }
 }
 
 if (errors.length > 0) {
@@ -171,9 +207,9 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-const improved =
-  counts.bareTextBlack < baseline.bareTextBlack ||
-  counts.bareBgWhite < baseline.bareBgWhite;
+const improved = Object.entries(counts).some(
+  ([key, count]) => count < (baseline[key] ?? 0)
+);
 if (improved) {
   console.log(
     '[contrast-ratchet] ✓ Violation count improved — run with --update to lower the baseline'

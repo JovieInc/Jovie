@@ -1,8 +1,8 @@
 /**
  * Workflow executor: release_to_revenue
  *
- * v1 only materializes the autopilot run record and parks it for downstream
- * human approval. Merch, social drafts, and SMS generation land in follow-on PRs.
+ * Materializes distribution drafts (3 social posts + 1 SMS) and parks the run
+ * for human approval. Nothing dispatches until a draft is explicitly approved.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -10,6 +10,8 @@ import { markWorkflowFailed } from '@/lib/connectors/workflows/execute-approved-
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { logger } from '@/lib/utils/logger';
+import { generateDistributionDraftsForRun } from '../distribution-drafts';
+import { syncStoreListingForRun } from '../store-listing';
 import type { ReleaseToRevenueRunStepOutputs } from '../types';
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '../types';
 
@@ -47,11 +49,24 @@ export async function initializeReleaseToRevenueRun(
     return;
   }
 
+  const [distributionDrafts, storeListing] = await Promise.all([
+    generateDistributionDraftsForRun({ stepOutputs }),
+    syncStoreListingForRun({
+      workflowRunId: input.workflowRunId,
+      stepOutputs,
+    }),
+  ]);
+
   await db
     .update(workflowRuns)
     .set({
       status: 'waiting_for_approval',
       currentStep: 'awaiting_approval',
+      stepOutputs: {
+        ...stepOutputs,
+        distributionDrafts,
+        storeListing,
+      },
       updatedAt: new Date(),
     })
     .where(
@@ -65,5 +80,7 @@ export async function initializeReleaseToRevenueRun(
     workflowRunId: input.workflowRunId,
     releaseId: stepOutputs.releaseId,
     title: stepOutputs.release.title,
+    draftCount: distributionDrafts.items.length,
+    merchCardIds: storeListing.merchCardIds,
   });
 }

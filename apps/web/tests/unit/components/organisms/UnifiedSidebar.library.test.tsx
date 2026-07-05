@@ -186,7 +186,7 @@ describe('UnifiedSidebar library route', () => {
 
     expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'New Conversation' })
+      screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Collapse sidebar' })
@@ -205,7 +205,7 @@ describe('UnifiedSidebar library route', () => {
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'New Conversation' })
+      screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
   });
 });

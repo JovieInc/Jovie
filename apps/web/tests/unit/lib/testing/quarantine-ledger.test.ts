@@ -16,9 +16,19 @@ describe('quarantine ledger', () => {
     );
 
     expect(isQuarantineLedgerValid(parsed)).toBe(true);
-    expect(parsed.ledger.entries).toHaveLength(3);
-    expect(parsed.unitPaths).toHaveLength(2);
-    expect(parsed.e2ePaths).toHaveLength(1);
+
+    // Count entries dynamically so the test tolerates additions/removals in
+    // tests/quarantine.json — only the structural guarantees matter here.
+    const expectedUnitCount = parsed.ledger.entries.filter(
+      entry => entry.kind === 'unit'
+    ).length;
+    const expectedE2eCount = parsed.ledger.entries.filter(
+      entry => entry.kind === 'e2e'
+    ).length;
+
+    expect(parsed.ledger.entries.length).toBeGreaterThan(0);
+    expect(parsed.unitPaths).toHaveLength(expectedUnitCount);
+    expect(parsed.e2ePaths).toHaveLength(expectedE2eCount);
     expect(parsed.summary.withinRetryBudget).toBe(true);
   });
 

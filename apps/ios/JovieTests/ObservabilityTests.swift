@@ -133,6 +133,13 @@ struct ObservabilityTests {
       .authCallbackURLParsed,
       context: ["phone": "+1 415 555 1212"]
     )
+    Observability.captureMessage(
+      .voiceTranscriptionCompleted,
+      context: [
+        "latency_ms": 240,
+        "status": "sent",
+      ]
+    )
 
     let breadcrumb = try #require(provider.breadcrumbs.first)
     #expect(breadcrumb.event.rawValue == "deep_link_received")
@@ -156,6 +163,10 @@ struct ObservabilityTests {
     let message = try #require(provider.messages.first)
     #expect(message.event == .authCallbackURLParsed)
     #expect(message.context["phone"] as? String == ObservabilityRedactor.filteredValue)
+    let voiceMessage = try #require(provider.messages.last)
+    #expect(voiceMessage.event == .voiceTranscriptionCompleted)
+    #expect(voiceMessage.context["latency_ms"] as? Int == 240)
+    #expect(voiceMessage.context["status"] as? String == "sent")
   }
 
   @Test func startSpanReturnsFinishableSpan() throws {

@@ -62,7 +62,7 @@ export function SharedMarketingHero({
       <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
 
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1200px]'>
+        <div className='mx-auto max-w-300'>
           <div
             className={cn(
               'grid items-center gap-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10',
@@ -83,7 +83,7 @@ export function SharedMarketingHero({
               >
                 {title}
               </h1>
-              <div className='mt-5 max-w-[34rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
+              <div className='mt-5 max-w-[34rem] text-base leading-[1.7] text-secondary-token sm:text-lg'>
                 {body}
               </div>
 
@@ -106,9 +106,7 @@ export function SharedMarketingHero({
                 ) : null}
 
                 {subcopy ? (
-                  <span className='text-[12px] text-tertiary-token'>
-                    {subcopy}
-                  </span>
+                  <span className='text-xs text-tertiary-token'>{subcopy}</span>
                 ) : null}
               </div>
 
@@ -117,7 +115,7 @@ export function SharedMarketingHero({
                   {proofPoints.map(label => (
                     <span
                       key={label}
-                      className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3.5 py-1.5 text-[12px] font-medium tracking-[-0.01em] text-secondary-token'
+                      className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3.5 py-1.5 text-xs font-medium tracking-tight text-secondary-token'
                     >
                       {label}
                     </span>

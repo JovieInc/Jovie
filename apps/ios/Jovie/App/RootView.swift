@@ -172,6 +172,44 @@ private struct AppContentView: View {
   let onAuthError: @MainActor (String?) -> Void
   @State private var chatRepository: ChatRepository?
   @State private var chatDraft = ""
+  @State private var audienceHighlightsState: AudienceHighlightsLoadState
+
+  init(
+    appState: AppState,
+    isAuthAvailable: Bool,
+    isSignInUnavailable: Bool,
+    authErrorMessage: String?,
+    onLogout: @escaping @MainActor () async -> Void,
+    onAuthReturn: @escaping @MainActor (MobileAuthReturn) -> Void,
+    onAuthError: @escaping @MainActor (String?) -> Void
+  ) {
+    self.appState = appState
+    self.isAuthAvailable = isAuthAvailable
+    self.isSignInUnavailable = isSignInUnavailable
+    self.authErrorMessage = authErrorMessage
+    self.onLogout = onLogout
+    self.onAuthReturn = onAuthReturn
+    self.onAuthError = onAuthError
+    _audienceHighlightsState = State(
+      initialValue: Self.previewAudienceHighlightsState(for: appState.launchMode)
+    )
+  }
+
+  private static func previewAudienceHighlightsState(
+    for launchMode: LaunchMode
+  ) -> AudienceHighlightsLoadState {
+    switch launchMode {
+    case .uiTestingAudience,
+         .uiTestingReady,
+         .uiTestingChat,
+         .uiTestingChatEntityFixture,
+         .uiTestingSettings,
+         .uiTestingVenueMode:
+      return .loaded(.preview)
+    default:
+      return .idle
+    }
+  }
 
   var body: some View {
     Group {
@@ -191,24 +229,33 @@ private struct AppContentView: View {
         .transition(.opacity)
       case .needsOnboarding:
         AppShellView(
-          profile: AppShellProfile(response: nil),
+          profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: false,
           initialTab: .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
           chatEnabled: false,
+          audienceEnabled: false,
           recentConversations: chatRepository?.conversations ?? [],
+          activeConversationID: chatRepository?.activeConversationID,
           onSelectConversation: { conversationID in
             Task { await chatRepository?.openConversation(conversationID) }
           },
+          onStartNewChat: {
+            chatRepository?.startNewConversation()
+          },
+          onAutoSendMessage: handleAutoSendMessage,
           onLogout: onLogout
         ) {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
-        } chatContent: { draft in
+        } audienceContent: { _ in
+          EmptyView()
+        } chatContent: { draft, voiceCaptureTrigger in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
               draft: draft,
+              voiceCaptureTrigger: voiceCaptureTrigger,
               webBaseURL: appState.configuration.webBaseURL
             )
           } else {
@@ -220,19 +267,26 @@ private struct AppContentView: View {
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: appState.isOffline,
-          initialTab: appState.launchMode.opensChatOnLaunch ? .chat : .profile,
+          initialTab: appState.launchMode.opensAudienceOnLaunch
+            ? .audience
+            : (appState.launchMode.opensChatOnLaunch ? .chat : appState.launchMode.defaultInitialTab),
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
           billingURL: appState.billingURL,
-          chatEnabled: appState.loadedDashboardResponse?.chatEnabled ?? false,
+          chatEnabled: appState.loadedDashboardResponse != nil,
+          audienceEnabled: appState.loadedDashboardResponse != nil,
           recentConversations: chatRepository?.conversations ?? [],
+          activeConversationID: chatRepository?.activeConversationID,
           onSelectConversation: { conversationID in
             Task { await chatRepository?.openConversation(conversationID) }
           },
+          onStartNewChat: {
+            chatRepository?.startNewConversation()
+          },
+          onAutoSendMessage: handleAutoSendMessage,
           onLogout: onLogout
         ) {
           DashboardView(
             state: appState.dashboardState,
-            isOffline: appState.isOffline,
             brightnessManager: appState.brightnessManager,
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
             loadAppleWalletProfilePass: {
@@ -243,11 +297,19 @@ private struct AppContentView: View {
             },
             onRetry: { await appState.retry() }
           )
-        } chatContent: { draft in
+        } audienceContent: { askJovie in
+          AudienceHighlightsView(
+            state: audienceHighlightsState,
+            isOffline: appState.isOffline,
+            onRetry: { await reloadAudienceHighlights(for: appState.activeUserID) },
+            onAskJovie: askJovie
+          )
+        } chatContent: { draft, voiceCaptureTrigger in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
               draft: draft,
+              voiceCaptureTrigger: voiceCaptureTrigger,
               webBaseURL: appState.configuration.webBaseURL
             )
           } else {
@@ -261,13 +323,26 @@ private struct AppContentView: View {
     // content paint feels intentional rather than a hard cut. Opacity-only, so
     // no layout shift and no decorative spatial motion.
     .animation(.easeInOut(duration: 0.28), value: appState.route)
+    .task(id: "\(appState.route)-\(appState.launchMode)") {
+      guard appState.route == .ready else { return }
+      await reloadAudienceHighlights(for: appState.activeUserID)
+    }
     .task(id: appState.activeUserID) {
       guard let activeUserID = appState.activeUserID else {
         chatRepository = nil
+        if Self.previewAudienceHighlightsState(for: appState.launchMode) == .idle {
+          audienceHighlightsState = .idle
+        }
         return
       }
 
-      if chatRepository == nil {
+      if appState.launchMode == .uiTestingAuthCallback {
+        chatRepository = nil
+        audienceHighlightsState = .loaded(.preview)
+        return
+      }
+
+      if chatRepository == nil, appState.launchMode.needsChatRepository {
         let repository = ChatRepository(
           client: MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
@@ -277,9 +352,67 @@ private struct AppContentView: View {
           clerkUserID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
         )
-        await repository.bootstrap()
         chatRepository = repository
+
+        if let fixtureTimeline = appState.launchMode.chatEntityFixture {
+          // Deterministic UI-testing fixture (JOV-3608): bypasses the network
+          // client/cache entirely so entity/skill chip rendering can be
+          // asserted without a mocked backend.
+          repository.seedTimelineForUITesting(
+            fixtureTimeline,
+            activeConversationID: MobileChatEntityFixture.conversationID
+          )
+        } else {
+          Task { await repository.bootstrap() }
+        }
       }
+
+      await reloadAudienceHighlights(for: activeUserID)
+    }
+  }
+
+  private func handleAutoSendMessage(_ text: String) {
+    Task { await chatRepository?.send(text: text) }
+  }
+
+  @MainActor
+  private func reloadAudienceHighlights(for userID: String?) async {
+    guard appState.launchMode.usesLiveClerk else {
+      audienceHighlightsState = Self.previewAudienceHighlightsState(for: appState.launchMode)
+      return
+    }
+
+    if appState.launchMode == .uiTestingAudience
+      || appState.launchMode == .uiTestingReady
+      || appState.launchMode == .uiTestingChat
+      || appState.launchMode == .uiTestingAuthCallback
+      || appState.launchMode == .uiTestingChatEntityFixture
+      || appState.launchMode == .uiTestingSettings
+      || appState.launchMode == .uiTestingVenueMode
+    {
+      audienceHighlightsState = .loaded(.preview)
+      return
+    }
+
+    guard let userID else {
+      audienceHighlightsState = .idle
+      return
+    }
+
+    audienceHighlightsState = .loading
+
+    let repository = AudienceHighlightsRepository(
+      apiClient: APIClient(
+        baseURL: appState.configuration.apiBaseURL,
+        tokenProvider: ClerkTokenProvider()
+      )
+    )
+
+    do {
+      let result = try await repository.load(for: userID)
+      audienceHighlightsState = .loaded(result.response)
+    } catch {
+      audienceHighlightsState = .error("Couldn't load audience highlights.")
     }
   }
 }
@@ -304,7 +437,11 @@ private struct MobileChatPlaceholderView: View {
               .foregroundStyle(JovieColor.textPrimary)
               .multilineTextAlignment(.center)
 
-            Text(isOffline ? "Offline. Drafts stay on this device." : "Native chat is in alpha for internal testers.")
+            Text(
+              isOffline
+                ? "Offline. Drafts stay on this device and cached history remains available."
+                : "Ask Jovie about your profile, releases, and next moves."
+            )
               .font(JovieFont.body(size: 15))
               .foregroundStyle(JovieColor.textTertiary)
               .multilineTextAlignment(.center)
@@ -315,10 +452,12 @@ private struct MobileChatPlaceholderView: View {
         .padding(.horizontal, JovieSpacing.xLarge)
 
         Spacer(minLength: 48)
-
-        ChatComposerPreview(draft: $draft)
+      }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        ChatComposerPreview(draft: $draft, isOffline: isOffline)
           .padding(.horizontal, JovieSpacing.large)
           .padding(.bottom, JovieSpacing.medium)
+          .background(JovieColor.backgroundBase)
       }
     }
     .accessibilityIdentifier("mobile-chat")
@@ -327,42 +466,27 @@ private struct MobileChatPlaceholderView: View {
 
 private struct ChatComposerPreview: View {
   @Binding var draft: String
+  let isOffline: Bool
+  @FocusState private var isComposerFocused: Bool
+  @State private var voiceCaptureService = VoiceCaptureService()
 
   var body: some View {
-    let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-
-    HStack(spacing: JovieSpacing.medium) {
-      TextField("Ask Jovie", text: $draft)
-        .textInputAutocapitalization(.sentences)
-        .disableAutocorrection(false)
-        .font(JovieFont.body(size: 16))
-        .foregroundStyle(JovieColor.textPrimary)
-        .frame(height: 52)
-
-      Button {
-        draft = ""
-      } label: {
-        Image(systemName: "arrow.up")
-          .font(.system(size: 16, weight: .bold))
-          .foregroundStyle(trimmedDraft.isEmpty ? JovieColor.textTertiary : JovieColor.backgroundBase)
-          .frame(width: 36, height: 36)
-          .background(
-            trimmedDraft.isEmpty ? JovieColor.surface2 : Color.white,
-            in: Circle()
-          )
-      }
-      .buttonStyle(.plain)
-      .disabled(trimmedDraft.isEmpty)
-      .accessibilityLabel("Send")
-    }
-    .padding(.horizontal, JovieSpacing.large)
-    .frame(height: 64)
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
-        .stroke(JovieColor.borderDefault, lineWidth: 1)
-    }
-    .accessibilityIdentifier("chat-composer")
+    ChatComposerBar(
+      draft: $draft,
+      isFocused: $isComposerFocused,
+      placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
+      isSending: false,
+      isPlusEnabled: true,
+      voiceCaptureService: voiceCaptureService,
+      onVoiceStart: {},
+      onVoiceFinish: {},
+      onVoiceCancel: {},
+      onSend: { draft = "" },
+      onSelectWorkflow: { action in
+        draft = action.prompt
+      },
+      onDraftEdited: {}
+    )
   }
 }
 
@@ -396,6 +520,10 @@ struct RootView: View {
     }
       .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
         if appState.launchMode.requiresAutoAuth, liveUserID == nil {
+          return
+        }
+
+        if appState.launchMode == .uiTestingAuthCallback, liveUserID == nil {
           return
         }
 
@@ -520,6 +648,13 @@ struct UITestingAuthCallbackRoot: View {
   private let statusKey = "ie.jov.Jovie.authCallbackUITestStatus"
   private let handledCountKey = "ie.jov.Jovie.authCallbackUITestHandledCount"
 
+  init(appState: AppState) {
+    self.appState = appState
+    // Seed the verifier before the first onOpenURL from a cold launch via
+    // XCUIApplication.open(_:) — the async .task below is too late on CI.
+    MobileAuthPendingStore.shared.save(codeVerifier: "test_verifier")
+  }
+
   var body: some View {
     RootView(
       appState: appState,
@@ -545,6 +680,9 @@ struct UITestingAuthCallbackRoot: View {
         UserDefaults.standard.set("waiting", forKey: statusKey)
         UserDefaults.standard.set(0, forKey: handledCountKey)
         MobileAuthPendingStore.shared.save(codeVerifier: expectedVerifier)
+        if let callbackURL = LiveAuthCallbackLaunchInput.callbackURL() {
+          handleCallbackURL(callbackURL)
+        }
         for url in MobileAuthCallbackURLInbox.shared.drain() {
           handleCallbackURL(url)
         }
@@ -573,22 +711,19 @@ struct UITestingAuthCallbackRoot: View {
         return
       }
 
-      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) {
+      if let authReturn = await Self.parseAuthReturnWhenReady(
+        url,
+        pendingStore: .shared,
+        codeVerifier: expectedVerifier
+      ) {
         handleAuthReturn(authReturn)
         return
       }
 
       guard MobileAuthReturnParser.isCodeCallback(url) else { return }
 
-      try? await Task.sleep(nanoseconds: 250_000_000)
-
-      guard let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) else {
-        authErrorMessage = "Couldn't finish sign-in. Try again."
-        UserDefaults.standard.set("error", forKey: statusKey)
-        return
-      }
-
-      handleAuthReturn(authReturn)
+      authErrorMessage = "Couldn't finish sign-in. Try again."
+      UserDefaults.standard.set("error", forKey: statusKey)
     }
   }
 
@@ -612,6 +747,25 @@ struct UITestingAuthCallbackRoot: View {
     appState.isOffline = false
     UserDefaults.standard.set(handledStates.count, forKey: handledCountKey)
     UserDefaults.standard.set("ready", forKey: statusKey)
+  }
+
+  @MainActor
+  private static func parseAuthReturnWhenReady(
+    _ url: URL,
+    pendingStore: MobileAuthPendingStore,
+    codeVerifier: String,
+    maxAttempts: Int = 40
+  ) async -> MobileAuthReturn? {
+    for _ in 0..<maxAttempts {
+      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: pendingStore) {
+        return authReturn
+      }
+
+      pendingStore.save(codeVerifier: codeVerifier)
+      try? await Task.sleep(nanoseconds: 50_000_000)
+    }
+
+    return nil
   }
 }
 #endif

@@ -26,7 +26,7 @@ export function FrostedContainer({
   };
 
   return (
-    <div className='relative min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200 overflow-hidden'>
+    <div className='relative min-h-screen bg-white dark:bg-gray-900 transition-colors duration-subtle overflow-hidden'>
       {/* Background Pattern */}
       {backgroundPattern !== 'none' && (
         <BackgroundPattern variant={backgroundPattern} />

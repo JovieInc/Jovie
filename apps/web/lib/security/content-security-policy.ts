@@ -103,6 +103,8 @@ const STATIC_CSP_PARTS = {
     'https://challenges.cloudflare.com',
     'https://r2.leadsy.ai',
     'https://tag.trovo-tag.com',
+    // Google Analytics 4 / gtag.js (JOV-3664)
+    'https://www.googletagmanager.com',
   ].join(' '),
 
   // Pre-computed img-src from canonical CDN domain registry
@@ -142,6 +144,10 @@ const STATIC_CSP_PARTS = {
     'https://www.googleapis.com',
     'https://gmail.googleapis.com',
     'https://calendar-pa.clients6.google.com',
+    // Google Analytics 4 event collection (JOV-3664)
+    'https://www.google-analytics.com',
+    'https://analytics.google.com',
+    'https://*.google-analytics.com',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)

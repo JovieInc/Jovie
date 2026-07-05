@@ -50,94 +50,48 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
   test.setTimeout(180_000);
   await blockAnalytics(page);
 
-  // Warmup pre-compiles this route in global-setup.ts
-  // 180s handles cold start under parallel test load (SSR render ~7s + compilation overhead)
-  let navigated = false;
+  // Warmup is handled in global-setup.ts; navigation needs explicit retry on
+  // local busy machines where Turbopack compilation can temporarily stall.
   try {
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 150_000 });
-    navigated = true;
+    const response = await smokeNavigateWithRetry(page, '/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 120_000,
+      retries: 3,
+    });
+    expect(
+      response?.status(),
+      'Homepage should not return a server error'
+    ).toBeLessThan(500);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
-      test.skip(
-        true,
-        'Homepage timed out under parallel test load — transient'
-      );
-      return;
-    }
-    throw e;
+    // Retry exhaustion is a hard smoke failure; runner/server issues should be
+    // fixed at the source instead of hidden as skipped homepage coverage.
+    throw new Error(`Homepage navigation failed: ${msg}`);
   }
 
   const currentUrl = page.url();
-  if (!navigated || isClerkRedirect(currentUrl)) {
-    test.skip(true, 'Clerk handshake redirect in CI');
-    return;
-  }
+  expect(
+    isClerkRedirect(currentUrl),
+    `Homepage should not redirect to Clerk handshake flow: ${currentUrl}`
+  ).toBe(false);
 
-  // If the page redirected away from / (e.g. Clerk dev-browser loop), skip
-  if (
-    !currentUrl.includes('localhost') &&
-    !currentUrl.startsWith('http://localhost')
-  ) {
-    test.skip(true, `Redirected to external URL: ${currentUrl}`);
-    return;
-  }
+  // Keep this as a URL sanity check so test data still anchors to local app.
+  expect(
+    currentUrl,
+    `Homepage should stay on the local app: ${currentUrl}`
+  ).toContain('localhost');
 
-  // Wait for page to have meaningful content (h1 or any loading indicator)
-  // Under parallel load the page may render a Clerk loading state first
-  await page
-    .waitForSelector('h1, main[class], [data-clerk-loaded], footer', {
-      timeout: 60_000,
-    })
-    .catch(() => null);
+  await expect(
+    page.locator('h1').first(),
+    'Homepage hero heading is missing — home page failed to render'
+  ).toBeVisible({ timeout: 45_000 });
 
-  // If still showing Clerk dev-browser state, skip
-  const afterWaitText =
-    (await page
-      .locator('body')
-      .innerText()
-      .catch(() => '')) ?? '';
-  if (
-    afterWaitText.toLowerCase().includes('loading') &&
-    afterWaitText.trim().length < 100
-  ) {
-    test.skip(
-      true,
-      'Homepage showing Clerk loading state under parallel test load'
-    );
-    return;
-  }
-
-  // h1 must be visible — if missing, the hero is broken
-  const h1Visible = await page
-    .locator('h1')
-    .first()
-    .isVisible({ timeout: 30_000 })
-    .catch(() => false);
-
-  if (!h1Visible) {
-    // Check if this is a Clerk or infrastructure issue (not app bug)
-    const bodyNow =
-      (await page
-        .locator('body')
-        .innerText()
-        .catch(() => '')) ?? '';
-    if (
-      bodyNow.toLowerCase().includes('clerk') ||
-      bodyNow.trim().length < 200
-    ) {
-      test.skip(
-        true,
-        'Homepage not rendering app content — likely Clerk parallel load issue'
-      );
-      return;
-    }
-    // Real failure: page loaded real content but no h1
-    expect(h1Visible, 'Homepage h1 not visible — hero heading is missing').toBe(
-      true
-    );
-    return;
-  }
+  // Optional structure check: if only shell rendered, this will fail without
+  // silently skipping.
+  await expect(
+    page.locator('main, [role="main"], #handle-input').first(),
+    'Homepage did not render the expected main content shell'
+  ).toBeVisible({ timeout: 60_000 });
 
   // CTA must be present — if no signup entry point, users can't convert
   const cta = page

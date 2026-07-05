@@ -22,8 +22,10 @@ import { Mark } from '@/lib/brand/primitives';
 
 /** Shared menu item styling for smart link and profile drawers */
 export const SMART_LINK_MENU_ITEM_CLASS =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
-export const SMART_LINK_MENU_ICON_CLASS = 'h-[16px] w-[16px] text-white/40';
+  'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
+export const SMART_LINK_MENU_ICON_CLASS = 'h-4 w-4 text-white/40';
+export const SMART_LINK_HERO_TITLE_CLASS =
+  'text-2xl font-semibold leading-[1.08] tracking-tight text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]';
 
 /** Hook for the share action used across all smart link pages */
 export function useSmartLinkShare(
@@ -99,7 +101,7 @@ function SmartLinkHeaderRightSlot({
         aria-label='Menu'
         aria-haspopup='dialog'
       >
-        <Mark size={17} className='h-[17px] w-[17px]' />
+        <Mark size={17} className='h-4 w-4' />
       </button>
     );
   }
@@ -113,7 +115,7 @@ function SmartLinkHeaderRightSlot({
       className='flex h-8 w-8 items-center justify-center text-white/48 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
       data-testid='smart-link-brand-mark'
     >
-      <Mark size={17} className='h-[17px] w-[17px]' />
+      <Mark size={17} className='h-4 w-4' />
     </span>
   );
 }
@@ -166,7 +168,7 @@ export function SmartLinkShell({
                   aria-label={returnLabel}
                   data-testid='smart-link-back'
                 >
-                  <ChevronLeft className='h-[16px] w-[16px]' />
+                  <ChevronLeft className='h-4 w-4' />
                 </Link>
               ) : null
             }

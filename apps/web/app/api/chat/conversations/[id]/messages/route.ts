@@ -1,7 +1,6 @@
-import { gateway } from '@ai-sdk/gateway';
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
-import { generateText } from '@/lib/ai/sdk';
+import { gateway, generateText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { getSessionContext } from '@/lib/auth/session';
 import { sanitizeConversationTitle } from '@/lib/chat/title';

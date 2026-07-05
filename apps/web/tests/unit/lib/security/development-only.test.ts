@@ -119,4 +119,36 @@ describe('development-only security helpers', () => {
       ).toBe(false);
     });
   });
+
+  describe('shouldBypassProductionBlockedDebugPath', () => {
+    it('allows loopback test-auth routes for CI automation', async () => {
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      const { shouldBypassProductionBlockedDebugPath } = await import(
+        '@/lib/security/development-only'
+      );
+
+      expect(
+        shouldBypassProductionBlockedDebugPath(
+          '/api/dev/test-auth/session',
+          '127.0.0.1',
+          new Headers({ host: '127.0.0.1:3100' })
+        )
+      ).toBe(true);
+    });
+
+    it('keeps public hosts blocked for test-auth routes', async () => {
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      const { shouldBypassProductionBlockedDebugPath } = await import(
+        '@/lib/security/development-only'
+      );
+
+      expect(
+        shouldBypassProductionBlockedDebugPath(
+          '/api/dev/test-auth/session',
+          'jov.ie',
+          new Headers({ host: 'jov.ie' })
+        )
+      ).toBe(false);
+    });
+  });
 });

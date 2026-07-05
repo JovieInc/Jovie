@@ -209,7 +209,7 @@ export function CinematicAppBoot({
           animationDuration: `${TIMELINE_MS}ms`,
           animationTimingFunction: 'var(--ds-motion-subtle-easing)',
           animationFillMode: 'forwards',
-          willChange: hasSidebar ? 'opacity, left' : 'opacity',
+          willChange: 'opacity',
         }}
       >
         <div

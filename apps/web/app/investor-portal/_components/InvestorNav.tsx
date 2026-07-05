@@ -66,7 +66,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
     <>
       {/* Desktop sidebar */}
       <nav
-        className='max-lg:hidden w-[200px] flex-shrink-0 flex-col border-r border-subtle bg-surface-0 px-3 py-6 lg:flex'
+        className='max-lg:hidden w-50 flex-shrink-0 flex-col border-r border-subtle bg-surface-0 px-3 py-6 lg:flex'
         aria-label='Investor Portal Navigation'
       >
         {/* Branding */}
@@ -183,7 +183,7 @@ function NavItem({
       <Link
         href={href}
         aria-current={isActive ? 'page' : undefined}
-        className={`block rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-app)] font-medium transition-colors ${
+        className={`block rounded-(--radius-sm) px-2 py-1.5 text-[length:var(--text-app)] font-medium transition-colors ${
           isActive
             ? 'bg-interactive-hover text-primary-token'
             : 'text-tertiary-token hover:bg-interactive-hover hover:text-secondary-token'

@@ -71,11 +71,11 @@ export function CopyableUrlRow({
 
   const sizeClasses = {
     sm: {
-      container: 'h-[22px] gap-1 rounded-full px-2',
-      icon: 'h-[11px] w-[11px]',
-      value: 'text-[10.5px]',
+      container: 'h-6 gap-1 rounded-full px-2',
+      icon: 'h-3 w-3',
+      value: 'text-3xs',
       button: 'h-4 w-4 rounded-full',
-      glyph: 'h-[10px] w-[10px]',
+      glyph: 'h-3 w-3',
     },
     md: {
       container: 'h-7 gap-1.5 rounded-full px-2.5',
@@ -87,7 +87,7 @@ export function CopyableUrlRow({
     lg: {
       container: 'h-8 gap-1.5 rounded-full px-3',
       icon: 'h-3.5 w-3.5',
-      value: 'text-[11.5px]',
+      value: 'text-2xs',
       button: 'h-5.5 w-5.5 rounded-full',
       glyph: 'h-3.5 w-3.5',
     },
@@ -99,7 +99,7 @@ export function CopyableUrlRow({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center transition-[background-color,border-color] duration-150',
+        'flex items-center transition-[background-color,border-color] duration-subtle',
         surface === 'boxed'
           ? 'border border-(--linear-app-frame-seam) bg-surface-0 hover:bg-surface-1'
           : 'border border-transparent bg-transparent hover:bg-surface-1/80',
@@ -115,7 +115,7 @@ export function CopyableUrlRow({
       )}
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-secondary-token',
+          'min-w-0 flex-1 truncate font-mono tracking-tight text-secondary-token',
           styles.value,
           'leading-none',
           valueClassName
@@ -129,7 +129,7 @@ export function CopyableUrlRow({
       </span>
       <span
         className={cn(
-          'inline-flex shrink-0 items-center gap-1 transition-opacity duration-150',
+          'inline-flex shrink-0 items-center gap-1 transition-opacity duration-subtle',
           actionsVisibility === 'hover' &&
             'opacity-0 focus-within:opacity-100 group-hover:opacity-100'
         )}

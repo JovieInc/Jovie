@@ -5,6 +5,130 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.61] - 2026-06-28
+
+> Outbound SMS provider integration ships behind `OUTBOUND_SMS_ENABLED`. Release alerts and webhook auto-replies (STOP/HELP) now route through a single Twilio connector.
+
+### Added
+
+- **[notifications] Outbound SMS connector (JOV-3626)**: `providers/sms/outbound-sms.ts` gates live Twilio POSTs behind `OUTBOUND_SMS_ENABLED`; `sendNotification()` SMS channel and inbound webhook auto-replies both use it; unit-economics spike documented in `NOTIFICATION_GUIDELINES.md`.
+
+## [Unreleased]
+
+- [internal] **Biome lint repair for desktop scripts (GH-13206)**: Resolved `organizeImports`, unused-var, and format drift in `apps/desktop/scripts/` — no logic changes, pre-commit gate stays green.
+- **Profile pages no longer squash the hero image or stretch cards (GH-11899)**: The profile hero now keeps its intended crop with a 240px minimum height at every screen size, and profile cards render in fixed shapes with the action button always anchored at the bottom.
+- [internal] **Profile composition layer (GH-11899)**: New `apps/web/lib/profile/composition.ts` + `--aspect-hero` / `--aspect-card-standard` theme tokens codify the deterministic profile rules (hero 16/7 crop + 240px floor; card shapes compact 1:1 / standard 4:5 / wide 16:9; CTA footer outside the clipped text zone). `EntityCard` gains an opt-in `shape` prop consumed by the profile carousel; hero/skeleton/desktop-cover/media-card instances adopt the tokens; arbitrary-values ratchet lowered. Root-cause fix for GH-8290 (hero squish) and GH-8443 (card height).
+- [internal] **Settings sidebar nav-row guard promoted to error + parity test (GH-12025)**: `sidebar-nav-row-ratchet.test.ts` flips `WARN_ONLY` off now that the hand-rolled nav-row baseline is 0, the settings row class derivation is extracted to `getSettingsSidebarRowClassName()` in `SettingsPolished.tsx`, and a settings-vs-shell parity test locks row padding/density/active/hover to the canonical `getSidebarNavRowClassName()` chrome.
+- **Release rows show stacked provider logos (GH-11493)**: Library table rows and shell release rows now render overlapping DSP avatars with a "+N more" chip and a hover popover listing every provider, replacing the bare provider-count number. The shell row's avatar stack also now reflects the release's full provider coverage instead of capping at four hardcoded majors.
+- [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
+- [internal] **iOS write-configuration resilience (GH-11003)**: Rewrote `apps/ios/scripts/write-configuration.sh` to use `/usr/bin/plutil` (always present on macOS) instead of `python3`, preventing failures when a broken Homebrew interpreter (e.g. pyexpat/libexpat symbol mismatch with python@3.14) is first on PATH. Adds a `TARGET_PLIST` env override for testability and four regression tests (`write-configuration.test.mjs`) run in `ios-ci.yml`.
+- **Smoother icon transitions (GH-11472)**: Copy buttons and the mobile menu now morph between states with a soft, interruptible animation instead of snapping. Adds shared animation primitives (`lib/animation/motion-primitives.ts` + `AnimatedIconSwap`) for icon swaps, staggered entrances, and layered depth shadows.
+- [internal] **Tool discovery skill (GH-13124)**: New `.claude/skills/tool-discovery/SKILL.md` — when a link/tool is shared without context, the agent searches GitHub (`gh search repos`) and the web for docs/pricing/reviews and returns a structured evaluation instead of asking for manual research or a gated unlock action.
+- [internal] **Ovie HUD auto-reload (GH-12988)**: Electron now polls `/api/health/build-info` every 60 seconds and reloads `/hud` windows when the deployed commit/build fingerprint changes, with no-store build-info responses so running operator shells pick up new HUD deploys without a manual restart.
+- [internal] **Mobile bottom nav derives from canonical config (GH-12644)**: `mobilePrimaryNavigation` no longer defines its own `mobileHome` item; it references the shared `newThreadNavItem` used by desktop nav directly, so mobile can no longer drift from desktop. Adds a regression test asserting every mobile nav item traces back to a canonical desktop nav item.
+- [internal] **Desktop auth return schemes (GH-12927)**: legacy per-environment deep-link aliases now map to the current auth-return handler so desktop shells can return from browser auth consistently while the main release path stamps the next DMG version.
+- [internal] **Desktop dir-only fuse builds (JOV-3835)**: dir-target Electron test builds disable only the embedded asar-integrity fuse so local/staging packaged apps boot instead of rendering a blank window; main release stamping will publish the next signed DMG.
+- [internal] **Codex issue shipper stale-checkout fail-closed gate (GH-12841)**: primary `~/Jovie` checkout must be clean `main` at `origin/main` before dispatch; unsafe drift logs `stale_checkout_abort` + Telegram/Slack and refuses to ship; safe detritus auto-heals for the next launchd tick; adds `shipper-gated-entrypoint.py` (gbrain/grok preflight) and blocks `git checkout` in the primary repo from agent bash hooks.
+- [internal] **Dev server stale `.next` cache guard (GH-12899)**: `node scripts/dev.mjs` now wipes `.next` when app route sources are newer than the compiled manifest, logs the on-disk route count at first compile, and Turbo `dev` restarts when `page.tsx` / `route.ts` / `layout.tsx` inputs change.
+- [internal] **Tracker migration phase 2 (GH-12725)**: Replaced Linear orchestrator/dispatcher with GitHub-native `agent-ready` dispatch, added `claimIssue`/`transitionIssue` to `scripts/lib/tracker.mjs`, switched Hermes-Air intake to `gh issue create` (Linear mirror behind `TRACKER_GITHUB_ONLY`), and standardized `Fixes #N` PR linking for merge-time issue close.
+- [internal] **Dev server resource hygiene (GH-12902)**: `pnpm dev` now starts web-only fast dev instead of all workspace Next.js servers; use `pnpm run dev:all` for the full turbo dev matrix. Added `pnpm run dev:cleanup` / `dev:cleanup:force` to report or terminate stale `next dev` / `turbo dev` processes (default threshold: 4h).
+- [internal] **Desktop build clarity (GH-12900)**: Documented the canonical production/staging/local Electron shells (`apps/desktop/BUILDS.md`), restricted `jovie://` URL registration to production only, disabled auto-update on local shells, gated CDP behind `JOVIE_DEV=1`, and added `pnpm run desktop:audit` for `/Applications` hygiene.
+- **iOS chat entity chip thumbnails (GH-12708)**: Inline transcript entity mentions now render as pill chips with a fixed 16×16 thumbnail slot using the shared `AvatarImageCache` loader (no raw `AsyncImage`); unresolved entities keep the accent-dot fallback.
+- [internal] Codex issue shipper now skips `type:epic` pointer issues (they have no code of their own), fixing the claim/find-nothing/release/re-claim loop on epics like #12729. Adds a `skippedEpic` scan counter. (#12846)
+- [internal] x402 payment-gated artist resources spike (#12750): `docs/spikes/x402-payment-gated-artist-resources.md` (conditional GO — self-hosted Cloudflare Worker template for per-resource pricing; defer managed Monetization Gateway) + reproducible unit-economics model `apps/web/lib/x402-spike/unit-economics.ts`.
+- [internal] Schedule the codex kanban ship loop via Houston launchd (`co.jovie.hermes.cron-codex-kanban-ship`, every 15m) with PAUSE-respecting `scripts/hermes/ship-loop.sh`.
+
+> Connector enrichment turns synced Gmail and Calendar objects into graph facts and calendar suggestions; assistant chat replies surface entity mentions as subdued accent spans that reveal detail cards on hover.
+
+### Added
+
+- **AI crawler intelligence (GitHub #12747 P0)**: Pro artists can see which AI services read their profile and asset pages — named crawlers, 30-day read counts, and weekly trends on the Audience dashboard. Free artists see a teaser with total read volume and an upgrade path. Data syncs daily from Cloudflare edge analytics.
+- [internal] **`readyToMerge` percentiles in `ci-metrics` (Hermes)**: `scripts/lib/merge-queue-guard.mjs`'s `parseMergeQueueTimeline` now also captures the latest `ready_for_review` timeline event (falling back to PR `createdAt` for never-drafted PRs) and computes `readyToMergedSeconds`; `scripts/lib/ci-metrics-compute.mjs` exposes a `latency.readyToMergeSeconds` `{p50,p75,p95}`; `scripts/hermes/jobs/ci-metrics.ts` surfaces it in the rendered summary and the `gbrain` `ci-metrics/latest` page. Continuously tracks the ready→merged p50<10m / p95<15m target using data the job already fetches — no new crons or API calls.
+- [internal] **Mobile action-loop API (GitHub #12706)**: adds read-only `/api/mobile/v1/inbox` and `/api/mobile/v1/calendar` endpoints backed by the existing opportunity inbox (`suggested_actions`) and calendar sources (tour dates + releases), plus iOS Codable contracts and `APIClient` fetch methods so shell v1.5 can land after the API contract.
+- **Production Journey Auditor**: a layered net for the signup → AI onboarding interview. Deepens the existing canary so it verifies the interview actually initializes (starter prompt visible, composer usable) instead of only checking the chat container is present; adds a nightly real-turn detector, a production smoke command (`qa:journey:smoke`) with a compact redacted failure packet, a product-promise registry, and a report-only exploratory journey scout (`qa:journey:scout`). [internal] Captures a currently-broken anonymous onboarding turn (500 on send) with a clear diagnosis — root cause tracked in JOV-3693.
+- **Connector enrichment pipelines (JOV-3114)**: adds `lib/connectors/enrichment/` with per-provider gmail/calendar pipelines that emit `context_facts`, memory graph observations, and `suggested_actions`; extends `context_fact_kind` for entity mentions; refactors `extractAndPropose` to sync Gmail `external_objects` then run the enrichment runner. Apple Photos deferred until JOV-2919.
+- **Chat progressive disclosure entity accents (JOV-3116)**: assistant responses parse `@kind:id[label]` wire tokens into per-type System B accent spans (release violet, artist purple, track blue, event orange) with hairline underlines instead of pills; hover/tap/focus opens the existing entity detail card with accent-tinted eyebrow copy. User bubbles keep rich input chips unchanged.
+- **Tagging now knows your world first (GitHub #11943)**: when you tag an artist, release, or event with `@` or `/`, the people and work you've recently referenced rank above generic Spotify results — and the menu opens already populated with them instead of waiting for a search. The same entity never shows twice, and Spotify stays available as a fallback.
+- [internal] **Taste-label guard (GitHub #12034)**: `scripts/taste-label-guard.mjs` + the `Taste Label Guard` workflow auto-clear `needs:taste` / `needs-human-taste` from PRs whose conventional-commit type is non-taste (chore/deps/build/ci/fix/refactor/test/docs/perf/style/revert) unless they carry a `ux:material` marker — so chores, dep bumps, and bug fixes auto-flow instead of waiting on a human. Backstops the Hermes `pr_gates.taste_surface` labeler.
+- [internal] **`eve` adopted as the product `AgentHarness` target (GitHub #12498)**: records the ADR delta from the recon spike (GitHub #12499, `docs/spikes/eve-agent-sdk-fit.md`, conditional GO) — names Vercel `eve` as the selected harness implementation (superseding the OpenAI Agents SDK target; interface unchanged) across `MEMORY_ADR.md`, `MEMORY_CORE_ARCHITECTURE.md`, and `AUTOMATION_AUDIT.md`, reaffirms the Trigger.dev (#9871) and AgentOS WDK (#8191) boundaries, and pins the decision in the memory-adr-contract guardrail test. The flag-gated `eve` build is decomposed and deferred (needs the `ai` v6→v7 bump + security scoping + human go-ahead).
+- [internal] **Merge-queue stall watchdog**: `scripts/merge-queue-watchdog.sh` + a `*/10` cron tick on `merge-queue-autoenroll.yml` rescue PRs stuck inside the Graphite queue (measured p90 94m / max 770m label→merge with no prior rescue). Stalled-but-clean PRs get a cooldown-guarded `merge-queue` label-cycle kick; conflicting PRs get `needs-conflict-resolution` only (drain owns the dequeue); terminal-red PRs get dequeued. `merge-queue-autoenroll.yml` also gains `workflow_run` (on CI completion) and `synchronize` triggers to cut enrollment latency.
+
+### Fixed
+
+- [internal] **Hermes/OpenClaw agent config health**: adds a launchd-backed sentinel for recurring Telegram-dispatched agent failures, catching stale Hermes fallback models, paid OpenRouter fallbacks, and schema-clobbered OpenClaw `memorySearch` blocks before gateway churn.
+- **Smoother dashboard interactions (JOV-3800)**: opening a release, contact, or tour-date panel from chat now shows the details instantly instead of a brief loading state; settings pages no longer nudge when a change is being saved; and the calendar keeps its layout steady while it first loads.
+- [internal] Pre-push Biome gate scopes to changed files (mirroring CI) instead of a repo-wide `biome check .`, so pre-existing Biome drift on `main` no longer blocks `git push` from every worktree and stops training agents toward the `JOVIE_SKIP_PRE_PUSH_GATE=1` escape hatch (GitHub #12475).
+- [internal] Cleared the pre-existing Biome drift on `main` that #12475 unblocked (GitHub #12482): `biome format` reflow of `globals.css` + `design-system.css` (whitespace-only — design tokens byte-identical with whitespace stripped) and `biome migrate` on `biome.json` (schema `2.4.8`→`2.5.1`, deprecated `recommended: false`→`preset: "none"`). `biome ci .` is now clean. The issue's `setup.ts` and public-SVG `noSvgWithoutTitle` buckets were already non-issues on current main (Biome 2.5.1 does not lint raw `.svg` files).
+- **Library share links no longer error on re-open**: opening a release that already has share settings — or two tabs opening it at once — previously returned a 500. The "ensure share settings exist" path is now idempotent under a concurrent first-open race via an `ON CONFLICT DO NOTHING` insert plus re-read (GitHub #12407).
+
+### Changed
+
+- [internal] **Slimmed the `gtmq_*` merge-queue CI lane**: Graphite batch branches now skip Lighthouse (all four surfaces), A11y, Mobile Overflow, E2E Smoke, Golden Path, `DB Migrate (PR main)`, Preview Deploy, and the `PR Summary` comment — none of those lanes ever gated `PR Ready`, and their evidence was already produced on the source PR before it entered the queue. `Layout Guard` moved off PRs entirely to run once post-merge (`push: main`) instead of once per PR and once per gtmq batch. `PR Ready` now depends directly on the four `ci-fast` leaves (typecheck, biome, guardrails, structural contract) instead of hopping through the `ci-fast` aggregate job, and waives its preview-evidence check on `gtmq_*` bases the same way it already waives it for Dependabot. Reduces GitHub Actions runner consumption by roughly 10–15 job slots per Graphite batch.
+- [internal] **Canonical Button system (DS_FOUNDATION_V1 Wave 1)**: `@jovie/ui` now exposes five Button variants (`primary`, `secondary`, `tertiary`, `ghost`, `link`) across three canonical sizes, with destructive styling handled by a prop; chat, library, calendar, claim, composer, and download surfaces now use the shared Button instead of retired `system-b-*-button` CSS classes, with a shrink-only ratchet preventing regressions.
+- [internal] **proxy.ts decomposed into lib/auth modules**: the 909-line middleware is now a ~280-line orchestrator; `handleProxyRequest` (routing, CSP nonce, state redirects, circuit breaker) moved to `lib/auth/proxy-request-handler.ts`, Clerk production/staging instance selection to `lib/auth/clerk-middleware-instances.ts`, and the thrice-repeated degraded-auth HTML/JSON block collapsed into `respondAuthDegraded()`. Behavior-preserving — no logic, status-code, or matcher changes; all 619 middleware/auth tests pass unchanged.
+- **Library right rail polish (JOV-3679)**: release status badges now use distinct colors — a released drop reads in accent purple instead of the same green as an approved one — buttons and icon buttons are pill-shaped with a clean hover circle, and streaming providers show their real brand icons (Spotify, Apple Music, …) in both the detail drawer and the filter rail. The approval control drops its redundant inline label.
+- **Homepage collapsed to hero + minimal footer**: the below-the-fold story stack (product statement, trust strip, go-live steps, workspace, artist-profiles carousel, Friday rhythm, bento/loop/stat sections, pricing, FAQ) and the final CTA are flagged off via the existing static marketing flags (`SHOW_HOMEPAGE_UNLOCKED_SECTIONS`, `SHOW_HOMEPAGE_V2_FINAL_CTA`). The header keeps the logo and sign-in but drops the center nav (its anchors pointed at the now-hidden sections), and the homepage footer renders the minimal variant. Fully reversible by flipping the flags back on. Pages stay fully static (`revalidate = false`).
+
+## [26.6.60] - 2026-06-28
+
+> Catalog collaborator signal matching resolves external mentions to discography releases with confidence scoring.
+
+### Added
+
+- **Catalog collaborator signal matching (JOV-2206)**: adds `lib/catalog` collaborator entity resolver with alias normalization, provider ID matching, and confidence scoring; founder-demo fixture coverage for Cosmic Gate → The Deep End; and `POST /api/catalog/collaborators/match` for confidence-scored release matches.
+
+## [26.6.59] - 2026-06-28
+
+> Merge-queue Lighthouse and mobile-overflow CI lanes reuse shared Neon fixtures reliably.
+
+### Fixed
+
+- **CI throughput (JOV-3606)**: public Lighthouse shard-0 and mobile overflow guards stop injecting stale main DB credentials into ephemeral Neon branches, rebalance the mobile-viewport Playwright spec across LHCI shards, and keep deterministic Promptfoo skill-registry coverage in sync with `analyzePackaging`.
+
+## [26.6.58] - 2026-06-28
+
+> Tasks workspace rows read calmer: overdue pills stop screaming red, the All tab stays visible, and list rows stop repeating title/due/assignee you already see in the detail pane. Release detail panel metadata rows are easier to scan: compact copy buttons, readable titles, and labeled copyright lines.
+
+### Fixed
+
+- **Tasks workspace UI polish (JOV-3652)**: stale overdue due chips downgrade from urgent red to muted metadata; the All assignee subview tab no longer clips under the toolbar; selected list rows hide duplicate title and due chips when the document pane is open; assignee chips hide on Mine/Jovie subviews where every row shares the same assignee.
+- **Release detail panel UI (JOV-3654)**: shrinks UPC/ISRC copy buttons to match metadata row density, exposes the full release title on hover when clamped, and labels phonogram/composition copyright rows as P-line/C-line instead of bare ℗/© symbols.
+
+## [26.6.57] - 2026-06-27
+
+> The desktop app recovers from renderer crashes instead of leaving you on a permanent black screen.
+
+### Fixed
+
+- **Desktop renderer crash recovery**: when the embedded web view crashes or runs out of memory, Jovie now reloads it automatically. If crashes repeat, the app shows the load-failure page with a Retry button instead of a blank black window.
+
+## [26.6.56] - 2026-06-26
+
+> Admins can now turn product features on and off per environment (dev, staging, prod) from a new Features panel, and changes take effect without a redeploy.
+
+### Added
+
+- **[internal] Admin Features page + runtime per-environment flag store**: new `/app/admin/features` page (admin-only) lists every runtime feature flag with an inline on/off switch for each of dev, staging, and prod. Toggles persist to a new `feature_flag_overrides` table and take effect on the next request — no redeploy. Reads are cached via `unstable_cache` + `revalidateTag('feature-flags')`, so the hot path stays read-free in steady state; an unset cell inherits the code default. The override layer is additive (absent row = no change).
+- **[internal] Flags now work in production**: `getAppFlagValue` consults the per-env override store, so a flag flipped in the admin panel changes server-rendered behavior in prod for all users. Dev-bar personal cookie overrides are now also honored in production for admins only (safe per-admin preview), instead of being ignored everywhere in prod.
+
+## [26.6.54] - 2026-06-21
+
+> [internal] Design-taste jury loop: change-aware screenshot planning, multi-juror consensus, and auto-filed issue manifests with reference comps; repo hygiene removes leaked competitor-analysis doc and adds blocking brand-scrub CI guard. Restores changelog email subscription by wiring invisible Turnstile bot protection.
+
+### Removed
+
+- **[internal] Competitor teardown doc removed from public repo**: a private competitor-analysis doc (`docs/plans/lyb-aesthetics-workout-tracker-validation.md`) was accidentally merged via PR #11018 and is now removed. Private strategy docs must live in a private repo.
+
+### Added
+
+- [internal] **Design-taste jury loop (JOV-10939)**: surgical change-aware capture planning skips non-UI pushes and regenerates only affected screenshot scenarios; per-surface benchmark references (Apple Health, Linear, Superhuman, Raycast, Frame.io, Mobbin/21st.dev/Godly); three-juror consensus engine (System B lead, product-density, marketing-restraint) emitting ranked findings tagged `ship` or `taste`; objective findings auto-file Visual QA issues with reference comps; taste findings queue to Tim; every consensus call writes to gbrain so the jury gate narrows over time.
+- **[internal] Brand-scrub CI gate** (`scripts/brand-scrub.py` + `.github/workflows/brand-scrub.yml`): blocking check on every PR that (a) rejects new files under `docs/plans/`, `docs/ideation/`, and similar strategy-doc paths, and (b) flags known competitor brand names in file content. 14 unit tests cover both rules.
+
+### Fixed
+
+- **[internal] Changelog email subscribe Turnstile wiring**: `ChangelogEmailSignup` now mounts the reusable `InvisibleTurnstile` atom and guards client-side submit until a valid token arrives, preventing the empty-token `403` that made changelog subscriptions non-functional when `TURNSTILE_SECRET_KEY` is configured in production.
+- **[internal] `InvisibleTurnstile` component**: new reusable atom (`components/atoms/InvisibleTurnstile.tsx`) that renders an execute-mode Cloudflare Turnstile widget off-screen, issues a deterministic bypass token in dev/E2E, and exposes `isTurnstileClientBypassed` / `isTurnstileClientConfigured` for consumers. 4 unit tests cover managed render, E2E bypass, missing site key, and external reset.
+
 ## [26.6.53] - 2026-06-15
 
 > The Mac desktop app now completes browser sign-in more reliably and ships as a desktop release.

@@ -1,18 +1,27 @@
-import { gateway } from '@ai-sdk/gateway';
 import {
   convertToModelMessages,
+  type LanguageModel,
   type ModelMessage,
   stepCountIs,
   type ToolSet,
   type UIMessage,
 } from 'ai';
-import { streamText } from '@/lib/ai/sdk';
+import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { extractLastUserText } from '@/lib/chat/message-text';
+import {
+  createStaticTextLanguageModel,
+  detectSystemPromptLeak,
+  isPromptDisclosureRequest,
+  PROMPT_DISCLOSURE_REFUSAL,
+  sanitizeAssistantResponse,
+} from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
+import { resolveChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import {
   isChatToolStepCapExhausted,
@@ -25,6 +34,7 @@ import type {
 } from '@/lib/chat/types';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
+import { startChatTurnLangfuseTrace } from '@/lib/observability/langfuse';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
 
@@ -77,25 +87,33 @@ export function isClientDisconnect(
 }
 
 /**
- * Selects the music-industry knowledge context relevant to the recent
- * conversation. Uses the last 3 user turns so follow-up questions retain
- * context from earlier turns.
+ * Collects the raw text of the most recent user turns (most-recent first),
+ * preserving any `@kind:id[label]` entity tokens verbatim so the server can
+ * resolve them. Used both for knowledge-context selection and entity hydration.
  */
-export function selectKnowledgeContextForTurn(uiMessages: UIMessage[]): string {
-  const recentUserText = [...uiMessages]
+export function recentUserTexts(uiMessages: UIMessage[], limit = 3): string[] {
+  return [...uiMessages]
     .reverse()
     .filter(m => m.role === 'user')
-    .slice(0, 3)
-    .flatMap(m =>
+    .slice(0, limit)
+    .map(m =>
       (m.parts ?? [])
         .filter(
           (p): p is { type: 'text'; text: string } =>
             p.type === 'text' && typeof p.text === 'string'
         )
         .map(p => p.text)
-    )
-    .join(' ');
-  return selectKnowledgeContext(recentUserText);
+        .join(' ')
+    );
+}
+
+/**
+ * Selects the music-industry knowledge context relevant to the recent
+ * conversation. Uses the last 3 user turns so follow-up questions retain
+ * context from earlier turns.
+ */
+export function selectKnowledgeContextForTurn(uiMessages: UIMessage[]): string {
+  return selectKnowledgeContext(recentUserTexts(uiMessages).join(' '));
 }
 
 export interface ExecuteChatTurnInput {
@@ -140,6 +158,11 @@ export interface ExecuteChatTurnInput {
   mode?: 'app' | 'onboarding';
 }
 
+export interface ChatTurnFinishSignals {
+  /** True when the model still wanted another tool round at the step cap. */
+  readonly toolStepCapExhausted: boolean;
+}
+
 export interface ExecuteChatTurnResult {
   /** The streamText result. Caller wraps with `.toUIMessageStreamResponse()`. */
   streamResult: ReturnType<typeof streamText>;
@@ -151,6 +174,8 @@ export interface ExecuteChatTurnResult {
   toolNames: readonly string[];
   /** Pre-converted model messages (the AI SDK input). */
   modelMessages: ModelMessage[];
+  /** Terminal signals populated as the model stream finishes. */
+  readonly turnSignals: ChatTurnFinishSignals;
 }
 
 /**
@@ -206,12 +231,25 @@ export async function executeChatTurn(
     if (!artistContext) {
       throw new Error('artistContext is required when mode is "app"');
     }
+    // Resolve `@kind:id[label]` entity tokens from the recent user turns against
+    // the artist's own catalog (the same `releases` rows that feed the
+    // right-rail entity panel) so the model recognises owned assets instead of
+    // mis-attributing them to another artist (JOV-3537).
+    const referencedEntities = buildReferencedEntitiesBlock({
+      userTexts: recentUserTexts(uiMessages),
+      ownedReleases: releases,
+      artist: {
+        displayName: artistContext.displayName,
+        username: artistContext.username,
+      },
+    });
     systemPrompt = buildSystemPrompt(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
       insightsEnabled,
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
       accountContext,
+      referencedEntities,
     });
   }
 
@@ -251,23 +289,50 @@ export async function executeChatTurn(
   const toolStepLimit = resolveChatToolStepLimit(
     planLimits.booleans.aiCanUseTools
   );
+  const turnSignals = { toolStepCapExhausted: false };
 
-  const streamResult = streamText({
-    model: gateway(selectedModel),
+  const disclosureProbeText =
+    lastUserText ?? extractLastUserText(uiMessages) ?? '';
+  const blockedForDisclosure =
+    disclosureProbeText.length > 0 &&
+    isPromptDisclosureRequest(disclosureProbeText);
+
+  const promptRegistry = resolveChatPromptRegistryEntry(mode);
+  const langfuseTrace = await startChatTurnLangfuseTrace({
+    requestId,
+    conversationId: resolvedConversationId,
+    userId,
+    userPlan,
+    mode,
+    selectedModel,
+    toolNames,
+    promptRegistry,
+    messageCount: uiMessages.length,
+    blockedForDisclosure,
+  });
+
+  const rawStreamResult = streamText({
+    model: blockedForDisclosure
+      ? (createStaticTextLanguageModel(
+          PROMPT_DISCLOSURE_REFUSAL
+        ) as unknown as LanguageModel)
+      : gateway(selectedModel),
     system: systemPrompt,
     messages: modelMessages,
-    tools,
-    stopWhen: stepCountIs(toolStepLimit),
-    prepareStep: ({ steps, stepNumber }) => {
-      const restrictedTools = resolveImportBioRestrictedTools(
-        steps,
-        stepNumber
-      );
-      if (restrictedTools) {
-        return { activeTools: restrictedTools };
-      }
-      return {};
-    },
+    tools: blockedForDisclosure ? undefined : tools,
+    stopWhen: blockedForDisclosure ? undefined : stepCountIs(toolStepLimit),
+    prepareStep: blockedForDisclosure
+      ? undefined
+      : ({ steps, stepNumber }) => {
+          const restrictedTools = resolveImportBioRestrictedTools(
+            steps,
+            stepNumber
+          );
+          if (restrictedTools) {
+            return { activeTools: restrictedTools };
+          }
+          return {};
+        },
     abortSignal: signal,
     experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
@@ -281,10 +346,60 @@ export async function executeChatTurn(
         chatToolStepLimit: toolStepLimit,
       },
     }),
-    onFinish: ({ steps }) => {
-      if (!isChatToolStepCapExhausted(steps, toolStepLimit)) {
+    onFinish: async ({ steps, text }) => {
+      let promptLeakBlocked = false;
+      if (!blockedForDisclosure && typeof text === 'string') {
+        const sanitized = sanitizeAssistantResponse(text);
+        if (sanitized.leaked) {
+          promptLeakBlocked = true;
+          telemetry?.setTags?.({
+            chat_prompt_leak_blocked: 'true',
+          });
+          telemetry?.addBreadcrumb?.({
+            category: 'ai-chat',
+            message: 'chat_prompt_leak_blocked',
+            level: 'warning',
+            data: {
+              requestId,
+              conversationId: resolvedConversationId,
+              profileId: resolvedProfileId,
+              plan: userPlan,
+              mode,
+            },
+          });
+          await telemetry?.captureException?.(
+            new Error('Assistant response matched system-prompt leak markers'),
+            {
+              tags: { feature: 'ai-chat', errorType: 'prompt_leak_blocked' },
+              extra: {
+                requestId,
+                conversationId: resolvedConversationId,
+                profileId: resolvedProfileId,
+                leakedChars: text.length,
+              },
+            }
+          );
+        } else if (text.length > 0 && detectSystemPromptLeak(text)) {
+          telemetry?.setTags?.({
+            chat_prompt_leak_detected: 'true',
+          });
+        }
+      }
+
+      langfuseTrace.endSuccess({
+        text: typeof text === 'string' ? text : undefined,
+        stepCount: steps.length,
+        leaked: promptLeakBlocked,
+      });
+
+      if (
+        blockedForDisclosure ||
+        !isChatToolStepCapExhausted(steps, toolStepLimit)
+      ) {
         return;
       }
+
+      turnSignals.toolStepCapExhausted = true;
 
       telemetry?.setTags?.({
         chat_tool_step_cap_exhausted: 'true',
@@ -309,6 +424,8 @@ export async function executeChatTurn(
     onError: async ({ error }) => {
       if (isClientDisconnect(error, signal)) return;
 
+      langfuseTrace.endError(error);
+
       telemetry?.captureException?.(error, {
         tags: { feature: 'ai-chat', errorType: 'streaming' },
         extra: {
@@ -323,11 +440,34 @@ export async function executeChatTurn(
     },
   });
 
+  const streamResult = blockedForDisclosure
+    ? rawStreamResult
+    : wrapStreamResultWithLeakGuard(rawStreamResult);
+
   return {
     streamResult,
     selectedModel,
     systemPrompt,
     toolNames,
     modelMessages,
+    turnSignals,
   };
+}
+
+function wrapStreamResultWithLeakGuard<T extends ReturnType<typeof streamText>>(
+  streamResult: T
+): T {
+  if (!streamResult?.text) {
+    return streamResult;
+  }
+
+  const sanitizedTextPromise = streamResult.text.then(
+    text => sanitizeAssistantResponse(text).text
+  );
+
+  return Object.create(streamResult, {
+    text: {
+      value: sanitizedTextPromise,
+    },
+  }) as T;
 }

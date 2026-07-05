@@ -20,17 +20,17 @@ export function DemoVideoPage() {
       data-testid='demo-video-page'
     >
       <h1
-        className='max-w-3xl text-center text-4xl font-bold leading-tight text-white sm:text-5xl'
+        className='max-w-3xl text-center text-4xl font-bold leading-tight text-white dark:text-white sm:text-5xl'
         style={{ fontFeatureSettings: 'var(--font-features)' }}
       >
-        Jovie turns artist signals into execution
+        Jovie Turns Artist Signals Into Execution
       </h1>
 
       <div className='mt-10 w-full sm:mt-14'>
         <DemoVideoPlayer
           captionsUrl={DEMO_CAPTIONS_PUBLIC_PATH}
           controls
-          label='Jovie demo video'
+          label='Jovie Demo Video'
           posterUrl={posterUrl}
           videoUrl={videoUrl}
         />
@@ -39,7 +39,7 @@ export function DemoVideoPage() {
       <div className='mt-10 flex flex-wrap items-center justify-center gap-4'>
         <a
           href={downloadHref}
-          className='inline-flex h-12 items-center rounded-full border border-white/20 px-8 text-sm font-semibold text-white transition-colors hover:bg-white/10'
+          className='inline-flex h-12 items-center rounded-full border border-white/20 px-8 text-sm font-semibold text-white dark:text-white transition-colors hover:bg-white/10'
           download='jovie-demo.mp4'
         >
           Download demo

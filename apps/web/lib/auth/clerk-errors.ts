@@ -53,25 +53,54 @@ const CLERK_ERROR_MESSAGES: Record<string, string> = {
   form_param_format_invalid: 'Please check your input and try again.',
 };
 
+type ClerkErrorEntry = {
+  readonly code?: string;
+  readonly message?: string;
+  readonly longMessage?: string;
+};
+
+function getFirstClerkErrorEntry(error: unknown): ClerkErrorEntry | undefined {
+  if (isClerkAPIResponseError(error)) {
+    return error.errors[0];
+  }
+
+  if (
+    error &&
+    typeof error === 'object' &&
+    Array.isArray((error as { errors?: unknown }).errors)
+  ) {
+    return (error as { errors: ReadonlyArray<ClerkErrorEntry> }).errors[0];
+  }
+
+  return undefined;
+}
+
+export function getClerkErrorCode(error: unknown): string | undefined {
+  return getFirstClerkErrorEntry(error)?.code;
+}
+
+export function isBotProtectionError(error: unknown): boolean {
+  const code = getClerkErrorCode(error);
+  return (
+    code === 'bot_traffic_detected' ||
+    (typeof code === 'string' && code.startsWith('captcha_'))
+  );
+}
+
 /**
  * Parse a Clerk API error into a user-friendly message.
- * Handles ClerkAPIResponseError and unknown error types.
+ * Handles ClerkAPIResponseError, resource API `{ error }` objects, and unknown types.
  */
 export function parseClerkError(error: unknown): string {
-  if (isClerkAPIResponseError(error)) {
-    const firstError = error.errors[0];
-    if (!firstError) {
-      return 'An unexpected error occurred. Please try again.';
-    }
-
-    const code = firstError.code;
+  const firstError = getFirstClerkErrorEntry(error);
+  if (firstError) {
+    const code = firstError.code ?? '';
     const customMessage = CLERK_ERROR_MESSAGES[code];
 
     if (customMessage) {
       return customMessage;
     }
 
-    // Fall back to Clerk's message if we don't have a custom one
     if (firstError.longMessage) {
       return firstError.longMessage;
     }

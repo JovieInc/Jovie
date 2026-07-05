@@ -57,7 +57,7 @@ export function SmartLinkRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token transition-colors duration-subtle ease-subtle',
+        'flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-2xs text-tertiary-token transition-colors duration-subtle ease-subtle',
         className
       )}
     >

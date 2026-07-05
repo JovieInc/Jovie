@@ -151,7 +151,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
         expect.objectContaining({
           kind: 'nav',
           id: 'go-chats',
-          label: 'Conversations',
+          label: 'Chats',
           href: APP_ROUTES.CHATS,
         }),
       ])
@@ -172,9 +172,9 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     // Section headings render as uppercased labels — entries with the same
     // text exist as nav-row labels, so target the heading by its style class.
     const sectionLabels = screen
-      .getAllByText(/^(Go to|Skills|Releases|Artists)$/)
+      .getAllByText(/^(Go To|Skills|Releases|Artists)$/)
       .map(el => el.textContent);
-    expect(sectionLabels).toContain('Go to');
+    expect(sectionLabels).toContain('Go To');
     expect(sectionLabels).toContain('Skills');
     expect(sectionLabels).toContain('Releases');
     expect(screen.getByText('Midnight Run')).toBeInTheDocument();

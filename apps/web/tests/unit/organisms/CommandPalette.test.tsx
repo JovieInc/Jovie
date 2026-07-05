@@ -135,9 +135,9 @@ describe('CommandPalette', () => {
   it('lists recent chats with safe fallback titles', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    expect(screen.getByText('Recent Conversations')).toBeInTheDocument();
+    expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
-    expect(screen.getByText('Untitled conversation')).toBeInTheDocument();
+    expect(screen.getByText('Untitled chat')).toBeInTheDocument();
   });
 
   it('routes a recent-chat commit to the chat route', () => {

@@ -586,7 +586,7 @@ jobs:
 
           echo "✅ HTTP canary passed: Deployment healthy and homepage renders"
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -628,6 +628,30 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Verify staging OAuth redirect URIs are accepted by Google/Apple
+        run: |
+          # Probe the Google/Apple authorize endpoints with the EXACT redirect_uri
+          # Clerk's STAGING instance hands them (clerk.staging.jov.ie). Catches
+          # code regressions in how the redirect_uri is built and staging Google
+          # client drift before promote. Production's own clients are covered by
+          # the post-promote production-oauth-gate (different Clerk instance).
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          attempt=1
+          max_attempts=3
+          until CI=true SMOKE_ONLY=1 BASE_URL="https://staging.jov.ie" pnpm exec playwright test tests/e2e/oauth-providers.spec.ts --project=chromium --reporter=line; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "❌ Staging OAuth redirect URIs are rejected by Google/Apple after ${max_attempts} attempts."
+              echo "canary_status=failed_oauth" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep_seconds=$((attempt * 15))
+            echo "⚠ Staging OAuth probe attempt ${attempt}/${max_attempts} failed; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
 
       - name: Mark canary verified
         id: canary-status

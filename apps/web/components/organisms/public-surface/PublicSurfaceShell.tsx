@@ -22,7 +22,7 @@ export function PublicSurfaceShell({
   return (
     <div
       className={cn(
-        'profile-viewport relative h-[100dvh] overflow-clip bg-base text-primary-token md:h-auto md:min-h-[100dvh] md:overflow-x-hidden',
+        'profile-viewport relative h-dvh overflow-clip bg-base text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden',
         className
       )}
     >
@@ -47,8 +47,8 @@ export function PublicSurfaceShell({
 
       {!ambientMediaUrl && showGradientBlurs ? (
         <>
-          <div className='pointer-events-none absolute left-[12%] top-[14%] h-56 w-56 rounded-full bg-[color:var(--profile-stage-glow-a)] blur-3xl sm:h-72 sm:w-72 md:h-[26rem] md:w-[26rem]' />
-          <div className='pointer-events-none absolute bottom-[10%] right-[10%] h-56 w-56 rounded-full bg-[color:var(--profile-stage-glow-b)] blur-3xl sm:h-72 sm:w-72 md:h-[24rem] md:w-[24rem]' />
+          <div className='pointer-events-none absolute left-[12%] top-[14%] h-56 w-56 rounded-full bg-(--profile-stage-glow-a) blur-3xl sm:h-72 sm:w-72 md:h-[26rem] md:w-[26rem]' />
+          <div className='pointer-events-none absolute bottom-[10%] right-[10%] h-56 w-56 rounded-full bg-(--profile-stage-glow-b) blur-3xl sm:h-72 sm:w-72 md:h-[24rem] md:w-[24rem]' />
         </>
       ) : null}
 

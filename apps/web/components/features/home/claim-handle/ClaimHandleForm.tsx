@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -136,6 +137,13 @@ export function ClaimHandleForm({
   // Availability is informational; server validates during onboarding.
   const hasClientError = !!handleError;
   const isDisabled = navigating || hasClientError;
+  const submitButtonSize = size === 'display' ? 'lg' : 'md';
+  const submitButtonClassName = cn(
+    'shrink-0 gap-1.5 rounded-lg focus-ring-themed',
+    isHero && 'h-10 px-4 text-xs',
+    size === 'display' && 'h-16 rounded-xl px-6 text-base sm:px-7',
+    !isHeroLike && 'h-9 px-3.5 sm:px-4'
+  );
 
   return (
     <form
@@ -175,12 +183,12 @@ export function ClaimHandleForm({
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder='you'
+            placeholder='You'
             required
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
-            aria-label='Choose your handle'
+            aria-label='Choose Your Handle'
             aria-invalid={unavailable ? 'true' : undefined}
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
             className={cn(
@@ -203,22 +211,18 @@ export function ClaimHandleForm({
           />
         </div>
 
-        <button
+        <Button
           type='submit'
           disabled={isDisabled}
           data-testid={submitButtonTestId}
           aria-busy={checkingAvail || navigating}
-          data-size={size}
-          data-disabled={isDisabled ? 'true' : 'false'}
-          className={cn(
-            'system-b-claim-handle-button',
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 focus-ring-themed'
-          )}
+          size={submitButtonSize}
+          className={submitButtonClassName}
         >
           <span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
             {buttonContent}
           </span>
-        </button>
+        </Button>
       </div>
 
       {/* Helper text — minimal, surgical */}

@@ -2,9 +2,13 @@
 /**
  * Codex Issue Shipper — Hermes-Air
  *
- * Watches open GitHub issues labeled `codex` and `codex-approved`, claims one
+ * Watches all open GitHub issues (not just codex-labeled), claims one
  * eligible issue, writes dispatch context to gbrain, then starts a
  * coder-profile agent to ship it.
+ *
+ * Issues labeled `no-auto`, `invalid` (confirmed misroutes), `type:epic`
+ * (pointer trackers with no code), or already claimed/blocked are excluded.
+ * All other open issues are dispatchable.
  *
  * The empty-queue path is intentionally cheap: GitHub scan, log, exit. No
  * gbrain query, model call, subagent, or CodeRabbit work happens unless an
@@ -31,22 +35,94 @@ import {
   buildDispatchPlans,
   buildGbrainCaptureText,
   buildGbrainQuery,
+  buildRecoveryStashMessage,
+  type CheckoutState,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   type DispatchPlan,
+  EPIC_LABEL,
+  type FinisherRunner,
+  finishDispatch,
   type GbrainContext,
+  GhEagainBackoff,
   type GithubIssue,
+  gbrainContextBlocker,
   HUMAN_REVIEW_LABEL,
   labelNames,
   loadShipperConfig,
+  NO_AUTO_LABEL,
+  parseAgentChain,
+  parseDirtyPaths,
+  planCheckoutGate,
+  routeForAgent,
   type ShipperConfig,
+  SpawnEagainError,
+  worktreeHasWork,
 } from '../lib/codex-issue-shipper';
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import { sendOpsAlert } from '../lib/ops-notify';
+import {
+  journalEnd,
+  journalStart,
+  planRecovery,
+  readJournal,
+  SHIP_OWNER_LOCK,
+} from '../lib/ship-ledger';
+import {
+  isSpawnResourceUnavailable,
+  SpawnResourceGuard,
+  SpawnResourceUnavailableError,
+} from '../lib/spawn-resource';
 
 const JOB = 'codex-issue-shipper';
+const ghEagainBackoff = new GhEagainBackoff();
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function handleSpawnEagain(
+  err: SpawnEagainError,
+  context: string
+): Promise<void> {
+  const backoff = ghEagainBackoff.record();
+  logJobEvent({
+    job: JOB,
+    event: 'gh_eagain_skip',
+    context,
+    command: err.command,
+    error: err.message,
+    consecutive: backoff.consecutive,
+  });
+  if (backoff.shouldBackoff) {
+    logJobEvent({
+      job: JOB,
+      event: 'gh_eagain_backoff',
+      sleepMs: backoff.sleepMs,
+      consecutive: backoff.consecutive,
+    });
+    await sleep(backoff.sleepMs);
+  }
+}
+
+const spawnResourceGuard = new SpawnResourceGuard({
+  onEvent: entry => logJobEvent({ job: JOB, ...entry }),
+});
+
+/**
+ * Sentinel file that, when present, pauses the shipper.
+ * Written by the Shipping Menu Bar ops tool (or `touch ~/.hermes/shipping-paused`).
+ * Removed to resume. Lets an operator halt all autonomous dispatch without
+ * unloading the LaunchAgent or touching env vars.
+ */
+const PAUSE_SENTINEL = join(HERMES_HOME(), 'shipping-paused');
+
+function HERMES_HOME(): string {
+  return process.env.HERMES_HOME ?? join(tmpdir(), '..', 'timwhite', '.hermes');
+}
 
 interface AgentRunResult {
   readonly ok: boolean;
@@ -55,6 +131,24 @@ interface AgentRunResult {
   readonly error?: string;
   readonly logPath: string;
   readonly promptPath: string;
+  readonly statePath: string;
+}
+
+interface AgentAttemptState {
+  readonly job: typeof JOB;
+  readonly issue: number;
+  readonly branch: string;
+  readonly agent: ShipperConfig['agent'];
+  readonly model: string;
+  readonly repoRoot: string;
+  readonly promptPath: string;
+  readonly logPath: string;
+  readonly startedAt: string;
+  readonly updatedAt: string;
+  readonly status: 'running' | 'succeeded' | 'failed';
+  readonly exitStatus?: number | null;
+  readonly signal?: NodeJS.Signals | null;
+  readonly error?: string;
 }
 
 interface CapacitySnapshot {
@@ -69,6 +163,22 @@ interface CapacitySnapshot {
 function shortError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function writeAgentAttemptState(
+  statePath: string,
+  state: AgentAttemptState
+): void {
+  try {
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'agent_attempt_state_write_failed',
+      statePath,
+      error: shortError(err),
+    });
+  }
 }
 
 function unquoteEnvValue(value: string): string {
@@ -98,12 +208,22 @@ function loadHermesEnv(): void {
 }
 
 function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
-  return execFileSync(args[0], args.slice(1), {
-    cwd: config.repoRoot,
-    encoding: 'utf8',
-    timeout: 30_000,
-    maxBuffer: 5 * 1024 * 1024,
-  });
+  try {
+    const result = execFileSync(args[0], args.slice(1), {
+      cwd: config.repoRoot,
+      encoding: 'utf8',
+      timeout: 30_000,
+      maxBuffer: 5 * 1024 * 1024,
+    });
+    spawnResourceGuard.recordSuccess();
+    return result;
+  } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure(args[0], err);
+      throw new SpawnResourceUnavailableError(args[0], err);
+    }
+    throw err;
+  }
 }
 
 function systemCapacity(config: ShipperConfig): CapacitySnapshot {
@@ -173,7 +293,7 @@ function spawnSyncSafe(
   command: string,
   args: ReadonlyArray<string>,
   cwd: string
-): { readonly status: number | null } {
+): { readonly status: number | null; readonly resourceUnavailable: boolean } {
   try {
     const result = execFileSync(command, args, {
       cwd,
@@ -182,13 +302,18 @@ function spawnSyncSafe(
       stdio: 'ignore',
     });
     void result;
-    return { status: 0 };
+    spawnResourceGuard.recordSuccess();
+    return { status: 0, resourceUnavailable: false };
   } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure(command, err);
+      return { status: null, resourceUnavailable: true };
+    }
     const status =
       typeof (err as { status?: unknown }).status === 'number'
         ? ((err as { status: number }).status ?? 1)
         : 1;
-    return { status };
+    return { status, resourceUnavailable: false };
   }
 }
 
@@ -243,47 +368,193 @@ function cleanupWorktree(config: ShipperConfig, repoRoot: string): void {
   }
 }
 
-function detectRepoRoot(): string {
+function detectRepoRoot(): string | null {
   if (process.env.HERMES_JOVIE_REPO) return process.env.HERMES_JOVIE_REPO;
-  return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-    timeout: 10_000,
-  }).trim();
+  try {
+    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8',
+      timeout: 10_000,
+    }).trim();
+    spawnResourceGuard.recordSuccess();
+    return root;
+  } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure('git', err);
+      return null;
+    }
+    throw err;
+  }
 }
 
-function detectGithubRepo(repoRoot: string): string {
-  if (process.env.GH_REPO) return process.env.GH_REPO;
-  return execFileSync(
-    'gh',
-    ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-    {
+/**
+ * Fail-closed primary-checkout gate (#12841). The shipper process already
+ * loaded dispatcher code from repoRoot at startup; if that checkout is not
+ * clean main at origin/main we refuse to dispatch THIS tick even after disk
+ * recovery so the next launchd re-exec loads fresh code.
+ */
+async function gatePrimaryCheckout(repoRoot: string): Promise<boolean> {
+  const git = (args: ReadonlyArray<string>): string =>
+    execFileSync('git', args, {
       cwd: repoRoot,
       encoding: 'utf8',
-      timeout: 30_000,
+      timeout: 60_000,
+    }).trim();
+
+  let state: CheckoutState;
+  let dirtyPaths: ReadonlyArray<string> = [];
+  try {
+    git(['fetch', 'origin', 'main']);
+    const porcelain = git(['status', '--porcelain', '--untracked-files=no']);
+    dirtyPaths = parseDirtyPaths(porcelain);
+    state = {
+      branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
+      headSha: git(['rev-parse', 'HEAD']),
+      originMainSha: git(['rev-parse', 'origin/main']),
+      dirty: porcelain.length > 0,
+    };
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'stale_checkout_abort',
+      detail: `checkout inspection failed: ${shortError(err)}`,
+      recovered: false,
+      dirtyPaths,
+    });
+    return true;
+  }
+
+  const plan = planCheckoutGate(state, dirtyPaths);
+  if (plan.proceed) return true;
+
+  let recovered = false;
+  let recoveryError: string | undefined;
+  if (plan.attemptRecovery) {
+    try {
+      if (state.dirty) {
+        git(['stash', 'push', '-m', buildRecoveryStashMessage(plan.detail)]);
+      }
+      git(['checkout', 'main']);
+      git(['reset', '--hard', 'origin/main']);
+      recovered = true;
+      logJobEvent({
+        job: JOB,
+        event: 'stale_checkout_recovered',
+        detail: plan.detail,
+        stashed: state.dirty,
+        dirtyPaths,
+      });
+    } catch (err) {
+      recoveryError = shortError(err);
+      logJobEvent({
+        job: JOB,
+        event: 'stale_checkout_recovery_failed',
+        detail: plan.detail,
+        error: recoveryError,
+        dirtyPaths,
+      });
     }
-  ).trim();
+  }
+
+  const alertLines = [
+    'Ovie shipper stale_checkout_abort',
+    `repo: ${repoRoot}`,
+    `detail: ${plan.detail}`,
+    plan.recoveryBlockedReason
+      ? `recovery skipped: ${plan.recoveryBlockedReason}`
+      : null,
+    recovered
+      ? 'disk recovery: succeeded (this tick still aborts — next launchd re-exec loads fresh dispatcher code)'
+      : recoveryError
+        ? `disk recovery: failed (${recoveryError})`
+        : plan.attemptRecovery
+          ? 'disk recovery: not attempted'
+          : null,
+    dirtyPaths.length > 0 ? `dirty paths: ${dirtyPaths.join(', ')}` : null,
+  ].filter((line): line is string => line !== null);
+
+  logJobEvent({
+    job: JOB,
+    event: 'stale_checkout_abort',
+    repoRoot,
+    detail: plan.detail,
+    recovered,
+    recoveryError,
+    recoveryBlockedReason: plan.recoveryBlockedReason,
+    dirtyPaths,
+  });
+  await sendOpsAlert(alertLines.join('\n'));
+  return false;
 }
 
-function listCodexIssues(config: ShipperConfig): ReadonlyArray<GithubIssue> {
-  const raw = run(
-    [
+function detectGithubRepo(repoRoot: string): string | null {
+  if (process.env.GH_REPO) return process.env.GH_REPO;
+  try {
+    const repo = execFileSync(
       'gh',
-      'issue',
-      'list',
-      '--repo',
-      config.repo,
-      '--state',
-      'open',
-      '--label',
-      'codex',
-      '--limit',
-      String(config.issueFetchLimit),
-      '--json',
-      'number,title,body,url,updatedAt,labels',
-    ],
-    config
-  );
-  return JSON.parse(raw) as ReadonlyArray<GithubIssue>;
+      ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 30_000,
+      }
+    ).trim();
+    spawnResourceGuard.recordSuccess();
+    return repo;
+  } catch (err) {
+    if (isSpawnResourceUnavailable(err)) {
+      spawnResourceGuard.recordFailure('gh', err);
+      return null;
+    }
+    throw err;
+  }
+}
+
+interface ListCodexIssuesResult {
+  readonly issues: ReadonlyArray<GithubIssue>;
+  readonly resourceUnavailable: boolean;
+}
+
+function listCodexIssues(config: ShipperConfig): ListCodexIssuesResult {
+  // Fixed: gh CLI does not support --page; use single fetch with max limit
+  const fetchLimit = Math.min(100, config.issueFetchLimit || 100);
+  try {
+    const raw = run(
+      [
+        'gh',
+        'issue',
+        'list',
+        '--repo',
+        config.repo,
+        '--state',
+        'open',
+        '--limit',
+        String(fetchLimit),
+        '--json',
+        'number,title,body,url,updatedAt,labels',
+      ],
+      config
+    );
+    const issues = JSON.parse(raw) as GithubIssue[];
+    return {
+      issues: issues.slice(0, config.issueFetchLimit || 100),
+      resourceUnavailable: false,
+    };
+  } catch (err) {
+    if (err instanceof SpawnResourceUnavailableError) {
+      return { issues: [], resourceUnavailable: true };
+    }
+    throw err;
+  }
+}
+
+async function handleSpawnResourcePressure(context: string): Promise<void> {
+  await spawnResourceGuard.maybeBackoff();
+  logJobEvent({
+    job: JOB,
+    event: 'spawn_resource_skip',
+    context,
+    consecutive: spawnResourceGuard.consecutiveFailures,
+  });
 }
 
 function ensureLabel(
@@ -358,6 +629,12 @@ function ensureControlLabels(config: ShipperConfig): void {
     CODEX_TRUSTED_LABEL,
     '0e8a16',
     'Maintainer approval for the local codex issue shipper to run an agent'
+  );
+  ensureLabel(
+    config,
+    NO_AUTO_LABEL,
+    'e99695',
+    'Opt out of automated issue shipping — agent will skip this issue'
   );
 }
 
@@ -610,7 +887,22 @@ function runAgent(
   const base = `github-${plan.issue.number}-${timestamp}`;
   const logPath = join(dir, `${base}.log`);
   const promptPath = join(dir, `${base}.prompt.md`);
+  const statePath = join(dir, `${base}.state.json`);
   writeFileSync(promptPath, prompt);
+  const startedAt = new Date().toISOString();
+  writeAgentAttemptState(statePath, {
+    job: JOB,
+    issue: plan.issue.number,
+    branch: plan.branchName,
+    agent: config.agent,
+    model: plan.route.sessionModel,
+    repoRoot,
+    promptPath,
+    logPath,
+    startedAt,
+    updatedAt: startedAt,
+    status: 'running',
+  });
   appendFileSync(
     logPath,
     [
@@ -618,13 +910,14 @@ function runAgent(
       `issue=${plan.issue.number}`,
       `branch=${plan.branchName}`,
       `model=${plan.route.sessionModel}`,
-      `started=${new Date().toISOString()}`,
+      `started=${startedAt}`,
+      `state=${statePath}`,
       '',
     ].join('\n')
   );
 
   const agentConfig = { ...config, repoRoot };
-  const command = buildAgentCommand(agentConfig, plan.route);
+  const command = buildAgentCommand(agentConfig, plan.route, promptPath);
   const fd = openSync(logPath, 'a');
   return new Promise(resolve => {
     let settled = false;
@@ -640,13 +933,29 @@ function runAgent(
     });
 
     const finish = (
-      result: Omit<AgentRunResult, 'logPath' | 'promptPath'>
+      result: Omit<AgentRunResult, 'logPath' | 'promptPath' | 'statePath'>
     ): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       closeSync(fd);
-      resolve({ ...result, logPath, promptPath });
+      writeAgentAttemptState(statePath, {
+        job: JOB,
+        issue: plan.issue.number,
+        branch: plan.branchName,
+        agent: config.agent,
+        model: plan.route.sessionModel,
+        repoRoot,
+        promptPath,
+        logPath,
+        startedAt,
+        updatedAt: new Date().toISOString(),
+        status: result.ok ? 'succeeded' : 'failed',
+        exitStatus: result.status,
+        signal: result.signal,
+        error: result.error,
+      });
+      resolve({ ...result, logPath, promptPath, statePath });
     };
 
     timeout = setTimeout(() => {
@@ -674,7 +983,7 @@ function runAgent(
       });
     });
 
-    child.stdin.end(prompt);
+    child.stdin.end(config.agent === 'grok' ? undefined : prompt);
   });
 }
 
@@ -713,54 +1022,143 @@ async function dispatchPlan(
   config: ShipperConfig,
   plan: DispatchPlan
 ): Promise<void> {
+  const gbrain = collectGbrainContext(plan);
+  const gbrainBlocker = gbrainContextBlocker(gbrain);
+  if (gbrainBlocker) {
+    markBlocked(config, plan, gbrainBlocker);
+    logJobEvent({
+      job: JOB,
+      event: 'gbrain_coordination_blocked',
+      issue: plan.issue.number,
+      error: gbrainBlocker,
+    });
+    return;
+  }
+
   const prepared = prepareWorktree(config, plan);
   const dispatch = prepared.plan;
   try {
     claimIssue(config, dispatch);
+    journalStart({
+      job: JOB,
+      repo: config.repo,
+      issue: dispatch.issue.number,
+      branch: dispatch.branchName,
+      worktree: prepared.repoRoot,
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+    });
 
-    let gbrain: GbrainContext;
-    try {
-      gbrain = collectGbrainContext(dispatch);
-    } catch (err) {
-      const reason = `GBrain capture failed, so no coding agent was started.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``;
-      releaseClaimForRetry(config, dispatch, reason);
+    const runInWorktree: FinisherRunner = (args, opts) =>
+      execFileSync(args[0], args.slice(1), {
+        cwd: prepared.repoRoot,
+        encoding: 'utf8',
+        timeout: opts?.timeoutMs ?? 30_000,
+        maxBuffer: 5 * 1024 * 1024,
+      });
+    const safeHasWork = (): boolean => {
+      try {
+        return worktreeHasWork(runInWorktree);
+      } catch {
+        return false;
+      }
+    };
+
+    // Agent fallback chain: an attempt that ends with neither a PR nor work
+    // in the worktree (and wasn't killed by the system) hands the same
+    // dispatch to the next harness instead of burning a claim-release cycle.
+    const chain = parseAgentChain(process.env, config.agent);
+    let agentResult!: AgentRunResult;
+    let pr: { number: number; url: string } | null = null;
+    let isSystemKilled = false;
+
+    for (let attempt = 0; attempt < chain.length; attempt++) {
+      const agent = chain[attempt];
+      const attemptRoute = routeForAgent(agent, dispatch.route);
+      const attemptConfig = { ...config, agent };
+      const attemptDispatch = { ...dispatch, route: attemptRoute };
+      const prompt = buildAgentPrompt({
+        issue: attemptDispatch.issue,
+        branchName: attemptDispatch.branchName,
+        baseBranch: 'main',
+        integrationBranch: attemptDispatch.integrationBranch,
+        route: attemptRoute,
+        gbrain,
+        repoRoot: prepared.repoRoot,
+      });
+
+      agentResult = await runAgent(
+        attemptConfig,
+        attemptDispatch,
+        prompt,
+        prepared.repoRoot
+      );
       logJobEvent({
         job: JOB,
-        event: 'gbrain_failed',
+        event: agentResult.ok ? 'agent_succeeded' : 'agent_failed',
         issue: dispatch.issue.number,
-        error: shortError(err),
+        agent,
+        attempt: attempt + 1,
+        status: agentResult.status,
+        signal: agentResult.signal,
+        error: agentResult.error,
+        logPath: agentResult.logPath,
+        promptPath: agentResult.promptPath,
+        statePath: agentResult.statePath,
+        gbrainSlug: gbrain.captureSlug,
+      });
+
+      // SIGTERM or timeout = system interruption — do not chain, release.
+      // A null exit status means the agent never ran to a decision — a
+      // spawn/infra failure (e.g. a harness binary missing), not a code
+      // verdict. Treat it like a system interruption: release, don't block.
+      isSystemKilled =
+        agentResult.status === 143 ||
+        agentResult.status === 137 ||
+        agentResult.status === null ||
+        Boolean(agentResult.error?.includes('timeout')) ||
+        Boolean(agentResult.error?.includes('killed'));
+      if (isSystemKilled) break;
+
+      pr = findPrForBranch(config, dispatch.branchName);
+      if (pr || safeHasWork()) break;
+
+      if (attempt < chain.length - 1) {
+        logJobEvent({
+          job: JOB,
+          event: 'agent_no_work_fallback',
+          issue: dispatch.issue.number,
+          fromAgent: agent,
+          toAgent: chain[attempt + 1],
+        });
+      }
+    }
+
+    if (isSystemKilled) {
+      releaseClaimForRetry(
+        config,
+        dispatch,
+        [
+          `Agent was interrupted (status=${agentResult.status}) - releasing claim for retry.`,
+          '',
+          agentResult.error ? `Error: \`${agentResult.error}\`` : null,
+          `Log: \`${agentResult.logPath}\``,
+          `State: \`${agentResult.statePath}\``,
+        ]
+          .filter((line): line is string => line !== null)
+          .join('\n')
+      );
+      logJobEvent({
+        job: JOB,
+        event: 'agent_interrupted_release_claim',
+        issue: dispatch.issue.number,
+        status: agentResult.status,
+        error: agentResult.error,
       });
       return;
     }
 
-    const prompt = buildAgentPrompt({
-      issue: dispatch.issue,
-      branchName: dispatch.branchName,
-      baseBranch: 'main',
-      integrationBranch: dispatch.integrationBranch,
-      route: dispatch.route,
-      gbrain,
-      repoRoot: prepared.repoRoot,
-    });
-
-    const agentResult = await runAgent(
-      config,
-      dispatch,
-      prompt,
-      prepared.repoRoot
-    );
-    logJobEvent({
-      job: JOB,
-      event: agentResult.ok ? 'agent_succeeded' : 'agent_failed',
-      issue: dispatch.issue.number,
-      status: agentResult.status,
-      signal: agentResult.signal,
-      error: agentResult.error,
-      logPath: agentResult.logPath,
-      promptPath: agentResult.promptPath,
-      gbrainSlug: gbrain.captureSlug,
-    });
-
+    // Non-zero exit (but not killed) = genuine failure, mark blocked
     if (!agentResult.ok) {
       markBlocked(
         config,
@@ -773,6 +1171,7 @@ async function dispatchPlan(
           agentResult.error ? `Error: \`${agentResult.error}\`` : null,
           `Log: \`${agentResult.logPath}\``,
           `Prompt: \`${agentResult.promptPath}\``,
+          `State: \`${agentResult.statePath}\``,
         ]
           .filter((line): line is string => line !== null)
           .join('\n')
@@ -780,21 +1179,59 @@ async function dispatchPlan(
       return;
     }
 
-    const pr = findPrForBranch(config, dispatch.branchName);
+    if (!pr) pr = findPrForBranch(config, dispatch.branchName);
+
+    // Deterministic finisher: the agent exited 0 without opening a PR, but
+    // may have left real work in the worktree (grok 0.2.77 abandons the
+    // long ship contract mid-task). Same trust model as the kanban lane —
+    // the model produces the diff, deterministic code owns commit/push/PR.
+    // Pre-commit hooks gate the commit; any failure falls through to the
+    // existing release-for-retry path.
     if (!pr) {
-      markBlocked(
+      try {
+        if (worktreeHasWork(runInWorktree)) {
+          finishDispatch(runInWorktree, {
+            repo: config.repo,
+            branchName: dispatch.branchName,
+            issue: dispatch.issue,
+            logPath: agentResult.logPath,
+            statePath: agentResult.statePath,
+          });
+          pr = findPrForBranch(config, dispatch.branchName);
+          logJobEvent({
+            job: JOB,
+            event: 'deterministic_finish_shipped',
+            issue: dispatch.issue.number,
+            branch: dispatch.branchName,
+            pr: pr?.number,
+          });
+        }
+      } catch (err) {
+        logJobEvent({
+          job: JOB,
+          event: 'deterministic_finish_failed',
+          issue: dispatch.issue.number,
+          branch: dispatch.branchName,
+          error: shortError(err),
+        });
+      }
+    }
+
+    if (!pr) {
+      releaseClaimForRetry(
         config,
         dispatch,
         [
-          `Agent exited 0 but no open PR exists for \`${dispatch.branchName}\`.`,
+          `Agent exited 0 but no open PR exists - releasing claim for retry.`,
           '',
           `Log: \`${agentResult.logPath}\``,
           `Prompt: \`${agentResult.promptPath}\``,
+          `State: \`${agentResult.statePath}\``,
         ].join('\n')
       );
       logJobEvent({
         job: JOB,
-        event: 'missing_pr_after_success',
+        event: 'missing_pr_release_claim',
         issue: plan.issue.number,
         branch: dispatch.branchName,
       });
@@ -812,6 +1249,7 @@ async function dispatchPlan(
           `PR: ${pr.url}`,
           `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
           `Log: \`${agentResult.logPath}\``,
+          `State: \`${agentResult.statePath}\``,
         ].join('\n')
       );
     } catch (err) {
@@ -836,7 +1274,68 @@ async function dispatchPlan(
       successCommentPosted,
     });
   } finally {
+    // Terminal for every path (success, blocked, released, thrown): the
+    // dispatch is no longer in flight, so a restart must not "recover" it.
+    journalEnd(dispatch.issue.number, config.repo);
     cleanupWorktree(config, prepared.repoRoot);
+  }
+}
+
+/**
+ * Restart recovery: release claims journaled by a previous shipper process
+ * that died mid-dispatch (auto-update, crash, kickstart -k). The issue goes
+ * back to the dispatchable pool; the worktree is pruned. Runs once per
+ * process, under the ship-owner lock, before any new dispatch.
+ */
+function recoverStaleJobs(config: ShipperConfig): void {
+  const { stale, live } = planRecovery(readJournal());
+  for (const entry of stale) {
+    try {
+      run(
+        [
+          'gh',
+          'issue',
+          'edit',
+          String(entry.issue),
+          '--repo',
+          entry.repo,
+          '--remove-label',
+          CODEX_CLAIM_LABEL,
+        ],
+        config
+      );
+    } catch {
+      // Label already gone (or gh hiccup) — recovery stays best-effort.
+    }
+    try {
+      commentIssue(
+        config,
+        entry.issue,
+        `Jovie agent (codex issue shipper) restarted mid-dispatch (owner pid ${entry.pid} gone). Claim released for retry.`
+      );
+    } catch {
+      // Comment is informational only.
+    }
+    if (entry.worktree && existsSync(entry.worktree)) {
+      cleanupWorktree(config, entry.worktree);
+    }
+    journalEnd(entry.issue, entry.repo);
+    logJobEvent({
+      job: JOB,
+      event: 'restart_recovered_claim',
+      issue: entry.issue,
+      repo: entry.repo,
+      deadPid: entry.pid,
+      startedAt: entry.startedAt,
+    });
+  }
+  if (stale.length > 0 || live.length > 0) {
+    logJobEvent({
+      job: JOB,
+      event: 'restart_recovery_done',
+      recovered: stale.length,
+      stillLive: live.length,
+    });
   }
 }
 
@@ -866,22 +1365,72 @@ async function dispatchBatch(
 }
 
 async function main(): Promise<void> {
+  try {
+    await runShipper();
+    ghEagainBackoff.reset();
+  } catch (err) {
+    if (err instanceof SpawnEagainError) {
+      await handleSpawnEagain(err, 'shipper');
+      return;
+    }
+    throw err;
+  }
+}
+
+async function runShipper(): Promise<void> {
   loadHermesEnv();
+
+  // Pause sentinel: if the operator has touched ~/.hermes/shipping-paused,
+  // skip this run entirely. Cheap — no GitHub scan, no gbrain, no model call.
+  if (existsSync(PAUSE_SENTINEL)) {
+    logJobEvent({ job: JOB, event: 'paused_skip' });
+    return;
+  }
+
   const repoRoot = detectRepoRoot();
+  if (!repoRoot) {
+    await handleSpawnResourcePressure('detect_repo_root');
+    return;
+  }
+  // #12841: fail-closed when the primary checkout is not clean main at
+  // origin/main. Skipped in dry-run so dev/CI feature-branch worktrees are not
+  // reset or blocked.
+  if (
+    process.env.HERMES_CODEX_SHIPPER_DRY_RUN !== '1' &&
+    !(await gatePrimaryCheckout(repoRoot))
+  ) {
+    return;
+  }
   const repo = detectGithubRepo(repoRoot);
+  if (!repo) {
+    await handleSpawnResourcePressure('detect_github_repo');
+    return;
+  }
   const config = loadShipperConfig(process.env, repoRoot, repo);
 
   await withJobLogging(JOB, async () => {
     const lockResult = await tryWithHeavyJobLock(
       JOB,
       async () => {
+        recoverStaleJobs(config);
         let controlLabelsEnsured = false;
 
         for (;;) {
-          const issues = listCodexIssues(config);
+          const listed = listCodexIssues(config);
+          if (listed.resourceUnavailable) {
+            await handleSpawnResourcePressure('list_codex_issues');
+            return;
+          }
+          const issues = listed.issues;
           const plans = buildDispatchPlans(issues, config);
           const skippedHuman = issues.filter(issue =>
             labelNames(issue).includes(HUMAN_REVIEW_LABEL)
+          ).length;
+          const skippedNoAuto = issues.filter(issue =>
+            labelNames(issue).includes(NO_AUTO_LABEL)
+          ).length;
+          const skippedEpic = issues.filter(issue =>
+            labelNames(issue).includes(EPIC_LABEL)
           ).length;
           const capacity = systemCapacity(config);
           const batch = plans.slice(0, capacity.allowedAgents);
@@ -892,6 +1441,8 @@ async function main(): Promise<void> {
             issueCount: issues.length,
             dispatchableCount: plans.length,
             skippedHuman,
+            skippedNoAuto,
+            skippedEpic,
             batchCount: batch.length,
             maxIssuesPerRun: config.maxIssuesPerRun,
             maxParallelAgents: config.maxParallelAgents,
@@ -936,7 +1487,9 @@ async function main(): Promise<void> {
           await dispatchBatch(config, batch);
         }
       },
-      { staleMs: config.singletonLockStaleMs }
+      // Machine-global lock: profile-scoped HERMES_HOME must not yield two
+      // "singletons" racing one GitHub queue (JovieInc/Jovie#12723).
+      { staleMs: config.singletonLockStaleMs, lockPath: SHIP_OWNER_LOCK }
     );
 
     if (!lockResult.acquired) {
@@ -951,6 +1504,16 @@ async function main(): Promise<void> {
 }
 
 void main().catch(err => {
+  if (err instanceof SpawnResourceUnavailableError) {
+    logJobEvent({
+      job: JOB,
+      event: 'spawn_resource_skip',
+      context: 'main_uncaught',
+      command: err.command,
+      error: err.message,
+    });
+    return;
+  }
   logJobEvent({
     job: JOB,
     event: 'fatal',

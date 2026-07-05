@@ -45,20 +45,8 @@ const MAX_ONLY_MARKETING_FEATURES = [
     entitlement: 'canAccessEmailCampaigns',
   },
   {
-    label: 'Fan subscriptions',
-    entitlement: 'canAccessFanSubscriptions',
-  },
-  {
     label: 'API access',
     entitlement: 'canAccessApiKeys',
-  },
-  {
-    label: 'Team management',
-    entitlement: 'canAccessTeamManagement',
-  },
-  {
-    label: 'White-label / custom domain',
-    entitlement: 'canAccessWhiteLabel',
   },
 ] as const;
 

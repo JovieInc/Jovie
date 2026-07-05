@@ -15,7 +15,7 @@
 #    no-cost success status so CI does not burn tokens or fail inconclusively
 # 5. If the PR diff is unavailable, skips the LLM call and reports a deterministic
 #    no-cost success status so scope-judge never stays pending
-# 6. Reports pass/fail/skip as a commit status (used as required check for auto-approve)
+# 6. Reports pass/fail/skip as a commit status (advisory — not on PR Ready / merge gate)
 #
 # SAFETY:
 # - Read-only: does not modify code, only reports status
@@ -61,7 +61,7 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 

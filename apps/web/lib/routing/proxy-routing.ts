@@ -155,7 +155,8 @@ export function isProxyRewriteExempt(pathname: string): boolean {
  * sharing the cached reference is safe.
  */
 const CATEGORIZE_PATH_CACHE_MAX = 1000;
-const categorizePathCache = new Map<string, PathCategory>();
+/** Exported for test teardown only. Do not call from production code. */
+export const _categorizePathCache = new Map<string, PathCategory>();
 
 /**
  * Categorize a pathname once for all routing decisions.
@@ -163,7 +164,7 @@ const categorizePathCache = new Map<string, PathCategory>();
  * Now also owns public-profile candidate detection (derived from APP_ROUTES).
  */
 export function categorizePath(pathname: string): PathCategory {
-  const cached = categorizePathCache.get(pathname);
+  const cached = _categorizePathCache.get(pathname);
   if (cached) return cached;
   const isAuthPath =
     pathname === APP_ROUTES.SIGNIN ||
@@ -224,12 +225,12 @@ export function categorizePath(pathname: string): PathCategory {
     publicProfileCandidate,
   };
 
-  if (categorizePathCache.size >= CATEGORIZE_PATH_CACHE_MAX) {
+  if (_categorizePathCache.size >= CATEGORIZE_PATH_CACHE_MAX) {
     // FIFO eviction: remove the oldest entry
-    const firstKey = categorizePathCache.keys().next().value;
-    if (firstKey !== undefined) categorizePathCache.delete(firstKey);
+    const firstKey = _categorizePathCache.keys().next().value;
+    if (firstKey !== undefined) _categorizePathCache.delete(firstKey);
   }
-  categorizePathCache.set(pathname, result);
+  _categorizePathCache.set(pathname, result);
   return result;
 }
 
@@ -241,7 +242,8 @@ export function categorizePath(pathname: string): PathCategory {
  * FIFO eviction prevents unbounded growth from fuzz/scan traffic.
  */
 const ANALYZE_HOST_CACHE_MAX = 50;
-const analyzeHostCache = new Map<string, HostInfo>();
+/** Exported for test teardown only. Do not call from production code. */
+export const _analyzeHostCache = new Map<string, HostInfo>();
 
 /**
  * Analyze hostname once for all routing decisions.
@@ -249,7 +251,7 @@ const analyzeHostCache = new Map<string, HostInfo>();
  * Investor portal: /investor-portal (path-based, bypasses Clerk auth)
  */
 export function analyzeHost(hostname: string): HostInfo {
-  const cached = analyzeHostCache.get(hostname);
+  const cached = _analyzeHostCache.get(hostname);
   if (cached) return cached;
   const isDevOrPreview =
     hostname === 'localhost' ||
@@ -270,12 +272,12 @@ export function analyzeHost(hostname: string): HostInfo {
     isInvestorPortal: INVESTOR_HOSTNAMES.has(hostname),
   };
 
-  if (analyzeHostCache.size >= ANALYZE_HOST_CACHE_MAX) {
+  if (_analyzeHostCache.size >= ANALYZE_HOST_CACHE_MAX) {
     // FIFO eviction: remove the oldest entry
-    const firstKey = analyzeHostCache.keys().next().value;
-    if (firstKey !== undefined) analyzeHostCache.delete(firstKey);
+    const firstKey = _analyzeHostCache.keys().next().value;
+    if (firstKey !== undefined) _analyzeHostCache.delete(firstKey);
   }
-  analyzeHostCache.set(hostname, result);
+  _analyzeHostCache.set(hostname, result);
   return result;
 }
 

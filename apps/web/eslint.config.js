@@ -194,7 +194,7 @@ const baseConfig = {
     '@jovie/no-hardcoded-routes': 'error',
     '@jovie/require-query-cache-config': 'error',
     '@jovie/require-abort-signal': 'error',
-    '@jovie/no-raw-motion-values': 'warn',
+    '@jovie/no-raw-motion-values': 'error',
     // Prevent renderer code from reaching past the guarded electron-bridge
     // wrapper — installed binaries may expose a partial bridge.
     '@jovie/no-direct-electron-bridge': 'error',
@@ -203,7 +203,7 @@ const baseConfig = {
     '@jovie/no-banned-marketing-copy': 'error',
     // Design-system focus ring enforcement — interactive elements must use
     // canonical focus-ring-themed or focus-visible:* utilities
-    '@jovie/no-raw-focus-ring': 'warn',
+    '@jovie/no-raw-focus-ring': 'error',
     '@jovie/no-ad-hoc-currency': 'error',
     // clerk-oauth-options-must-include-prompt is scoped to app/(auth)/** via
     // its internal file-path check, so setting 'error' globally is safe — it
@@ -213,8 +213,8 @@ const baseConfig = {
     // DESIGN.md text casing — Title Case labels, sentence case body/toasts/tooltips
     '@jovie/canonical-ui-label-casing': 'error',
     // Contrast guardrail — bare text-black/bg-white without dark: counterpart (JOV-11038)
-    // warn rather than error to avoid blocking legacy code; ratchet is the hard gate
-    '@jovie/no-hardcoded-theme-colors': 'warn',
+    // error at author time; contrast-ratchet counts legacy debt in CI (JOV-3572)
+    '@jovie/no-hardcoded-theme-colors': 'error',
   },
 };
 
@@ -422,6 +422,14 @@ module.exports = [
     ],
     rules: {
       '@jovie/no-ad-hoc-currency': 'off',
+    },
+  },
+  // Experimental shell routes — not production UI; label-casing ratchet deferred (#11251).
+  {
+    files: ['**/app/exp/**/*.{ts,tsx}'],
+    rules: {
+      '@jovie/canonical-ui-label-casing': 'off',
+      '@jovie/no-hardcoded-theme-colors': 'off',
     },
   },
   {

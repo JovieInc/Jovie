@@ -43,6 +43,8 @@ describe('CookieBannerSection', () => {
 
   it.each([
     '/desktop-auth',
+    '/start',
+    '/start/access',
     '/auth/native-complete',
     '/signin',
     '/signin/sso-callback',
@@ -63,10 +65,10 @@ describe('CookieBannerSection', () => {
     expect(banner.className).toContain('fixed');
     expect(banner.className).toContain('bottom-4');
     expect(banner.className).toContain('right-4');
-    expect(banner.className).toContain('max-w-[340px]');
+    expect(banner.className).toContain('max-w-85');
     // Inner card surface matching upgrade compact + floating
     const card = banner.firstChild as HTMLElement;
-    expect(card.className).toContain('rounded-[18px]');
+    expect(card.className).toContain('rounded-2xl');
     expect(card.className).toContain('border-(--linear-app-frame-seam)');
     expect(card.className).toContain('bg-surface-1');
     expect(card.className).toContain('shadow-card');
@@ -98,6 +100,20 @@ describe('CookieBannerSection', () => {
         document.documentElement.style.getPropertyValue('--cookie-banner-h');
       // Non-empty when visible (exact px depends on jsdom layout, but presence + numeric)
       expect(h).toMatch(/^\d/);
+    });
+  });
+
+  // JOV-3555: the published reservation must include the banner's 16px bottom
+  // inset PLUS a 12px separation gap so the public-profile bottom tab nav stacked
+  // above it never abuts/overlaps the banner. jsdom reports 0 measured height, so
+  // the value reduces to 16 + 12 = 28px.
+  it('reserves bottom inset + separation gap above the measured banner height', async () => {
+    setCookie('jv_cc_required=1');
+    render(<CookieBannerSection />);
+    await vi.waitFor(() => {
+      const h =
+        document.documentElement.style.getPropertyValue('--cookie-banner-h');
+      expect(h).toBe('28px');
     });
   });
 

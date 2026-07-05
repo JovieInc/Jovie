@@ -129,6 +129,6 @@ describe('release downloads shell contract', () => {
 
     expect(source).toContain("className='block min-h-9");
     expect(source).toContain('min-h-10');
-    expect(tableSource).toContain("className='min-h-[220px]");
+    expect(tableSource).toContain("className='min-h-55");
   });
 });

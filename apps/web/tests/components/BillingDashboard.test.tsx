@@ -198,7 +198,7 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
-  it('renders plan comparison grid with Free/Pro columns', async () => {
+  it('renders plan comparison grid with Free, Pro, and Max columns', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -211,17 +211,9 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
-    const maxEnabled = process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
-
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
-
-    // Max plan is gated behind NEXT_PUBLIC_FEATURE_MAX_PLAN flag
-    if (maxEnabled) {
-      expect(screen.getByText('Max')).toBeInTheDocument();
-    } else {
-      expect(screen.queryByText('Max')).not.toBeInTheDocument();
-    }
+    expect(screen.getByText('Max')).toBeInTheDocument();
   });
 
   it('shows Current Plan badge on the active plan', async () => {
@@ -355,8 +347,12 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Cancel your subscription?')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Keep Subscription')).toBeInTheDocument();
-    expect(screen.getByText('Yes, Cancel')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Keep Subscription' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Cancel Subscription' })
+    ).toBeInTheDocument();
   });
 
   it('renders partial UI when pricing fails but billing succeeds', async () => {

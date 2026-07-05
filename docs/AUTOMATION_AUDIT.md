@@ -22,6 +22,18 @@ Accepted direction:
 
 No cron or workflow triggers were changed by this decision note.
 
+### 0.1 Product memory runtime split (JOV-2705)
+
+Creator-facing product memory uses a **separate durable stack** from internal AgentOS WDK. Canonical architecture: [`docs/MEMORY_CORE_ARCHITECTURE.md`](MEMORY_CORE_ARCHITECTURE.md). Import boundaries: [`docs/MEMORY_ADR.md`](MEMORY_ADR.md).
+
+| Layer | Internal AgentOS | Product memory |
+| --- | --- | --- |
+| Durable runner | Vercel Workflow/WDK (`workflows/agent-os-dry-run.ts`) | Trigger.dev via `WorkflowRunner` when cross-step durability ships; v0 runs inline |
+| Cognition | Bounded agent adapters + artifact builders | Vercel `eve` via `AgentHarness` (supersedes OpenAI Agents SDK target — #12498; AI SDK Gateway interim for chat/simple extraction) |
+| Store | `AgentRunArtifact`, admin ops tables | Neon `memory_*` via `lib/memory/*` |
+
+**Does not change §0 AgentOS direction:** WDK dry-run proof for the operator control plane remains in flight. Trigger.dev is **not** an AgentOS-WDK-failure fallback for product memory — it is the planned product workflow runner ([JOV-1945](https://linear.app/jovie/issue/JOV-1945)). No cron entries or GitHub Actions triggers were added for memory workflows in this decision.
+
 ---
 
 ## 1. Cron Registry

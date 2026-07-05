@@ -4,7 +4,7 @@ import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
-import { OperatorBanner } from '@/features/admin/OperatorBanner';
+import { OperatorBannerWrapper } from '@/features/admin/OperatorBannerWrapper';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { resolveAppShellRouteFlagNames } from '@/lib/flags/route-snapshots';
@@ -86,7 +86,7 @@ export async function DashboardShellContent({
   const shellContents = (
     <div className='h-full'>
       {/* ENG-004: Show environment issues to admins in non-production */}
-      <OperatorBanner isAdmin={dashboardData.isAdmin} />
+      <OperatorBannerWrapper isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
       <DashboardDataProvider value={dashboardData}>
         <DashboardLoadTracker pathname={pathname} userId={userId} />

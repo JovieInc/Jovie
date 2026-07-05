@@ -17,6 +17,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { db } from '@/lib/db';
+import { suggestedActionStatusEnum } from '@/lib/db/schema/enums';
 import {
   reconcileOrphanedAcceptedActions,
   recoverOrphanedApprovedAction,
@@ -69,7 +70,7 @@ describe('recoverOrphanedApprovedAction', () => {
     mockSelectChain([
       {
         id: ACTION_ID,
-        status: 'dismissed',
+        status: 'rejected',
         userId: USER_ID,
         payload: {},
       },
@@ -92,7 +93,7 @@ describe('recoverOrphanedApprovedAction', () => {
           ? [
               {
                 id: ACTION_ID,
-                status: 'accepted',
+                status: 'approved',
                 userId: USER_ID,
                 payload: { title: 'Show' },
               },
@@ -124,7 +125,7 @@ describe('recoverOrphanedApprovedAction', () => {
           ? [
               {
                 id: ACTION_ID,
-                status: 'accepted',
+                status: 'approved',
                 userId: USER_ID,
                 payload: { title: 'Show' },
               },
@@ -167,7 +168,7 @@ describe('recoverOrphanedApprovedAction', () => {
           ? [
               {
                 id: ACTION_ID,
-                status: 'accepted',
+                status: 'approved',
                 userId: USER_ID,
                 payload: { title: 'Show' },
               },
@@ -195,6 +196,18 @@ describe('recoverOrphanedApprovedAction', () => {
 describe('reconcileOrphanedAcceptedActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('uses migration 0048 suggested_action_status values (approved, not accepted)', () => {
+    expect(suggestedActionStatusEnum.enumValues).toEqual([
+      'pending',
+      'approved',
+      'executed',
+      'rejected',
+      'failed',
+      'expired',
+    ]);
+    expect(suggestedActionStatusEnum.enumValues).not.toContain('accepted');
   });
 
   it('returns empty results when connector workflow tables are not migrated', async () => {

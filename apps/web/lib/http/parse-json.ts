@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { captureError, captureWarning } from '@/lib/error-tracking';
+import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 
 interface ParseJsonOptions<T> {
   route: string;
@@ -104,7 +105,7 @@ export async function parseJsonBody<T = unknown>(
   // Check Content-Length header first for early rejection
   const contentLength = request.headers.get('content-length');
   if (contentLength && Number.parseInt(contentLength, 10) > maxBodySize) {
-    captureWarning(`[${options.route}] Request body too large`, {
+    logger.warn(`[${options.route}] Request body too large`, {
       contentLength,
       maxBodySize,
     });
@@ -126,7 +127,7 @@ export async function parseJsonBody<T = unknown>(
 
   // Check if body exceeded limit during streaming read
   if (exceeded) {
-    captureWarning(`[${options.route}] Request body exceeds size limit`, {
+    logger.warn(`[${options.route}] Request body exceeds size limit`, {
       actualSize,
       maxBodySize,
     });

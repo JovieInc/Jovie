@@ -85,7 +85,7 @@ export function SmartLinkAudioPreview({
           onClick={handleToggle}
           aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
           aria-pressed={isPlaying}
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/90 text-black transition-colors duration-fast hover:bg-white active:bg-white/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70'
+          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/90 text-black dark:text-white transition-colors duration-fast hover:bg-white active:bg-white/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70'
         >
           {isPlaying ? (
             <Pause className='h-3 w-3' />
@@ -100,9 +100,9 @@ export function SmartLinkAudioPreview({
             duration={duration}
             onSeek={seek}
             disabled={false}
-            className='h-[3px] w-full'
+            className='h-1 w-full'
           />
-          <div className='flex items-center justify-between text-[10px] tabular-nums text-white/35'>
+          <div className='flex items-center justify-between text-3xs tabular-nums text-white/35'>
             <span>{currentTimeFormatted}</span>
             <span>
               {durationFormatted}
@@ -112,7 +112,7 @@ export function SmartLinkAudioPreview({
         </div>
       </div>
       {fallbackSourceLabel ? (
-        <p className='text-[10px] text-white/45'>{fallbackSourceLabel}</p>
+        <p className='text-3xs text-white/45'>{fallbackSourceLabel}</p>
       ) : null}
     </div>
   );

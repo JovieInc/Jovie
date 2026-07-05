@@ -24,7 +24,7 @@ const MARKDOWN_STYLES = cn(
 
   // Blockquotes with subtle styling
   '[&_blockquote]:my-10 [&_blockquote]:relative [&_blockquote]:pl-6',
-  '[&_blockquote]:before:absolute [&_blockquote]:before:left-0 [&_blockquote]:before:top-0 [&_blockquote]:before:bottom-0 [&_blockquote]:before:w-[3px] [&_blockquote]:before:rounded-full [&_blockquote]:before:bg-border-strong',
+  '[&_blockquote]:before:absolute [&_blockquote]:before:left-0 [&_blockquote]:before:top-0 [&_blockquote]:before:bottom-0 [&_blockquote]:before:w-1 [&_blockquote]:before:rounded-full [&_blockquote]:before:bg-border-strong',
   '[&_blockquote_p]:text-lg [&_blockquote_p]:text-secondary-token [&_blockquote_p]:italic [&_blockquote_p]:mb-0',
 
   // Lists with proper spacing
@@ -40,7 +40,7 @@ const MARKDOWN_STYLES = cn(
   '[&_ol>li::marker]:text-tertiary-token [&_ol>li::marker]:font-medium',
 
   // Links with subtle underline
-  '[&_a]:text-primary-token [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-4 [&_a]:decoration-border-default [&_a]:transition-colors [&_a]:duration-200',
+  '[&_a]:text-primary-token [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-4 [&_a]:decoration-border-default [&_a]:transition-colors [&_a]:duration-subtle',
   'hover:[&_a]:decoration-primary-token',
 
   // Strong/bold text

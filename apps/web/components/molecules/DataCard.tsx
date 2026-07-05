@@ -24,15 +24,15 @@ export function DataCard({
 }: DataCardProps) {
   const badgeClasses = {
     default: 'bg-surface-hover text-secondary',
-    success: 'bg-[var(--color-success-subtle)] text-[var(--color-success)]',
-    warning: 'bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
-    error: 'bg-[var(--color-error-subtle)] text-[var(--color-error)]',
+    success: 'bg-success-subtle text-success',
+    warning: 'bg-warning-subtle text-warning',
+    error: 'bg-error-subtle text-error',
   };
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between rounded-[10px] border border-subtle bg-surface-1 p-3 shadow-card transition-colors',
+        'flex items-center justify-between rounded-lg border border-subtle bg-surface-1 p-3 shadow-card transition-colors',
         className
       )}
     >

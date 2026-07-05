@@ -123,6 +123,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.supabase.in' },
       { protocol: 'https', hostname: 'vercel.live' },
       { protocol: 'https', hostname: 'vercel.com' },
+      { protocol: 'https', hostname: 'www.googletagmanager.com' }, // GTM conversion tracking pixels
     ],
     formats: ['image/avif', 'image/webp'],
     qualities: [25, 50, 75, 85, 100],
@@ -260,6 +261,7 @@ const nextConfig = {
     ];
 
     const legacyAppRedirects = [
+      { source: '/account', destination: '/app/settings/account' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
       // NOTE: shell-owned aliases such as /app/profile, /app/tipping,
@@ -455,6 +457,8 @@ const nextConfig = {
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
     turbopackFileSystemCacheForDev: true,
+    // Enable auth interrupts for unauthorized()/forbidden() in server components
+    authInterrupts: true,
     // Cache client-side RSC responses to prevent skeleton flashes on navigation.
     // Next.js 15+ defaults dynamic routes to 0s (always re-fetch), which causes
     // unnecessary skeleton loaders on every page switch. Mutations that need

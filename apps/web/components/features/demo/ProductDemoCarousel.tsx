@@ -73,9 +73,9 @@ export function ProductDemoCarousel() {
           onClick={handleAdvance}
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
-          aria-label='Next slide'
+          aria-label='Next Slide'
         >
-          <div className='relative aspect-[1440/900] w-full overflow-hidden bg-black'>
+          <div className='relative aspect-[1440/900] w-full overflow-hidden bg-black dark:bg-black'>
             <AnimatePresence mode='wait'>
               <motion.div
                 key={slide.id}
@@ -112,7 +112,7 @@ export function ProductDemoCarousel() {
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.4, delay: 0.3 }}
               >
-                <p className='text-lg font-semibold tracking-tight text-white sm:text-xl md:text-2xl'>
+                <p className='text-lg font-semibold tracking-tight text-white dark:text-white sm:text-xl md:text-2xl'>
                   {slide.caption}
                 </p>
               </motion.div>

@@ -5,7 +5,12 @@ import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  ComposerFocusProvider,
+  useComposerFocus,
+} from '@/components/features/chat/Composer';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
+import * as largeTextPaste from '@/lib/chat/large-text-paste';
 import { fastRender } from '@/tests/utils/fast-render';
 
 function withProviders(ui: ReactNode) {
@@ -168,11 +173,11 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
   });
 
-  it('opens the attachment dropdown when clicking the plus button', async () => {
+  it('opens the file attach menu when clicking the plus button', async () => {
     const user = userEvent.setup();
-    const onImageAttach = vi.fn();
+    const onFileAttach = vi.fn();
     const { getByRole } = fastRender(
-      withProviders(<ChatInput {...baseProps} onImageAttach={onImageAttach} />)
+      withProviders(<ChatInput {...baseProps} onFileAttach={onFileAttach} />)
     );
 
     const textarea = getByRole('textbox', { name: /chat message input/i });
@@ -180,12 +185,12 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
 
     // Click the plus button to open the attachment dropdown
-    await user.click(getByRole('button', { name: /attachment options/i }));
+    await user.click(getByRole('button', { name: /Attach Files/i }));
 
     // Dropdown menu receives focus when opened (standard Radix behavior)
     expect(getByRole('menu')).toBeInTheDocument();
     expect(
-      getByRole('menuitem', { name: /attach image/i })
+      getByRole('menuitem', { name: /Attach Files/i })
     ).toBeInTheDocument();
     expect(screen.queryByText('Attachments')).not.toBeInTheDocument();
     expect(
@@ -196,10 +201,10 @@ describe('ChatInput', () => {
 
   it('keeps composer controls at stable dimensions while using heavier icons', () => {
     const { getByRole } = fastRender(
-      withProviders(<ChatInput {...baseProps} onImageAttach={vi.fn()} />)
+      withProviders(<ChatInput {...baseProps} onFileAttach={vi.fn()} />)
     );
 
-    const attachButton = getByRole('button', { name: /attachment options/i });
+    const attachButton = getByRole('button', { name: /Attach Files/i });
     const sendButton = getByRole('button', { name: /send message/i });
 
     expect(attachButton.className).toContain('h-9');
@@ -278,7 +283,7 @@ describe('ChatInput', () => {
   it('renders the tokenized composer geometry', () => {
     fastRender(
       withProviders(
-        <ChatInput {...baseProps} value='' onImageAttach={vi.fn()} />
+        <ChatInput {...baseProps} value='' onFileAttach={vi.fn()} />
       )
     );
 
@@ -302,7 +307,7 @@ describe('ChatInput', () => {
     });
 
     for (const buttonName of [
-      /attachment options/i,
+      /Attach Files/i,
       /dictation unavailable/i,
       /send message/i,
     ]) {
@@ -319,13 +324,13 @@ describe('ChatInput', () => {
           {...baseProps}
           value=''
           variant='hero'
-          onImageAttach={vi.fn()}
+          onFileAttach={vi.fn()}
         />
       )
     );
 
     const attachButton = screen.getByRole('button', {
-      name: /attachment options/i,
+      name: /Attach Files/i,
     });
     const inlineField = screen.getByTestId('chat-input-inline-field');
 
@@ -340,7 +345,7 @@ describe('ChatInput', () => {
         <ChatInput
           {...baseProps}
           value=''
-          onImageAttach={vi.fn()}
+          onFileAttach={vi.fn()}
           variant='hero'
         />
       )
@@ -348,11 +353,11 @@ describe('ChatInput', () => {
 
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.getAttribute('data-variant')).toBe('hero');
-    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 840px)');
-    expect(surface.style.borderRadius).toBe('36px');
+    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 45rem)');
+    expect(surface.style.borderRadius).toBe('999px');
 
-    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-[52px]'
+    expect(screen.getByTestId('chat-composer-input-row').className).toContain(
+      'min-h-13'
     );
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
@@ -371,54 +376,89 @@ describe('ChatInput', () => {
         <ChatInput
           {...baseProps}
           value='draft message'
-          onImageAttach={vi.fn()}
+          onFileAttach={vi.fn()}
           variant='hero'
         />
       )
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.style.borderRadius).toBe('36px');
+    expect(surface.style.borderRadius).toBe('24px');
 
-    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-[88px]'
-    );
-    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'grid'
-    );
+    const inputRow = screen.getByTestId('chat-composer-input-row');
+    expect(inputRow.className).toContain('grid');
+    expect(inputRow.className).toContain('content-start');
+    expect(inputRow.className).not.toContain('min-h-22');
   });
 
-  it('renders the grid layout (not pill) for hero variant when pending images are present', () => {
-    const pendingImages = [
+  it('keeps hero pill geometry when only external attachments are present', () => {
+    const pendingFiles = [
       {
         id: 'p1',
-        name: 'preview.png',
-        mediaType: 'image/png',
-        previewUrl: 'blob:mock',
-        dataUrl: 'data:image/png;base64,AAAA',
-      },
+        name: 'track.wav',
+        size: 1024,
+        mediaType: 'audio/wav',
+        kind: 'audio',
+        progress: 100,
+        speed: 0,
+        status: 'ready',
+        kindLabel: 'WAV · audio',
+      } as const,
     ];
     fastRender(
       withProviders(
         <ChatInput
           {...baseProps}
           value=''
-          onImageAttach={vi.fn()}
-          pendingImages={pendingImages}
-          onRemoveImage={vi.fn()}
+          onFileAttach={vi.fn()}
+          pendingFiles={pendingFiles}
+          onRemoveFile={vi.fn()}
           variant='hero'
         />
       )
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.style.borderRadius).toBe('36px'); // geometry still 36 for hero non-entity
+    expect(surface.style.borderRadius).toBe('999px');
+    expect(surface).not.toHaveAttribute('data-expanded');
+
+    const inputRow = screen.getByTestId('chat-composer-input-row');
+    expect(inputRow.className).toContain('min-h-13');
+    expect(inputRow.className).not.toContain('grid');
+  });
+
+  it('does not inflate the textarea row when typing with a ready audio attachment', () => {
+    const pendingFiles = [
+      {
+        id: 'a1',
+        name: 'demo.wav',
+        size: 2048,
+        mediaType: 'audio/wav',
+        kind: 'audio',
+        progress: 100,
+        speed: 0,
+        status: 'ready',
+        kindLabel: 'WAV · audio',
+      } as const,
+    ];
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value='transcribe this clip'
+          onFileAttach={vi.fn()}
+          pendingFiles={pendingFiles}
+          onRemoveFile={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
-    const container = inlineField.parentElement;
-    expect(container?.className).toContain('min-h-[88px]');
-    expect(container?.className).toContain('grid');
-    expect(container?.className).not.toContain('min-h-[52px]');
+    const inputRow = inlineField.parentElement;
+    expect(inputRow?.className).toContain('content-start');
+    expect(inputRow?.className).not.toContain('min-h-22');
+    expect(inlineField.className).not.toContain('min-h-7');
   });
 
   it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
@@ -713,6 +753,72 @@ describe('ChatInput', () => {
     });
 
     await waitFor(() => expect(sendButton).toBeEnabled());
+  });
+
+  it('routes very large text pastes through the chunked insert helper', () => {
+    const insertSpy = vi.spyOn(largeTextPaste, 'insertLargeTextAtCaret');
+    const onChange = vi.fn();
+    const largePaste = 'z'.repeat(5000);
+
+    fastRender(
+      withProviders(
+        <ChatInput {...baseProps} value='hello' onChange={onChange} />
+      )
+    );
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    }) as HTMLTextAreaElement;
+    textarea.setSelectionRange(5, 5);
+
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) => (type === 'text/plain' ? largePaste : ''),
+      },
+    });
+
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+    expect(insertSpy.mock.calls[0]?.[0]).toMatchObject({
+      pastedText: largePaste,
+      currentValue: 'hello',
+    });
+    insertSpy.mockRestore();
+  });
+
+  it('registers composer focus with the shell and exits on Escape', async () => {
+    const user = userEvent.setup();
+
+    function ShellFocusProbe() {
+      const { isComposerFocused } = useComposerFocus();
+      return (
+        <div data-testid='shell-focus-state'>
+          {isComposerFocused ? 'focused' : 'idle'}
+        </div>
+      );
+    }
+
+    fastRender(
+      withProviders(
+        <ComposerFocusProvider>
+          <ShellFocusProbe />
+          <ControlledChatInputHarness />
+        </ComposerFocusProvider>
+      )
+    );
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+
+    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('idle');
+    await user.click(textarea);
+    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent(
+      'focused'
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('shell-focus-state')).toHaveTextContent('idle');
+    expect(textarea).not.toHaveFocus();
   });
 
   it('shows the stop action while streaming even when the draft is empty', async () => {

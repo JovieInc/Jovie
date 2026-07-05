@@ -196,6 +196,60 @@ describe('staging Clerk key resolution', () => {
     await expect(resolvePublishableKeyFromHeaders()).resolves.toBeUndefined();
   });
 
+  describe('resolveClerkKeys memoization (#10992)', () => {
+    it('caches ok results so env reads are not repeated on the hot path', () => {
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+
+      const first = resolveClerkKeys('staging.jov.ie');
+      delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+      delete process.env.CLERK_SECRET_KEY_STAGING;
+
+      const second = resolveClerkKeys('staging.jov.ie');
+      expect(second).toBe(first);
+      expect(second.publishableKey).toBe('pk_live_staging_example');
+    });
+
+    it('does not cache staging_missing so a later secret key can resolve', () => {
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+
+      expect(resolveClerkKeys('staging.jov.ie').status).toBe('staging_missing');
+
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+      expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+        publishableKey: 'pk_live_staging_example',
+        secretKey: 'sk_live_staging_example',
+        status: 'ok',
+      });
+    });
+
+    it('does not cache staging_inherits_prod so a corrected env can resolve', () => {
+      expect(resolveClerkKeys('staging.jov.ie').status).toBe(
+        'staging_inherits_prod'
+      );
+
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+      expect(resolveClerkKeys('staging.jov.ie').status).toBe('ok');
+    });
+
+    it('bounds the cache with FIFO eviction at 50 hostnames', () => {
+      process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
+      process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+
+      const evictedHost = 'memo-evict-probe.example';
+      const first = resolveClerkKeys(evictedHost);
+      expect(resolveClerkKeys(evictedHost)).toBe(first);
+
+      for (let i = 0; i < 50; i++) {
+        resolveClerkKeys(`memo-filler-${i}.example`);
+      }
+
+      expect(_resolveClerkKeysCache.size).toBe(50);
+      expect(resolveClerkKeys(evictedHost)).not.toBe(first);
+    });
+  });
+
   it('prefers the middleware-injected publishable key header when present', async () => {
     headersMock.mockResolvedValue(
       new Headers({
@@ -214,6 +268,8 @@ describe('staging Clerk key resolution', () => {
 
 describe('resolvePublishableKeyStaticFirst', () => {
   const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
+  const ORIGINAL_CLERK_MOCK = process.env.NEXT_PUBLIC_CLERK_MOCK;
+  const ORIGINAL_E2E_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS;
 
   beforeEach(() => {
     headersMock.mockReset();
@@ -223,6 +279,8 @@ describe('resolvePublishableKeyStaticFirst', () => {
     process.env.CLERK_SECRET_KEY = 'sk_live_production_example';
     delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
     delete process.env.CLERK_SECRET_KEY_STAGING;
+    delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
   });
 
   afterEach(() => {
@@ -230,6 +288,16 @@ describe('resolvePublishableKeyStaticFirst', () => {
       delete process.env.VERCEL_ENV;
     } else {
       process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
+    }
+    if (ORIGINAL_CLERK_MOCK === undefined) {
+      delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    } else {
+      process.env.NEXT_PUBLIC_CLERK_MOCK = ORIGINAL_CLERK_MOCK;
+    }
+    if (ORIGINAL_E2E_BYPASS === undefined) {
+      delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+    } else {
+      process.env.E2E_USE_TEST_AUTH_BYPASS = ORIGINAL_E2E_BYPASS;
     }
     if (
       process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ===
@@ -301,6 +369,38 @@ describe('resolvePublishableKeyStaticFirst', () => {
 
     const result = await resolvePublishableKeyStaticFirst();
     expect(result).toBeUndefined();
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the build-time key in Clerk mock mode without calling headers()', async () => {
+    process.env.VERCEL_ENV = 'development';
+    process.env.NEXT_PUBLIC_CLERK_MOCK = '1';
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the runtime key for CI smoke bypass without calling headers()', async () => {
+    process.env.VERCEL_ENV = 'development';
+    delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
+    expect(headersMock).not.toHaveBeenCalled();
+  });
+
+  it('reads E2E_USE_TEST_AUTH_BYPASS via runtime env lookup for standalone smoke servers', async () => {
+    process.env.VERCEL_ENV = 'development';
+    delete process.env.NEXT_PUBLIC_CLERK_MOCK;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+    (process.env as Record<string, string | undefined>)[
+      'E2E_USE_TEST_AUTH_BYPASS'
+    ] = '1';
+
+    const result = await resolvePublishableKeyStaticFirst();
+    expect(result).toBe('pk_live_production_example');
     expect(headersMock).not.toHaveBeenCalled();
   });
 

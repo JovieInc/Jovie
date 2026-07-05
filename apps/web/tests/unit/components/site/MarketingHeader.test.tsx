@@ -18,13 +18,19 @@ describe('MarketingHeader', () => {
     mockUsePathname.mockReturnValue('/about');
   });
 
-  it('renders only logo and auth actions by default on standard routes', () => {
+  it('renders marketing center navigation by default on standard routes', () => {
     render(<MarketingHeader />);
 
-    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Pricing' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
+    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
+      'href',
+      '/support'
+    );
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
       '/signin'
@@ -34,20 +40,14 @@ describe('MarketingHeader', () => {
     ).toHaveAttribute('href', '/signup');
   });
 
-  it('does not mount flyout menus when center navigation is disabled', () => {
-    const { container } = render(<MarketingHeader />);
-    const featuresFlyout = container.querySelector(
-      '#marketing-header-flyout-features'
-    );
-    const resourcesFlyout = container.querySelector(
-      '#marketing-header-flyout-resources'
-    );
+  it('shows flyout menu triggers when center navigation is enabled by default', () => {
+    render(<MarketingHeader />);
 
-    expect(featuresFlyout).toBeNull();
-    expect(resourcesFlyout).toBeNull();
+    expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
   });
 
-  it('keeps explicit custom nav links hidden until the shared nav flag is enabled', () => {
+  it('renders explicit custom nav links when the shared nav flag is enabled by default', () => {
     render(
       <MarketingHeader
         navLinks={[
@@ -58,8 +58,14 @@ describe('MarketingHeader', () => {
     );
 
     expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Product' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Pricing' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
   });
 
   it('hides inline glass auth on mobile when a mobile nav is present', () => {

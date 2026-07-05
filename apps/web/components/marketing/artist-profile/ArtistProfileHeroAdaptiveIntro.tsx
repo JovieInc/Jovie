@@ -21,14 +21,14 @@ export function ArtistProfileHeroAdaptiveIntro({
   showForgeUiMarketingUpdates = false,
 }: Readonly<ArtistProfileHeroAdaptiveIntroProps>) {
   return (
-    <div className='relative overflow-x-clip bg-black'>
+    <div className='relative overflow-x-clip bg-black dark:bg-black'>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
         <ArtistProfileHero hero={hero} />
       </div>
 
       <div
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}
-        className='relative bg-black pb-16 pt-2 sm:pb-10 sm:pt-4 lg:pb-12 lg:pt-6'
+        className='relative bg-black dark:bg-black pb-16 pt-2 sm:pb-10 sm:pt-4 lg:pb-12 lg:pt-6'
       >
         <MarketingContainer
           width='page'
@@ -53,7 +53,7 @@ export function ArtistProfileHeroAdaptiveIntro({
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}
         className='relative z-30 lg:-mt-28 xl:-mt-32'
       >
-        <HomeTrustSection label='Trusted by Artists' />
+        <HomeTrustSection label='Trusted By Artists' />
       </div>
 
       <style>{`

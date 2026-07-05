@@ -1,3 +1,5 @@
+import { PROFILE_HERO_COMPOSITION_CLASSNAME } from '@/lib/profile/composition';
+
 /**
  * Profile loading skeleton — matches the V2 ProfileViewportShell + ArtistHero + ProfileScrollBody layout.
  * Full-bleed hero gradient at top, then rounded panel placeholders in the scroll body zone.
@@ -5,13 +7,13 @@
 export function ProfileSkeleton() {
   const pulse = 'animate-pulse motion-reduce:animate-none';
   const panelClass =
-    'rounded-[var(--profile-card-radius)] bg-white/[0.04] backdrop-blur-sm';
+    'rounded-(--profile-card-radius) bg-white/[0.04] backdrop-blur-sm';
 
   return (
     <output
-      className='relative min-h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-white/90'
+      className='relative min-h-dvh overflow-hidden bg-(--profile-stage-bg) text-white/90'
       aria-busy='true'
-      aria-label='Loading Jovie profile'
+      aria-label='Loading Jovie Profile'
     >
       {/* Ambient background blur placeholder */}
       <div className='absolute inset-0' aria-hidden='true'>
@@ -19,11 +21,13 @@ export function ProfileSkeleton() {
       </div>
 
       {/* Viewport shell */}
-      <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:items-center md:px-6 md:py-8'>
-        <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-[var(--profile-shell-card-radius)] md:border md:border-white/[0.06]'>
-          {/* Hero placeholder — matches ArtistHero height */}
+      <div className='relative mx-auto flex min-h-dvh w-full max-w-170 items-stretch justify-center md:items-center md:px-6 md:py-8'>
+        <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-(--profile-shell-card-radius) md:border md:border-white/[0.06]'>
+          {/* Hero placeholder — matches the ArtistHero composition shape
+              (#11899: fixed 16/7 crop + 240px floor) so skeleton → loaded
+              causes zero layout shift. */}
           <div
-            className={`relative h-[48dvh] max-h-[620px] min-h-[420px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[var(--profile-shell-card-radius)] xl:max-h-[640px] 2xl:max-h-[680px] ${pulse}`}
+            className={`relative overflow-hidden md:rounded-t-[var(--profile-shell-card-radius)] ${PROFILE_HERO_COMPOSITION_CLASSNAME} ${pulse}`}
           >
             {/* Gradient overlay: artistic dark hero fade — intentional profile-stage values */}
             <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(18,20,26,0.6)_50%,rgba(10,11,14,0.95)_100%)]' />
@@ -32,14 +36,14 @@ export function ProfileSkeleton() {
             <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6'>
               <div className='flex justify-between gap-3'>
                 <div
-                  className={`h-[52px] w-[90px] rounded-full bg-white/[0.06] ${pulse}`}
+                  className={`h-13 w-23 rounded-full bg-white/[0.06] ${pulse}`}
                 />
                 <div className='flex items-center gap-2'>
                   <div
                     className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
                   />
                   <div
-                    className={`h-11 w-[76px] rounded-full bg-white/[0.06] ${pulse}`}
+                    className={`h-11 w-19 rounded-full bg-white/[0.06] ${pulse}`}
                   />
                   <div
                     className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
@@ -59,7 +63,7 @@ export function ProfileSkeleton() {
                     />
                   </div>
                   <div
-                    className={`h-11 w-[88px] shrink-0 rounded-full bg-white/[0.06] ${pulse}`}
+                    className={`h-11 w-22 shrink-0 rounded-full bg-white/[0.06] ${pulse}`}
                   />
                 </div>
                 {/* Primary action placeholder (e.g. Get Tickets, Listen) */}

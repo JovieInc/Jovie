@@ -10,7 +10,9 @@ const suggestionSources = [
 ];
 
 const transformPressPatterns = [
-  /\bactive:scale(?:-\[[^\]]+\]|-\d+)?\b/,
+  /\bhover:scale(?:-\[[^\]]+\]|-\d+)?\b/,
+  /\bhover:translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
+  /\bhover:-translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
   /\btransition-all\b/,
   /\btransition-transform\b/,
   /\btransition-\[[^\]]*transform[^\]]*\]/,
@@ -27,7 +29,7 @@ describe('dashboard universal link suggestion System B guard', () => {
       expect(offenders, `${sourcePath} leaked ${offenders.join(', ')}`).toEqual(
         []
       );
-      expect(source).toContain('min-h-[44px]');
+      expect(source).toContain('min-h-11');
       expect(source).toContain('transition-[background-color,color]');
       expect(source).toContain('active:bg-surface-2');
     }

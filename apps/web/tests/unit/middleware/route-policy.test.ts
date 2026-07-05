@@ -6,9 +6,12 @@
  * These tests assert the classification bugfix: /start, /pricing, /about,
  * /investors etc NEVER trigger the public-profile audience block DB path.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  _analyzeHostCache,
+  _categorizePathCache,
+  analyzeHost,
   categorizePath,
   getPublicProfileCandidate,
   isProxyRewriteExempt,
@@ -88,6 +91,73 @@ describe('route-policy (proxy-routing)', () => {
       expect(isProxyRewriteExempt('/onboarding')).toBe(true);
       expect(isProxyRewriteExempt('/onboarding/checkout')).toBe(true);
       expect(isProxyRewriteExempt('/pricing')).toBe(false);
+    });
+  });
+});
+
+describe('proxy-routing memoization (#10992)', () => {
+  afterEach(() => {
+    _categorizePathCache.clear();
+    _analyzeHostCache.clear();
+  });
+
+  describe('categorizePath cache', () => {
+    it('returns the same object reference on repeated calls (cache hit)', () => {
+      const first = categorizePath('/timwhite');
+      const second = categorizePath('/timwhite');
+      expect(second).toBe(first);
+    });
+
+    it('returns a fresh result for a different pathname', () => {
+      const a = categorizePath('/timwhite');
+      const b = categorizePath('/joviewhite');
+      expect(b).not.toBe(a);
+    });
+
+    it('bounds the cache at 1000 entries with FIFO eviction', () => {
+      // Seed a reference entry
+      const evictedPath = '/memo-evict-probe-path';
+      const first = categorizePath(evictedPath);
+      expect(categorizePath(evictedPath)).toBe(first);
+
+      // Fill 1000 entries so evictedPath is pushed out
+      for (let i = 0; i < 1000; i++) {
+        categorizePath(`/memo-filler-user-${i}`);
+      }
+
+      expect(_categorizePathCache.size).toBe(1000);
+      // The evicted entry is no longer the same reference
+      expect(categorizePath(evictedPath)).not.toBe(first);
+    });
+  });
+
+  describe('analyzeHost cache', () => {
+    it('returns the same object reference on repeated calls (cache hit)', () => {
+      const first = analyzeHost('jov.ie');
+      const second = analyzeHost('jov.ie');
+      expect(second).toBe(first);
+    });
+
+    it('returns a fresh result for a different hostname', () => {
+      const a = analyzeHost('jov.ie');
+      const b = analyzeHost('staging.jov.ie');
+      expect(b).not.toBe(a);
+    });
+
+    it('bounds the cache at 50 entries with FIFO eviction', () => {
+      // Seed a reference entry
+      const evictedHost = 'memo-evict-probe.example';
+      const first = analyzeHost(evictedHost);
+      expect(analyzeHost(evictedHost)).toBe(first);
+
+      // Fill 50 entries so evictedHost is pushed out
+      for (let i = 0; i < 50; i++) {
+        analyzeHost(`memo-filler-${i}.example`);
+      }
+
+      expect(_analyzeHostCache.size).toBe(50);
+      // The evicted entry is no longer the same reference
+      expect(analyzeHost(evictedHost)).not.toBe(first);
     });
   });
 });

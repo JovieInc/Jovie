@@ -50,18 +50,25 @@ enum AvatarImageLoader {
   }
 }
 
-struct DashboardAvatarView: View {
-  let name: String
-  let avatarURL: URL?
+/// Cache-first remote image view shared by dashboard avatars and chat entity
+/// chip thumbnails (GH-12708). Seeds `@State` from `AvatarImageCache` in
+/// `init` so re-appearance never flashes the fallback placeholder.
+struct CachedRemoteImageView<Fallback: View>: View {
+  let imageURL: URL?
+  let size: CGFloat
+  @ViewBuilder let fallback: () -> Fallback
 
   @State private var image: UIImage?
 
-  init(name: String, avatarURL: URL?) {
-    self.name = name
-    self.avatarURL = avatarURL
-    // Seed from cache synchronously so a previously-loaded avatar shows on the
-    // very first frame — no placeholder flash on re-appearance.
-    _image = State(initialValue: avatarURL.flatMap(AvatarImageCache.image(for:)))
+  init(
+    imageURL: URL?,
+    size: CGFloat,
+    @ViewBuilder fallback: @escaping () -> Fallback
+  ) {
+    self.imageURL = imageURL
+    self.size = size
+    self.fallback = fallback
+    _image = State(initialValue: imageURL.flatMap(AvatarImageCache.image(for:)))
   }
 
   var body: some View {
@@ -72,50 +79,56 @@ struct DashboardAvatarView: View {
           .scaledToFill()
           .transition(.opacity)
       } else {
-        fallback
+        fallback()
       }
     }
-    .frame(width: 28, height: 28)
+    .frame(width: size, height: size)
     .clipShape(Circle())
-    .overlay(Circle().stroke(JovieColor.borderDefault, lineWidth: 1))
     .animation(.easeOut(duration: 0.2), value: image == nil)
-    .task(id: avatarURL) { await load() }
+    .task(id: imageURL) { await load() }
   }
 
   @MainActor
   private func load() async {
-    guard let avatarURL else {
+    guard let imageURL else {
       image = nil
       return
     }
 
-    if let cached = AvatarImageCache.image(for: avatarURL) {
+    if let cached = AvatarImageCache.image(for: imageURL) {
       if image == nil {
         image = cached
       }
       return
     }
 
-    guard let loaded = await AvatarImageLoader.load(avatarURL) else {
+    guard let loaded = await AvatarImageLoader.load(imageURL) else {
       return
     }
 
     image = loaded
   }
+}
 
-  private var fallback: some View {
-    ZStack {
-      Circle().fill(JovieColor.surface1)
-      Text(String(name.prefix(1)).uppercased())
-        .font(JovieFont.body(size: 13, weight: .semibold))
-        .foregroundStyle(JovieColor.textPrimary)
+struct DashboardAvatarView: View {
+  let name: String
+  let avatarURL: URL?
+
+  var body: some View {
+    CachedRemoteImageView(imageURL: avatarURL, size: 28) {
+      ZStack {
+        Circle().fill(JovieColor.surface1)
+        Text(String(name.prefix(1)).uppercased())
+          .font(JovieFont.body(size: 13, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+      }
     }
+    .overlay(Circle().stroke(JovieColor.borderDefault, lineWidth: 1))
   }
 }
 
 struct DashboardView: View {
   let state: DashboardLoadState
-  let isOffline: Bool
   let brightnessManager: BrightnessControlling
   let showVenueModeOnLaunch: Bool
   let loadAppleWalletProfilePass: @Sendable () async throws -> Data
@@ -130,7 +143,6 @@ struct DashboardView: View {
 
   init(
     state: DashboardLoadState,
-    isOffline: Bool,
     brightnessManager: BrightnessControlling,
     showVenueModeOnLaunch: Bool = false,
     loadAppleWalletProfilePass: @escaping @Sendable () async throws -> Data = {
@@ -139,7 +151,6 @@ struct DashboardView: View {
     onRetry: @escaping () async -> Void
   ) {
     self.state = state
-    self.isOffline = isOffline
     self.brightnessManager = brightnessManager
     self.showVenueModeOnLaunch = showVenueModeOnLaunch
     self.loadAppleWalletProfilePass = loadAppleWalletProfilePass
@@ -216,15 +227,6 @@ struct DashboardView: View {
       }
 
       Spacer()
-
-      if isOffline {
-        Text("Offline")
-          .font(JovieFont.body(size: 12, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(JovieColor.surface1, in: Capsule())
-      }
     }
     .padding(.bottom, JovieSpacing.large)
     .overlay(alignment: .bottom) {
@@ -293,7 +295,7 @@ struct DashboardView: View {
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity)
       .disabled(response.qrPayload == nil)
-      .accessibilityLabel("Profile QR Code")
+      .accessibilityLabel(response.qrPayload == nil ? "QR unavailable" : "Profile QR Code")
       .accessibilityIdentifier("profile-qr-button")
 
       Text(response.publicProfileURL ?? "jov.ie")
@@ -305,6 +307,8 @@ struct DashboardView: View {
           copyURL(response.publicProfileURL)
         }
         .buttonStyle(JoviePillButtonStyle(filled: false))
+        .accessibilityIdentifier("dashboard-copy-url-button")
+        .accessibilityValue(didCopyURL ? "Copied" : "Copy URL")
 
         ShareLink(item: response.publicProfileURL ?? response.continueOnWebURL) {
           Text("Share")

@@ -17,6 +17,10 @@ const TIM_ACTION_REQUIRED_SECTION = join(
   TEST_DIR,
   '../../../components/features/admin/TimActionRequiredSection.tsx'
 );
+const WHAT_SHIPPED = join(
+  TEST_DIR,
+  '../../../components/features/admin/WhatShipped.tsx'
+);
 
 const OPERATIONAL_CONTROL_PANEL = join(
   TEST_DIR,
@@ -28,6 +32,7 @@ const OPS_COMPONENT_FILES = [
   HUD_DASHBOARD_CLIENT,
   HUD_STATUS_PILL,
   OPERATIONAL_CONTROL_PANEL,
+  WHAT_SHIPPED,
   join(OPS_ROUTE_DIR, 'HudClockClient.tsx'),
 ] as const;
 
@@ -71,6 +76,25 @@ describe('admin ops shell normalization', () => {
     );
   });
 
+  it('mounts WhatShipped as the first HUD card', () => {
+    const hudSource = readSource(HUD_DASHBOARD_CLIENT);
+
+    expect(hudSource).toContain('import { WhatShipped }');
+    expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
+    expect(hudSource.indexOf('<WhatShipped')).toBeLessThan(
+      hudSource.indexOf('<TimActionRequiredSection')
+    );
+  });
+
+  it('uses the shared shell row frame for what shipped rows', () => {
+    const whatShippedSource = readSource(WHAT_SHIPPED);
+
+    expect(whatShippedSource).toContain(
+      "import { ShellListRowFrame } from '@/components/organisms/table';"
+    );
+    expect(whatShippedSource).toContain('<ShellListRowFrame');
+  });
+
   it('normalizes admin ops list rows onto the shared shell row frame', () => {
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
     const actionSource = readSource(TIM_ACTION_REQUIRED_SECTION);
@@ -105,7 +129,7 @@ describe('admin ops shell normalization', () => {
 
     expect(source).not.toContain('uppercase');
     expect(source).not.toMatch(/\btracking-\[/);
-    expect(source).toContain('font-[510]');
+    expect(source).toContain('font-medium');
     expect(source).toContain('getAccentCssVars');
     expect(source).toContain('HUD_TONE_ACCENT');
   });

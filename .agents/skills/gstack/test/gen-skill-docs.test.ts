@@ -1329,6 +1329,51 @@ describe('preamble routing injection', () => {
 // --- {{DESIGN_OUTSIDE_VOICES}} resolver tests ---
 
 describe('DESIGN_OUTSIDE_VOICES resolver', () => {
+  test('design-canonical exists as the shared design doctrine', () => {
+    const content = fs.readFileSync(path.join(ROOT, 'design-canonical', 'SKILL.md'), 'utf-8');
+    expect(content).toContain('# /design-canonical: Jovie Design Operating System');
+    expect(content).toContain('Reading this as: <page kind> for <audience>');
+    expect(content).toContain('Veronica uses this skill');
+    expect(content).toContain('Ovie-facing agent prompts');
+  });
+
+  test('design-canonical install artifacts are tracked for clean checkouts', () => {
+    const repoRoot = path.resolve(ROOT, '../../..');
+    const requiredPaths = [
+      '.agents/skills/gstack/design-canonical/SKILL.md.tmpl',
+      '.agents/skills/gstack/design-canonical/SKILL.md',
+      '.agents/skills/gstack/.agents/skills/gstack-design-canonical/SKILL.md',
+      '.agents/skills/gstack/.agents/skills/gstack-design-canonical/agents/openai.yaml',
+      '.agents/skills/gstack/.factory/skills/gstack-design-canonical/SKILL.md',
+      '.claude/skills/gstack/design-canonical/SKILL.md',
+      '.claude/skills/design-canonical/SKILL.md',
+    ];
+
+    for (const trackedPath of requiredPaths) {
+      const result = Bun.spawnSync(['git', 'ls-files', '--error-unmatch', trackedPath], {
+        cwd: repoRoot,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      expect(result.exitCode, `${trackedPath} must be tracked`).toBe(0);
+    }
+  });
+
+  test('legacy design skills load design-canonical first', () => {
+    const legacySkills = [
+      'design-review',
+      'plan-design-review',
+      'design-consultation',
+      'design-shotgun',
+      'design-html',
+    ];
+
+    for (const skill of legacySkills) {
+      const content = fs.readFileSync(path.join(ROOT, skill, 'SKILL.md'), 'utf-8');
+      expect(content).toContain('First load `/design-canonical`');
+    }
+  });
+
   test('plan-design-review contains outside voices section', () => {
     const content = fs.readFileSync(path.join(ROOT, 'plan-design-review', 'SKILL.md'), 'utf-8');
     expect(content).toContain('Design Outside Voices');

@@ -24,7 +24,7 @@ import {
 } from './DspProviderIcon';
 
 const BASE_PILL_CLASSNAME =
-  'inline-flex min-h-[28px] items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-caption tracking-[-0.01em] transition-[background-color,border-color,color] duration-150';
+  'inline-flex min-h-7 items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-caption tracking-tight transition-[background-color,border-color,color] duration-subtle';
 
 const INTERACTIVE_PILL_CLASSNAME =
   'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 disabled:opacity-50 disabled:cursor-not-allowed';
@@ -79,7 +79,7 @@ export function DspConnectionPill({
         }}
       >
         <DspProviderIcon provider={provider} size='sm' className='gap-0' />
-        <span className='truncate max-w-[120px] text-secondary-token'>
+        <span className='truncate max-w-30 text-secondary-token'>
           {artistName || 'Connected'}
         </span>
         <CheckCircle2 className='h-4 w-4 shrink-0' style={{ color: accent }} />
@@ -111,7 +111,7 @@ export function DspConnectionPill({
             aria-label={`${label} connection: ${artistName || 'Connected'}`}
           >
             <DspProviderIcon provider={provider} size='sm' className='gap-0' />
-            <span className='truncate max-w-[120px] text-secondary-token'>
+            <span className='truncate max-w-30 text-secondary-token'>
               {artistName || 'Connected'}
             </span>
             {hovered || menuOpen ? (

@@ -253,6 +253,36 @@ describe('proxy debug/test route lockdown', () => {
     expect(response.headers.get('x-middleware-rewrite')).toBeNull();
   });
 
+  it('allows loopback test-auth routes on production-built CI servers', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    const req = createTestRequest({
+      pathname: '/api/dev/test-auth/session',
+      hostname: '127.0.0.1',
+    });
+    const response = await callMiddleware(req);
+
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+  });
+
+  it('blocks test-auth routes on public hosts even with E2E bypass', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    const req = createTestRequest({
+      pathname: '/api/dev/test-auth/session',
+      hostname: 'jov.ie',
+    });
+    const response = await callMiddleware(req);
+    const rewriteUrl = response.headers.get('x-middleware-rewrite');
+
+    expect(rewriteUrl).toBeTruthy();
+    expect(new URL(rewriteUrl!).pathname).toBe('/404');
+  });
+
   it('keeps /demo reachable outside development', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', 'production');

@@ -34,10 +34,10 @@ export function UpdateAvailablePill() {
       data-testid='update-available-pill'
       onClick={handleClick}
       disabled={updating}
-      aria-label='Update available — click to install'
+      aria-label='Update Available — Click To Install'
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className={cn(
-        'inline-flex h-6 items-center justify-center gap-1 rounded-full bg-white px-2.5 text-black',
+        'inline-flex h-6 items-center justify-center gap-1 rounded-full bg-white dark:bg-surface-1 px-2.5 text-black dark:text-white',
         'hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-1 disabled:opacity-70'
       )}
     >
@@ -46,7 +46,7 @@ export function UpdateAvailablePill() {
       ) : (
         <Download className='h-3 w-3 shrink-0' aria-hidden='true' />
       )}
-      <span className='whitespace-nowrap text-[11.5px] font-medium leading-none'>
+      <span className='whitespace-nowrap text-2xs font-medium leading-none'>
         {updating ? 'Updating…' : 'Update'}
       </span>
     </button>
