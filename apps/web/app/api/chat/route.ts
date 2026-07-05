@@ -455,6 +455,16 @@ function normalizeToolIntent(value: unknown): string | null {
   return /^[a-z][a-z0-9_:-]{0,63}$/i.test(trimmed) ? trimmed : null;
 }
 
+/**
+ * 👎 model-rotation step (JOV-3362 / #11461). Only a small non-negative
+ * integer is accepted; the actual model is resolved server-side from the
+ * vetted rotation chain, so the client can never name a model directly.
+ */
+function normalizeModelRotationStep(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return 0;
+  return Math.min(Math.max(value, 0), 8);
+}
+
 function normalizeClientId(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -2417,6 +2427,7 @@ export async function POST(req: Request) {
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
   const toolIntent = normalizeToolIntent(body.toolIntent);
+  const modelRotationStep = normalizeModelRotationStep(body.modelRotationStep);
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
   const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
@@ -2804,6 +2815,7 @@ export async function POST(req: Request) {
       accountContext,
       insightsEnabled,
       forceLightModel,
+      modelRotationStep,
       lastUserText: userText,
       tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
