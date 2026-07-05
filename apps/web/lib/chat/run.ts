@@ -6,6 +6,11 @@ import {
   type ToolSet,
   type UIMessage,
 } from 'ai';
+import {
+  CHAT_WORKFLOW,
+  recordModelUsage,
+  resolveWorkflowModel,
+} from '@/lib/ai/experiments/service.server';
 import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
@@ -266,7 +271,18 @@ export async function executeChatTurn(
       planLimits.booleans.aiCanUseTools,
       lastUserText
     );
-  const selectedModel = shouldUseLightModel ? CHAT_MODEL_LIGHT : CHAT_MODEL;
+  // Per-workflow model A/B bake-off (GH #11462): when an experiment is
+  // active for the chat workflow, split default-model traffic across its
+  // candidate arms (deterministic per user). The light-model heuristic and
+  // the ai_chat_force_light incident lever always take precedence, and any
+  // experiment-store failure fails open to CHAT_MODEL.
+  const { model: selectedModel, isExperimentArm } = shouldUseLightModel
+    ? { model: CHAT_MODEL_LIGHT, isExperimentArm: false }
+    : await resolveWorkflowModel(
+        CHAT_WORKFLOW,
+        CHAT_MODEL,
+        userId ?? requestId
+      );
 
   // Tag the request scope with chat-specific dimensions so all telemetry
   // events for this turn (errors, perf, breadcrumbs) are filterable
@@ -346,7 +362,19 @@ export async function executeChatTurn(
         chatToolStepLimit: toolStepLimit,
       },
     }),
-    onFinish: async ({ steps, text }) => {
+    onFinish: async ({ steps, text, totalUsage }) => {
+      // Cost log for active bake-off arms only (GH #11462) — fire-and-forget,
+      // recordModelUsage never throws.
+      if (isExperimentArm && !blockedForDisclosure) {
+        void recordModelUsage({
+          workflow: CHAT_WORKFLOW,
+          model: selectedModel,
+          inputTokens: totalUsage?.inputTokens,
+          outputTokens: totalUsage?.outputTokens,
+          requestId,
+        });
+      }
+
       let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {
         const sanitized = sanitizeAssistantResponse(text);
