@@ -58,7 +58,8 @@ export function OpportunityInboxPageClient({
 }: OpportunityInboxPageClientProps) {
   const pathname = usePathname();
   const [cards, setCards] = useState(inbox.cards);
-  const initialTourDates = inbox.tourDates ?? EMPTY_OPPORTUNITY_INBOX_TOUR_DATES;
+  const initialTourDates =
+    inbox.tourDates ?? EMPTY_OPPORTUNITY_INBOX_TOUR_DATES;
   const [pendingTourDates, setPendingTourDates] = useState(
     initialTourDates.pending
   );

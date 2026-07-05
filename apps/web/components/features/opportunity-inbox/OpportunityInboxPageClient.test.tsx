@@ -225,9 +225,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(rejectedSection).toBeInTheDocument();
     // Hidden by default: the details disclosure starts collapsed.
     expect(rejectedSection).not.toHaveAttribute('open');
-    expect(
-      screen.getByText('Rejected Tour Dates (1)')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Rejected Tour Dates (1)')).toBeInTheDocument();
   });
 
   it('restores a rejected tour date via undo', () => {
