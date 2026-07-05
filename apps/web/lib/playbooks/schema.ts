@@ -38,8 +38,7 @@ export const MEASURABLE_METRIC_SOURCES = [
   'custom_event',
 ] as const;
 
-export type MeasurableMetricSource =
-  (typeof MEASURABLE_METRIC_SOURCES)[number];
+export type MeasurableMetricSource = (typeof MEASURABLE_METRIC_SOURCES)[number];
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/;

@@ -32,9 +32,7 @@ const INVALID_FIXTURE = readFileSync(
   'utf-8'
 );
 
-function buildValidSource(
-  overrides: Record<string, unknown> = {}
-): string {
+function buildValidSource(overrides: Record<string, unknown> = {}): string {
   const definition = {
     id: 'unit-test-playbook',
     title: 'Unit Test Playbook',
@@ -156,9 +154,7 @@ describe('validatePlaybookSource', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errors[0].rule).toBe('invalid-schema');
-      expect(result.errors.some(e => e.path === 'problemStatement')).toBe(
-        true
-      );
+      expect(result.errors.some(e => e.path === 'problemStatement')).toBe(true);
     }
   });
 
@@ -214,9 +210,7 @@ describe('validatePlaybookSource', () => {
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      const error = result.errors.find(
-        e => e.rule === 'undeclared-tool-deps'
-      );
+      const error = result.errors.find(e => e.rule === 'undeclared-tool-deps');
       expect(error).toBeDefined();
       expect(error?.path).toBe('steps[0].tool');
     }

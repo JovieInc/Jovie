@@ -30,7 +30,9 @@ try {
     .filter(name => name.endsWith(PLAYBOOK_FILE_SUFFIX))
     .sort();
 } catch {
-  console.log(`No playbooks directory at ${playbooksDir} — nothing to validate.`);
+  console.log(
+    `No playbooks directory at ${playbooksDir} — nothing to validate.`
+  );
   process.exit(0);
 }
 
@@ -56,7 +58,9 @@ for (const file of files) {
       );
       continue;
     }
-    console.log(`✓ ${displayPath} (${result.definition.id}@${result.definition.version})`);
+    console.log(
+      `✓ ${displayPath} (${result.definition.id}@${result.definition.version})`
+    );
     continue;
   }
 
