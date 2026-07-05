@@ -24,7 +24,12 @@ describe('ChatMerchActionCard', () => {
     );
 
     expect(screen.getByText(/Publish Merch: Tour Tee/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Publish/i }));
+    const confirmButton = screen.getByRole('button', { name: /Publish/i });
+    expect(confirmButton.className).toContain('bg-btn-primary');
+    expect(confirmButton.className).toContain('text-btn-primary-foreground');
+    expect(confirmButton.className).toContain('hover:bg-btn-primary-hover');
+
+    await user.click(confirmButton);
     expect(mutateMock).toHaveBeenCalledWith(
       { profileId: 'profile-1', merchCardId: 'card-1', action: 'publish' },
       expect.any(Object)

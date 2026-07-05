@@ -49,13 +49,13 @@ export function HeroTaskCard({
 
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='text-[11px] tracking-[0.08em] text-white/45'>
+          <p className='text-2xs tracking-[0.08em] text-white/45'>
             Release Task
           </p>
           <h3
             className={[
-              'mt-1 font-[580] tracking-[-0.02em] text-white',
-              compact ? 'text-[13px] leading-5' : 'text-[14px] leading-5',
+              'mt-1 font-[580] tracking-tighter text-white dark:text-white',
+              compact ? 'text-app leading-5' : 'text-sm leading-5',
             ].join(' ')}
           >
             {task.title}
@@ -64,7 +64,7 @@ export function HeroTaskCard({
 
         <span
           className={[
-            'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium',
+            'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-3xs font-medium',
             status.pillClassName,
           ].join(' ')}
         >
@@ -73,7 +73,7 @@ export function HeroTaskCard({
         </span>
       </div>
 
-      <div className='mt-4 flex items-center justify-between gap-3 text-[11px] text-white/62'>
+      <div className='mt-4 flex items-center justify-between gap-3 text-2xs text-white/62'>
         <span>{task.meta}</span>
         <span className='text-white/78'>{task.dueLabel}</span>
       </div>

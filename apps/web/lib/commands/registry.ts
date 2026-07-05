@@ -31,6 +31,8 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Onboarding-only continuation from the Spotify picker; requires a selected candidate.',
   createMerch:
     'Conversational merch creation is gated by plan and rollout flags before broader slash exposure.',
+  createMerchAlternativeItem:
+    'Follow-up from a saved merch card; shown as card/menu actions once a source design exists.',
   createPromoStrategy: 'Pro-only; surfaced via the release detail surface.',
   createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
   deleteOrArchiveMerchCard:
@@ -55,12 +57,16 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Onboarding evaluator trigger; direct slash access would bypass required intake signal.',
   proposeProfileEdit:
     'Triggered conversationally; surfacing as a slash command would duplicate proposeAvatarUpload + proposeSocialLink.',
+  proposeVideoRecording:
+    'Triggered conversationally after Jovie writes a recording script; not a standalone slash command.',
   publishMerchCard:
     'Merch lifecycle action shown from merch cards, not the root slash menu.',
   recordInterviewSignal:
     'Silent onboarding telemetry; never user-visible as a command.',
   reorderMerchCards:
     'Merch ordering requires concrete card IDs from the merch UI, not a root slash command.',
+  retouchImage:
+    'Triggered conversationally against an attached or referenced photo; not a standalone slash command.',
   searchSpotifyArtist:
     'Onboarding-first identity picker; the authenticated chat slash menu should not expose it.',
   selectMerchDesign:
@@ -221,7 +227,7 @@ export const COMMANDS: readonly Command[] = [
   nav(
     'go-chats',
     'Chats',
-    'Open the all-chats workspace.',
+    'Open the chats workspace.',
     'MessageSquare',
     APP_ROUTES.CHATS
   ),

@@ -32,12 +32,25 @@ const {
   creatorContacts,
   discogReleases,
   discogTracks,
+  libraryAssetApprovalStatuses,
   promoDownloads,
   providers,
   providerLinks,
   tourDates,
   users,
 } = schema;
+
+export function buildPublicReleaseApprovalSeedRow(
+  creatorProfileId: string,
+  releaseId: string
+): typeof libraryAssetApprovalStatuses.$inferInsert {
+  return {
+    creatorProfileId,
+    assetId: releaseId,
+    itemKind: 'release',
+    approvalStatus: 'approved',
+  };
+}
 
 interface TestProfile {
   username: string;
@@ -946,6 +959,21 @@ async function seedReleasesForProfile(
     } satisfies SeededReleaseValues;
 
     const releaseId = await ensureRelease(releaseValues);
+
+    await db
+      .insert(libraryAssetApprovalStatuses)
+      .values(buildPublicReleaseApprovalSeedRow(profileId, releaseId))
+      .onConflictDoUpdate({
+        target: [
+          libraryAssetApprovalStatuses.creatorProfileId,
+          libraryAssetApprovalStatuses.assetId,
+        ],
+        set: {
+          approvalStatus: 'approved',
+          itemKind: 'release',
+          updatedAt: new Date(),
+        },
+      });
 
     if (!existingReleaseId) {
       console.log(

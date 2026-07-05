@@ -9,6 +9,12 @@ This document explains the automation and labels used in this repo so agents can
 - `.github/workflows/neon-ephemeral-branch-cleanup.yml`
 - `.coderabbit.yaml`
 
+## Company doctrine (2026-06-22)
+
+**100% autonomous dev shipping.** Machines review code (strict CI, bots, autofix, MQ). Humans plan and **production taste** only. Auth/payment/migration are **CI-gated**, not Tim-per-PR gates.
+
+See `docs/company/autonomous-shipping-doctrine.md`.
+
 ## Auto-merge
 
 - Auto-merge is allowed only when CI is green and the PR is eligible.
@@ -53,7 +59,7 @@ These labels are used to coordinate automation and prevent merge loops.
 ### `ai:opt-out`
 
 - Disables AI automation for the PR.
-- Use when the PR touches high-risk areas (auth, payments, migrations) or when human review is required.
+- Use only when automation is actively harmful or duplicating work — **not** because the PR touches auth, payments, or migrations (CI owns risk there).
 
 ## CI healing labels
 
@@ -96,8 +102,8 @@ Durable hardening policy:
 - Prefer focused regression tests for deterministic parser/script failures.
 - Update gstack `.tmpl` files before regenerating derived `SKILL.md` files.
 - Update `LESSONS.md` only for repeated root causes, not every weekly finding.
-- Create a Linear follow-up issue when the right fix requires product work, broad refactors, auth/billing/migration changes, or human prioritization. Do not merely mention the follow-up in a PR comment or summary.
-- Never auto-merge, never create app/Vercel cron routes, and never touch high-risk paths without human review.
+- Create a Linear follow-up issue when the right fix requires product work, broad refactors, or human **taste** prioritization — not when CI can gate auth/billing/migration.
+- Never auto-merge taste-labelled PRs; never create app/Vercel cron routes without CI review. High-risk paths ship via **stricter CI**, not mandatory human code review.
 
 ## CodeRabbit CLI (local)
 

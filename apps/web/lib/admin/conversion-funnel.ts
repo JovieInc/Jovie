@@ -2,10 +2,17 @@ import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
 
+import {
+  type AnalyticsRange,
+  resolveRangeStart,
+} from '@/lib/analytics/time-range';
 import { db } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
 
-export type ConversionFunnelTimeRange = '7d' | '30d' | 'all';
+export type ConversionFunnelTimeRange = Extract<
+  AnalyticsRange,
+  '7d' | '30d' | 'all'
+>;
 
 export interface ConversionFunnelStage {
   /** Machine-readable stage key */
@@ -26,14 +33,6 @@ export interface ConversionFunnelData {
   errors: string[];
 }
 
-function toDateFilter(timeRange: ConversionFunnelTimeRange): Date | null {
-  if (timeRange === 'all') return null;
-  const now = new Date();
-  const days = timeRange === '7d' ? 7 : 30;
-  now.setDate(now.getDate() - days);
-  return now;
-}
-
 /**
  * Queries the database to reconstruct the signup-to-paid conversion funnel.
  *
@@ -50,7 +49,9 @@ export async function getConversionFunnelData(
   timeRange: ConversionFunnelTimeRange = 'all'
 ): Promise<ConversionFunnelData> {
   const errors: string[] = [];
-  const dateFilter = toDateFilter(timeRange);
+  // Canonical window semantics (rolling N × 24h days ending now; 'all' = no
+  // lower bound) — shared with every other analytics surface.
+  const dateFilter = resolveRangeStart(timeRange);
 
   try {
     type FunnelRow = {

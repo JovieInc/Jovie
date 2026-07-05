@@ -37,7 +37,6 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
-import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useAppFlag } from '@/lib/flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
@@ -342,10 +341,10 @@ function ConnectedReleaseEmptyState({
     <PageShell className='mt-2.5' data-testid='release-table-shell'>
       <DrawerSurfaceCard
         variant='card'
-        className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
+        className='flex min-h-53 flex-col items-center justify-center px-5 py-9 text-center'
         testId='releases-empty-state-connected'
       >
-        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
+        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-lg border border-subtle bg-surface-1'>
           <Icon
             name='Disc3'
             className='size-4 text-tertiary-token'
@@ -353,7 +352,7 @@ function ConnectedReleaseEmptyState({
           />
         </div>
         <h3 className='text-app font-caption text-primary-token'>
-          No releases yet
+          No Releases Yet
         </h3>
         <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
           {description}
@@ -539,7 +538,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     useState(false);
   const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
   const router = useRouter();
-  const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
+  const albumArtFlagEnabled = useAppFlag('ALBUM_ART_GENERATION');
   const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
 
   const {

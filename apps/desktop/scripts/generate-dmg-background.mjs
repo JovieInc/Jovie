@@ -83,7 +83,9 @@ export async function generateDmgBackground({
   year = getDesktopBuildYear(),
 } = {}) {
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await sharp(Buffer.from(buildDmgBackgroundSvg({ year }))).png().toFile(outputPath);
+  await sharp(Buffer.from(buildDmgBackgroundSvg({ year })))
+    .png()
+    .toFile(outputPath);
   return outputPath;
 }
 

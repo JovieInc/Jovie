@@ -5,6 +5,7 @@ const mockPublicClickLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicClickLimiterLimit = vi.hoisted(() => vi.fn());
 const capturedInsertValues = vi.hoisted(() => [] as unknown[]);
 const mockDetectBot = vi.hoisted(() => vi.fn());
+const mockShouldExcludeSelfByProfileId = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicClickLimiter: {
@@ -132,6 +133,10 @@ vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: mockDetectBot,
 }));
 
+vi.mock('@/lib/analytics/self-exclusion', () => ({
+  shouldExcludeSelfByProfileId: mockShouldExcludeSelfByProfileId,
+}));
+
 const { POST } = await import('@/app/api/audience/click/route');
 
 describe('POST /api/audience/click', () => {
@@ -146,6 +151,7 @@ describe('POST /api/audience/click', () => {
     });
     mockPublicClickLimiterLimit.mockResolvedValue({ success: true });
     mockDetectBot.mockReturnValue({ isBot: false, shouldBlock: false });
+    mockShouldExcludeSelfByProfileId.mockResolvedValue(false);
   });
 
   it('returns 429 when rate limited', async () => {
@@ -198,6 +204,30 @@ describe('POST /api/audience/click', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid click payload');
+  });
+
+  it('skips recording when the authenticated owner clicks their own profile', async () => {
+    mockShouldExcludeSelfByProfileId.mockResolvedValueOnce(true);
+
+    const request = new NextRequest('http://localhost/api/audience/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        linkId: '123e4567-e89b-12d3-a456-426614174001',
+        linkType: 'social',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      success: true,
+      fingerprint: 'self-filtered',
+    });
+    expect(capturedInsertValues).toHaveLength(0);
   });
 
   it('records click for valid payload', async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { validateProductionRobots } from '@/lib/seo/ratchet';
 
 describe('public surface guardrails', () => {
   it('keeps production robots disallows scoped to safe namespaces', async () => {
@@ -31,6 +32,80 @@ describe('public surface guardrails', () => {
         '/hud',
       ])
     );
+  });
+
+  describe('robots() VERCEL_ENV branch matrix — fail-safe default', () => {
+    async function getRobotsMeta(vercelEnv: string | undefined) {
+      vi.resetModules();
+      vi.doMock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
+      vi.doMock('@/lib/env-server', () => ({
+        env: { VERCEL_ENV: vercelEnv },
+      }));
+      const { default: robots } = await import('../../../app/robots');
+      return robots();
+    }
+
+    it('VERCEL_ENV=production → allow-rules (sitemap present)', async () => {
+      const meta = await getRobotsMeta('production');
+      const rules = Array.isArray(meta.rules) ? meta.rules : [];
+      const wildcard = rules.find(r => r.userAgent === '*');
+      expect(wildcard?.allow).toBe('/');
+      expect(meta.sitemap).toBeTruthy();
+    });
+
+    it('VERCEL_ENV=preview → Disallow: / (block all)', async () => {
+      const meta = await getRobotsMeta('preview');
+      const rules = Array.isArray(meta.rules) ? meta.rules : [];
+      const wildcard = rules.find(r => r.userAgent === '*');
+      expect(wildcard?.disallow).toBe('/');
+      expect(wildcard?.allow).toBeUndefined();
+    });
+
+    it('VERCEL_ENV=development → Disallow: / (block all)', async () => {
+      const meta = await getRobotsMeta('development');
+      const rules = Array.isArray(meta.rules) ? meta.rules : [];
+      const wildcard = rules.find(r => r.userAgent === '*');
+      expect(wildcard?.disallow).toBe('/');
+      expect(wildcard?.allow).toBeUndefined();
+    });
+
+    it('VERCEL_ENV="" (empty) → allow-rules (fail-safe: empty ≠ preview)', async () => {
+      const meta = await getRobotsMeta('');
+      const rules = Array.isArray(meta.rules) ? meta.rules : [];
+      const wildcard = rules.find(r => r.userAgent === '*');
+      expect(wildcard?.allow).toBe('/');
+    });
+
+    it('VERCEL_ENV=undefined → allow-rules (fail-safe: missing ≠ preview)', async () => {
+      const meta = await getRobotsMeta(undefined);
+      const rules = Array.isArray(meta.rules) ? meta.rules : [];
+      const wildcard = rules.find(r => r.userAgent === '*');
+      expect(wildcard?.allow).toBe('/');
+    });
+  });
+
+  describe('AEO ratchet — AI crawler allow rules (JOV-11044)', () => {
+    async function getProductionRobots() {
+      vi.resetModules();
+      vi.doMock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
+      vi.doMock('@/lib/env-server', () => ({
+        env: { VERCEL_ENV: 'production' },
+      }));
+      const { default: robots } = await import('../../../app/robots');
+      return robots();
+    }
+
+    it('production robots config passes SEO/AEO ratchet (JOV-11044)', async () => {
+      const meta = await getProductionRobots();
+      const issues = validateProductionRobots(meta);
+
+      expect(
+        issues,
+        issues
+          .map(issue => `${issue.message}\n  ↳ ${issue.remediation}`)
+          .join('\n')
+      ).toEqual([]);
+    });
   });
 
   it('marks sensitive utility and investor routes as noindex', async () => {

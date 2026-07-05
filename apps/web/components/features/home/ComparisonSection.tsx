@@ -27,10 +27,10 @@ export function SocialProofSection() {
   ];
 
   const stats = [
-    { number: '10,000+', label: 'Artists using Jovie' },
-    { number: '1M+', label: 'Fans converted to streams' },
-    { number: '99.9%', label: 'Uptime guarantee' },
-    { number: '47%', label: 'Average conversion increase' },
+    { number: '10,000+', label: 'Artists Using Jovie' },
+    { number: '1M+', label: 'Fans Converted To Streams' },
+    { number: '99.9%', label: 'Uptime Guarantee' },
+    { number: '47%', label: 'Average Conversion Increase' },
   ];
 
   return (
@@ -58,7 +58,7 @@ export function SocialProofSection() {
           </div>
 
           <h2 className='text-4xl font-medium tracking-tight text-primary-token sm:text-5xl lg:text-6xl'>
-            Musicians love Jovie
+            Musicians Love Jovie
           </h2>
 
           <p className='mt-6 text-xl text-secondary-token'>
@@ -88,8 +88,8 @@ export function SocialProofSection() {
           <div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
             {testimonials.map(testimonial => (
               <div key={testimonial.author} className='relative group'>
-                <div className='absolute -inset-4 bg-linear-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500' />
-                <div className='relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all duration-slower'>
+                <div className='absolute -inset-4 bg-linear-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-cinematic' />
+                <div className='relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-colors duration-slower'>
                   <div className='mb-6'>
                     <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400'>
                       {testimonial.metric}
@@ -101,7 +101,7 @@ export function SocialProofSection() {
                   </blockquote>
 
                   <div className='flex items-center'>
-                    <div className='w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm'>
+                    <div className='w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white dark:text-white font-semibold text-sm'>
                       {testimonial.avatar}
                     </div>
                     <div className='ml-3'>

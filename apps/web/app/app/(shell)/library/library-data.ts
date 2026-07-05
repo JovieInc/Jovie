@@ -3,6 +3,7 @@ import {
   DEFAULT_LIBRARY_APPROVAL_STATUS,
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
+import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { hashLibraryWaveformSeed } from './library-waveform-peaks';
 
@@ -32,6 +33,8 @@ export type LibraryView =
 export type LibraryAspectRatio = '1:1' | '16:9' | '9:16';
 
 export type LibraryGridDensity = 'compact' | 'comfortable' | 'spacious';
+
+export type LibraryViewMode = 'grid' | 'list' | 'table';
 
 export type LibraryMediaOrientation = 'landscape' | 'portrait';
 
@@ -76,6 +79,7 @@ export interface LibraryReleaseAsset {
   readonly updatedAt?: string;
   readonly aspectRatio?: LibraryAspectRatio;
   readonly mediaOrientation?: LibraryMediaOrientation;
+  readonly share?: LibraryAssetShareViewModel | null;
 }
 
 export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {
@@ -106,6 +110,24 @@ export function getLibraryAspectRatioClass(ratio: LibraryAspectRatio): string {
     default:
       return 'aspect-square';
   }
+}
+
+/**
+ * Compact drawer-hero sizing for the narrow right rail.
+ *
+ * Caps width for square/landscape art and caps HEIGHT for portrait art so a
+ * tall 9:16 canvas does not blow the rail out vertically. Returns the wrapper
+ * class plus the aspect class; the aspect class keeps the media's true ratio
+ * while the cap that does not match the long axis is effectively inert.
+ */
+export function getLibraryDrawerHeroClass(ratio: LibraryAspectRatio): string {
+  const aspectClass = getLibraryAspectRatioClass(ratio);
+  // Portrait: bound by height so width derives down from the cap.
+  if (ratio === '9:16') {
+    return `${aspectClass} mx-auto h-full max-h-72 w-auto`;
+  }
+  // Square / landscape: bound by width.
+  return `${aspectClass} mx-auto w-full max-w-56`;
 }
 
 function normalizeHttpUrl(value: string | null | undefined): string | null {

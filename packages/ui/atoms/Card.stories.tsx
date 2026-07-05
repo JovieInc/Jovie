@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from './card';
+import { InlineOfflineNotice } from './inline-offline';
 
 const meta: Meta<typeof Card> = {
   title: 'UI/Atoms/Card',
@@ -209,6 +210,90 @@ export const HoverableInteractive: Story = {
         </CardHeader>
         <CardContent>
           <p>Click anywhere on this card to trigger an action.</p>
+        </CardContent>
+      </>
+    ),
+  },
+};
+
+export const PartialData: Story = {
+  args: {
+    contentState: 'partial',
+    className: 'max-w-md',
+    children: (
+      <>
+        <CardHeader>
+          <CardTitle>Audience insights</CardTitle>
+          <CardDescription>
+            Showing cached metrics while fresh data loads.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p>12.4K profile views · last synced 2m ago</p>
+        </CardContent>
+      </>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Partial-data state via data-content-state="partial" and --state-partial-opacity.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    className: 'max-w-xs',
+    children: (
+      <>
+        <CardHeader>
+          <CardTitle
+            maxLines={2}
+            title='Independent Artist Revenue Playbook for Multi-Platform Release Campaigns'
+          >
+            Independent Artist Revenue Playbook for Multi-Platform Release
+            Campaigns
+          </CardTitle>
+          <CardDescription>
+            Long titles clamp without breaking card layout.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className='text-sm text-secondary-token'>
+            Use maxLines or truncate on CardTitle for long-content handling.
+          </p>
+        </CardContent>
+      </>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Long-content state via data-content-length="long" with line-clamp utilities.',
+      },
+    },
+  },
+};
+
+export const InlineOffline: Story = {
+  args: {
+    className: 'max-w-md',
+    children: (
+      <>
+        <CardHeader>
+          <CardTitle>Billing summary</CardTitle>
+          <CardDescription>Retry when your connection returns.</CardDescription>
+        </CardHeader>
+        <CardContent className='space-y-3'>
+          <InlineOfflineNotice onRetry={() => undefined} />
+          <p className='text-sm text-secondary-token'>
+            Cached invoice totals remain visible beneath the inline offline
+            notice.
+          </p>
         </CardContent>
       </>
     ),

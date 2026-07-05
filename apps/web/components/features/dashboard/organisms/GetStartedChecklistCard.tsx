@@ -26,18 +26,18 @@ const CHECKLIST_ITEM_ALIASES: Readonly<Record<string, readonly string[]>> = {
 const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: 'share-instagram',
-    label: 'Share your profile on Instagram',
+    label: 'Share Your Profile On Instagram',
     description: 'Post your link to your story or bio',
   },
   {
     id: 'spotify-bio',
-    label: 'Add your Jovie link to your Spotify bio',
+    label: 'Add Your Jovie Link To Your Spotify Bio',
     description: 'Fans searching for you will find everything',
     action: 'copy-url',
   },
   {
     id: 'qr-code',
-    label: 'Download a QR code for your next show',
+    label: 'Download A QR Code For Your Next Show',
     description: 'Print it for merch tables and venues',
   },
   {
@@ -172,7 +172,7 @@ export function GetStartedChecklistCard({
       <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <div className='flex items-center gap-1.5'>
           <h3 className='text-xs font-caption tracking-[-0.01em] text-primary-token'>
-            Get started
+            Get Started
           </h3>
           <span className='text-2xs text-tertiary-token'>
             {completedCount}/{CHECKLIST_ITEMS.length}
@@ -230,7 +230,10 @@ export function GetStartedChecklistCard({
               }
             >
               {isDone ? (
-                <Check className='h-2.5 w-2.5 text-white' aria-hidden='true' />
+                <Check
+                  className='h-2.5 w-2.5 text-white dark:text-white'
+                  aria-hidden='true'
+                />
               ) : null}
             </button>
           );

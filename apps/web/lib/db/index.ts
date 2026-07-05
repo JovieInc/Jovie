@@ -40,6 +40,7 @@ export {
   getRlsSessionResetSql,
   getRlsSessionSetSql,
   initializeDb,
+  invalidateColumnExistenceCache,
   isRetryableError,
   resetRlsSession,
   setSessionUser,

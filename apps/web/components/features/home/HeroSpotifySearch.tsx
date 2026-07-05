@@ -250,7 +250,7 @@ export function HeroSpotifySearch() {
     (!isSpotifyUrl(trimmedQuery) && results.length === 0);
 
   return (
-    <div ref={containerRef} className='relative mx-auto w-full max-w-[480px]'>
+    <div ref={containerRef} className='relative mx-auto w-full max-w-120'>
       <label htmlFor='hero-spotify-search' className='sr-only'>
         Search Spotify artists or paste a link
       </label>
@@ -458,7 +458,7 @@ export function HeroSpotifySearch() {
                       ) : null}
                     </div>
                     {artist.isClaimed && (
-                      <span className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-[10px] font-semibold text-brand-spotify'>
+                      <span className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-3xs font-semibold text-brand-spotify'>
                         On Jovie
                       </span>
                     )}

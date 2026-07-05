@@ -16,6 +16,11 @@ function minimalValidInput(toolName: keyof typeof TOOL_SCHEMAS): unknown {
         generationId: '550e8400-e29b-41d4-a716-446655440000',
         optionNumber: 1,
       };
+    case 'createMerchAlternativeItem':
+      return {
+        merchCardId: '550e8400-e29b-41d4-a716-446655440000',
+        itemType: 'hoodie',
+      };
     case 'publishMerchCard':
     case 'pauseMerchCard':
     case 'unpauseMerchCard':

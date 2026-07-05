@@ -110,7 +110,7 @@ describe('AvatarUpload - Error Handling', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
 
     const invalidFile = new File(['test'], 'test.txt', { type: 'text/plain' });
 
@@ -131,7 +131,7 @@ describe('AvatarUpload - Error Handling', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
 
     const largeFile = new File(['x'], 'large.jpg', { type: 'image/jpeg' });
     Object.defineProperty(largeFile, 'size', {
@@ -163,7 +163,7 @@ describe('AvatarUpload - Error Handling', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
 
     fireEvent.change(fileInput, { target: { files: [validFile] } });
@@ -190,7 +190,7 @@ describe('AvatarUpload - Error Handling', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
 
     fireEvent.change(fileInput, { target: { files: [validFile] } });

@@ -15,7 +15,7 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
       <Link
         ref={ref}
         href={feature.href}
-        className={`group relative flex items-start gap-3 p-3 transition-colors duration-150 focus-ring-themed ${className}`}
+        className={`group relative flex items-start gap-3 p-3 transition-colors duration-subtle focus-ring-themed ${className}`}
         style={style}
         role='menuitem'
       >

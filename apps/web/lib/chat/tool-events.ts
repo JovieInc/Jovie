@@ -5,6 +5,7 @@ import {
   type UIMessage,
 } from 'ai';
 import { z } from 'zod';
+import { normalizeToolFailureOutput } from './tool-errors';
 import { getToolUiConfig } from './tool-ui-registry';
 
 export type PersistedToolState =
@@ -30,6 +31,8 @@ export interface PersistedToolEvent {
   readonly input?: Record<string, unknown>;
   readonly output?: Record<string, unknown>;
   readonly errorMessage?: string;
+  readonly errorCode?: string;
+  readonly retryable?: boolean;
   readonly summary?: string;
   readonly uiHint: PersistedToolUiHint;
   readonly approval?: PersistedToolApproval;
@@ -40,6 +43,8 @@ export interface PendingToolPersistenceEnvelope {
 }
 
 const recordSchema = z.record(z.string(), z.unknown());
+
+/* eslint-disable @jovie/chat-tool-schema-strict -- persistence DTOs, not LLM tool inputs */
 const approvalSchema = z.object({
   id: z.string().min(1),
   approved: z.boolean().optional(),
@@ -54,6 +59,8 @@ export const persistedToolEventSchema = z.object({
   input: recordSchema.optional(),
   output: recordSchema.optional(),
   errorMessage: z.string().optional(),
+  errorCode: z.string().optional(),
+  retryable: z.boolean().optional(),
   summary: z.string().optional(),
   uiHint: z.enum(['artifact', 'status']),
   approval: approvalSchema.optional(),
@@ -94,6 +101,7 @@ export const chatPersistenceMessageSchema = z
 export const chatPersistenceBatchSchema = z.object({
   messages: z.array(chatPersistenceMessageSchema).min(1).max(100),
 });
+/* eslint-enable @jovie/chat-tool-schema-strict */
 
 export type ChatPersistenceMessage = z.infer<
   typeof chatPersistenceMessageSchema
@@ -262,15 +270,28 @@ function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
     errorMessage = outputError ?? approvalReason;
   }
 
+  const persistedOutput =
+    state === 'succeeded' ? capPersistedToolOutput(output) : output;
+  const normalizedFailure =
+    state === 'failed'
+      ? normalizeToolFailureOutput(toolName, output ?? { error: errorMessage })
+      : null;
+
   return {
     schemaVersion: 2,
     toolCallId: part.toolCallId,
     toolName,
     state,
     input,
-    output,
-    errorMessage,
-    summary: getSummaryForState(state, output, outputError, approvalReason),
+    output:
+      (normalizedFailure as unknown as Record<string, unknown> | undefined) ??
+      persistedOutput,
+    errorMessage: normalizedFailure?.error ?? errorMessage,
+    errorCode: normalizedFailure?.errorCode,
+    retryable: normalizedFailure?.retryable,
+    summary:
+      normalizedFailure?.error ??
+      getSummaryForState(state, persistedOutput, outputError, approvalReason),
     uiHint: config.uiHint,
     approval,
   };
@@ -354,6 +375,62 @@ function dedupeEvents(events: PersistedToolEvent[]): PersistedToolEvent[] {
 }
 
 export const STALE_RUNNING_TOOL_EVENT_MS = 5 * 60 * 1000;
+
+/** Max serialized bytes for a persisted tool output payload. */
+export const PERSISTED_TOOL_OUTPUT_MAX_BYTES = 16 * 1024;
+
+function measureSerializedBytes(value: unknown): number {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+function pickRefetchableId(
+  output: Record<string, unknown>
+): string | undefined {
+  for (const key of [
+    'releaseId',
+    'generationId',
+    'id',
+    'merchCardId',
+    'conversationId',
+  ]) {
+    const value = output[key];
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+export function capPersistedToolOutput(
+  output: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (!output) {
+    return output;
+  }
+
+  if (measureSerializedBytes(output) <= PERSISTED_TOOL_OUTPUT_MAX_BYTES) {
+    return output;
+  }
+
+  const refetchableId = pickRefetchableId(output);
+  const summary =
+    extractSummary(output) ??
+    (typeof output.message === 'string' ? output.message : undefined) ??
+    'Tool output truncated for storage.';
+
+  return {
+    success: output.success,
+    truncated: true,
+    summary,
+    ...(refetchableId ? { refetchableId } : {}),
+    originalBytes: measureSerializedBytes(output),
+  };
+}
 
 const CLIENT_DISCONNECT_TOOL_ERROR =
   'This tool was interrupted when the chat disconnected. Retry when you are ready.';

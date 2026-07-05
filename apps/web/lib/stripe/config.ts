@@ -6,6 +6,9 @@
  *
  * Pricing tiers and amounts are defined in lib/config/plan-prices.ts (single source of truth).
  * Free tier has no Stripe subscription.
+ *
+ * Active prices are offered at checkout. Legacy prices resolve webhooks for retired
+ * subscriptions but are excluded from checkout and plan-change options.
  */
 
 import 'server-only';
@@ -13,24 +16,36 @@ import 'server-only';
 import { PRICING } from '@/lib/config/pricing';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { HARDCODED_LEGACY_PRICES } from './legacy-prices';
 
 // Plan types supported by the application
 export type PlanType = 'free' | 'pro' | 'max';
 
 // Price mapping interface
-interface PriceMapping {
+export interface PriceMapping {
   priceId: string;
   plan: PlanType;
   amount: number;
   currency: string;
   interval: 'month' | 'year';
   description: string;
+  /** When true, excluded from checkout and plan-change option lists. */
+  legacy?: boolean;
 }
 
-// Current active price mappings
-const buildPriceMappings = (): Record<string, PriceMapping> => {
+const toMappingRecord = (
+  mappings: PriceMapping[]
+): Record<string, PriceMapping> =>
+  mappings
+    .filter(mapping => Boolean(mapping.priceId))
+    .reduce<Record<string, PriceMapping>>((acc, mapping) => {
+      acc[mapping.priceId] = mapping;
+      return acc;
+    }, {});
+
+// Current active price mappings (checkout-eligible)
+const buildActivePriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
-    // All tiers from centralized PRICING config
     {
       priceId: PRICING.pro.monthly.priceId || '',
       plan: PRICING.pro.monthly.entitlementPlan,
@@ -65,16 +80,57 @@ const buildPriceMappings = (): Record<string, PriceMapping> => {
     },
   ];
 
-  return mappings
-    .filter(mapping => Boolean(mapping.priceId))
-    .reduce<Record<string, PriceMapping>>((acc, mapping) => {
-      acc[mapping.priceId] = mapping;
-      return acc;
-    }, {});
+  return toMappingRecord(mappings);
 };
 
-export const PRICE_MAPPINGS: Record<string, PriceMapping> =
-  buildPriceMappings();
+/**
+ * Retired Stripe prices still on active subscriptions.
+ * founding -> pro per ENTITLEMENT_REGISTRY.getEntitlements('founding').
+ */
+const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
+  const mappings: PriceMapping[] = [];
+
+  if (env.STRIPE_PRICE_FOUNDING_MONTHLY) {
+    mappings.push({
+      priceId: env.STRIPE_PRICE_FOUNDING_MONTHLY,
+      plan: 'pro',
+      amount: 1200,
+      currency: 'usd',
+      interval: 'month',
+      description: 'Founding Member (legacy)',
+      legacy: true,
+    });
+  }
+
+  for (const legacy of HARDCODED_LEGACY_PRICES) {
+    if (mappings.some(mapping => mapping.priceId === legacy.priceId)) {
+      continue;
+    }
+    mappings.push({
+      priceId: legacy.priceId,
+      plan: legacy.plan,
+      amount: legacy.amount,
+      currency: 'usd',
+      interval: legacy.interval,
+      description: legacy.description,
+      legacy: true,
+    });
+  }
+
+  return toMappingRecord(mappings);
+};
+
+export const ACTIVE_PRICE_MAPPINGS: Record<string, PriceMapping> =
+  buildActivePriceMappings();
+
+const LEGACY_PRICE_MAPPINGS: Record<string, PriceMapping> =
+  buildLegacyPriceMappings();
+
+/** All price IDs for webhook/plan lookup (active + legacy). */
+export const PRICE_MAPPINGS: Record<string, PriceMapping> = {
+  ...ACTIVE_PRICE_MAPPINGS,
+  ...LEGACY_PRICE_MAPPINGS,
+};
 
 /**
  * Get plan type from Stripe price ID
@@ -89,7 +145,7 @@ export function getPlanFromPriceId(priceId: string): PlanType | null {
  * Get all currently active price IDs for checkout
  */
 export function getActivePriceIds(): string[] {
-  return Object.values(PRICE_MAPPINGS).map(mapping => mapping.priceId);
+  return Object.values(ACTIVE_PRICE_MAPPINGS).map(mapping => mapping.priceId);
 }
 
 /**
@@ -104,7 +160,9 @@ export function getPriceMappingDetails(priceId: string): PriceMapping | null {
  * Filters based on what's currently active
  */
 export function getAvailablePricing() {
-  return Object.values(PRICE_MAPPINGS).sort((a, b) => a.amount - b.amount);
+  return Object.values(ACTIVE_PRICE_MAPPINGS).sort(
+    (a, b) => a.amount - b.amount
+  );
 }
 
 export function isMaxPlanEnabled(): boolean {

@@ -1,7 +1,5 @@
 export interface IOSAlphaAccessInput {
   readonly isAuthenticated: boolean;
-  readonly isAdmin: boolean;
-  readonly flagEnabled: boolean;
   readonly installUrl: string | null | undefined;
 }
 
@@ -12,11 +10,9 @@ export interface IOSAlphaAccess {
 
 export function resolveIOSAlphaAccess({
   isAuthenticated,
-  isAdmin,
-  flagEnabled,
   installUrl,
 }: IOSAlphaAccessInput): IOSAlphaAccess {
-  const hasAccess = isAuthenticated && (isAdmin || flagEnabled);
+  const hasAccess = isAuthenticated;
   const trimmedInstallUrl = installUrl?.trim() ?? '';
 
   return {

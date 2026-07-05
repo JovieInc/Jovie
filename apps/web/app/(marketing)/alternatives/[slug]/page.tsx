@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import {
   FaqSection,
   MarketingContainer,
-  MarketingHero,
+  MarketingHeroLayout,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -62,7 +62,7 @@ export default async function AlternativesPage({
       <script type='application/ld+json'>{faqSchema}</script>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <MarketingHero variant='left'>
+      <MarketingHeroLayout variant='left'>
         <p className='marketing-kicker'>Alternative</p>
         <h1 className='marketing-h1-linear mt-6 max-w-[20ch] text-primary-token'>
           {data.heroHeadline}
@@ -70,13 +70,13 @@ export default async function AlternativesPage({
         <p className='mt-6 max-w-[60ch] text-lg leading-relaxed text-secondary-token'>
           {data.heroSubheadline}
         </p>
-      </MarketingHero>
+      </MarketingHeroLayout>
 
       {/* Why Switch */}
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <h2 className='text-2xl font-semibold text-primary-token'>
-            Why musicians are switching
+            Why Musicians Are Switching
           </h2>
           <ul className='mt-6 space-y-4'>
             {data.whySwitch.map(reason => (
@@ -96,7 +96,7 @@ export default async function AlternativesPage({
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <h2 className='text-2xl font-semibold text-primary-token'>
-            What you get with {APP_NAME}
+            What You Get With {APP_NAME}
           </h2>
           <div className='mt-6 grid gap-8 sm:grid-cols-2'>
             {data.highlights.map(highlight => (
@@ -118,14 +118,14 @@ export default async function AlternativesPage({
         <section>
           <div className='rounded-xl border border-border-primary bg-surface-secondary p-8 text-center'>
             <h2 className='text-xl font-semibold text-primary-token'>
-              Ready to try {APP_NAME}?
+              Ready To Try {APP_NAME}?
             </h2>
             <p className='mt-2 text-sm text-secondary-token'>
               Create your free profile in under a minute.
             </p>
             <Link
               href={APP_ROUTES.SIGNUP}
-              className='mt-6 inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)'
+              className='mt-6 inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)'
             >
               Request Access
             </Link>

@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import { BASE_URL } from '@/constants/app';
+import { PROFILE_HERO_COMPOSITION_CLASSNAME } from '@/lib/profile/composition';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -112,12 +113,11 @@ export function ArtistHero({
     'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-mid font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-opacity duration-slow hover:opacity-94 active:opacity-[0.9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
+    // Composition rule (#11899, lib/profile/composition.ts): the hero keeps a
+    // fixed 16/7 crop with a 240px floor — height derives from width, never
+    // from viewport or content flow. The fill image crops, never squashes.
     <section
-      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px] xl:max-h-[640px] 2xl:max-h-[680px] ${
-        compact
-          ? 'h-[40dvh] min-h-[320px] max-h-[460px]'
-          : 'h-[48dvh] min-h-[420px] max-h-[620px]'
-      }`}
+      className={`relative w-full overflow-hidden md:rounded-t-3xl ${PROFILE_HERO_COMPOSITION_CLASSNAME}`}
       data-testid='profile-header'
     >
       <div className='absolute inset-0'>
@@ -171,9 +171,9 @@ export function ArtistHero({
               }
             >
               {shareSuccess ? (
-                <Check className='h-[17px] w-[17px]' aria-hidden='true' />
+                <Check className='h-4 w-4' aria-hidden='true' />
               ) : (
-                <Share2 className='h-[17px] w-[17px]' aria-hidden='true' />
+                <Share2 className='h-4 w-4' aria-hidden='true' />
               )}
               <span className='sr-only md:not-sr-only md:inline'>
                 {shareSuccess ? 'Copied' : 'Share'}
@@ -185,7 +185,7 @@ export function ArtistHero({
               className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-mid font-semibold tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
               aria-label={`Manage alerts for ${artist.name}`}
             >
-              <Bell className='h-[17px] w-[17px]' aria-hidden='true' />
+              <Bell className='h-4 w-4' aria-hidden='true' />
               <span className='sr-only md:not-sr-only md:inline'>Notify</span>
             </button>
           </div>
@@ -201,7 +201,7 @@ export function ArtistHero({
               ) : null}
 
               <h1
-                className={`line-clamp-3 max-w-[21rem] font-[640] tracking-[-0.065em] text-white md:max-w-[30rem] md:text-[3.5rem] md:leading-[0.94] ${
+                className={`line-clamp-3 max-w-[21rem] font-[640] tracking-[-0.065em] text-white dark:text-white md:max-w-[30rem] md:text-[3.5rem] md:leading-[0.94] ${
                   compact ? 'text-[2.25rem]' : 'text-[2.65rem]'
                 }`}
               >
@@ -215,10 +215,7 @@ export function ArtistHero({
               className={`${heroPearlClassName} inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-mid font-semibold tracking-[-0.015em] text-white/92 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
               aria-label={`Listen to ${artist.name}`}
             >
-              <Play
-                className='mr-2 h-[17px] w-[17px] fill-current'
-                aria-hidden='true'
-              />
+              <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
               Play
             </button>
           </div>
@@ -229,12 +226,9 @@ export function ArtistHero({
                   const content = (
                     <>
                       {primaryActionKind === 'tickets' ? (
-                        <Ticket
-                          className='mr-2 h-[17px] w-[17px]'
-                          aria-hidden='true'
-                        />
+                        <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
                       ) : null}
-                      {primaryAction.label}
+                      {primaryAction.label || 'Open'}
                     </>
                   );
                   const label = primaryAction.ariaLabel ?? primaryAction.label;

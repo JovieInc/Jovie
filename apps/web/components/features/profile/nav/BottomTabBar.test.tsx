@@ -9,7 +9,7 @@
  *  - Tab click handler calls onTabSelect with correct mode
  *  - Grid column count matches visible tab count
  *  - No horizontal overflow at narrow viewports (320px) — structural check
- *  - 44×44pt touch target minimum via min-h-[50px] class
+ *  - 44×44pt touch target minimum via min-h-13 class
  *  - Empty Events tabs remain reachable so the surface can show alert signup
  */
 
@@ -63,7 +63,7 @@ describe('BottomTabBar — tab rendering', () => {
   it('renders the nav with accessible label', () => {
     render(<BottomTabBar {...makeProps()} />);
     expect(
-      screen.getByRole('navigation', { name: 'Profile navigation' })
+      screen.getByRole('navigation', { name: 'Profile Navigation' })
     ).toBeInTheDocument();
   });
 });
@@ -184,11 +184,11 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('all primary tab buttons have min-h-[50px] for 44pt touch target compliance', () => {
+  it('all primary tab buttons have min-h-13 for 44pt touch target compliance', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const buttons = container.querySelectorAll('button');
     for (const btn of buttons) {
-      expect(btn.className).toContain('min-h-[50px]');
+      expect(btn.className).toContain('min-h-13');
     }
   });
 

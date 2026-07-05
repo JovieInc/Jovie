@@ -28,55 +28,88 @@
  * In practice: only runs when there are queued workflow_runs rows.
  */
 
-import { and, eq, inArray, lte } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, lte, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { isMissingConnectorWorkflowTablesError } from '@/lib/connectors/schema-errors';
 import {
   executeApprovedAction,
   markWorkflowFailed,
 } from '@/lib/connectors/workflows/execute-approved-action';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
-import { env } from '@/lib/env-server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '@/lib/release-to-revenue/types';
+import { initializeReleaseToRevenueRun } from '@/lib/release-to-revenue/workflows/initialize-run';
 import { logger } from '@/lib/utils/logger';
 
+export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const MAX_RUNS_PER_TICK = 20;
 const MAX_CONCURRENT_RUNS = 5;
+/** Reclaim in-flight runs whose lease expired (lambda timeout / crash guard). */
+const LEASE_DURATION_MS = 10 * 60 * 1000;
+
+function leaseExpiredBefore(now: Date) {
+  const staleBefore = new Date(now.getTime() - LEASE_DURATION_MS);
+  return or(
+    lt(workflowRuns.leaseExpiresAt, now),
+    and(
+      isNull(workflowRuns.leaseExpiresAt),
+      lt(workflowRuns.updatedAt, staleBefore)
+    )
+  );
+}
 
 export async function GET(request: Request): Promise<Response> {
-  // Verify cron secret
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/process-workflow-runs',
+    requireTrustedOrigin: true,
+  });
+  if (authError) return authError;
 
   const now = new Date();
 
   try {
-    // Step 1: SELECT up to MAX_RUNS_PER_TICK queued runs (uses LIMIT)
-    const queuedRuns = await db
+    const leaseExpiresAt = new Date(now.getTime() + LEASE_DURATION_MS);
+
+    // Step 1: SELECT claimable runs — queued due now, or running with expired lease
+    const claimableRuns = await db
       .select({ id: workflowRuns.id, kind: workflowRuns.kind })
       .from(workflowRuns)
       .where(
-        and(eq(workflowRuns.status, 'queued'), lte(workflowRuns.runAt, now))
+        or(
+          and(eq(workflowRuns.status, 'queued'), lte(workflowRuns.runAt, now)),
+          and(eq(workflowRuns.status, 'running'), leaseExpiredBefore(now))
+        )
       )
       .limit(MAX_RUNS_PER_TICK);
 
-    if (queuedRuns.length === 0) {
+    if (claimableRuns.length === 0) {
       return NextResponse.json({ ok: true, processed: 0 });
     }
 
-    // Step 2: CAS claim by ID — atomically transition to 'running'
-    const queuedIds = queuedRuns.map(r => r.id);
+    // Step 2: CAS claim by ID — atomically transition/refresh lease to 'running'
+    const claimableIds = claimableRuns.map(r => r.id);
     const claimed = await db
       .update(workflowRuns)
-      .set({ status: 'running', updatedAt: now })
+      .set({
+        status: 'running',
+        claimedAt: now,
+        leaseExpiresAt,
+        updatedAt: now,
+      })
       .where(
         and(
-          inArray(workflowRuns.id, queuedIds),
-          eq(workflowRuns.status, 'queued')
+          inArray(workflowRuns.id, claimableIds),
+          or(
+            and(
+              eq(workflowRuns.status, 'queued'),
+              lte(workflowRuns.runAt, now)
+            ),
+            and(eq(workflowRuns.status, 'running'), leaseExpiredBefore(now))
+          )
         )
       )
       .returning({
@@ -103,6 +136,9 @@ export async function GET(request: Request): Promise<Response> {
           try {
             if (run.kind === 'execute_approved_action') {
               await executeApprovedAction({ workflowRunId: run.id });
+              processed++;
+            } else if (run.kind === RELEASE_TO_REVENUE_WORKFLOW_KIND) {
+              await initializeReleaseToRevenueRun({ workflowRunId: run.id });
               processed++;
             } else {
               logger.warn('[process-workflow-runs] unknown workflow kind', {
@@ -142,6 +178,13 @@ export async function GET(request: Request): Promise<Response> {
       failed,
     });
   } catch (err) {
+    if (isMissingConnectorWorkflowTablesError(err)) {
+      logger.info(
+        '[process-workflow-runs] connector workflow tables not migrated; skipping tick'
+      );
+      return NextResponse.json({ ok: true, processed: 0, skipped: true });
+    }
+
     // JOV-2326: a failed cron tick is self-healing — the next tick (6 min) will retry
     // any pending rows. Log at warn level to avoid Sentry noise from transient Neon
     // connection failures; escalate only if the error recurs persistently.

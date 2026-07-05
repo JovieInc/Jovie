@@ -41,7 +41,7 @@ describe('FirstFanCelebration', () => {
   it('renders celebration dialog when subscriberCount is 1', () => {
     render(<FirstFanCelebration subscriberCount={1} userId={userId} />);
     expect(
-      screen.getByText('Your first fan just subscribed!')
+      screen.getByText('Your First Fan Just Subscribed!')
     ).toBeInTheDocument();
   });
 

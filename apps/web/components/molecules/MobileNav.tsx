@@ -3,10 +3,17 @@
 import { ArrowRight, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
-import { UserButton } from '@/components/organisms/user-button';
 
+import { AnimatedIconSwap } from '@/components/atoms/AnimatedIconSwap';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
@@ -16,20 +23,20 @@ type NavLink = { href: string; label: string };
 
 // ── Hoisted style objects (avoid re-creating on every render → less GC pressure) ──
 
-const CTA_BUTTON_STYLE: React.CSSProperties = {
+const CTA_BUTTON_STYLE: CSSProperties = {
   color: 'var(--linear-btn-primary-fg)',
   backgroundColor: 'var(--linear-btn-primary-bg)',
   border: '1px solid var(--linear-btn-primary-border)',
   boxShadow: 'var(--linear-shadow-button)',
 };
 
-const OVERLAY_STYLE: React.CSSProperties = {
+const OVERLAY_STYLE: CSSProperties = {
   background: 'oklch(0% 0 0 / 0.6)',
   backdropFilter: 'blur(8px)',
   WebkitBackdropFilter: 'blur(8px)',
 };
 
-const NAV_PANEL_STYLE: React.CSSProperties = {
+const NAV_PANEL_STYLE: CSSProperties = {
   backgroundColor:
     'color-mix(in oklab, var(--linear-bg-surface-0) 95%, white 5%)',
   borderTop:
@@ -39,7 +46,7 @@ const NAV_PANEL_STYLE: React.CSSProperties = {
   paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
 };
 
-const GRABBER_STYLE: React.CSSProperties = {
+const GRABBER_STYLE: CSSProperties = {
   background:
     'color-mix(in oklab, var(--linear-text-tertiary) 40%, transparent)',
 };
@@ -57,7 +64,7 @@ function buildNavLinks(
   }
 
   if (!showAuthenticatedAction && includePublicLogin) {
-    baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log in' });
+    baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log In' });
   }
 
   return baseLinks;
@@ -81,8 +88,8 @@ function MobileNavCta({
     <Link
       href={href}
       className={cn(
-        'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
-        'text-[17px] font-semibold',
+        'group flex items-center justify-center gap-2 h-13 rounded-xl',
+        'text-base font-semibold',
         'transition-colors duration-subtle ease-subtle'
       )}
       style={CTA_BUTTON_STYLE}
@@ -99,11 +106,13 @@ export function MobileNav({
   includePublicLogin = true,
   publicCtaHref,
   publicCtaLabel,
+  authenticatedUserSlot,
 }: {
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly includePublicLogin?: boolean;
   readonly publicCtaHref?: string;
   readonly publicCtaLabel?: string;
+  readonly authenticatedUserSlot?: ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -173,27 +182,13 @@ export function MobileNav({
         aria-expanded={isOpen}
         aria-controls='mobile-nav-panel'
       >
-        <div className='relative size-5'>
-          {/* Hamburger → X morphing */}
-          <Menu
-            size={20}
-            className={cn(
-              'absolute inset-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
-              isOpen
-                ? 'opacity-0 rotate-90 scale-75'
-                : 'opacity-100 rotate-0 scale-100'
-            )}
-          />
-          <X
-            size={20}
-            className={cn(
-              'absolute inset-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
-              isOpen
-                ? 'opacity-100 rotate-0 scale-100'
-                : 'opacity-0 -rotate-90 scale-75'
-            )}
-          />
-        </div>
+        {/* Hamburger → X morphing via the shared icon-swap primitive */}
+        <AnimatedIconSwap
+          activeKey={isOpen ? 'close' : 'open'}
+          className='size-5'
+        >
+          {isOpen ? <X size={20} /> : <Menu size={20} />}
+        </AnimatedIconSwap>
       </button>
 
       {/* Portal: render overlay + nav panel outside header to avoid
@@ -219,19 +214,16 @@ export function MobileNav({
               id='mobile-nav-panel'
               className={cn(
                 'fixed inset-x-0 bottom-0 z-[100]',
-                'rounded-t-[20px]',
+                'rounded-t-3xl',
                 'transition-[opacity,transform] duration-cinematic ease-cinematic',
                 'translate-y-0 opacity-100 pointer-events-auto'
               )}
               style={NAV_PANEL_STYLE}
-              aria-label='Mobile navigation'
+              aria-label='Mobile Navigation'
             >
               {/* Grabber handle */}
               <div className='flex justify-center pt-3 pb-2' aria-hidden='true'>
-                <div
-                  className='w-9 h-[5px] rounded-full'
-                  style={GRABBER_STYLE}
-                />
+                <div className='w-9 h-1 rounded-full' style={GRABBER_STYLE} />
               </div>
 
               {/* Nav links */}
@@ -241,8 +233,8 @@ export function MobileNav({
                     key={`${link.href}-${link.label}`}
                     href={link.href}
                     className={cn(
-                      'flex items-center h-[52px] px-4 rounded-xl',
-                      'text-[17px] font-medium',
+                      'flex items-center h-13 px-4 rounded-xl',
+                      'text-base font-medium',
                       'text-primary-token',
                       'transition-colors duration-subtle ease-subtle',
                       'hover:bg-(--linear-bg-hover)',
@@ -274,7 +266,7 @@ export function MobileNav({
               </div>
 
               {/* User section (authenticated) */}
-              {showAuthenticatedAction && (
+              {showAuthenticatedAction && authenticatedUserSlot ? (
                 <div
                   className={cn(
                     'mx-4 mt-4 pt-4',
@@ -285,9 +277,9 @@ export function MobileNav({
                     animationDelay: `${80 + (navLinks.length + 1) * 50}ms`,
                   }}
                 >
-                  <UserButton />
+                  {authenticatedUserSlot}
                 </div>
-              )}
+              ) : null}
             </nav>
           </>,
           portalTarget

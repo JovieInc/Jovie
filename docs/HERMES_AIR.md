@@ -4,7 +4,7 @@ Day-to-day operations for the always-on Hermes gateway running on the dedicated 
 
 ## What This Machine Is
 
-A single-purpose orchestration node. It listens for brain dumps (Telegram + Voice Memos), persists them to gbrain, routes engineering work to Linear, and routes ops tasks to sub-agents. The Hermes scanner code does **zero coding** itself. The opt-in codex issue shipper can start a separate `JOVIE_AGENT_PROFILE=coder` child session for GitHub issues explicitly labeled `codex`.
+A single-purpose orchestration node. It listens for brain dumps (Telegram + Voice Memos), persists them to gbrain, routes engineering work to **GitHub Issues** (Linear mirror optional via `TRACKER_GITHUB_ONLY`), and routes ops tasks to sub-agents. The Hermes scanner code does **zero coding** itself. The opt-in codex issue shipper can start a separate `JOVIE_AGENT_PROFILE=coder` child session for eligible open GitHub issues.
 
 ## First-Time Setup
 
@@ -80,8 +80,9 @@ doppler secrets set HERMES_TELEGRAM_CHAT_ID="<telegram-chat-id>" \
 |---|---|---|
 | `HERMES_TELEGRAM_BOT_TOKEN` | Telegram gateway authentication | manual (BotFather) |
 | `OPENROUTER_API_KEY` | Free-model router authentication | already provisioned |
-| `LINEAR_API_KEY` | Filing issues from voice/Telegram intake | already provisioned |
-| `GITHUB_TOKEN` | PR-stuck / CI-failure monitors | already provisioned |
+| `GITHUB_TOKEN` | Filing issues + PR-stuck / CI-failure monitors | already provisioned |
+| `GH_REPO` | Target repo for `gh issue create` (defaults to authenticated default) | optional |
+| `LINEAR_API_KEY` | Optional Linear mirror while `TRACKER_GITHUB_ONLY` is unset | already provisioned |
 | `AIRTABLE_API_KEY` | Founder-OS profile (fundraising base) | already provisioned |
 | `SENTRY_AUTH_TOKEN` | Optional: ship Hermes errors to Sentry `hermes-air` env | already provisioned |
 | `HERMES_TELEGRAM_CHAT_ID` | Optional: Telegram private-chat allowlist + outbound target | manual after first bot message |
@@ -90,13 +91,14 @@ The bootstrap script verifies every required secret is present before continuing
 
 ## Daily Operation
 
-Once installed, you should never need to interact with the Air directly. All control is through Telegram and Linear.
+Once installed, you should never need to interact with the Air directly. All control is through Telegram and GitHub Issues.
 
 | To do this | Do this |
 |---|---|
 | Brain-dump an idea | Telegram the bot, or record a Voice Memo on iPhone |
-| File a bug | Voice-memo "Hermes, file a Linear issue for ..." or type it |
-| Queue local coding work | Add the GitHub issue label `codex` |
+| File a bug | Voice-memo "Hermes, file a GitHub issue for ..." or type it |
+| Queue CI agent dispatch | Add the GitHub issue label `agent-ready` |
+| Queue local coding work | Leave issue open for the codex issue shipper (or add `codex` for explicit routing) |
 | Ask a strategic question | Telegram the bot; the chief profile routes |
 | Get a daily summary | Wait for the 07:00 briefing, or Telegram "brief me" |
 | Push back rate-limited | Hermes will respond with which model it used |
@@ -124,6 +126,15 @@ tail -50 ~/.hermes/logs/dispatch.jsonl | jq .
 # Codex issue shipper logs
 tail -50 ~/.hermes/logs/launchd/cron-codex-issue-shipper.log
 tail -50 ~/.hermes/logs/codex-issue-shipper/*.log 2>/dev/null  # after a non-dry-run agent dispatch
+
+# Hermes/OpenClaw agent config health
+tsx scripts/hermes/jobs/agent-config-health.ts
+tail -50 ~/.hermes/logs/launchd/cron-agent-config-health.err.log
+
+# Latest gbrain health summary written by Hermes
+gbrain search "ops/gbrain-health/latest" --limit 3
+tail -50 ~/.hermes/logs/launchd/cron-gbrain-health-summary.log \
+  ~/.hermes/logs/launchd/cron-gbrain-health-summary.err.log
 
 # Free-model rankings
 cat ~/.hermes/state/model-router-rankings.json | jq .
@@ -187,13 +198,31 @@ HERMES_CODEX_SHIPPER_DRY_RUN=1 tsx scripts/hermes/jobs/codex-issue-shipper.ts
 tsx scripts/hermes/jobs/codex-issue-shipper.ts
 ```
 
-The job watches open GitHub issues labeled `codex`. Empty runs only call GitHub, write a JSONL event, and exit. No gbrain query, model call, subagent, or CodeRabbit review starts until an eligible issue exists.
+The job watches open GitHub issues and filters out hard-skip labels (`no-auto`, `invalid`, `type:epic`, `human-review-required`, already-claimed, or blocked). Empty runs only call GitHub, write a JSONL event, and exit. No gbrain query, model call, subagent, or CodeRabbit review starts until an eligible issue exists. Before the shipper claims a selected issue or prepares a worktree, it must complete the gbrain coordination preflight: fetch `gbrain:agent-org-chart` when available, check `shared-skills/coordination-basics/SKILL.md` when present, query for existing work/ownership, delegate through the coordination inbox if another agent owns the area, and stop with a `system-blocker` if gbrain is unreachable.
+
+Only one shipper run may own the queue at a time. A new cron invocation takes a non-blocking singleton lock check; if another shipper is still active, the new invocation logs `singleton_active_skip` and exits. The active run keeps draining the queue in batches until no eligible issues remain, the machine is under too much pressure to launch another agent, or all remaining issues are blocked or human-gated.
+
+UI/UX, design, taste, token, and visual-polish issues get an additional coder prompt block that loads `design-taste-frontend`, requires the design-read statement, dials, before/after evidence, narrow checks, and the checklist pass/fail in the PR body. For existing product/dashboard UI, agents use the skill's audit/checklist portions only; they must not force landing-page patterns into product UI.
+
+Restore the external design skill in a fresh worktree only after confirming the
+reviewed upstream commit. The required headless install command is intentionally
+guarded so mutable upstream instructions cannot be installed silently:
+
+```bash
+test "$(git ls-remote https://github.com/Leonxlnx/taste-skill.git HEAD | awk '{print $1}')" = "06d6028b5c623016c59ce8536f578e5a1127b499" && DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 npx --yes skills add https://github.com/Leonxlnx/taste-skill --skill "design-taste-frontend" -y
+```
+
+Safe UI-only fixes can use the guarded Graphite UI fast lane from JOV-3895 only when the diff stays inside the allowed visual UI paths in `.github/MERGE_QUEUE.md`. The PR must carry `ui`, `fast-track-ui`, `fast`, and `merge-queue`, plus a `## Fast-track UI eligibility` section with `Why eligible`, `Before`, `After`, and `Checks run` evidence. The merge-queue guard fails closed for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, and broad refactors.
 
 Config variables:
 
 | Variable | Default | Purpose | Update path |
 |---|---:|---|---|
-| `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` | `1` | Max Codex issues shipped per run; controls concurrency and spend | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` | `3` | Max Codex issues selected per drain batch; also caps parallel agent fan-out | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS` | `3` | Absolute cap for concurrent coder agents inside the singleton shipper run | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB` | `4096` | Below this free-memory floor, launch at most one new coder; below half this floor, launch none | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU` | `1.5` | Above this one-minute load-per-CPU threshold, launch at most one new coder; above 1.5x this threshold, launch none | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_SINGLETON_LOCK_STALE_MS` | `28800000` | Long-running shipper lock TTL; new crons skip while the owning process is alive | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
 | `HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD` | `4` | Eligible queue depth that routes trainable issues through `integration/codex-queue` | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
 | `HERMES_CODEX_SHIPPER_AGENT` | `claude` | Local coding agent binary; `claude` keeps subagent support, `codex` is available as an explicit override | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
 
@@ -204,6 +233,7 @@ Control labels:
 | `codex` | Eligible source queue |
 | `codex-in-progress` | Claimed by the local shipper |
 | `codex-blocked` | Real blocker; the shipper will not retry automatically |
+| `invalid` | Confirmed misroute; the shipper will not claim or retry |
 | `human-review-required` | Hard skip |
 | `integration-branch` | Batch trainable issues through the integration branch |
 
@@ -211,9 +241,9 @@ Ship now / Re-evaluate when / Then:
 
 | Decision | Trigger | Action |
 |---|---|---|
-| Ship now | Default `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN=1`, because one coder session can consume hours of agent time plus CI minutes | Keep one issue per run and let the 15-minute cron continue draining |
-| Re-evaluate when | Eligible `codex` queue stays above 4 issues for two consecutive runs and cost per shipped issue stays under the weekly unit target: CI minutes x runner cost plus agent minutes x model cost | Raise `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` or add an `integration-branch` label to queue trainable issues |
-| Then | CI minutes x runner cost plus agent minutes x model cost stay within the weekly agent budget | Keep the higher concurrency; otherwise return to one issue per run |
+| Ship now | Default `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN=3` and `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS=3`, because one singleton run can keep the queue hot without duplicate cron owners | Keep up to three coder lanes active while free memory stays above 4096MB and load stays below 1.5 per CPU |
+| Re-evaluate when | Cost per shipped issue rises above the weekly unit target: CI minutes x runner cost plus agent minutes x model cost, or local pressure repeatedly logs `capacity_throttled` | Lower `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS`, raise machine capacity, or route more trainable issues through `integration-branch` labels |
+| Then | CI minutes x runner cost plus agent minutes x model cost stay within the weekly agent budget | Keep three lanes; otherwise reduce the cap until the queue drain cost is back inside target |
 
 ## Recovery Procedures
 
@@ -221,9 +251,22 @@ Ship now / Re-evaluate when / Then:
 
 1. Check launchd state: `launchctl print gui/$(id -u)/ai.hermes.gateway | grep -A 3 "last exit"`
 2. Tail gateway log: `tail -100 ~/.hermes/logs/gateway.error.log`
-3. Confirm the supported Hermes gateway command works: `hermes gateway status`
-4. Re-run bootstrap: `./scripts/hermes/bootstrap-air.sh` (idempotent)
-5. If config is corrupt: `mv ~/.hermes/config.yaml ~/.hermes/config.yaml.bak && ./scripts/hermes/bootstrap-air.sh --reconfigure`
+3. Run the config sentinel: `tsx scripts/hermes/jobs/agent-config-health.ts`
+4. Confirm the supported Hermes gateway command works: `hermes gateway status`
+5. Re-run bootstrap: `./scripts/hermes/bootstrap-air.sh` (idempotent)
+6. If config is corrupt: `mv ~/.hermes/config.yaml ~/.hermes/config.yaml.bak && ./scripts/hermes/bootstrap-air.sh --reconfigure`
+
+### Agents keep failing after Telegram dispatch
+
+Run the config sentinel before changing models or restarting services:
+
+```bash
+tsx scripts/hermes/jobs/agent-config-health.ts
+tail -20 ~/.hermes/logs/jobs.jsonl | jq 'select(.job == "agent-config-health")'
+```
+
+It fails on the recurring local-agent patterns that caused OpenClaw/Hermes churn:
+schema-clobbered `memorySearch` blocks in `~/.openclaw/openclaw.json`, Vercel AI Gateway embedding model names without the `openai/` prefix, and stale Hermes fallbacks such as `nex-agi/nex-n2-pro`.
 
 ### Voice memo ingest stopped working
 
@@ -250,6 +293,15 @@ Once you understand the cause, fix it (likely in `free-model-router.ts` rankings
 1. On Air: `tailscale ip -4` — confirm Tailscale IP.
 2. On Air: `lsof -i :<gbrain-port>` — confirm `gbrain serve --http --bind <tailscale-ip>` is listening.
 3. On Pro: update MCP config to point at `http://<air-tailscale-ip>:<port>`.
+
+### Supabase connection exhaustion (Pro-hosted company brain)
+
+Hermes-Air runs gbrain on **PGLite** — no Postgres pool budget needed on the Air.
+The shared Supabase company brain on the MacBook Pro is different: each gbrain
+process multiplies pools unless clamped. See [`docs/GBRAIN_POOL_BUDGET.md`](./GBRAIN_POOL_BUDGET.md)
+for `GBRAIN_POOL_SIZE`, `GBRAIN_MAX_CONNECTIONS`, and verification steps.
+Codex hooks already source `scripts/lib/gbrain-pool-env.sh`; long-lived Pro
+cron/launchd wrappers must export the same env.
 
 ### Air rebooted
 

@@ -115,7 +115,7 @@ export function CelebrationCardPreview({
       {/* Card preview */}
       <div
         className={`overflow-hidden rounded-xl border border-subtle ${
-          selectedSize === 'story' ? 'max-h-[320px]' : 'max-h-[240px]'
+          selectedSize === 'story' ? 'max-h-80' : 'max-h-60'
         }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- preview of generated image */}
@@ -123,7 +123,7 @@ export function CelebrationCardPreview({
           src={cardUrl}
           alt='Your shareable profile card'
           className={`w-full ${
-            selectedSize === 'story' ? 'max-w-[180px]' : 'max-w-[240px]'
+            selectedSize === 'story' ? 'max-w-45' : 'max-w-60'
           }`}
         />
       </div>

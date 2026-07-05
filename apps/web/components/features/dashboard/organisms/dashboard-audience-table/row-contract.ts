@@ -73,7 +73,23 @@ export function getAudienceDisplayName(
     return name;
   }
 
-  return isAudienceMemberAnonymous(member) ? 'Anonymous Fan' : 'Visitor';
+  return isAudienceMemberAnonymous(member) ? 'Anonymous Fan' : 'Fan';
+}
+
+/** Whether the artist can message this fan through a known channel. */
+export function canMessageAudienceMember(
+  member: Pick<
+    AudienceMember,
+    | 'displayName'
+    | 'email'
+    | 'emailVisibleToArtist'
+    | 'phone'
+    | 'spotifyConnected'
+  >
+): boolean {
+  return (
+    !isAudienceMemberAnonymous(member) && isAudienceMemberReachable(member)
+  );
 }
 
 export function getAudienceIdentityChip(

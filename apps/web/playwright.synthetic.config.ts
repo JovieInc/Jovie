@@ -18,6 +18,10 @@ export default defineConfig({
     '**/synthetic-legacy-otp.spec.ts',
     '**/onboarding-robot.full.spec.ts',
     '**/public-profile-smoke.spec.ts',
+    // Production Journey Auditor: anonymous signup→interview initialization
+    // probe. Prod gates the full turn behind Turnstile, so the smoke verifies
+    // the interview *initializes* (the gap the prod break fell through).
+    '**/canary-auth-signup-onboarding.spec.ts',
   ],
   fullyParallel: false, // Sequential for stability in prod
   forbidOnly: true, // Always enforced in synthetic mode
@@ -37,6 +41,9 @@ export default defineConfig({
     ],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['line'],
+    // Compact, redacted failure packet per failed journey (route, step,
+    // screenshot, console errors, failed requests, trace path).
+    ['./tests/e2e/reporters/journey-failure-packet.ts'],
   ],
 
   use: {

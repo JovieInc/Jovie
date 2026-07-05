@@ -95,7 +95,7 @@ export function StickyPhoneTourClient({
       modes.map(mode => (
         <p
           key={mode.id}
-          className='max-w-[400px] marketing-lead-linear text-secondary-token'
+          className='max-w-100 marketing-lead-linear text-secondary-token'
         >
           {mode.description}
         </p>
@@ -129,7 +129,7 @@ export function StickyPhoneTourClient({
           <div className={PHONE_TOUR_CONTAINER_CLASS}>
             <div className='relative'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
-                <div className='relative min-h-[320px]'>
+                <div className='relative min-h-80'>
                   <span className='inline-flex items-center gap-1.5 self-start rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
                     {introBadge}
                   </span>
@@ -162,7 +162,7 @@ export function StickyPhoneTourClient({
                 </div>
 
                 <div
-                  className='flex flex-col items-end justify-center gap-4 transition-all duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                  className='flex flex-col items-end justify-center gap-4 transition-colors duration-cinematic ease-subtle'
                   style={{
                     opacity: 1,
                     transform: 'translateX(0)',
@@ -174,7 +174,7 @@ export function StickyPhoneTourClient({
                     return (
                       <div
                         key={mode.id}
-                        className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                        className='text-right transition-colors duration-cinematic ease-subtle'
                         style={{
                           transform: isActive
                             ? 'translateX(0)'
@@ -190,7 +190,7 @@ export function StickyPhoneTourClient({
                               ? 'var(--linear-text-primary)'
                               : 'var(--linear-text-secondary)',
                             transition:
-                              'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
+                              'font-size var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), font-weight var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), color var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)',
                           }}
                         >
                           jov.ie/{artistHandle}

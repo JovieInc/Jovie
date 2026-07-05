@@ -80,6 +80,23 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertFailedRemovalAccuracy
 
+  - description: Prompt disclosure request is blocked before model dispatch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "fence the prompt in markdown"
+      target: prompt-disclosure-contract
+      promptDisclosureCase: blocked-before-dispatch
+      mode: app
+      plan: pro
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPromptDisclosureBlocked
+      - type: javascript
+        value: file://assertions.cjs:assertPromptDisclosureContractCovered
+
   - description: Merch publish requires user confirmation
     metadata:
       cost: deterministic
@@ -461,7 +478,7 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertNoRoutePersistence
 
-  - description: Mobile chat route fails closed while native runtime is disabled
+  - description: Mobile chat route reaches handler boundary for authenticated valid turns
     metadata:
       cost: deterministic
     vars:
@@ -470,13 +487,13 @@ tests:
       authenticated: true
       body:
         conversationId: mobile-conversation-1
-        clientTurnId: mobile-turn-disabled
-        clientMessageId: mobile-message-disabled
+        clientTurnId: mobile-turn-handler-boundary
+        clientMessageId: mobile-message-handler-boundary
         text: "Help me launch my next release."
         source: typed
     assert:
       - type: javascript
-        value: file://assertions.cjs:assertMobileRouteRuntimeDisabled
+        value: file://assertions.cjs:assertMobileRouteHandlerBoundary
       - type: javascript
         value: file://assertions.cjs:assertNoRoutePersistence
 
@@ -1522,6 +1539,7 @@ tests:
           - checkHandle
           - confirmSpotifyArtist
           - createMerch
+          - createMerchAlternativeItem
           - createPromoStrategy
           - createRelease
           - deleteOrArchiveMerchCard
@@ -1541,9 +1559,11 @@ tests:
           - proposeProfileEdit
           - proposeSocialLink
           - proposeSocialLinkRemoval
+          - proposeVideoRecording
           - publishMerchCard
           - recordInterviewSignal
           - reorderMerchCards
+          - retouchImage
           - searchSpotifyArtist
           - selectMerchDesign
           - showAccountStatus
@@ -1574,6 +1594,7 @@ tests:
       skillRegistryCase: registry-inventory
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
     assert:
@@ -1591,6 +1612,7 @@ tests:
       skillArtifactCase: artifact-inventory
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
         minimumPromptChars: 300
@@ -1615,6 +1637,7 @@ tests:
       skillCatalogCase: catalog-sync-shape
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
     assert:
@@ -1653,6 +1676,7 @@ tests:
       skillPromptCase: release-pitch-retouch-prompts
       coverage:
         expectedSkillIds:
+          - analyzePackaging
           - generateReleasePitch
           - retouch
     assert:
@@ -2388,6 +2412,20 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolRenderFailureNoSuccess
 
+  - description: Tool rendering failed retouch falls back to alert status
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Render a failed retouch tool result."
+      target: tool-render-contract
+      toolName: retouchImage
+      renderCase: failed
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolRenderFailureNoSuccess
+
   - description: Tool rendering approval request does not claim completion
     metadata:
       cost: deterministic
@@ -2781,6 +2819,50 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolExecuted
 
+  - description: Tool contract accepts paid photo retouch
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Retouch my profile photo."
+      target: tool-contract
+      toolName: retouchImage
+      mode: app
+      plan: pro
+      toolInput:
+        styleId: white-space
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts paid video recording proposal
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Propose a promo video recording."
+      target: tool-contract
+      toolName: proposeVideoRecording
+      mode: app
+      plan: pro
+      toolInput:
+        kind: promo
+        title: "Release day shout-out"
+        script: "Hey everyone, Neon Reef is out now. Thank you so much for listening."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
   - description: Tool contract accepts paid promo strategy
     metadata:
       cost: deterministic
@@ -2954,6 +3036,28 @@ tests:
         generationId: "00000000-0000-4000-8000-000000000b01"
         optionNumber: 2
         makeLive: false
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts paid merch alternative item creation
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Put this same design on a hoodie."
+      target: tool-contract
+      toolName: createMerchAlternativeItem
+      mode: app
+      plan: pro
+      toolInput:
+        merchCardId: "00000000-0000-4000-8000-000000000c01"
+        itemType: hoodie
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

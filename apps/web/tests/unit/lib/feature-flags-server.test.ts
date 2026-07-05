@@ -42,6 +42,10 @@ const { mockIsAdmin } = vi.hoisted(() => ({
   mockIsAdmin: vi.fn(),
 }));
 
+const { mockGetFlagOverrideMap } = vi.hoisted(() => ({
+  mockGetFlagOverrideMap: vi.fn(),
+}));
+
 const { mockCookiesGet, mockCookies } = vi.hoisted(() => {
   const mockCookiesGet = vi.fn();
   return {
@@ -79,6 +83,12 @@ vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mockIsAdmin,
 }));
 
+vi.mock('@/lib/flags/overrides-store.server', () => ({
+  getFlagOverrideMap: mockGetFlagOverrideMap,
+  revalidateFeatureFlags: vi.fn(),
+  FEATURE_FLAGS_CACHE_TAG: 'feature-flags',
+}));
+
 describe('Statsig server initialization', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -93,6 +103,7 @@ describe('Statsig server initialization', () => {
     });
     mockCookiesGet.mockReset().mockReturnValue(undefined);
     mockIsAdmin.mockReset().mockResolvedValue(false);
+    mockGetFlagOverrideMap.mockReset().mockResolvedValue({});
     initializeMock.mockReset().mockResolvedValue({ success: true });
     shutdownMock.mockReset().mockResolvedValue({ success: true });
     statsigConstructorMock.mockClear();
@@ -285,6 +296,68 @@ describe('Statsig server initialization', () => {
       getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
     ).resolves.toBe(true);
     expect(mockIsAdmin).toHaveBeenCalledWith('admin_123');
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('honors a per-environment override before the registry default', async () => {
+    // RELEASE_PLAN_DEMO is NOT admin-default-true, so the env override is the
+    // deciding layer for an anonymous request.
+    mockGetFlagOverrideMap.mockResolvedValue({ RELEASE_PLAN_DEMO: false });
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(true);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: { RELEASE_PLAN_DEMO: { run } },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(getAppFlagValue('RELEASE_PLAN_DEMO')).resolves.toBe(false);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('honors a personal override cookie for admins in production', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    mockIsAdmin.mockResolvedValue(true);
+    mockCookiesGet.mockImplementation((name: string) =>
+      name === 'jovie_app_flag_overrides'
+        ? {
+            value: encodeURIComponent(
+              JSON.stringify({ 'code:SPOTIFY_OAUTH': false })
+            ),
+          }
+        : undefined
+    );
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(true);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: { SPOTIFY_OAUTH: { run } },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    // Personal override (false) wins even over admin-default-true.
+    await expect(
+      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+    ).resolves.toBe(false);
     expect(run).not.toHaveBeenCalled();
   });
 });

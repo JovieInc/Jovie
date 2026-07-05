@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { STABLE_CACHE } from './cache-strategies';
+import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
 import { createQueryFn, FetchError } from './fetch';
 import { queryKeys } from './keys';
 
@@ -18,6 +18,8 @@ export interface ChatUsageData {
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
+  /** Present when billing was unavailable and the snapshot is cached or degraded. */
+  _stale?: boolean;
 }
 
 const fetchChatUsage = createQueryFn<ChatUsageData>('/api/chat/usage');
@@ -25,7 +27,7 @@ const fetchChatUsage = createQueryFn<ChatUsageData>('/api/chat/usage');
 export const chatUsageQueryOptions = {
   queryKey: queryKeys.chat.usage(),
   queryFn: fetchChatUsage,
-  ...STABLE_CACHE,
+  ...FREQUENT_BACKGROUND_CACHE,
   retry: (failureCount: number, error: Error) => {
     if (error instanceof FetchError && !error.isRetryable()) {
       return false;

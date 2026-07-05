@@ -15,9 +15,51 @@ export interface BotDetectionResult {
   asn?: number;
 }
 
-interface DetectBotOptions {
+export interface DetectBotOptions {
   readonly userAgent?: string | null;
+  readonly asn?: number;
+  readonly memberVisits?: number;
+  readonly memberConversions?: number;
 }
+
+/** Minimum visits before the high-velocity zero-click heuristic applies. */
+export const VELOCITY_BOT_MIN_VISITS = 40;
+
+/** Maximum conversions allowed for the high-velocity zero-click heuristic. */
+export const VELOCITY_BOT_MAX_CONVERSIONS = 0;
+
+/**
+ * Known cloud/hosting provider ASNs observed in datacenter-city traffic
+ * (AWS, Azure, GCP, OCI, DigitalOcean, etc.).
+ */
+export const DATACENTER_ASNS = new Set([
+  // Amazon AWS
+  16509, 14618, 8987, 7224, 39111, 393406,
+  // Microsoft Azure
+  8075, 8068, 8069, 12076, 35106, 35908,
+  // Google Cloud
+  15169, 396982, 19527, 36040, 36039,
+  // Oracle Cloud
+  31898, 14340,
+  // DigitalOcean
+  14061,
+  // Linode / Akamai
+  63949,
+  // Vultr
+  20473,
+  // Hetzner
+  24940,
+  // OVH
+  16276,
+  // Scaleway
+  12876,
+  // Alibaba Cloud
+  45102, 37963,
+  // Tencent Cloud
+  132203, 45090,
+  // IBM Cloud
+  36351, 14148,
+]);
 
 // Conservative bot detection - only block obvious crawlers on sensitive endpoints
 const META_USER_AGENTS = [
@@ -46,6 +88,39 @@ const KNOWN_CRAWLERS = [
 ];
 
 /**
+ * Extract ASN from CDN/proxy headers (Vercel, Cloudflare).
+ */
+export function extractAsnFromRequest(request: {
+  headers: Headers;
+}): number | undefined {
+  const raw =
+    request.headers.get('x-vercel-ip-asn')?.trim() ||
+    request.headers.get('cf-ip-asn')?.trim() ||
+    null;
+
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function isDatacenterAsn(asn: number): boolean {
+  return DATACENTER_ASNS.has(asn);
+}
+
+export function isHighVelocityZeroClickBot(
+  visits: number,
+  conversions: number
+): boolean {
+  return (
+    visits >= VELOCITY_BOT_MIN_VISITS &&
+    conversions <= VELOCITY_BOT_MAX_CONVERSIONS
+  );
+}
+
+/**
  * Detects if request is from a bot with anti-cloaking considerations
  */
 export function detectBot(
@@ -66,7 +141,14 @@ export function detectBot(
     userAgent.toLowerCase().includes(bot.toLowerCase())
   );
 
-  const isBot = isMeta || isKnownCrawler;
+  const asn = options.asn ?? extractAsnFromRequest(request);
+  const isDatacenter = asn !== undefined && isDatacenterAsn(asn);
+  const isVelocityBot =
+    options.memberVisits !== undefined &&
+    options.memberConversions !== undefined &&
+    isHighVelocityZeroClickBot(options.memberVisits, options.memberConversions);
+
+  const isBot = isMeta || isKnownCrawler || isDatacenter || isVelocityBot;
 
   // Determine blocking strategy based on endpoint
   let shouldBlock = false;
@@ -81,6 +163,10 @@ export function detectBot(
   } else if (isKnownCrawler) {
     reason = 'Known crawler detected';
     // Don't block other crawlers to avoid anti-cloaking issues
+  } else if (isDatacenter) {
+    reason = 'datacenter_asn';
+  } else if (isVelocityBot) {
+    reason = 'high_velocity_zero_click';
   }
 
   return {
@@ -89,6 +175,7 @@ export function detectBot(
     reason,
     shouldBlock,
     userAgent,
+    asn,
   };
 }
 

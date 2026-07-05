@@ -2,11 +2,25 @@
 
 # dependencies
 /node_modules
+scripts/node_modules
 apps/web/node_modules
+apps/console/node_modules
 /.bundle/
 /vendor/bundle/
 /.pnp
 .pnp.js
+
+# design-sync build artifacts (skill scratch + generated bundle; durable inputs live in .design-sync-marketing/)
+/.ds-sync/
+/ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.design-sync-marketing/dist/
+apps/web/.ds-design-sync-marketing.css
+.design-sync/dist/
+apps/web/.ds-design-sync-home.css
+.design-sync/previews/_images.ts
 
 # testing
 /coverage
@@ -21,6 +35,9 @@ packages/ui/coverage/
 /artifacts/
 apps/web/test-results/
 apps/web/artifacts/
+apps/console/node_modules
+apps/console/.next
+apps/console/public/taste-inbox/screenshots/
 
 # next.js
 /.next/
@@ -72,6 +89,8 @@ storybook-static/
 .claude/projects/
 .claude/teams/
 .claude/tasks/
+.claude/settings.local.json
+.claude/settings.local.json.*
 .claude_settings.json
 .auto-claude*
 # Codex team config is tracked; runtime/local artifacts stay ignored.
@@ -85,6 +104,7 @@ apps/should-i-make/node_modules
 apps/should-i-make/.next
 packages/ui/node_modules
 packages/*/node_modules
+workers/*/node_modules
 
 # Turborepo
 .turbo
@@ -122,10 +142,20 @@ output/
 .claude/skills/gstack/
 .claude/scheduled_tasks.lock
 
+# QA swarm runtime artifacts (findings, remediation manifests, Eve queue)
+.context/qa-swarm/
+
+# Journey scout reports + evidence (Production Journey Auditor)
+.context/journey-scout/
+
 # Ruflo MCP local state (sqlite + vector index, never committed)
 .claude-flow/
 .swarm/
 ruvector.db
+
+# no-mistakes gate evidence (branch-scoped artifacts; keep directory only)
+.no-mistakes/evidence/**
+!.no-mistakes/evidence/.gitkeep
 
 # AgentOS run artifacts (binary outputs not source-controlled)
 agentos/runs/**/artifacts/
@@ -144,5 +174,19 @@ apps/desktop/*
 !apps/desktop/src/
 apps/desktop/src/*
 !apps/desktop/src/system-b-tokens.ts
+!apps/desktop/src/desktop-auth-security.ts
+!apps/desktop/src/desktop-csp-watchdog.ts
+!apps/desktop/src/desktop-permissions.ts
+!apps/desktop/src/desktop-security-reporting.ts
+!apps/desktop/src/window-state.ts
+!apps/desktop/src/renderer-recovery.ts
+!apps/desktop/src/tray.ts
+!apps/desktop/scripts/desktop-tray-contract.test.mjs
+!apps/desktop/scripts/
+!apps/desktop/scripts/desktop-csp-watchdog.test.ts
+!apps/desktop/electron-builder.local.yml
 apps/extension/
 .agents/
+
+# Vitest junit output (generated; never commit — caused recurring PR conflicts)
+*.junit.xml

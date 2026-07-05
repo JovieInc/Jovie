@@ -36,7 +36,7 @@ export default function CheckoutCancelPage() {
 
         <div className='space-y-5 px-5 py-5 text-center sm:px-6'>
           <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))]'>
-            <XCircle className='h-7 w-7 text-[var(--linear-warning)]' />
+            <XCircle className='h-7 w-7 text-(--linear-warning)' />
           </div>
 
           <p className='text-app leading-5 text-secondary-token'>

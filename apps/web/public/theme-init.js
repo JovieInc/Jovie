@@ -27,8 +27,9 @@
       var resolvedDark =
         theme === 'dark' || (theme === 'system' && systemPrefersDark);
 
-      root.classList.toggle('dark', resolvedDark);
-      root.style.colorScheme = resolvedDark ? 'dark' : 'light';
+      if (root.classList.contains('dark') !== resolvedDark) {
+        root.classList.toggle('dark', resolvedDark);
+      }
 
       var metaThemeEnabled = document.querySelector('meta[name="theme-color"]');
       if (metaThemeEnabled) {
@@ -41,8 +42,9 @@
       // Public/marketing routes: always dark — the design system assumes dark mode.
       // Ignoring stored preference prevents hybrid light/dark rendering since the
       // marketing layout hardcodes a .dark ancestor class.
-      root.classList.add('dark');
-      root.style.colorScheme = 'dark';
+      if (!root.classList.contains('dark')) {
+        root.classList.add('dark');
+      }
 
       var metaThemeDark = document.querySelector('meta[name="theme-color"]');
       if (metaThemeDark) {
@@ -50,11 +52,33 @@
       }
     }
 
+    var initialProfileMode = new URLSearchParams(
+      globalThis.location?.search ?? ''
+    ).get('mode');
+    if (
+      initialProfileMode === 'listen' ||
+      initialProfileMode === 'pay' ||
+      initialProfileMode === 'subscribe' ||
+      initialProfileMode === 'about' ||
+      initialProfileMode === 'contact' ||
+      initialProfileMode === 'tour' ||
+      initialProfileMode === 'releases' ||
+      initialProfileMode === 'tip'
+    ) {
+      root.dataset.profileInitialMode =
+        initialProfileMode === 'tip' ? 'pay' : initialProfileMode;
+    } else {
+      delete root.dataset.profileInitialMode;
+    }
+
     // High contrast mode (independent of light/dark)
     if (typeof localStorage !== 'undefined' && localStorage) {
       var hc = localStorage.getItem('jovie-high-contrast');
-      if (hc === 'true') root.classList.add('high-contrast');
-      else root.classList.remove('high-contrast');
+      if (hc === 'true' && !root.classList.contains('high-contrast')) {
+        root.classList.add('high-contrast');
+      } else if (hc !== 'true' && root.classList.contains('high-contrast')) {
+        root.classList.remove('high-contrast');
+      }
     }
   } catch {
     // Theme detection failed - defaults will apply

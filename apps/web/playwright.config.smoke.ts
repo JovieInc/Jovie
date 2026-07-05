@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { DESKTOP_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
+import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 /**
  * Smoke Test Playwright Configuration (Desktop)
@@ -32,9 +33,13 @@ if (!managedWebServerUrl.port) {
 const managedWebServerPort = managedWebServerUrl.port;
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const isCI = !!process.env.CI;
+const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 const usesManagedLocalWebServer = !process.env.BASE_URL;
 const shouldThrottleManagedTestAuthRun =
   isCI && usesManagedLocalWebServer && useTestAuthBypass;
+// GitHub-hosted runners expose ~7 GiB RAM; an 8 GiB V8 heap starves the OS and
+// Playwright, causing next dev to OOM mid-smoke (ECONNREFUSED cascades).
+const smokeDevHeapMb = isCI ? 4096 : 8192;
 
 function getWorkers(defaultWorkers: number): number {
   const explicitWorkers = process.env.PLAYWRIGHT_WORKERS;
@@ -93,20 +98,28 @@ export default defineConfig({
           // scope happens to be active in the parent shell.
           // See .claude/rules/environment.md.
           command: process.env.DATABASE_URL
-            ? 'pnpm run dev:local:playwright'
-            : 'doppler run --project jovie-web --config dev -- pnpm run dev:local:playwright',
+            ? 'pnpm run dev:fast'
+            : 'doppler run --project jovie-web --config dev -- pnpm run dev:fast',
           env: {
             ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
+            NEXT_PUBLIC_E2E_MODE: '1',
             NEXT_DISABLE_TOOLBAR: '1',
+            // Arms the onboarding LLM-failure fallback spec. Inert unless a
+            // request also carries x-jovie-e2e-llm-failure; hard-ignored on
+            // production deploys (see onboarding-handler.ts).
+            CHAT_LLM_FAILURE_INJECTION: '1',
             E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
+            E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
             ...(useTestAuthBypass
               ? {
                   NEXT_PUBLIC_CLERK_MOCK: '1',
                   NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
                 }
               : {}),
+            NODE_OPTIONS:
+              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=${smokeDevHeapMb}`.trim(),
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: true,

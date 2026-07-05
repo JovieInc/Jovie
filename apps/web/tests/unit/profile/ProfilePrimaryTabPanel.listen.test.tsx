@@ -138,6 +138,7 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
       />
     );
 
+    expect(screen.getByTestId('profile-primary-tab-music-empty')).toBeVisible();
     expect(screen.getByText('No Music')).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Turn on alerts' })

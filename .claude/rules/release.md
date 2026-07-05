@@ -16,10 +16,23 @@ The gstack skill pipeline handles verification. The standard agent workflow:
 
 1. `/qa` — Systematic QA testing (skip if already run manually)
 2. `/review` — Pre-landing code review (skip if already run manually)
-3. `/ship` — Tests, review, version bump, PR creation/update
+3. `/ship` — Tests, review, PR creation/update (no feature-branch version bump)
 4. `/land-and-deploy` — Merge, CI wait, deploy verification
+5. Main/release path — run `pnpm version:stamp` to stamp the merged release fan-out, then `pnpm version:check`
 
 `/ship` runs typecheck, lint, and tests as part of its pre-flight checks. There is no separate `/verify` step.
+
+### Bug-to-Test Gate (required before `/ship`)
+
+Bug fixes must ship with regression test evidence. Before `/ship`, run:
+
+```bash
+pnpm --filter @jovie/web run test:bug-to-test
+```
+
+- **Pass:** continue to `/ship`.
+- **Fail:** add/update the smallest regression test, or document `bug-to-test: waived — <reason>` in the PR body for copy-only/config-only fixes.
+- `/ship` Step 3.35 re-runs this gate and blocks PR creation when evidence is missing.
 
 **IMPORTANT:** Always run `pnpm biome check --write apps/web` before pushing so formatting issues are fixed in-place. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations.
 
@@ -93,6 +106,8 @@ Labels are part of the CI control plane, not just project organization. Apply in
 - Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
 - If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
 
+- Never hand-edit the taste gate labels (`needs-human-taste`, `needs:taste`, `taste-approved`). The ONLY way to clear the gate is the `/approve` flow (`taste-approve.yml`): screenshot in the PR body + an `/approve`/`lgtm`/👍 comment from a maintainer. Hand-edits with a user token retrigger other label automation and get reverted (JOV-3808); the workflow's bot-token label surgery is the path that sticks.
+
 ## Auto-Merge Path Guardrails
 
 Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual review.
@@ -124,11 +139,11 @@ When in doubt, skip auto-merge and request review.
 1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately.
 2. **Iterate** — push frequently, let CI catch issues, fix and push again.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
-4. `/ship` handles: tests, review, version bump, CHANGELOG, commit, push, PR creation/update.
+4. `/ship` handles: tests, review, CHANGELOG `[Unreleased]` notes, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) — see "Version Stamping (main-only)" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. **Enable automerge** with squash after the PR is marked ready:
+6. **Add to the Graphite merge queue** after the PR is marked ready. Apply the `merge-queue` label and Graphite enqueues and merges the PR when CI is green:
    ```bash
-   gh pr merge --auto --squash
+   gh pr edit --add-label merge-queue
    ```
 
 ## Conventional Commits Required
@@ -234,9 +249,36 @@ BOT REVIEWS
 - Deploy trigger: automatic on push to `main`
 - Health check: https://jov.ie/api/health (returns `{"status":"ok"}`)
 
+## Version Stamping (main-only)
+
+**Version stamping is main-only. Feature branches and their PRs MUST NOT bump the version fan-out.** This prevents recurring merge conflicts where concurrent PRs all edit the same version lines.
+
+**Protected version fan-out files (do NOT bump on feature branches):**
+
+- `VERSION`
+- `version.json`
+- the `version` field of root + workspace `package.json` files (`apps/*`, `packages/*`)
+- dated release headings in `CHANGELOG.md` (e.g. `## [26.6.61] - 2026-06-28`)
+
+**What feature branches MAY do:**
+
+- Add release notes under the `## [Unreleased]` section of `CHANGELOG.md`.
+- Edit `package.json` for dependency/script changes — only the `version` field is protected.
+
+**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out. It auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
+
+**Stamping on main:** After merge to `main` (or from the release workflow), run:
+
+```bash
+pnpm version:stamp        # bump CalVer, write fan-out, promote [Unreleased] → dated heading
+pnpm version:check        # validate consistency
+```
+
+`scripts/version-stamp.mjs` computes the next `YY.M.PATCH` (increment PATCH within the month, reset to 0 on month rollover), writes all fan-out files, and re-opens a fresh empty `## [Unreleased]` section. Use `--dry-run` to preview or `--set <version>` to stamp an explicit version.
+
 ## Changelog
 
-**Do not manually edit `CHANGELOG.md` during development.** The `/ship` workflow generates changelog entries automatically from the diff and commit history.
+**During development, only add notes under the `## [Unreleased]` section of `CHANGELOG.md`.** The `/ship` workflow appends `[Unreleased]` entries automatically from the diff and commit history. The dated release heading is stamped on the main/release path by `pnpm version:stamp` — never add a dated `## [X.Y.Z] - DATE` heading on a feature branch.
 
 `CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
 
@@ -264,7 +306,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | --- | --- | --- |
 | Fast Gate | Cheap deterministic checks required for every merge candidate. | `ci-fast`, `Unit Tests` |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `Structural Contract`, `CI Risk Classifier` |
-| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)` |
+| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)` |
 | Preview Evidence | Preview deploys and visual/a11y/performance evidence for review. | `Build (public routes)`, `Lighthouse (public routes PR)`, `Lighthouse (dashboard PR)`, `Lighthouse (onboarding PR)`, `Lighthouse (admin PR)`, `Preview Deploy (PR)` |
 | Main Deploy | Post-merge staging, canary, production promotion, and deploy-health gates. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -276,7 +318,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Job | Tier | Local remediation command |
 | --- | --- | --- |
 | `ci-fast` | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
-| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs` |
+| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors` |
 | `CI Risk Classifier` | structural-contract | `pnpm ci:harness:check` |
 | `Unit Tests` | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build (public routes)` | preview-evidence | `pnpm run build:web` |
@@ -285,6 +327,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | `Lighthouse (onboarding PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr` |
 | `Lighthouse (admin PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:admin:pr` |
 | `E2E Smoke (PR Fast Feedback)` | risk-triggered-smoke | `pnpm run test:web:smoke` |
+| `Golden Path (PR)` | risk-triggered-smoke | `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci` |
 | `Preview Deploy (PR)` | preview-evidence | `pnpm run build:web` |
 
 ### Risk-Triggered Evidence

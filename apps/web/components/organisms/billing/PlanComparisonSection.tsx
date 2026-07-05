@@ -170,7 +170,7 @@ export function PlanComparisonSection({
                     </span>
                   ) : (
                     <>
-                      <span className='text-[28px] font-[620] tracking-[-0.03em] text-primary-token'>
+                      <span className='text-3xl font-[620] tracking-[-0.03em] text-primary-token'>
                         {priceDisplay}
                       </span>
                       <span className='text-app text-secondary-token'>

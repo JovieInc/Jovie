@@ -88,6 +88,28 @@ When a PR introduces or modifies any of the following, the PR description MUST i
 - **Monthly cost estimate**: $X based on [pricing tier]
 ```
 
+## Neon CI Endpoint Pool (JOV-2497)
+
+Neon caps **concurrently active compute endpoints** per project. CI jobs that create or
+wake ephemeral branches (Lighthouse, A11y, Mobile Overflow, E2E smoke) can saturate this
+pool when many PRs run at once.
+
+| Control | Location | Behavior |
+|---------|----------|----------|
+| **Four-slot branch-creation pool** | `.github/workflows/ci.yml` `neon-create-branch-with-retry` jobs only | Cross-PR queue on branch creation per `github.job`; artifact consumers (public/onboarding/admin/chat Lighthouse, A11y, Mobile Overflow) stay outside the pool so matrix siblings are not cancelled |
+| **Shared `neon-db` branch** | `neon-db` job + artifact consumers | One ephemeral branch per workflow run for public Lighthouse/A11y/Mobile Overflow |
+| **2h branch TTL** | `neon-create-branch-with-retry` `expires_in_hours: 2` on `neon-db` | Safety net if cleanup misses a branch |
+| **PR-close prefix cleanup** | `neon-ephemeral-branch-cleanup.yml` | Deletes `<sanitized-ref>-*` branches when a PR closes |
+| **Scheduled cleanup** | `neon-scheduled-cleanup.yml` every 30m | Reaps orphaned branches older than 45m |
+
+**Monitoring:** In Neon console → project `curly-dew-35158967` → Branches, watch active
+endpoint count during drain/rebase bursts. CI failures with
+`You have exceeded the limit of concurrently active endpoints` indicate pool saturation.
+
+**Tuning:** If queue latency grows, raise the Neon plan endpoint cap (fastest) or add a
+fifth pool slot in `ci.yml` (requires editing the digit-bucket expression). Do not remove
+the pool without raising the Neon cap — bulk rebases will cascade again.
+
 ## API Runtime
 
 All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge runtime.

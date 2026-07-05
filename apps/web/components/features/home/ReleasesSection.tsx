@@ -58,7 +58,7 @@ export function ReleasesSection() {
 
         <div className='flex flex-wrap items-center justify-between gap-3 rounded-[0.9rem] border border-subtle bg-surface-1 px-3.5 py-2.75 sm:px-4'>
           <div>
-            <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+            <p className='text-2xs uppercase tracking-[0.08em] text-quaternary-token'>
               Release event
             </p>
             <p className='mt-1 text-sm font-medium text-primary-token'>
@@ -108,7 +108,7 @@ export function ReleasesSection() {
 
           <div className='grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1'>
             <div className='rounded-[0.9rem] border border-subtle bg-surface-1 p-3.5'>
-              <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+              <p className='text-2xs uppercase tracking-[0.08em] text-quaternary-token'>
                 Paid release notifications
               </p>
               <p className='mt-2 text-[1.6rem] font-semibold tracking-tight text-primary-token'>
@@ -129,7 +129,7 @@ export function ReleasesSection() {
                   <Mail className='h-4 w-4' />
                 </span>
                 <div className='min-w-0'>
-                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+                  <p className='text-2xs uppercase tracking-[0.08em] text-quaternary-token'>
                     Release email
                   </p>
                   <p className='mt-1 text-sm font-medium text-primary-token'>
@@ -139,7 +139,7 @@ export function ReleasesSection() {
                     {activeRelease.title} is out now. Fans already have the
                     smart link in their inbox.
                   </p>
-                  <div className='mt-2.5 inline-flex items-center gap-2 rounded-full bg-emerald-500/12 px-2.5 py-1 text-[11px] font-medium text-emerald-300'>
+                  <div className='mt-2.5 inline-flex items-center gap-2 rounded-full bg-emerald-500/12 px-2.5 py-1 text-2xs font-medium text-emerald-300'>
                     <CheckCheck className='h-3 w-3' />
                     Sent automatically by Jovie
                   </div>

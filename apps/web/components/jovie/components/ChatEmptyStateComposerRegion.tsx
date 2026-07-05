@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 
+import { CHAT_CONTENT_SHELL_CLASSNAME } from '../chat-layout';
+
 export function ChatEmptyStateComposerRegion({
   above,
   children,
@@ -12,7 +14,7 @@ export function ChatEmptyStateComposerRegion({
 }) {
   return (
     <div
-      className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center px-1 py-8'
+      className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-full flex-col items-center justify-center px-1 py-8`}
       data-testid='chat-empty-state-composer-region'
     >
       <div
@@ -25,7 +27,10 @@ export function ChatEmptyStateComposerRegion({
         }}
         data-testid='chat-empty-state-logo'
       >
-        <JovieMarkElectric className='h-full w-full' />
+        <JovieMarkElectric
+          className='h-full w-full'
+          idSeed='chat-empty-state-logo'
+        />
       </div>
       {above ? (
         <div className='absolute inset-x-0 bottom-1/2 z-10 mb-12 max-h-[min(46vh,24rem)] overflow-y-auto overscroll-contain px-1 pb-1'>

@@ -27,7 +27,10 @@ const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 // hydrates and useEffect runs.  Stash it so the hook can pick it up later.
 let _earlyPromptEvent: BeforeInstallPromptEvent | null = null;
 
-if (typeof window !== 'undefined' && !isElectronRuntime()) {
+if (typeof window !== 'undefined' && isElectronRuntime()) {
+  // Desktop shells must never keep a PWA service worker controlling auth routes.
+  unregisterServiceWorker().catch(() => {});
+} else if (typeof window !== 'undefined') {
   // Register the service worker early -- Chrome requires a registered SW with
   // a fetch handler before it will fire beforeinstallprompt.
   // In development, skip registration (and unregister any stale SW) unless

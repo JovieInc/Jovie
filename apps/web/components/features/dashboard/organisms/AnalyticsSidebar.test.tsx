@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { AnalyticsSidebar } from './AnalyticsSidebar';
+import { AnalyticsSidebar, calculateConversionRate } from './AnalyticsSidebar';
 
 vi.mock('@/lib/queries', () => ({
   useDashboardAnalyticsQuery: () => ({
@@ -125,6 +125,17 @@ vi.mock('@/components/atoms/AppSegmentControl', () => ({
     </div>
   ),
 }));
+
+describe('calculateConversionRate', () => {
+  it('suppresses misleading percents on tiny bases', () => {
+    expect(calculateConversionRate(12, 1)).toBeNull();
+    expect(calculateConversionRate(3, 1)).toBeNull();
+  });
+
+  it('shows conversion percent once the base is large enough', () => {
+    expect(calculateConversionRate(60, 30)).toBe('200%');
+  });
+});
 
 describe('AnalyticsSidebar', () => {
   it('renders the sidebar with card surface variant', () => {

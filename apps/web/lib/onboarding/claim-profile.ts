@@ -9,6 +9,11 @@ import {
   chatMessages,
 } from '@/lib/db/schema/chat';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import {
+  fetchArtistBySpotifyUrl,
+  type MusicFetchArtistResult,
+} from '@/lib/dsp-enrichment/providers/musicfetch';
+import { captureError } from '@/lib/error-tracking';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
 import {
   type ClaimedOnboardingState,
@@ -20,6 +25,7 @@ import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
 
 const HANDLE_CLAIM_MAX_ATTEMPTS = 5;
+const MAX_IMPORTED_BIO_LENGTH = 2_000;
 
 export interface MaterializeClaimedOnboardingProfileInput {
   readonly userId: string;
@@ -101,6 +107,83 @@ function buildOnboardingSettings(
 
 function hasMaterializableState(state: ClaimedOnboardingState): boolean {
   return Boolean(state.artist || state.handle);
+}
+
+function cleanImportedBio(bio: string | null | undefined): string | null {
+  const cleaned = bio?.trim().replaceAll(/\s+/g, ' ') ?? '';
+  if (!cleaned) return null;
+  return cleaned.slice(0, MAX_IMPORTED_BIO_LENGTH);
+}
+
+function cleanSpotifyAvatarUrl(
+  imageUrl: string | null | undefined
+): string | null {
+  const cleaned = imageUrl?.trim();
+  if (!cleaned) return null;
+
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol !== 'https:') return null;
+    if (
+      parsed.hostname === 'i.scdn.co' ||
+      parsed.hostname.endsWith('.scdn.co')
+    ) {
+      return parsed.toString();
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function fetchMusicFetchProfile(
+  state: ClaimedOnboardingState
+): Promise<MusicFetchArtistResult | null> {
+  if (!state.artist?.url) return null;
+
+  try {
+    return await fetchArtistBySpotifyUrl(state.artist.url);
+  } catch (error) {
+    await captureError(
+      'MusicFetch profile import failed during chat claim',
+      error,
+      {
+        route: 'onboarding_claim_profile',
+        spotifyArtistId: state.artist.id,
+      }
+    );
+    return null;
+  }
+}
+
+async function buildImportedProfileFields({
+  existingProfile,
+  state,
+}: {
+  readonly existingProfile: CreatorProfile | null;
+  readonly state: ClaimedOnboardingState;
+}): Promise<Record<string, unknown>> {
+  if (!state.artist) return {};
+
+  const musicFetch = await fetchMusicFetchProfile(state);
+  const importedBio = cleanImportedBio(musicFetch?.bio);
+  const importedAvatarUrl =
+    cleanSpotifyAvatarUrl(state.artist.imageUrl) ??
+    cleanSpotifyAvatarUrl(musicFetch?.image?.url);
+
+  return {
+    avatarUrl:
+      existingProfile?.avatarLockedByUser && existingProfile.avatarUrl
+        ? existingProfile.avatarUrl
+        : (importedAvatarUrl ?? existingProfile?.avatarUrl ?? null),
+    ...(importedBio && !existingProfile?.bio ? { bio: importedBio } : {}),
+    spotifyId: state.artist.id,
+    spotifyUrl: state.artist.url,
+    spotifyFollowers: state.artist.followers,
+    spotifyPopularity: state.artist.popularity,
+    genres: [...state.artist.genres],
+  };
 }
 
 interface PersistClaimedProfileInput {
@@ -260,19 +343,10 @@ export async function materializeClaimedOnboardingProfile({
     conversationId,
     now
   );
-  const spotifyFields = state.artist
-    ? {
-        avatarUrl:
-          existingProfile?.avatarLockedByUser && existingProfile.avatarUrl
-            ? existingProfile.avatarUrl
-            : (state.artist.imageUrl ?? existingProfile?.avatarUrl ?? null),
-        spotifyId: state.artist.id,
-        spotifyUrl: state.artist.url,
-        spotifyFollowers: state.artist.followers,
-        spotifyPopularity: state.artist.popularity,
-        genres: [...state.artist.genres],
-      }
-    : {};
+  const spotifyFields = await buildImportedProfileFields({
+    existingProfile,
+    state,
+  });
 
   const { profileId, handle, status } =
     await persistClaimedProfileWithHandleRetry({

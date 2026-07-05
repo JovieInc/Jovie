@@ -58,7 +58,7 @@ export function UniversalLinkInputArtistSearchMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-all',
+          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-colors',
           'focus-within:ring-2 focus-within:ring-accent',
           showResults ? 'rounded-t-3xl border-b-0' : 'rounded-full',
           disabled && 'opacity-50'
@@ -115,7 +115,7 @@ export function UniversalLinkInputArtistSearchMode({
             type='button'
             onClick={exitSearchMode}
             className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:bg-surface-2 hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-            aria-label='Exit search mode'
+            aria-label='Exit Search Mode'
           >
             <X className='w-4 h-4' />
           </button>
@@ -172,7 +172,7 @@ export function UniversalLinkInputArtistSearchMode({
                 id='artist-search-results'
                 className='sr-only'
                 size={Math.min(results.length, 5)}
-                aria-label='Artist search results'
+                aria-label='Artist Search Results'
                 value={
                   activeResultIndex >= 0 && results[activeResultIndex]
                     ? results[activeResultIndex].id

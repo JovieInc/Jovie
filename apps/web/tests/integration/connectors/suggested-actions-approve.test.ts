@@ -97,7 +97,7 @@ describe('CAS approve: approve → 200 first call, 409 second', () => {
 
     const updated = await db
       .update(suggestedActions)
-      .set({ status: 'accepted' as const, approvedAt: new Date() })
+      .set({ status: 'approved' as const, approvedAt: new Date() })
       .where(
         and(
           eq(suggestedActions.id, ACTION_ID),
@@ -128,7 +128,7 @@ describe('CAS approve: approve → 200 first call, 409 second', () => {
 
     const updated = await db
       .update(suggestedActions)
-      .set({ status: 'accepted' as const, approvedAt: new Date() })
+      .set({ status: 'approved' as const, approvedAt: new Date() })
       .where(
         and(
           eq(suggestedActions.id, ACTION_ID),
@@ -194,7 +194,7 @@ describe('CAS concurrent approve: exactly one workflow_runs row', () => {
     const approveOne = async () => {
       const updated = await db
         .update(suggestedActions)
-        .set({ status: 'accepted' as const, approvedAt: new Date() })
+        .set({ status: 'approved' as const, approvedAt: new Date() })
         .where(
           and(
             eq(suggestedActions.id, ACTION_ID),
@@ -244,7 +244,7 @@ describe('CAS reject: dismiss → 200 first call, 409 second', () => {
 
     const updated = await db
       .update(suggestedActions)
-      .set({ status: 'dismissed' as const })
+      .set({ status: 'rejected' as const })
       .where(
         and(
           eq(suggestedActions.id, ACTION_ID),
@@ -264,7 +264,7 @@ describe('CAS reject: dismiss → 200 first call, 409 second', () => {
 
     const updated = await db
       .update(suggestedActions)
-      .set({ status: 'dismissed' as const })
+      .set({ status: 'rejected' as const })
       .where(
         and(
           eq(suggestedActions.id, ACTION_ID),

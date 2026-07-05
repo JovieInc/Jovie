@@ -53,14 +53,14 @@ export function DashboardMockup({
       {/* Mac window chrome */}
       <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-5'>
         <div className='flex gap-2' aria-hidden='true'>
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
+          <div className='h-3 w-3 rounded-full border border-black/10 bg-(--color-accent-red)' />
+          <div className='h-3 w-3 rounded-full border border-black/10 bg-(--color-accent-orange)' />
+          <div className='h-3 w-3 rounded-full border border-black/10 bg-(--color-accent-green)' />
         </div>
         <div className='flex-1 text-center text-xs text-tertiary-token'>
           Jovie - Release Flow
         </div>
-        <div className='w-[52px]' />
+        <div className='w-13' />
       </div>
 
       {/* Column headers */}
@@ -68,11 +68,11 @@ export function DashboardMockup({
         className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2 max-md:hidden'
         style={{ borderBottom: '1px solid var(--linear-border-subtle)' }}
       >
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
+        <span className='text-3xs font-medium uppercase tracking-[0.08em] text-quaternary-token'>
           Release
         </span>
         <span />
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
+        <span className='text-3xs font-medium uppercase tracking-[0.08em] text-quaternary-token'>
           Smart link
         </span>
       </div>
@@ -115,7 +115,7 @@ export function DashboardMockup({
                     {release.title}
                   </p>
                   {release.isNew && (
-                    <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400'>
+                    <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider text-amber-400'>
                       New
                     </span>
                   )}
@@ -126,7 +126,7 @@ export function DashboardMockup({
               </div>
 
               <div
-                className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-slower'
+                className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors duration-slower'
                 style={{
                   backgroundColor: isActive
                     ? 'rgba(255,255,255,0.07)'
@@ -183,7 +183,7 @@ export function DashboardMockup({
                       {release.title}
                     </p>
                     {release.isNew && (
-                      <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400'>
+                      <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wider text-amber-400'>
                         New
                       </span>
                     )}
@@ -193,7 +193,7 @@ export function DashboardMockup({
                   </p>
                 </div>
               </div>
-              <div className='mt-2 ml-[52px] flex items-center gap-1.5'>
+              <div className='mt-2 ml-13 flex items-center gap-1.5'>
                 <svg
                   width='11'
                   height='11'

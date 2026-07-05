@@ -181,7 +181,7 @@ function KanbanColumn<TData>({
   }, []);
 
   return (
-    <ContentSurfaceCard className='flex min-w-[300px] max-w-[380px] flex-1 flex-col overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)]'>
+    <ContentSurfaceCard className='flex min-w-75 max-w-95 flex-1 flex-col overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)]'>
       <div className='flex items-center justify-between border-b border-subtle px-3 py-2.5'>
         <div className='flex items-center gap-2'>
           {accentStyle && (
@@ -191,7 +191,7 @@ function KanbanColumn<TData>({
               aria-hidden='true'
             />
           )}
-          <h3 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-app font-semibold tracking-tight text-primary-token'>
             {column.title}
           </h3>
         </div>

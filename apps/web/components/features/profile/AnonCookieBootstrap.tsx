@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { ProfilePacAssignment } from '@/lib/flags/profile-pac';
 
 interface AnonCookieBootstrapProps {
   /**
@@ -11,6 +12,7 @@ interface AnonCookieBootstrapProps {
    * react if the user has been assigned a different variant.
    */
   readonly onVariantResolved?: (variant: ProfileAlertOptInVariant) => void;
+  readonly onProfilePacResolved?: (assignment: ProfilePacAssignment) => void;
 }
 
 /**
@@ -32,24 +34,35 @@ interface AnonCookieBootstrapProps {
  */
 export function AnonCookieBootstrap({
   onVariantResolved,
+  onProfilePacResolved,
 }: AnonCookieBootstrapProps) {
   useEffect(() => {
-    if (!onVariantResolved) return;
+    if (!onVariantResolved && !onProfilePacResolved) return;
 
     void fetch('/api/profile/audience-anon-cookie', {
       method: 'GET',
       credentials: 'same-origin',
     })
       .then(res => (res.ok ? res.json() : null))
-      .then((data: { alertOptInVariant: ProfileAlertOptInVariant } | null) => {
-        if (data?.alertOptInVariant) {
-          onVariantResolved(data.alertOptInVariant);
+      .then(
+        (
+          data: {
+            alertOptInVariant?: ProfileAlertOptInVariant;
+            profilePac?: ProfilePacAssignment;
+          } | null
+        ) => {
+          if (data?.alertOptInVariant) {
+            onVariantResolved?.(data.alertOptInVariant);
+          }
+          if (data?.profilePac) {
+            onProfilePacResolved?.(data.profilePac);
+          }
         }
-      })
+      )
       .catch(() => {
         // Best-effort: analytics and the default CTA variant are unaffected.
       });
-  }, [onVariantResolved]);
+  }, [onProfilePacResolved, onVariantResolved]);
 
   return null;
 }

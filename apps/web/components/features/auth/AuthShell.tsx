@@ -9,15 +9,19 @@ import {
   AuthProviderButtonSlot,
   AuthProviderButtonSlots,
 } from '@/features/auth/AuthProviderButtons';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
   buildAuthRouteUrl,
   getDefaultSignUpFallbackRedirectUrl,
 } from '@/lib/auth/build-auth-route-url';
+import { isSessionExists, parseClerkError } from '@/lib/auth/clerk-errors';
 import { CLERK_COMPONENT_OPTIONS } from '@/lib/auth/clerk-options';
 import {
   getEnabledAuthOAuthProviders,
   type PrimaryAuthOAuthProvider,
 } from '@/lib/auth/oauth-providers';
+import { ClerkCaptchaMount } from './ClerkCaptchaMount';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
 export type AuthShellMode = 'sign-in' | 'sign-up';
@@ -111,6 +115,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     compact = false,
   } = props;
   const searchParams = useSearchParams();
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   const clerk = useClerk();
   const signInState = useSignIn();
   const signUpState = useSignUp();
@@ -140,7 +145,15 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   );
   const activeAuthResource = isSignUp ? signUpState.signUp : signInState.signIn;
   const isAuthStartReady =
-    isMounted && clerk.loaded && Boolean(activeAuthResource);
+    isMounted &&
+    clerk.loaded &&
+    Boolean(activeAuthResource) &&
+    !(isAuthLoaded && isSignedIn);
+
+  const redirectSignedInVisitor = useCallback(() => {
+    const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
+    globalThis.location?.assign(destination);
+  }, [searchParams]);
 
   const handleProviderSelect = useCallback(
     async (provider: PrimaryAuthOAuthProvider) => {
@@ -166,10 +179,24 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           : await signInState.signIn?.sso(redirectParams);
 
         if (!result || result.error) {
+          if (isSessionExists(result?.error)) {
+            redirectSignedInVisitor();
+            return;
+          }
+
           throw result?.error ?? new Error('Missing Clerk auth resource');
         }
-      } catch {
-        setOauthError(getAuthStartErrorMessage(mode));
+      } catch (error) {
+        if (isSessionExists(error)) {
+          redirectSignedInVisitor();
+          return;
+        }
+
+        setOauthError(
+          error && typeof error === 'object' && 'errors' in error
+            ? parseClerkError(error)
+            : getAuthStartErrorMessage(mode)
+        );
         setPendingProvider(null);
       }
     },
@@ -179,10 +206,15 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       mode,
       pendingProvider,
       resolvedRedirect,
+      redirectSignedInVisitor,
       signInState.signIn,
       signUpState.signUp,
     ]
   );
+
+  if (isAuthLoaded && isSignedIn) {
+    return null;
+  }
 
   const hasNoEnabledProviders = enabledOAuthProviders.length === 0;
   const showStablePlaceholder = !isAuthStartReady;
@@ -200,6 +232,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         data-auth-shell-providers='0'
         className='relative min-h-72'
       >
+        <ClerkCaptchaMount />
         <AuthProvidersUnavailable mode={mode} />
         <AuthLegalText mode={mode} />
       </div>
@@ -213,6 +246,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       data-auth-shell-ready={isAuthStartReady ? 'true' : 'false'}
       className='relative min-h-96'
     >
+      <ClerkCaptchaMount />
       {showStablePlaceholder ? (
         <AuthStableStartPlaceholder
           mode={mode}
@@ -243,7 +277,7 @@ function AuthShellTitle({ mode }: Readonly<{ mode: AuthShellMode }>) {
   return (
     <div className='mb-4 text-center'>
       <p className='text-2xl font-semibold leading-tight tracking-normal text-primary-token'>
-        {isSignUp ? 'Request access' : 'Welcome back'}
+        {isSignUp ? 'Create your account' : 'Welcome back'}
       </p>
     </div>
   );

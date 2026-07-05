@@ -23,7 +23,7 @@
  *     pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth": {"...": "..."}}'
  *
  *   # Common auth fix helper: inspect current redirect-related config
- *   doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "jov.ie|myapp://"
+ *   doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
  *
  * Safety (enforced):
  * - Always runs `clerk whoami` + instance verification first.
@@ -371,7 +371,7 @@ async function cmdPatch(options: ClerkConfigOptions): Promise<void> {
 async function cmdCheckRedirects(options: ClerkConfigOptions): Promise<void> {
   if (!options.pattern) {
     throw new Error(
-      'check-redirects requires --pattern "substring" (e.g. "myapp://" or "jov.ie")'
+      'check-redirects requires --pattern "substring" (e.g. "ie.jov.jovie|jovie://" for native schemes, or "jov.ie")'
     );
   }
 
@@ -440,7 +440,7 @@ Global options (apply to most):
 
 Examples (MUST use doppler for env-appropriate keys):
   doppler run --project jovie-web --config dev -- pnpm tsx scripts/clerk-config.ts pull --instance dev
-  doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "jov.ie|myapp://"
+  doppler run ... pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
   doppler run ... pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth":{"...":{}}}'
 
 See docs/CLERK_CLI.md for full manual flows + safety rules.

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
@@ -33,7 +34,7 @@ export function ImagePreviewStrip({
           {images.map(image => (
             <motion.div
               key={image.id}
-              className='system-b-image-preview-item'
+              className='system-b-image-preview-item group/image-preview'
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -47,18 +48,20 @@ export function ImagePreviewStrip({
                 unoptimized
               />
               <div className='system-b-image-preview-caption'>
-                <p className='truncate text-2xs font-medium text-white'>
+                <p className='truncate text-2xs font-medium text-white dark:text-white'>
                   {image.name}
                 </p>
               </div>
-              <button
+              <Button
                 type='button'
+                variant='ghost'
+                size='icon'
                 onClick={() => onRemove(image.id)}
-                className='system-b-image-preview-remove-button'
+                className='absolute right-1.5 top-1.5 h-6 w-6 rounded-lg border border-white/15 bg-black/55 text-white opacity-100 transition-opacity duration-fast ease-subtle hover:bg-black/55 hover:text-white focus-visible:opacity-100 dark:text-white md:opacity-0 md:group-hover/image-preview:opacity-100'
                 aria-label={`Remove ${image.name}`}
               >
                 <X className='h-3.5 w-3.5' />
-              </button>
+              </Button>
             </motion.div>
           ))}
         </AnimatePresence>

@@ -62,6 +62,8 @@ describe('dev-test-auth.server', () => {
 
   it('enables local browse auth on trusted hosts when bypass mode is enabled', async () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('VERCEL_ENV', 'development');
     const { getDevTestAuthAvailability } = await import(
       '@/lib/auth/dev-test-auth.server'
     );
@@ -71,19 +73,30 @@ describe('dev-test-auth.server', () => {
       trustedHost: true,
       reason: null,
     });
-  });
+  }, 15_000);
 
-  it('allows trusted preview hosts but rejects wildcard Vercel hosts when bypass mode is enabled', async () => {
+  it('rejects trusted preview hosts outside explicit development', async () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
     const { getDevTestAuthAvailability } = await import(
       '@/lib/auth/dev-test-auth.server'
     );
 
     expect(getDevTestAuthAvailability('preview.jov.ie')).toEqual({
-      enabled: true,
-      trustedHost: true,
-      reason: null,
+      enabled: false,
+      trustedHost: false,
+      reason: 'Not available outside development',
     });
+  });
+
+  it('rejects wildcard Vercel hosts even in development bypass mode', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'development');
+    const { getDevTestAuthAvailability } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
     expect(
       getDevTestAuthAvailability('jovie-git-feature-123-jovie.vercel.app')
     ).toEqual({
@@ -104,7 +117,37 @@ describe('dev-test-auth.server', () => {
     expect(getDevTestAuthAvailability('localhost')).toEqual({
       enabled: false,
       trustedHost: false,
-      reason: 'Not available in production',
+      reason: 'Not available outside development',
+    });
+  });
+
+  it('enables loopback automation for production-built CI test servers', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VERCEL_ENV', '');
+    const { getDevTestAuthAvailability } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    expect(getDevTestAuthAvailability('127.0.0.1')).toEqual({
+      enabled: true,
+      trustedHost: true,
+      reason: null,
+    });
+  });
+
+  it('rejects preview deployments even when the bypass env is enabled', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    const { getDevTestAuthAvailability } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    expect(getDevTestAuthAvailability('preview.jov.ie')).toEqual({
+      enabled: false,
+      trustedHost: false,
+      reason: 'Not available outside development',
     });
   });
 

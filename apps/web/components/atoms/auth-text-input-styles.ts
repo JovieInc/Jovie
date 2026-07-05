@@ -9,7 +9,7 @@ export const AUTH_TEXT_INPUT_BASE_CLASS = cn(
   'text-sm font-medium',
   'touch-manipulation',
   '[-webkit-tap-highlight-color:transparent]',
-  'transition-colors duration-150'
+  'transition-colors duration-subtle'
 );
 
 export const AUTH_TEXT_INPUT_VARIANT_CLASS = {

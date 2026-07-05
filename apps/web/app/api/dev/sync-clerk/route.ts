@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { selectVerifiedClerkEmail } from '@/lib/auth/clerk-identity';
 import { syncClerkIdForEmail } from '@/lib/auth/sync-clerk-id';
+import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
 import { normalizeEmail } from '@/lib/utils/email';
 
 export const runtime = 'nodejs';
@@ -16,20 +20,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * but the dev Clerk instance assigns a different user ID for the same email.
  */
 export async function POST() {
-  // SECURITY: dev-only routes use ALLOW gate, not DENY gate. See audit #1.
-  // An AND-gate on (NODE_ENV && VERCEL_ENV === 'production') leaves preview/staging
-  // open because VERCEL_ENV === 'preview' there. The correct pattern is to allow
-  // only when the env is explicitly 'development'; every other env (preview,
-  // staging, production) returns 403.
-  const isDevEnv =
-    process.env.NODE_ENV === 'development' ||
-    process.env.VERCEL_ENV === 'development';
-
-  if (!isDevEnv) {
-    return NextResponse.json(
-      { success: false, error: 'Not available outside development' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson(undefined, {
+      headers: NO_STORE_HEADERS,
+    });
   }
 
   const { userId: clerkUserId } = await getCachedAuth();

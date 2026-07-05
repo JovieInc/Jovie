@@ -85,9 +85,40 @@ describe('ci-harness risk classifier', () => {
     expect(risk.matchedRules.map(rule => rule.id)).toEqual(['public-ui']);
   });
 
-  it('keeps package manifest dependency changes in the env-config smoke lane', () => {
+  it('does not escalate dependency-only semver bumps to smoke', () => {
+    const risk = classifyCiRisk(
+      ['apps/web/package.json', 'pnpm-lock.yaml'],
+      manifest,
+      {
+        isDependencyOnlyPackageManifestChange: file =>
+          file === 'apps/web/package.json',
+      }
+    );
+
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.requiresPreview).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
+  it('does not escalate root devDependency bumps with lockfile to smoke', () => {
+    const risk = classifyCiRisk(['package.json', 'pnpm-lock.yaml'], manifest, {
+      isVersionOnlyPackageManifestChange: () => false,
+      isDependencyOnlyPackageManifestChange: file => file === 'package.json',
+    });
+
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.requiresPreview).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
+  it('keeps package manifest changes that alter scripts in the env-config smoke lane', () => {
     const risk = classifyCiRisk(['package.json'], manifest, {
       isVersionOnlyPackageManifestChange: () => false,
+      isDependencyOnlyPackageManifestChange: () => false,
     });
 
     expect(risk.riskLevel).toBe('high');
@@ -103,6 +134,38 @@ describe('ci-harness risk classifier', () => {
     expect(risk.requiresSmoke).toBe(true);
     expect(risk.requiresPreview).toBe(false);
     expect(risk.blocksUnattendedAutoMerge).toBe(true);
+  });
+
+  it('does not require web smoke for iOS-only workflow dependency bumps', () => {
+    const risk = classifyCiRisk(
+      [
+        '.github/workflows/ios-testflight.yml',
+        '.github/workflows/ios-signing-bootstrap.yml',
+      ],
+      manifest
+    );
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
+  it('does not require smoke for documentation-only agent control plane edits', () => {
+    const risk = classifyCiRisk(['.claude/rules/ui.md'], manifest);
+    expect(risk.riskLevel).toBe('low');
+    expect(risk.requiresSmoke).toBe(false);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
+    expect(risk.matchedRules).toEqual([]);
+  });
+
+  it('still requires smoke for executable agent control plane edits', () => {
+    const risk = classifyCiRisk(['.claude/hooks/lint-check.sh'], manifest);
+    expect(risk.riskLevel).toBe('high');
+    expect(risk.requiresSmoke).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.matchedRules.map(rule => rule.id)).toContain(
+      'agent-control-plane'
+    );
   });
 });
 
@@ -131,8 +194,10 @@ describe('ci-harness artifact formatter', () => {
     expect(artifact.requiredGates.map(job => job.id)).toContain(
       'ci-structural-contract'
     );
-    expect(artifact.nextLocalCommands).toContain(
-      'pnpm ci:harness:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs'
-    );
+    expect(
+      artifact.nextLocalCommands.some(command =>
+        command.includes('pnpm doc:freshness:check')
+      )
+    ).toBe(true);
   });
 });

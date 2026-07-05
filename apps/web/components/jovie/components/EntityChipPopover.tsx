@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
 import {
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
@@ -14,10 +15,12 @@ import {
   useState,
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
+import { useOptionalPreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { useAppFlag } from '@/lib/flags/client';
 import { getInitials } from '@/lib/utils/initials';
+import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
 const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
@@ -65,8 +68,14 @@ export function EntityChipPopover({
 
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const entityPanel = useOptionalChatEntityPanel();
+  const previewPanel = useOptionalPreviewPanelState();
   const canOpenEntityPanel =
     designV1ChatEntitiesEnabled && kind === 'release' && entityPanel !== null;
+  const canOpenProfilePreview =
+    kind === 'artist' &&
+    previewPanel !== null &&
+    entity?.meta?.kind === 'artist' &&
+    entity.meta.isYou === true;
 
   const focusKey = useMemo(() => `${kind}:${id}:${label}`, [kind, id, label]);
 
@@ -140,6 +149,13 @@ export function EntityChipPopover({
     setOpen(false);
   }, [entityPanel, id, label, focusKey]);
 
+  const handleOpenProfilePreview = useCallback(() => {
+    if (!previewPanel) return;
+    entityPanel?.close();
+    previewPanel.open();
+    setOpen(false);
+  }, [entityPanel, previewPanel]);
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -163,6 +179,12 @@ export function EntityChipPopover({
         sideOffset={6}
         align='start'
         testId='entity-chip-popover-content'
+        data-entity-kind={kind}
+        style={
+          {
+            '--jovie-entity-accent': `var(${ENTITY_KIND_ACCENT_VAR[kind]})`,
+          } as CSSProperties
+        }
         onPointerEnter={() => {
           // Keep the popover open while the cursor is over its content.
           clearTimers();
@@ -180,6 +202,8 @@ export function EntityChipPopover({
           entity={entity}
           canOpen={canOpenEntityPanel}
           onOpenEntity={handleOpenEntityPanel}
+          canOpenProfilePreview={canOpenProfilePreview}
+          onOpenProfilePreview={handleOpenProfilePreview}
         />
       </PopoverContent>
     </Popover>
@@ -192,6 +216,8 @@ interface EntityChipPopoverBodyProps {
   readonly entity: EntityRef | undefined;
   readonly canOpen: boolean;
   readonly onOpenEntity: () => void;
+  readonly canOpenProfilePreview: boolean;
+  readonly onOpenProfilePreview: () => void;
 }
 
 function EntityChipPopoverBody({
@@ -200,6 +226,8 @@ function EntityChipPopoverBody({
   entity,
   canOpen,
   onOpenEntity,
+  canOpenProfilePreview,
+  onOpenProfilePreview,
 }: EntityChipPopoverBodyProps) {
   const eyebrow = entity ? eyebrowFor(entity) : KIND_PREFIX[kind];
   const subtitle = entity?.meta?.subtitle;
@@ -232,6 +260,16 @@ function EntityChipPopoverBody({
         ) : null}
         {stats ? (
           <p className='system-b-entity-chip-popover-stats'>{stats}</p>
+        ) : null}
+        {canOpenProfilePreview ? (
+          <button
+            type='button'
+            onClick={onOpenProfilePreview}
+            className='system-b-entity-chip-popover-action focus-ring'
+          >
+            Open live profile preview
+            <ArrowUpRight className='system-b-entity-chip-popover-action-icon' />
+          </button>
         ) : null}
         {canOpen ? (
           <button

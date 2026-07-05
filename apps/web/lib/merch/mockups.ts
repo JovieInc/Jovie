@@ -2,7 +2,7 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { merchDesignOptions } from '@/lib/db/schema/merch';
+import { merchCards, merchDesignOptions } from '@/lib/db/schema/merch';
 import {
   createMockupTask,
   isPrintfulConfigured,
@@ -319,6 +319,15 @@ export async function attachMockupsToDesignOption(
     .update(merchDesignOptions)
     .set({ mockupUrls: merged, updatedAt: new Date() })
     .where(eq(merchDesignOptions.id, optionId));
+
+  await db
+    .update(merchCards)
+    .set({
+      mockupUrls: merged,
+      primaryImageUrl: merged[0] ?? '',
+      updatedAt: new Date(),
+    })
+    .where(eq(merchCards.selectedDesignOptionId, optionId));
 
   logger.info('[merch mockups] Attached Printful mockups to design option', {
     optionId,

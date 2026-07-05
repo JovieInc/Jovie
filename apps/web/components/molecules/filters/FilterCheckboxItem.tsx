@@ -63,7 +63,7 @@ export function FilterCheckboxItem({
     count !== undefined || checked ? (
       <span className='flex items-center gap-1'>
         {count === undefined ? null : (
-          <span className='text-[10px] tabular-nums text-tertiary-token'>
+          <span className='text-3xs tabular-nums text-tertiary-token'>
             {count}
           </span>
         )}

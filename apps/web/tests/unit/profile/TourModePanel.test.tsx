@@ -145,6 +145,20 @@ describe('TourModePanel', () => {
     );
   });
 
+  it('renders the events empty state as a full-color gradient bento card', () => {
+    render(<TourModePanel artist={artist} tourDates={[]} />);
+
+    expect(
+      screen.getByTestId('profile-primary-tab-events-empty')
+    ).toBeInTheDocument();
+    const heading = screen.getByText('No Events');
+    expect(heading).toHaveClass('dark:text-white');
+    expect(heading.className).not.toMatch(/text-\(--color-text-tooltip\)/);
+    const bentoCard = screen.getByTestId('profile-primary-tab-events-empty')
+      .firstChild as HTMLElement;
+    expect(bentoCard.style.background).toContain('var(--color-accent-blue)');
+  });
+
   it('renders the styled all-shows list when no geolocation is available', () => {
     locationMock.error = 'Location denied';
     render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);

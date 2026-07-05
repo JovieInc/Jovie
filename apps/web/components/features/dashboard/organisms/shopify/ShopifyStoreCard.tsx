@@ -124,7 +124,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
           <h3 className='text-app font-caption text-primary-token'>Shop</h3>
         </div>
 
-        <p className='text-[12.5px] leading-5 text-secondary-token'>
+        <p className='text-xs leading-5 text-secondary-token'>
           Link your Shopify store to add a shop button on your public profile.
           Fans will be redirected to your store with Jovie attribution.
         </p>
@@ -200,7 +200,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
             href={shopPageUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token'
           >
             <ExternalLink className='h-3 w-3' />
             Preview shop link

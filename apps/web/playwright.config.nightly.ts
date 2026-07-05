@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { RELIABILITY_CANARY_E2E_GLOBS } from './lib/testing/reliability-detectors';
 
 // Build extra HTTP headers for Vercel Deployment Protection bypass
 // Both headers are required for browser automation to work correctly
@@ -34,6 +35,7 @@ export default defineConfig({
     '**/dashboard-pages-health.spec.ts',
     '**/onboarding-completion.spec.ts',
     '**/onboarding-robot.full.spec.ts',
+    ...RELIABILITY_CANARY_E2E_GLOBS,
   ],
   fullyParallel: true,
   forbidOnly: isCI,

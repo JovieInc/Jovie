@@ -129,7 +129,7 @@ function CompactSearchForm(
           <span className='sr-only'>{triggerLabel}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align='end' className='w-[320px] p-0'>
+      <PopoverContent align='end' className='w-80 p-0'>
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
           <span className='text-app font-caption text-primary-token'>
             {triggerLabel}
@@ -253,10 +253,7 @@ export function PageToolbarSearchForm(
         onChange={onSearchValueChange}
         placeholder={placeholder}
         ariaLabel={ariaLabel}
-        className={cn(
-          'min-w-0 flex-1 sm:w-[260px] sm:flex-none',
-          fieldClassName
-        )}
+        className={cn('min-w-0 flex-1 sm:w-65 sm:flex-none', fieldClassName)}
       />
       <AppIconButton
         type='submit'

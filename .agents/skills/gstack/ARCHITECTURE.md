@@ -211,6 +211,17 @@ Templates contain the workflows, tips, and examples that require human judgment.
 
 This is structurally sound — if a command exists in code, it appears in docs. If it doesn't exist, it can't appear.
 
+## Canonical Design Skill
+
+`design-canonical` is the durable design doctrine for all agents and Ovie. It owns
+the design-read sentence, design dials, official-system matching, anti-slop rules,
+cross-platform checklist, and PR evidence contract. Mode-specific skills such as
+`design-review`, `plan-design-review`, `design-consultation`, `design-shotgun`, and
+`design-html` must load it first and then add only their execution workflow.
+
+When adding or changing design guidance, prefer `design-canonical/SKILL.md.tmpl`.
+Only edit a legacy design skill when the change is specific to that mode's mechanics.
+
 ### The preamble
 
 Every skill starts with a `{{PREAMBLE}}` block that runs before the skill's own logic. It handles five things in a single bash command:

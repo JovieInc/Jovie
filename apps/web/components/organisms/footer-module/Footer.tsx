@@ -29,8 +29,8 @@ const FOOTER_COLUMNS = [
     id: 'account',
     heading: 'Account',
     links: [
-      { href: APP_ROUTES.SIGNIN, label: 'Log in' },
-      { href: APP_ROUTES.SIGNUP, label: 'Get started' },
+      { href: APP_ROUTES.SIGNIN, label: 'Log In' },
+      { href: APP_ROUTES.SIGNUP, label: 'Get Started' },
     ],
   },
   {
@@ -90,8 +90,8 @@ export function Footer({
             variant={config.colorVariant}
             ariaLabel='Legal'
             links={PROFILE_LEGAL_LINKS}
-            className='gap-2 text-[10px] leading-4'
-            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
+            className='gap-2 text-3xs leading-4'
+            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />
         </div>
 
@@ -100,8 +100,8 @@ export function Footer({
             variant={config.colorVariant}
             ariaLabel='Legal'
             links={PROFILE_LEGAL_LINKS}
-            className='gap-2 text-[10px] leading-4'
-            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
+            className='gap-2 text-3xs leading-4'
+            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
           />
         </div>
       </footer>
@@ -114,7 +114,7 @@ export function Footer({
       <footer
         className={className}
         style={{ backgroundColor: 'var(--linear-bg-footer)' }}
-        aria-label='Site footer'
+        aria-label='Site Footer'
       >
         <div
           aria-hidden='true'
@@ -180,7 +180,7 @@ export function Footer({
                 <Link
                   href={APP_ROUTES.LEGAL_PRIVACY}
                   prefetch={false}
-                  className='text-app tracking-[-0.01em] transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
+                  className='text-app tracking-tight transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
                   style={{ color: 'var(--linear-text-tertiary)' }}
                 >
                   Privacy
@@ -188,7 +188,7 @@ export function Footer({
                 <Link
                   href={APP_ROUTES.LEGAL_TERMS}
                   prefetch={false}
-                  className='text-app tracking-[-0.01em] transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
+                  className='text-app tracking-tight transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
                   style={{ color: 'var(--linear-text-tertiary)' }}
                 >
                   Terms
@@ -196,7 +196,7 @@ export function Footer({
               </div>
               <Copyright
                 variant='light'
-                className='text-2xs leading-[16px] font-normal tracking-[-0.01em] opacity-100'
+                className='text-2xs leading-[16px] font-normal tracking-tight opacity-100'
                 style={{
                   color: 'var(--linear-text-tertiary)',
                 }}
@@ -243,7 +243,7 @@ export function Footer({
                       key={link.href}
                       href={link.href}
                       prefetch={false}
-                      className='text-app leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-subtle hover:[color:var(--linear-text-secondary)]'
+                      className='text-app leading-[19.5px] font-normal tracking-tight transition-colors duration-subtle hover:[color:var(--linear-text-secondary)]'
                       style={{ color: 'var(--linear-text-tertiary)' }}
                     >
                       {link.label}
@@ -254,7 +254,7 @@ export function Footer({
             </div>
             <Copyright
               variant={config.colorVariant}
-              className='text-2xs leading-[16px] font-normal tracking-[-0.01em] opacity-100'
+              className='text-2xs leading-[16px] font-normal tracking-tight opacity-100'
               style={{
                 color: 'var(--linear-text-tertiary)',
               }}

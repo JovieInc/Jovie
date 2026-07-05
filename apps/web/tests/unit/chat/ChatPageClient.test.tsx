@@ -382,29 +382,38 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('does not register chat header actions on the new-chat route', () => {
+  it('registers the artist profile rail toggle on the new-chat route', () => {
     renderChatPage();
 
-    expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
+    const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
+    expect(headerActions).not.toBeNull();
+    expect(headerActions).toEqual(
+      expect.objectContaining({
+        type: expect.anything(),
+      })
+    );
   });
 
-  it('does not hydrate the profile right panel from ambient preview state without a panel query', () => {
+  it('hydrates preview data on chat and registers the live profile panel when preview is open', () => {
     mockPreviewPanelState.isOpen = true;
 
     renderChatPage();
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
-    expect(hasRegisteredRightPanel()).toBe(false);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
+    expect(hasRegisteredRightPanel()).toBe(true);
+    expect(mockSetPreviewData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'testartist',
+      })
+    );
   });
 
-  it('clears preview data while profile panel hydration is inactive', () => {
+  it('does not register a right panel when the preview panel is closed', () => {
     mockPreviewPanelState.isOpen = false;
 
     renderChatPage();
 
     expect(hasRegisteredRightPanel()).toBe(false);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
   });
 
   it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {

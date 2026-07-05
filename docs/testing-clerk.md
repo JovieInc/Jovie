@@ -73,11 +73,11 @@ Used when:
 - Testing authentication flows and protected routes
 
 ```bash
-# Real keys (from Clerk Dashboard)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZGlzdGluY3QtZ2lyYWZmZS01LmNsZXJrLmFjY291bnRzLmRldiQ
-CLERK_SECRET_KEY=sk_test_RS2raun9iVe9B0DnsvO4cCO9lQ7MDRtqaVuPheJBAv
-E2E_CLERK_USER_USERNAME=e2e@jov.ie
-E2E_CLERK_USER_PASSWORD=vPdf9pKNK_eo.PuLzWGJ4C!q76gpa3V9Y8-peB
+# Real keys (from Clerk Dashboard — load from Doppler or .env.development.local, never commit)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your-real-publishable-key
+CLERK_SECRET_KEY=sk_test_your-real-secret-key
+E2E_CLERK_USER_USERNAME=your-test-user@example.com
+E2E_CLERK_USER_PASSWORD=YourTestPassword123!
 ```
 
 ## Test Types
@@ -207,7 +207,7 @@ The test setup provides detailed logging:
 
 ```
 ✓ Clerk testing token set up successfully
-✓ E2E test user configured: e2e@jov.ie
+✓ E2E test user configured: your-test-user@example.com
 ```
 
 or

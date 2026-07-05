@@ -109,7 +109,7 @@ doppler run --project jovie-web --config dev -- \
 
 # Quick auth-relevant inspection (redirects, oauth, native, etc.)
 doppler run --project jovie-web --config dev -- \
-  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "jov.ie|myapp://|universal"
+  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
 
 # Safe preview of a change (dry-run is default/enforced for mutations)
 doppler run --project jovie-web --config dev -- \

@@ -86,6 +86,11 @@ export {
 } from './DrawerPropertyRow';
 export { DrawerSection, type DrawerSectionProps } from './DrawerSection';
 export {
+  DrawerSectionGroup,
+  type DrawerSectionGroupProps,
+  useDrawerSectionGroup,
+} from './DrawerSectionGroup';
+export {
   DRAWER_SECTION_HEADING_CLASSNAME,
   DrawerSectionHeading,
   type DrawerSectionHeadingProps,

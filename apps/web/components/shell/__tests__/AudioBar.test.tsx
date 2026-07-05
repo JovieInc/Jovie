@@ -66,7 +66,7 @@ describe('AudioBar', () => {
   it('calls onCollapse when minimize is pressed', () => {
     const onCollapse = vi.fn();
     render(<AudioBar {...baseProps} onCollapse={onCollapse} />);
-    fireEvent.click(screen.getByLabelText(/^Minimize Player/));
+    fireEvent.click(screen.getByTestId('audio-bar-minimize'));
     expect(onCollapse).toHaveBeenCalledOnce();
   });
 });

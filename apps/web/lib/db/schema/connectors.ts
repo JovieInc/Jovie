@@ -12,8 +12,10 @@
  *   `waiting_for_approval`.
  */
 
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -465,6 +467,15 @@ export const suggestedActions = pgTable(
     executedAt: timestamp('executed_at', { withTimezone: true }),
     executionResult: jsonb('execution_result'),
 
+    /**
+     * When the detector emitted this opportunity (opportunity lifecycle start).
+     * Backfilled as `created_at` for pre-existing rows (labeled assumption).
+     * Cycle time = linked run's `shipped_at` − `detected_at`.
+     */
+    detectedAt: timestamp('detected_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -524,6 +535,21 @@ export const workflowRuns = pgTable(
     /** Earliest time this workflow should be picked up by the cron processor. */
     runAt: timestamp('run_at', { withTimezone: true }).notNull().defaultNow(),
 
+    /** When this run was claimed by the cron processor (lease start). */
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+
+    /**
+     * Lease expiry for in-flight runs. Expired leases are reclaimed on the next
+     * cron tick so lambda timeouts cannot orphan rows in `running` forever.
+     */
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+
+    /**
+     * When the run reached `completed` and its output was published/sent
+     * (opportunity lifecycle end). Set by the executor's completed transition.
+     */
+    shippedAt: timestamp('shipped_at', { withTimezone: true }),
+
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -531,10 +557,180 @@ export const workflowRuns = pgTable(
       .notNull()
       .defaultNow(),
   },
-  t => [index('workflow_runs_status_run_at_idx').on(t.status, t.runAt)]
+  t => [
+    index('workflow_runs_status_run_at_idx').on(t.status, t.runAt),
+    uniqueIndex('workflow_runs_execute_approved_action_approval_uniq')
+      .on(drizzleSql`${t.stepOutputs} ->> 'approvalId'`)
+      .where(
+        drizzleSql`${t.kind} = 'execute_approved_action' AND ${t.stepOutputs} ->> 'approvalId' IS NOT NULL`
+      ),
+  ]
 );
 
 export type WorkflowRun = typeof workflowRuns.$inferSelect;
 export type NewWorkflowRun = typeof workflowRuns.$inferInsert;
 export const insertWorkflowRunSchema = createInsertSchema(workflowRuns);
 export const selectWorkflowRunSchema = createSelectSchema(workflowRuns);
+
+// ---------------------------------------------------------------------------
+// workflow_run_outcomes
+// ---------------------------------------------------------------------------
+
+/**
+ * Revenue outcome snapshot written when a workflow_run reaches `completed`.
+ * One row per run — joins GMV, smartlink clicks, DSP clicks, and captured fans
+ * inside the attribution window so automations can be rolled up to artist lift.
+ */
+export const workflowRunOutcomes = pgTable(
+  'workflow_run_outcomes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workflowRunId: uuid('workflow_run_id')
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Release or catalog asset tied to the automation, when known. */
+    releaseId: text('release_id'),
+    /** Originating suggested_action for connector automations. */
+    suggestedActionId: uuid('suggested_action_id').references(
+      () => suggestedActions.id,
+      { onDelete: 'set null' }
+    ),
+    gmvDeltaCents: integer('gmv_delta_cents').notNull().default(0),
+    clickDelta: integer('click_delta').notNull().default(0),
+    dspClickDelta: integer('dsp_click_delta').notNull().default(0),
+    newFansDelta: integer('new_fans_delta').notNull().default(0),
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  t => [
+    uniqueIndex('workflow_run_outcomes_workflow_run_id_uniq').on(
+      t.workflowRunId
+    ),
+    index('workflow_run_outcomes_user_id_window_end_idx').on(
+      t.userId,
+      t.windowEnd
+    ),
+  ]
+);
+
+export type WorkflowRunOutcome = typeof workflowRunOutcomes.$inferSelect;
+export type NewWorkflowRunOutcome = typeof workflowRunOutcomes.$inferInsert;
+export const insertWorkflowRunOutcomeSchema =
+  createInsertSchema(workflowRunOutcomes);
+export const selectWorkflowRunOutcomeSchema =
+  createSelectSchema(workflowRunOutcomes);
+
+// ---------------------------------------------------------------------------
+// workflow_step_results
+// ---------------------------------------------------------------------------
+
+/**
+ * Workflow-level result log (#12145): one row per executed workflow step,
+ * tying an agent task outcome to its cost and the opportunity it served.
+ *
+ * Powers: agent task success rate, % human override, throughput per agent,
+ * cost per opportunity identified, time-to-resolution per workflow chain,
+ * and hallucination correction rate (retried / total).
+ *
+ * `status` and `agent` are text (not enums) per the schema convention that
+ * new kinds must not require a migration. Known statuses:
+ * `success` | `failed` | `human_override` | `retried`.
+ */
+export const workflowStepResults = pgTable(
+  'workflow_step_results',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+    /** Step name within the workflow (matches `workflow_runs.current_step` vocabulary). */
+    step: text('step').notNull(),
+    /** Agent/executor identifier, e.g. `execute_approved_action`. */
+    agent: text('agent').notNull(),
+    status: text('status').notNull(),
+    tokensIn: integer('tokens_in'),
+    tokensOut: integer('tokens_out'),
+    /** LLM + execution cost in USD. Cross-checks against Agnost LLM-level cost. */
+    costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
+    latencyMs: integer('latency_ms'),
+    /** The suggested_action (opportunity) this step served, when known. */
+    linkedOpportunityId: uuid('linked_opportunity_id').references(
+      () => suggestedActions.id,
+      { onDelete: 'set null' }
+    ),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  t => [
+    index('workflow_step_results_agent_created_idx').on(t.agent, t.createdAt),
+    index('workflow_step_results_run_id_idx').on(t.runId),
+  ]
+);
+
+export type WorkflowStepResult = typeof workflowStepResults.$inferSelect;
+export type NewWorkflowStepResult = typeof workflowStepResults.$inferInsert;
+export const insertWorkflowStepResultSchema =
+  createInsertSchema(workflowStepResults);
+export const selectWorkflowStepResultSchema =
+  createSelectSchema(workflowStepResults);
+
+// ---------------------------------------------------------------------------
+// release_cycle_step_events
+// ---------------------------------------------------------------------------
+
+/**
+ * Manual-vs-automated release-cycle step classification (#12144).
+ * One row per (release, step) execution, tagged with how it was done:
+ * `automation` (workflow_run did it) | `manual` (artist action, no linked run)
+ * | `skipped`. Canonical step vocabulary lives in
+ * `lib/analytics/release-cycle-classification.ts`.
+ */
+export const releaseCycleStepEvents = pgTable(
+  'release_cycle_step_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Release/catalog asset id (text, matching `workflow_run_outcomes.release_id`). */
+    releaseId: text('release_id').notNull(),
+    /** Canonical release-cycle step key (see RELEASE_CYCLE_STEPS). */
+    step: text('step').notNull(),
+    /** `automation` | `manual` | `skipped`. Text (not enum) — no migration for new sources. */
+    source: text('source').notNull(),
+    /** The workflow_run that executed this step, when source = automation. */
+    workflowRunId: uuid('workflow_run_id').references(() => workflowRuns.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  t => [
+    index('release_cycle_step_events_user_release_idx').on(
+      t.userId,
+      t.releaseId
+    ),
+    uniqueIndex('release_cycle_step_events_release_step_uniq').on(
+      t.releaseId,
+      t.step
+    ),
+  ]
+);
+
+export type ReleaseCycleStepEvent = typeof releaseCycleStepEvents.$inferSelect;
+export type NewReleaseCycleStepEvent =
+  typeof releaseCycleStepEvents.$inferInsert;
+export const insertReleaseCycleStepEventSchema = createInsertSchema(
+  releaseCycleStepEvents
+);
+export const selectReleaseCycleStepEventSchema = createSelectSchema(
+  releaseCycleStepEvents
+);

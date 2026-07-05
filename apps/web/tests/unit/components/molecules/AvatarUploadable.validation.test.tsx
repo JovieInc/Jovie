@@ -53,7 +53,7 @@ describe('AvatarUploadable - File Validation', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const file = createMockFile('avatar.jpg', 'image/jpeg', 2048);
 
     fireEvent.change(fileInput, { target: { files: [file] } });
@@ -74,7 +74,7 @@ describe('AvatarUploadable - File Validation', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const invalidFile = createMockFile('document.pdf', 'application/pdf', 1024);
 
     fireEvent.change(fileInput, { target: { files: [invalidFile] } });
@@ -100,7 +100,7 @@ describe('AvatarUploadable - File Validation', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const largeFile = createMockFile(
       'large.jpg',
       'image/jpeg',
@@ -132,7 +132,7 @@ describe('AvatarUploadable - File Validation', () => {
         />
       );
 
-      const fileInput = screen.getByLabelText('Choose profile photo file');
+      const fileInput = screen.getByLabelText('Choose Profile Photo File');
       const validFile = createMockFile(
         `test.${type.split('/')[1]}`,
         type,
@@ -164,7 +164,7 @@ describe('AvatarUploadable - File Validation', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const heicFile = createMockFile('photo.heic', 'image/heic', 2048);
 
     fireEvent.change(fileInput, { target: { files: [heicFile] } });
@@ -193,7 +193,7 @@ describe('AvatarUploadable - File Validation', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const heicFile = createMockFile('photo.heic', 'image/heic', 2048);
 
     fireEvent.change(fileInput, { target: { files: [heicFile] } });
@@ -217,7 +217,7 @@ describe('AvatarUploadable - File Validation', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const largeFile = createMockFile(
       'large.jpg',
       'image/jpeg',

@@ -156,11 +156,11 @@ export function CreatorActionsMenu({
   const isError = status === 'error';
 
   const stateClass = cn(
-    'transition duration-200 ease-out transform',
+    'transition duration-subtle ease-out transform',
     isSuccess &&
-      'animate-pulse motion-reduce:animate-none scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
+      'animate-pulse motion-reduce:animate-none scale-[1.02] ring-1 ring-(--color-accent)',
     isError &&
-      'animate-bounce motion-reduce:animate-none scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
+      'animate-bounce motion-reduce:animate-none scale-[0.97] ring-1 ring-(--color-destructive)'
   );
 
   if (!isMobile) {

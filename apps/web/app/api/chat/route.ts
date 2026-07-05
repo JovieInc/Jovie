@@ -36,10 +36,9 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   tool,
-  type UIMessage,
   type UIMessageChunk,
 } from 'ai';
-import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
@@ -56,14 +55,22 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { extractLastUserText } from '@/lib/chat/message-text';
+import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
 } from '@/lib/chat/release-writes';
+import { fetchReleasesForChat } from '@/lib/chat/releases';
 import {
   extractUIMessageText,
   parseChatRequestBody,
 } from '@/lib/chat/request-validation';
+import {
+  buildRetouchUnavailableAssistantMessage,
+  detectRetouchIntent,
+  resolveRetouchCapability,
+} from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
@@ -78,14 +85,18 @@ import {
 } from '@/lib/chat/tool-events';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
+  createMerchAlternativeTool,
   createMerchGenerateTool,
   createMerchPreviewTool,
   createMerchSelectTool,
 } from '@/lib/chat/tools/merch-tools';
+import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
+import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
   persistTerminalAssistantMessage,
+  recordChatTurnModel,
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
@@ -95,17 +106,17 @@ import {
   type ChatTelemetry,
   type ReleaseContext,
 } from '@/lib/chat/types';
+import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
-import { discogReleases } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { checkGateForUser } from '@/lib/flags/server';
+import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
+import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -152,7 +163,6 @@ import type {
 } from '@/lib/services/album-art/types';
 import {
   buildCanvasMetadata,
-  getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
@@ -165,7 +175,6 @@ import {
   resolvePitchDestination,
 } from '@/lib/services/pitch';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { toISOStringOrNull } from '@/lib/utils/date';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 export const dynamic = 'force-dynamic';
@@ -367,36 +376,6 @@ function formatAvailableReleases(releases: ReleaseContext[]): string {
 }
 
 /**
- * Fetches release data for the chat context.
- * Used by creative tools (canvas, social ads, related artists).
- */
-async function fetchReleasesForChat(
-  profileId: string
-): Promise<ReleaseContext[]> {
-  const releases = await db
-    .select({
-      id: discogReleases.id,
-      title: discogReleases.title,
-      releaseType: discogReleases.releaseType,
-      releaseDate: discogReleases.releaseDate,
-      artworkUrl: discogReleases.artworkUrl,
-      spotifyPopularity: discogReleases.spotifyPopularity,
-      totalTracks: discogReleases.totalTracks,
-      metadata: discogReleases.metadata,
-    })
-    .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, profileId))
-    .orderBy(desc(discogReleases.releaseDate))
-    .limit(50);
-
-  return releases.map(r => ({
-    ...r,
-    releaseDate: toISOStringOrNull(r.releaseDate),
-    canvasStatus: getCanvasStatusFromMetadata(r.metadata),
-  }));
-}
-
-/**
  * Resolves artist context from profileId (server-side) or client-provided data.
  * Returns { context } on success or { error } with a NextResponse on failure.
  */
@@ -462,14 +441,6 @@ function safeSetSentryContext(callback: () => void): void {
   } catch {
     // Observability must never break the chat request path.
   }
-}
-
-function extractLastUserText(uiMessages: UIMessage[]): string {
-  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return '';
-  return extractUIMessageText(
-    lastUserMsg.parts as Array<{ type: string; text?: string }>
-  ).trim();
 }
 
 function normalizeChatTurnSource(value: unknown): ChatTurnSource {
@@ -629,11 +600,18 @@ function buildChatTurnMetadata(input: {
   readonly conversationId: string;
   readonly turnId: string;
   readonly requestId: string;
+  readonly toolStepCapExhausted?: boolean;
+  /** Resolved model id that produced the turn (feedback attribution). */
+  readonly model?: string;
 }) {
   return {
     conversationId: input.conversationId,
     turnId: input.turnId,
     requestId: input.requestId,
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.toolStepCapExhausted
+      ? { toolStepCapExhausted: true as const }
+      : {}),
   };
 }
 
@@ -767,7 +745,10 @@ function createSocialLinkRemovalTool(profileId: string | null) {
  * Creates the checkCanvasStatus tool for querying release canvas status.
  * Fetches release data and reports which releases need canvas videos.
  */
-function createCheckCanvasStatusTool(profileId: string | null) {
+function createCheckCanvasStatusTool(
+  profileId: string | null,
+  releases: ReleaseContext[]
+) {
   return tool({
     description:
       "Check which of the artist's releases have Spotify Canvas videos set and which are missing them. Use this when the artist asks about canvas videos or wants to generate them.",
@@ -786,8 +767,6 @@ function createCheckCanvasStatusTool(profileId: string | null) {
           error: 'Profile ID required for release data',
         };
       }
-
-      const releases = await fetchReleasesForChat(profileId);
 
       if (releases.length === 0) {
         return {
@@ -878,7 +857,10 @@ function createSuggestRelatedArtistsTool(context: ArtistContext) {
  * Creates the generateCanvasPlan tool.
  * Helps the artist plan a canvas video generation from their album artwork.
  */
-function createGenerateCanvasPlanTool(profileId: string | null) {
+function createGenerateCanvasPlanTool(
+  profileId: string | null,
+  releases: ReleaseContext[]
+) {
   return tool({
     description:
       'Generate a detailed plan for creating a Spotify Canvas video from album artwork. Includes artwork processing steps, animation style recommendations, and technical specs. Use this when an artist wants to create a canvas for a specific release.',
@@ -898,7 +880,6 @@ function createGenerateCanvasPlanTool(profileId: string | null) {
         return { success: false, error: 'Profile ID required' };
       }
 
-      const releases = await fetchReleasesForChat(profileId);
       const release = findReleaseByTitle(releases, releaseTitle);
 
       if (!release) {
@@ -918,6 +899,7 @@ function createGenerateAlbumArtTool(params: {
   readonly clerkUserId: string;
   readonly artistName: string;
   readonly canGenerateAlbumArt: boolean;
+  readonly releases: ReleaseContext[];
 }) {
   return tool({
     description:
@@ -967,6 +949,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROFILE_REQUIRED' as const,
           error: 'Profile ID required',
         };
       }
@@ -974,6 +957,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PLAN_UNAVAILABLE' as const,
           error: 'Album art generation requires a Pro plan.',
         };
       }
@@ -982,12 +966,12 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
+          errorCode: 'PROVIDER_UNAVAILABLE' as const,
           error: 'Album art generation is temporarily unavailable.',
         };
       }
 
-      const releases = await fetchReleasesForChat(params.profileId);
-      const target = resolveAlbumArtReleaseTarget(releases, {
+      const target = resolveAlbumArtReleaseTarget(params.releases, {
         releaseId,
         releaseTitle,
       });
@@ -1020,6 +1004,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             burstLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -1033,6 +1018,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'RATE_LIMITED' as const,
           error:
             dailyLimit.reason ??
             'Album art generation limit reached. Please try again later.',
@@ -1132,6 +1118,7 @@ function createGenerateAlbumArtTool(params: {
           return {
             success: false as const,
             retryable: false,
+            errorCode: 'PROVIDER_UNAVAILABLE' as const,
             error: 'Album art generation is temporarily unavailable.',
           };
         }
@@ -1142,6 +1129,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: true,
+          errorCode: 'TOOL_EXECUTION_FAILED' as const,
           error: 'Unable to generate album art. Please try again.',
         };
       }
@@ -1442,7 +1430,8 @@ function buildCanvasPlan(
  */
 function createPromoStrategyTool(
   context: ArtistContext,
-  profileId: string | null
+  profileId: string | null,
+  releases: ReleaseContext[]
 ) {
   return tool({
     description:
@@ -1468,14 +1457,11 @@ function createPromoStrategyTool(
         .describe('Target platforms for the promotion'),
     }),
     execute: async ({ releaseTitle, budget, platforms }) => {
-      let targetRelease: ReleaseContext | null = null;
-
-      if (profileId) {
-        const releases = await fetchReleasesForChat(profileId);
-        targetRelease = releaseTitle
+      const targetRelease = profileId
+        ? releaseTitle
           ? findReleaseByTitle(releases, releaseTitle)
-          : (releases[0] ?? null);
-      }
+          : (releases[0] ?? null)
+        : null;
 
       return {
         success: true,
@@ -1536,7 +1522,10 @@ function createShowTopInsightsTool(profileId: string | null) {
  * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
  * Since Spotify has no public API for canvas status, this is the only reliable way to track it.
  */
-function createMarkCanvasUploadedTool(profileId: string | null) {
+function createMarkCanvasUploadedTool(
+  profileId: string | null,
+  releases: ReleaseContext[]
+) {
   return tool({
     description:
       "Mark a release as having a Spotify Canvas video uploaded. Use this when the artist confirms they've already set a canvas for a track/release in Spotify for Artists, or when they tell you a canvas is already uploaded.",
@@ -1550,7 +1539,6 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
         return { success: false, error: 'Profile ID required' };
       }
 
-      const releases = await fetchReleasesForChat(profileId);
       const release = findReleaseByTitle(releases, releaseTitle);
 
       if (!release) {
@@ -1683,7 +1671,8 @@ function createReleaseTool(resolvedProfileId: string) {
  */
 function createWorldClassBioTool(
   context: ArtistContext,
-  profileId: string | null
+  profileId: string | null,
+  releases: ReleaseContext[]
 ) {
   return tool({
     description:
@@ -1706,12 +1695,6 @@ function createWorldClassBioTool(
         .describe('Maximum words for the returned draft (default 180)'),
     }),
     execute: async ({ goal, tone, maxWords }) => {
-      let releases: Awaited<ReturnType<typeof fetchReleasesForChat>> = [];
-      try {
-        releases = profileId ? await fetchReleasesForChat(profileId) : [];
-      } catch {
-        // Non-fatal: proceed with empty releases rather than failing the tool
-      }
       const wordLimit = maxWords ?? 180;
       const draftPackage = buildArtistBioDraft({
         artistName: context.displayName,
@@ -1831,7 +1814,8 @@ function createSubmitFeedbackTool(clerkUserId: string) {
  */
 function createGenerateReleasePitchTool(
   resolvedProfileId: string,
-  identity: { clerkUserId: string; conversationId: string | null }
+  identity: { clerkUserId: string; conversationId: string | null },
+  releases: ReleaseContext[]
 ) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions.`,
@@ -1884,8 +1868,6 @@ function createGenerateReleasePitchTool(
       instructions,
     }) => {
       try {
-        const releases = await fetchReleasesForChat(resolvedProfileId);
-
         if (releases.length === 0) {
           return {
             success: false as const,
@@ -2000,11 +1982,19 @@ function buildFreeChatTools(
 function buildChatTools(
   artistContext: ArtistContext,
   resolvedProfileId: string | null,
+  releases: ReleaseContext[],
   insightsEnabled: boolean,
   clerkUserId: string,
   canGenerateAlbumArt: boolean,
   albumArtEnabled: boolean,
   canAccessMerchCreation: boolean,
+  canAccessAiRetouching: boolean,
+  teleprompterRecordingEnabled: boolean,
+  userEntitlements: Awaited<
+    ReturnType<
+      typeof import('@/lib/entitlements/server').getCurrentUserEntitlements
+    >
+  >,
   reservedTurn?: {
     readonly conversationId: string;
     readonly turnId: string;
@@ -2016,13 +2006,17 @@ function buildChatTools(
       : {}),
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
-    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
+    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
     suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(
       artistContext,
-      resolvedProfileId
+      resolvedProfileId,
+      releases
     ),
-    generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
+    generateCanvasPlan: createGenerateCanvasPlanTool(
+      resolvedProfileId,
+      releases
+    ),
     ...(albumArtEnabled && canGenerateAlbumArt
       ? {
           generateAlbumArt: createGenerateAlbumArtTool({
@@ -2030,12 +2024,22 @@ function buildChatTools(
             clerkUserId,
             artistName: artistContext.displayName,
             canGenerateAlbumArt,
+            releases,
+          }),
+        }
+      : {}),
+    ...(canAccessAiRetouching
+      ? {
+          retouchImage: createRetouchImageTool({
+            profileId: resolvedProfileId,
+            entitlements: userEntitlements,
           }),
         }
       : {}),
     createPromoStrategy: createPromoStrategyTool(
       artistContext,
-      resolvedProfileId
+      resolvedProfileId,
+      releases
     ),
     // gh-9808 HOT ZONE: voice promo audio generation from cloned voice (premium, 11Labs)
     // "clone my voice" / "voice promo" / "radio drop" intent loads via system prompt
@@ -2043,7 +2047,10 @@ function buildChatTools(
       profileId: resolvedProfileId ?? '',
       artistName: artistContext.displayName,
     }),
-    markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
+    markCanvasUploaded: createMarkCanvasUploadedTool(
+      resolvedProfileId,
+      releases
+    ),
     formatLyrics: createLyricsFormatTool(),
     ...(resolvedProfileId
       ? {
@@ -2053,7 +2060,8 @@ function buildChatTools(
             {
               clerkUserId,
               conversationId: reservedTurn?.conversationId ?? null,
-            }
+            },
+            releases
           ),
         }
       : {}),
@@ -2074,6 +2082,12 @@ function buildChatTools(
           selectMerchDesign: createMerchSelectTool({
             profileId: resolvedProfileId,
             clerkUserId,
+          }),
+          createMerchAlternativeItem: createMerchAlternativeTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+            conversationId: reservedTurn?.conversationId ?? null,
+            turnId: reservedTurn?.turnId ?? null,
           }),
           updateMerchCard: createMerchUpdateTool({
             profileId: resolvedProfileId,
@@ -2147,6 +2161,13 @@ function buildChatTools(
           showArtistPayouts: createMerchPayoutsTool(resolvedProfileId),
         }
       : {}),
+    ...(teleprompterRecordingEnabled
+      ? {
+          proposeVideoRecording: createProposeVideoRecordingTool({
+            clerkUserId,
+          }),
+        }
+      : {}),
   };
 }
 
@@ -2205,24 +2226,14 @@ function buildChatErrorResponse(
 }
 
 async function tryRouteViaIntent(
-  uiMessages: UIMessage[],
+  userText: string,
   profileId: unknown,
   userId: string,
   corsHeaders: Record<string, string>,
   requestId: string,
   reservedTurn?: { conversationId: string; turnId: string } | null
 ): Promise<Response | null> {
-  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return null;
-
-  const userText = lastUserMsg.parts
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('')
-    .trim();
+  if (!userText) return null;
 
   const intent = classifyIntent(userText);
   if (!isDeterministicIntent(intent)) return null;
@@ -2364,11 +2375,10 @@ export async function POST(req: Request) {
   // light model without a code change. Defaults (both false) = normal behavior.
   // Keys are const-declared so a typo fails at compile time rather than
   // silently falling back to the default.
-  const chatDisabled = await checkGateForUser(
-    userId,
-    CHAT_KILL_SWITCH_GATES.DISABLED,
-    false
-  );
+  const [chatDisabled, forceLightModel] = await checkGatesForUser(userId, [
+    { key: CHAT_KILL_SWITCH_GATES.DISABLED, defaultValue: false },
+    { key: CHAT_KILL_SWITCH_GATES.FORCE_LIGHT, defaultValue: false },
+  ]);
   if (chatDisabled) {
     return NextResponse.json(
       {
@@ -2381,11 +2391,6 @@ export async function POST(req: Request) {
       { status: 503, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const forceLightModel = await checkGateForUser(
-    userId,
-    CHAT_KILL_SWITCH_GATES.FORCE_LIGHT,
-    false
-  );
   const parsedRequest = await parseChatRequestBody(req, {
     corsHeaders,
     requestId,
@@ -2414,9 +2419,19 @@ export async function POST(req: Request) {
   const toolIntent = normalizeToolIntent(body.toolIntent);
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
+  const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
+    userId,
+  });
+  const teleprompterRecordingEnabled = await getAppFlagValue(
+    'TELEPROMPTER_RECORDING',
+    { userId }
+  );
   const albumArtCapability = resolveAlbumArtCapability({
-    featureEnabled: FEATURE_FLAGS.ALBUM_ART_GENERATION,
+    featureEnabled: albumArtFeatureEnabled,
     providerConfigured: isXaiConfigured(),
+    entitlements: currentUserEntitlements,
+  });
+  const retouchCapability = resolveRetouchCapability({
     entitlements: currentUserEntitlements,
   });
 
@@ -2557,6 +2572,38 @@ export async function POST(req: Request) {
         }),
       });
     }
+
+    if (
+      retouchCapability.availability !== 'available' &&
+      detectRetouchIntent({ text: userText, toolIntent })
+    ) {
+      const replyText =
+        buildRetouchUnavailableAssistantMessage(retouchCapability);
+      await persistTerminalAssistantMessage({
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        status: 'failed_tool_unavailable',
+        content: replyText,
+        errorCode: retouchCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
+        errorMessage: retouchCapability.reason,
+      });
+
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'retouch-unavailable',
+          'x-conversation-id': reservation.conversationId,
+          'x-chat-turn-id': reservation.turn.id,
+        },
+        metadata: buildChatTurnMetadata({
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+          requestId,
+        }),
+      });
+    }
   }
 
   // Rate limiting - plan-aware daily quota + burst protection. For clients
@@ -2620,7 +2667,7 @@ export async function POST(req: Request) {
 
   // --- Deterministic intent routing (skip AI for simple CRUD) ---
   const intentResponse = await tryRouteViaIntent(
-    uiMessages,
+    userText,
     profileId,
     userId,
     corsHeaders,
@@ -2675,7 +2722,7 @@ export async function POST(req: Request) {
     reservedTurn?.conversationId ?? resolvedConversationId;
 
   try {
-    const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
+    const albumArtEnabled = albumArtFeatureEnabled;
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(
       resolvedProfileId,
@@ -2689,11 +2736,15 @@ export async function POST(req: Request) {
           ...buildChatTools(
             artistContext,
             resolvedProfileId,
+            releases,
             insightsEnabled,
             userId,
             albumArtCapability.availability === 'available',
             albumArtEnabled,
             planLimits.booleans.canAccessMerchCreation,
+            planLimits.booleans.canAccessAiRetouching,
+            teleprompterRecordingEnabled,
+            currentUserEntitlements,
             reservedTurn
           ),
         }
@@ -2753,12 +2804,32 @@ export async function POST(req: Request) {
       accountContext,
       insightsEnabled,
       forceLightModel,
-      tools,
+      lastUserText: userText,
+      tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,
       telemetry,
       onStreamError: persistStreamFailure,
     });
+
+    // Record the producing model on the turn row (fire-and-forget) so 👍/👎
+    // feedback votes can attribute this output to a model server-side, even
+    // when the vote arrives after a page reload (JOV #11460).
+    if (reservedTurn) {
+      recordChatTurnModel(reservedTurn.turnId, turn.selectedModel).catch(
+        error => {
+          Sentry.addBreadcrumb({
+            category: 'ai-chat',
+            message: 'chat_turn_model_record_failed',
+            level: 'warning',
+            data: {
+              turnId: reservedTurn.turnId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+        }
+      );
+    }
 
     return turn.streamResult.toUIMessageStreamResponse({
       headers: {
@@ -2777,14 +2848,18 @@ export async function POST(req: Request) {
               conversationId: reservedTurn.conversationId,
               turnId: reservedTurn.turnId,
               requestId,
+              model: turn.selectedModel,
+              toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,
       onFinish: async ({ responseMessage, isAborted }) => {
         if (!reservedTurn || streamFailurePersisted) return;
 
-        const assistantText = extractUIMessageText(
-          responseMessage.parts as Array<{ type: string; text?: string }>
-        );
+        const assistantText = sanitizeAssistantResponse(
+          extractUIMessageText(
+            responseMessage.parts as Array<{ type: string; text?: string }>
+          )
+        ).text;
         const toolCalls = preparePersistedToolEventsForTurnFinish({
           parts: responseMessage.parts,
           isAborted,
@@ -2807,6 +2882,16 @@ export async function POST(req: Request) {
               }
             : {}),
         });
+
+        if (!isAborted && assistantText.trim().length > 0) {
+          scheduleOnlineScoring({
+            traceId: requestId,
+            caseName: `prod:${requestId}`,
+            userPrompt: userText,
+            assistantResponse: assistantText,
+            plan: userPlan,
+          });
+        }
       },
       onError: () => {
         return 'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.';

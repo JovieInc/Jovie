@@ -29,7 +29,7 @@ function isAuthDegradedError(error: Error): boolean {
 export default function WaitlistError({ error, reset }: ErrorProps) {
   if (isAuthDegradedError(error)) {
     return (
-      <div className='flex min-h-screen items-center justify-center bg-[#06070a] px-5 py-8'>
+      <div className='flex min-h-screen items-center justify-center bg-background px-5 py-8'>
         <AuthUnavailableCard />
       </div>
     );

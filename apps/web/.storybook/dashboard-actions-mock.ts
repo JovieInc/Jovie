@@ -1,12 +1,19 @@
 // Mock for dashboard actions that provides types but no server-side functionality
 
 export type DashboardData = {
-  user: any;
-  creatorProfile: any;
-  socialLinks: any[];
-  totalClicks: number;
-  recentClicks: any[];
-  analytics: any;
+  user: { id: string } | null;
+  creatorProfiles: unknown[];
+  selectedProfile: unknown | null;
+  needsOnboarding: boolean;
+  sidebarCollapsed: boolean;
+  hasSocialLinks: boolean;
+  hasMusicLinks: boolean;
+  isAdmin: boolean;
+  tippingStats: Record<string, unknown>;
+  profileCompletion: {
+    percentage: number;
+    steps: unknown[];
+  };
 };
 
 export type ProfileSocialLink = {
@@ -17,17 +24,43 @@ export type ProfileSocialLink = {
   order: number;
 };
 
-// Mock functions that don't do anything in Storybook
-export const updateCreatorProfile = async (...args: any[]) => {
-  return Promise.resolve();
-};
+const emptyDashboardData = (): DashboardData => ({
+  user: { id: 'storybook-user' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: false,
+  hasMusicLinks: false,
+  isAdmin: false,
+  tippingStats: {},
+  profileCompletion: { percentage: 0, steps: [] },
+});
 
-export const updateSocialLinks = async (...args: any[]) => {
-  return Promise.resolve();
-};
+export const getDashboardDataEssential = async (): Promise<DashboardData> =>
+  emptyDashboardData();
 
-// Add any other exports that might be needed
+export const getDashboardData = async (): Promise<DashboardData> =>
+  emptyDashboardData();
+
+export const getDashboardShellData = async (): Promise<DashboardData> =>
+  emptyDashboardData();
+
+export const updateCreatorProfile = async (..._args: unknown[]) =>
+  Promise.resolve();
+
+export const updateSocialLinks = async (..._args: unknown[]) =>
+  Promise.resolve();
+
+export const updateAllowProfilePhotoDownloads = async (..._args: unknown[]) =>
+  Promise.resolve();
+
+export const updateShowOldReleases = async (..._args: unknown[]) =>
+  Promise.resolve();
+
 export default {
+  getDashboardDataEssential,
+  getDashboardData,
   updateCreatorProfile,
   updateSocialLinks,
 };
