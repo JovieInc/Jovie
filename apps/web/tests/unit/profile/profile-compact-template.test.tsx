@@ -364,7 +364,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const artistPhoto = screen.getByRole('img', { name: mockArtist.name });
+    const artistPhoto = screen
+      .getAllByRole('img', { name: mockArtist.name })
+      .find(img => img.closest('header'));
+    expect(artistPhoto).toBeDefined();
     expect(artistPhoto).toHaveAttribute(
       'src',
       'https://example.com/artist.jpg'
