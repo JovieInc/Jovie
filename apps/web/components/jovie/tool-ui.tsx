@@ -21,6 +21,7 @@ import { ChatAlbumArtCard } from './components/ChatAlbumArtCard';
 import { ChatAnalyticsCard } from './components/ChatAnalyticsCard';
 import { ChatArtifactErrorCard } from './components/ChatArtifactErrorCard';
 import { ChatAvatarUploadCard } from './components/ChatAvatarUploadCard';
+import { ChatFeedbackControl } from './components/ChatFeedbackControl';
 import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
 import { ChatMerchActionCard } from './components/ChatMerchActionCard';
@@ -46,11 +47,52 @@ import { isChatAlbumArtToolResult } from './types';
 
 type ToolRendererVariant = 'chat' | 'inline';
 
+/**
+ * Feedback context for 👍/👎 votes on tool/skill results (JOV #11460).
+ * Provided by the authenticated chat surface; absent = controls hidden.
+ */
+export interface ChatToolFeedbackContext {
+  readonly messageId: string;
+  readonly turnId?: string;
+  readonly conversationId?: string;
+}
+
 interface ToolPartsRendererProps {
   readonly parts: readonly MessagePart[];
   readonly profileId?: string;
   readonly variant: ToolRendererVariant;
   readonly hasMessageText?: boolean;
+  readonly feedback?: ChatToolFeedbackContext;
+}
+
+/** Tool states that accept feedback (in-flight work is not votable). */
+const FEEDBACK_ELIGIBLE_STATES: ReadonlySet<PersistedToolEvent['state']> =
+  new Set(['succeeded', 'failed']);
+
+function ToolEventFeedback({
+  event,
+  feedback,
+  className,
+}: Readonly<{
+  event: PersistedToolEvent;
+  feedback: ChatToolFeedbackContext | undefined;
+  className?: string;
+}>) {
+  if (!feedback || !FEEDBACK_ELIGIBLE_STATES.has(event.state)) {
+    return null;
+  }
+
+  return (
+    <ChatFeedbackControl
+      messageId={feedback.messageId}
+      turnId={feedback.turnId}
+      conversationId={feedback.conversationId}
+      toolCallId={event.toolCallId}
+      toolName={event.toolName}
+      excerpt={event.summary ?? undefined}
+      className={className}
+    />
+  );
 }
 
 function isInsightsResult(result: unknown): result is ChatInsightsToolResult {
@@ -164,12 +206,14 @@ function ToolActivityRow({
   multiple,
   index,
   count,
+  feedback,
 }: Readonly<{
   event: PersistedToolEvent;
   variant: ToolRendererVariant;
   multiple: boolean;
   index: number;
   count: number;
+  feedback?: ChatToolFeedbackContext;
 }>) {
   const body = getToolStatusBody(event);
   const nextStep = getToolStatusNextStep(event);
@@ -267,6 +311,11 @@ function ToolActivityRow({
           </details>
         ) : null}
       </div>
+      <ToolEventFeedback
+        event={event}
+        feedback={feedback}
+        className='shrink-0 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100'
+      />
     </div>
   );
 }
@@ -274,9 +323,11 @@ function ToolActivityRow({
 function ToolActivityFeed({
   events,
   variant,
+  feedback,
 }: Readonly<{
   events: readonly PersistedToolEvent[];
   variant: ToolRendererVariant;
+  feedback?: ChatToolFeedbackContext;
 }>) {
   if (events.length === 0) {
     return null;
@@ -302,6 +353,7 @@ function ToolActivityFeed({
           multiple={multiple}
           index={index}
           count={events.length}
+          feedback={feedback}
         />
       ))}
     </div>
@@ -652,11 +704,13 @@ function renderToolActivityGroups({
   profileId,
   variant,
   hasMessageText,
+  feedback,
 }: Readonly<{
   events: readonly PersistedToolEvent[];
   profileId?: string;
   variant: ToolRendererVariant;
   hasMessageText: boolean;
+  feedback?: ChatToolFeedbackContext;
 }>): ReactNode[] {
   const elements: ReactNode[] = [];
   let statusEvents: PersistedToolEvent[] = [];
@@ -672,7 +726,11 @@ function renderToolActivityGroups({
         key={`activity:${key}`}
         className={cn(hasMessageText && variant === 'chat' && 'mt-2.5')}
       >
-        <ToolActivityFeed events={statusEvents} variant={variant} />
+        <ToolActivityFeed
+          events={statusEvents}
+          variant={variant}
+          feedback={feedback}
+        />
       </div>
     );
     statusEvents = [];
@@ -697,6 +755,11 @@ function renderToolActivityGroups({
         className={cn(hasMessageText && variant === 'chat' && 'mt-3')}
       >
         {artifactCard}
+        <ToolEventFeedback
+          event={event}
+          feedback={feedback}
+          className='mt-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100'
+        />
       </div>
     );
   }
@@ -715,6 +778,7 @@ export function ToolPartsRenderer({
   profileId,
   variant,
   hasMessageText = false,
+  feedback,
 }: ToolPartsRendererProps) {
   const events = useMemo(() => getRenderableToolEvents(parts), [parts]);
   const loggedFallbackToolCallsRef = useRef<Set<string>>(new Set());
@@ -756,6 +820,7 @@ export function ToolPartsRenderer({
         profileId,
         variant,
         hasMessageText,
+        feedback,
       })}
     </>
   );

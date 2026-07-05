@@ -7,7 +7,7 @@ import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCom
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HomepageWorkspaceSectionLazy } from '@/components/homepage/HomepageWorkspaceSectionLazy';
 import { HERO_COPY } from '@/components/homepage/intent';
-import { FaqSection } from '@/components/marketing';
+import { FaqSection, MarketingHero } from '@/components/marketing';
 import { FridayRhythmSectionLazy } from '@/components/marketing/FridayRhythmSectionLazy';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
@@ -220,38 +220,54 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 
 const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);
 
-function HomepageHeroActions() {
+function HomepageHero() {
   const secondaryCta = getHomepageFrontDoorCtaContract(
     FEATURE_FLAGS.WAITLIST_ENABLED
   ).secondary;
 
   return (
-    <div className='homepage-hero-actions system-b-mounted-home-hero-actions'>
-      <HomepageTrackedLink
-        href={HERO_COPY.primaryCta.href}
-        data-testid='homepage-primary-cta'
-        data-cta-sign-up='true'
-        className='public-action-primary system-b-mounted-home-hero-primary focus-ring-themed'
-        eventName='homepage_hero_cta_clicked'
-        eventProperties={{ cta: 'primary', label: HERO_COPY.primaryCta.label }}
-      >
-        {HERO_COPY.primaryCta.label}
-      </HomepageTrackedLink>
-      {secondaryCta ? (
-        <HomepageTrackedLink
-          href={secondaryCta.href}
-          className='homepage-hero-secondary-link system-b-mounted-home-hero-secondary focus-ring-themed'
-          eventName='homepage_hero_cta_clicked'
-          eventProperties={{
-            cta: 'secondary',
-            label: secondaryCta.label,
-          }}
-        >
-          {secondaryCta.label}
-          <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
-        </HomepageTrackedLink>
-      ) : null}
-    </div>
+    <MarketingHero
+      headingId='home-hero-heading'
+      testId='homepage-hero-shell'
+      headline={HERO_COPY.headline}
+      subtitle={HERO_COPY.subhead}
+      linkComponent={HomepageTrackedLink}
+      primaryCta={{
+        label: HERO_COPY.primaryCta.label,
+        href: HERO_COPY.primaryCta.href,
+        testId: 'homepage-primary-cta',
+        signUp: true,
+        eventName: 'homepage_hero_cta_clicked',
+        eventProperties: { cta: 'primary', label: HERO_COPY.primaryCta.label },
+      }}
+      secondaryCta={
+        secondaryCta
+          ? {
+              label: (
+                <>
+                  {secondaryCta.label}
+                  <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
+                </>
+              ),
+              href: secondaryCta.href,
+              eventName: 'homepage_hero_cta_clicked',
+              eventProperties: {
+                cta: 'secondary',
+                label: secondaryCta.label,
+              },
+            }
+          : undefined
+      }
+      media={<HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />}
+      logos={
+        <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
+          <HomeTrustSection
+            label='Used By Artists And Teams With Releases Distributed Through'
+            presentation='inline-strip'
+          />
+        </div>
+      }
+    />
   );
 }
 
@@ -414,53 +430,7 @@ export default async function HomePage() {
 
   return (
     <HomePageShell>
-      <section
-        className='homepage-hero-stage system-b-mounted-home-hero-stage'
-        aria-labelledby='home-hero-heading'
-      >
-        <div
-          data-testid='homepage-hero-shell'
-          className='homepage-hero-shell system-b-mounted-home-hero-shell'
-        >
-          <div
-            aria-hidden='true'
-            className='homepage-hero-shell__layer homepage-hero-shell__base'
-          />
-          <div
-            aria-hidden='true'
-            className='homepage-hero-shell__layer homepage-hero-shell__halo'
-          />
-          <div
-            aria-hidden='true'
-            className='homepage-hero-shell__layer homepage-hero-shell__beam'
-          />
-          <div aria-hidden='true' className='homepage-hero-shell__grid-wrap'>
-            <div className='homepage-hero-shell__grid' />
-          </div>
-
-          <div className='homepage-hero-inner system-b-mounted-home-hero-inner'>
-            <div className='homepage-hero-copy system-b-mounted-home-hero-copy'>
-              <h1
-                id='home-hero-heading'
-                className='homepage-hero-headline system-b-mounted-home-hero-headline'
-              >
-                {HERO_COPY.headline}
-              </h1>
-              <p className='homepage-hero-subhead system-b-mounted-home-hero-subhead'>
-                {HERO_COPY.subhead}
-              </p>
-              <HomepageHeroActions />
-            </div>
-            <HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />
-          </div>
-        </div>
-      </section>
-      <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
-        <HomeTrustSection
-          label='Used By Artists And Teams With Releases Distributed Through'
-          presentation='inline-strip'
-        />
-      </div>
+      <HomepageHero />
       <HomepageStoryStack showUnlockedSections={showUnlockedSections} />
     </HomePageShell>
   );

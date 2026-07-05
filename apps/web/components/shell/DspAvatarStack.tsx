@@ -50,8 +50,9 @@ const STATUS_LABEL: Record<DspStatus, string> = {
 };
 
 /**
- * DspAvatarStack — single primary DSP avatar + "+N" overflow chip with a
- * hover popover listing every DSP and its status.
+ * DspAvatarStack — stacked (overlapping) DSP avatars + "+N" overflow chip
+ * with a hover popover listing every DSP and its status. `maxVisible`
+ * controls how many avatars render before the overflow chip (default 1).
  *
  * Sorts the input so `live` DSPs lead, then `pending`/`error`, then `missing`
  * — the visible primary is always the most-actionable DSP. The popover
@@ -74,9 +75,15 @@ const STATUS_LABEL: Record<DspStatus, string> = {
 export function DspAvatarStack({
   dsps,
   className,
+  maxVisible = 1,
 }: {
   readonly dsps: readonly DspAvatarItem[];
   readonly className?: string;
+  /**
+   * How many overlapping DSP avatars to show before collapsing the rest into
+   * the "+N" chip. Defaults to 1 (single primary avatar), the original shape.
+   */
+  readonly maxVisible?: number;
 }) {
   const popoverId = useId();
 
@@ -85,12 +92,9 @@ export function DspAvatarStack({
   const ordered = [...dsps].sort(
     (a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]
   );
-  const primary = ordered[0];
   const liveCount = ordered.filter(d => d.status === 'live').length;
-  const others = Math.max(0, ordered.length - 1);
-  const primaryAvatarStyle = {
-    '--system-b-dsp-avatar-color': primary.color,
-  } as CSSProperties;
+  const visible = ordered.slice(0, Math.max(1, maxVisible));
+  const others = Math.max(0, ordered.length - visible.length);
 
   return (
     <div
@@ -105,29 +109,40 @@ export function DspAvatarStack({
         className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
         type='button'
       >
-        <span
-          className={cn(
-            'relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white dark:text-white',
-            'ring-2 ring-(--system-b-bg-page)',
-            primary.status === 'missing'
-              ? 'opacity-40'
-              : 'opacity-75 transition-opacity duration-fast ease-subtle group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
-          )}
-          style={primaryAvatarStyle}
-        >
-          {primary.glyph}
-          {primary.status === 'pending' && (
+        <span className='inline-flex items-center'>
+          {visible.map((dsp, index) => (
             <span
-              aria-hidden='true'
-              className='system-b-dsp-status-dot system-b-dsp-status-dot-pending absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
-            />
-          )}
-          {primary.status === 'error' && (
-            <span
-              aria-hidden='true'
-              className='system-b-dsp-status-dot system-b-dsp-status-dot-error absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
-            />
-          )}
+              key={dsp.id}
+              className={cn(
+                'relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--system-b-dsp-avatar-color) text-3xs font-semibold text-white dark:text-white',
+                'ring-2 ring-(--system-b-bg-page)',
+                index > 0 && '-ml-1.5',
+                dsp.status === 'missing'
+                  ? 'opacity-40'
+                  : 'opacity-75 transition-opacity duration-fast ease-subtle group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
+              )}
+              style={
+                {
+                  '--system-b-dsp-avatar-color': dsp.color,
+                  zIndex: visible.length - index,
+                } as CSSProperties
+              }
+            >
+              {dsp.glyph}
+              {dsp.status === 'pending' && (
+                <span
+                  aria-hidden='true'
+                  className='system-b-dsp-status-dot system-b-dsp-status-dot-pending absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
+                />
+              )}
+              {dsp.status === 'error' && (
+                <span
+                  aria-hidden='true'
+                  className='system-b-dsp-status-dot system-b-dsp-status-dot-error absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ring-1 ring-(--system-b-bg-page)'
+                />
+              )}
+            </span>
+          ))}
         </span>
         {others > 0 && (
           <span className='inline-flex h-5 items-center rounded-full border border-(--system-b-app-shell-border) bg-surface-1 px-1.5 text-3xs font-caption tabular-nums text-tertiary-token'>

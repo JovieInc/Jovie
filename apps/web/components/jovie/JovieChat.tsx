@@ -615,6 +615,7 @@ export function JovieChat({
                 inlineChatError={inlineChatError}
                 isStuckToBottom={isStuckToBottom}
                 onScrollToBottom={() => scrollToBottom()}
+                conversationId={activeConversationId ?? conversationId}
               />
             )}
           </div>

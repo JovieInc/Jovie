@@ -85,6 +85,23 @@ function getFocusedSettingsHref(sectionId: string): string {
   }
 }
 
+/**
+ * Settings sidebar rows share the canonical shell nav-row chrome
+ * (`getSidebarNavRowClassName`) so padding/density/active/hover stay
+ * byte-identical to the main app sidebar. The only divergence is
+ * structural: settings rows have no icon column, so the grid collapses
+ * to a single column and the icon guide lines are hidden.
+ *
+ * Exported for the settings-vs-shell parity test
+ * (tests/unit/sidebar-row-alignment.test.tsx).
+ */
+export function getSettingsSidebarRowClassName(isActive: boolean): string {
+  return getSidebarNavRowClassName({
+    active: isActive,
+    className: 'grid-cols-[minmax(0,1fr)] before:hidden after:hidden text-left',
+  });
+}
+
 const SettingsSidebar = memo(
   ({
     groups,
@@ -105,11 +122,7 @@ const SettingsSidebar = memo(
                   const href = useRouteLinks
                     ? getFocusedSettingsHref(section.id)
                     : `#${section.id}`;
-                  const rowClassName = getSidebarNavRowClassName({
-                    active: isActive,
-                    className:
-                      'grid-cols-[minmax(0,1fr)] before:hidden after:hidden text-left',
-                  });
+                  const rowClassName = getSettingsSidebarRowClassName(isActive);
                   const rowContent = (
                     <span className='min-w-0 truncate text-left justify-self-start'>
                       {section.title}

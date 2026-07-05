@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import { BASE_URL } from '@/constants/app';
+import { PROFILE_HERO_COMPOSITION_CLASSNAME } from '@/lib/profile/composition';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -112,12 +113,11 @@ export function ArtistHero({
     'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-mid font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-opacity duration-slow hover:opacity-94 active:opacity-[0.9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
+    // Composition rule (#11899, lib/profile/composition.ts): the hero keeps a
+    // fixed 16/7 crop with a 240px floor — height derives from width, never
+    // from viewport or content flow. The fill image crops, never squashes.
     <section
-      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-130 md:rounded-t-3xl xl:max-h-160 2xl:max-h-170 ${
-        compact
-          ? 'h-[40dvh] min-h-80 max-h-115'
-          : 'h-[48dvh] min-h-105 max-h-155'
-      }`}
+      className={`relative w-full overflow-hidden md:rounded-t-3xl ${PROFILE_HERO_COMPOSITION_CLASSNAME}`}
       data-testid='profile-header'
     >
       <div className='absolute inset-0'>

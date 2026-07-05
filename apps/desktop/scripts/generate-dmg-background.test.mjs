@@ -1,8 +1,8 @@
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   buildDmgBackgroundSvg,
   getDesktopBuildYear,
