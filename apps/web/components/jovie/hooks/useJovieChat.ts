@@ -5,7 +5,14 @@ import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
@@ -13,6 +20,12 @@ import {
   readComposerDraft,
   saveComposerDraft,
 } from '@/lib/chat/composer-draft-store';
+import {
+  modelRotationNoticeForStep,
+  readModelRotationStep,
+  recordAssistantTurnClean,
+  subscribeModelRotation,
+} from '@/lib/chat/model-rotation-store';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
@@ -531,6 +544,11 @@ export function useJovieChat({
         adoptServerConversationId(metadata.conversationId, 'completed');
       }
 
+      // 👎 recovery loop (JOV-3362 / #11461): count clean assistant turns so
+      // a rotated conversation auto-reverts to the default model after 3
+      // completions without a new thumbs-down.
+      recordAssistantTurnClean(finishedConversationId);
+
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
       });
@@ -703,6 +721,20 @@ export function useJovieChat({
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
 
+  // Reactive view of the 👎 model-rotation state (JOV-3362 / #11461). The
+  // store mutates from ChatFeedbackControl (a different component), so the
+  // hook subscribes rather than reading module state during render only.
+  const rotationSnapshot = useCallback(
+    () => readModelRotationStep(activeConversationId),
+    [activeConversationId]
+  );
+  const modelRotationStep = useSyncExternalStore(
+    subscribeModelRotation,
+    rotationSnapshot,
+    () => 0
+  );
+  const modelRotationNotice = modelRotationNoticeForStep(modelRotationStep);
+
   useEffect(() => {
     if (status !== 'ready') return;
     queryClient.invalidateQueries({
@@ -855,12 +887,19 @@ export function useJovieChat({
       const toolIntent =
         options?.toolIntent ?? inferToolIntentFromPrompt(trimmedText);
 
+      // 👎 recovery loop (JOV-3362 / #11461): after a thumbs-down, route this
+      // conversation's next turn to the next model in the fallback chain. The
+      // client only transmits an integer step; the server resolves + clamps
+      // the actual model from its own vetted chain.
+      const modelRotationStep = readModelRotationStep(activeConversationId);
+
       const sendOptions = {
         body: {
           clientTurnId,
           clientMessageId: `${clientTurnId}:user`,
           source: options?.source ?? 'typed',
           ...(toolIntent ? { toolIntent } : {}),
+          ...(modelRotationStep > 0 ? { modelRotationStep } : {}),
         },
       };
       dispatchTimelineEvent({
@@ -1053,6 +1092,8 @@ export function useJovieChat({
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */
     conversationTitle,
+    /** Quiet status line while the conversation is rotated off the default model (👎 recovery). */
+    modelRotationNotice,
     // Refs
     inputRef,
     // Handlers
