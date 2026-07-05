@@ -1,5 +1,12 @@
 name: PR Conflict Handler
 
+# Automatically resolves merge conflicts on agent PRs.
+# Fires on:
+#   - PR push (detect conflicts immediately)
+#   - CI completion (conflict may surface as test failure)
+#   - Schedule weekday safety net
+#   - Manual dispatch
+
 on:
   workflow_dispatch:
     inputs:
@@ -18,6 +25,11 @@ on:
   schedule:
     # Read-only audit. Do not auto-push/rebase the fleet on a tight cadence.
     - cron: '17 15 * * 1-5'
+  pull_request:
+    types: [synchronize]
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
 
 permissions:
   contents: write
