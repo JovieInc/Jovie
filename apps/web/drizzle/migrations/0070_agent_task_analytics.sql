@@ -107,3 +107,4 @@ CREATE INDEX IF NOT EXISTS "release_cycle_step_events_user_release_idx"
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "release_cycle_step_events_release_step_uniq"
   ON "release_cycle_step_events" ("release_id", "step");
+-- gate-evidence re-run trigger
