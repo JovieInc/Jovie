@@ -16,6 +16,7 @@ vi.mock('@/lib/queries', () => ({
   useCheckoutMutation: vi.fn(),
   usePortalMutation: vi.fn(),
   useFeedbackMutation: vi.fn(),
+  useChatUsageQuery: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -58,6 +59,7 @@ import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import {
   useBillingStatusQuery,
+  useChatUsageQuery,
   useCheckoutMutation,
   useFeedbackMutation,
   usePortalMutation,
@@ -72,6 +74,7 @@ const flushMicrotasks = async () => {
 };
 
 const mockUseBillingStatusQuery = vi.mocked(useBillingStatusQuery);
+const mockUseChatUsageQuery = vi.mocked(useChatUsageQuery);
 const mockUsePricingOptionsQuery = vi.mocked(usePricingOptionsQuery);
 const mockUseCheckoutMutation = vi.mocked(useCheckoutMutation);
 const mockUsePortalMutation = vi.mocked(usePortalMutation);
@@ -139,6 +142,25 @@ describe('UserButton billing actions', () => {
       mutateAsync: vi.fn().mockResolvedValue({ ok: true, id: 'feedback_test' }),
       isPending: false,
       isError: false,
+    } as any);
+
+    mockUseChatUsageQuery.mockReturnValue({
+      data: {
+        plan: 'free',
+        dailyLimit: 10,
+        used: 4,
+        remaining: 6,
+        resetAt: '2026-05-23T07:00:00.000Z',
+        monthlyLimit: 310,
+        monthlyUsed: 24,
+        monthlyRemaining: 286,
+        monthlyResetAt: '2026-06-01T00:00:00.000Z',
+        isExhausted: false,
+        warningThreshold: 2,
+        isNearLimit: false,
+      },
+      isLoading: false,
+      error: null,
     } as any);
 
     mockUseUserSafe.mockReturnValue({
@@ -600,7 +622,7 @@ describe('UserButton billing actions', () => {
     expect(document.querySelector('.animate-pulse')).toBeNull();
   });
 
-  it('shows a usage stats entry and routes there from the user menu', async () => {
+  it('shows an inline usage remaining row in the user menu', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
       isLoading: false,
@@ -611,8 +633,9 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    await user.click(await screen.findByText('Usage Stats'));
 
-    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_USAGE);
+    expect(screen.getByText('Usage remaining')).toBeInTheDocument();
+    expect(screen.getByText('60%')).toBeInTheDocument();
+    expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 });

@@ -12,6 +12,8 @@ export type { CookieActionsProps } from './CookieActions';
 export { CookieActions } from './CookieActions';
 export type { DSPButtonGroupProps } from './DSPButtonGroup';
 export { DSPButtonGroup } from './DSPButtonGroup';
+export type { EmptyStateProps } from './EmptyState';
+export { EmptyState } from './EmptyState';
 export type { FeatureCardProps } from './FeatureCard';
 export { FeatureCard } from './FeatureCard';
 export { FrostedContainer } from './FrostedContainer';

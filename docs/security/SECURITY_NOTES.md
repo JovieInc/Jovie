@@ -26,6 +26,11 @@ _Last reviewed: 2026-04-01_
     - Do **not** add new real secrets under `env-backup/`.
     - If examples are needed, commit **redacted sample files** only, and keep real values in Vercel / 1Password / secret manager.
 
+- **JOV-2940 (2026-06): Neon owner credentials in `.claude/settings.local.json.backup`**
+  - Tracked local Claude permission overrides were committed with embedded Neon `DATABASE_URL` values.
+  - **Repo fix:** files removed from `HEAD`, `.gitignore` updated, gitleaks rules tightened. See `docs/security/JOV-2940-credential-exposure-remediation.md`.
+  - **Still required:** rotate Neon + Clerk credentials, purge history via `scripts/security/purge-settings-local-history.sh`.
+
 - **URL encryption** ✅ **UPDATED 2026-03-21**
   - Link wrapping uses AES-256-GCM encryption with a versioned envelope (`v: 1`) via `encryptUrlRawKey()`/`decryptUrlRawKey()` in `lib/utils/url-encryption.server.ts`.
   - The raw `URL_ENCRYPTION_KEY` (base64-encoded 32-byte key) is used directly as the AES key — no scrypt derivation — for fast encrypt/decrypt on the hot `/go/:shortId` redirect path.

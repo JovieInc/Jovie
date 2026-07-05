@@ -252,6 +252,22 @@ export async function reserveChatTurn(input: {
   };
 }
 
+/**
+ * Records the resolved model id (`anthropic/...`) that is producing this
+ * turn's assistant output. Fire-and-forget from the chat route right after
+ * model selection so 👍/👎 feedback rows can attribute votes to the
+ * producing model even when the stream later fails (JOV #11460).
+ */
+export async function recordChatTurnModel(
+  turnId: string,
+  model: string
+): Promise<void> {
+  await db
+    .update(chatTurns)
+    .set({ model, updatedAt: new Date() })
+    .where(eq(chatTurns.id, turnId));
+}
+
 export async function markChatTurnStreaming(turnId: string): Promise<void> {
   const now = new Date();
   await db

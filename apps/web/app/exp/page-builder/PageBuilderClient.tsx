@@ -50,7 +50,7 @@ type StudioMode = 'pages' | 'sections' | 'product' | 'screenshots';
  * without configuring anything.
  */
 const DEFAULT_BODY: readonly string[] = [
-  'marketing-hero-centered',
+  'marketing-hero',
   'home-trust-default',
   'feature-card-grid-3up',
   'testimonial-card-3up',
@@ -191,7 +191,7 @@ export function PageBuilderClient({
           The composed landing page. Padding-top = toolbar height so the
           header always renders below the toolbar without overlap.
         */
-        <div className='pt-[64px]'>
+        <div className='pt-16'>
           <MarketingHeader
             variant={headerMode === 'transparent' ? 'homepage' : 'landing'}
           />
@@ -255,7 +255,7 @@ function Toolbar({
   onOpenDrawer,
 }: ToolbarProps) {
   return (
-    <div className='fixed left-0 right-0 top-0 z-50 flex h-[56px] items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white shadow-lg backdrop-blur-md'>
+    <div className='fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white dark:text-white shadow-lg backdrop-blur-md'>
       <span
         className={
           designV1Enabled
@@ -289,7 +289,7 @@ function Toolbar({
                 className={cn(
                   'inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-2xs font-semibold transition-colors',
                   mode === option.value
-                    ? 'bg-white text-black'
+                    ? 'bg-white text-black dark:text-white'
                     : 'text-white/70 hover:text-white'
                 )}
               >
@@ -336,7 +336,7 @@ function Toolbar({
           <button
             type='button'
             onClick={onOpenDrawer}
-            className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/10'
+            className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white dark:text-white transition-colors hover:bg-white/10'
           >
             <Plus className='h-3.5 w-3.5' />
             Sections ({bodyCount})
@@ -380,7 +380,7 @@ function Toggle<T extends string>({
             className={cn(
               'inline-flex h-6 items-center rounded px-2.5 text-2xs font-semibold transition-colors',
               opt.value === value
-                ? 'bg-white text-black'
+                ? 'bg-white text-black dark:text-white'
                 : 'text-white/70 hover:text-white'
             )}
           >
@@ -416,7 +416,7 @@ export function DesignStudioWorkspace({
 }: Readonly<{ mode: Exclude<StudioMode, 'pages'> }>) {
   return (
     <main
-      className='min-h-screen bg-surface-1 px-4 pb-12 pt-[80px] text-white sm:px-6 lg:px-8'
+      className='min-h-screen bg-surface-1 px-4 pb-12 pt-20 text-white dark:text-white sm:px-6 lg:px-8'
       data-testid={`design-studio-${mode}`}
     >
       {renderDesignStudio(mode)}
@@ -430,7 +430,7 @@ function StudioIntro({
 }: Readonly<{ title: string; description: string }>) {
   return (
     <div className='mb-6 flex flex-col gap-2'>
-      <h1 className='text-2xl font-semibold tracking-[-0.02em]'>{title}</h1>
+      <h1 className='text-2xl font-semibold tracking-tighter'>{title}</h1>
       <p className='max-w-3xl text-sm leading-6 text-white/55'>{description}</p>
     </div>
   );
@@ -524,7 +524,7 @@ function DesignStudioItemCard({
       className='overflow-hidden rounded-lg border border-white/10 bg-white/[0.035]'
       data-testid={`design-studio-item-${item.id}`}
     >
-      <div className={compact ? 'max-h-[280px] overflow-hidden' : ''}>
+      <div className={compact ? 'max-h-70 overflow-hidden' : ''}>
         {item.preview()}
       </div>
       <div className='space-y-3 border-t border-white/10 p-4'>
@@ -536,7 +536,7 @@ function DesignStudioItemCard({
                 {item.description}
               </p>
             </div>
-            <span className='shrink-0 rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-white/55'>
+            <span className='shrink-0 rounded-md bg-white/[0.06] px-2 py-1 text-2xs text-white/55'>
               {DESIGN_STUDIO_CATEGORY_LABELS[item.category]}
             </span>
           </div>
@@ -572,7 +572,7 @@ function DesignStudioItemCard({
           {item.componentPaths.slice(0, 4).map(path => (
             <code
               key={path}
-              className='rounded bg-black/35 px-2 py-1 text-[10px] text-white/45'
+              className='rounded bg-black/35 px-2 py-1 text-3xs text-white/45'
             >
               {path}
             </code>
@@ -597,7 +597,7 @@ function ScreenshotScenarioCard({
             {scenario.route}
           </p>
         </div>
-        <span className='rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-white/55'>
+        <span className='rounded-md bg-white/[0.06] px-2 py-1 text-2xs text-white/55'>
           {scenario.viewport}
         </span>
       </div>
@@ -704,12 +704,12 @@ function SectionDrawer({
 
   return (
     <div
-      className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-[380px] flex-col border-l border-white/10 bg-black text-white shadow-2xl'
+      className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-95 flex-col border-l border-white/10 bg-black dark:bg-black text-white dark:text-white shadow-2xl'
       role='dialog'
       aria-modal='true'
       aria-label='Body section composer'
     >
-      <div className='flex h-[56px] items-center justify-between border-b border-white/10 px-4'>
+      <div className='flex h-14 items-center justify-between border-b border-white/10 px-4'>
         <span className='text-sm font-semibold'>Body sections</span>
         <button
           type='button'
@@ -741,7 +741,7 @@ function SectionDrawer({
                     key={`${id}-${idx}`}
                     className='flex items-center gap-2 rounded border border-white/10 bg-white/[0.03] px-2 py-1.5'
                   >
-                    <span className='flex-1 truncate text-xs text-white'>
+                    <span className='flex-1 truncate text-xs text-white dark:text-white'>
                       {variant?.label ?? id}
                     </span>
                     <button

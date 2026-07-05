@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
@@ -23,7 +24,11 @@ import {
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
-import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import {
+  APP_ROUTES,
+  buildLibraryViewRoute,
+  isDemoRoutePath,
+} from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
@@ -31,16 +36,15 @@ import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQue
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
+  artistProfileNavItem,
   artistSettingsNavigation,
-  libraryNavItem,
   newThreadNavItem,
   primaryNavigation,
-  profileNavItem,
-  settingsNavItem,
+  releasesNavItem,
+  touringNavItem,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
-import { ProfileMenuActions } from './ProfileMenuActions';
 import type { DashboardNavProps, NavItem } from './types';
 
 const searchNavItem: NavItem = {
@@ -49,7 +53,7 @@ const searchNavItem: NavItem = {
   id: 'search',
   icon: Search,
   description:
-    'Search app content across chats, releases, artists, tasks, and more',
+    'Search app content across conversations, releases, artists, tasks, and more',
 };
 
 type DashboardNavSection = {
@@ -58,19 +62,42 @@ type DashboardNavSection = {
   readonly items: NavItem[];
 };
 
-type MoreNavSection = {
-  readonly key: 'more';
-  readonly label: string;
-  readonly items: NavItem[];
-};
+function navItemPathname(href: string): string {
+  return new URL(href, 'https://jovie.local').pathname;
+}
+
+function isReleasesRoute(pathname: string): boolean {
+  return (
+    pathname === APP_ROUTES.LIBRARY ||
+    pathname === APP_ROUTES.DASHBOARD_LIBRARY ||
+    pathname === APP_ROUTES.LEGACY_DASHBOARD_LIBRARY ||
+    pathname === APP_ROUTES.RELEASES ||
+    pathname === APP_ROUTES.DASHBOARD_RELEASES
+  );
+}
 
 function isItemActive(pathname: string, item: NavItem): boolean {
+  if (item.id === 'releases') {
+    return isReleasesRoute(pathname);
+  }
+
+  if (item.id === 'artist-profile') {
+    return (
+      pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`)
+    );
+  }
+
+  if (item.id === 'touring') {
+    return (
+      pathname === APP_ROUTES.SETTINGS_TOURING ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_TOURING}/`)
+    );
+  }
+
   const normalizedPathname = (() => {
-    if (
-      pathname === APP_ROUTES.DASHBOARD_RELEASES ||
-      pathname === APP_ROUTES.RELEASES
-    ) {
-      return APP_ROUTES.RELEASES;
+    if (isReleasesRoute(pathname)) {
+      return APP_ROUTES.LIBRARY;
     }
     if (
       pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
@@ -81,12 +108,9 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     return pathname;
   })();
 
-  if (
-    normalizedPathname === item.href ||
-    (normalizedPathname === APP_ROUTES.RELEASES &&
-      (item.href === APP_ROUTES.RELEASES ||
-        item.href === APP_ROUTES.DASHBOARD_RELEASES))
-  ) {
+  const itemPathname = navItemPathname(item.href);
+
+  if (normalizedPathname === itemPathname || normalizedPathname === item.href) {
     return true;
   }
 
@@ -95,7 +119,7 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     return false;
   }
 
-  return normalizedPathname.startsWith(`${item.href}/`);
+  return normalizedPathname.startsWith(`${itemPathname}/`);
 }
 
 function normalizeTrailingSlash(pathname: string): string {
@@ -140,6 +164,8 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
+  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
+    usePreviewPanelState();
   const queryClient = useQueryClient();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [threadReadAtById, setThreadReadAtById] =
@@ -147,19 +173,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
     readTasksSeenAt
   );
-  const username =
-    selectedProfile?.usernameNormalized ?? selectedProfile?.username;
-  const publicProfileHref = username ? `/${username}` : undefined;
-
-  // Memoize profile actions to prevent creating new JSX on every render
-  const profileActions = useMemo(
-    () =>
-      publicProfileHref ? (
-        <ProfileMenuActions publicProfileHref={publicProfileHref} />
-      ) : null,
-    [publicProfileHref]
-  );
-
   const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
@@ -209,83 +222,80 @@ export function DashboardNav(_: DashboardNavProps) {
     setTasksSeenAt(nextSeenAt);
   }, [pathname]);
 
-  // Settings nav: "General" (user) and artist name (or "Artist") groups
-  const artistSettingsLabel = artistName || 'Artist';
-  const moreLabel = 'More';
+  // Settings nav: "General" (user) and artist name (or "Artist") groups.
+  // In the chat shell the artist row itself shows the display name, so keep the
+  // section label generic to avoid duplicate "Tim White" buttons in the sidebar.
+  const artistSettingsLabel =
+    shellChatV1Enabled || isInSettings ? 'Artist' : artistName || 'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
-  const { moreSection, navSections } = useMemo<{
-    readonly moreSection: MoreNavSection | null;
-    readonly navSections: DashboardNavSection[];
-  }>(() => {
-    const decorateItem = (item: NavItem): NavItem =>
-      item.id === 'tasks'
-        ? {
-            ...item,
-            badge: (() => {
-              if (isPlanGateLoading) return undefined;
-              if (canAccessTasksWorkspace)
-                return formatTaskBadge(taskStats, tasksSeenAt);
-              return (
-                <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-secondary-token'>
-                  Pro
-                </span>
-              );
-            })(),
-          }
-        : item;
+  const navSections = useMemo<readonly DashboardNavSection[]>(() => {
+    const decorateItem = (item: NavItem): NavItem => {
+      if (item.id === 'tasks') {
+        return {
+          ...item,
+          badge: (() => {
+            if (isPlanGateLoading) return undefined;
+            if (canAccessTasksWorkspace)
+              return formatTaskBadge(taskStats, tasksSeenAt);
+            return (
+              <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-3xs font-semibold tracking-wider text-secondary-token'>
+                Pro
+              </span>
+            );
+          })(),
+        };
+      }
 
-    const releaseItem = primaryNavigation.find(item => item.id === 'releases');
+      if (shellChatV1Enabled && !isInSettings && item.id === 'artist-profile') {
+        return {
+          ...item,
+          name: artistName || item.name,
+          href: APP_ROUTES.CHAT_PROFILE_PANEL,
+        };
+      }
+
+      return item;
+    };
+
     const audienceItem = primaryNavigation.find(item => item.id === 'audience');
     const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
-    const artistProfileItem: NavItem = {
-      ...profileNavItem,
-      name: artistSettingsLabel,
-    };
 
     if (shellChatV1Enabled) {
-      return {
-        moreSection: {
-          key: 'more',
-          label: moreLabel,
-          items: [artistProfileItem, settingsNavItem].map(decorateItem),
+      return [
+        {
+          key: 'top',
+          items: [
+            decorateItem(newThreadNavItem),
+            searchNavItem,
+            decorateItem(releasesNavItem),
+          ],
         },
-        navSections: [
-          {
-            key: 'top',
-            items: [
-              decorateItem(newThreadNavItem),
-              searchNavItem,
-              decorateItem(libraryNavItem),
-            ],
-          },
-          {
-            key: 'artist',
-            label: artistSettingsLabel,
-            items: [
-              ...(releaseItem ? [decorateItem(releaseItem)] : []),
-              ...(audienceItem ? [decorateItem(audienceItem)] : []),
-              ...(tasksItem ? [decorateItem(tasksItem)] : []),
-            ],
-          },
-        ],
-      };
+        {
+          key: 'artist',
+          label: artistSettingsLabel,
+          items: [
+            decorateItem(artistProfileNavItem),
+            decorateItem(touringNavItem),
+            ...(audienceItem ? [decorateItem(audienceItem)] : []),
+            ...(tasksItem ? [decorateItem(tasksItem)] : []),
+          ],
+        },
+      ];
     }
 
-    return {
-      moreSection: null,
-      navSections: [
-        {
-          key: 'primary',
-          items: primaryNavigation.map(decorateItem),
-        },
-      ],
-    };
+    return [
+      {
+        key: 'primary',
+        items: primaryNavigation.map(decorateItem),
+      },
+    ];
   }, [
     canAccessTasksWorkspace,
     isPlanGateLoading,
+    artistName,
     artistSettingsLabel,
-    moreLabel,
+    isInSettings,
     shellChatV1Enabled,
     taskStats,
     tasksSeenAt,
@@ -312,13 +322,15 @@ export function DashboardNav(_: DashboardNavProps) {
       return;
     }
 
+    const releasesRoute = buildLibraryViewRoute('releases');
+
     if (releasesPrefetchedProfileIdRef.current === profileId) {
-      router.prefetch(APP_ROUTES.RELEASES);
+      router.prefetch(releasesRoute);
       return;
     }
 
     releasesPrefetchedProfileIdRef.current = profileId;
-    router.prefetch(APP_ROUTES.RELEASES);
+    router.prefetch(releasesRoute);
 
     try {
       await Promise.all([
@@ -343,7 +355,8 @@ export function DashboardNav(_: DashboardNavProps) {
       !profileId ||
       releasesWarmReadyProfileIdRef.current === profileId ||
       pathname === APP_ROUTES.RELEASES ||
-      pathname === APP_ROUTES.DASHBOARD_RELEASES
+      pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+      pathname === APP_ROUTES.LIBRARY
     ) {
       return;
     }
@@ -405,6 +418,20 @@ export function DashboardNav(_: DashboardNavProps) {
     openCommandPalette();
   }, []);
 
+  const handleOpenArtistProfilePanel = useCallback(() => {
+    const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
+
+    if (isOnChat) {
+      openPreviewPanel();
+      return;
+    }
+
+    router.push(APP_ROUTES.CHAT);
+    queueMicrotask(() => {
+      openPreviewPanel();
+    });
+  }, [openPreviewPanel, pathname, router]);
+
   const activeThreadId = useMemo(() => {
     const chatPrefix = `${APP_ROUTES.CHAT}/`;
     if (!pathname.startsWith(chatPrefix)) return null;
@@ -456,16 +483,17 @@ export function DashboardNav(_: DashboardNavProps) {
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
-      const isProfileItem = item.id === 'profile';
       const isReleasesItem = item.id === 'releases';
       const isSearchItem = item.id === 'search';
+      const opensArtistProfilePanel =
+        shellChatV1Enabled && !isInSettings && item.id === 'artist-profile';
       const isNewThreadItem =
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       let isActive = false;
-      if (isProfileItem) {
-        isActive = isItemActive(pathname, item);
-      } else if (isNewThreadItem) {
+      if (isNewThreadItem) {
         isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
+      } else if (opensArtistProfilePanel) {
+        isActive = isPreviewPanelOpen;
       } else if (!isSearchItem) {
         isActive = isItemActive(pathname, item);
       }
@@ -473,10 +501,11 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem && !isSearchItem;
-      const renderAsButton = isSearchItem;
+      const renderAsButton = isSearchItem || opensArtistProfilePanel;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
       else if (isSearchItem) onClick = handleSearchClick;
+      else if (opensArtistProfilePanel) onClick = handleOpenArtistProfilePanel;
 
       return (
         <NavMenuItem
@@ -485,7 +514,6 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           prefetch={undefined}
-          actions={isProfileItem ? profileActions : null}
           onClick={onClick}
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
@@ -502,13 +530,15 @@ export function DashboardNav(_: DashboardNavProps) {
     },
     [
       pathname,
-      profileActions,
       handleDemoNavClick,
       handlePrefetch,
       handleSearchClick,
+      handleOpenArtistProfilePanel,
       clearPendingReleasesShell,
       showPendingReleasesShell,
       isDemo,
+      isInSettings,
+      isPreviewPanelOpen,
       shellChatV1Enabled,
     ]
   );
@@ -525,11 +555,11 @@ export function DashboardNav(_: DashboardNavProps) {
 
   return (
     <>
-      <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
+      <nav className='flex flex-1 flex-col' aria-label='Dashboard Navigation'>
         {isInSettings ? (
           <>
             <SidebarCollapsibleGroup
-              label='General'
+              label='Account'
               defaultOpen
               storageKey='settings.general'
             >
@@ -576,9 +606,6 @@ export function DashboardNav(_: DashboardNavProps) {
                 normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
               }
               onThreadContextMenu={onThreadContextMenu}
-              onNewThread={() => {
-                router.push(APP_ROUTES.CHAT);
-              }}
               state={
                 conversationsError
                   ? 'error'
@@ -590,18 +617,6 @@ export function DashboardNav(_: DashboardNavProps) {
               tight
               collapsed={false}
             />
-          </div>
-        ) : null}
-
-        {moreSection ? (
-          <div data-nav-section={moreSection.key} className='mt-3'>
-            <SidebarCollapsibleGroup
-              label={moreSection.label}
-              defaultOpen={false}
-              storageKey={moreSection.key}
-            >
-              {renderSection(moreSection.items)}
-            </SidebarCollapsibleGroup>
           </div>
         ) : null}
 
@@ -618,7 +633,7 @@ export function DashboardNav(_: DashboardNavProps) {
                   className='space-y-2'
                   data-admin-section={section.label}
                 >
-                  <p className='px-2.5 pb-0.5 text-2xs font-semibold tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
+                  <p className='px-2.5 pb-0.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>
                   {renderSection(section.items)}

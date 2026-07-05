@@ -1,6 +1,5 @@
-import { Button } from '@jovie/ui';
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 
 const meta: Meta<typeof Popover> = {
   title: 'Atoms/Popover',

@@ -19,7 +19,12 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { type DbOrTransaction, doesTableExist } from '@/lib/db';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
-import { dashboardQuery } from '@/lib/db/query-timeout';
+import {
+  dashboardQuery,
+  isPostgresTimeoutError,
+  isQueryTimeoutError,
+  QUERY_TIMEOUTS,
+} from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -39,6 +44,7 @@ import {
   type BioLinkActivation,
   getBioLinkActivationWindowEnd,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
+  isMissingCreatorDistributionEventsTableError,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
@@ -237,14 +243,41 @@ async function buildBioLinkActivation(
             )
           )
           .orderBy(asc(creatorDistributionEvents.createdAt)),
-      'Creator distribution events query'
+      'Creator distribution events query',
+      { db: tx }
     ).catch((error: unknown) => {
+      if (isMissingCreatorDistributionEventsTableError(error)) {
+        Sentry.logger.warn(
+          '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
+          { profileId: profile.id }
+        );
+        return [];
+      }
+
+      const migrationResult = handleMigrationErrors(error, {
+        userId: profile.id,
+        operation: 'creator_distribution_events',
+      });
+
+      if (!migrationResult.shouldRetry) {
+        return (migrationResult.fallbackData ?? []) as Array<{
+          createdAt: Date;
+          eventType: string;
+        }>;
+      }
+
+      const level =
+        isQueryTimeoutError(error) || isPostgresTimeoutError(error)
+          ? 'warning'
+          : 'error';
+
       Sentry.captureException(error, {
-        level: 'warning',
+        level,
         tags: {
           query: 'creator_distribution_events',
           context: 'dashboard_data_settled',
         },
+        extra: { profileId: profile.id },
       });
       return [];
     });
@@ -867,14 +900,6 @@ async function fetchTippingStatsWithSession(
   profileId: string
 ): Promise<TippingStats> {
   try {
-    // Set a PostgreSQL-level statement timeout to prevent long-running queries
-    // from holding Neon WebSocket connections open past the idle timeout.
-    // This is a safety net in addition to the JS-level timeout.
-    // Use SET (session-scoped) instead of SET LOCAL — SET LOCAL is a no-op
-    // outside a transaction block and the Neon HTTP driver does not support
-    // transactions. See lib/db/query-timeout.ts for documentation.
-    await tx.execute(drizzleSql`SET statement_timeout = '5000ms'`);
-
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
@@ -914,7 +939,8 @@ async function fetchTippingStatsWithSession(
           })
           .from(tips)
           .where(eq(tips.creatorProfileId, profileId)),
-      'Tipping stats query'
+      'Tipping stats query',
+      { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
     );
 
     // Limit click events query to last 12 months to leverage indexes
@@ -934,7 +960,8 @@ async function fetchTippingStatsWithSession(
               drizzleSql`${clickEvents.createdAt} >= ${twelveMonthsAgoISO}::timestamp`
             )
           ),
-      'Click events query'
+      'Click events query',
+      { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
     );
 
     const tipTotalsRaw = tipTotalsRawResult?.[0];

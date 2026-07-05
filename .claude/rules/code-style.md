@@ -420,6 +420,17 @@ Before merging any PR that introduces background/scheduled work, verify:
 - [ ] Is the frequency justified? What breaks if we run it less often?
 - [ ] Have I included a Cost Impact section in the PR description?
 
+## Build Before You Build (Prior-Art Gate)
+
+Before scoping infrastructure, tooling, or re-implementing a known software category (visual regression, scheduling, queues, auth, parsing, charts, date handling, state management, etc.), run the prior-art gate (gstack ETHOS §2):
+
+1. **Name the category** ("this is a visual-regression differ").
+2. **Scan prior art (~5 min):** existing stack feature? standard OSS lib? SaaS/API? Note licenses.
+3. **Decide adopt > wrap > build.** Build only for core differentiation or when every candidate fails a stated hard requirement.
+4. **Record on the issue/plan:** category · candidates + links + license · adopt/wrap/build + why. Infra/tooling without this section is not ready.
+
+**Precedence:** §2 (Search Before Building) runs before §1 (Boil the Lake). Completeness governs how thoroughly you finish what you've *decided* to build — never justifies rebuilding off-the-shelf solutions.
+
 ## Documentation Index
 
 Reference docs for common agent lookups:
@@ -435,3 +446,19 @@ Reference docs for common agent lookups:
 | `docs/DB_MIGRATIONS.md` | How do I create/run migrations? What are the invariants? |
 | `docs/TESTING_GUIDELINES.md` | Testing philosophy, patterns, and when to write tests |
 | `docs/DOPPLER_SETUP.md` | How to set up and use Doppler for secrets management |
+| `docs/REVENUE_LIFT_METRICS.md` | How is IRPAA (artist revenue lift) defined, and which table/column emits each metric term? |
+
+## Pre-commit review (agents)
+
+Run CodeRabbit **locally before committing** to catch issues before CI. CodeRabbit
+is a metered plan, so PR auto-review is OFF (`.coderabbit.yaml` `auto_review.enabled: false`)
+— shifting it left to pre-commit conserves reviews and catches problems earlier:
+
+```bash
+coderabbit review --agent --type uncommitted --base main -c AGENTS.md   # before committing
+coderabbit review --agent --type committed   --base main -c AGENTS.md   # already-committed branch work
+```
+
+Address blocking findings before committing. CI-side review is the gbrain-aware
+Claude reviewer (`.github/workflows/claude-review.yml`); on a PR you can still
+invoke CodeRabbit on-demand with `@coderabbitai review`.

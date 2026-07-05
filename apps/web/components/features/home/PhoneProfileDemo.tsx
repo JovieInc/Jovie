@@ -10,7 +10,7 @@ const SUB_ITEMS = [
     number: '2.1',
     title: 'Streaming Links',
     description:
-      'One clean page for every link out — Spotify, Apple Music, YouTube Music, and more.',
+      'One clean page for every link out — Spotify, Apple Music, YouTube Music, and more.', // ui-casing-allow: marketing feature sentence
   },
   {
     number: '2.2',
@@ -70,7 +70,7 @@ export function PhoneProfileDemo() {
           transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
           opacity: isVisible ? 1 : 0,
           transition:
-            'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out',
+            'transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-subtle-easing)',
         }}
       >
         <div
@@ -79,7 +79,7 @@ export function PhoneProfileDemo() {
             filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.35))',
           }}
         >
-          <PhoneFrame className='lg:h-[634px] lg:w-[302px] xl:h-[664px] xl:w-[316px]'>
+          <PhoneFrame className='lg:h-159 lg:w-76 xl:h-166 xl:w-79'>
             <MarketingPhoneImage
               scenarioId='tim-white-profile-listen-mobile'
               altOverride='Artist profile page showing streaming links, tips, and tour dates'

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "maxAllowedFlakyTests": 0,
+  "lockedAt": "2026-06-27",
+  "comment": "Flaky-rate ratchet floor. CI fails when detected flaky tests exceed this value. The floor may only decrease (improve) over time. Use 'node check-flaky-ratchet.js --update <N>' to lower it after deflaking tests."
+}

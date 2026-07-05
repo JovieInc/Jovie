@@ -606,9 +606,9 @@ test.describe('Tasks layout', () => {
     await expect(titleEditor).toHaveValue(taskTitle, { timeout: 15_000 });
     await titleEditor.fill(editedTitle);
 
-    await selectTaskMetaOption(page, 'Change task priority', 'Urgent');
-    await selectTaskMetaOption(page, 'Change task assignee', 'Jovie');
-    await selectTaskMetaOption(page, 'Change task status', 'In Progress');
+    await selectTaskMetaOption(page, 'Change Task Priority', 'Urgent');
+    await selectTaskMetaOption(page, 'Change Task Assignee', 'Jovie');
+    await selectTaskMetaOption(page, 'Change Task Status', 'In Progress');
 
     await expect
       .poll(() => getSeededTaskState(taskId), {

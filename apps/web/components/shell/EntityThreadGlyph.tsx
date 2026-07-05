@@ -34,7 +34,7 @@ export interface EntityThreadGlyphProps {
 export function EntityThreadGlyph({
   threadTitle,
   onOpen,
-  tooltipLabel = 'Jovie working — open thread',
+  tooltipLabel = 'Jovie working — open chat',
 }: EntityThreadGlyphProps) {
   return (
     <Tooltip label={tooltipLabel}>
@@ -44,7 +44,7 @@ export function EntityThreadGlyph({
           e.stopPropagation();
           onOpen();
         }}
-        aria-label='Open running thread'
+        aria-label='Open Running Chat'
         className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-cyan-300/85 hover:text-cyan-200 hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
       >
         <span className='relative inline-grid place-items-center h-3 w-3'>

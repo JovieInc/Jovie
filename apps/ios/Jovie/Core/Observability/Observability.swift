@@ -9,6 +9,8 @@ enum Observability {
     release: String = Bundle.main.observabilityReleaseName,
     buildNumber: String = Bundle.main.observabilityBuildNumber,
     dsn: String?,
+    ingestURL: URL? = nil,
+    ingestSecret: String? = nil,
     isEnabled: Bool = true
   ) {
     let configuration = ObservabilityConfiguration(
@@ -32,6 +34,16 @@ enum Observability {
 
     replacementProvider.configure(configuration)
     replaceProvider(replacementProvider)
+
+    let usesSentry = configuration.isEnabled
+      && configuration.dsn?.isEmpty == false
+    MetricKitReporter.shared.configure(
+      ingestURL: ingestURL,
+      ingestSecret: ingestSecret,
+      release: configuration.release,
+      environment: configuration.environment,
+      isEnabled: configuration.isEnabled && !usesSentry
+    )
   }
 
   static func useProviderForTesting(_ replacement: ObservabilityProvider) {

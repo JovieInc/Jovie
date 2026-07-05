@@ -32,7 +32,15 @@ describe('POST /api/dev/clear-session', () => {
 
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(body.error).toBe('Not available in production');
+    expect(body.error).toBe('Not available outside development');
+  });
+
+  it('returns 403 on preview deployments', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+
+    const res = await POST();
+    expect(res.status).toBe(403);
   });
 
   it('returns 200 with deleted cookie names in non-production', async () => {

@@ -42,7 +42,7 @@ function ActivityEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <div className='flex min-h-[140px] items-center rounded-md bg-surface-1 px-2'>
+      <div className='flex min-h-35 items-center rounded-md bg-surface-1 px-2'>
         <p className='text-xs leading-[17px] text-secondary-token'>
           No recent activity. Share your profile to see engagement here.
         </p>
@@ -83,7 +83,7 @@ const ActivityItem = memo(function ActivityItem({
         <ActivityGlyph icon={activity.icon} />
       </span>
       <div className='min-w-0 flex-1'>
-        <p className='text-app leading-5 tracking-[-0.01em] text-secondary-token'>
+        <p className='text-app leading-5 tracking-tight text-secondary-token'>
           <span className='tabular-nums text-tertiary-token'>
             {formatTimeAgo(activity.timestamp)}
           </span>
@@ -147,7 +147,7 @@ export function DashboardActivityFeed({
           <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
             <Zap className='h-4 w-4 text-tertiary-token' aria-hidden='true' />
           </div>
-          <h3 className='text-app font-caption tracking-[-0.01em] text-secondary-token'>
+          <h3 className='text-app font-caption tracking-tight text-secondary-token'>
             Activity
           </h3>
         </div>
@@ -160,7 +160,7 @@ export function DashboardActivityFeed({
         </span>
       </div>
 
-      <div className='min-h-[180px]'>
+      <div className='min-h-45'>
         {(() => {
           if (error) {
             return (

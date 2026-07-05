@@ -170,7 +170,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Email Alerts')).toBeInTheDocument();
+    expect(screen.getByText('Get Updates')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
     expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   }, 10_000);
@@ -182,7 +182,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
-    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
   });
 
   it('routes subscribed users into manage mode when a handler is provided', () => {
@@ -254,7 +254,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       />
     );
 
-    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -291,7 +291,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    expect(await screen.findByText('Email Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -332,7 +332,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit' }));
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
 
     mockUseSubscriptionForm.mockReturnValue(
@@ -383,7 +383,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit' }));
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
 
     mockUseSubscriptionForm.mockReturnValue(

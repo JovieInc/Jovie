@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 
 export interface TableCellProps {
   readonly children: React.ReactNode;
-  readonly width?: string; // e.g., 'w-14', 'w-[260px]'
+  readonly width?: string; // e.g., 'w-14', 'w-65'
   readonly align?: 'left' | 'center' | 'right';
   readonly className?: string;
   readonly hideOnMobile?: boolean;

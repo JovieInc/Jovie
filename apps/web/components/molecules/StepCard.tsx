@@ -24,10 +24,10 @@ export interface StepCardProps {
 }
 
 export const cardBaseClasses =
-  'relative bg-surface-1/80 backdrop-blur-sm border border-default rounded-2xl p-8 transition-all duration-300';
+  'relative bg-surface-1/80 backdrop-blur-sm border border-default rounded-2xl p-8 transition-colors duration-cinematic';
 
 export const glowEffectClasses =
-  'absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 transition-opacity duration-500 group-hover:opacity-100';
+  'absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 transition-opacity duration-cinematic group-hover:opacity-100';
 
 export function StepCard({
   stepNumber,
@@ -62,7 +62,7 @@ export function StepCard({
         >
           <div className='text-center'>
             {/* Icon circle */}
-            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg'>
+            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white dark:text-white shadow-lg'>
               {icon}
             </div>
 

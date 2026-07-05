@@ -222,7 +222,7 @@ export function ReleaseDspLinks({
                         side='top'
                       >
                         <span
-                          className='hidden text-[10px] text-tertiary-token md:inline'
+                          className='hidden text-3xs text-tertiary-token md:inline'
                           title={verifiedLabel ?? undefined}
                         >
                           {formatTimeAgo(provider.updatedAt)}
@@ -241,7 +241,7 @@ export function ReleaseDspLinks({
       {/* Missing providers — visually muted, warning affordance */}
       {unresolvedProviders.length > 0 && (
         <div className='mt-3 space-y-1.5'>
-          <div className='flex items-center gap-1.5 px-2 text-[10px] font-medium uppercase tracking-wide text-tertiary-token'>
+          <div className='flex items-center gap-1.5 px-2 text-3xs font-medium uppercase tracking-wide text-tertiary-token'>
             <AlertTriangle className='h-3 w-3' aria-hidden='true' />
             <span>Missing</span>
           </div>
@@ -253,8 +253,8 @@ export function ReleaseDspLinks({
                 <div
                   key={`missing-${key}`}
                   className={cn(
-                    'group flex min-h-[32px] items-center justify-between rounded-[10px] border border-dashed border-subtle bg-transparent px-2 py-1.5 opacity-75',
-                    'transition-[background-color,opacity] duration-150 lg:hover:opacity-100'
+                    'group flex min-h-8 items-center justify-between rounded-lg border border-dashed border-subtle bg-transparent px-2 py-1.5 opacity-75',
+                    'transition-[background-color,opacity] duration-subtle lg:hover:opacity-100'
                   )}
                   data-dsp-status='missing'
                   data-provider={key}
@@ -270,7 +270,7 @@ export function ReleaseDspLinks({
                     <span className='text-app font-[460] text-secondary-token'>
                       {label}
                     </span>
-                    <span className='shrink-0 text-[10px] text-tertiary-token'>
+                    <span className='shrink-0 text-3xs text-tertiary-token'>
                       Missing
                     </span>
                   </div>
@@ -280,7 +280,7 @@ export function ReleaseDspLinks({
                   >
                     <span
                       className='flex h-4 w-4 items-center justify-center text-warning'
-                      aria-label='Missing provider'
+                      aria-label='Missing Provider'
                       role='img'
                     >
                       <AlertTriangle className='h-3 w-3' aria-hidden='true' />
@@ -322,7 +322,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-[30px] w-full rounded-md border-subtle bg-surface-0 text-xs'>
+              <SelectTrigger className='h-8 w-full rounded-md border-subtle bg-surface-0 text-xs'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
@@ -375,12 +375,12 @@ export function ReleaseDspLinks({
               disabled={
                 !isValidUrl(newLinkUrl) || !selectedProvider || isAddingDspLink
               }
-              className='min-w-[68px]'
+              className='min-w-17'
             >
               {isAddingDspLink ? 'Adding...' : 'Add'}
             </DrawerButton>
           </div>
-          <p className='min-h-[16px] text-2xs leading-[15px] text-tertiary-token'>
+          <p className='min-h-4 text-2xs leading-[15px] text-tertiary-token'>
             {!selectedProvider || !isValidUrl(newLinkUrl)
               ? 'Choose a provider and paste a valid URL to add this link.'
               : 'Your draft will stay in place if the save fails.'}

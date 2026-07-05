@@ -35,7 +35,7 @@ export function SkipToContent({
         'focus:fixed focus:left-4 focus:top-4 focus:z-50',
         'focus:rounded-md focus:bg-surface-1 focus:px-4 focus:py-2',
         'focus:text-sm focus:text-primary-token focus:shadow-lg',
-        'focus:ring-2 focus:ring-accent',
+        'focus-visible:ring-2 focus-visible:ring-accent',
         className
       )}
     >

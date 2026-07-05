@@ -82,7 +82,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
             className={cn(
-              'h-4 w-4 rounded-[3px] p-0 transition-opacity duration-150 focus-visible:opacity-100',
+              'h-4 w-4 rounded-xs p-0 transition-opacity duration-subtle focus-visible:opacity-100',
               isPlaying
                 ? 'text-(--linear-accent) opacity-100'
                 : 'text-quaternary-token opacity-0 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
@@ -108,7 +108,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {!hasPreview && !(showType && typeStyle) && (
           <VolumeX
             className='h-3 w-3 text-quaternary-token'
-            aria-label='No preview available'
+            aria-label='No Preview Available'
           />
         )}
       </div>

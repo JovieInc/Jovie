@@ -13,7 +13,7 @@ const SELECTED_ROW_CLASSES = [
   'data-[selected]:bg-cyan-300/[0.06]',
   'data-[focused]:bg-cyan-300/[0.04]',
   'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
-  'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
+  'before:h-3.5 before:w-1 before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
   'before:transition-colors before:duration-subtle before:ease-subtle',
@@ -60,7 +60,7 @@ export const LyricRow = React.memo(function LyricRow({
   if (!editing) {
     if (!interactive) {
       return (
-        <li className='text-center text-[20px] leading-[1.35] font-display text-secondary-token'>
+        <li className='text-center text-xl leading-[1.35] font-display text-secondary-token'>
           {line.text}
         </li>
       );
@@ -78,8 +78,8 @@ export const LyricRow = React.memo(function LyricRow({
             'group/lyric block w-full text-center cursor-pointer select-none bg-transparent border-0 p-0',
             'transition-[color,opacity,transform] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
             isActive
-              ? 'text-primary-token text-[28px] leading-[1.25] font-display opacity-100'
-              : 'text-tertiary-token text-[20px] leading-[1.35] font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
+              ? 'text-primary-token text-3xl leading-[1.25] font-display opacity-100'
+              : 'text-tertiary-token text-xl leading-[1.35] font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
           )}
         >
           {line.text}
@@ -111,7 +111,7 @@ export const LyricRow = React.memo(function LyricRow({
         type='button'
         onClick={onStamp}
         className={cn(
-          'shrink-0 h-6 px-1.5 rounded text-[10.5px] tabular-nums font-caption transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+          'shrink-0 h-6 px-1.5 rounded text-3xs tabular-nums font-caption transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
           isActive
             ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
             : 'text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) hover:text-primary-token hover:border-cyan-500/40'
@@ -126,7 +126,7 @@ export const LyricRow = React.memo(function LyricRow({
         onChange={e => onChangeText(e.target.value)}
         onFocus={onFocus}
         className={cn(
-          'flex-1 min-w-0 bg-transparent outline-none text-[15px] font-display placeholder:text-quaternary-token/60',
+          'flex-1 min-w-0 bg-transparent outline-none text-mid font-display placeholder:text-quaternary-token/60',
           isActive ? 'text-primary-token' : 'text-secondary-token'
         )}
         placeholder='Lyric line'

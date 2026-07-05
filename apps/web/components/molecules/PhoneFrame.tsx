@@ -10,7 +10,7 @@ export function PhoneFrame({ children, className }: PhoneFrameProps) {
   return (
     <div
       className={cn(
-        'relative mx-auto flex h-[592px] w-[282px] flex-col items-center',
+        'relative mx-auto flex h-148 w-71 flex-col items-center',
         className
       )}
     >

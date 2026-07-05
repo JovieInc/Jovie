@@ -407,6 +407,52 @@ jobs:
 
           echo "✅ Homepage renders correctly"
 
+          echo "Checking production-shaped robots.txt and sitemap.xml..."
+          robots_url="${deployment_url%/}/robots.txt"
+          sitemap_url="${deployment_url%/}/sitemap.xml"
+          robots_body=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${robots_url}$( [[ "$robots_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
+          sitemap_body=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${sitemap_url}$( [[ "$sitemap_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
+
+          if echo "$robots_body" | grep -Eiq '^[[:space:]]*user-agent:[[:space:]]*\*[[:space:]]*$' && echo "$robots_body" | grep -Eiq '^[[:space:]]*disallow:[[:space:]]*/[[:space:]]*$' && ! echo "$robots_body" | grep -Eiq '^[[:space:]]*allow:[[:space:]]*/[[:space:]]*$'; then
+            echo "❌ Canary failed: robots.txt globally blocks all crawlers with Disallow: /"
+            echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if ! echo "$robots_body" | grep -Eiq '^[[:space:]]*sitemap:.*sitemap\.xml[[:space:]]*$'; then
+            echo "❌ Canary failed: robots.txt is missing a Sitemap: .../sitemap.xml reference"
+            echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          for crawler in GPTBot ChatGPT-User Claude-Web PerplexityBot Google-Extended; do
+            if ! echo "$robots_body" | grep -Eiq "^[[:space:]]*user-agent:[[:space:]]*${crawler}[[:space:]]*$"; then
+              echo "❌ Canary failed: robots.txt is missing User-agent: ${crawler}"
+              echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          done
+
+          if [ -z "$sitemap_body" ] || ! echo "$sitemap_body" | grep -Eiq '<urlset'; then
+            echo "❌ Canary failed: sitemap.xml is empty or missing <urlset>"
+            echo "canary_status=failed_seo_sitemap" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if ! echo "$sitemap_body" | grep -Eiq '<url\b'; then
+            echo "❌ Canary failed: sitemap.xml contains zero <url> entries"
+            echo "canary_status=failed_seo_sitemap" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if echo "$sitemap_body" | grep -Eiq '<url\b' && ! echo "$sitemap_body" | grep -Eiq '<lastmod>'; then
+            echo "❌ Canary failed: sitemap.xml is missing <lastmod> entries"
+            echo "canary_status=failed_seo_sitemap" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "✅ robots.txt and sitemap.xml passed SEO guardrails"
+
           check_route_renders() {
             local route_label="$1"
             local route_path="$2"
@@ -540,7 +586,7 @@ jobs:
 
           echo "✅ HTTP canary passed: Deployment healthy and homepage renders"
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -582,6 +628,30 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Verify staging OAuth redirect URIs are accepted by Google/Apple
+        run: |
+          # Probe the Google/Apple authorize endpoints with the EXACT redirect_uri
+          # Clerk's STAGING instance hands them (clerk.staging.jov.ie). Catches
+          # code regressions in how the redirect_uri is built and staging Google
+          # client drift before promote. Production's own clients are covered by
+          # the post-promote production-oauth-gate (different Clerk instance).
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          attempt=1
+          max_attempts=3
+          until CI=true SMOKE_ONLY=1 BASE_URL="https://staging.jov.ie" pnpm exec playwright test tests/e2e/oauth-providers.spec.ts --project=chromium --reporter=line; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "❌ Staging OAuth redirect URIs are rejected by Google/Apple after ${max_attempts} attempts."
+              echo "canary_status=failed_oauth" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep_seconds=$((attempt * 15))
+            echo "⚠ Staging OAuth probe attempt ${attempt}/${max_attempts} failed; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
 
       - name: Mark canary verified
         id: canary-status

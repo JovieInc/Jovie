@@ -126,7 +126,7 @@ describe('AvatarUploadable - Upload Mode', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText('Choose profile photo file');
+    const fileInput = screen.getByLabelText('Choose Profile Photo File');
     expect(fileInput).toBeInTheDocument();
     expect(fileInput).toHaveAttribute('type', 'file');
     expect(fileInput).toHaveClass('sr-only');

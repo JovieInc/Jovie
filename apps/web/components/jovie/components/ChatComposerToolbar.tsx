@@ -1,21 +1,14 @@
 'use client';
 
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   SimpleTooltip,
 } from '@jovie/ui';
-import {
-  ArrowUp,
-  FileAudio2,
-  ImagePlus,
-  Loader2,
-  Mic,
-  MicOff,
-  Plus,
-} from 'lucide-react';
+import { ArrowUp, Loader2, Mic, MicOff, Paperclip, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useRef } from 'react';
 
@@ -113,8 +106,7 @@ export function ComposerSendButton({
 }
 
 export interface ComposerAttachButtonProps {
-  readonly isImageProcessing: boolean;
-  readonly isAudioProcessing?: boolean;
+  readonly isFileProcessing: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   /**
@@ -126,43 +118,43 @@ export interface ComposerAttachButtonProps {
   readonly plusMenuOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  readonly onImageAttach: () => void;
-  readonly onAudioAttach?: () => void;
+  readonly onFileAttach: () => void;
 }
 
 export function ComposerAttachButton({
-  isImageProcessing,
-  isAudioProcessing = false,
+  isFileProcessing,
   isLoading,
   isSubmitting,
   disabled = false,
   plusMenuOpen,
   onOpenChange,
   onMouseDown,
-  onImageAttach,
-  onAudioAttach,
+  onFileAttach,
 }: ComposerAttachButtonProps) {
-  const isProcessing = isImageProcessing || isAudioProcessing;
+  const isProcessing = isFileProcessing;
 
   return (
     <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           onMouseDown={onMouseDown}
           disabled={isProcessing || isLoading || isSubmitting || disabled}
           className={cn(
-            'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            'h-9 w-9 shrink-0 border border-transparent bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
+            plusMenuOpen && 'border-subtle bg-surface-1 text-primary-token',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
-          aria-label='Attachment options'
+          aria-label='Attach Files'
         >
           {isProcessing ? (
             <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
           ) : (
             <Plus className='h-4 w-4' strokeWidth={2.25} />
           )}
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='start'
@@ -175,23 +167,15 @@ export function ComposerAttachButton({
         <DropdownMenuItem
           className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
           onSelect={() => {
-            onImageAttach();
+            onFileAttach();
           }}
         >
-          <ImagePlus className='h-3.5 w-3.5' />
-          Attach image
+          <Paperclip className='h-3.5 w-3.5' />
+          Attach files
+          <span className='ml-auto text-2xs text-tertiary-token'>
+            Drop or browse
+          </span>
         </DropdownMenuItem>
-        {onAudioAttach ? (
-          <DropdownMenuItem
-            className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
-            onSelect={() => {
-              onAudioAttach();
-            }}
-          >
-            <FileAudio2 className='h-3.5 w-3.5' />
-            Attach audio
-          </DropdownMenuItem>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -263,8 +247,10 @@ export function ComposerMicButton({
 
   return (
     <SimpleTooltip content={tooltip}>
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
@@ -274,10 +260,11 @@ export function ComposerMicButton({
         data-testid='dictation-toggle'
         data-active={isListening ? 'true' : undefined}
         className={cn(
-          'system-b-chat-composer-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-full touch-none select-none',
+          'h-9 w-9 shrink-0 touch-none select-none border border-transparent bg-surface-0 hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
           !isSupported
             ? 'text-quaternary-token'
             : !isListening && 'text-tertiary-token',
+          isListening && 'border-default bg-surface-2 text-primary-token',
           'disabled:cursor-not-allowed disabled:opacity-50'
         )}
         aria-label={label}
@@ -288,7 +275,7 @@ export function ComposerMicButton({
         ) : (
           <Mic className='h-4 w-4' strokeWidth={2.25} />
         )}
-      </button>
+      </Button>
     </SimpleTooltip>
   );
 }

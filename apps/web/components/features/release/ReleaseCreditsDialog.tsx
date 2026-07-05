@@ -95,7 +95,7 @@ export function ReleaseCreditsDialog({
             className='overflow-hidden rounded-t-2xl px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'
           >
             <SheetHeader className='border-b border-subtle pb-3 text-left'>
-              <SheetTitle className='text-[13px] font-semibold text-primary-token'>
+              <SheetTitle className='text-app font-semibold text-primary-token'>
                 Credits
               </SheetTitle>
               <SheetDescription className='sr-only'>
@@ -120,7 +120,7 @@ export function ReleaseCreditsDialog({
         size='sm'
         className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] overflow-hidden sm:mx-auto sm:w-full'
       >
-        <DialogTitle className='text-[13px] font-semibold text-primary-token'>
+        <DialogTitle className='text-app font-semibold text-primary-token'>
           Credits
         </DialogTitle>
         <DialogDescription className='sr-only'>

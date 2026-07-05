@@ -91,6 +91,13 @@ export const chatTurns = pgTable(
     clientTurnId: text('client_turn_id').notNull(),
     status: chatTurnStatusEnum('status').notNull().default('reserved'),
     source: text('source').notNull().default('typed'),
+    /**
+     * Resolved model id (`anthropic/...`) that produced this turn's
+     * assistant output. Recorded when the turn starts streaming so 👍/👎
+     * feedback rows can attribute votes to the producing model (JOV #11460,
+     * feeds the per-workflow model A/B bake-off). Null on pre-feature turns.
+     */
+    model: text('model'),
     toolIntent: text('tool_intent'),
     errorCode: text('error_code'),
     errorMessage: text('error_message'),
@@ -136,6 +143,17 @@ export const chatMessages = pgTable(
     role: chatMessageRoleEnum('role').notNull(),
     content: text('content').notNull(),
     toolCalls: jsonb('tool_calls'),
+    /**
+     * Which system produced an assistant message: 'llm' | 'script'
+     * (JOV-3806). Null on user rows and pre-feature assistant rows.
+     */
+    assistantSource: text('assistant_source'),
+    /**
+     * Deterministic script line key (e.g. 'greet:v1') when
+     * assistantSource='script'. Joined nightly against conversion outcomes
+     * to tune the response bank.
+     */
+    scriptLineKey: text('script_line_key'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
@@ -144,6 +162,9 @@ export const chatMessages = pgTable(
     ),
     turnIdIdx: index('idx_chat_messages_turn_id').on(table.turnId),
     createdAtIdx: index('idx_chat_messages_created_at').on(table.createdAt),
+    scriptLineKeyIdx: index('idx_chat_messages_script_line_key')
+      .on(table.scriptLineKey)
+      .where(drizzleSql`${table.scriptLineKey} IS NOT NULL`),
     conversationClientMessageUnique: uniqueIndex(
       'idx_chat_messages_conversation_client_message_unique'
     )

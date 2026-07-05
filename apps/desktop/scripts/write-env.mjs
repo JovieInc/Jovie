@@ -18,8 +18,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const raw = process.env.ELECTRON_ENV;
-const appEnv =
-  raw === 'staging' || raw === 'local' ? raw : 'production';
+const appEnv = raw === 'staging' || raw === 'local' ? raw : 'production';
 
 function resolveAppUrl(env) {
   if (env === 'staging') {
@@ -27,7 +26,7 @@ function resolveAppUrl(env) {
   }
 
   if (env === 'local') {
-    const localUrl = process.env.ELECTRON_APP_URL || 'http://127.0.0.1:3112';
+    const localUrl = process.env.ELECTRON_APP_URL || 'http://localhost:3112';
     const parsed = new URL(localUrl);
     const isLoopback =
       parsed.hostname === 'localhost' ||

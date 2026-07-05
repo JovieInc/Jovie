@@ -19,6 +19,18 @@ Brief description of the changes in this PR.
 - [ ] Manual testing completed
 - [ ] New tests added (if applicable)
 
+### Bug-to-Test Rule (required for bug fixes)
+
+Per `.claude/rules/testing.md`, **every bug fix needs a regression test** at the smallest layer that would have caught the bug.
+
+Complete this section when the PR is a bug fix (`fix:` commits/title, `fix/` branch, or the Bug fix checkbox below):
+
+- [ ] Regression test added or updated (`*.test.*` / `*.spec.*`)
+- [ ] `bug-to-test: satisfied` noted in this PR description
+- [ ] OR `bug-to-test: waived — <reason>` documented (copy-only / config-only fixes only)
+
+If this is **not** a bug fix and no new test is required, say so explicitly (for example: `bug-to-test: not applicable — feature work`).
+
 ## Icon Usage Standards ✅
 
 *Complete this section if your PR includes any icon usage*
@@ -98,6 +110,18 @@ Brief description of the changes in this PR.
 
 *Add screenshots or videos to help explain your changes*
 
+## Design Skill Evidence
+
+*Complete this section for UI, UX, design-system, Ovie visual, or design-skill changes*
+
+- [ ] Design-read included: `Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>`
+- [ ] Dials included: `DESIGN_VARIANCE`, `MOTION_INTENSITY`, `VISUAL_DENSITY`
+- [ ] Before/after evidence included (screenshots, mockups, or component/file evidence)
+- [ ] Narrow lint and typecheck output included
+- [ ] `design-canonical` checklist included with explicit pass/fail for contrast, states, layout, motion, icons, anti-slop, and evidence
+
+If the PR is not design-related, say `design-canonical: not applicable`.
+
 ## Related Issues
 
 Closes #(issue number)
@@ -134,4 +158,3 @@ If this PR introduces custom SVGs:
 4. **Configuration**: Added to ESLint approved list
 
 Use the [Design Review Checklist](docs/DESIGN_REVIEW_CHECKLIST.md) for detailed guidance.
-

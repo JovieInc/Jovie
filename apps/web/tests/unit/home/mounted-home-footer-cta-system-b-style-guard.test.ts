@@ -24,9 +24,9 @@ describe('mounted homepage footer CTA System B source contract', () => {
       'components/marketing/homepage-v2/HomepageV2Ctas.tsx'
     );
 
-    expect(layoutSource).toContain(
-      "<HomeLegalFooter className='system-b-mounted-home-footer' />"
-    );
+    expect(layoutSource).toContain('<MarketingFooter');
+    expect(layoutSource).toContain("variant='minimal'");
+    expect(layoutSource).toContain("className='system-b-mounted-home-footer'");
     expect(finalCtaSource).toMatch(
       /(?=.*system-b-mounted-home-footer-cta(?!-))(?=.*system-b-mounted-home-footer-cta-container)(?=.*system-b-mounted-home-footer-cta-copy)(?=.*system-b-mounted-home-footer-cta-heading)(?=.*system-b-mounted-home-footer-cta-action)/s
     );

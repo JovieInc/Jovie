@@ -40,7 +40,7 @@ vi.mock('drizzle-orm', async importOriginal => {
 
 // Mock cached auth functions
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: mockCachedAuth,
+  getOptionalAuth: mockCachedAuth,
   getCachedCurrentUser: mockCachedCurrentUser,
 }));
 

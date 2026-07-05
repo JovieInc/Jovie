@@ -80,7 +80,7 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
     }),
     memberColumnHelper.accessor('lastSeenAt', {
       id: 'last',
-      header: 'Last',
+      header: 'Last Seen',
       cell: ({ row }) => (
         <AudienceLastCell lastSeenAt={row.original.lastSeenAt} />
       ),

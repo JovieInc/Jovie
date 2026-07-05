@@ -4,6 +4,7 @@ import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { isMobileChatEnabled } from '@/lib/mobile/chat/access';
 import { getMobileSessionUserId } from '@/lib/mobile/session-auth';
 import { isAppleWalletProfilePassAvailable } from '@/lib/wallet/apple/profile-pass';
 
@@ -18,6 +19,7 @@ export interface MobileMeResponse {
   avatarUrl: string | null;
   continueOnWebUrl: string;
   appleWalletProfilePassAvailable: boolean;
+  chatEnabled: boolean;
 }
 
 function buildNeedsOnboardingResponse(): NextResponse {
@@ -30,6 +32,7 @@ function buildNeedsOnboardingResponse(): NextResponse {
     avatarUrl: null,
     continueOnWebUrl: getAppUrl(),
     appleWalletProfilePassAvailable: false,
+    chatEnabled: false,
   };
 
   return NextResponse.json(payload, {
@@ -103,6 +106,7 @@ export async function GET(request: Request) {
         isPublic: profile.isPublic,
         onboardingCompletedAt: profile.onboardingCompletedAt,
       });
+    const chatEnabled = await isMobileChatEnabled(userId);
     const payload: MobileMeResponse = {
       state: 'ready',
       displayName: profile.displayName,
@@ -112,6 +116,7 @@ export async function GET(request: Request) {
       avatarUrl: profile.avatarUrl,
       continueOnWebUrl: getAppUrl(),
       appleWalletProfilePassAvailable,
+      chatEnabled,
     };
 
     return NextResponse.json(payload, {

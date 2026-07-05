@@ -62,7 +62,7 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
           <h3
             id={titleId}
             className={cn(
-              'text-app font-[540] tracking-[-0.02em]',
+              'text-app font-[540] tracking-tighter',
               props.gated ? 'text-tertiary-token' : 'text-primary-token'
             )}
           >

@@ -51,8 +51,8 @@ export function AssigneeChip({
         className={cn(
           'inline-flex items-center gap-1.5 shrink-0',
           expanded
-            ? 'text-[12.5px] text-secondary-token'
-            : 'text-[10.5px] text-tertiary-token',
+            ? 'text-xs text-secondary-token'
+            : 'text-3xs text-tertiary-token',
           className
         )}
         title={`Assigned to ${label}`}
@@ -73,8 +73,8 @@ export function AssigneeChip({
       className={cn(
         'inline-flex items-center gap-1.5 shrink-0',
         expanded
-          ? 'text-[12.5px] text-secondary-token'
-          : 'text-[10.5px] text-tertiary-token',
+          ? 'text-xs text-secondary-token'
+          : 'text-3xs text-tertiary-token',
         className
       )}
       title={name ? `Assigned to ${name}` : 'Assigned'}

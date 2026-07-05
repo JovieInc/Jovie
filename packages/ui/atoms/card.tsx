@@ -21,20 +21,36 @@ const cardVariants = cva(
   }
 );
 
+export type CardContentState = 'default' | 'partial' | 'offline';
+
 export interface CardProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof cardVariants> {
   readonly asChild?: boolean;
+  /**
+   * Async/partial content state for data-backed cards.
+   */
+  readonly contentState?: CardContentState;
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant, asChild = false, ...props }, ref) => {
+  (
+    { className, variant, asChild = false, contentState = 'default', ...props },
+    ref
+  ) => {
     const Comp = asChild ? Slot : 'div';
 
     return (
       <Comp
         ref={ref}
-        className={cn(cardVariants({ variant, className }))}
+        data-content-state={
+          contentState === 'default' ? undefined : contentState
+        }
+        className={cn(
+          cardVariants({ variant, className }),
+          contentState === 'partial' &&
+            'opacity-[var(--state-partial-opacity)] saturate-75'
+        )}
         {...props}
       />
     );
@@ -64,17 +80,33 @@ CardHeader.displayName = 'CardHeader';
 export interface CardTitleProps
   extends React.HTMLAttributes<HTMLHeadingElement> {
   readonly asChild?: boolean;
+  /**
+   * Truncate overflowing titles to a single line.
+   */
+  readonly truncate?: boolean;
+  /**
+   * Clamp long titles to N lines (2 or 3). Ignored when truncate is true.
+   */
+  readonly maxLines?: 2 | 3;
 }
 
 const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
-  ({ className, asChild = false, ...props }, ref) => {
+  (
+    { className, asChild = false, truncate = false, maxLines, ...props },
+    ref
+  ) => {
     const Comp = asChild ? Slot : 'h3';
+    const isLongContent = truncate || maxLines !== undefined;
 
     return (
       <Comp
         ref={ref}
+        data-content-length={isLongContent ? 'long' : undefined}
         className={cn(
           'text-base font-semibold leading-none tracking-tight text-primary-token',
+          truncate && 'truncate',
+          maxLines === 2 && 'line-clamp-2 leading-snug',
+          maxLines === 3 && 'line-clamp-3 leading-snug',
           className
         )}
         {...props}

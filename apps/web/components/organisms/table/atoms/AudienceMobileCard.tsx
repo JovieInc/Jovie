@@ -15,10 +15,10 @@ import {
 import {
   AUDIENCE_STATE_LABELS,
   AUDIENCE_STATE_STYLES,
+  canMessageAudienceMember,
   getAudienceDisplayName,
   getAudienceDisplayState,
   isAudienceMemberAnonymous,
-  isAudienceMemberReachable,
 } from '@/components/features/dashboard/organisms/dashboard-audience-table/row-contract';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
@@ -67,17 +67,17 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
     nowMs,
     isSsr,
   });
-  const reachable = isAudienceMemberReachable(member);
+  const canMessage = canMessageAudienceMember(member);
 
   const handleCardClick = useCallback(() => onTap(member), [member, onTap]);
 
   const handleActionClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
-      if (!reachable) return;
+      if (!canMessage) return;
       onAction?.(member);
     },
-    [member, onAction, reachable]
+    [member, onAction, canMessage]
   );
 
   return (
@@ -130,17 +130,18 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
               ? formatTimeAgo(member.lastSeenAt)
               : '—'}
           </span>
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={handleActionClick}
-            disabled={!reachable}
-            aria-label={`Message ${displayName}`}
-            className='pointer-events-auto relative z-10 min-h-[44px] min-w-[88px] px-3 text-xs'
-          >
-            Message
-          </Button>
+          {canMessage ? (
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              onClick={handleActionClick}
+              aria-label={`Message ${displayName}`}
+              className='pointer-events-auto relative z-10 min-h-11 min-w-22 px-3 text-xs'
+            >
+              Message
+            </Button>
+          ) : null}
         </div>
       </div>
 

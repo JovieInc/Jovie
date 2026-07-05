@@ -24,7 +24,7 @@ function getInput() {
 }
 
 function getSubmit() {
-  return screen.getByRole('button', { name: 'Submit prompt' });
+  return screen.getByRole('button', { name: 'Submit Prompt' });
 }
 
 describe('HomepageIntent', () => {

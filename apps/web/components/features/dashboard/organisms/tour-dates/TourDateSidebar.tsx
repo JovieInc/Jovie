@@ -31,6 +31,7 @@ import {
 } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
+import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import {
   useDeleteTourDateMutation,
   useTourDateAnalyticsQuery,
@@ -525,7 +526,7 @@ export function TourDateSidebar({
                 <div className='space-y-2'>
                   <DrawerStatGrid>
                     <StatTile
-                      label='Ticket Clicks'
+                      label={CANONICAL_METRICS.ticket_clicks.label}
                       value={numberFormatter.format(
                         analyticsData?.ticketClicks ?? 0
                       )}

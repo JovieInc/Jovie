@@ -25,12 +25,12 @@ export default function PitchPage() {
       <h1 className='sr-only'>Jovie Pitch Deck</h1>
 
       {/* Desktop / tablet: full-bleed deck stage */}
-      <div className='hidden h-svh w-full flex-col bg-black sm:flex'>
+      <div className='hidden h-svh w-full flex-col bg-black dark:bg-black sm:flex'>
         <header className='flex h-11 shrink-0 items-center justify-between border-b border-white/[0.04] px-5'>
           <Link
             href='/'
             className='inline-flex items-center opacity-80 transition-opacity duration-subtle hover:opacity-100'
-            aria-label='Jovie home'
+            aria-label='Jovie Home'
           >
             <Logo variant='word' tone='white' size='xs' />
           </Link>
@@ -40,7 +40,7 @@ export default function PitchPage() {
               target='_blank'
               rel='noreferrer'
               className={CHROME_LINK_CLASS}
-              aria-label='Open deck in new tab for fullscreen presentation'
+              aria-label='Open Deck In New Tab For Fullscreen Presentation'
             >
               <Maximize2
                 className='size-3 opacity-80 group-hover:opacity-100'
@@ -52,7 +52,7 @@ export default function PitchPage() {
               href={PDF_HREF}
               download={PDF_FILENAME}
               className={CHROME_LINK_CLASS}
-              aria-label='Download pitch deck as PDF'
+              aria-label='Download Pitch Deck As PDF'
             >
               <Download
                 className='size-3 opacity-80 group-hover:opacity-100'
@@ -81,7 +81,7 @@ export default function PitchPage() {
       </div>
 
       {/* Mobile: minimal fallback */}
-      <div className='flex min-h-svh w-full flex-col items-center justify-center gap-10 bg-black px-6 py-16 sm:hidden'>
+      <div className='flex min-h-svh w-full flex-col items-center justify-center gap-10 bg-black dark:bg-black px-6 py-16 sm:hidden'>
         <Logo variant='word' tone='white' size='sm' />
         <div className='flex flex-col items-center gap-3 text-center'>
           <p className='font-mono text-[10px] uppercase tracking-[0.18em] text-white/35'>
@@ -95,7 +95,7 @@ export default function PitchPage() {
           <a
             href={PDF_HREF}
             download={PDF_FILENAME}
-            className='inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition-colors duration-subtle hover:border-white/40 hover:bg-white/[0.04]'
+            className='inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white dark:text-white transition-colors duration-subtle hover:border-white/40 hover:bg-white/[0.04]'
           >
             <Download className='size-4' aria-hidden='true' />
             Download PDF

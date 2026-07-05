@@ -22,6 +22,18 @@ Accepted direction:
 
 No cron or workflow triggers were changed by this decision note.
 
+### 0.1 Product memory runtime split (JOV-2705)
+
+Creator-facing product memory uses a **separate durable stack** from internal AgentOS WDK. Canonical architecture: [`docs/MEMORY_CORE_ARCHITECTURE.md`](MEMORY_CORE_ARCHITECTURE.md). Import boundaries: [`docs/MEMORY_ADR.md`](MEMORY_ADR.md).
+
+| Layer | Internal AgentOS | Product memory |
+| --- | --- | --- |
+| Durable runner | Vercel Workflow/WDK (`workflows/agent-os-dry-run.ts`) | Trigger.dev via `WorkflowRunner` when cross-step durability ships; v0 runs inline |
+| Cognition | Bounded agent adapters + artifact builders | Vercel `eve` via `AgentHarness` (supersedes OpenAI Agents SDK target — #12498; AI SDK Gateway interim for chat/simple extraction) |
+| Store | `AgentRunArtifact`, admin ops tables | Neon `memory_*` via `lib/memory/*` |
+
+**Does not change §0 AgentOS direction:** WDK dry-run proof for the operator control plane remains in flight. Trigger.dev is **not** an AgentOS-WDK-failure fallback for product memory — it is the planned product workflow runner ([JOV-1945](https://linear.app/jovie/issue/JOV-1945)). No cron entries or GitHub Actions triggers were added for memory workflows in this decision.
+
 ---
 
 ## 1. Cron Registry
@@ -75,7 +87,8 @@ These routes exist in the codebase but have **no entry in `vercel.json`**. They 
 | **Main Autofix** | `main-autofix.yml` | `workflow_run` (Main CI health monitor completes with failure) | Fetches failed CI logs + diff, calls Claude Code to fix root cause, opens auto-merge PR; 3-attempt cap, escalates to `needs-human` after | Event-driven on red main detection | **Keep** — reduces solo-founder interrupt burden when main goes red |
 | **Main CI Health Monitor** | `main-ci-health-monitor.yml` | Scheduled at `7,22,37,52 * * * *` (every ~15 min, offset from top-of-minute) | Detects stalled or failing CI on main; dispatches autofix if needed; alerts on systemic failures | Always-on monitoring | **Keep** |
 | **Sentry Autofix** | `sentry-autofix.yml` | `repository_dispatch` (`sentry-issue`) | Receives Sentry error payload, calls Claude Code to fix root cause, opens auto-merge PR with dedup | Event-driven; fires when Sentry webhook delivers | **Keep** — directly compounds product stability KPI |
-| **Nightly Tests** | `nightly-tests.yml` | Scheduled `0 2 * * *` (daily 02:00 UTC) | Runs Knip dead-code audit, full unit test suite, E2E suite (including Design V1 canary and full-surface chaos), Slack alerts on failure | Daily | **Keep** — only place full E2E and dead-code audits run; flags regressions before they compound |
+| **Nightly Tests** | `nightly-tests.yml` | Scheduled `0 2 * * *` PT | Runs Knip dead-code audit, full unit test suite, E2E suite (including Design V1 canary and full-surface chaos), Slack alerts on failure | Daily | **Keep** — only place full E2E and dead-code audits run; flags regressions before they compound |
+| **Nightly Testing Agent** | `nightly-testing-agent.yml` | Scheduled `30 2 * * *` PT | Risk-ranked target selection, unit telemetry normalization, Stryker mutation hotspots, commits `docs/NIGHTLY_TESTING_AGENT_REPORT.md`, publishes Redis ops snapshot for `/app/admin/ops` | Daily | **Keep** — deterministic, LLM-free regression intelligence loop (JOV-1870) |
 | **Synthetic Monitoring** | `synthetic-monitoring.yml` | Scheduled every 15 min business hours (PST 8am-8pm), every 30 min off-hours | Golden path + public profile smoke test against `jov.ie` production | Always-on production health | **Keep** — essential for solo founder not to miss production incidents |
 | **Linear Sync on Merge** | `linear-sync-on-merge.yml` | `pull_request` (closed) | Extracts Linear issue marker from merged PR, transitions issue to Done, posts merge SHA comment | Per-merge | **Keep** — closes the Linear state loop for all merged PRs, not just agent ones |
 | **Auto-PR on Agent Push** | `auto-pr-on-push.yml` | `push` to `codex/**`, `codegen-bot/**`, `linear/**`, `claude/**`, `*/jov-**` | Creates draft PR when agent pushes branch without an existing PR; extracts Linear ticket ID | Per-push | **Keep** — closes the gap where agents push but leave no PR |

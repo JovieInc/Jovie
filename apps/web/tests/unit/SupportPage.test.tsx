@@ -38,6 +38,16 @@ describe('SupportPage', () => {
     expect(contactButton).toHaveTextContent('Contact Support');
   });
 
+  it('uses secondary CTA styling on the light support section', () => {
+    render(<SupportPage />);
+
+    const contactButton = screen.getByRole('link', {
+      name: /send email to support team/i,
+    });
+    expect(contactButton).toHaveClass('public-action-secondary');
+    expect(contactButton).not.toHaveClass('public-action-primary');
+  });
+
   it('has proper accessibility attributes', () => {
     render(<SupportPage />);
 
@@ -80,6 +90,15 @@ describe('SupportPage', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveClass('marketing-h1-linear');
+
+    const sectionHeadings = screen.getAllByRole('heading', { level: 2 });
+    expect(sectionHeadings).toHaveLength(3);
+    for (const sectionHeading of sectionHeadings) {
+      expect(sectionHeading).toHaveClass('marketing-h2-linear');
+      expect(sectionHeading).toHaveClass('text-primary-token');
+      expect(sectionHeading).not.toHaveClass('text-2xl');
+      expect(sectionHeading).not.toHaveClass('font-semibold');
+    }
   });
 
   it('renders within a MarketingHero component', () => {
@@ -87,5 +106,31 @@ describe('SupportPage', () => {
 
     const section = container.querySelector('section');
     expect(section).toBeInTheDocument();
+  });
+
+  it('renders support channels as surfaced cards with icons', () => {
+    render(<SupportPage />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'How can we help?' })
+    ).toBeInTheDocument();
+
+    for (const title of ['Documentation', 'Email Support', 'Getting Started']) {
+      expect(
+        screen.getByRole('heading', { level: 3, name: title })
+      ).toBeInTheDocument();
+    }
+
+    const cards = screen.getAllByRole('article');
+    expect(cards).toHaveLength(3);
+    for (const card of cards) {
+      expect(card).toHaveClass(
+        'rounded-2xl',
+        'border',
+        'border-subtle',
+        'bg-surface-1',
+        'p-6'
+      );
+    }
   });
 });

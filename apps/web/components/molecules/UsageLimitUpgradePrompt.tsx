@@ -75,7 +75,7 @@ export function UsageLimitUpgradePrompt({
       {/* Progress bar */}
       <div className='mb-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2'>
         <div
-          className={`h-full rounded-full transition-all ${
+          className={`h-full rounded-full transition-[background-color,width] ${
             isAtLimit ? 'bg-destructive' : 'bg-amber-500'
           }`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -89,7 +89,7 @@ export function UsageLimitUpgradePrompt({
               ? `${featureName} limit reached`
               : `${current} of ${limit} ${featureName} used`}
           </p>
-          <p className='mt-0.5 text-[12px] text-secondary-token'>
+          <p className='mt-0.5 text-xs text-secondary-token'>
             Upgrade for {upgradeCopy}.
           </p>
         </div>

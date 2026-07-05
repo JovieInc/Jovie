@@ -1,22 +1,20 @@
 'use client';
 
-import { SimpleTooltip, Skeleton } from '@jovie/ui';
+import { Button, SimpleTooltip, Skeleton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import dynamic from 'next/dynamic';
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
+import { copyMarkdownToClipboard } from '@/lib/chat/copy-markdown';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
+import { AssistantMessageText } from './AssistantMessageText';
+import { ChatFeedbackControl } from './ChatFeedbackControl';
+import { ChatStepLimitAffordance } from './ChatStepLimitAffordance';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
-
-const ChatMarkdown = dynamic(
-  () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
-  { ssr: false }
-);
 
 interface ChatMessageProps {
   readonly id: string;
@@ -32,6 +30,18 @@ interface ChatMessageProps {
   readonly profileId?: string;
   /** Skip entrance animation for messages loaded from persistence. */
   readonly skipEntrance?: boolean;
+  /** Show the inline continue affordance after a tool-step cap stop. */
+  readonly toolStepCapExhausted?: boolean;
+  /** Persisted chat turn id — enables model attribution for feedback votes. */
+  readonly turnId?: string;
+  /** Conversation id for feedback rows. */
+  readonly conversationId?: string;
+  /**
+   * Render 👍/👎 feedback controls on assistant messages and tool results.
+   * Enabled on the authenticated app chat surface; off for onboarding and
+   * other anonymous embeds where votes cannot be attributed to a user.
+   */
+  readonly enableFeedback?: boolean;
   /**
    * Render generic app tool cards/status rows. Callers with surface-specific
    * tool cards can opt out and render their own tool UI beside the message.
@@ -52,7 +62,11 @@ function areChatMessagePropsEqual(
     previous.avatarUrl === next.avatarUrl &&
     previous.profileId === next.profileId &&
     previous.skipEntrance === next.skipEntrance &&
-    previous.renderTools === next.renderTools
+    previous.renderTools === next.renderTools &&
+    previous.toolStepCapExhausted === next.toolStepCapExhausted &&
+    previous.turnId === next.turnId &&
+    previous.conversationId === next.conversationId &&
+    previous.enableFeedback === next.enableFeedback
   );
 }
 
@@ -65,10 +79,43 @@ export const ChatMessage = memo(function ChatMessage({
   profileId,
   skipEntrance,
   renderTools = true,
+  toolStepCapExhausted = false,
+  turnId,
+  conversationId,
+  enableFeedback = false,
 }: ChatMessageProps) {
   const isUser = role === 'user';
-  const { copy, isSuccess } = useClipboard();
+  const { copy, isSuccess: fallbackCopySuccess } = useClipboard();
+  const [markdownCopied, setMarkdownCopied] = useState(false);
+  const markdownCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const messageText = getMessageText(parts);
+  const isCopySuccess = markdownCopied || fallbackCopySuccess;
+
+  useEffect(() => {
+    return () => {
+      if (markdownCopyTimeoutRef.current) {
+        clearTimeout(markdownCopyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyMessage = () => {
+    void copyMarkdownToClipboard(messageText).then(success => {
+      if (success) {
+        setMarkdownCopied(true);
+        if (markdownCopyTimeoutRef.current) {
+          clearTimeout(markdownCopyTimeoutRef.current);
+        }
+        markdownCopyTimeoutRef.current = setTimeout(() => {
+          setMarkdownCopied(false);
+        }, 2000);
+        return;
+      }
+      void copy(messageText);
+    });
+  };
   const shouldReduceMotion = useReducedMotion();
   const toolEvents = getRenderableToolEvents(parts);
   const fileParts = parts.filter(
@@ -88,7 +135,8 @@ export const ChatMessage = memo(function ChatMessage({
       return { dedupeKey, url: file.url, name: file.name };
     });
   })();
-  const hasAssistantContent = Boolean(messageText) || toolEvents.length > 0;
+  const hasAssistantContent =
+    Boolean(messageText) || toolEvents.length > 0 || toolStepCapExhausted;
   const useUserPillBubble =
     isUser &&
     imageChips.length === 0 &&
@@ -142,7 +190,7 @@ export const ChatMessage = memo(function ChatMessage({
               className='system-b-chat-loading-indicator'
               role='status'
               aria-live='polite'
-              aria-label='Jovie is thinking'
+              aria-label='Jovie Is Thinking'
             >
               {/* Assistant thinking shimmer — ChatMessageSkeleton-style reserved space */}
               <div className='system-b-chat-loading-head'>
@@ -174,7 +222,7 @@ export const ChatMessage = memo(function ChatMessage({
                   data-testid='chat-message-reply'
                   className='system-b-chat-message-reply'
                 >
-                  <ChatMarkdown
+                  <AssistantMessageText
                     content={messageText}
                     isStreaming={Boolean(isStreaming)}
                   />
@@ -187,29 +235,60 @@ export const ChatMessage = memo(function ChatMessage({
                   profileId={profileId}
                   variant='chat'
                   hasMessageText={Boolean(messageText)}
+                  feedback={
+                    enableFeedback && !isStreaming
+                      ? { messageId: id, turnId, conversationId }
+                      : undefined
+                  }
                 />
               ) : null}
+
+              {toolStepCapExhausted ? <ChatStepLimitAffordance /> : null}
             </div>
           ) : null}
 
-          {!isThinking && !isStreaming && messageText ? (
-            <div className='system-b-chat-copy-row'>
-              <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
-                <button
-                  type='button'
-                  onClick={() => copy(messageText)}
-                  className='system-b-chat-copy-button'
-                  aria-label={
-                    isSuccess ? 'Copied to clipboard' : 'Copy message'
-                  }
-                >
-                  {isSuccess ? (
-                    <Check className='system-b-chat-copy-icon' />
-                  ) : (
-                    <Copy className='system-b-chat-copy-icon' />
-                  )}
-                </button>
-              </SimpleTooltip>
+          {/* Copy row is always rendered when there is content to reserve its
+              height and prevent a layout shift when streaming ends (JOV-11948).
+              The button is hidden via aria-hidden + pointer-events while
+              streaming; CSS opacity:0 already hides it visually on non-hover. */}
+          {!isThinking && messageText ? (
+            <div
+              className='system-b-chat-copy-row'
+              aria-hidden={isStreaming ? true : undefined}
+              style={isStreaming ? { pointerEvents: 'none' } : undefined}
+            >
+              {!isStreaming ? (
+                <>
+                  <SimpleTooltip
+                    content={isCopySuccess ? 'Copied!' : 'Copy response'}
+                  >
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='icon'
+                      onClick={handleCopyMessage}
+                      className='h-7 w-7 shadow-none'
+                      aria-label={
+                        isCopySuccess ? 'Copied to clipboard' : 'Copy message'
+                      }
+                    >
+                      {isCopySuccess ? (
+                        <Check className='system-b-chat-copy-icon' />
+                      ) : (
+                        <Copy className='system-b-chat-copy-icon' />
+                      )}
+                    </Button>
+                  </SimpleTooltip>
+                  {enableFeedback ? (
+                    <ChatFeedbackControl
+                      messageId={id}
+                      turnId={turnId}
+                      conversationId={conversationId}
+                      excerpt={messageText}
+                    />
+                  ) : null}
+                </>
+              ) : null}
             </div>
           ) : null}
         </div>

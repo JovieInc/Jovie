@@ -37,7 +37,7 @@ export function HeroDesktopPreviewMount() {
   }, []);
 
   if (!shouldRender) {
-    return <div aria-hidden='true' className='h-[592px] w-[282px]' />;
+    return <div aria-hidden='true' className='h-148 w-71' />;
   }
 
   return <HeroPhoneStaticPreview />;

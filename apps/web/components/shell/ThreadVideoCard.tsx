@@ -1,6 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Maximize2, Mic2, Play } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { ThreadCardIconBtn } from './ThreadCardIconBtn';
 
 export interface ThreadVideoCardProps {
@@ -43,20 +45,28 @@ export function ThreadVideoCard({
               'aria-label': `Play ${title}`,
             }
           : {})}
-        className='system-b-thread-media-preview system-b-thread-video-preview'
+        className='system-b-thread-media-preview system-b-thread-video-preview group'
       >
         <span aria-hidden='true' className='system-b-thread-video-backdrop' />
         <span className='system-b-thread-play-shell'>
-          <span
-            className='system-b-thread-play-button'
-            data-interactive={onPlay ? 'true' : 'false'}
+          <Button
+            asChild
+            variant='primary'
+            size='icon'
+            static
+            className={cn(
+              'h-12 w-12 shadow-none transition-colors duration-fast ease-subtle',
+              onPlay ? 'group-hover:bg-btn-primary-hover' : 'bg-btn-primary/40'
+            )}
           >
-            <Play
-              className='h-4 w-4 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          </span>
+            <span data-interactive={onPlay ? 'true' : 'false'}>
+              <Play
+                className='h-4 w-4 translate-x-px'
+                strokeWidth={2.5}
+                fill='currentColor'
+              />
+            </span>
+          </Button>
         </span>
         <span className='system-b-thread-duration-badge'>
           {formatDuration(durationSec)}
@@ -66,7 +76,7 @@ export function ThreadVideoCard({
         <Mic2 className='system-b-thread-media-icon' strokeWidth={2.25} />
         <span className='system-b-thread-media-label'>{title}</span>
         {onFullscreen && (
-          <ThreadCardIconBtn label='Full-screen' onClick={onFullscreen}>
+          <ThreadCardIconBtn label='Fullscreen' onClick={onFullscreen}>
             <Maximize2 className='h-3 w-3' strokeWidth={2.25} />
           </ThreadCardIconBtn>
         )}

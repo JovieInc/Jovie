@@ -44,6 +44,15 @@ export const TOOL_SCHEMAS = {
     }),
   },
 
+  retouchImage: {
+    description:
+      'Retouch an attached or referenced artist photo using the White Space editorial style.',
+    inputSchema: chatToolSchema({
+      styleId: z.enum(['white-space']).optional(),
+      instructions: z.string().max(500).optional(),
+    }),
+  },
+
   generateReleasePitch: {
     description: `Generate one copy-paste-ready release pitch for a destination. Ask where they want to pitch it before using this tool unless the task or user message clearly maps to: ${PITCH_TARGET_OPTIONS_TEXT}.`,
     inputSchema: chatToolSchema({
@@ -87,6 +96,21 @@ export const TOOL_SCHEMAS = {
     }).refine(data => data.optionNumber !== undefined || data.optionId, {
       message: 'Provide either optionNumber or optionId.',
       path: ['optionNumber'],
+    }),
+  },
+
+  createMerchAlternativeItem: {
+    description:
+      'Create a new merch card that keeps an existing card design but moves it onto a different Printful product. Use when the artist asks for the same design on another item, like a hoodie, hat, tank, or a specific Printful catalog product ID.',
+    inputSchema: chatToolSchema({
+      merchCardId: z.string().uuid(),
+      itemType: z
+        .string()
+        .min(2)
+        .max(120)
+        .describe(
+          'Target product type or Printful catalog product ID, for example "hoodie", "hat", or "catalog product 71".'
+        ),
     }),
   },
 

@@ -327,9 +327,12 @@ The helper now prefers the local dev auth route on loopback/private hosts and on
 
 ### Flaky tests
 
-- Add to `tests/quarantine.json` with owner and exit criteria
+- Add to `tests/quarantine.json` ledger entries with owner, first-seen date, reproduction command, fix issue link, and expiration date
+- Retry budget caps live in `retryBudget` and are enforced by CI via `.github/scripts/quarantine-ledger.mjs`
+- HUD `/app/admin/ops` shows active quarantine count and retry budget usage
 - Auto-unquarantined after 5 consecutive passes
 - Run `pnpm test:flaky` to detect flaky tests
+- Validate ledger locally with `pnpm --filter @jovie/web run test:quarantine-ledger`
 
 ### Smoke suite too slow
 

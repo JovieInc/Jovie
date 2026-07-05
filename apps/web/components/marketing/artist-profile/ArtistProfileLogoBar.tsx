@@ -25,7 +25,7 @@ export function ArtistProfileLogoBar({
             return (
               <Logo
                 key={logo.id}
-                className='h-[22px] w-auto max-w-[170px]'
+                className='h-6 w-auto max-w-43'
                 aria-label={logo.label}
               />
             );

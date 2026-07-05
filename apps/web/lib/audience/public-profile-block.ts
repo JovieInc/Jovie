@@ -1,10 +1,13 @@
 import 'server-only';
 
-import * as Sentry from '@sentry/nextjs';
 import { createFingerprintEdge } from '@/lib/audience/fingerprint';
-import { env } from '@/lib/env-server';
-import { captureWarning } from '@/lib/error-tracking';
+import { withTimeout } from '@/lib/db/query-timeout';
 import { getRedis } from '@/lib/redis';
+
+// Timeout for audience-block DB queries. Matches proxy-state.ts budget — kept
+// below the Neon p99 cold-start budget (~3 s) so a cache-miss does not stall
+// every visitor navigation for more than ~3 s. Fails open on timeout.
+const AUDIENCE_BLOCK_DB_QUERY_TIMEOUT_MS = 3000;
 
 /**
  * Mirror extractClientIP() priority for the middleware audience-block check.
@@ -32,6 +35,10 @@ const MEMORY_CACHE_TTL_MS = 10_000; // 10s — collapse rapid navigations per is
 const REDIS_CACHE_TTL_SECONDS = 60; // ≤60s per audit acceptance criteria
 const REDIS_CACHE_TIMEOUT_MS = 500;
 const MEMORY_CACHE_MAX_ENTRIES = 1_000;
+
+type SentryModule = typeof import('@sentry/nextjs');
+
+let sentryModulePromise: Promise<SentryModule> | null = null;
 
 type MemoryCacheKind = 'negative' | 'has-blocks';
 
@@ -80,6 +87,86 @@ function clearMemoryCache(cacheKey: string): void {
   memoryCache.delete(cacheKey);
 }
 
+function isTestRuntime(): boolean {
+  return process.env.NODE_ENV === 'test';
+}
+
+function isPublicNoAuthSmoke(): boolean {
+  return process.env.PUBLIC_NOAUTH_SMOKE === '1';
+}
+
+function isE2ERuntime(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+  );
+}
+
+function isSecureVercelDeployment(): boolean {
+  return (
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.VERCEL_ENV === 'production'
+  );
+}
+
+function shouldSkipAudienceBlockTelemetry(): boolean {
+  // This module is shared by ISR-sensitive public routes and proxy checks.
+  // Keep env reads inline so typed server env imports cannot pull request-aware
+  // modules into static profile renders.
+  if (isSecureVercelDeployment()) {
+    return false;
+  }
+
+  return process.env.CI === 'true' || isTestRuntime() || isE2ERuntime();
+}
+
+function loadSentry(): Promise<SentryModule> {
+  if (!sentryModulePromise) {
+    sentryModulePromise = import('@sentry/nextjs');
+  }
+  return sentryModulePromise;
+}
+
+function addAudienceBlockBreadcrumb(params: {
+  readonly cacheKey: string;
+  readonly durationMs: number;
+  readonly message: string;
+}): void {
+  if (shouldSkipAudienceBlockTelemetry()) return;
+
+  void loadSentry()
+    .then(Sentry => {
+      Sentry.addBreadcrumb({
+        category: 'audience-block',
+        message: params.message,
+        level: 'info',
+        data: {
+          cacheKey: params.cacheKey,
+          durationMs: params.durationMs,
+        },
+      });
+    })
+    .catch(() => {});
+}
+
+function captureAudienceBlockWarning(
+  message: string,
+  context: Record<string, unknown>
+): void {
+  console.warn(message, context);
+  if (shouldSkipAudienceBlockTelemetry()) return;
+
+  void loadSentry()
+    .then(Sentry => {
+      Sentry.captureMessage(message, {
+        level: 'warning',
+        extra: context,
+        tags: { context: 'audience-block' },
+      });
+    })
+    .catch(() => {});
+}
+
 async function tryGetRedisFlag(cacheKey: string): Promise<boolean> {
   const redis = getRedis();
   if (!redis) return false;
@@ -96,23 +183,23 @@ async function tryGetRedisFlag(cacheKey: string): Promise<boolean> {
     const cacheDuration = Date.now() - cacheStart;
 
     if (cached) {
-      Sentry.addBreadcrumb({
-        category: 'audience-block',
+      addAudienceBlockBreadcrumb({
+        cacheKey,
+        durationMs: cacheDuration,
         message: 'Cache hit',
-        level: 'info',
-        data: { cacheKey, durationMs: cacheDuration },
       });
       return true;
     }
 
-    Sentry.addBreadcrumb({
-      category: 'audience-block',
+    addAudienceBlockBreadcrumb({
+      cacheKey,
+      durationMs: cacheDuration,
       message: 'Cache miss',
-      level: 'info',
-      data: { cacheKey, durationMs: cacheDuration },
     });
   } catch (error) {
-    captureWarning('[audience-block] Redis cache read failed', { error });
+    captureAudienceBlockWarning('[audience-block] Redis cache read failed', {
+      error,
+    });
   }
 
   return false;
@@ -123,7 +210,9 @@ function setRedisFlag(cacheKey: string): void {
   if (!redis) return;
 
   redis.set(cacheKey, true, { ex: REDIS_CACHE_TTL_SECONDS }).catch(error => {
-    captureWarning('[audience-block] Redis cache write failed', { error });
+    captureAudienceBlockWarning('[audience-block] Redis cache write failed', {
+      error,
+    });
   });
 }
 
@@ -132,7 +221,9 @@ function deleteRedisFlag(cacheKey: string): void {
   if (!redis) return;
 
   redis.del(cacheKey).catch(error => {
-    captureWarning('[audience-block] Redis cache delete failed', { error });
+    captureAudienceBlockWarning('[audience-block] Redis cache delete failed', {
+      error,
+    });
   });
 }
 
@@ -219,7 +310,7 @@ async function profileHasActiveBlocks(username: string): Promise<boolean> {
   const { audienceBlocks } = await import('@/lib/db/schema/analytics');
   const { creatorProfiles } = await import('@/lib/db/schema/profiles');
 
-  const [result] = await db
+  const queryPromise = db
     .select({ profileId: creatorProfiles.id })
     .from(creatorProfiles)
     .where(
@@ -240,6 +331,12 @@ async function profileHasActiveBlocks(username: string): Promise<boolean> {
     )
     .limit(1);
 
+  const [result] = await withTimeout(
+    queryPromise,
+    AUDIENCE_BLOCK_DB_QUERY_TIMEOUT_MS,
+    '[audience-block] profileHasActiveBlocks'
+  );
+
   return !!result;
 }
 
@@ -252,7 +349,7 @@ async function isVisitorBlockedByFingerprint(
   const { audienceBlocks } = await import('@/lib/db/schema/analytics');
   const { creatorProfiles } = await import('@/lib/db/schema/profiles');
 
-  const [result] = await db
+  const queryPromise = db
     .select({ blockId: audienceBlocks.id })
     .from(creatorProfiles)
     .innerJoin(
@@ -267,6 +364,12 @@ async function isVisitorBlockedByFingerprint(
       )
     )
     .limit(1);
+
+  const [result] = await withTimeout(
+    queryPromise,
+    AUDIENCE_BLOCK_DB_QUERY_TIMEOUT_MS,
+    '[audience-block] isVisitorBlockedByFingerprint'
+  );
 
   return !!result;
 }
@@ -286,8 +389,8 @@ export async function checkProfileVisitorBlocked(
   ip: string | null,
   ua: string | null
 ): Promise<boolean> {
-  if (env.NODE_ENV === 'test') return false;
-  if (env.PUBLIC_NOAUTH_SMOKE === '1') return false;
+  if (isTestRuntime()) return false;
+  if (isPublicNoAuthSmoke()) return false;
 
   try {
     const normalizedUsername = normalizeUsername(username);
@@ -306,7 +409,7 @@ export async function checkProfileVisitorBlocked(
     }
 
     const fingerprint = await createFingerprintEdge(ip, ua);
-    return isVisitorBlockedByFingerprint(normalizedUsername, fingerprint);
+    return await isVisitorBlockedByFingerprint(normalizedUsername, fingerprint);
   } catch {
     return false;
   }

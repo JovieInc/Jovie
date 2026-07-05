@@ -15,7 +15,6 @@ export { AuthShell, type AuthShellMode } from './AuthShell';
 export { AuthUnavailableCard } from './AuthUnavailableCard';
 export {
   AuthBackButton,
-  AuthButton,
   AuthFooterLink,
   AuthGoogleIcon,
   AuthInput,

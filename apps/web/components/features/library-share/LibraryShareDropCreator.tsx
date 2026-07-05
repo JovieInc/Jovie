@@ -1,6 +1,7 @@
 'use client';
 
-import { Share2 } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { Check, Copy, ExternalLink, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -28,6 +29,19 @@ export function LibraryShareDropCreator({
     useState<LibraryShareExpiryPreset>('never');
   const [passphrase, setPassphrase] = useState('');
   const [loading, setLoading] = useState(false);
+  const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function copyShareUrl(url: string) {
+    try {
+      await globalThis.navigator?.clipboard?.writeText(url);
+      setCopied(true);
+      toast.success('Share link copied');
+      globalThis.setTimeout?.(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy link');
+    }
+  }
 
   async function handleCreate() {
     setLoading(true);
@@ -54,10 +68,9 @@ export function LibraryShareDropCreator({
         throw new Error(body.error ?? 'Failed to create share drop');
       }
 
-      await globalThis.navigator?.clipboard?.writeText(body.shareUrl);
-      toast.success('Share link copied');
+      setCreatedUrl(body.shareUrl);
+      await copyShareUrl(body.shareUrl);
       onCreated?.(body.shareUrl);
-      setOpen(false);
     } catch (error) {
       const messageText =
         error instanceof Error ? error.message : 'Failed to create share drop';
@@ -65,6 +78,74 @@ export function LibraryShareDropCreator({
     } finally {
       setLoading(false);
     }
+  }
+
+  if (createdUrl) {
+    return (
+      <div
+        className='rounded-2xl border border-subtle bg-surface-0 p-4'
+        data-testid='library-share-created-panel'
+      >
+        <p className='text-sm font-semibold text-primary-token'>
+          Share drop ready
+        </p>
+        <p className='mt-1 text-xs text-secondary-token'>
+          Anyone with this link can view the press kit.
+        </p>
+        <div className='mt-3 flex items-center gap-1.5 rounded-xl border border-subtle bg-surface-1 p-1 pl-3'>
+          <span
+            className='min-w-0 flex-1 truncate text-xs text-primary-token'
+            title={createdUrl}
+            data-testid='library-share-created-url'
+          >
+            {createdUrl}
+          </span>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={() => {
+              copyShareUrl(createdUrl).catch(() => {});
+            }}
+            aria-label='Copy Share Link'
+            className='h-7 shrink-0 gap-1 rounded-lg px-2 text-xs font-medium normal-case'
+            data-testid='library-share-copy-button'
+          >
+            {copied ? (
+              <Check className='h-3.5 w-3.5' strokeWidth={2.25} />
+            ) : (
+              <Copy className='h-3.5 w-3.5' strokeWidth={2.25} />
+            )}
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+          <a
+            href={createdUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            aria-label='Open Share Link In New Tab'
+            className='inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border border-subtle px-2 text-xs font-medium text-primary-token transition-colors hover:bg-surface-2'
+            data-testid='library-share-open-button'
+          >
+            <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
+            Open
+          </a>
+        </div>
+        <Button
+          type='button'
+          variant='link'
+          size='sm'
+          onClick={() => {
+            setCreatedUrl(null);
+            setCopied(false);
+            setOpen(false);
+          }}
+          className='mt-3 h-auto p-0 text-xs font-medium text-secondary-token normal-case hover:text-primary-token'
+          data-testid='library-share-done-button'
+        >
+          Done
+        </Button>
+      </div>
+    );
   }
 
   if (!open) {

@@ -137,16 +137,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Bot detection - detect but continue to record with isBot flag
-    const botDetection = detectBot(request, '/api/audience/click');
-    if (botDetection.isBot && botDetection.shouldBlock) {
-      // Return success but don't record for blocked bots
-      return NextResponse.json(
-        { success: true, fingerprint: 'bot-filtered' },
-        { headers: NO_STORE_HEADERS }
-      );
-    }
-
     let body: unknown;
     try {
       body = await request.json();
@@ -235,7 +225,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Pro feature: exclude the artist's own clicks from analytics
+    // Exclude authenticated owner self-clicks from audience analytics
     if (await shouldExcludeSelfByProfileId(profileId)) {
       return NextResponse.json(
         { success: true, fingerprint: 'self-filtered' },
@@ -246,7 +236,12 @@ export async function POST(request: NextRequest) {
     const fingerprint = createFingerprint(resolvedIP, userAgent);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
-    const audienceTags = botDetection.isBot ? ['bot'] : [];
+    const preliminaryBotDetection = detectBot(request, '/api/audience/click', {
+      userAgent,
+    });
+    const preliminaryAudienceTags = preliminaryBotDetection.isBot
+      ? ['bot']
+      : [];
 
     // Encrypt IP address for storage (GDPR/CCPA compliance)
     const encryptedIP = encryptIP(resolvedIP);
@@ -275,7 +270,7 @@ export async function POST(request: NextRequest) {
             deviceType: normalizedDevice,
             referrerHistory: [],
             latestActions: [],
-            tags: audienceTags,
+            tags: preliminaryAudienceTags,
             createdAt: now,
             updatedAt: now,
           })
@@ -312,6 +307,12 @@ export async function POST(request: NextRequest) {
       const existingActionCount = Array.isArray(member.latestActions)
         ? member.latestActions.length
         : 0;
+      const botDetection = detectBot(request, '/api/audience/click', {
+        userAgent,
+        memberVisits: member.visits ?? 0,
+        memberConversions: existingActionCount,
+      });
+      const audienceTags = botDetection.isBot ? ['bot'] : [];
       const actionCount = Math.min(existingActionCount + 1, 5);
       const weight = getActionWeight(linkType);
       const tags = mergeAudienceTags(member.tags, audienceTags);

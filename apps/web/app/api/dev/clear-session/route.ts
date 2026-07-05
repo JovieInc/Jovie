@@ -2,6 +2,10 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { CLERK_COOKIE_PREFIXES } from '@/lib/auth/clerk-cookie-names';
 import { DEV_TEST_AUTH_COOKIE_NAMES } from '@/lib/auth/dev-test-auth.server';
+import {
+  developmentOnlyForbiddenJson,
+  isExplicitDevelopmentEnvironment,
+} from '@/lib/security/development-only';
 
 export const runtime = 'nodejs';
 
@@ -28,15 +32,10 @@ const APP_COOKIES = new Set([
 const PRESERVE_PREFIXES = ['__dev_toolbar'];
 
 export async function POST() {
-  const isProductionEnv =
-    process.env.NODE_ENV === 'production' &&
-    process.env.VERCEL_ENV === 'production';
-
-  if (isProductionEnv) {
-    return NextResponse.json(
-      { success: false, error: 'Not available in production' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+  if (!isExplicitDevelopmentEnvironment()) {
+    return developmentOnlyForbiddenJson(undefined, {
+      headers: NO_STORE_HEADERS,
+    });
   }
 
   const cookieStore = await cookies();

@@ -488,6 +488,41 @@ Final passing evidence:
 - No production Clerk settings changed.
 - No Clerk dashboard changes made for this auth-smoke stabilization.
 
+## JOV-2329 — Production Turnstile hostname allowlist for jov.ie - 2026-06-12
+
+Failing production evidence inspected:
+
+- Linear JOV-2329: `/start` on `https://jov.ie/start` rendered Turnstile client
+  error `110200` (domain not authorized) even though Doppler `prd` already had
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`.
+- Live Playwright probe on 2026-06-12: sending the first onboarding message surfaces
+  the Turnstile security panel and loads the Cloudflare challenge for site key
+  `0x4AAAAAADM7PX2W5Au4ZIkV`, but anonymous `/api/chat` still returns
+  `TURNSTILE_REQUIRED` until a client token is minted.
+
+Root cause:
+
+- The active Cloudflare Turnstile widget did not include `jov.ie` / `www.jov.ie`
+  in Hostname Management. Cloudflare returns client error `110200` when the page
+  hostname is outside the widget allowlist.
+
+Fix made in repo:
+
+- Added `scripts/turnstile-config.ts` to inspect/update widget hostnames via the
+  Cloudflare API (dry-run by default).
+- Documented operator flow in `docs/TURNSTILE_SETUP.md`.
+- Added synthetic regression coverage for `verification failed (110200)`.
+
+Post-merge operator action still required once per environment:
+
+1. Create/store `CLOUDFLARE_API_TOKEN` (Turnstile Sites Read + Write) in Doppler
+   `jovie-web/prd`.
+2. Preview:
+   `doppler run --project jovie-web --config prd -- pnpm tsx scripts/turnstile-config.ts ensure-hostnames --dry-run`
+3. Apply:
+   `doppler run --project jovie-web --config prd -- pnpm tsx scripts/turnstile-config.ts ensure-hostnames --yes --allow-prod`
+4. Re-check `https://jov.ie/start` and production synthetic `/start` health.
+
 ## Post-Merge Required Smoke and Mobile Guard Closeout - 2026-06-02
 
 Failing CI evidence inspected:

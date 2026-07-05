@@ -6,41 +6,58 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
   type AppFlagName,
-  type AppFlagSnapshot,
   LEGACY_STATSIG_GATE_KEYS,
+  type PartialAppFlagSnapshot,
   type ProfileAlertOptInVariant,
   type StatsigFeatureFlagsBootstrap,
   type SubscribeCTAVariant,
+  type TeleprompterShowcaseVariant,
 } from './contracts';
 import {
   APP_FLAG_OVERRIDES_COOKIE,
   getAppFlagOverrideValue,
   parseAppFlagOverrides,
 } from './overrides';
+import { getFlagOverrideMap } from './overrides-store.server';
+import type { ProfilePacAssignment } from './profile-pac';
 import {
   APP_FLAG_REGISTRY,
   PROFILE_ALERT_OPTIN_VARIANT_FLAG,
+  PROFILE_PAC_VARIANT_SLOTS_FLAG,
   SUBSCRIBE_CTA_VARIANT_FLAG,
+  TELEPROMPTER_SHOWCASE_VARIANT_FLAG,
 } from './registry';
 
 const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
   (Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[]).filter(
-    flagName => flagName !== 'RELEASE_PLAN_DEMO'
+    flagName =>
+      flagName !== 'RELEASE_PLAN_DEMO' &&
+      flagName !== 'RELEASE_TO_REVENUE_AUTOPILOT'
   )
 );
 
-function shouldHonorClientFlagOverrides(): boolean {
-  return !(
+function isProductionRuntime(): boolean {
+  return (
     process.env.NODE_ENV === 'production' &&
     process.env.VERCEL_ENV === 'production'
   );
 }
 
-const getRequestFlagOverrides = dedupe(async () => {
-  if (!shouldHonorClientFlagOverrides()) {
-    return {};
+/**
+ * Personal (per-browser) cookie overrides from the dev bar are honored
+ * everywhere EXCEPT production — there they only apply for admins, so an
+ * admin can preview a flag in prod without changing it for any other user.
+ */
+async function shouldHonorPersonalOverrides(
+  userId: string | null
+): Promise<boolean> {
+  if (!isProductionRuntime()) {
+    return true;
   }
+  return userId ? await checkAdminRole(userId) : false;
+}
 
+const getRequestFlagOverrides = dedupe(async () => {
   const cookieStore = await cookies();
   const rawOverrides = cookieStore.get(APP_FLAG_OVERRIDES_COOKIE)?.value;
   return parseAppFlagOverrides(
@@ -54,16 +71,32 @@ export async function getAppFlagValue(
     readonly userId?: string | null;
   }
 ): Promise<boolean> {
-  const overrides = await getRequestFlagOverrides();
-  const overrideValue = getAppFlagOverrideValue(flagName, overrides);
-  if (overrideValue !== undefined) {
-    return overrideValue;
+  if (await shouldHonorPersonalOverrides(options?.userId ?? null)) {
+    const overrides = await getRequestFlagOverrides();
+    const overrideValue = getAppFlagOverrideValue(flagName, overrides);
+    if (overrideValue !== undefined) {
+      return overrideValue;
+    }
   }
 
   if (options?.userId && ADMIN_DEFAULT_TRUE_FLAGS.has(flagName)) {
     if (await checkAdminRole(options.userId)) {
       return true;
     }
+  }
+
+  // Per-environment override (admin Features page / dev bar "publish to env").
+  // Cached via `unstable_cache` + `revalidateTag`, so this is read-free on the
+  // hot path. Wrapped defensively: the override layer must never break flag
+  // resolution. An unset cell falls through to the registry/Statsig default.
+  try {
+    const envOverrides = await getFlagOverrideMap();
+    const envOverride = envOverrides[flagName];
+    if (envOverride !== undefined) {
+      return envOverride;
+    }
+  } catch {
+    // Ignore — fall through to the registry default.
   }
 
   return APP_FLAG_REGISTRY[flagName].run({
@@ -75,17 +108,20 @@ export async function getAppFlagValue(
 
 export async function getAppFlagsSnapshot(options?: {
   readonly userId?: string | null;
-}): Promise<AppFlagSnapshot> {
+  readonly flagNames?: readonly AppFlagName[];
+}): Promise<PartialAppFlagSnapshot> {
   const userId = options?.userId ?? null;
+  const flagNames =
+    options?.flagNames ?? (Object.keys(APP_FLAG_REGISTRY) as AppFlagName[]);
 
   const resolvedEntries = await Promise.all(
-    (Object.keys(APP_FLAG_REGISTRY) as AppFlagName[]).map(async flagName => [
+    flagNames.map(async flagName => [
       flagName,
       await getAppFlagValue(flagName, { userId }),
     ])
   );
 
-  return Object.fromEntries(resolvedEntries) as AppFlagSnapshot;
+  return Object.fromEntries(resolvedEntries) as PartialAppFlagSnapshot;
 }
 
 export async function getFeatureFlagsBootstrap(
@@ -127,6 +163,26 @@ export async function getProfileAlertOptInVariant(
   return PROFILE_ALERT_OPTIN_VARIANT_FLAG.run({
     identify: {
       userId: stableId,
+    },
+  });
+}
+
+export async function getProfilePacAssignment(
+  stableId: string | null
+): Promise<ProfilePacAssignment> {
+  return PROFILE_PAC_VARIANT_SLOTS_FLAG.run({
+    identify: {
+      userId: stableId,
+    },
+  });
+}
+
+export async function getTeleprompterShowcaseVariant(
+  userId: string | null
+): Promise<TeleprompterShowcaseVariant> {
+  return TELEPROMPTER_SHOWCASE_VARIANT_FLAG.run({
+    identify: {
+      userId,
     },
   });
 }

@@ -12,11 +12,11 @@ import {
   useState,
 } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { getSidebarNavRowClassName } from '@/components/shell/SidebarNavItem';
 import { APP_ROUTES } from '@/constants/routes';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/features/dashboard/organisms/DataPrivacySection';
-
 import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/features/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAudienceSection } from '@/features/dashboard/organisms/SettingsAudienceSection';
@@ -31,7 +31,6 @@ import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/set
 import { publicEnv } from '@/lib/env-public';
 import { useAppFlag } from '@/lib/flags/client';
 import { useBillingStatusQuery } from '@/lib/queries';
-import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
@@ -86,6 +85,23 @@ function getFocusedSettingsHref(sectionId: string): string {
   }
 }
 
+/**
+ * Settings sidebar rows share the canonical shell nav-row chrome
+ * (`getSidebarNavRowClassName`) so padding/density/active/hover stay
+ * byte-identical to the main app sidebar. The only divergence is
+ * structural: settings rows have no icon column, so the grid collapses
+ * to a single column and the icon guide lines are hidden.
+ *
+ * Exported for the settings-vs-shell parity test
+ * (tests/unit/sidebar-row-alignment.test.tsx).
+ */
+export function getSettingsSidebarRowClassName(isActive: boolean): string {
+  return getSidebarNavRowClassName({
+    active: isActive,
+    className: 'grid-cols-[minmax(0,1fr)] before:hidden after:hidden text-left',
+  });
+}
+
 const SettingsSidebar = memo(
   ({
     groups,
@@ -93,10 +109,10 @@ const SettingsSidebar = memo(
     useRouteLinks = false,
   }: SettingsSidebarProps) => (
     <aside className='h-fit'>
-      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
+      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
@@ -106,33 +122,30 @@ const SettingsSidebar = memo(
                   const href = useRouteLinks
                     ? getFocusedSettingsHref(section.id)
                     : `#${section.id}`;
+                  const rowClassName = getSettingsSidebarRowClassName(isActive);
+                  const rowContent = (
+                    <span className='min-w-0 truncate text-left justify-self-start'>
+                      {section.title}
+                    </span>
+                  );
+
                   return (
                     <li key={section.id}>
                       {useRouteLinks ? (
                         <Link
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
-                          className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-xs tracking-[-0.012em] transition-colors',
-                            isActive
-                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
-                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
-                          )}
+                          className={rowClassName}
                         >
-                          {section.title}
+                          {rowContent}
                         </Link>
                       ) : (
                         <a
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
-                          className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-xs tracking-[-0.012em] transition-colors',
-                            isActive
-                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
-                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
-                          )}
+                          className={rowClassName}
                         >
-                          {section.title}
+                          {rowContent}
                         </a>
                       )}
                     </li>
@@ -162,7 +175,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
+      className='flex w-full items-center justify-between rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
         <p className='text-sm font-caption text-primary-token'>
@@ -201,7 +214,7 @@ export function SettingsPolished({
       ) : (
         <div className='text-center py-4'>
           <h3 className='text-sm font-caption text-primary-token mb-3'>
-            Account settings unavailable
+            Account Settings Unavailable
           </h3>
           <p className='text-app text-secondary-token'>
             Clerk is not configured (missing publishable key). Set
@@ -254,7 +267,7 @@ export function SettingsPolished({
         id: 'touring',
         title: 'Touring',
         description:
-          'Connect Bandsintown to display tour dates on your profile.',
+          'Connect Bandsintown to display tour dates on your profile.', // ui-casing-allow: Bandsintown brand name
         render: () => <SettingsTouringSection profileId={artist.id} />,
       },
     ],
@@ -318,7 +331,7 @@ export function SettingsPolished({
             {
               id: 'payments',
               title: 'Payments',
-              description: 'Connect Stripe to receive payments from fans.',
+              description: 'Connect Stripe to receive payments from fans.', // ui-casing-allow: Stripe brand name
               render: () => <SettingsPaymentsSection />,
             },
           ]
@@ -414,7 +427,7 @@ export function SettingsPolished({
 
     return (
       <div
-        className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+        className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
         data-testid='settings-polished'
       >
         <div className='lg:sticky lg:top-4 lg:self-start'>
@@ -444,7 +457,7 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+      className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
       data-testid='settings-polished'
     >
       <div className='lg:sticky lg:top-4 lg:self-start'>

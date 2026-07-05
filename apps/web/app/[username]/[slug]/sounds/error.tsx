@@ -22,7 +22,7 @@ export default function SoundsErrorBoundary({
 
   return (
     <div className='flex h-dvh flex-col items-center justify-center bg-base px-6 text-foreground'>
-      <div className='max-w-[272px] text-center'>
+      <div className='max-w-68 text-center'>
         <Icon
           name='AlertTriangle'
           className='mx-auto h-10 w-10 text-muted-foreground'

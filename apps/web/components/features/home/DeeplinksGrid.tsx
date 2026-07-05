@@ -34,7 +34,7 @@ const MODES: ModeData[] = [
     id: 'tour',
     headline: 'Show the closest show first.',
     description:
-      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the nearest date and ticket button first.',
+      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the nearest date and ticket button first.', // ui-casing-allow: marketing feature sentence
     slug: 'tour',
     outcome: 'Sell tickets',
   },
@@ -42,7 +42,7 @@ const MODES: ModeData[] = [
     id: 'pay',
     headline: 'Turn in-person moments into revenue.',
     description:
-      'When someone scans your QR code after a set, Jovie opens the fastest payment flow instead of another menu of links.',
+      'When someone scans your QR code after a set, Jovie opens the fastest payment flow instead of another menu of links.', // ui-casing-allow: marketing feature sentence
     slug: 'pay',
     outcome: 'Earn',
   },
@@ -50,7 +50,7 @@ const MODES: ModeData[] = [
     id: 'listen',
     headline: 'Open the right streaming app instantly.',
     description:
-      'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music without the usual friction.',
+      'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music without the usual friction.', // ui-casing-allow: marketing feature sentence
     slug: 'listen',
     outcome: 'Boost streams',
   },
@@ -66,7 +66,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
       </div>
 
       <div className='flex flex-col items-center px-5 pb-2'>
-        <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
+        <div className='rounded-full p-1 ring-1 ring-white/6 shadow-sm'>
           <Avatar
             src={MOCK_ARTIST.image}
             alt={MOCK_ARTIST.name}
@@ -94,7 +94,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
         {MODES.map((mode, i) => (
           <div
             key={mode.id}
-            className='rounded-full transition-all duration-[var(--linear-duration-slow)] ease-[var(--linear-ease)]'
+            className='rounded-full transition-colors duration-[var(--linear-duration-slow)] ease-subtle'
             style={{
               width: i === activeIndex ? 16 : 6,
               height: 6,
@@ -114,7 +114,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
         {MODES.map((mode, i) => (
           <div
             key={mode.id}
-            className='absolute inset-0 px-5 transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+            className='absolute inset-0 px-5 transition-opacity duration-cinematic ease-subtle'
             style={{
               opacity: i === activeIndex ? 1 : 0,
               pointerEvents: i === activeIndex ? 'auto' : 'none',
@@ -126,7 +126,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
       </div>
 
       <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
+        <p className='text-3xs uppercase tracking-[0.15em] text-secondary-token'>
           Powered by Jovie
         </p>
       </div>
@@ -147,7 +147,7 @@ function CrossfadeBlock({
         <div
           key={item.id}
           aria-hidden={i !== activeIndex}
-          className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+          className='transition-opacity duration-cinematic ease-subtle'
           style={{
             opacity: i === activeIndex ? 1 : 0,
             pointerEvents: i === activeIndex ? 'auto' : 'none',
@@ -174,11 +174,11 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
         <h3 className='text-lg font-semibold tracking-tight text-primary-token'>
           {mode.headline}
         </h3>
-        <span className='shrink-0 rounded-full border border-subtle px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-secondary-token'>
+        <span className='shrink-0 rounded-full border border-subtle px-2.5 py-1 text-3xs font-medium uppercase tracking-[0.08em] text-secondary-token'>
           {mode.outcome}
         </span>
       </div>
-      <p className='mt-2 text-[14px] leading-[1.6] text-secondary-token'>
+      <p className='mt-2 text-sm leading-[1.6] text-secondary-token'>
         {mode.description}
       </p>
       <div className='mt-4 flex items-center justify-end'>
@@ -238,7 +238,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => ({
         id: mode.id,
         content: (
-          <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+          <p className='max-w-100 marketing-lead-linear text-secondary-token'>
             {mode.description}
           </p>
         ),
@@ -283,7 +283,7 @@ export function DeeplinksGrid() {
                   </span>
 
                   <h2 className='marketing-h2-linear text-primary-token'>
-                    The right action for every fan.
+                    The Right Action For Every Fan.
                   </h2>
 
                   <CrossfadeBlock activeIndex={activeIndex} items={headlines} />
@@ -322,7 +322,7 @@ export function DeeplinksGrid() {
                     {MODES.map((mode, i) => (
                       <div
                         key={mode.id}
-                        className='h-1 rounded-full transition-all duration-[var(--linear-duration-slow)] ease-[var(--linear-ease)]'
+                        className='h-1 rounded-full transition-colors duration-[var(--linear-duration-slow)] ease-subtle'
                         style={{
                           width: i === activeIndex ? 32 : 8,
                           backgroundColor:
@@ -370,7 +370,7 @@ export function DeeplinksGrid() {
                   {MODES.map((mode, i) => (
                     <div
                       key={mode.id}
-                      className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                      className='text-right transition-colors duration-cinematic ease-subtle'
                       style={{
                         transform:
                           i === activeIndex
@@ -388,7 +388,7 @@ export function DeeplinksGrid() {
                               ? 'var(--linear-text-primary)'
                               : 'var(--linear-text-secondary)',
                           transition:
-                            'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
+                            'font-size var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), font-weight var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), color var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)',
                         }}
                       >
                         <span
@@ -442,9 +442,9 @@ export function DeeplinksGrid() {
                 One profile. Every way fans support you.
               </span>
               <h2 className='marketing-h2-linear text-primary-token'>
-                The right action for every fan.
+                The Right Action For Every Fan.
               </h2>
-              <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+              <p className='max-w-100 marketing-lead-linear text-secondary-token'>
                 Every visitor sees the action most likely to convert in that
                 moment: listen, pay, tour, or subscribe.
               </p>

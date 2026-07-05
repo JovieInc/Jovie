@@ -21,10 +21,10 @@ function ProfilePageChatFallback() {
             <AlertCircle className='h-5 w-5 text-tertiary-token' />
           </div>
           <p className='text-sm text-secondary-token'>
-            Something went wrong loading chat. Please try again.
+            Something went wrong loading the conversation. Please try again.
           </p>
           <DashboardHeaderActionButton
-            ariaLabel='Reload chat'
+            ariaLabel='Reload Chat'
             onClick={() => router.refresh()}
             icon={<RefreshCw className='h-4 w-4' />}
             label='Reload'
@@ -54,7 +54,7 @@ function ProfilePageChatInner() {
                 We hit a problem loading your profile. Please retry in a moment.
               </p>
               <DashboardHeaderActionButton
-                ariaLabel='Retry loading profile chat'
+                ariaLabel='Retry Loading Profile Chat'
                 onClick={() => router.refresh()}
                 icon={<RefreshCw className='h-4 w-4' />}
                 label='Retry'

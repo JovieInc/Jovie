@@ -1,7 +1,8 @@
-import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { verifyGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { storeTokens } from '@/lib/connectors/token-vault';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
@@ -126,10 +127,9 @@ export async function GET(request: Request) {
       .insert(connectorAccounts)
       .values({
         userId,
-        provider: drizzleSql`'gmail'::connector_provider`,
+        provider: CONNECTOR_PROVIDERS.gmail,
         providerAccountId: gmailAddress,
-        status:
-          drizzleSql`'connected'::connector_status` as unknown as 'connected',
+        status: asConnectorStatusSql('connected'),
         scopes: grantedScopes,
         capabilities: { canRead: true },
       })
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
           connectorAccounts.providerAccountId,
         ],
         set: {
-          status: drizzleSql`'connected'::connector_status`,
+          status: asConnectorStatusSql('connected'),
           scopes: grantedScopes,
           capabilities: { canRead: true },
           lastErrorCode: null,
@@ -167,10 +167,9 @@ export async function GET(request: Request) {
       .insert(connectorAccounts)
       .values({
         userId,
-        provider: drizzleSql`'google_calendar'::connector_provider`,
+        provider: CONNECTOR_PROVIDERS.google_calendar,
         providerAccountId: gmailAddress,
-        status:
-          drizzleSql`'connected'::connector_status` as unknown as 'connected',
+        status: asConnectorStatusSql('connected'),
         scopes: grantedScopes,
         capabilities: { canRead: true, canWrite },
       })
@@ -181,7 +180,7 @@ export async function GET(request: Request) {
           connectorAccounts.providerAccountId,
         ],
         set: {
-          status: drizzleSql`'connected'::connector_status`,
+          status: asConnectorStatusSql('connected'),
           scopes: grantedScopes,
           capabilities: { canRead: true, canWrite },
           lastErrorCode: null,

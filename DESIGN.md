@@ -9,7 +9,20 @@
 
 ## Surface Classification
 
-Jovie uses two related but distinct design systems based on surface purpose:
+> **Direction (2026-06-18, founder-locked): one design system, two languages.**
+> Jovie is converging on a single token foundation, one color palette, and one core
+> typeface (Inter), expressed as a compact **product language** (operational, Linear-like)
+> and a more editorial **marketing language** (more spacing, larger type scale, more
+> cinematic motion — same tokens underneath). **System B is canonical.** The historical
+> "System A vs System B" split documented below is being **actively retired**: System A
+> surfaces are reskinned onto System B tokens with their editorial layouts preserved.
+> DM Sans was retired 2026-06-18 — Inter is the sole body/UI face; **Satoshi is the one
+> approved display exception** (hero / large display). This supersedes the earlier
+> "full retirement deferred 3 months" note. The table below reflects migration *state*,
+> not the target.
+
+Jovie historically used two related but distinct design systems based on surface purpose
+(now converging — see the banner above):
 
 | Surface | System | Mood | Routes |
 |---------|--------|------|--------|
@@ -22,7 +35,7 @@ Jovie uses two related but distinct design systems based on surface purpose:
 
 **Decision tree:** Selling/explaining (blog, pricing, legal) → System A. Everything else (homepage, auth, app, profiles) → System B.
 
-Note: the homepage migrated from System A to System B on 2026-04-22. The chat-intake surface is product, not marketing. The restraint is the brand. Full System A retirement is TBD after 3 months of shipping.
+Migration status: homepage migrated 2026-04-22; pricing, download, launch, artist-notifications, and pay since. **Full System A retirement is now in progress (founder-directed 2026-06-18), superseding the earlier 3-month deferral.** Remaining holdouts being reskinned onto System B tokens: `(marketing)/{about, ai, artist-profile, artist-profiles, blog, changelog, compare/[slug], alternatives/[slug], support, investors, voice, new}` and `(dynamic)/legal/*`. Each surface ships with its own `*-system-b-style-guard` test, and a global ratchet keeps the holdout list shrink-only.
 
 See the [Surface Classification](#canonical-surface-split) section below for full route mapping.
 
@@ -30,20 +43,28 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 ## Typography
 
-### System A — Marketing (Satoshi + DM Sans)
+### Marketing language — display type (Satoshi) — formerly "System A"
 
-Marketing pages use a two-font system loaded via `next/font/local` in the marketing layout:
+> **DM Sans retired 2026-06-18.** Marketing body + UI is now **Inter** (the single body/UI
+> face). **Satoshi** is retained only as the approved **display** exception for headings /
+> hero on the editorial marketing language. `--marketing-font-body` now resolves to Inter
+> (`var(--font-sans)`); `--marketing-font-display` stays Satoshi.
+
+The editorial marketing language uses Satoshi at display sizes only:
 
 - **Display/Hero:** Satoshi Variable (weight 800, letter-spacing -0.025em)
 - **Section headlines:** Satoshi Variable (weight 700, letter-spacing -0.02em)
 - **Subsection:** Satoshi Variable (weight 600, letter-spacing -0.015em)
-- **Buttons:** Satoshi Variable (weight 600, letter-spacing -0.01em) — buttons are controls, not copy
-- **Body:** DM Sans Variable (weight 400, letter-spacing -0.005em)
-- **Captions/meta:** DM Sans Variable (weight 500)
+- **Buttons:** Inter (weight 600) — buttons are product controls, on the product UI face
+- **Body:** Inter Variable — unified body face (was DM Sans, retired 2026-06-18)
+- **Captions/meta:** Inter Variable
 
-Font files: `apps/web/public/fonts/Satoshi-Variable.woff2` (~42KB), `apps/web/public/fonts/DMSans-Variable.woff2` (~48KB).
+Font files: `apps/web/public/fonts/Satoshi-Latin.woff2`. The DM Sans web font is no longer
+loaded in `app/layout.tsx`. (`DMSans-Regular.ttf` remains only for server-side OG-image
+Satori rendering, which is a build-time asset, not live page type — tracked for cleanup.)
 
-CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Scoped to `.linear-marketing` wrapper via `--marketing-font-display` and `--marketing-font-body`.
+CSS variables: `--font-satoshi` (set by `next/font/local`); `--marketing-font-display`
+(Satoshi) and `--marketing-font-body` (Inter) scoped to the `.linear-marketing` wrapper.
 
 ### System B — App (Inter)
 
@@ -182,6 +203,18 @@ The example above says one thing three times. Jovie should say it once.
 - Hover feedback should stay visual, not positional. Prefer color, border, or shadow changes. Do not make the interface jump on hover unless the motion communicates direct manipulation.
 - Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
 
+### Ovie Ops Cockpit Guardrail
+
+Ovie UI/UX work must use the make-interfaces-better path: load gstack `/design-review`, load `design-taste-frontend` where available, and run the checklist in `docs/ovie-design-guardrails.md`.
+
+Before changing Ovie UI, include the Design Read line:
+
+`Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>`
+
+Ovie should read as a macOS ops cockpit: dense but calm, fast, native-feeling, and focused on operator decisions. Do not import landing-page patterns, decorative AI-dashboard chrome, oversized hero/card structures, or motion that makes controls jump.
+
+Ovie UI PRs require before/after screenshots or component evidence and explicit pass/fail for hierarchy, spacing, typography scale, visual density, interaction states, contrast, macOS-native affordances, and no layout jank.
+
 ---
 
 ## Subtraction Principle
@@ -212,7 +245,38 @@ If removing an element makes the screen clearer and does not reduce comprehensio
 
 ---
 
+## Use Tokens, Not Raw Colors
+
+Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
+
+### Banned patterns
+
+| Banned | Why | Use instead |
+|--------|-----|-------------|
+| `text-black` without `dark:text-*` | Black text invisible in dark mode | `text-foreground` |
+| `text-white` without `dark:text-*` | White text invisible in light mode | `text-foreground` or `text-primary-token` |
+| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-background` or `bg-surface-1` |
+| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-background` |
+| `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
+
+**Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.
+
+### Enforcement
+
+A custom ESLint rule (`@jovie/no-hardcoded-theme-colors`, set to `warn`) flags these patterns at author time. A ratchet script (`pnpm --filter web lint:contrast-ratchet`) counts existing violations and fails CI if new ones are introduced.
+
+To fix a violation:
+1. Replace with a semantic token (preferred), or
+2. Pair with a `dark:` counterpart (`text-black dark:text-white`), or
+3. Add `// eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- <reason>` for intentional brand/brand-swatch exceptions.
+
+---
+
 ## Color System
+
+> **Canonical source:** Token values in the tables below are mirrored from
+> `apps/web/styles/design-system.css` (the single source of truth). When tokens
+> change in CSS, update these tables in the same PR — do not invent values here.
 
 ### Theme Generation
 
@@ -249,10 +313,10 @@ Three input variables generate the entire palette:
 
 | Token | Value | Hex | Usage |
 |-------|-------|-----|-------|
-| `--color-bg-base` | `#08090a` | — | Sidebar, page background |
-| `--color-bg-surface-0` | `#0f1011` | — | Primary app surface |
-| `--color-bg-surface-1` | `#17171a` | — | Cards, panels |
-| `--color-bg-surface-2` | `#23252a` | — | Inputs, elevated |
+| `--color-bg-base` | `#06070a` | — | Sidebar, page background (carbon palette) |
+| `--color-bg-surface-0` | `#0a0b0e` | — | Primary app surface (carbon palette) |
+| `--color-bg-surface-1` | `#101216` | — | Cards, panels (carbon palette) |
+| `--color-bg-surface-2` | `#161a20` | — | Inputs, elevated (carbon palette) |
 | `--color-bg-surface-3` | `#2a2c32` | — | Modals, tooltips |
 | Text primary | `lch(100% 0 282)` | `#ffffff` | Headings |
 | Text secondary | `lch(90.65% 1.35 282)` | `#E3E4E6` | Body, labels (bright!) |
@@ -368,9 +432,9 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | Prose | 680px | Long-form text |
 | Pricing grid | 1024px | Pricing layout (intentional narrow) |
 
-**Rule:** All marketing sections use the canonical width (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+**Rule:** All marketing sections use the canonical width (`var(--ds-public-content-max)` / `max-w-public-content`). Full-bleed sections explicitly break out. No more mixed widths.
 
-These are surface-side aliases of `--ds-public-content-max` and `--ds-prose-max` (DS_FOUNDATION_V1).
+Legacy aliases (`--linear-content-max`, `--public-content-max-page`, `--public-content-max-landing`) all resolve to `--ds-public-content-max` (1298px). Prose uses `--ds-prose-max` (680px).
 
 ---
 
@@ -390,8 +454,10 @@ of redefining them.
   - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
     modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
   - Raw durations and easings in route code are forbidden (enforced in Wave 4).
-- **Canonical button variants:** TBD by the Wave 1 audit; this section will
-  link forward to the Wave 1 PR once it lands.
+- **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
+  and `link`. Destructive styling is a `destructive` prop, not a variant.
+- **Canonical button sizes:** `sm` = 28px, `md` = 36px, `lg` = 44px;
+  `icon` uses the `md` control height with equal width.
 
 See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
 for the canonical CSS + Tailwind references.
@@ -496,14 +562,22 @@ duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ### Buttons
 
-| Variant | Light bg | Light fg | Dark bg | Dark fg |
-|---------|----------|----------|---------|---------|
-| Primary | `oklch(10% 0 0)` | `oklch(100% 0 0)` | `#e6e6e6` | `#08090a` |
-| Secondary | `oklch(93% chroma hue)` | `oklch(20% 0 0)` | `oklch(19% chroma hue)` | `oklch(90% 0 0)` |
-| Accent | `#7170ff` | white | `#7170ff` | white |
-| Marketing CTA | `#ffffff` | `#08090a` | `#ffffff` | `#08090a` |
+| Variant | Visual | Use case |
+|---------|--------|----------|
+| Primary | Solid high-contrast pill, black-on-light and white-on-dark via button tokens | Primary CTAs, submit, confirm |
+| Secondary | Subtle surface with 1px border and restrained hover elevation | Secondary actions, toolbar buttons, paired actions |
+| Tertiary | Transparent text/button chrome with hover reveal | Low-emphasis actions, row actions, dismiss |
+| Ghost | Transparent icon-first control with hover-circle reveal | Icon-only buttons, close, delete, add-row |
+| Link | Inline text with underline-on-hover, no control chrome | Inline actions, learn more, view all |
 
-Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padding: 12px horizontal.
+| Size | Height | Usage |
+|------|--------|-------|
+| Sm | 28px | Compact toolbar and table actions |
+| Md | 36px | Default all-purpose control |
+| Lg | 44px | Hero and feature callout CTAs |
+| Icon | 36px square | Icon-only controls |
+
+Destructive actions use `destructive` on any variant. Examples: primary destructive is a red filled button, secondary destructive is a red text/border action, and ghost destructive is a red icon/text control with subtle red hover surface.
 
 ### Sidebar (App Shell)
 
@@ -738,7 +812,7 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 
 | File | Responsibility |
 |------|----------------|
-| `apps/web/styles/design-system.css` | Canonical app/product token source |
+| `apps/web/styles/design-system.css` | **Canonical token source** — all width, surface, and color values in this doc mirror CSS here |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |
@@ -772,6 +846,10 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 | 2026-04-22 | Homepage migrated from System A to System B | Chat-intake is product, not marketing. Satoshi-editorial typography on a utility entrypoint was a category error. Lovable, v0, Bolt, and ChatGPT all use one system across homepage and product. System A scope shrinks to editorial surfaces (blog, pricing, changelog, support, legal). Full System A retirement deferred 3 months pending shipping data. |
 | 2026-04-22 | Homepage hero typography: Inter 40→48→56px, weight 680 (Linear bold / `font-bold` token) | Replaces Satoshi 800 marketing display. Product-powerful without tipping into marketing-shout. Letter-spacing -2.5% at display sizes. `--font-weight-bold` resolves to 680 (verified at runtime); the plan's initial "try 590 first, 680 if too muted" landed on 680. |
 | 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | Supersedes the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stay Inter. Driven by Frame.io-inspired hero composition where Inter at 80px reads narrow; Satoshi at 600/-0.045em matches Frame.io's FrameGothic computed style spec (verified by getComputedStyle). |
-| 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). Everything boxed at 1200px now. |
+| 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). **Superseded 2026-06-28** by DS_FOUNDATION_V1 1298px. |
+| 2026-06-28 | Canonical 1298px public/marketing width (DS_FOUNDATION_V1) | One width in code + docs. `--ds-public-content-max` is canonical; legacy 1200/1280 aliases resolve to 1298px. Linear.app container parity. |
+| 2026-07-02 | Canonical button variants shipped (DS_FOUNDATION_V1 Wave 1) | 5 variants (`primary`, `secondary`, `tertiary`, `ghost`, `link`) + `destructive` prop. 3 sizes (`sm`/`md`/`lg`) + `icon`. 19 surface-specific `system-b-*-button` classes migrated behind a shrink-only ratchet. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
+| 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
+| 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |

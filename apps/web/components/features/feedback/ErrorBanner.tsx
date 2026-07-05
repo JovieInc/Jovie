@@ -49,7 +49,7 @@ export function ErrorBanner({
     navigator.clipboard
       .writeText(details)
       .then(() => {
-        toast.success('Error details copied to clipboard');
+        toast.success('Copied');
       })
       .catch(() => {
         toast.error('Failed to copy error details');
@@ -102,7 +102,7 @@ export function ErrorBanner({
           'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
         )}
       >
-        {action.label}
+        {action.label || 'Action'}
       </button>
     );
   };

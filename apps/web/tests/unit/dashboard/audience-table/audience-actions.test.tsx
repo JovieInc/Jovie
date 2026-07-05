@@ -50,7 +50,30 @@ describe('buildAudienceActions', () => {
     expect(items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'copy-email', disabled: true }),
-        expect.objectContaining({ id: 'send-notification', disabled: true }),
+      ])
+    );
+    expect(items).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'send-notification' }),
+      ])
+    );
+  });
+
+  it('omits send notification for anonymous fans', () => {
+    const items = buildAudienceActions(
+      {
+        ...baseMember,
+        displayName: null,
+        email: null,
+        phone: null,
+        spotifyConnected: false,
+      },
+      callbacks
+    );
+
+    expect(items).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'send-notification' }),
       ])
     );
   });
@@ -69,7 +92,7 @@ describe('buildAudienceActions', () => {
     expect(items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'copy-email', disabled: true }),
-        expect.objectContaining({ id: 'send-notification', disabled: false }),
+        expect.objectContaining({ id: 'send-notification' }),
       ])
     );
   });

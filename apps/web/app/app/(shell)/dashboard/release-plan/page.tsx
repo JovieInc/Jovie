@@ -67,10 +67,10 @@ export default function ReleasePlanPage() {
                 data-testid={`release-plan-track-${index}`}
                 className='flex flex-col gap-1 rounded-md border border-subtle bg-surface-0 px-3 py-3'
               >
-                <span className='text-[11px] font-caption text-tertiary-token'>
+                <span className='text-2xs font-caption text-tertiary-token'>
                   Track {index + 1}
                 </span>
-                <span className='text-[13px] font-medium text-primary-token'>
+                <span className='text-app font-medium text-primary-token'>
                   {track.title}
                 </span>
               </div>

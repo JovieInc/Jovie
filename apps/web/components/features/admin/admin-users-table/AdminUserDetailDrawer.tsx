@@ -41,9 +41,9 @@ function computeProfileCompleteness(user: AdminUserRow): {
   const fields: ProfileField[] = [
     { label: 'Name', filled: Boolean(user.name) },
     { label: 'Email', filled: Boolean(user.email) },
-    { label: 'Billing connected', filled: Boolean(user.stripeCustomerId) },
+    { label: 'Billing Connected', filled: Boolean(user.stripeCustomerId) },
     { label: 'Subscription', filled: Boolean(user.stripeSubscriptionId) },
-    { label: 'Active account', filled: !user.deletedAt },
+    { label: 'Active Account', filled: !user.deletedAt },
   ];
 
   const filled = fields.filter(f => f.filled).length;
@@ -71,7 +71,7 @@ function ProfileCompletenessBar({
       </div>
       <div className='h-1.5 w-full overflow-hidden rounded-full bg-surface-3'>
         <div
-          className='h-full rounded-full bg-brand-primary transition-all duration-300'
+          className='h-full rounded-full bg-brand-primary transition-colors duration-cinematic'
           style={{ width: `${score}%` }}
         />
       </div>
@@ -234,7 +234,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>User ID</dt>
             <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>
-              <span className='truncate max-w-[140px]'>{user.id}</span>
+              <span className='truncate max-w-35'>{user.id}</span>
               <CopyButton value={user.id} label='User ID' />
             </dd>
           </div>
@@ -242,7 +242,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>Clerk ID</dt>
             <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>
-              <span className='truncate max-w-[140px]'>{user.clerkId}</span>
+              <span className='truncate max-w-35'>{user.clerkId}</span>
               <CopyButton value={user.clerkId} label='Clerk ID' />
             </dd>
           </div>
@@ -267,7 +267,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
             <dt className='text-secondary-token'>Stripe customer</dt>
             <dd className='text-primary-token'>
               {user.stripeCustomerId ? (
-                <span className='font-mono text-xs truncate max-w-[140px] inline-block'>
+                <span className='font-mono text-xs truncate max-w-35 inline-block'>
                   {user.stripeCustomerId}
                 </span>
               ) : (

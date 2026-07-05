@@ -231,7 +231,7 @@ describe('RadioGroup', () => {
       expect(radio.className).toContain('disabled:opacity-50');
     });
 
-    it('keeps press feedback free of transform motion', () => {
+    it('keeps hover feedback free of transform motion', () => {
       render(
         <RadioGroup>
           <RadioGroupItem value='test' data-testid='radio' />
@@ -239,7 +239,7 @@ describe('RadioGroup', () => {
       );
       const radio = screen.getByTestId('radio');
       expect(radio.className).not.toMatch(
-        /\b(?:transition-all|transition-transform|active:scale|active:translate|hover:-translate)\b/
+        /\b(?:transition-all|transition-transform|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
       );
     });
 

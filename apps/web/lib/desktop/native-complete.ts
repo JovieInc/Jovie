@@ -22,12 +22,24 @@ interface DesktopSignInResource {
   }>;
 }
 
-type DesktopSetActive = (params: { session: string }) => Promise<void>;
+type DesktopSetActive = (params: {
+  session: string;
+  redirectUrl?: string;
+}) => Promise<void>;
 
 type DesktopNativeExchangeFetch = (
   input: RequestInfo | URL,
   init?: RequestInit
 ) => Promise<Pick<Response, 'ok' | 'status' | 'json'>>;
+
+const SET_ACTIVE_SETTLE_TIMEOUT_MS = 5000;
+const RETURN_ROUTE_VERIFY_TIMEOUT_MS = 30_000;
+const RETURN_ROUTE_VERIFY_INTERVAL_MS = 500;
+
+export type DesktopReturnRouteVerificationResult =
+  | 'ready'
+  | 'unauthenticated'
+  | 'unknown';
 
 export type DesktopAuthDiagnosticStage =
   | 'completion_consume_started'
@@ -44,7 +56,11 @@ export type DesktopAuthDiagnosticStage =
   | 'ticket_finalize_succeeded'
   | 'session_id_missing'
   | 'set_active_started'
+  | 'set_active_timed_out'
   | 'set_active_succeeded'
+  | 'return_route_verify_started'
+  | 'return_route_verify_failed'
+  | 'return_route_verified'
   | 'route_ready';
 
 export interface CompleteDesktopNativeAuthInput {
@@ -55,6 +71,11 @@ export interface CompleteDesktopNativeAuthInput {
   readonly reloadClerk?: () => Promise<void>;
   readonly getActiveSessionId?: () => string | null;
   readonly getActiveUserId?: () => string | null;
+  readonly setActiveTimeoutMs?: number;
+  readonly returnRouteVerificationTimeoutMs?: number;
+  readonly verifyReturnRoute?: (
+    returnTo: string
+  ) => Promise<DesktopReturnRouteVerificationResult>;
   readonly recordDiagnostic?: (
     stage: DesktopAuthDiagnosticStage,
     detail?: string
@@ -190,6 +211,88 @@ function getClerkErrorCode(value: unknown): string | null {
   return typeof code === 'string' ? code : null;
 }
 
+async function waitForSetActiveToSettle(input: {
+  readonly setActive: DesktopSetActive;
+  readonly sessionId: string;
+  readonly returnTo: string;
+  readonly timeoutMs: number;
+}): Promise<'settled' | 'timed_out'> {
+  let activationError: unknown;
+  const activation = input
+    .setActive({ session: input.sessionId, redirectUrl: input.returnTo })
+    .then(
+      () => 'settled' as const,
+      error => {
+        activationError = error;
+        return 'rejected' as const;
+      }
+    );
+  const timeout = new Promise<'timed_out'>(resolve => {
+    setTimeout(() => resolve('timed_out'), input.timeoutMs);
+  });
+
+  const result = await Promise.race([activation, timeout]);
+  if (result === 'rejected') {
+    throw createError('desktop-auth-set-active-failed', activationError);
+  }
+
+  return result;
+}
+
+async function waitForReturnRouteVerification(input: {
+  readonly returnTo: string;
+  readonly timeoutMs: number;
+  readonly verifyReturnRoute?: (
+    returnTo: string
+  ) => Promise<DesktopReturnRouteVerificationResult>;
+}): Promise<DesktopReturnRouteVerificationResult> {
+  if (!input.verifyReturnRoute) return 'ready';
+
+  const deadline = Date.now() + input.timeoutMs;
+  let lastResult: DesktopReturnRouteVerificationResult = 'unknown';
+
+  while (Date.now() < deadline) {
+    try {
+      lastResult = await input.verifyReturnRoute(input.returnTo);
+      if (lastResult === 'ready') return 'ready';
+    } catch {
+      lastResult = 'unknown';
+    }
+
+    await new Promise(resolve =>
+      setTimeout(resolve, RETURN_ROUTE_VERIFY_INTERVAL_MS)
+    );
+  }
+
+  return lastResult;
+}
+
+async function verifyReturnRouteReady(input: {
+  readonly returnTo: string;
+  readonly timeoutMs: number;
+  readonly verifyReturnRoute?: (
+    returnTo: string
+  ) => Promise<DesktopReturnRouteVerificationResult>;
+  readonly recordDiagnostic: (
+    stage: DesktopAuthDiagnosticStage,
+    detail?: string
+  ) => void;
+}): Promise<void> {
+  input.recordDiagnostic('return_route_verify_started', input.returnTo);
+  const result = await waitForReturnRouteVerification({
+    returnTo: input.returnTo,
+    timeoutMs: input.timeoutMs,
+    verifyReturnRoute: input.verifyReturnRoute,
+  });
+
+  if (result !== 'ready') {
+    input.recordDiagnostic('return_route_verify_failed', result);
+    throw new Error('desktop-auth-server-session-not-active');
+  }
+
+  input.recordDiagnostic('return_route_verified', input.returnTo);
+}
+
 export async function completeDesktopNativeAuth({
   consumeCompletion,
   fetchNativeExchange = fetch,
@@ -198,6 +301,9 @@ export async function completeDesktopNativeAuth({
   reloadClerk,
   getActiveSessionId,
   getActiveUserId,
+  setActiveTimeoutMs = SET_ACTIVE_SETTLE_TIMEOUT_MS,
+  returnRouteVerificationTimeoutMs = RETURN_ROUTE_VERIFY_TIMEOUT_MS,
+  verifyReturnRoute,
   recordDiagnostic = recordDesktopAuthDiagnostic,
 }: CompleteDesktopNativeAuthInput): Promise<DesktopNativeAuthResult> {
   recordDiagnostic('completion_consume_started');
@@ -270,6 +376,12 @@ export async function completeDesktopNativeAuth({
     if (hydrationStatus === 'active') {
       const activeSessionId = getActiveSessionId?.() ?? 'hydrated_session';
       recordDiagnostic('ticket_finalize_succeeded', activeSessionId);
+      await verifyReturnRouteReady({
+        returnTo: exchange.returnTo,
+        timeoutMs: returnRouteVerificationTimeoutMs,
+        verifyReturnRoute,
+        recordDiagnostic,
+      });
       recordDiagnostic('route_ready', exchange.returnTo);
       return { returnTo: exchange.returnTo };
     }
@@ -285,8 +397,18 @@ export async function completeDesktopNativeAuth({
   recordDiagnostic('ticket_sign_in_succeeded');
 
   recordDiagnostic('set_active_started', sessionId);
-  await setActive({ session: sessionId });
-  recordDiagnostic('set_active_succeeded', sessionId);
+  const setActiveResult = await waitForSetActiveToSettle({
+    setActive,
+    sessionId,
+    returnTo: exchange.returnTo,
+    timeoutMs: setActiveTimeoutMs,
+  });
+  recordDiagnostic(
+    setActiveResult === 'settled'
+      ? 'set_active_succeeded'
+      : 'set_active_timed_out',
+    sessionId
+  );
 
   recordDiagnostic('ticket_finalize_started', 'verify_active_session');
   const activationStatus = await waitForActivatedSession({
@@ -301,6 +423,12 @@ export async function completeDesktopNativeAuth({
   }
 
   recordDiagnostic('ticket_finalize_succeeded', sessionId);
+  await verifyReturnRouteReady({
+    returnTo: exchange.returnTo,
+    timeoutMs: returnRouteVerificationTimeoutMs,
+    verifyReturnRoute,
+    recordDiagnostic,
+  });
   recordDiagnostic('route_ready', exchange.returnTo);
 
   return { returnTo: exchange.returnTo };

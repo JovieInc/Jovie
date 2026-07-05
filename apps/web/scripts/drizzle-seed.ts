@@ -33,6 +33,7 @@ import {
 import { scraperConfigs } from '@/lib/db/schema/ingestion';
 import { socialAccounts, socialLinks } from '@/lib/db/schema/links';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import { assertSeedDatabaseTarget } from './seed-database-guard';
 import {
   chunk,
   FAN_NAMES,
@@ -45,9 +46,10 @@ import {
   pickWeightedLinkType,
   pickWeightedReferrer,
 } from './seed-helpers';
-
-const SEED_FINGERPRINT_PREFIX = 'seed_fp_';
-const SEED_TESTNET_IP_PREFIX = '203.0.113.';
+import {
+  SEED_FINGERPRINT_PREFIX,
+  SEED_TESTNET_IP_PREFIX,
+} from './synthetic-audience-markers';
 
 // Load .env.local first to override defaults, then fallback to .env
 dotenvConfig({ path: '.env.local', override: true });
@@ -1827,14 +1829,7 @@ async function seedDatabase() {
 }
 
 async function main() {
-  const branch =
-    process.env.VERCEL_GIT_COMMIT_REF || process.env.GIT_BRANCH || 'local';
-  console.log(`🔀 Detected branch: ${branch}`);
-
-  if (branch === 'production') {
-    console.log('⚠️  Skipping: will not seed production database');
-    return;
-  }
+  assertSeedDatabaseTarget({ scriptName: 'drizzle-seed.ts' });
 
   try {
     await initDb();
