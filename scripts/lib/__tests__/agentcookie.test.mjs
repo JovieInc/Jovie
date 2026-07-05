@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   AGENTCOOKIE_PORT,
   API_KEY_ALLOWLIST,
-  COOKIE_ALLOWLIST,
-  COOKIE_BLOCKLIST,
   buildReceiveCommand,
   buildSendCommand,
+  COOKIE_ALLOWLIST,
+  COOKIE_BLOCKLIST,
   domainMatchesList,
   isApiKeyAllowed,
   isDomainAllowed,
@@ -17,20 +17,31 @@ describe('agentcookie security policy', () => {
   // ── blocklist ──────────────────────────────────────────────────────────────
 
   it('blocks banking domains', () => {
-    for (const domain of ['chase.com', 'wellsfargo.com', 'paypal.com', 'stripe.com']) {
-      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(false);
+    for (const domain of [
+      'chase.com',
+      'wellsfargo.com',
+      'paypal.com',
+      'stripe.com',
+    ]) {
+      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(
+        false
+      );
     }
   });
 
   it('blocks healthcare domains', () => {
     for (const domain of ['mychart.com', 'aetna.com', 'kaiserpermanente.org']) {
-      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(false);
+      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(
+        false
+      );
     }
   });
 
   it('blocks password manager domains', () => {
     for (const domain of ['1password.com', 'lastpass.com', 'bitwarden.com']) {
-      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(false);
+      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(
+        false
+      );
     }
   });
 
@@ -40,13 +51,17 @@ describe('agentcookie security policy', () => {
       'console.cloud.google.com',
       'portal.azure.com',
     ]) {
-      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(false);
+      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(
+        false
+      );
     }
   });
 
   it('blocks tax / government domains', () => {
     for (const domain of ['irs.gov', 'turbotax.com', 'ssa.gov']) {
-      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(false);
+      expect(isDomainAllowed(domain), `${domain} should be blocked`).toBe(
+        false
+      );
     }
   });
 
@@ -63,7 +78,12 @@ describe('agentcookie security policy', () => {
   });
 
   it('allows dev tooling domains', () => {
-    for (const domain of ['github.com', 'linear.app', 'vercel.com', 'sentry.io']) {
+    for (const domain of [
+      'github.com',
+      'linear.app',
+      'vercel.com',
+      'sentry.io',
+    ]) {
       expect(isDomainAllowed(domain), `${domain} should be allowed`).toBe(true);
     }
   });
@@ -72,8 +92,12 @@ describe('agentcookie security policy', () => {
 
   it('blocks subdomains of blocked root domains', () => {
     expect(domainMatchesList('app.chase.com', COOKIE_BLOCKLIST)).toBe(true);
-    expect(domainMatchesList('secure.wellsfargo.com', COOKIE_BLOCKLIST)).toBe(true);
-    expect(domainMatchesList('vault.1password.com', COOKIE_BLOCKLIST)).toBe(true);
+    expect(domainMatchesList('secure.wellsfargo.com', COOKIE_BLOCKLIST)).toBe(
+      true
+    );
+    expect(domainMatchesList('vault.1password.com', COOKIE_BLOCKLIST)).toBe(
+      true
+    );
   });
 
   it('allows subdomains of allowed root domains', () => {
@@ -83,7 +107,10 @@ describe('agentcookie security policy', () => {
 
   it('rejects unknown domains (default-deny)', () => {
     for (const domain of ['example.com', 'randomsite.io', 'notlisted.org']) {
-      expect(isDomainAllowed(domain), `${domain} should be blocked (default-deny)`).toBe(false);
+      expect(
+        isDomainAllowed(domain),
+        `${domain} should be blocked (default-deny)`
+      ).toBe(false);
     }
   });
 
@@ -125,7 +152,9 @@ describe('agentcookie security policy', () => {
   // ── list non-overlap guarantee ─────────────────────────────────────────────
 
   it('has no domain in both blocklist and allowlist', () => {
-    const overlapping = COOKIE_BLOCKLIST.filter(d => COOKIE_ALLOWLIST.includes(d));
+    const overlapping = COOKIE_BLOCKLIST.filter(d =>
+      COOKIE_ALLOWLIST.includes(d)
+    );
     expect(overlapping).toEqual([]);
   });
 
