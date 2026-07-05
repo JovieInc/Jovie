@@ -12,6 +12,8 @@
 
 /* Import Linear-specific tokens for marketing pages */
 @import "./linear-tokens.css";
+/* Generated from design/tokens.json (JOV #12009) — pnpm tokens:build */
+@import "./generated/design-tokens.css";
 /* DESIGN AGENT: Carbon palette synced to shell-v1 */
 /* Tokens updated: bg-page #06070a, surface0 #0a0b0e, surface1 #101216, 
    surface2 #161a20, contentSurface #0a0c0f, border #171a20 */

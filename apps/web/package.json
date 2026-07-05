@@ -33,6 +33,8 @@
     "lint:contrast-ratchet": "node scripts/lint-contrast-ratchet.mjs && tsx scripts/lint-contrast-computed.ts",
     "lint:contrast-computed": "tsx scripts/lint-contrast-computed.ts",
     "lint:touch-target": "tsx scripts/lint-touch-target.ts",
+    "tokens:build": "node scripts/build-design-tokens.mjs",
+    "tokens:check": "node scripts/build-design-tokens.mjs --check",
     "lint:button-canon-ratchet": "vitest run --config=vitest.config.mts tests/unit/design-system/button-canon-ratchet.test.ts",
     "lint:seo": "node scripts/seo-ratchet-guard.mjs && vitest run --config=vitest.config.fast.mts tests/app/seo-ratchet.test.ts tests/app/robots.test.ts tests/app/sitemap.test.ts",
     "lint:seo:live": "tsx scripts/seo-ratchet-live.ts",
