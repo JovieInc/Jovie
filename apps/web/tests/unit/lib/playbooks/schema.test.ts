@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { resolveAppWebRoot, resolveMonorepoRoot } from '@/lib/filesystem-paths';
@@ -67,6 +67,28 @@ function buildValidSource(
   };
   return `---\n${JSON.stringify(definition, null, 2)}\n---\n\n# Body\n`;
 }
+
+describe('docs/playbooks sweep', () => {
+  // Mirrors scripts/validate-playbooks.ts so the unit-test CI lane enforces
+  // the contract for every committed playbook file.
+  const playbooksDir = join(MONOREPO_ROOT, 'docs', 'playbooks');
+  const playbookFiles = readdirSync(playbooksDir).filter(name =>
+    name.endsWith('.playbook.md')
+  );
+
+  it('has at least the worked example', () => {
+    expect(playbookFiles.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it.each(playbookFiles)('%s passes the validator', file => {
+    const raw = readFileSync(join(playbooksDir, file), 'utf-8');
+    const result = validatePlaybookSource(raw);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (result.ok) {
+      expect(`${result.definition.id}.playbook.md`).toBe(file);
+    }
+  });
+});
 
 describe('parsePlaybookFrontmatter', () => {
   it('splits frontmatter and body', () => {
