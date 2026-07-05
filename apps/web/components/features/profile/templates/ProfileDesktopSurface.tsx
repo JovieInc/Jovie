@@ -381,8 +381,12 @@ export function ProfileDesktopSurface({
   const homeOverview = (
     <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
       <div className='grid min-h-0 min-w-0 gap-3.5'>
+        {/* Composition rule (#11899): the desktop cover is a fixed standard
+            4:5 shape — height is the single driver (viewport-bounded with a
+            min floor), width follows the aspect ratio, and the fill image
+            crops (object-cover), never squashes. */}
         <section
-          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)]'
+          className='relative aspect-card-standard h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)]'
           data-testid='profile-desktop-cover'
         >
           <div className='absolute inset-0'>
