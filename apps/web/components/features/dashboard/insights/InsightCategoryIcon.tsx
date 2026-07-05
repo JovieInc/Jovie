@@ -8,56 +8,32 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
+import {
+  type AccentPaletteName,
+  getAccentCssVars,
+} from '@/lib/ui/accent-palette';
 import type { InsightCategory } from '@/types/insights';
 
+/**
+ * Carbon accent assignment per insight category. Categories are categorical
+ * (8 distinct variables), so the full palette reads as categories rather than
+ * status. `timing` stays neutral (token greyscale) by design.
+ */
 const CATEGORY_CONFIG: Record<
   InsightCategory,
   {
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-    iconClassName: string;
-    chipClassName: string;
+    accent: AccentPaletteName | null;
   }
 > = {
-  geographic: {
-    icon: MapPin,
-    iconClassName: 'text-blue-600 dark:text-blue-400',
-    chipClassName: 'bg-blue-500/10 dark:bg-blue-500/15',
-  },
-  growth: {
-    icon: TrendingUp,
-    iconClassName: 'text-emerald-600 dark:text-emerald-400',
-    chipClassName: 'bg-emerald-500/10 dark:bg-emerald-500/15',
-  },
-  content: {
-    icon: Music,
-    iconClassName: 'text-purple-600 dark:text-purple-400',
-    chipClassName: 'bg-purple-500/10 dark:bg-purple-500/15',
-  },
-  revenue: {
-    icon: DollarSign,
-    iconClassName: 'text-yellow-600 dark:text-yellow-400',
-    chipClassName: 'bg-yellow-500/10 dark:bg-yellow-500/15',
-  },
-  tour: {
-    icon: Ticket,
-    iconClassName: 'text-orange-600 dark:text-orange-400',
-    chipClassName: 'bg-orange-500/10 dark:bg-orange-500/15',
-  },
-  platform: {
-    icon: Share2,
-    iconClassName: 'text-accent',
-    chipClassName: 'bg-accent/10 dark:bg-accent/15',
-  },
-  engagement: {
-    icon: Users,
-    iconClassName: 'text-pink-600 dark:text-pink-400',
-    chipClassName: 'bg-pink-500/10 dark:bg-pink-500/15',
-  },
-  timing: {
-    icon: Clock,
-    iconClassName: 'text-tertiary-token',
-    chipClassName: 'bg-surface-0',
-  },
+  geographic: { icon: MapPin, accent: 'blue' },
+  growth: { icon: TrendingUp, accent: 'green' },
+  content: { icon: Music, accent: 'purple' },
+  revenue: { icon: DollarSign, accent: 'teal' },
+  tour: { icon: Ticket, accent: 'orange' },
+  platform: { icon: Share2, accent: 'gray' },
+  engagement: { icon: Users, accent: 'pink' },
+  timing: { icon: Clock, accent: null },
 };
 
 interface InsightCategoryIconProps {
@@ -74,11 +50,24 @@ export function InsightCategoryIcon({
   const chipSize = size === 'sm' ? 'h-6 w-6' : 'h-7 w-7';
   const iconSize = size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4';
 
+  if (!config.accent) {
+    return (
+      <div
+        className={`shrink-0 flex ${chipSize} items-center justify-center rounded-lg bg-surface-0`}
+      >
+        <IconComponent className={`${iconSize} text-tertiary-token`} />
+      </div>
+    );
+  }
+
+  const accent = getAccentCssVars(config.accent);
+
   return (
     <div
-      className={`shrink-0 flex ${chipSize} items-center justify-center rounded-lg ${config.chipClassName}`}
+      className={`shrink-0 flex ${chipSize} items-center justify-center rounded-lg`}
+      style={{ backgroundColor: accent.subtle }}
     >
-      <IconComponent className={`${iconSize} ${config.iconClassName}`} />
+      <IconComponent className={iconSize} style={{ color: accent.solid }} />
     </div>
   );
 }

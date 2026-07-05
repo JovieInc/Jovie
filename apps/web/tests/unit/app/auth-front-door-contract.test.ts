@@ -62,7 +62,9 @@ describe('auth front-door contract', () => {
   });
 
   it('keeps Clerk-owned auth copy aligned with the canonical cross-links', () => {
-    expect(authClerkLocalization.signUp.start.title).toBe('Request access');
+    expect(authClerkLocalization.signUp.start.title).toBe(
+      'Create your account'
+    );
     expect(authClerkLocalization.signUp.start.actionText).toBe(
       'Have an account?'
     );
@@ -71,7 +73,7 @@ describe('auth front-door contract', () => {
     expect(authClerkLocalization.signIn.start.title).toBe('Welcome back');
     expect(authClerkLocalization.signIn.start.actionText).toBe('No account?');
     expect(authClerkLocalization.signIn.start.actionLink).toBe(
-      'Request access'
+      'Create your account'
     );
   });
 });

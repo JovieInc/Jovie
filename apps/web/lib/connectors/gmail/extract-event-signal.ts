@@ -1,9 +1,9 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { gateway } from '@ai-sdk/gateway';
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
-import { generateObject } from '@/lib/ai/sdk';
+import { gateway, generateObject } from '@/lib/ai/sdk';
+import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { db } from '@/lib/db';
 import { agentRuns } from '@/lib/db/schema/connectors';
 import { env } from '@/lib/env-server';
@@ -176,6 +176,10 @@ export async function extractEventSignal(
       system: EXTRACTOR_SYSTEM_PROMPT,
       prompt,
       maxOutputTokens: 2000,
+      experimental_telemetry: buildAiTelemetry({
+        functionId: 'jovie-gmail-event-extractor',
+        identity: { userId, sessionId: inputContextDigest },
+      }),
     });
 
     const inputTokens = usage.inputTokens ?? 0;

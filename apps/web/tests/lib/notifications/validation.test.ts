@@ -8,8 +8,61 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import {
+  getNotificationCaptureError,
+  NOTIFICATION_CAPTURE_ERROR_MESSAGES,
+} from '@/lib/validation/schemas/notifications';
 
 describe('Notification Validation', () => {
+  describe('getNotificationCaptureError', () => {
+    it('names exact email validation rules', () => {
+      expect(getNotificationCaptureError({ channel: 'email', value: '' })).toBe(
+        NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailRequired
+      );
+      expect(
+        getNotificationCaptureError({ channel: 'email', value: 'fan@domain' })
+      ).toBe(NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailFormat);
+      expect(
+        getNotificationCaptureError({
+          channel: 'email',
+          value: 'fan @domain.com',
+        })
+      ).toBe(NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailNoSpaces);
+    });
+
+    it('accepts valid email capture input', () => {
+      expect(
+        getNotificationCaptureError({
+          channel: 'email',
+          value: 'fan@example.com',
+        })
+      ).toBeNull();
+    });
+
+    it('limits SMS capture to US and Canada', () => {
+      expect(
+        getNotificationCaptureError({
+          channel: 'sms',
+          value: '+15551234567',
+          country_code: 'GB',
+        })
+      ).toBe(NOTIFICATION_CAPTURE_ERROR_MESSAGES.smsCountry);
+      expect(
+        getNotificationCaptureError({
+          channel: 'sms',
+          value: '+15551234567',
+        })
+      ).toBe(NOTIFICATION_CAPTURE_ERROR_MESSAGES.smsCountry);
+      expect(
+        getNotificationCaptureError({
+          channel: 'sms',
+          value: '+15551234567',
+          country_code: 'CA',
+        })
+      ).toBeNull();
+    });
+  });
+
   describe('normalizeSubscriptionEmail', () => {
     it('should return null for null or undefined input', () => {
       expect(normalizeSubscriptionEmail(null)).toBeNull();

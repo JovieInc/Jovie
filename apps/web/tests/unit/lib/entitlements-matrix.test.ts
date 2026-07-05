@@ -150,6 +150,7 @@ const LIMITS_FREE = {
   aiDailyMessageLimit: 10,
   aiPitchGenPerRelease: 1,
   aiRetouchDailyLimit: null,
+  chatFileUploadLimit: 5,
 } as const;
 
 const LIMITS_PRO = {
@@ -159,6 +160,7 @@ const LIMITS_PRO = {
   aiDailyMessageLimit: 100,
   aiPitchGenPerRelease: 5,
   aiRetouchDailyLimit: 10,
+  chatFileUploadLimit: null,
 } as const;
 
 const LIMITS_MAX = {
@@ -168,6 +170,7 @@ const LIMITS_MAX = {
   aiDailyMessageLimit: 500,
   aiPitchGenPerRelease: null,
   aiRetouchDailyLimit: 50,
+  chatFileUploadLimit: null,
 } as const;
 
 const LIMITS_TRIAL = {
@@ -177,6 +180,7 @@ const LIMITS_TRIAL = {
   aiDailyMessageLimit: 25,
   aiPitchGenPerRelease: 3,
   aiRetouchDailyLimit: 10,
+  chatFileUploadLimit: 15,
 } as const;
 
 const MATRIX = {

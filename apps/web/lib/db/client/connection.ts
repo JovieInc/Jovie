@@ -37,8 +37,27 @@ let _pool: Pool | undefined;
 const DEFAULT_POOL_MAX = 20;
 const TEST_POOL_MAX = 1;
 
+/**
+ * Opt-in pool-level PostgreSQL statement_timeout (milliseconds).
+ * When unset, connections use the server default (no app-enforced cap).
+ */
+export function resolveStatementTimeoutMs(): number | undefined {
+  const raw = process.env.DB_STATEMENT_TIMEOUT_MS;
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
 export function resolvePoolConfig(connectionString: string) {
   const runningInTest = isTestEnv();
+  const statementTimeoutMs = resolveStatementTimeoutMs();
 
   return {
     connectionString,
@@ -46,6 +65,9 @@ export function resolvePoolConfig(connectionString: string) {
     idleTimeoutMillis: 20_000,
     connectionTimeoutMillis: 15_000,
     allowExitOnIdle: true,
+    ...(statementTimeoutMs !== undefined
+      ? { statement_timeout: statementTimeoutMs }
+      : {}),
   };
 }
 
@@ -101,6 +123,7 @@ export function initializeDb(): DbType {
   logDbInfo('pool_config', 'Initialized Neon pool configuration', {
     environment: env.NODE_ENV,
     maxConnections: poolConfig.max,
+    statementTimeoutMs: poolConfig.statement_timeout ?? null,
     playwrightWorkerIndex: process.env.TEST_WORKER_INDEX ?? null,
     vitestWorkerId: process.env.VITEST_POOL_ID ?? null,
   });

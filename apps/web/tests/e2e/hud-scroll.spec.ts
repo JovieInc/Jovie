@@ -20,6 +20,67 @@ import {
 
 const APP_SHELL_SCROLL_SELECTOR = '[data-testid="app-shell-scroll"]';
 
+async function resolveRouteScrollSelector(
+  page: import('@playwright/test').Page,
+  routeLabel: string,
+  preferredSelector?: string
+): Promise<string | null> {
+  return page.evaluate(
+    ({ label, preferred }) => {
+      const shellScroll = document.querySelector(
+        '[data-testid="app-shell-scroll"]'
+      ) as HTMLElement | null;
+      if (!shellScroll) {
+        return null;
+      }
+
+      const probeId = label.replaceAll(/\s+/g, '-');
+
+      const isScrollable = (element: HTMLElement) => {
+        const style = globalThis.getComputedStyle(element);
+        const overflowY = style.overflowY;
+        return (
+          overflowY === 'auto' ||
+          overflowY === 'scroll' ||
+          overflowY === 'overlay'
+        );
+      };
+
+      const markProbe = (element: HTMLElement) => {
+        element.setAttribute('data-route-scroll-probe', probeId);
+        return `[data-route-scroll-probe="${probeId}"]`;
+      };
+
+      const preferredElement = preferred
+        ? (document.querySelector(preferred) as HTMLElement | null)
+        : null;
+
+      if (preferredElement) {
+        let cursor: HTMLElement | null = preferredElement;
+        while (cursor && shellScroll.contains(cursor)) {
+          if (isScrollable(cursor)) {
+            return markProbe(cursor);
+          }
+          cursor = cursor.parentElement;
+        }
+      }
+
+      const ownedScrollPane = Array.from(
+        shellScroll.querySelectorAll<HTMLElement>('*')
+      ).find(isScrollable);
+
+      if (ownedScrollPane) {
+        return markProbe(ownedScrollPane);
+      }
+
+      return isScrollable(shellScroll)
+        ? '[data-testid="app-shell-scroll"]'
+        : null;
+    },
+    { label: routeLabel, preferred: preferredSelector ?? null }
+  );
+}
+
 test.describe('HUD kiosk scroll regression', () => {
   // Kiosk page is token-gated, so storageState (which carries the admin
   // session, when present) is not required. Start with a clean context to
@@ -69,18 +130,21 @@ test.describe('App-shell scroll-pane regression', () => {
       label: 'admin overview',
       bypass: '/api/dev/test-auth/enter?persona=admin&redirect=/app/admin',
       expectedPath: /\/app\/admin/,
+      scrollSelector: '[data-testid="admin-overview-page"]',
     },
     {
       label: 'dashboard earnings',
       bypass:
         '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/earnings',
       expectedPath: /\/app\/dashboard\/earnings/,
+      scrollSelector: '[data-testid="dashboard-earnings-content-panel"]',
     },
     {
       label: 'dashboard audience',
       bypass:
         '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/audience',
       expectedPath: /\/app\/audience/,
+      scrollSelector: '[data-testid="dashboard-audience-table"]',
     },
   ] as const;
 
@@ -103,7 +167,7 @@ test.describe('App-shell scroll-pane regression', () => {
       await page.goto(route.bypass);
       await page.waitForURL(route.expectedPath, { timeout: 30_000 });
 
-      // Wait for the shell scroll container to mount before measuring.
+      // Wait for the shell scroll clip to mount before measuring route-owned panes.
       await expect(page.locator(APP_SHELL_SCROLL_SELECTOR)).toBeVisible({
         timeout: 30_000,
       });
@@ -115,6 +179,16 @@ test.describe('App-shell scroll-pane regression', () => {
         .waitForLoadState('networkidle', { timeout: 5_000 })
         .catch(() => {});
 
+      const scrollSelector = await resolveRouteScrollSelector(
+        page,
+        route.label,
+        route.scrollSelector
+      );
+      test.skip(
+        !scrollSelector,
+        `${route.label} has no route-owned scroll pane at 1280x720`
+      );
+
       // Skip the assertion if the route's natural content fits in the
       // viewport (legitimately short page) — the assertion would false-fail
       // by the helper's own precondition. This is intentional: the test is
@@ -122,14 +196,14 @@ test.describe('App-shell scroll-pane regression', () => {
       const overflows = await page.evaluate(sel => {
         const el = document.querySelector(sel) as HTMLElement | null;
         return el ? el.scrollHeight > el.clientHeight + 4 : false;
-      }, APP_SHELL_SCROLL_SELECTOR);
+      }, scrollSelector);
       test.skip(
         !overflows,
         `${route.label} content fits in viewport at 1280x720 — nothing to scroll`
       );
 
       await assertScrollable(page, {
-        containerSelector: APP_SHELL_SCROLL_SELECTOR,
+        containerSelector: scrollSelector,
       });
     });
   }

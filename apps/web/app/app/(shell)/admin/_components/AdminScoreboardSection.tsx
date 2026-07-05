@@ -51,9 +51,9 @@ function FunnelStep({
           aria-hidden='true'
         />
       )}
-      <li className='min-w-[100px] shrink-0 list-none'>
+      <li className='min-w-25 shrink-0 list-none'>
         <p className='text-2xs font-semibold text-tertiary-token'>{label}</p>
-        <p className='text-[24px] font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'>
+        <p className='text-2xl font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'>
           {count.toLocaleString('en-US')}
         </p>
         <p className='mt-0.5 text-xs text-tertiary-token'>
@@ -115,7 +115,7 @@ export function AdminHeroMetricsSkeleton() {
       data-testid='admin-hero-metrics-skeleton'
     >
       {['mrr', 'customers', 'growth'].map(key => (
-        <div key={key} className='min-h-[75px]'>
+        <div key={key} className='min-h-19'>
           <div className='h-9 w-24 animate-pulse rounded-md bg-surface-1' />
           <div className='mt-1.5 h-4 w-32 animate-pulse rounded-md bg-surface-1' />
         </div>
@@ -267,7 +267,7 @@ export function AdminScoreboardSectionSkeleton() {
             'signed-up',
             'paid',
           ].map(key => (
-            <div key={key} className='min-w-[100px]'>
+            <div key={key} className='min-w-25'>
               <div className='h-3 w-14 animate-pulse rounded bg-surface-1' />
               <div className='mt-1 h-6 w-12 animate-pulse rounded bg-surface-1' />
               <div className='mt-1 h-3 w-10 animate-pulse rounded bg-surface-1' />

@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
@@ -121,10 +122,13 @@ function buildAsset(
     artist: 'Tim White',
     artworkUrl: 'https://cdn.example.com/artwork.jpg',
     previewUrl: 'https://cdn.example.com/preview.mp3',
+    videoUrl: null,
+    waveformSeed: 17,
     smartLinkPath: '/tim/take-me-over',
     releaseDate: '2026-04-28T00:00:00.000Z',
     releaseType: 'single',
     status: 'released',
+    approvalStatus: 'draft',
     trackCount: 1,
     providerCount: 1,
     providers: [
@@ -199,13 +203,14 @@ function renderLibraryWithSidebarOverride(
 }
 
 function clickGridView() {
-  fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Grid View' }));
 }
 
 describe('LibrarySurface', () => {
   const baseMatchMedia = window.matchMedia;
 
   beforeEach(() => {
+    window.localStorage.clear();
     audioMock.playbackState = { ...audioMock.basePlaybackState };
     audioMock.toggleTrack.mockClear();
     audioMock.seek.mockClear();
@@ -233,12 +238,16 @@ describe('LibrarySurface', () => {
       expect(source).not.toMatch(localRecipePattern);
     }
 
-    expect(source).toContain('border-success/20 bg-success/10 text-success');
-    expect(source).toContain('border-info/20 bg-info/10 text-info');
+    // Release/approval badge accents live in their semantic helpers
+    // (lib/library/{release,approval}-status.ts) — guarded for distinctness
+    // in library-system-b-compliance.test.ts and approval-status.test.ts.
+    expect(source).toContain('releaseStatusClasses');
+    expect(source).toContain('libraryApprovalStatusClasses');
     expect(source).toContain('system-b-library-filter-pill-active');
+    expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
-    expect(source).toContain('system-b-library-dropzone--dragging');
+    expect(source).toContain('ReleaseAudioAssetPanel');
   });
 
   it('aligns library grid and list insets with the shell header padding contract', () => {
@@ -251,10 +260,8 @@ describe('LibrarySurface', () => {
     expect(source).toContain(
       'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)'
     );
-    expect(source).toContain('LIBRARY_GRID_LAYOUT_CLASS');
-    expect(source).toContain(
-      'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
-    );
+    expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
+    expect(source).toContain('useLibraryGridDensity');
     expect(source).toContain('px-(--linear-app-header-padding-x) sm:flex');
     expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
     expect(source).not.toMatch(/grid gap-2\.5/u);
@@ -283,8 +290,108 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /Inspect Take Me Over/u })
+      screen.queryByRole('button', { name: /View Take Me Over/u })
     ).toBeNull();
+  });
+
+  it('shows the card-size toggle in grid view and persists density preference', () => {
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.queryByTestId('library-grid-density-toggle')
+    ).not.toBeInTheDocument();
+
+    clickGridView();
+    expect(
+      screen.getByTestId('library-grid-density-toggle')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Small cards/u }));
+    expect(window.localStorage.getItem('jovie:library-grid-density')).toBe(
+      'compact'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Large cards/u }));
+    expect(window.localStorage.getItem('jovie:library-grid-density')).toBe(
+      'spacious'
+    );
+  });
+
+  it('renders aspect-ratio-aware artwork frames in grid cards', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'video-landscape',
+        title: 'Music Video',
+        itemKind: 'video',
+        assetKinds: ['artwork', 'video'],
+      }),
+      buildAsset({
+        id: 'video-portrait',
+        title: 'Reel',
+        itemKind: 'video',
+        mediaOrientation: 'portrait',
+        assetKinds: ['artwork', 'video'],
+      }),
+    ]);
+    clickGridView();
+
+    const releaseCard = screen
+      .getByRole('button', { name: /View Take Me Over/u })
+      .querySelector('.system-b-library-card-artwork');
+    const landscapeCard = screen
+      .getByRole('button', { name: /View Music Video/u })
+      .querySelector('.system-b-library-card-artwork');
+    const portraitCard = screen
+      .getByRole('button', { name: /View Reel/u })
+      .querySelector('.system-b-library-card-artwork');
+
+    expect(releaseCard?.className).toContain('aspect-square');
+    expect(landscapeCard?.className).toContain('aspect-video');
+    expect(portraitCard?.className).toContain('aspect-[9/16]');
+  });
+
+  it('renders approval status badges and supports filtering by approval status', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset({ approvalStatus: 'needs_review' }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Second Track',
+        approvalStatus: 'approved',
+      }),
+    ]);
+    clickGridView();
+
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveTextContent('Needs Review');
+    expect(
+      screen.getByTestId('library-approval-status-release-2')
+    ).toHaveTextContent('Approved');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /Needs Review/u }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('library-approval-status-release-1')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('library-approval-status-release-2')
+      ).toBeNull();
+    });
+  });
+
+  it('keeps the approval status inline control labelled after the details refactor', () => {
+    renderLibrary([buildAsset({ approvalStatus: 'draft' })]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    const trigger = screen.getByTestId(
+      'library-approval-status-select-release-1'
+    );
+    expect(trigger).toHaveAccessibleName('Approval Status');
+    expect(trigger.tagName).toBe('BUTTON');
   });
 
   it('renders release assets with grid cards and a read-only detail drawer', () => {
@@ -298,31 +405,38 @@ describe('LibrarySurface', () => {
     expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Lyrics').length).toBeGreaterThan(0);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /Inspect Take Me Over/u })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /View Take Me Over/u }));
 
-    expect(screen.getByText('Apr 28, 2026')).toBeDefined();
     expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
       'aria-hidden',
       'false'
     );
-    expect(screen.getByRole('link', { name: /Open Release/u })).toHaveAttribute(
-      'href',
-      '/tim/take-me-over'
-    );
-    expect(screen.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(
+      drawer.getByRole('button', {
+        name: 'More actions',
+      })
+    ).toBeInTheDocument();
+    // Approval status stays a single accessible editor in the default-open
+    // Details section while the drawer sections remain single-open.
+    expect(
+      drawer.getByRole('button', { name: 'Approval Status' })
+    ).toBeInTheDocument();
+    fireEvent.click(drawer.getByRole('button', { name: 'Providers' }));
+    expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    fireEvent.click(drawer.getByRole('button', { name: 'Audio' }));
     expect(
       drawer.getAllByRole('button', {
         name: /Play Preview for Take Me Over/u,
       }).length
     ).toBeGreaterThan(0);
-    expect(screen.getByText('68/100')).toBeDefined();
-    expect(screen.getByText('Progressive House')).toBeDefined();
+    fireEvent.click(drawer.getByRole('button', { name: 'Details' }));
+    expect(drawer.getByText('Apr 28, 2026')).toBeDefined();
+    expect(drawer.getByText('68/100')).toBeDefined();
+    expect(drawer.getByText('Progressive House')).toBeDefined();
 
     fireEvent.keyDown(window, { key: 'Escape' });
 
@@ -330,6 +444,39 @@ describe('LibrarySurface', () => {
       'aria-hidden',
       'true'
     );
+  });
+
+  it('copies the canonical share URL from the drawer overflow menu', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderLibrary([
+      buildAsset({
+        share: {
+          assetId: 'release-1',
+          visibility: 'private',
+          shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
+        },
+      }),
+    ]);
+    clickGridView();
+
+    await user.click(
+      screen.getByRole('button', { name: /View Take Me Over/u })
+    );
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+
+    await user.click(drawer.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Copy Share Link' }));
+
+    expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
   });
 
   it('renders merch assets with prices and the shared detail drawer', () => {
@@ -364,7 +511,7 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: /Inspect Never Say A Word Hoodie/u,
+        name: /View Never Say A Word Hoodie/u,
       })
     );
 
@@ -375,11 +522,34 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     expect(drawer.getByText('$22.00')).toBeInTheDocument();
     expect(drawer.queryByText('$9.00')).toBeNull();
-    expect(drawer.getByRole('link', { name: /Open Merch/u })).toHaveAttribute(
-      'href',
-      '/app/library?view=merch'
-    );
+    expect(
+      drawer.getByRole('button', { name: 'More actions' })
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+  });
+
+  it('renders the library right rail as a sticky carded panel', () => {
+    renderLibrary([buildAsset()]);
+    clickGridView();
+
+    fireEvent.click(screen.getByRole('button', { name: /View Take Me Over/u }));
+
+    const drawer = screen.getByTestId('library-asset-drawer');
+    const stickyRail = screen.getByTestId('library-asset-drawer-sticky-rail');
+    const stickyCard = stickyRail.querySelector('[data-variant="card"]');
+
+    expect(stickyCard).toBeInTheDocument();
+    expect(stickyCard).toContainElement(
+      screen.getByRole('button', { name: 'More actions' })
+    );
+    expect(
+      within(stickyRail).getByRole('heading', { name: 'Take Me Over' })
+    ).toBeInTheDocument();
+    expect(
+      drawer.querySelectorAll('[data-variant="card"]').length
+    ).toBeGreaterThan(1);
+    expect(drawer.textContent).toContain('Details');
+    expect(drawer.textContent).toContain('Providers');
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
@@ -387,7 +557,7 @@ describe('LibrarySurface', () => {
     clickGridView();
 
     const assetCardButton = screen.getByRole('button', {
-      name: /Inspect Take Me Over/u,
+      name: /View Take Me Over/u,
     });
 
     expect(assetCardButton.className).toContain(
@@ -400,26 +570,24 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(assetCardButton);
 
-    const closeButton = screen.getByRole('button', {
-      name: 'Close asset details',
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    const overflowButton = drawer.getByRole('button', {
+      name: 'More actions',
     });
-    const openReleaseLink = screen.getByRole('link', {
-      name: /Open Release/u,
+    fireEvent.click(drawer.getByRole('button', { name: 'Audio' }));
+    const [previewButton] = drawer.getAllByRole('button', {
+      name: /Play Preview for Take Me Over/u,
     });
-    const [previewButton] = within(
-      screen.getByTestId('library-asset-drawer')
-    ).getAllByRole('button', { name: /Play Preview for Take Me Over/u });
     if (!previewButton) {
       throw new Error('Expected a drawer preview button');
     }
-    const providerLink = screen.getByRole('link', { name: /Spotify/u });
+    fireEvent.click(drawer.getByRole('button', { name: 'Providers' }));
+    const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
-    for (const element of [
-      closeButton,
-      openReleaseLink,
-      previewButton,
-      providerLink,
-    ]) {
+    expect(overflowButton.className).toContain(
+      'focus-visible:ring-(--linear-border-focus)'
+    );
+    for (const element of [previewButton, providerLink]) {
       expect(element.className).toContain(
         'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
       );
@@ -450,7 +618,7 @@ describe('LibrarySurface', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
     clickGridView();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
+    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
 
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(
@@ -458,6 +626,59 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+  });
+
+  it('switches to the catalog table view with explicit columns and persists the choice', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+      }),
+    ]);
+
+    // Defaults to list (header hidden, release rows present).
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+
+    // Catalog rows render with the minimal column header.
+    expect(
+      screen.getByTestId('library-catalog-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-catalog-row-release-2')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Status' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Title' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Artist' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Type' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+    expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+    expect(window.localStorage.getItem('jovie:library-view-mode')).toBe(
+      'table'
+    );
+
+    // No regression: switching back to list restores release rows.
+    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('library-catalog-row-release-1')
+    ).not.toBeInTheDocument();
+    expect(window.localStorage.getItem('jovie:library-view-mode')).toBe('list');
   });
 
   it('starts the persistent player from real production preview data', () => {
@@ -562,10 +783,11 @@ describe('LibrarySurface', () => {
     );
     expect(row).toHaveAttribute('aria-selected', 'true');
     expect(row.className).toContain('system-b-library-table-row-selected');
-    expect(screen.getByRole('link', { name: /Open Release/u })).toHaveAttribute(
-      'href',
-      '/tim/take-me-over'
-    );
+    expect(
+      within(screen.getByTestId('library-asset-drawer')).getByRole('button', {
+        name: 'More actions',
+      })
+    ).toBeInTheDocument();
   });
 
   it('filters release assets from the shell header search contract', () => {
@@ -601,6 +823,35 @@ describe('LibrarySurface', () => {
     expect(
       screen.queryByTestId('library-release-row-release-1')
     ).not.toBeInTheDocument();
+  });
+
+  it('filters library assets from sidebar smart filter views', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        previewUrl: null,
+        assetKinds: ['artwork', 'lyrics', 'providers'],
+      }),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(
+      screen.getByTestId('library-saved-filter-views')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Missing audio/u }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+      expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^All items/u }));
+
+    expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+    expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
   });
 
   it('filters library assets from top-level view chips', async () => {
@@ -657,7 +908,10 @@ describe('LibrarySurface', () => {
     expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     expect(
-      screen.getByRole('navigation', { name: 'Library filters' })
+      screen.getByRole('navigation', { name: 'Library Filters' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-saved-filter-views')
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /All Releases/u })

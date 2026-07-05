@@ -79,11 +79,7 @@ export function TableHeaderCell<TData>({
                 <Icon
                   name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
                   className={cn('shrink-0', iconColors.sortIndicator)}
-                  ariaLabel={
-                    sortDirection === 'asc'
-                      ? 'Sorted ascending'
-                      : 'Sorted descending'
-                  }
+                  aria-hidden
                   size={12}
                 />
               )}

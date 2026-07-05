@@ -83,6 +83,10 @@ vi.mock('@/lib/auth/clerk-sync', () => ({
   syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
 }));
 
+vi.mock('@/lib/auth/ban-check', () => ({
+  invalidateBanStatusCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: vi.fn().mockResolvedValue(undefined),
 }));

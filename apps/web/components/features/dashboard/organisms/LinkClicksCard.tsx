@@ -68,7 +68,7 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
 
       <ul
         className='mt-4 list-none space-y-0 p-0'
-        aria-label='Link clicks by platform'
+        aria-label='Link Clicks By Platform'
       >
         {stats.map((stat, i) => {
           const accentColor = ACCENT_COLORS[i % ACCENT_COLORS.length];
@@ -96,7 +96,7 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
               </div>
               <div className='mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.04]'>
                 <div
-                  className='h-full rounded-full transition-[width] duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]'
+                  className='h-full rounded-full transition-[width] duration-cinematic ease-subtle'
                   style={{
                     width: animated ? `${widthPct}%` : '0%',
                     background: accentColor,

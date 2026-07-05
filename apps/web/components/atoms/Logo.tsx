@@ -112,7 +112,7 @@ export function Logo({
       data-testid={testId}
       className={cn(
         sizeClasses[size],
-        'transition-colors duration-200',
+        'transition-colors duration-subtle',
         wordmarkClassName
       )}
       style={{ color: 'var(--linear-text-primary, currentColor)' }}

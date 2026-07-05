@@ -54,7 +54,7 @@ export function ProfileFeatureCardsModalClient({
             onClick={() => handleFeatureClick(feature.id)}
             className='group rounded-3xl border border-subtle bg-surface-1 overflow-hidden text-left focus-ring-themed'
           >
-            <div className='relative flex min-h-[240px] flex-col justify-end gap-4 p-6 sm:p-7 cursor-pointer select-none'>
+            <div className='relative flex min-h-60 flex-col justify-end gap-4 p-6 sm:p-7 cursor-pointer select-none'>
               <div className='absolute inset-0 opacity-70'>
                 <Image
                   src={feature.imageSrc}

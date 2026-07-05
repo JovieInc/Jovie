@@ -150,7 +150,7 @@ describe('public profile notifications OTP step', () => {
   it('renders OTP verification UI in ArtistNotificationsCTA after email entry', async () => {
     render(<ArtistNotificationsCTA artist={artist} autoOpen />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^submit$/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Enter the code')).toBeInTheDocument();
@@ -166,7 +166,7 @@ describe('public profile notifications OTP step', () => {
   it('renders OTP verification UI in TwoStepNotificationsCTA after email entry', async () => {
     render(<TwoStepNotificationsCTA artist={artist} startExpanded />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^submit$/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Enter the code')).toBeInTheDocument();

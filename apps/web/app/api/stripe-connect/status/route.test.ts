@@ -29,6 +29,15 @@ vi.mock('@/lib/stripe/connect-readiness', () => ({
   getStripeConnectReadiness: hoisted.getStripeConnectReadiness,
 }));
 
+vi.mock('@/lib/stripe/connect-errors', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/stripe/connect-errors')>();
+  return {
+    ...actual,
+    isStripeConnectPlatformProfileBlocked: vi.fn(() => false),
+  };
+});
+
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'id',
@@ -55,11 +64,16 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+const connectErrors = await import('@/lib/stripe/connect-errors');
 const { GET } = await import('./route');
 
 describe('GET /api/stripe-connect/status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectErrors.clearStripeConnectPlatformProfileBlock();
+    vi.mocked(
+      connectErrors.isStripeConnectPlatformProfileBlocked
+    ).mockReturnValue(false);
     hoisted.requireAuth.mockResolvedValue({ userId: 'clerk_user_123' });
     hoisted.getAppFlagValue.mockResolvedValue(true);
     hoisted.getUserByClerkId.mockResolvedValue({
@@ -96,6 +110,7 @@ describe('GET /api/stripe-connect/status', () => {
       onboardingComplete: true,
       payoutsEnabled: true,
       email: 'payouts@example.com',
+      onboardingAvailable: true,
     });
     expect(hoisted.getStripeConnectReadiness).toHaveBeenCalledWith('acct_abc');
   });
@@ -112,6 +127,7 @@ describe('GET /api/stripe-connect/status', () => {
       onboardingComplete: true,
       payoutsEnabled: true,
       email: null,
+      onboardingAvailable: true,
     });
   });
 
@@ -134,7 +150,28 @@ describe('GET /api/stripe-connect/status', () => {
       onboardingComplete: false,
       payoutsEnabled: false,
       email: null,
+      onboardingAvailable: true,
     });
+    expect(hoisted.getStripeConnectReadiness).not.toHaveBeenCalled();
+  });
+
+  it('reports onboardingAvailable=false when the platform guard is active', async () => {
+    vi.mocked(
+      connectErrors.isStripeConnectPlatformProfileBlocked
+    ).mockReturnValue(true);
+    hoisted.dbSelect.mockResolvedValue([
+      {
+        id: 'profile_123',
+        stripeAccountId: null,
+        stripeOnboardingComplete: false,
+        stripePayoutsEnabled: false,
+      },
+    ]);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(body.onboardingAvailable).toBe(false);
     expect(hoisted.getStripeConnectReadiness).not.toHaveBeenCalled();
   });
 });

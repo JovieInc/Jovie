@@ -20,6 +20,7 @@ const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 const SIGNUP_PATH = '/signup';
 const START_PATH = '/start';
 const TURNSTILE_CONFIG_ERROR = 'turnstile is not configured';
+const TURNSTILE_DOMAIN_ERROR = 'verification failed (110200)';
 
 test.describe('Synthetic Monitoring - Golden Path', () => {
   // Only run in synthetic monitoring mode
@@ -72,6 +73,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         'text="Internal Server Error"',
         'text="Something went wrong"',
         `text="${TURNSTILE_CONFIG_ERROR}"`,
+        `text="${TURNSTILE_DOMAIN_ERROR}"`,
         '[data-testid="error-boundary"]',
       ];
 
@@ -84,6 +86,55 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
 
       console.log(`[Synthetic] ✅ ${name} health check passed`);
     }
+  });
+
+  test('Onboarding start page shows no visible Turnstile UI (JOV-3305)', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+
+    await page.goto(START_PATH, {
+      waitUntil: 'commit',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await waitForHydration(page);
+
+    // The Turnstile widget must be fully invisible (appearance: 'execute').
+    // No "Security Check" heading, no visible bordered widget frame, no
+    // "Required before your first message" copy should appear on the
+    // golden-path start page. If Cloudflare's Turnstile re-pings or falls
+    // back to interactive mode, this assertion goes red (JOV-3305).
+    await expect(
+      page.getByText('Security Check'),
+      'No visible "Security Check" panel should appear on the start page'
+    ).not.toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByText('Required before your first message.'),
+      'No visible Turnstile interaction prompt should appear on the start page'
+    ).not.toBeVisible();
+    await expect(
+      page.getByTestId('onboarding-turnstile-panel'),
+      'Turnstile panel should not be visible on the golden-path start page'
+    ).not.toBeVisible();
+
+    // The widget frame should exist but be screen-reader-only (invisible).
+    const widgetFrame = page.getByTestId('onboarding-turnstile-widget-frame');
+    if ((await widgetFrame.count()) > 0) {
+      // If the frame exists, it must be hidden (sr-only or not visible)
+      await expect(widgetFrame).not.toBeVisible();
+    }
+
+    console.log('[Synthetic] ✅ No visible Turnstile UI on start page');
   });
 
   test('Performance baseline check', async ({ page }) => {

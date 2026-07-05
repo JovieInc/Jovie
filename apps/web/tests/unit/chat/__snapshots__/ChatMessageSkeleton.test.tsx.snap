@@ -14,6 +14,7 @@ exports[`ChatMessageSkeleton > matches snapshot 1`] = `
       <div
         aria-hidden="true"
         class="skeleton motion-reduce:animate-none rounded-full system-b-chat-message-skeleton-user-line"
+        data-state="shimmer"
       />
     </div>
   </div>
@@ -26,14 +27,17 @@ exports[`ChatMessageSkeleton > matches snapshot 1`] = `
       <div
         aria-hidden="true"
         class="skeleton motion-reduce:animate-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-wide"
+        data-state="shimmer"
       />
       <div
         aria-hidden="true"
         class="skeleton motion-reduce:animate-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-medium"
+        data-state="shimmer"
       />
       <div
         aria-hidden="true"
         class="skeleton motion-reduce:animate-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-short"
+        data-state="shimmer"
       />
     </div>
   </div>

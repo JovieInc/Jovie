@@ -23,6 +23,7 @@ import {
 } from '@/lib/db/schema/profiles';
 import { DSP_PROVIDER_AVATAR_CONFIDENCE } from '@/lib/dsp-provider-metadata';
 import { captureError } from '@/lib/error-tracking';
+import { scheduleBulkPressPhotoImportIfEligible } from '@/lib/press-photos/schedule-bulk-import';
 import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { logger } from '@/lib/utils/logger';
 import { setEnrichmentJobStatus } from '../enrichment-status';
@@ -606,7 +607,24 @@ export async function processProfileEnrichmentJob(
 export async function processProfileEnrichmentJobStandalone(
   jobPayload: unknown
 ): Promise<ProfileEnrichmentResult> {
-  return processProfileEnrichmentJob(db, jobPayload);
+  const result = await processProfileEnrichmentJob(db, jobPayload);
+
+  if (result.avatarCandidatesAdded > 0 && result.errors.length === 0) {
+    void scheduleBulkPressPhotoImportIfEligible({
+      creatorProfileId: result.creatorProfileId,
+      trigger: 'profile_enrichment_standalone',
+    }).catch(error => {
+      void captureError(
+        'Bulk press photo import scheduling failed after profile enrichment',
+        error,
+        {
+          creatorProfileId: result.creatorProfileId,
+        }
+      );
+    });
+  }
+
+  return result;
 }
 
 /**

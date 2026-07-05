@@ -48,6 +48,37 @@ dangerous_patterns=(
   "chown -R"
 )
 
+# Block checkout/switch in the primary Jovie shipper checkout (#12841).
+# Agents must use isolated worktrees; hijacking ~/Jovie silently runs stale
+# dispatcher code while agent worktrees still fetch origin/main.
+primary_repo="${HERMES_JOVIE_REPO:-}"
+if [ -z "$primary_repo" ]; then
+  for candidate in "${HOME}/Jovie" "${HOME}/jovie"; do
+    if [ -d "$candidate/.git" ]; then
+      primary_repo="$candidate"
+      break
+    fi
+  done
+fi
+if [ -n "$primary_repo" ]; then
+  if echo "$command" | grep -qE '(^|[[:space:]])(git checkout|git switch|gh pr checkout)'; then
+    if echo "$command" | grep -qF "$primary_repo"; then
+      echo "🚨 BLOCKED: git checkout/switch in primary Jovie repo ($primary_repo)"
+      echo "Use an isolated worktree for branch work. Hijacking the shipper checkout runs stale dispatcher code."
+      echo "Command: $command"
+      exit 1
+    fi
+    if echo "$command" | grep -qE '(^|[[:space:]])(git checkout|git switch)([[:space:]]|$)'; then
+      if [ "$(pwd -P 2>/dev/null)" = "$(cd "$primary_repo" && pwd -P 2>/dev/null)" ]; then
+        echo "🚨 BLOCKED: git checkout/switch while cwd is primary Jovie repo ($primary_repo)"
+        echo "Use an isolated worktree for branch work."
+        echo "Command: $command"
+        exit 1
+      fi
+    fi
+  fi
+fi
+
 # Check for dangerous patterns
 for pattern in "${dangerous_patterns[@]}"; do
   if echo "$command" | grep -qE "$pattern"; then
@@ -59,6 +90,23 @@ for pattern in "${dangerous_patterns[@]}"; do
     exit 1
   fi
 done
+
+# Block checkout/switch in the primary Jovie dispatcher repo (#12841).
+# Agents must use isolated worktrees; hijacking ~/Jovie leaves the shipper on
+# stale dispatcher code with zero alarm.
+primary_repo="${HERMES_JOVIE_REPO:-${HOME}/Jovie}"
+if echo "$command" | grep -qE '(^|[;&|[:space:]])(git checkout|git switch|gh pr checkout)([[:space:]]|$)'; then
+  if echo "$command" | grep -qF "$primary_repo" \
+    || echo "$command" | grep -qE '(^|[[:space:]])~/Jovie([[:space:]/]|$)' \
+    || echo "$command" | grep -qE "git -C[[:space:]]+['\"]?${primary_repo}"; then
+    echo "🚨 BLOCKED: git checkout/switch in primary Jovie repo"
+    echo "Primary repo: $primary_repo"
+    echo "Command: $command"
+    echo ""
+    echo "Use an isolated worktree for branch work. Never hijack the shipper checkout."
+    exit 1
+  fi
+fi
 
 # Warn about potentially risky commands (but don't block)
 risky_patterns=(

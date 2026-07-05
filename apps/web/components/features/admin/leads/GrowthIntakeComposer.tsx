@@ -240,7 +240,7 @@ https://instagram.com/artist'
         </Button>
       </div>
       {summary ? (
-        <p className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
+        <p className='rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
           {summary}
         </p>
       ) : null}
@@ -316,7 +316,7 @@ https://instagram.com/artist'
         </Button>
       </div>
       {summary ? (
-        <p className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
+        <p className='rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
           {summary}
         </p>
       ) : null}
@@ -350,16 +350,6 @@ export function GrowthIntakeComposer({
 
   return (
     <div className='space-y-3' data-testid='admin-growth-view-ingest'>
-      <div className='space-y-1'>
-        <h3 className='text-app font-medium text-primary-token'>
-          Unified Intake
-        </h3>
-        <p className='text-xs text-secondary-token'>
-          Add one profile, run a batch import, or feed fresh lead URLs from the
-          same control.
-        </p>
-      </div>
-
       <SegmentControl
         value={mode}
         onValueChange={value => {
@@ -378,8 +368,8 @@ export function GrowthIntakeComposer({
         <div
           className={
             banner.tone === 'success'
-              ? 'rounded-[10px] border border-success/20 bg-success/10 px-3 py-2 text-xs text-success'
-              : 'rounded-[10px] border border-error/20 bg-error/10 px-3 py-2 text-xs text-error'
+              ? 'rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-xs text-success'
+              : 'rounded-lg border border-error/20 bg-error/10 px-3 py-2 text-xs text-error'
           }
         >
           {banner.message}

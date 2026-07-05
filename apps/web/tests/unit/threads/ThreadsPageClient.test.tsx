@@ -144,7 +144,7 @@ describe('ChatsPageClient', () => {
     );
     expect(document.querySelector('.anim-calm-breath')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search chats' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search Chats' }), {
       target: { value: 'Pitch' },
     });
 
@@ -173,7 +173,7 @@ describe('ChatsPageClient', () => {
 
     render(<ThreadsPageClient />);
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search chats' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search Chats' }), {
       target: { value: 'Missing' },
     });
 
@@ -207,7 +207,9 @@ describe('ChatsPageClient', () => {
     expect(copySessionId).toHaveBeenCalledWith('thread-newer');
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Chat actions for Pitch tasks' })
+      screen.getByRole('button', {
+        name: 'Chat Actions for Pitch tasks',
+      })
     );
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
 

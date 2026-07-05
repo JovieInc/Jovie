@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  _analyzeHostCache,
+  _categorizePathCache,
   analyzeHost,
   categorizePath,
   DASHBOARD_URL,
+  getPublicProfileCandidate,
 } from '@/lib/routing/proxy-routing';
 
 describe('proxy routing helpers', () => {
@@ -76,9 +79,19 @@ describe('proxy routing helpers', () => {
       expect(categorizePath(APP_ROUTES.PRICING).isAuthCallbackPath).toBe(false);
     });
 
-    it('only adds nonce requirements to app and api surfaces', () => {
+    it('adds nonce requirements to app, api, and hydrated auth surfaces', () => {
       expect(categorizePath('/api/stripe/checkout').needsNonce).toBe(true);
       expect(categorizePath('/app/dashboard').needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.SIGNIN).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.SIGNUP).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.SIGNIN_SSO_CALLBACK).needsNonce).toBe(
+        true
+      );
+      expect(categorizePath(APP_ROUTES.DESKTOP_AUTH).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.AUTH_NATIVE_COMPLETE).needsNonce).toBe(
+        true
+      );
+      expect(categorizePath(APP_ROUTES.START).needsNonce).toBe(true);
       expect(categorizePath('/pricing').needsNonce).toBe(false);
     });
 
@@ -90,5 +103,62 @@ describe('proxy routing helpers', () => {
 
   it('keeps the dashboard path stable across environments', () => {
     expect(DASHBOARD_URL).toBe('/app');
+  });
+
+  describe('proxy hot-path memoization (#10992)', () => {
+    beforeEach(() => {
+      _categorizePathCache.clear();
+      _analyzeHostCache.clear();
+    });
+
+    it('returns the same categorizePath object for repeated pathname lookups', () => {
+      const first = categorizePath('/app/dashboard');
+      const second = categorizePath('/app/dashboard');
+      expect(second).toBe(first);
+    });
+
+    it('returns the same analyzeHost object for repeated hostname lookups', () => {
+      const first = analyzeHost('staging.jov.ie');
+      const second = analyzeHost('staging.jov.ie');
+      expect(second).toBe(first);
+    });
+
+    it('bounds categorizePath cache with FIFO eviction at 1000 entries', () => {
+      const evictedPath = '/memo-evict-probe';
+      const first = categorizePath(evictedPath);
+      expect(categorizePath(evictedPath)).toBe(first);
+
+      for (let i = 0; i < 1000; i++) {
+        categorizePath(`/memo-filler-${i}`);
+      }
+
+      expect(_categorizePathCache.size).toBe(1000);
+      expect(categorizePath(evictedPath)).not.toBe(first);
+    });
+
+    it('bounds analyzeHost cache with FIFO eviction at 50 entries', () => {
+      const evictedHost = 'memo-evict-probe.example';
+      const first = analyzeHost(evictedHost);
+      expect(analyzeHost(evictedHost)).toBe(first);
+
+      for (let i = 0; i < 50; i++) {
+        analyzeHost(`memo-filler-${i}.example`);
+      }
+
+      expect(_analyzeHostCache.size).toBe(50);
+      expect(analyzeHost(evictedHost)).not.toBe(first);
+    });
+  });
+
+  describe('getPublicProfileCandidate reserved short-circuit (JOV-3054)', () => {
+    it('excludes reserved legacy paths before any profile DB work', () => {
+      expect(getPublicProfileCandidate('/login')).toBeNull();
+      expect(getPublicProfileCandidate('/request-access')).toBeNull();
+      expect(getPublicProfileCandidate('/register')).toBeNull();
+    });
+
+    it('still recognizes real public profile handles', () => {
+      expect(getPublicProfileCandidate('/timwhite')).toBe('timwhite');
+    });
   });
 });

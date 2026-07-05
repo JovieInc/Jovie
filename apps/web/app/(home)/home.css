@@ -736,6 +736,18 @@ body:has(.home-viewport)::-webkit-scrollbar {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.home-bento-pairs-section {
+  /* Light band on the dark homepage shell — scopes tokens so black marketing
+     copy and white cards keep WCAG contrast when html.dark is active. */
+  color-scheme: light;
+  --color-bg-base: #f5f5f7;
+  --color-text-primary-token: #000;
+  --color-text-secondary-token: rgb(0 0 0 / 0.58);
+  --color-text-tertiary-token: rgb(0 0 0 / 0.45);
+  background: var(--color-bg-base);
+  color: #000;
+}
+
 .homepage-outcome-section {
   overflow: hidden;
   padding-block: clamp(5rem, 8.5vw, 7.5rem) clamp(5rem, 8.5vw, 7.5rem);
@@ -817,11 +829,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  overflow: hidden;
-  border: 1px solid rgba(5, 6, 8, 0.08);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 18px 70px -56px rgba(0, 0, 0, 0.45);
   padding: clamp(2.35rem, 3.45vw, 3.55rem);
   scroll-snap-align: start;
 }
@@ -889,21 +896,24 @@ body:has(.home-viewport)::-webkit-scrollbar {
   gap: 0.75rem;
 }
 
-.homepage-outcome-release-card,
-.homepage-outcome-drawer,
-.homepage-outcome-share-card {
-  border: 1px solid rgba(5, 6, 8, 0.08);
-  border-radius: 8px;
-  background: #f7f7f8;
-  box-shadow: 0 14px 44px -36px rgba(0, 0, 0, 0.38);
-}
-
 .homepage-outcome-release-card {
   display: flex;
   flex-direction: column;
   min-height: 6.25rem;
   justify-content: flex-end;
   padding: 1rem;
+}
+
+.homepage-outcome-drawer {
+  padding: 1rem;
+}
+
+.homepage-outcome-share-card {
+  max-width: 17rem;
+  margin-left: auto;
+  padding: 1rem;
+  text-align: center;
+  color: #050608;
 }
 
 .homepage-outcome-release-card strong,
@@ -931,10 +941,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: 520;
   letter-spacing: -0.01em;
   color: rgb(5 6 8 / 0.52);
-}
-
-.homepage-outcome-drawer {
-  padding: 1rem;
 }
 
 .homepage-outcome-drawer__title {
@@ -1042,7 +1048,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding: 1rem;
   text-align: center;
   color: #050608;
-  background: #f7f7f8;
 }
 
 .homepage-outcome-share-card p {

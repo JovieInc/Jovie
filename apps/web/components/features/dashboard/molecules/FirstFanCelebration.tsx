@@ -88,13 +88,13 @@ export function FirstFanCelebration({
     <dialog
       ref={dialogRef}
       className='fixed inset-0 z-50 m-0 flex h-full w-full max-w-none items-center justify-center border-none bg-(--bg)/95 p-0 backdrop-blur-sm'
-      aria-label='First fan celebration'
+      aria-label='First Fan Celebration'
     >
       <ConfettiOverlay />
 
       {/* Content */}
       <div
-        className={`relative z-10 flex flex-col items-center gap-5 px-6 text-center transition-all duration-700 ease-out ${
+        className={`relative z-10 flex flex-col items-center gap-5 px-6 text-center transition-colors duration-cinematic ease-out ${
           isVisible
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-8 scale-95'
@@ -106,7 +106,7 @@ export function FirstFanCelebration({
         />
 
         <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
-          Your first fan just subscribed!
+          Your First Fan Just Subscribed!
         </h2>
 
         <p className='max-w-sm text-secondary-token'>

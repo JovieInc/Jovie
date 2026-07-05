@@ -31,7 +31,7 @@ export function FilterChip({
         className
       )}
     >
-      {children}
+      {children || 'Filter'}
     </button>
   );
 }

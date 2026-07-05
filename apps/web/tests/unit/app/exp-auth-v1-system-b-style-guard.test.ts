@@ -6,8 +6,8 @@ const webRoot = path.resolve(__dirname, '../../..');
 const sourcePath = 'app/exp/auth-v1/page.tsx';
 
 const forbiddenButtonMotionPatterns = [
-  /\bactive:scale(?:-\[[^\]]+\]|-\d+)?\b/,
-  /\bactive:translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
+  /\bhover:scale(?:-\[[^\]]+\]|-\d+)?\b/,
+  /\bhover:translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
   /\bhover:-translate(?:-\[[^\]]+\]|-[a-z0-9/[\].-]+)?\b/,
   /\bgroup-hover:scale(?:-\[[^\]]+\]|-\d+)?\b/,
   /\btransition-all\b/,

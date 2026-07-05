@@ -9,7 +9,12 @@
  * - Retry logic for flaky operations
  */
 
-import { type ConsoleMessage, expect, Page } from '@playwright/test';
+import {
+  type ConsoleMessage,
+  expect,
+  type Locator,
+  Page,
+} from '@playwright/test';
 
 // ============================================================================
 // Constants
@@ -19,6 +24,14 @@ import { type ConsoleMessage, expect, Page } from '@playwright/test';
  * Standard timeouts for smoke tests (tuned for CI performance)
  * Increased to handle Turbopack compilation and React hydration
  */
+/** Canonical chat composer input (Title Case label in product UI). */
+export function chatComposerInputLocator(scope: Page | Locator): Locator {
+  return scope
+    .getByRole('combobox', { name: /chat message input/i })
+    .or(scope.getByRole('textbox', { name: /chat message input/i }))
+    .first();
+}
+
 export const SMOKE_TIMEOUTS = {
   /** Default page navigation timeout */
   NAVIGATION: 60_000, // Increased from 30s to 60s for Turbopack
@@ -725,6 +738,49 @@ export async function checkElementVisibility(
 // ============================================================================
 
 /**
+ * Navigate to an authenticated app chat route with retries for transient CI
+ * failures (Neon cold start, Turbopack compile stalls, net::ERR_*).
+ *
+ * Uses `waitUntil: 'commit'` so navigation does not block on a hung SSR render
+ * when the database is slow; callers should assert route-specific UI after.
+ */
+export async function gotoAuthenticatedChatRoute(
+  page: Page,
+  options?: {
+    path?: string;
+    perAttemptTimeout?: number;
+    retries?: number;
+    urlPattern?: RegExp;
+    urlSettleTimeout?: number;
+  }
+): Promise<void> {
+  const path = options?.path ?? '/app/chat';
+  const perAttemptTimeout = options?.perAttemptTimeout ?? 60_000;
+  const urlPattern = options?.urlPattern ?? /\/app\/chat/;
+  const urlSettleTimeout = options?.urlSettleTimeout ?? 20_000;
+  const maxAttempts = (options?.retries ?? RETRY_CONFIG.DEFAULT_RETRIES) + 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await page.goto(path, {
+        timeout: perAttemptTimeout,
+        waitUntil: 'commit',
+      });
+      await page.waitForURL(urlPattern, { timeout: urlSettleTimeout });
+      return;
+    } catch (error) {
+      if (attempt < maxAttempts && isTransientNavigationError(error)) {
+        console.warn(
+          `Transient navigation failure for ${path} (attempt ${attempt}/${maxAttempts}); retrying`
+        );
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+/**
  * Navigate with retry logic for flaky network conditions
  */
 export async function smokeNavigateWithRetry(
@@ -763,6 +819,8 @@ export function isTransientNavigationError(error: unknown): boolean {
     msg.includes('net::ERR_CONNECTION_REFUSED') ||
     msg.includes('net::ERR_CONNECTION_RESET') ||
     msg.includes('net::ERR_EMPTY_RESPONSE') ||
+    msg.includes('net::ERR_ABORTED') ||
+    msg.includes('frame was detached') ||
     msg.includes('Target closed') ||
     msg.includes('Target page, context or browser has been closed') ||
     msg.includes('browser has disconnected') ||

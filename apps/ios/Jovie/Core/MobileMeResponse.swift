@@ -12,6 +12,8 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
   let publicProfileURL: String?
   let qrPayload: String?
   let avatarURL: String?
+  let appleWalletProfilePassAvailable: Bool
+  let chatEnabled: Bool
   let continueOnWebURL: String
 
   enum CodingKeys: String, CodingKey {
@@ -21,6 +23,8 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     case publicProfileURL = "publicProfileUrl"
     case qrPayload
     case avatarURL = "avatarUrl"
+    case appleWalletProfilePassAvailable
+    case chatEnabled
     case continueOnWebURL = "continueOnWebUrl"
   }
 
@@ -31,6 +35,20 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     publicProfileURL: "https://jov.ie/tim",
     qrPayload: "https://jov.ie/tim",
     avatarURL: nil,
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: true,
+    continueOnWebURL: "https://jov.ie/app"
+  )
+
+  static let previewReadyWithoutQR = MobileMeResponse(
+    state: .ready,
+    displayName: "Tim White",
+    username: "tim",
+    publicProfileURL: "https://jov.ie/tim",
+    qrPayload: nil,
+    avatarURL: nil,
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: true,
     continueOnWebURL: "https://jov.ie/app"
   )
 
@@ -41,6 +59,8 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     publicProfileURL: nil,
     qrPayload: nil,
     avatarURL: nil,
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: false,
     continueOnWebURL: "https://jov.ie/app"
   )
 }

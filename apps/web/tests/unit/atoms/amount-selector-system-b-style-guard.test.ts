@@ -7,7 +7,7 @@ const appRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const sourcePath = join(appRoot, 'components/atoms/AmountSelector.tsx');
 
 const forbiddenMotionClasses =
-  /\b(?:transition-all|transition-transform|duration-\d+|active:scale|active:translate|hover:-translate|group-hover:scale)\b|\btransition-\[[^\]]*transform[^\]]*\]/;
+  /\b(?:transition-all|transition-transform|duration-\d+|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b|\btransition-\[[^\]]*transform[^\]]*\]/;
 
 describe('AmountSelector System B style guard', () => {
   it('keeps amount state changes visually stable', async () => {

@@ -49,7 +49,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
 
   const sizeClasses = {
     sm: {
-      button: 'h-5 gap-1 rounded-full px-1 text-[10px]',
+      button: 'h-5 gap-1 rounded-full px-1 text-3xs',
       icon: 'h-3 w-3',
     },
     md: {
@@ -65,7 +65,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       type='button'
       onClick={handleCopy}
       className={cn(
-        'group/copy -mx-1 inline-flex items-center border border-transparent font-mono text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'group/copy -mx-1 inline-flex items-center border border-transparent font-mono text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         styles.button,
         className
       )}

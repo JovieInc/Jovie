@@ -101,10 +101,10 @@ export function CelebrationCardPreview({
               setSelectedSize(size);
               onInteraction?.();
             }}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               selectedSize === size
-                ? 'bg-primary-token text-on-primary'
-                : 'bg-surface-2 text-secondary-token hover:text-primary-token'
+                ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+                : 'border-transparent bg-surface-2 text-secondary-token hover:text-primary-token'
             }`}
           >
             {SIZE_LABELS[size]}
@@ -115,7 +115,7 @@ export function CelebrationCardPreview({
       {/* Card preview */}
       <div
         className={`overflow-hidden rounded-xl border border-subtle ${
-          selectedSize === 'story' ? 'max-h-[320px]' : 'max-h-[240px]'
+          selectedSize === 'story' ? 'max-h-80' : 'max-h-60'
         }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- preview of generated image */}
@@ -123,7 +123,7 @@ export function CelebrationCardPreview({
           src={cardUrl}
           alt='Your shareable profile card'
           className={`w-full ${
-            selectedSize === 'story' ? 'max-w-[180px]' : 'max-w-[240px]'
+            selectedSize === 'story' ? 'max-w-45' : 'max-w-60'
           }`}
         />
       </div>

@@ -23,6 +23,10 @@ import { expect, test } from '@playwright/test';
 // No auth — test public pages as anonymous visitor
 test.use({ storageState: { cookies: [], origins: [] } });
 
+/** Visual & A11y CI sets E2E_SKIP_AUTH when Clerk secrets are unavailable. */
+const shouldSkipAuthVisual =
+  process.env.E2E_SKIP_AUTH === 'true' || process.env.E2E_SKIP_AUTH === '1';
+
 async function blockAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/profile/view', r =>
     r.fulfill({ status: 200, body: '{}' })
@@ -101,6 +105,11 @@ test.describe('homepage visual regression', () => {
 // 2. Auth pages — frequent regressions in light/dark mode visibility
 // ==========================================================================
 test.describe('auth pages visual regression', () => {
+  test.skip(
+    shouldSkipAuthVisual,
+    'E2E_SKIP_AUTH — Clerk secrets unavailable in visual CI'
+  );
+
   test('signin dark mode', async ({ page }) => {
     await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -393,6 +402,11 @@ test.describe('JOV-2081: Viewport matrix — homepage', () => {
 });
 
 test.describe('JOV-2081: Viewport matrix — /sign-up', () => {
+  test.skip(
+    shouldSkipAuthVisual,
+    'E2E_SKIP_AUTH — Clerk secrets unavailable in visual CI'
+  );
+
   for (const viewport of VIEWPORT_MATRIX) {
     test(`sign-up no horizontal scroll at ${viewport.label}px`, async ({
       page,
@@ -476,6 +490,11 @@ test.describe('JOV-2081: Viewport matrix — /sign-up', () => {
 });
 
 test.describe('JOV-2081: Viewport matrix — /sign-in', () => {
+  test.skip(
+    shouldSkipAuthVisual,
+    'E2E_SKIP_AUTH — Clerk secrets unavailable in visual CI'
+  );
+
   for (const viewport of VIEWPORT_MATRIX) {
     test(`sign-in no horizontal scroll at ${viewport.label}px`, async ({
       page,

@@ -15,7 +15,7 @@ const forbiddenProductStatementSourcePatterns = [
   /\btext-white(?:\/|\b)/,
   /\b(?:white|black|blue|violet|sky|cyan|pink|fuchsia|emerald|amber|orange|rose|red)-(?:[0-9]|\[|\/)/,
   /\bshadow-(?:sm|md|lg|xl|2xl|inner|\[)/,
-  /\b(?:transition-all|transition-transform|hover:brightness|active:scale|hover:-translate|group-hover:scale)\b/,
+  /\b(?:transition-all|transition-transform|hover:brightness|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/,
 ] as const;
 
 const forbiddenProductStatementCssPatterns = [

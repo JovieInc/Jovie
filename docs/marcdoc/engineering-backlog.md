@@ -343,3 +343,14 @@ description: Engineering backlog (MarcDoc-style)
   - Electric spark intro plays once per mount.
 - **PR**: https://github.com/JovieInc/Jovie/pull/10373
 - **Date**: 2026-06-09
+
+## ENG-034 — /start onboarding: hide Turnstile chrome until verification is required (JOV-2925)
+- **Status**: `P1-Doing`
+- **Why it matters**: The first-message composer showed redundant "Security Check" chrome while Turnstile was still loading silently, cluttering top-of-funnel onboarding.
+- **Where**: `apps/web/components/features/onboarding/OnboardingTurnstile.tsx`, `OnboardingShell.tsx`, `OnboardingChat.tsx`
+- **Acceptance criteria**:
+  - Turnstile widget can load silently without showing heading/copy/frame.
+  - Security panel appears only for interactive, error, or explicit verification states.
+  - Composer status banner omits Turnstile slot until the panel is actually visible.
+- **PR**: https://github.com/JovieInc/Jovie/pull/10376
+- **Date**: 2026-06-08

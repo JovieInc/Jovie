@@ -190,10 +190,10 @@ vi.mock(
         {canCreateManualReleases ? (
           <button
             type='button'
-            aria-label='Create a new release'
+            aria-label='Create A New Release'
             onClick={onCreateManual}
           >
-            Create a new release
+            Create A New Release
           </button>
         ) : null}
         <button
@@ -259,10 +259,10 @@ vi.mock(
           {canCreateManualReleases && onCreateRelease ? (
             <button
               type='button'
-              aria-label='Create a new release'
+              aria-label='Create A New Release'
               onClick={onCreateRelease}
             >
-              Create a new release
+              Create A New Release
             </button>
           ) : null}
         </div>
@@ -658,8 +658,8 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={true}
         />
       );
-      // When connected but no releases and not importing, shows "No releases yet"
-      expect(screen.getByText('No releases yet')).toBeInTheDocument();
+      // When connected but no releases and not importing, shows connected empty state
+      expect(screen.getByText('No Releases Yet')).toBeInTheDocument();
     });
 
     it('shows releases table when releases exist', () => {
@@ -783,7 +783,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -805,7 +805,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -841,7 +841,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -884,7 +884,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -936,7 +936,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -978,7 +978,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -1016,7 +1016,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -1055,7 +1055,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {
@@ -1103,7 +1103,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
       );
 
       await waitFor(() => {

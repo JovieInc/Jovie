@@ -247,7 +247,6 @@ enum NativeTicketSignInDiagnostics {
 
   private static func setSummary(_ summary: String) {
     UserDefaults.standard.set(summary, forKey: summaryKey)
-    UserDefaults.standard.synchronize()
   }
 }
 #endif
@@ -341,6 +340,8 @@ struct JovieApp: App {
     Observability.configure(
       environment: configuration.observabilityEnvironment,
       dsn: configuration.sentryDSN,
+      ingestURL: configuration.observabilityIngestURL,
+      ingestSecret: configuration.observabilityIngestSecret,
       isEnabled: launchMode == .live
     )
     Observability.setTag(key: "platform", value: "ios")

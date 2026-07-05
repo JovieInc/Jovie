@@ -104,7 +104,7 @@ export function ScheduledReleasePage({
         </div>
 
         {/* Countdown */}
-        <div className='mt-5 flex w-full items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl empty:hidden'>
+        <div className='mt-5 flex w-full items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl empty:hidden'>
           <ReleaseCountdown releaseDate={releaseDate} compact />
         </div>
 

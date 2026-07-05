@@ -106,7 +106,7 @@ export default async function AgentRunDebugPage({
 
       {/* Input context digest */}
       <DebugSection title='Input Context Digest'>
-        <code className='block break-all rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-secondary-token'>
+        <code className='block break-all rounded-md bg-surface-0 px-3 py-2.5 font-mono text-xs text-secondary-token'>
           {run.inputContextDigest}
         </code>
         <p className='mt-1 text-xs text-tertiary-token'>
@@ -118,7 +118,7 @@ export default async function AgentRunDebugPage({
       {/* Rendered prompt */}
       {run.prompt && (
         <DebugSection title='Rendered Prompt'>
-          <pre className='max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-secondary-token'>
+          <pre className='max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-xs text-secondary-token'>
             {run.prompt}
           </pre>
         </DebugSection>
@@ -127,7 +127,7 @@ export default async function AgentRunDebugPage({
       {/* Tool calls */}
       {toolCalls.length > 0 && (
         <DebugSection title={`Tool Calls (${toolCalls.length})`}>
-          <pre className='max-h-64 overflow-y-auto whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-secondary-token'>
+          <pre className='max-h-64 overflow-y-auto whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-xs text-secondary-token'>
             {JSON.stringify(toolCalls, null, 2)}
           </pre>
         </DebugSection>
@@ -136,7 +136,7 @@ export default async function AgentRunDebugPage({
       {/* Error */}
       {run.error && (
         <DebugSection title='Error'>
-          <pre className='whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-destructive'>
+          <pre className='whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-xs text-destructive'>
             {run.error}
           </pre>
         </DebugSection>
@@ -172,9 +172,9 @@ function MetaRow({
   readonly value: string;
 }) {
   return (
-    <div className='grid gap-1 text-[13px] sm:grid-cols-[minmax(120px,0.4fr)_minmax(0,1fr)] sm:items-baseline'>
+    <div className='grid gap-1 text-app sm:grid-cols-[minmax(120px,0.4fr)_minmax(0,1fr)] sm:items-baseline'>
       <dt className='shrink-0 text-tertiary-token'>{label}</dt>
-      <dd className='min-w-0 truncate font-mono text-[12px] text-secondary-token sm:text-right'>
+      <dd className='min-w-0 truncate font-mono text-xs text-secondary-token sm:text-right'>
         {value}
       </dd>
     </div>

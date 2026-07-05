@@ -12,7 +12,8 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
   type AppFlagName,
-  type AppFlagSnapshot,
+  DESIGN_V1_ALIAS_FLAGS,
+  type PartialAppFlagSnapshot,
 } from './contracts';
 import {
   APP_FLAG_OVERRIDES_CHANGED_EVENT,
@@ -53,7 +54,9 @@ function partitionOverrides(record: AppFlagOverrideRecord): {
   return { valid, orphans };
 }
 
-const AppFlagsContext = createContext<AppFlagSnapshot | null>(null);
+const DESIGN_V1_ALIAS_FLAG_NAMES = new Set<AppFlagName>(DESIGN_V1_ALIAS_FLAGS);
+
+const AppFlagsContext = createContext<PartialAppFlagSnapshot | null>(null);
 const OverridesContext = createContext<AppFlagOverridesContextValue | null>(
   null
 );
@@ -140,12 +143,12 @@ export function AppFlagProvider({
   initialFlags,
 }: {
   readonly children: React.ReactNode;
-  readonly initialFlags?: AppFlagSnapshot;
+  readonly initialFlags?: PartialAppFlagSnapshot;
 }) {
   const overridesValue = useStoredAppFlagOverrides();
 
   return (
-    <AppFlagsContext.Provider value={initialFlags ?? APP_FLAG_DEFAULTS}>
+    <AppFlagsContext.Provider value={initialFlags ?? null}>
       <OverridesContext.Provider value={overridesValue}>
         {children}
       </OverridesContext.Provider>
@@ -167,7 +170,19 @@ export function useAppFlag(flagName: AppFlagName): boolean {
     return overrideValue;
   }
 
-  return appFlags?.[flagName] ?? APP_FLAG_DEFAULTS[flagName];
+  if (appFlags && flagName in appFlags) {
+    return appFlags[flagName] ?? APP_FLAG_DEFAULTS[flagName];
+  }
+
+  if (
+    DESIGN_V1_ALIAS_FLAG_NAMES.has(flagName) &&
+    appFlags &&
+    'DESIGN_V1' in appFlags
+  ) {
+    return appFlags.DESIGN_V1 ?? APP_FLAG_DEFAULTS[flagName];
+  }
+
+  return APP_FLAG_DEFAULTS[flagName];
 }
 
 export function useAppFlagWithLoading(flagName: AppFlagName): {

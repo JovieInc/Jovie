@@ -1,23 +1,28 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   getMobileSessionUserIdMock: vi.fn(),
+  handleMobileChatTurnMock: vi.fn(),
 }));
 
 vi.mock('@/lib/mobile/session-auth', () => ({
   getMobileSessionUserId: hoisted.getMobileSessionUserIdMock,
 }));
 
-const routeModulePromise = import('@/app/api/mobile/v1/chat/turns/route');
+vi.mock('@/lib/mobile/chat/turn-handler', () => ({
+  handleMobileChatTurn: hoisted.handleMobileChatTurnMock,
+}));
 
-async function text(response: Response) {
-  return response.text();
-}
+const routeModulePromise = import('@/app/api/mobile/v1/chat/turns/route');
 
 describe('POST /api/mobile/v1/chat/turns', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.getMobileSessionUserIdMock.mockResolvedValue('user_123');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when the mobile session token is missing', async () => {
@@ -43,7 +48,7 @@ describe('POST /api/mobile/v1/chat/turns', () => {
     });
   });
 
-  it('validates required mobile turn ids before the runtime starts', async () => {
+  it('validates required mobile turn ids before the chat handler runs', async () => {
     const { POST } = await routeModulePromise;
     const response = await POST(
       new Request('https://jov.ie/api/mobile/v1/chat/turns', {
@@ -59,9 +64,18 @@ describe('POST /api/mobile/v1/chat/turns', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Invalid request body',
     });
+    expect(hoisted.handleMobileChatTurnMock).not.toHaveBeenCalled();
   });
 
-  it('fails closed with an NDJSON error event until native chat runtime is enabled', async () => {
+  it('delegates to the chat runtime without the old rollout env', async () => {
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', '');
+    vi.stubEnv('MOBILE_CHAT_ALPHA_GATE_ENABLED', 'true');
+    const runtimeResponse = new Response('{"type":"turn.reserved"}\n', {
+      status: 200,
+      headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' },
+    });
+    hoisted.handleMobileChatTurnMock.mockResolvedValue(runtimeResponse);
+
     const { POST } = await routeModulePromise;
     const response = await POST(
       new Request('https://jov.ie/api/mobile/v1/chat/turns', {
@@ -75,12 +89,42 @@ describe('POST /api/mobile/v1/chat/turns', () => {
       })
     );
 
-    expect(response.status).toBe(501);
-    expect(response.headers.get('Content-Type')).toBe(
-      'application/x-ndjson; charset=utf-8'
+    expect(response.status).toBe(200);
+    expect(hoisted.handleMobileChatTurnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates to the chat runtime when legacy env is still enabled', async () => {
+    vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', 'true');
+    const runtimeResponse = new Response('{"type":"turn.reserved"}\n', {
+      status: 200,
+      headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' },
+    });
+    hoisted.handleMobileChatTurnMock.mockResolvedValue(runtimeResponse);
+
+    const { POST } = await routeModulePromise;
+    const response = await POST(
+      new Request('https://jov.ie/api/mobile/v1/chat/turns', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientTurnId: 'turn_123',
+          clientMessageId: 'msg_123',
+          text: 'Help me launch my release',
+          source: 'typed',
+        }),
+      })
     );
-    await expect(text(response)).resolves.toBe(
-      '{"type":"error","errorCode":"MOBILE_CHAT_RUNTIME_DISABLED","message":"Native chat is not enabled for this build."}\n'
+
+    expect(response.status).toBe(200);
+    expect(hoisted.handleMobileChatTurnMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.handleMobileChatTurnMock).toHaveBeenCalledWith(
+      'user_123',
+      expect.objectContaining({
+        clientTurnId: 'turn_123',
+        clientMessageId: 'msg_123',
+        text: 'Help me launch my release',
+        source: 'typed',
+      }),
+      expect.anything()
     );
   });
 });

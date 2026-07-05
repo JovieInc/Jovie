@@ -57,12 +57,11 @@ import type * as Sentry from '@sentry/nextjs';
 /**
  * Sentry Event type alias for cleaner code
  */
-type SentryEvent = Parameters<
-  NonNullable<Sentry.BrowserOptions['beforeSend']>
->[0];
-type SentryEventHint = Parameters<
-  NonNullable<Sentry.BrowserOptions['beforeSend']>
->[1];
+// SDK v10: BrowserOptions is no longer exported from @sentry/nextjs's isomorphic
+// type surface. Use the core event types directly — they are the exact params of
+// beforeSend (event, hint).
+type SentryEvent = Sentry.ErrorEvent;
+type SentryEventHint = Sentry.EventHint;
 
 /**
  * Environment detection utilities.

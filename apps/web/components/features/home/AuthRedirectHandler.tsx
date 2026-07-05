@@ -3,22 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-
-const CLERK_ACTIVITY_COOKIE = '__client_uat';
-
-const hasActiveClerkSession = (cookieValue: string) => {
-  const cookies = cookieValue.split(';');
-  const clientUat = cookies.find(cookie =>
-    cookie.trim().startsWith(`${CLERK_ACTIVITY_COOKIE}=`)
-  );
-
-  if (!clientUat) {
-    return false;
-  }
-
-  const value = clientUat.split('=')[1]?.trim();
-  return Boolean(value && value !== '0');
-};
+import { hasActiveClerkSession } from '@/lib/auth/auth-session-cookies';
 
 /**
  * Non-blocking redirect handler for authenticated users on the homepage.
@@ -66,4 +51,4 @@ export function AuthRedirectHandler() {
   );
 }
 
-export { hasActiveClerkSession };
+export { hasActiveClerkSession } from '@/lib/auth/auth-session-cookies';

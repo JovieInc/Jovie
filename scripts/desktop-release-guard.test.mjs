@@ -52,14 +52,14 @@ test('still fails when a desktop test changes with release-impacting desktop cod
   assert.deepEqual(result.desktopFiles, ['apps/desktop/src/main.ts']);
 });
 
-test('passes when desktop changes include a VERSION bump', () => {
+test('passes when desktop changes include unreleased changelog notes', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
-    'VERSION',
+    'CHANGELOG.md',
   ]);
 
   assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, ['VERSION']);
+  assert.deepEqual(result.releaseHandlingFiles, ['CHANGELOG.md']);
 });
 
 test('passes when desktop changes include explicit release workflow handling', () => {

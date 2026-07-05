@@ -156,7 +156,7 @@ export function OnboardingHandleStep({
           {/* Validation feedback + suggestions — tight under input */}
           <output
             data-testid='onboarding-handle-validation-status'
-            className='min-h-[20px] flex flex-col items-start gap-2'
+            className='min-h-5 flex flex-col items-start gap-2'
             aria-live='polite'
           >
             {autoSubmitClaimed && handleInput ? (

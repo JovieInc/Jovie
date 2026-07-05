@@ -10,6 +10,12 @@ import {
 } from '@/lib/db/schema/chat';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import {
+  fetchArtistBySpotifyUrl,
+  type MusicFetchArtistResult,
+} from '@/lib/dsp-enrichment/providers/musicfetch';
+import { captureError } from '@/lib/error-tracking';
+import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
+import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
 } from '@/lib/onboarding/claimed-state';
@@ -17,6 +23,9 @@ import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
+
+const HANDLE_CLAIM_MAX_ATTEMPTS = 5;
+const MAX_IMPORTED_BIO_LENGTH = 2_000;
 
 export interface MaterializeClaimedOnboardingProfileInput {
   readonly userId: string;
@@ -58,37 +67,19 @@ async function fetchExistingProfile(
   return profile ?? null;
 }
 
-async function isHandleAvailableForProfile(
-  handle: string,
-  profileId: string | null
-): Promise<boolean> {
-  const [conflict] = await db
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, handle))
-    .limit(1);
-
-  return !conflict || conflict.id === profileId;
+function pickInitialProfileHandle(
+  proposedHandle: string | null
+): string | null {
+  return cleanProposedHandle(proposedHandle);
 }
 
-async function resolveProfileHandle({
-  existingProfileId,
-  proposedHandle,
-  state,
-}: {
-  readonly existingProfileId: string | null;
-  readonly proposedHandle: string | null;
-  readonly state: ClaimedOnboardingState;
-}): Promise<string> {
-  const cleaned = cleanProposedHandle(proposedHandle);
-  if (
-    cleaned &&
-    (await isHandleAvailableForProfile(cleaned, existingProfileId))
-  ) {
-    return cleaned;
-  }
-
-  return reserveOnboardingHandle(state.artist?.name ?? cleaned ?? 'artist');
+async function reserveFallbackProfileHandle(
+  state: ClaimedOnboardingState,
+  cleanedProposedHandle: string | null
+): Promise<string> {
+  return reserveOnboardingHandle(
+    state.artist?.name ?? cleanedProposedHandle ?? 'artist'
+  );
 }
 
 function buildOnboardingSettings(
@@ -118,55 +109,105 @@ function hasMaterializableState(state: ClaimedOnboardingState): boolean {
   return Boolean(state.artist || state.handle);
 }
 
-export async function materializeClaimedOnboardingProfile({
-  userId,
-  conversationId,
-  ipAddress,
-  userAgent,
-}: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
-  const messageRows = await db
-    .select({ toolCalls: chatMessages.toolCalls })
-    .from(chatMessages)
-    .where(eq(chatMessages.conversationId, conversationId))
-    .orderBy(chatMessages.createdAt);
+function cleanImportedBio(bio: string | null | undefined): string | null {
+  const cleaned = bio?.trim().replaceAll(/\s+/g, ' ') ?? '';
+  if (!cleaned) return null;
+  return cleaned.slice(0, MAX_IMPORTED_BIO_LENGTH);
+}
 
-  const state = deriveClaimedOnboardingStateFromMessageRows(messageRows);
-  if (!hasMaterializableState(state)) {
-    return { profileId: null, handle: null, status: 'skipped' };
+function cleanSpotifyAvatarUrl(
+  imageUrl: string | null | undefined
+): string | null {
+  const cleaned = imageUrl?.trim();
+  if (!cleaned) return null;
+
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol !== 'https:') return null;
+    if (
+      parsed.hostname === 'i.scdn.co' ||
+      parsed.hostname.endsWith('.scdn.co')
+    ) {
+      return parsed.toString();
+    }
+  } catch {
+    return null;
   }
 
-  const existingProfile = await fetchExistingProfile(userId);
-  const handle = await resolveProfileHandle({
-    existingProfileId: existingProfile?.id ?? null,
-    proposedHandle: state.handle,
-    state,
-  });
-  const now = new Date();
-  const displayName =
-    state.artist?.name ?? existingProfile?.displayName ?? handle;
-  const settings = buildOnboardingSettings(
-    existingProfile?.settings,
-    state,
-    conversationId,
-    now
-  );
-  const spotifyFields = state.artist
-    ? {
-        avatarUrl:
-          existingProfile?.avatarLockedByUser && existingProfile.avatarUrl
-            ? existingProfile.avatarUrl
-            : (state.artist.imageUrl ?? existingProfile?.avatarUrl ?? null),
-        spotifyId: state.artist.id,
-        spotifyUrl: state.artist.url,
-        spotifyFollowers: state.artist.followers,
-        spotifyPopularity: state.artist.popularity,
-        genres: [...state.artist.genres],
+  return null;
+}
+
+async function fetchMusicFetchProfile(
+  state: ClaimedOnboardingState
+): Promise<MusicFetchArtistResult | null> {
+  if (!state.artist?.url) return null;
+
+  try {
+    return await fetchArtistBySpotifyUrl(state.artist.url);
+  } catch (error) {
+    await captureError(
+      'MusicFetch profile import failed during chat claim',
+      error,
+      {
+        route: 'onboarding_claim_profile',
+        spotifyArtistId: state.artist.id,
       }
-    : {};
+    );
+    return null;
+  }
+}
 
-  let profileId: string;
-  let status: 'created' | 'updated';
+async function buildImportedProfileFields({
+  existingProfile,
+  state,
+}: {
+  readonly existingProfile: CreatorProfile | null;
+  readonly state: ClaimedOnboardingState;
+}): Promise<Record<string, unknown>> {
+  if (!state.artist) return {};
 
+  const musicFetch = await fetchMusicFetchProfile(state);
+  const importedBio = cleanImportedBio(musicFetch?.bio);
+  const importedAvatarUrl =
+    cleanSpotifyAvatarUrl(state.artist.imageUrl) ??
+    cleanSpotifyAvatarUrl(musicFetch?.image?.url);
+
+  return {
+    avatarUrl:
+      existingProfile?.avatarLockedByUser && existingProfile.avatarUrl
+        ? existingProfile.avatarUrl
+        : (importedAvatarUrl ?? existingProfile?.avatarUrl ?? null),
+    ...(importedBio && !existingProfile?.bio ? { bio: importedBio } : {}),
+    spotifyId: state.artist.id,
+    spotifyUrl: state.artist.url,
+    spotifyFollowers: state.artist.followers,
+    spotifyPopularity: state.artist.popularity,
+    genres: [...state.artist.genres],
+  };
+}
+
+interface PersistClaimedProfileInput {
+  readonly userId: string;
+  readonly handle: string;
+  readonly existingProfile: CreatorProfile | null;
+  readonly displayName: string;
+  readonly settings: Record<string, unknown>;
+  readonly now: Date;
+  readonly spotifyFields: Record<string, unknown>;
+}
+
+async function persistClaimedProfileRow({
+  userId,
+  handle,
+  existingProfile,
+  displayName,
+  settings,
+  now,
+  spotifyFields,
+}: PersistClaimedProfileInput): Promise<{
+  profileId: string;
+  status: 'created' | 'updated';
+}> {
   if (existingProfile) {
     const [updated] = await db
       .update(creatorProfiles)
@@ -188,34 +229,135 @@ export async function materializeClaimedOnboardingProfile({
       .where(eq(creatorProfiles.id, existingProfile.id))
       .returning({ id: creatorProfiles.id });
 
-    profileId = updated?.id ?? existingProfile.id;
-    status = 'updated';
-  } else {
-    const [created] = await db
-      .insert(creatorProfiles)
-      .values({
-        userId,
-        creatorType: 'artist',
-        username: handle,
-        usernameNormalized: handle,
-        displayName,
-        isPublic: true,
-        isClaimed: true,
-        claimedAt: now,
-        onboardingCompletedAt: now,
-        settings,
-        theme: {},
-        ingestionStatus: 'idle',
-        ...spotifyFields,
-      })
-      .returning({ id: creatorProfiles.id });
-
-    if (!created?.id) {
-      throw new Error('Failed to create claimed onboarding profile');
-    }
-    profileId = created.id;
-    status = 'created';
+    return {
+      profileId: updated?.id ?? existingProfile.id,
+      status: 'updated',
+    };
   }
+
+  const [created] = await db
+    .insert(creatorProfiles)
+    .values({
+      userId,
+      creatorType: 'artist',
+      username: handle,
+      usernameNormalized: handle,
+      displayName,
+      isPublic: true,
+      isClaimed: true,
+      claimedAt: now,
+      onboardingCompletedAt: now,
+      settings,
+      theme: {},
+      ingestionStatus: 'idle',
+      ...spotifyFields,
+    })
+    .returning({ id: creatorProfiles.id });
+
+  if (!created?.id) {
+    throw new Error('Failed to create claimed onboarding profile');
+  }
+
+  return { profileId: created.id, status: 'created' };
+}
+
+async function persistClaimedProfileWithHandleRetry({
+  userId,
+  existingProfile,
+  state,
+  proposedHandle,
+  settings,
+  now,
+  spotifyFields,
+}: {
+  readonly userId: string;
+  readonly existingProfile: CreatorProfile | null;
+  readonly state: ClaimedOnboardingState;
+  readonly proposedHandle: string | null;
+  readonly settings: Record<string, unknown>;
+  readonly now: Date;
+  readonly spotifyFields: Record<string, unknown>;
+}): Promise<{
+  profileId: string;
+  handle: string;
+  status: 'created' | 'updated';
+}> {
+  const cleanedProposedHandle = pickInitialProfileHandle(proposedHandle);
+  let handle =
+    cleanedProposedHandle ??
+    (await reserveFallbackProfileHandle(state, cleanedProposedHandle));
+
+  for (let attempt = 0; attempt < HANDLE_CLAIM_MAX_ATTEMPTS; attempt++) {
+    const displayName =
+      state.artist?.name ?? existingProfile?.displayName ?? handle;
+
+    try {
+      const result = await persistClaimedProfileRow({
+        userId,
+        handle,
+        existingProfile,
+        displayName,
+        settings,
+        now,
+        spotifyFields,
+      });
+
+      return { ...result, handle };
+    } catch (error) {
+      if (
+        !isHandleUniqueViolation(error) ||
+        attempt === HANDLE_CLAIM_MAX_ATTEMPTS - 1
+      ) {
+        throw error;
+      }
+
+      handle = await reserveFallbackProfileHandle(state, cleanedProposedHandle);
+    }
+  }
+
+  throw new Error('Failed to claim onboarding profile handle after retries');
+}
+
+export async function materializeClaimedOnboardingProfile({
+  userId,
+  conversationId,
+  ipAddress,
+  userAgent,
+}: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
+  const messageRows = await db
+    .select({ toolCalls: chatMessages.toolCalls })
+    .from(chatMessages)
+    .where(eq(chatMessages.conversationId, conversationId))
+    .orderBy(chatMessages.createdAt);
+
+  const state = deriveClaimedOnboardingStateFromMessageRows(messageRows);
+  if (!hasMaterializableState(state)) {
+    return { profileId: null, handle: null, status: 'skipped' };
+  }
+
+  const existingProfile = await fetchExistingProfile(userId);
+  const now = new Date();
+  const settings = buildOnboardingSettings(
+    existingProfile?.settings,
+    state,
+    conversationId,
+    now
+  );
+  const spotifyFields = await buildImportedProfileFields({
+    existingProfile,
+    state,
+  });
+
+  const { profileId, handle, status } =
+    await persistClaimedProfileWithHandleRetry({
+      userId,
+      existingProfile,
+      state,
+      proposedHandle: state.handle,
+      settings,
+      now,
+      spotifyFields,
+    });
 
   await db
     .update(users)

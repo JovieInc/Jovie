@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   buildAuthRouteUrl,
   buildProtectedAuthRedirectUrl,
+  getDefaultSignUpFallbackRedirectUrl,
 } from '@/lib/auth/build-auth-route-url';
+
+describe('getDefaultSignUpFallbackRedirectUrl', () => {
+  it('routes new sign-ups to onboarding start by default', () => {
+    expect(getDefaultSignUpFallbackRedirectUrl()).toBe(APP_ROUTES.START);
+  });
+});
 
 describe('buildAuthRouteUrl', () => {
   it('forwards only a valid redirect_url', () => {

@@ -165,6 +165,7 @@ vi.mock('motion/react', () => ({
           children ?? null,
     }
   ),
+  useReducedMotion: () => false,
 }));
 
 vi.mock('@headlessui/react', async () => {

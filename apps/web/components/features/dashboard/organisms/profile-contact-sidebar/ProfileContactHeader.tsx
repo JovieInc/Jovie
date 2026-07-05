@@ -80,7 +80,7 @@ export function ProfileContactHeader({
         </div>
 
         {metaParts.length > 0 && (
-          <p className='text-[10.5px] leading-[14px] tracking-[0.01em] text-tertiary-token'>
+          <p className='text-3xs leading-[14px] tracking-[0.01em] text-tertiary-token'>
             {metaParts.join(' · ')}
           </p>
         )}

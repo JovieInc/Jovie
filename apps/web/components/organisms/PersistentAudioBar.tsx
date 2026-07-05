@@ -17,6 +17,7 @@ import {
   resolveLyricsReturnRoute,
 } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { isFormElement } from '@/lib/utils/keyboard';
@@ -54,11 +55,25 @@ export function PersistentAudioBar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const designV1LyricsEnabled = useAppFlag('DESIGN_V1');
-  const { playbackState, toggleTrack, seek, stop, onError } =
-    useTrackAudioPlayer();
+  const {
+    playbackState,
+    toggleTrack,
+    playNext,
+    playPrevious,
+    seek,
+    stop,
+    onError,
+  } = useTrackAudioPlayer();
+  const prefersReducedMotion = useReducedMotion();
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [waveformOn, setWaveformOn] = useState(true);
+  // Cinematic reveal (JOV-3487): the shell bar lands into place from the
+  // bottom on first play. Starts un-revealed so the CSS transition has an
+  // off-screen "from" frame to interpolate from; flips to revealed on the
+  // next frame after a track becomes active. Resets per track so a fresh
+  // track replays the reveal even without an unmount.
+  const [revealed, setRevealed] = useState(false);
   const lastNonLyricsPathRef = useRef<string>(APP_ROUTES.LIBRARY);
   const currentPathWithSearch = useMemo(() => {
     if (!pathname) return APP_ROUTES.LIBRARY;
@@ -80,6 +95,31 @@ export function PersistentAudioBar({
   useEffect(() => {
     setBarCollapsed(false);
   }, [playbackState.activeTrackId]);
+
+  // Drive the cinematic reveal. No active track → no reveal (un-revealed so
+  // the next first-play animates in). Reduced motion → snap revealed (no
+  // translate frame ever paints). Otherwise paint one un-revealed frame, then
+  // flip to revealed on the next animation frame so the bar decelerates into
+  // place from below.
+  useEffect(() => {
+    if (!playbackState.activeTrackId) {
+      setRevealed(false);
+      return;
+    }
+    if (prefersReducedMotion) {
+      setRevealed(true);
+      return;
+    }
+    setRevealed(false);
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => setRevealed(true));
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [playbackState.activeTrackId, prefersReducedMotion]);
 
   useEffect(() => {
     if (!isLyricsRoutePath(pathname) && pathname) {
@@ -248,7 +288,7 @@ export function PersistentAudioBar({
 
   const legacyBar = (className?: string) => (
     <section
-      aria-label='Audio player'
+      aria-label='Audio Player'
       className={cn(
         'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
         className
@@ -273,10 +313,10 @@ export function PersistentAudioBar({
         )}
 
         {/* Track info */}
-        <div className='min-w-0 shrink-0 w-[120px] lg:w-[180px]'>
+        <div className='min-w-0 shrink-0 w-30 lg:w-45'>
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-caption leading-[1.2] text-primary-token'
+            className='text-xs font-caption leading-[1.2] text-primary-token'
           >
             {playbackState.trackTitle ?? ''}
           </TruncatedText>
@@ -294,7 +334,7 @@ export function PersistentAudioBar({
 
         {/* Seek area */}
         <div className='flex flex-1 items-center gap-2 min-w-0'>
-          <span className='text-[10px] tabular-nums text-quaternary-token shrink-0 w-8 text-right'>
+          <span className='text-3xs tabular-nums text-quaternary-token shrink-0 w-8 text-right'>
             {currentTimeFormatted}
           </span>
           <SeekBar
@@ -302,13 +342,13 @@ export function PersistentAudioBar({
             duration={playbackState.duration}
             onSeek={seek}
             disabled={isLoading}
-            className='h-[3px] flex-1 min-w-[60px] bg-surface-1'
+            className='h-1 flex-1 min-w-15 bg-surface-1'
           />
-          <span className='text-[10px] tabular-nums text-quaternary-token shrink-0 w-8'>
+          <span className='text-3xs tabular-nums text-quaternary-token shrink-0 w-8'>
             {durationFormatted}
           </span>
           {isPreview ? (
-            <span className='text-[9px] text-tertiary-token shrink-0'>
+            <span className='text-3xs text-tertiary-token shrink-0'>
               Preview
             </span>
           ) : null}
@@ -330,7 +370,7 @@ export function PersistentAudioBar({
           type='button'
           onClick={stop}
           className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
-          aria-label='Dismiss player'
+          aria-label='Dismiss Player'
         >
           <X className='h-3.5 w-3.5' />
         </button>
@@ -369,8 +409,15 @@ export function PersistentAudioBar({
           maxHeight: barCollapsed
             ? 0
             : 'var(--linear-app-audio-bar-max-height)',
-          opacity: barCollapsed ? 0 : 1,
-          transform: barCollapsed ? 'translateY(10px)' : 'translateY(0)',
+          opacity: revealed && !barCollapsed ? 1 : 0,
+          transform: !revealed
+            ? 'translateY(100%)'
+            : barCollapsed
+              ? 'translateY(10px)'
+              : 'translateY(0)',
+          // Keyed on collapse only — the reveal is purely visual (transform +
+          // opacity), so the bar stays interactive the instant it mounts
+          // rather than waiting out the slide-in.
           pointerEvents: barCollapsed ? 'none' : 'auto',
           transition: SHELL_AUDIO_BAR_TRANSITION,
         }}
@@ -387,6 +434,14 @@ export function PersistentAudioBar({
         <AudioBar
           isPlaying={playbackState.isPlaying}
           onPlay={handleToggle}
+          onPrevious={
+            playbackState.hasPrevious
+              ? () => playPrevious().catch(() => {})
+              : undefined
+          }
+          onNext={
+            playbackState.hasNext ? () => playNext().catch(() => {}) : undefined
+          }
           onCollapse={() => setBarCollapsed(true)}
           currentTime={playbackState.currentTime}
           duration={playbackState.duration}

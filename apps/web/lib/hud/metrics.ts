@@ -2,12 +2,54 @@ import 'server-only';
 
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminReliabilitySummary } from '@/lib/admin/overview';
+import { getAdminSentryMetrics } from '@/lib/admin/sentry-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { checkDbHealth } from '@/lib/db';
 import { getHudDeployments } from '@/lib/deployments/github';
 import { env } from '@/lib/env-server';
+import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
+import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
+import { mapHermesEventsToAgentRunArtifacts } from '@/lib/hud/hermes-events';
+import { getHermesEventsPayload } from '@/lib/hud/hermes-events-store';
+import { buildHudMetricSources } from '@/lib/hud/source-trust';
+import { getHudQuarantineMetrics } from '@/lib/testing/quarantine-ledger.server';
+import { logger } from '@/lib/utils/logger';
 import type { HudAccessMode, HudMetrics } from '@/types/hud';
+
+function buildHudAgentRuns(): HudMetrics['agentRuns'] {
+  const { events } = getHermesEventsPayload();
+  return mapHermesEventsToAgentRunArtifacts(events);
+}
+
+function buildHudTestingMetrics(): HudMetrics['testing'] {
+  const quarantine = getHudQuarantineMetrics();
+
+  return {
+    quarantine: {
+      activeCount: quarantine.summary.activeCount,
+      expiredCount: quarantine.summary.expiredCount,
+      expiringSoonCount: quarantine.summary.expiringSoonCount,
+      unitCount: quarantine.summary.unitCount,
+      e2eCount: quarantine.summary.e2eCount,
+      estimatedRetryAttemptsPerRun:
+        quarantine.summary.estimatedRetryAttemptsPerRun,
+      retryBudgetCap: quarantine.summary.retryBudgetCap,
+      retryBudgetUsagePercent: quarantine.summary.retryBudgetUsagePercent,
+      withinRetryBudget: quarantine.summary.withinRetryBudget,
+      unitDefaultRetries: quarantine.retryBudget.unitDefaultRetries,
+      quarantineUnitRetries: quarantine.retryBudget.quarantineUnitRetries,
+      quarantineE2eRetries: quarantine.retryBudget.quarantineE2eRetries,
+      isValid: quarantine.isValid,
+      ledgerPath: quarantine.ledgerPath,
+    },
+  };
+}
+
+export interface BuildDegradedHudMetricsOptions {
+  context?: string;
+  timeoutMs?: number;
+}
 
 function normalizeIso(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
@@ -126,7 +168,168 @@ function calculateFinancialStatus(
   };
 }
 
-export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
+export function buildDegradedHudMetrics(
+  mode: HudAccessMode,
+  options: BuildDegradedHudMetricsOptions = {}
+): HudMetrics {
+  const generatedAt = new Date();
+  const fetchedAtIso = generatedAt.toISOString();
+  const timeoutDetail =
+    options.context != null
+      ? `${options.context} timed out after ${options.timeoutMs ?? 'unknown'}ms`
+      : 'HUD metrics request timed out';
+
+  const branding = {
+    startupName: env.HUD_STARTUP_NAME ?? 'Jovie',
+    logoUrl: env.HUD_STARTUP_LOGO_URL ?? null,
+  };
+
+  const stripeMetrics = {
+    mrrUsd: 0,
+    activeSubscribers: 0,
+    mrrUsd30dAgo: 0,
+    mrrGrowth30dUsd: 0,
+    isConfigured: true,
+    isAvailable: false,
+    errorMessage: timeoutDetail,
+  };
+
+  const mercuryMetrics = {
+    balanceUsd: 0,
+    burnRateUsd: 0,
+    burnWindowDays: 30,
+    isConfigured: true,
+    isAvailable: false,
+    defaultStatus: 'unknown' as const,
+    errorMessage: timeoutDetail,
+  };
+
+  const sentryMetrics = {
+    unresolvedIssues24h: 0,
+    totalEvents24h: 0,
+    impactedUsers24h: 0,
+    criticalIssues24h: 0,
+    topIssueTitle: null,
+    topIssueShortId: null,
+    isConfigured: true,
+    isAvailable: false,
+    errorMessage: timeoutDetail,
+  };
+
+  const operationsStatus: HudMetrics['operations'] = {
+    status: 'degraded',
+    dbLatencyMs: null,
+    checkedAtIso: fetchedAtIso,
+  };
+
+  const deployments: HudMetrics['deployments'] = {
+    availability: 'error',
+    current: null,
+    recent: [],
+    errorMessage: timeoutDetail,
+  };
+
+  const dispatch = getHermesDispatchAvailability();
+
+  return {
+    accessMode: mode,
+    branding,
+    overview: {
+      mrrUsd: 0,
+      activeSubscribers: 0,
+      balanceUsd: 0,
+      burnRateUsd: 0,
+      runwayMonths: null,
+      defaultStatus: 'unknown',
+      defaultStatusDetail:
+        'Metrics temporarily unavailable due to upstream timeout.',
+      financialDataAvailable: false,
+    },
+    operations: operationsStatus,
+    reliability: {
+      errorRatePercent: 0,
+      reliabilityScorePercent: 0,
+      p95LatencyMs: null,
+      incidents24h: 0,
+      lastIncidentAtIso: null,
+      unresolvedSentryIssues24h: 0,
+    },
+    testing: buildHudTestingMetrics(),
+    deployments,
+    aiOps: {
+      availability: 'error',
+      generatedAtIso: fetchedAtIso,
+      counts: {
+        queued: 0,
+        running: 0,
+        blocked: 0,
+        review: 0,
+        done: 0,
+        failed: 0,
+        stale: 0,
+      },
+      dispatch,
+      mergeQueue: {
+        openAgentPrs: 0,
+        openAgentPrThreshold: 10,
+        pressure: 'normal',
+      },
+      runs: [],
+      blockers: [],
+      recommendations: [],
+      sources: {
+        github: {
+          availability: 'error',
+          configured: true,
+          itemCount: 0,
+          errorMessage: timeoutDetail,
+        },
+        linear: {
+          availability: 'not_configured',
+          configured: false,
+          itemCount: 0,
+        },
+        sentry: {
+          availability: 'not_configured',
+          configured: false,
+          itemCount: 0,
+        },
+        hermes: {
+          availability: 'available',
+          configured: true,
+          itemCount: 0,
+        },
+        'hermes-air': {
+          availability: 'not_configured',
+          configured: false,
+          itemCount: 0,
+        },
+        ci: {
+          availability: 'error',
+          configured: true,
+          itemCount: 0,
+          errorMessage: timeoutDetail,
+        },
+      },
+      errorMessage: timeoutDetail,
+    },
+    sources: buildHudMetricSources({
+      stripe: stripeMetrics,
+      mercury: mercuryMetrics,
+      sentry: sentryMetrics,
+      operations: operationsStatus,
+      deployments,
+      fetchedAtIso,
+      sentryOrgSlug: env.SENTRY_ORG_SLUG,
+      githubOwner: env.HUD_GITHUB_OWNER,
+      githubRepo: env.HUD_GITHUB_REPO,
+    }),
+    agentRuns: buildHudAgentRuns(),
+    generatedAtIso: fetchedAtIso,
+  };
+}
+
+async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
   const generatedAt = new Date();
 
   const branding = {
@@ -138,6 +341,7 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     stripeMetrics,
     mercuryMetrics,
     reliabilitySummary,
+    sentryMetrics,
     dbHealth,
     deployments,
     aiOps,
@@ -145,6 +349,7 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
     getAdminReliabilitySummary(),
+    getAdminSentryMetrics(),
     checkDbHealth(),
     getHudDeployments(),
     getHudAiOpsSummary(generatedAt),
@@ -172,6 +377,23 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     }
     return null;
   })();
+
+  const fetchedAtIso = generatedAt.toISOString();
+  const sources = buildHudMetricSources({
+    stripe: stripeMetrics,
+    mercury: mercuryMetrics,
+    sentry: sentryMetrics,
+    operations: {
+      status: dbHealth.healthy ? 'ok' : 'degraded',
+      dbLatencyMs: dbHealth.latency ?? null,
+      checkedAtIso: fetchedAtIso,
+    },
+    deployments,
+    fetchedAtIso,
+    sentryOrgSlug: env.SENTRY_ORG_SLUG,
+    githubOwner: env.HUD_GITHUB_OWNER,
+    githubRepo: env.HUD_GITHUB_REPO,
+  });
 
   return {
     accessMode: mode,
@@ -201,8 +423,30 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
       lastIncidentAtIso,
       unresolvedSentryIssues24h: reliabilitySummary.unresolvedSentryIssues24h,
     },
+    testing: buildHudTestingMetrics(),
     deployments,
     aiOps,
-    generatedAtIso: generatedAt.toISOString(),
+    sources,
+    agentRuns: buildHudAgentRuns(),
+    generatedAtIso: fetchedAtIso,
   };
+}
+
+export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
+  try {
+    return await fetchHudMetrics(mode);
+  } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      logger.warn('HUD metrics fetch timed out; returning degraded payload', {
+        context: error.context,
+        timeoutMs: error.timeoutMs,
+      });
+      return buildDegradedHudMetrics(mode, {
+        context: error.context,
+        timeoutMs: error.timeoutMs,
+      });
+    }
+
+    throw error;
+  }
 }

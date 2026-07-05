@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   getRedisMock: vi.fn(),
   redisGetMock: vi.fn(),
+  redisGetdelMock: vi.fn(),
   redisSetMock: vi.fn(),
   redisDelMock: vi.fn(),
 }));
@@ -15,6 +16,7 @@ vi.mock('@/lib/redis', () => ({
 
 const redisMock = {
   get: hoisted.redisGetMock,
+  getdel: hoisted.redisGetdelMock,
   set: hoisted.redisSetMock,
   del: hoisted.redisDelMock,
 };
@@ -28,6 +30,7 @@ describe('auth routing state store', () => {
     hoisted.redisSetMock.mockResolvedValue('OK');
     hoisted.redisDelMock.mockResolvedValue(1);
     hoisted.redisGetMock.mockResolvedValue(null);
+    hoisted.redisGetdelMock.mockResolvedValue(null);
   });
 
   it('fails closed when Redis is unavailable', async () => {
@@ -135,21 +138,20 @@ describe('auth routing state store', () => {
     );
   });
 
-  it('validates native exchange and deletes the code after success', async () => {
+  it('validates native exchange and atomically claims the code after success', async () => {
     const { consumeStoredNativeExchangeCode } = await modulePromise;
-    hoisted.redisGetMock.mockResolvedValue(
-      JSON.stringify({
-        code: 'code_123',
-        client: 'ios',
-        state: 'state_123',
-        userId: 'user_123',
-        returnTo: '/app',
-        codeChallenge: 'challenge',
-        createdAt: 1_000,
-        expiresAt: 61_000,
-        consumedAt: null,
-      })
-    );
+    const storedRecord = JSON.stringify({
+      code: 'code_123',
+      client: 'ios',
+      state: 'state_123',
+      userId: 'user_123',
+      returnTo: '/app',
+      codeChallenge: 'challenge',
+      createdAt: 1_000,
+      expiresAt: 61_000,
+      consumedAt: null,
+    });
+    hoisted.redisGetdelMock.mockResolvedValue(storedRecord);
 
     await expect(
       consumeStoredNativeExchangeCode({
@@ -166,24 +168,27 @@ describe('auth routing state store', () => {
       returnTo: '/app',
     });
 
-    expect(hoisted.redisDelMock).toHaveBeenCalledWith('auth:exchange:code_123');
+    expect(hoisted.redisGetdelMock).toHaveBeenCalledWith(
+      'auth:exchange:code_123'
+    );
+    expect(hoisted.redisSetMock).not.toHaveBeenCalled();
+    expect(hoisted.redisDelMock).not.toHaveBeenCalled();
   });
 
-  it('does not delete native exchange codes on verifier mismatch', async () => {
+  it('restores native exchange codes on verifier mismatch', async () => {
     const { consumeStoredNativeExchangeCode } = await modulePromise;
-    hoisted.redisGetMock.mockResolvedValue(
-      JSON.stringify({
-        code: 'code_123',
-        client: 'ios',
-        state: 'state_123',
-        userId: 'user_123',
-        returnTo: '/app',
-        codeChallenge: 'challenge',
-        createdAt: 1_000,
-        expiresAt: 61_000,
-        consumedAt: null,
-      })
-    );
+    const storedRecord = JSON.stringify({
+      code: 'code_123',
+      client: 'ios',
+      state: 'state_123',
+      userId: 'user_123',
+      returnTo: '/app',
+      codeChallenge: 'challenge',
+      createdAt: 1_000,
+      expiresAt: 61_000,
+      consumedAt: null,
+    });
+    hoisted.redisGetdelMock.mockResolvedValue(storedRecord);
 
     await expect(
       consumeStoredNativeExchangeCode({
@@ -196,6 +201,55 @@ describe('auth routing state store', () => {
       })
     ).resolves.toEqual({ ok: false, reason: 'wrong_verifier' });
 
+    expect(hoisted.redisGetdelMock).toHaveBeenCalledWith(
+      'auth:exchange:code_123'
+    );
+    expect(hoisted.redisSetMock).toHaveBeenCalledWith(
+      'auth:exchange:code_123',
+      storedRecord,
+      { ex: 59 }
+    );
     expect(hoisted.redisDelMock).not.toHaveBeenCalled();
+  });
+
+  it('allows only one concurrent native exchange to succeed', async () => {
+    const { consumeStoredNativeExchangeCode } = await modulePromise;
+    const storedRecord = JSON.stringify({
+      code: 'code_123',
+      client: 'ios',
+      state: 'state_123',
+      userId: 'user_123',
+      returnTo: '/app',
+      codeChallenge: 'challenge',
+      createdAt: 1_000,
+      expiresAt: 61_000,
+      consumedAt: null,
+    });
+    hoisted.redisGetdelMock
+      .mockResolvedValueOnce(storedRecord)
+      .mockResolvedValueOnce(null);
+
+    const exchangeInput = {
+      client: 'ios' as const,
+      code: 'code_123',
+      state: 'state_123',
+      codeVerifier: 'verifier',
+      now: 2_000,
+      createCodeChallenge: () => 'challenge',
+    };
+
+    const [firstResult, secondResult] = await Promise.all([
+      consumeStoredNativeExchangeCode(exchangeInput),
+      consumeStoredNativeExchangeCode(exchangeInput),
+    ]);
+
+    expect(firstResult).toEqual({
+      ok: true,
+      userId: 'user_123',
+      returnTo: '/app',
+    });
+    expect(secondResult).toEqual({ ok: false, reason: 'missing' });
+    expect(hoisted.redisGetdelMock).toHaveBeenCalledTimes(2);
+    expect(hoisted.redisSetMock).not.toHaveBeenCalled();
   });
 });

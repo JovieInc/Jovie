@@ -179,7 +179,7 @@ describe('CalendarPageClient', () => {
     );
 
     const bulkSlot = screen
-      .getByText('Pending review · 1')
+      .getByText('Pending Review · 1')
       .closest('div')
       ?.parentElement?.querySelector('.system-b-calendar-bulk-action-slot');
     expect(bulkSlot).toBeInTheDocument();

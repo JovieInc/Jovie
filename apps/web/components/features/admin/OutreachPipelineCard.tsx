@@ -71,7 +71,7 @@ function PipelineStep({
       subtitle={detail}
       icon={Icon}
       iconClassName={iconClassName}
-      valueClassName='text-[24px] font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'
+      valueClassName='text-2xl font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'
       subtitleClassName='text-2xs leading-[16px] text-secondary-token'
     />
   );

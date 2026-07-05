@@ -1,5 +1,5 @@
 import { Container } from '@/components/site/Container';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { cn } from '@/lib/utils';
 import { HomeHeroCTA } from './HomeHeroCTA';
 import { HomeHeroPhoneComposition } from './HomeHeroPhoneComposition';
@@ -38,7 +38,7 @@ export function HomeHero({
       <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[42rem]' />
 
       <Container size='homepage'>
-        <div className='homepage-hero-stacked mx-auto max-w-[1200px]'>
+        <div className='homepage-hero-stacked mx-auto max-w-300'>
           <div className='homepage-hero-copy'>
             {eyebrow ? (
               <p className='homepage-hero-eyebrow'>{eyebrow}</p>

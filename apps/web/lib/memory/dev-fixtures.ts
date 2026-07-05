@@ -1,3 +1,4 @@
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import type {
   MemoryEnrichmentProviderResponse,
   MemoryIngestSource,
@@ -71,7 +72,7 @@ export const memoryDevFixtures = {
       sourceType: 'calendar_event',
       externalId: 'calendar:dim-mak-session',
       metadata: {
-        provider: 'google_calendar',
+        provider: CONNECTOR_PROVIDERS.google_calendar,
         locationName: 'Dim Mak Studio',
         startsAt: '2026-06-01T22:00:00.000Z',
       },

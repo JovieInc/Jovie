@@ -108,7 +108,7 @@ function StudioFrame({
   return (
     <div
       className={cn(
-        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-[#0d0e11] text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]',
+        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-background text-white dark:text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]',
         className
       )}
     >
@@ -146,7 +146,7 @@ function PublicProfileIphonePreview() {
   ] as const;
 
   return (
-    <StudioFrame className='bg-[#050608] p-4'>
+    <StudioFrame className='bg-background p-4'>
       <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
         {states.map(state => (
           <div key={state.id} className='min-w-0'>
@@ -175,8 +175,8 @@ function PublicProfileIphonePreview() {
 
 function PublicProfileMerchFixturePreview() {
   return (
-    <StudioFrame className='flex items-center justify-center bg-[#050608] p-6'>
-      <div className='w-full max-w-[390px] rounded-[28px] border border-white/10 bg-black p-4'>
+    <StudioFrame className='flex items-center justify-center bg-background p-6'>
+      <div className='w-full max-w-[390px] rounded-[28px] border border-white/10 bg-black dark:bg-black p-4'>
         <div className='relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.035]'>
           <div className='grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-3 p-3'>
             <div className='aspect-square overflow-hidden rounded-[16px] bg-[linear-gradient(135deg,rgba(255,255,255,0.22),rgba(255,255,255,0.04))]'>
@@ -186,7 +186,7 @@ function PublicProfileMerchFixturePreview() {
               <p className='text-[11px] font-semibold text-white/45'>
                 Merch Drop
               </p>
-              <p className='mt-1 text-[16px] font-[650] leading-5 tracking-[-0.03em] text-white [overflow-wrap:anywhere]'>
+              <p className='mt-1 text-[16px] font-[650] leading-5 tracking-[-0.03em] text-white dark:text-white [overflow-wrap:anywhere]'>
                 Tour Tee
               </p>
               <p className='mt-1 text-[12px] leading-5 text-white/55'>
@@ -205,7 +205,7 @@ function MusicAiCommandPreview() {
     <StudioFrame className='grid grid-cols-[178px_1fr]'>
       <aside className='border-r border-white/10 bg-black/35 p-3'>
         <div className='mb-5 flex items-center gap-2'>
-          <div className='grid h-7 w-7 place-items-center rounded-md bg-white text-black'>
+          <div className='grid h-7 w-7 place-items-center rounded-md bg-white dark:bg-surface-1 text-black dark:text-white'>
             <Sparkles className='h-3.5 w-3.5' />
           </div>
           <div className='min-w-0'>
@@ -224,7 +224,7 @@ function MusicAiCommandPreview() {
               key={label as string}
               className={cn(
                 'flex items-center gap-2 rounded-md px-2 py-1.5 text-white/60',
-                label === 'Chat' && 'bg-white/[0.06] text-white'
+                label === 'Chat' && 'bg-white/[0.06] text-white dark:text-white'
               )}
             >
               <Icon className='h-3.5 w-3.5' />
@@ -238,17 +238,17 @@ function MusicAiCommandPreview() {
         <div className='mx-auto max-w-[520px] space-y-3 pt-4'>
           <div className='rounded-2xl border border-white/10 bg-white/[0.035] p-3'>
             <p className='text-[12px] text-white/60'>Sora Vale</p>
-            <p className='mt-1 text-[14px] leading-6 text-white'>
+            <p className='mt-1 text-[14px] leading-6 text-white dark:text-white'>
               Find the right track, pull release context, and draft a pitch for
               playlist editors.
             </p>
           </div>
-          <div className='ml-auto max-w-[420px] rounded-2xl bg-white px-3 py-2 text-[13px] text-black'>
+          <div className='ml-auto max-w-[420px] rounded-2xl bg-white dark:bg-surface-1 px-3 py-2 text-[13px] text-black dark:text-white'>
             Search artist Sora Vale and track Midnight Static.
           </div>
         </div>
 
-        <div className='absolute bottom-4 left-1/2 w-[520px] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-2xl border border-white/12 bg-[#15161b] p-2 shadow-2xl'>
+        <div className='absolute bottom-4 left-1/2 w-[520px] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-2xl border border-white/12 bg-surface-1 p-2 shadow-2xl'>
           <div className='flex items-center gap-2 border-b border-white/10 px-2 py-2 text-[12px] text-white/50'>
             <Search className='h-3.5 w-3.5' />
             <span>/artist Sora Vale /track Midnight Static</span>
@@ -268,7 +268,7 @@ function MusicAiCommandPreview() {
                     <Icon className='h-4 w-4' />
                   </div>
                   <div className='min-w-0'>
-                    <p className='truncate text-[13px] font-medium text-white'>
+                    <p className='truncate text-[13px] font-medium text-white dark:text-white'>
                       {row.title}
                     </p>
                     <p className='truncate text-[11px] text-white/45'>

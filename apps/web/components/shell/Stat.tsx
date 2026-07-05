@@ -31,12 +31,12 @@ export interface StatProps {
 export function Stat({ label, value, mono, tabular, className }: StatProps) {
   return (
     <div className={cn('flex flex-col gap-0.5', className)}>
-      <span className='text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+      <span className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
         {label}
       </span>
       <span
         className={cn(
-          'text-[13px] text-primary-token',
+          'text-app text-primary-token',
           mono && 'font-mono tracking-wide',
           tabular && 'tabular-nums'
         )}

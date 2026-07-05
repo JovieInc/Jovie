@@ -26,8 +26,8 @@ export interface DrawerAnalyticsSummaryCardProps {
 }
 
 const METRIC_TILE_CLASSNAME = 'px-3 py-2.5';
-const STABLE_ANALYTICS_BODY_CLASSNAME = 'min-h-[106px]';
-const STABLE_ANALYTICS_FOOTER_CLASSNAME = 'min-h-[40px]';
+const STABLE_ANALYTICS_BODY_CLASSNAME = 'min-h-27';
+const STABLE_ANALYTICS_FOOTER_CLASSNAME = 'min-h-10';
 
 function MetricTile({
   label,
@@ -43,11 +43,11 @@ function MetricTile({
       className={METRIC_TILE_CLASSNAME}
       data-testid={`drawer-analytics-metric-${id}`}
     >
-      <p className='text-[10.5px] font-caption leading-[14px] text-tertiary-token'>
+      <p className='text-3xs font-caption leading-[14px] text-tertiary-token'>
         {label}
       </p>
       <p
-        className='mt-1 tabular-nums text-[20px] font-[620] leading-none tracking-[-0.03em] text-primary-token'
+        className='mt-1 tabular-nums text-xl font-[620] leading-none tracking-[-0.03em] text-primary-token'
         data-testid={`drawer-analytics-metric-value-${id}`}
       >
         {value}
@@ -56,7 +56,7 @@ function MetricTile({
         <p
           aria-hidden={hint ? undefined : true}
           className={cn(
-            'mt-1 min-h-[13px] text-[10px] leading-[13px] text-tertiary-token',
+            'mt-1 min-h-3 text-3xs leading-[13px] text-tertiary-token',
             !hint && 'invisible'
           )}
         >
@@ -70,9 +70,9 @@ function MetricTile({
 function LoadingMetricTile() {
   return (
     <div aria-hidden='true' className={METRIC_TILE_CLASSNAME}>
-      <div className='h-[11px] w-16 rounded skeleton' />
+      <div className='h-3 w-16 rounded skeleton' />
       <div className='mt-2 h-6 w-12 rounded skeleton' />
-      <div className='mt-2 h-[10px] w-14 rounded skeleton' />
+      <div className='mt-2 h-3 w-14 rounded skeleton' />
     </div>
   );
 }
@@ -109,7 +109,7 @@ function DrawerAnalyticsSummaryBody({
 
   if (state === 'error') {
     return (
-      <div className='flex min-h-[72px] items-center'>
+      <div className='flex min-h-18 items-center'>
         <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
           {errorMessage}
         </p>
@@ -129,7 +129,7 @@ function DrawerAnalyticsSummaryBody({
 
   if (emptyMessage) {
     return (
-      <div className='flex min-h-[72px] items-center'>
+      <div className='flex min-h-18 items-center'>
         <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
           {emptyMessage}
         </p>

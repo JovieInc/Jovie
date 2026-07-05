@@ -10,13 +10,14 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { logger } from '@/lib/utils/logger';
 
 import { discoverLinksForRelease } from './discovery';
-import { getReleasesForProfile } from './queries';
+import { getReleasesForProfile, type ReleaseWithProviders } from './queries';
 
 // ============================================================================
 // Types
@@ -37,6 +38,16 @@ export interface UnderEnrichedProfile {
   avgProviderCount: number;
 }
 
+export interface ReEnrichProfileOptions {
+  /** Cap releases processed; uses under-enriched release query when set */
+  releaseLimit?: number;
+}
+
+export interface SweepUnderEnrichedOptions {
+  profileLimit?: number;
+  releaseLimit?: number;
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -44,18 +55,105 @@ export interface UnderEnrichedProfile {
 /** Delay between releases to respect MusicFetch rate limit (6 req/min) */
 const INTER_RELEASE_DELAY_MS = 11_000;
 
-/** Maximum profiles to process in a single sweep */
-const MAX_PROFILES_PER_SWEEP = 10;
+/** Maximum profiles to discover in a single sweep query */
+export const MAX_PROFILES_PER_SWEEP = 10;
+
+/** Maximum profiles to process in one sweep invocation (admin/manual) */
+export const MAX_PROFILES_PER_SWEEP_RUN = 5;
+
+/** Maximum releases to re-enrich per profile in one sweep invocation */
+export const MAX_RELEASES_PER_PROFILE_SWEEP = 10;
+
+/** Cron sub-job limits — conservative for shared daily-maintenance budget */
+export const MAX_PROFILES_PER_CRON_SWEEP = 1;
+export const MAX_RELEASES_PER_PROFILE_CRON_SWEEP = 4;
 
 /**
  * Minimum distinct canonical providers a release should have.
  * Profiles with releases averaging below this are considered under-enriched.
  */
-const MIN_CANONICAL_PROVIDERS = 5;
+export const MIN_CANONICAL_PROVIDERS = 5;
 
 // ============================================================================
 // Core Re-Enrichment
 // ============================================================================
+
+/**
+ * Fetch a bounded batch of under-enriched releases for a profile.
+ * Orders worst-first (fewest canonical providers) so each cron tick makes progress.
+ */
+export async function getUnderEnrichedReleasesForProfile(
+  creatorProfileId: string,
+  limit: number
+): Promise<ReleaseWithProviders[]> {
+  const releaseIdRows = await db.execute(drizzleSql`
+    SELECT
+      r.id AS release_id,
+      COUNT(DISTINCT pl.provider_id) AS provider_count
+    FROM discog_releases r
+    LEFT JOIN provider_links pl
+      ON pl.release_id = r.id
+      AND pl.owner_type = 'release'
+      AND (
+        pl.source_type = 'manual'
+        OR (pl.metadata->>'discoveredFrom') IS NULL
+        OR (pl.metadata->>'discoveredFrom') != 'search_fallback'
+      )
+    WHERE r.creator_profile_id = ${creatorProfileId}
+      AND r.deleted_at IS NULL
+    GROUP BY r.id
+    HAVING COUNT(DISTINCT pl.provider_id) < ${MIN_CANONICAL_PROVIDERS}
+    ORDER BY COUNT(DISTINCT pl.provider_id) ASC, r.release_date ASC NULLS LAST
+    LIMIT ${limit}
+  `);
+
+  const releaseIds = releaseIdRows.rows.map(row => row.release_id as string);
+  if (releaseIds.length === 0) {
+    return [];
+  }
+
+  const releases = await db
+    .select()
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        inArray(discogReleases.id, releaseIds),
+        isNull(discogReleases.deletedAt)
+      )
+    );
+
+  const providerLinksResult = await db
+    .select()
+    .from(providerLinks)
+    .where(
+      and(
+        eq(providerLinks.ownerType, 'release'),
+        inArray(providerLinks.releaseId, releaseIds)
+      )
+    );
+
+  const linksByRelease = new Map<string, typeof providerLinksResult>();
+  for (const link of providerLinksResult) {
+    if (!link.releaseId) continue;
+    const existing = linksByRelease.get(link.releaseId) ?? [];
+    existing.push(link);
+    linksByRelease.set(link.releaseId, existing);
+  }
+
+  const releasesById = new Map(releases.map(release => [release.id, release]));
+
+  return releaseIds
+    .map(releaseId => {
+      const release = releasesById.get(releaseId);
+      if (!release) return null;
+      return {
+        ...release,
+        providerLinks: linksByRelease.get(releaseId) ?? [],
+      };
+    })
+    .filter((release): release is ReleaseWithProviders => release !== null);
+}
 
 /**
  * Re-enrich all releases for a creator profile.
@@ -64,7 +162,8 @@ const MIN_CANONICAL_PROVIDERS = 5;
  * search fallbacks) for each release, respecting rate limits.
  */
 export async function reEnrichProfile(
-  creatorProfileId: string
+  creatorProfileId: string,
+  options?: ReEnrichProfileOptions
 ): Promise<ReEnrichResult> {
   const result: ReEnrichResult = {
     profileId: creatorProfileId,
@@ -74,9 +173,15 @@ export async function reEnrichProfile(
     errors: [],
   };
 
-  const importedReleases = await getReleasesForProfile(creatorProfileId, {
-    includeDrafts: true,
-  });
+  const importedReleases =
+    options?.releaseLimit != null
+      ? await getUnderEnrichedReleasesForProfile(
+          creatorProfileId,
+          options.releaseLimit
+        )
+      : await getReleasesForProfile(creatorProfileId, {
+          includeDrafts: true,
+        });
 
   if (importedReleases.length === 0) {
     return result;
@@ -86,7 +191,6 @@ export async function reEnrichProfile(
     const release = importedReleases[i];
 
     try {
-      // Filter out search_fallback links — they should be upgraded to canonical
       const existingProviders = release.providerLinks
         .filter(l => {
           const meta = l.metadata as Record<string, unknown> | null;
@@ -120,7 +224,6 @@ export async function reEnrichProfile(
       });
     }
 
-    // Rate limit: wait between releases (skip after last release)
     if (i < importedReleases.length - 1) {
       await new Promise(resolve => setTimeout(resolve, INTER_RELEASE_DELAY_MS));
     }
@@ -142,9 +245,6 @@ export async function reEnrichProfile(
 
 /**
  * Find profiles whose releases have fewer canonical provider links than expected.
- *
- * A profile is "under-enriched" if its releases average fewer than
- * MIN_CANONICAL_PROVIDERS distinct canonical (non-search_fallback) provider links.
  */
 export async function findUnderEnrichedProfiles(options?: {
   limit?: number;
@@ -190,35 +290,46 @@ export async function findUnderEnrichedProfiles(options?: {
 }
 
 /**
- * Sweep all under-enriched profiles and re-enrich them.
- * Processes profiles sequentially to respect API rate limits.
+ * Sweep under-enriched profiles and re-enrich them in bounded batches.
  */
-export async function sweepUnderEnrichedProfiles(): Promise<{
+export async function sweepUnderEnrichedProfiles(
+  options?: SweepUnderEnrichedOptions
+): Promise<{
   profilesProcessed: number;
   totalLinksDiscovered: number;
   errors: string[];
+  hasMoreProfiles: boolean;
 }> {
-  const profiles = await findUnderEnrichedProfiles();
+  const profileLimit = options?.profileLimit ?? MAX_PROFILES_PER_SWEEP_RUN;
+  const releaseLimit = options?.releaseLimit ?? MAX_RELEASES_PER_PROFILE_SWEEP;
+
+  const profiles = await findUnderEnrichedProfiles({
+    limit: profileLimit,
+  });
   const summary = {
     profilesProcessed: 0,
     totalLinksDiscovered: 0,
     errors: [] as string[],
+    hasMoreProfiles: profiles.length === profileLimit,
   };
 
   logger.info('Starting under-enriched profile sweep', {
     profileCount: profiles.length,
+    profileLimit,
+    releaseLimit,
   });
 
   for (const profile of profiles) {
     try {
-      // Rate limit: add delay between profiles to avoid MusicFetch rate limit
       if (summary.profilesProcessed > 0) {
         await new Promise(resolve =>
           setTimeout(resolve, INTER_RELEASE_DELAY_MS)
         );
       }
 
-      const result = await reEnrichProfile(profile.creatorProfileId);
+      const result = await reEnrichProfile(profile.creatorProfileId, {
+        releaseLimit,
+      });
       summary.profilesProcessed++;
       summary.totalLinksDiscovered += result.linksDiscovered;
 
@@ -246,4 +357,17 @@ export async function sweepUnderEnrichedProfiles(): Promise<{
   logger.info('Under-enriched profile sweep complete', summary);
 
   return summary;
+}
+
+/** Bounded sweep entry point for cron sub-jobs. */
+export async function sweepUnderEnrichedProfilesForCron(): Promise<{
+  profilesProcessed: number;
+  totalLinksDiscovered: number;
+  errors: string[];
+  hasMoreProfiles: boolean;
+}> {
+  return sweepUnderEnrichedProfiles({
+    profileLimit: MAX_PROFILES_PER_CRON_SWEEP,
+    releaseLimit: MAX_RELEASES_PER_PROFILE_CRON_SWEEP,
+  });
 }

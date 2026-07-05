@@ -7,6 +7,7 @@ import {
   shouldRecordInvestorView,
 } from '@/lib/auth/investor-view-dedup';
 import { captureError } from '@/lib/error-tracking';
+import { apiLimiter } from '@/lib/rate-limit';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 
 const INVESTOR_TOKEN_COOKIE = '__investor_token';
@@ -78,6 +79,27 @@ export async function handleInvestorRequest(
       );
       res.headers.set('Cache-Control', 'private, no-store');
       return res;
+    }
+
+    // Rate limit token validation to prevent brute-force enumeration.
+    // Key by IP + token-presence so legitimate investors with valid tokens
+    // are not blocked by unrelated traffic from the same IP.
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+    const rateLimitKey = 'investor-portal:token:' + clientIp;
+    const rateLimitResult = await apiLimiter.limit(rateLimitKey);
+    if (!rateLimitResult.success) {
+      return new NextResponse(null, {
+        status: 429,
+        headers: {
+          'Retry-After': String(
+            Math.max(
+              1,
+              Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
+            )
+          ),
+        },
+      });
     }
 
     const isValid = await validateInvestorToken(tokenParam);

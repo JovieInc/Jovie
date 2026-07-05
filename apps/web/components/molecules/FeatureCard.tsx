@@ -175,7 +175,7 @@ export function FeatureCard({
         <div
           className={`
             inline-flex h-12 w-12 items-center justify-center rounded-xl 
-            text-white shadow-lg bg-gradient-to-br ${accentClasses[accent]}
+            text-white dark:text-white shadow-lg bg-gradient-to-br ${accentClasses[accent]}
           `}
         >
           {icon}

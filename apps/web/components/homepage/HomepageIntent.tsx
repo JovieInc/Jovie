@@ -239,11 +239,11 @@ export function HomepageIntent({
         <>
           <h1
             id='home-hero-heading'
-            className='homepage-hero-headline self-center text-center text-white'
+            className='homepage-hero-headline self-center text-center text-white dark:text-white'
           >
             {HERO_COPY.headline}
           </h1>
-          <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
+          <p className='homepage-hero-subhead mt-6 max-w-170 self-center text-center text-base leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-lg'>
             {HERO_COPY.subhead}
           </p>
         </>
@@ -252,7 +252,7 @@ export function HomepageIntent({
       <label htmlFor={INPUT_ID} className='sr-only'>
         Ask Jovie
       </label>
-      <div className='relative mt-6 flex w-full max-w-[780px] items-center'>
+      <div className='relative mt-6 flex w-full max-w-195 items-center'>
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -261,29 +261,29 @@ export function HomepageIntent({
           value={value}
           onChange={e => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder='Ask Jovie...'
-          className='h-[62px] w-full rounded-full border border-white/[0.09] bg-[linear-gradient(180deg,rgba(18,20,28,0.9)_0%,rgba(12,13,18,0.94)_100%)] pl-6 pr-[4.85rem] text-[16px] tracking-[-0.016em] text-white shadow-[0_14px_42px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition-[border-color,box-shadow] duration-subtle placeholder:text-white/26 hover:border-white/[0.13] focus-visible:border-white/[0.18] focus-visible:shadow-[0_16px_48px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,255,255,0.025)] sm:h-[64px]'
+          placeholder='Ask Jovie...' // ui-casing-allow: brand placeholder
+          className='h-16 w-full rounded-full border border-white/[0.09] bg-[linear-gradient(180deg,rgba(18,20,28,0.9)_0%,rgba(12,13,18,0.94)_100%)] pl-6 pr-[4.85rem] text-base tracking-[-0.016em] text-white dark:text-white shadow-[0_14px_42px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition-[border-color,box-shadow] duration-subtle placeholder:text-white dark:text-white/26 hover:border-white/[0.13] focus-visible:border-white/[0.18] focus-visible:shadow-[0_16px_48px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,255,255,0.025)] sm:h-16'
         />
         <button
           type='button'
-          aria-label='Submit prompt'
+          aria-label='Submit Prompt'
           aria-disabled={!canSubmit}
           onClick={submit}
           className={[
-            'absolute right-[9px] inline-flex h-11 w-11 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle sm:h-12 sm:w-12',
+            'absolute right-2 inline-flex h-11 w-11 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle sm:h-12 sm:w-12',
             canSubmit
-              ? 'border-white/[0.08] bg-white/[0.09] text-white shadow-[0_10px_24px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.12]'
+              ? 'border-white/[0.08] bg-white/[0.09] text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.12]'
               : 'border-white/[0.04] bg-white/[0.04] text-white/28 pointer-events-none opacity-80',
           ].join(' ')}
         >
-          <ArrowUp className='h-[18px] w-[18px]' strokeWidth={2.4} />
+          <ArrowUp className='h-5 w-5' strokeWidth={2.4} />
         </button>
       </div>
 
-      <div className='relative mt-4 w-full max-w-[888px]'>
+      <div className='relative mt-4 w-full max-w-222'>
         <button
           type='button'
-          aria-label='Scroll prompts left'
+          aria-label='Scroll Prompts Left'
           data-testid='homepage-pill-scroll-left'
           disabled={!canScrollPillsLeft}
           onClick={() => scrollPills(-1)}
@@ -294,7 +294,7 @@ export function HomepageIntent({
         <div
           ref={pillRailRef}
           data-testid='homepage-pill-rail'
-          className='flex w-full min-w-0 items-center justify-start gap-2 overflow-x-auto scroll-smooth px-4 py-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-auto sm:max-w-[804px] sm:px-8 [&::-webkit-scrollbar]:hidden'
+          className='flex w-full min-w-0 items-center justify-start gap-2 overflow-x-auto scroll-smooth px-4 py-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-auto sm:max-w-201 sm:px-8 [&::-webkit-scrollbar]:hidden'
           style={{
             WebkitMaskImage:
               'linear-gradient(to right, transparent 0, black 56px, black calc(100% - 56px), transparent 100%)',
@@ -307,7 +307,7 @@ export function HomepageIntent({
               key={pill.id}
               type='button'
               onClick={() => handlePillClick(pill)}
-              className='shrink-0 whitespace-nowrap rounded-full border border-white/[0.05] bg-white/[0.025] px-[15px] py-[8px] text-[12.5px] font-medium tracking-[-0.012em] text-white/62 transition-[background-color,border-color,color] duration-subtle hover:border-white/[0.1] hover:bg-white/[0.04] hover:text-white/84 focus-visible:border-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/8'
+              className='shrink-0 whitespace-nowrap rounded-full border border-white/[0.05] bg-white/[0.025] px-4 py-2 text-xs font-medium tracking-[-0.012em] text-white/62 transition-[background-color,border-color,color] duration-subtle hover:border-white/[0.1] hover:bg-white/[0.04] hover:text-white/84 focus-visible:border-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/8'
             >
               {pill.label}
             </button>
@@ -315,7 +315,7 @@ export function HomepageIntent({
         </div>
         <button
           type='button'
-          aria-label='Scroll prompts right'
+          aria-label='Scroll Prompts Right'
           data-testid='homepage-pill-scroll-right'
           disabled={!canScrollPillsRight}
           onClick={() => scrollPills(1)}

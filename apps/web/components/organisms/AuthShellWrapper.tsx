@@ -1,6 +1,7 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
   useCallback,
@@ -12,7 +13,10 @@ import {
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
+import { ComposerFocusProvider } from '@/components/features/chat/Composer';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -35,6 +39,7 @@ import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useAppFlag } from '@/lib/flags/client';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
@@ -78,8 +83,10 @@ function AuthShellWrapperInner({
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
+  const pathname = usePathname();
   const headerActions = useHeaderActions();
   const isElectron = useIsElectronRuntime();
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -105,18 +112,30 @@ function AuthShellWrapperInner({
     ? 'artist-profile-settings'
     : 'app-shell';
 
+  const showArtistProfileRailToggle =
+    shellChatV1Enabled &&
+    previewEnabled &&
+    !config.isDemoRoute &&
+    (config.isChatRoute || pathname === APP_ROUTES.DASHBOARD);
+
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
     () => (
       <>
+        {showArtistProfileRailToggle ? <ArtistProfileRailToggle /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
         {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),
-    [config.isDemoRoute, config.showChatUsageIndicator, isElectron]
+    [
+      config.isDemoRoute,
+      config.showChatUsageIndicator,
+      isElectron,
+      showArtistProfileRailToggle,
+    ]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
@@ -215,7 +234,7 @@ function AuthShellWrapperInner({
     [clearPendingShell, pendingShellRoute, showPendingShell]
   );
   const shellChildren = (
-    <div className='relative min-h-full'>
+    <div className='relative flex h-full min-h-0 flex-col'>
       {children}
       <div
         ref={releasesShellOverlayRef}
@@ -226,7 +245,7 @@ function AuthShellWrapperInner({
         <div className='w-full max-w-3xl rounded-2xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
           <div className='flex items-center justify-between gap-4'>
             <div>
-              <p className='text-sm font-semibold tracking-[-0.02em] text-primary-token'>
+              <p className='text-sm font-semibold tracking-tighter text-primary-token'>
                 Opening Releases
               </p>
               <p className='mt-1 text-sm text-secondary-token'>
@@ -248,30 +267,32 @@ function AuthShellWrapperInner({
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
       <PendingShellContext.Provider value={pendingShellContextValue}>
-        <RightPanelProvider>
-          <PreviewPanelProvider
-            key={previewPanelScope}
-            defaultOpen={shouldDefaultOpenPreviewPanel}
-            enabled={previewEnabled}
-          >
-            <RightRailKeyboardHandler />
-            <AuthShell
-              section={config.section}
-              breadcrumbs={config.breadcrumbs}
-              headerBadge={headerBadge}
-              headerAction={headerAction}
-              showMobileTabs={config.showMobileTabs}
-              isTableRoute={config.isTableRoute}
-              isLyricsRoute={config.isLyricsRoute}
-              onSidebarOpenChange={
-                persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-              }
-              sidebarDefaultOpen={sidebarDefaultOpen}
+        <ComposerFocusProvider>
+          <RightPanelProvider>
+            <PreviewPanelProvider
+              key={previewPanelScope}
+              defaultOpen={shouldDefaultOpenPreviewPanel}
+              enabled={previewEnabled}
             >
-              {shellChildren}
-            </AuthShell>
-          </PreviewPanelProvider>
-        </RightPanelProvider>
+              <RightRailKeyboardHandler />
+              <AuthShell
+                section={config.section}
+                breadcrumbs={config.breadcrumbs}
+                headerBadge={headerBadge}
+                headerAction={headerAction}
+                showMobileTabs={config.showMobileTabs}
+                isTableRoute={config.isTableRoute}
+                isLyricsRoute={config.isLyricsRoute}
+                onSidebarOpenChange={
+                  persistSidebarCollapsed ? handleSidebarOpenChange : undefined
+                }
+                sidebarDefaultOpen={sidebarDefaultOpen}
+              >
+                {shellChildren}
+              </AuthShell>
+            </PreviewPanelProvider>
+          </RightPanelProvider>
+        </ComposerFocusProvider>
       </PendingShellContext.Provider>
     </TableMetaContext.Provider>
   );

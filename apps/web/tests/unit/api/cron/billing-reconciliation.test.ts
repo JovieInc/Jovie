@@ -198,12 +198,14 @@ describe('GET /api/cron/billing-reconciliation', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
+    expect(data.stats.fixed).toBe(1);
     expect(mockDbUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         stripeSubscriptionId: 'sub_trialing',
       })
     );
     expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
   it('continues second-pass repairs when one user repair fails', async () => {
@@ -281,6 +283,13 @@ describe('GET /api/cron/billing-reconciliation', () => {
         stripeSubscriptionId: 'sub_active',
       })
     );
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      'Billing reconciliation found issues',
+      undefined,
+      expect.objectContaining({
+        stats: expect.objectContaining({ errors: 1 }),
+      })
+    );
   });
 
   it('continues reconciliation when audit log insert fails', async () => {
@@ -355,6 +364,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
       expect.any(Error),
       expect.objectContaining({ userId: 'user_1' })
     );
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
   it('handles reconciliation errors gracefully', async () => {

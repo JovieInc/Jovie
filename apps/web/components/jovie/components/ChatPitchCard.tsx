@@ -1,9 +1,11 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
+import { ChatArtifactErrorCard } from './ChatArtifactErrorCard';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 
 const PLATFORM_CONFIG = [
@@ -71,14 +73,16 @@ function CopyButton({
   }, [copied]);
 
   return (
-    <button
+    <Button
       type='button'
+      variant='ghost'
+      size='icon'
       onClick={handleCopy}
-      className='system-b-chat-pitch-copy-button focus-ring'
+      className='h-6 w-6 rounded-md focus-ring'
       aria-label={`Copy ${platform} pitch`}
     >
       <CopyToggleIcon copied={copied} size='system-b-chat-pitch-copy-icon' />
-    </button>
+    </Button>
   );
 }
 
@@ -158,12 +162,11 @@ export function ChatPitchCard({
 
   if (state === 'error') {
     return (
-      <output className='system-b-chat-pitch-error'>
-        <span className='system-b-chat-pitch-error-title'>
-          Pitch Generation Failed
-        </span>
-        {error && <p className='system-b-chat-pitch-error-message'>{error}</p>}
-      </output>
+      <ChatArtifactErrorCard
+        title='Pitch Generation Failed'
+        message={error}
+        retryPrompt='Please retry generating the pitch.'
+      />
     );
   }
 

@@ -3,7 +3,7 @@
  *
  * All image CDN domains for supported platforms, used by:
  * - avatar-hosts.ts (runtime hostname validation)
- * - content-security-policy.ts (CSP img-src directive)
+ * - content-security-policy.ts (CSP img-src, media-src, connect-src directives)
  * - dsp-images.ts (DSP image optimization bypass)
  * - next.config.js (Next.js remotePatterns — inline copy, verified by sync test)
  *
@@ -84,6 +84,21 @@ export const INFRASTRUCTURE_MEDIA_DOMAINS: readonly string[] = [
 ];
 
 /**
+ * Infrastructure connect domains not tied to a specific platform.
+ *
+ * Separate from image/media domains because they map to CSP `connect-src`
+ * (not `img-src` or `media-src`). Only include hosts the browser fetches
+ * directly — server-side API calls do not need entries here.
+ */
+export const INFRASTRUCTURE_CONNECT_DOMAINS: readonly string[] = [
+  // Vercel dashboard/API (chat surface deployment status, toolbar)
+  'vercel.com',
+  // Vercel Blob client uploads + direct browser fetches
+  '*.blob.vercel-storage.com',
+  '*.public.blob.vercel-storage.com',
+];
+
+/**
  * Infrastructure image domains not tied to a specific platform.
  */
 export const INFRASTRUCTURE_IMAGE_DOMAINS: readonly string[] = [
@@ -96,6 +111,8 @@ export const INFRASTRUCTURE_IMAGE_DOMAINS: readonly string[] = [
   '*.googleusercontent.com',
   '*.gravatar.com',
   'images.unsplash.com',
+  // Google Tag Manager (conversion tracking pixels fired as img tags)
+  'www.googletagmanager.com',
   // Utilities
   'api.qrserver.com',
   // Hosting / storage
@@ -172,4 +189,12 @@ export function getCspMediaSrcDomains(): string[] {
     ...INFRASTRUCTURE_MEDIA_DOMAINS,
   ];
   return [...new Set(allDomains)].map(d => `https://${d}`);
+}
+
+/**
+ * Returns all connect domains prefixed with `https://` for CSP connect-src.
+ * Used by content-security-policy.ts.
+ */
+export function getCspConnectSrcDomains(): string[] {
+  return [...new Set(INFRASTRUCTURE_CONNECT_DOMAINS)].map(d => `https://${d}`);
 }

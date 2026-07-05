@@ -10,7 +10,10 @@
  * - Billing reconciliation: every day (safety net for webhooks)
  * - Cleanup SMS subscribe intents: every day (folded from standalone cron per JOV-1901)
  * - Waitlist auto-accept: every day when enabled
+ * - Onboarding script self-improvement: every day (JOV-3806)
  * - Data retention: Sundays only (heavy operation)
+ * - Under-enriched discography sweep: every day (bounded batch)
+ * - AI crawler analytics sync: every day (Cloudflare GraphQL, GH-12748)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -21,13 +24,16 @@
 import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { captureError } from '@/lib/error-tracking';
+import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { logger } from '@/lib/utils/logger';
 import { runWaitlistAutoAccept } from '@/lib/waitlist/auto-accept';
 import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
 import { cleanupOrphanedPhotos } from '../cleanup-photos/route';
 import { cleanupSmsIntents } from '../cleanup-sms-intents/route';
+import { syncAiCrawlerAnalyticsCron } from '../sync-ai-crawler-analytics/route';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for all sub-jobs
@@ -106,7 +112,26 @@ export async function GET(request: Request) {
     runWaitlistAutoAccept
   );
 
-  // 6. Data retention — Sundays only (heavy operation)
+  // 6. Under-enriched discography sweep — bounded daily batch (JOV-3068)
+  results.discographyReEnrich = await runSubJob(
+    'discographyReEnrich',
+    sweepUnderEnrichedProfilesForCron
+  );
+
+  // 7. Onboarding script self-improvement — recompute conversion counters,
+  //    mine lint-clean LLM candidates, promote/retire variants (JOV-3806)
+  results.onboardingScriptAggregation = await runSubJob(
+    'onboardingScriptAggregation',
+    runOnboardingScriptAggregation
+  );
+
+  // 8. AI crawler analytics sync — Cloudflare edge analytics (GH-12748)
+  results.aiCrawlerAnalytics = await runSubJob(
+    'aiCrawlerAnalytics',
+    syncAiCrawlerAnalyticsCron
+  );
+
+  // 8. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

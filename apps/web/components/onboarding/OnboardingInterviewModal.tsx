@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Textarea } from '@jovie/ui';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -155,41 +155,55 @@ export function OnboardingInterviewModal({
   if (!open) return null;
 
   const entry = draft[current];
-  const progress = draft
-    .map((_, idx) => (idx <= current ? '●' : '○'))
-    .join(' ');
+  const progressLabel = `Question ${current + 1} of ${draft.length}`;
   const canSubmit = !submitting;
   const isLastQuestion = current === draft.length - 1;
   let submitLabel = 'Next';
-  if (isLastQuestion) submitLabel = submitting ? 'Sending…' : 'Send';
+  if (isLastQuestion) submitLabel = submitting ? 'Sending...' : 'Send';
 
   return (
     <dialog
       ref={dialogRef}
-      aria-label='Quick interview'
-      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-48px)] w-full max-w-[480px] overflow-auto rounded-2xl border border-white/[0.08] bg-[var(--color-bg-surface-3,#2a2c32)] p-6 text-primary-token shadow-[0_5px_50px_rgba(0,0,0,0.5),0_4px_30px_rgba(0,0,0,0.4)] backdrop:bg-black/60 backdrop:backdrop-blur-sm'
+      aria-label='Quick Interview'
+      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-48px)] w-full max-w-120 overflow-auto rounded-(--linear-radius-lg) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-6 text-primary-token shadow-(--linear-shadow-card-elevated) backdrop:bg-(--linear-bg-page) backdrop:backdrop-blur-sm'
     >
-      <div className='mb-4 flex items-center justify-between gap-4 text-xs text-secondary-token'>
-        <span className='tracking-widest'>{progress}</span>
+      <div className='mb-4 flex min-h-7 items-center justify-between gap-4 text-2xs text-secondary-token'>
+        <span
+          aria-label={progressLabel}
+          className='flex items-center gap-1.5'
+          role='status'
+        >
+          {draft.map((entryItem, idx) => (
+            <span
+              aria-hidden='true'
+              className='h-1.5 w-1.5 rounded-full bg-tertiary-token transition-colors duration-subtle data-[state=active]:bg-primary-token'
+              data-state={idx <= current ? 'active' : 'idle'}
+              key={entryItem.question.id}
+            />
+          ))}
+        </span>
         <button
           type='button'
           onClick={endInterview}
           disabled={submitting}
-          className='underline-offset-4 hover:underline disabled:opacity-50'
+          className='text-2xs text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline disabled:opacity-50'
         >
-          End interview
+          End Interview
         </button>
       </div>
 
-      <h2 className='mb-2 text-lg font-medium'>Quick question — 30 seconds.</h2>
-      <p className='mb-4 text-sm text-secondary-token'>
-        We&apos;re building this for you. Your answers go straight to the
-        founders.
+      <h2 className='mb-2 text-mid font-medium text-primary-token'>
+        Quick Question
+      </h2>
+      <p className='mb-4 text-app leading-5 text-secondary-token'>
+        Takes about 30 seconds. Your answers go straight to the founders.
       </p>
 
-      <div className='mb-3 text-base font-medium'>{entry.question.prompt}</div>
+      <div className='mb-3 text-app font-medium leading-5 text-primary-token'>
+        {entry.question.prompt}
+      </div>
 
-      <textarea
+      <Textarea
         value={entry.answer}
         onChange={e =>
           setDraft(prev =>
@@ -201,7 +215,8 @@ export function OnboardingInterviewModal({
         placeholder={entry.question.placeholder ?? ''}
         rows={4}
         disabled={submitting}
-        className='w-full resize-none rounded-lg border border-white/[0.08] bg-white/[0.04] p-3 text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:border-white/20'
+        resizable={false}
+        textareaSize='lg'
       />
 
       <div className='mt-4 flex items-center justify-between gap-3'>
@@ -209,7 +224,7 @@ export function OnboardingInterviewModal({
           type='button'
           onClick={() => advance(true)}
           disabled={!canSubmit}
-          className='text-sm text-secondary-token underline-offset-4 hover:underline disabled:opacity-50'
+          className='text-app text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline disabled:opacity-50'
         >
           Skip
         </button>

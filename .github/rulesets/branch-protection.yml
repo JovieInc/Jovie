@@ -39,7 +39,8 @@
 #    When agent-remediation pushes a fix, old informational approvals
 #    are dismissed. This keeps the audit trail accurate.
 #
-# 4. Simplified status checks: only PR Ready + Migration Guard
+# 4. Simplified status checks: PR Ready + Migration Guard + Fork PR Gate
+#    + PR Size Guard (the full live required set on ruleset 10512119).
 #    PR Ready aggregates only the fast deterministic lane:
 #    ci-fast (typecheck + lint + server boundaries + guardrails).
 #    Slower checks run post-merge or in nightly/manual lanes, which keeps
@@ -50,10 +51,10 @@
 #    would be stuck forever. Instead, auto-approve checks for
 #    scope-judge status internally before enabling auto-merge.
 #
-# 6. merge_queue enabled (lightweight)
-#    PRs enter the merge queue after checks pass. The queue reruns only
-#    ci-fast (merge_group trigger) against latest main to catch integration conflicts.
-#    Slower checks are intentionally kept out of the merge queue.
+# 6. Graphite merge queue (not GitHub native merge_queue)
+#    PRs enter Graphite's queue via the merge-queue label. Graphite rebases on
+#    main and reruns the same aggregate PR lane (CI / PR Ready) — no merge_group
+#    trigger and no pinned leaf jobs. Batch failures bisect to the culprit PR.
 #
 # 7. Fork PR Gate (required status check)
 #    Since required_approving_review_count is 0, fork PRs from external
@@ -95,7 +96,7 @@ rules:
   - type: 'required_status_checks'
     parameters:
       # Require branch to be up-to-date with main before merging.
-      # The merge queue handles this automatically.
+      # Graphite rebases each PR on latest main before merging, satisfying this.
       strict_required_status_checks_policy: true
       required_status_checks:
         # PR Ready: The single aggregate gate for the fast PR lane.
@@ -113,36 +114,42 @@ rules:
         # collaborator submits an APPROVE review. See design decision #7.
         - context: 'Fork PR Gate'
 
-  # ── Merge Queue ────────────────────────────────────────────────────────
-  - type: 'merge_queue'
-    parameters:
-      # Merge method: squash keeps history clean with one commit per PR
-      merge_method: 'squash'
+        # PR Size Guard: Caps PR size (800 lines / 40 files, tunable via repo
+        # vars PR_MAX_LINES / PR_MAX_FILES) to force small, reviewable PRs.
+        # Runs as its own workflow (.github/workflows/pr-size-guard.yml), so
+        # the live context is the bare job name with no "CI /" prefix. Approved
+        # mechanical codemods opt out with the `big-pr` label.
+        - context: 'PR Size Guard'
 
-      # Min entries before queue starts processing. 1 = process immediately
-      # (don't wait for batching). This maximizes speed for autonomous PRs.
-      min_entries_to_merge: 1
+  # ── Merge Queue: Graphite (not GitHub-native) ──────────────────────────
+  # The native `merge_queue` rule was retired 2026-06-18 — Graphite owns the
+  # queue now (the two are mutually exclusive). Graphite enqueues PRs labeled
+  # `merge-queue`, rebases on main, runs the required checks above, and
+  # squash-merges. Queue settings (strategy, timeout, CI optimization,
+  # fast-track) live in app.graphite.com/settings/merge-queue — there is no
+  # CLI/API for them. See .github/MERGE_QUEUE.md.
 
-      # Max entries to batch together. 10 balances throughput for 20+ agent PRs
-      # with blast radius control. Merge queue only runs ci-fast (~30s), so
-      # batches process quickly and failures are cheap to retry.
-      max_entries_to_merge: 10
+  # ── Linear History ─────────────────────────────────────────────────────
+  - type: 'required_linear_history'
+    # Squash-only history. Graphite squash-merges, so this always holds.
 
-      # Minutes to wait for more PRs before processing a batch.
-      # 0 = process immediately when min_entries_to_merge is met.
-      min_entries_to_merge_wait_minutes: 0
-
-      # Status checks that must pass in the merge queue context.
-      # The CI workflow triggers on merge_group events but only runs
-      # ci-fast (typecheck + lint + boundaries + guardrails).
-      # Slower checks are intentionally kept out of the merge queue.
-      check_response_timeout_minutes: 10
+  # ── Signed Commits ─────────────────────────────────────────────────────
+  - type: 'required_signatures'
+    # Every commit on main must be cryptographically signed (GPG or SSH/Sigstore).
+    # Graphite squash-merges and agent-authored commits must sign before merge.
+    # security.yml commit-signature-check surfaces unsigned merges post-hoc.
+    # Human/admin: apply this ruleset via gh api after agent signing is configured.
 
   # ── Branch Integrity ───────────────────────────────────────────────────
   - type: 'non_fast_forward'
     # Block force pushes to main. Always.
 
 # ── Bypass Actors ──────────────────────────────────────────────────────
-# No bypass actors. Every PR — human or agent — must pass through
-# the same CI + merge queue gates.
-bypass_actors: []
+# Graphite App (graphite-app, App ID 158384) must bypass so it can merge
+# through this protected branch from its queue. Required by Graphite's
+# merge-queue setup — without it Graphite cannot push the merged commit.
+# No human/agent bypass: every PR still passes CI + Graphite's queue.
+bypass_actors:
+  - actor_id: 158384
+    actor_type: 'Integration'
+    bypass_mode: 'always'

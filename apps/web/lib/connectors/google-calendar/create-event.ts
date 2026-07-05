@@ -3,12 +3,12 @@
  *
  * Design invariants:
  * 1. REFUSES to run unless the `suggested_actions` row for `approvalId` has
- *    status='accepted' for the calling `userId`. Throws otherwise.
+ *    status='approved' for the calling `userId`. Throws otherwise.
  * 2. Uses `suggestedActions.idempotencyKey` as the Google Calendar event.id
  *    so retries are at-most-once at the provider level.
  * 3. Treats Google 409 (duplicate event ID) as success — the event was already
  *    created by a prior run.
- * 4. On success, CAS-transitions the row: accepted → completed.
+ * 4. On success, CAS-transitions the row: approved → executed.
  *
  * This file is intentionally a write tool only — it does not read or sync
  * calendar events. That concern lives in the C-PR-2 driver.
@@ -155,7 +155,7 @@ export async function createCalendarEvent(
   if (action.userId !== userId) {
     throw new ApprovalRequiredError(approvalId, 'wrong_user');
   }
-  if (action.status !== 'accepted') {
+  if (action.status !== 'approved') {
     throw new ApprovalRequiredError(approvalId, 'not_accepted');
   }
 
@@ -218,12 +218,12 @@ export async function createCalendarEvent(
   }
 
   // ---------------------------------------------------------------------------
-  // 4. CAS: transition accepted → completed
+  // 4. CAS: transition approved → executed
   // ---------------------------------------------------------------------------
   const casUpdated = await db
     .update(suggestedActions)
     .set({
-      status: 'completed',
+      status: 'executed',
       executedAt: new Date(),
       executionResult: { googleEventId, idempotent },
     })
@@ -231,7 +231,7 @@ export async function createCalendarEvent(
       and(
         eq(suggestedActions.id, approvalId),
         eq(suggestedActions.userId, userId),
-        eq(suggestedActions.status, 'accepted')
+        eq(suggestedActions.status, 'approved')
       )
     )
     .returning({ id: suggestedActions.id });
@@ -240,12 +240,12 @@ export async function createCalendarEvent(
     // Another concurrent executor already CAS-transitioned this row.
     // The calendar event is already created — log and treat as success.
     logger.warn(
-      '[calendar.createEvent] CAS accepted→completed missed — concurrent executor won',
+      '[calendar.createEvent] CAS approved→executed missed — concurrent executor won',
       { approvalId, googleEventId }
     );
     await captureError(
       'Calendar createEvent CAS miss (concurrent executor)',
-      new Error('CAS miss on accepted→completed'),
+      new Error('CAS miss on approved→executed'),
       { approvalId, googleEventId }
     );
   }

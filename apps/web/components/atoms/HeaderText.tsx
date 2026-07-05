@@ -17,7 +17,7 @@ export function headerTextClass({
   className?: string;
 }) {
   return cn(
-    'text-sm font-medium leading-5 tracking-[-0.01em]',
+    'text-sm font-medium leading-5 tracking-tight',
     toneClasses[tone],
     className
   );

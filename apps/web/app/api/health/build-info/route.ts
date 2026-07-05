@@ -31,11 +31,18 @@ export function GET() {
     }
   }
 
-  return NextResponse.json({
-    buildId: _cachedBuildId,
-    version,
-    deployedAt: env.VERCEL_DEPLOYMENT_TIME || Date.now(),
-    commitSha: buildSha || runtimeCommitSha,
-    environment,
-  });
+  return NextResponse.json(
+    {
+      buildId: _cachedBuildId,
+      version,
+      deployedAt: env.VERCEL_DEPLOYMENT_TIME || Date.now(),
+      commitSha: buildSha || runtimeCommitSha,
+      environment,
+    },
+    {
+      headers: {
+        'cache-control': 'no-store',
+      },
+    }
+  );
 }

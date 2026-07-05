@@ -30,7 +30,7 @@ function DefaultSidebarSkeleton({
       // without a width/header reflow.
       className={cn(
         'max-lg:hidden bg-sidebar lg:flex lg:shrink-0 lg:flex-col',
-        isShellChatV1 ? 'lg:w-(--linear-app-sidebar-width)' : 'lg:w-[232px]'
+        isShellChatV1 ? 'lg:w-(--linear-app-sidebar-width)' : 'lg:w-58'
       )}
     >
       <div

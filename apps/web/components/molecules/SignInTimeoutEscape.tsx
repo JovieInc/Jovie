@@ -48,14 +48,14 @@ export function SignInTimeoutEscape() {
   if (!timedOut) return null;
 
   return (
-    <div className='mt-6 text-center text-sm text-[var(--color-text-tertiary-token)]'>
+    <div className='mt-6 text-center text-sm text-tertiary-token'>
       Having trouble?{' '}
       {/* API route, not a page — intentional full-document navigation so the
           server can clear cookies and 303 to /signin?reset=1. */}
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <a
         href='/api/auth/reset'
-        className='underline font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+        className='underline font-medium text-(--color-text-secondary) hover:text-(--color-text-primary)'
       >
         Reset session and retry &rarr;
       </a>

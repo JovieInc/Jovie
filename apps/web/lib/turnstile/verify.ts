@@ -150,3 +150,33 @@ function sleep(ms: number): Promise<void> {
 export function isTurnstileConfigured(): boolean {
   return getSecretKey() !== null;
 }
+
+/**
+ * Classify a failed verification so callers can choose the right HTTP status:
+ * - `rejected` → the token was missing or genuinely invalid (the client's
+ *   fault). Surface a 403.
+ * - `unavailable` → Cloudflare or our config let us down (timeout, HTTP error,
+ *   missing secret). The client did nothing wrong; surface a 503 so they retry.
+ *
+ * Single source of truth so every public form maps reasons consistently
+ * instead of re-deriving the rejected/unavailable split inline.
+ */
+export type TurnstileFailureClass = 'rejected' | 'unavailable';
+
+const UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
+  'turnstile_not_configured',
+  'siteverify_timeout',
+  'siteverify_error',
+  'siteverify_exhausted_retries',
+]);
+
+export function classifyTurnstileFailure(
+  result: TurnstileVerifyResult
+): TurnstileFailureClass {
+  const reason = result.reason ?? '';
+  if (reason.startsWith('siteverify_http_')) return 'unavailable';
+  if (UNAVAILABLE_REASONS.has(reason)) return 'unavailable';
+  // `missing_token` and `siteverify_failed` (bad/expired token) are the
+  // client's responsibility.
+  return 'rejected';
+}

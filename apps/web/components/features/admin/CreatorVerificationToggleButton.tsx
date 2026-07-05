@@ -24,11 +24,11 @@ export function CreatorVerificationToggleButton({
   const label = profile.isVerified ? 'Unverify' : 'Verify';
 
   const stateClass = cn(
-    'transition duration-200 ease-out transform',
+    'transition duration-subtle ease-out transform',
     status === 'success' &&
-      'animate-pulse motion-reduce:animate-none scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
+      'animate-pulse motion-reduce:animate-none scale-[1.02] ring-1 ring-(--color-accent)',
     status === 'error' &&
-      'animate-bounce motion-reduce:animate-none scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
+      'animate-bounce motion-reduce:animate-none scale-[0.97] ring-1 ring-(--color-destructive)'
   );
 
   const getIcon = () => {

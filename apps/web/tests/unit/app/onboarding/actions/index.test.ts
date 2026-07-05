@@ -144,8 +144,11 @@ vi.mock('@/app/onboarding/actions/profile-setup', () => ({
   updateExistingProfile: vi.fn(),
 }));
 
-vi.mock('@/app/onboarding/actions/sync', () => ({
-  runBackgroundSyncOperations: vi.fn(),
+vi.mock('@/app/onboarding/actions/post-onboarding', () => ({
+  finalizePostOnboarding: vi.fn(),
+  runBoundedPostOnboardingSideEffect: vi.fn(
+    async (_: string, operation: () => Promise<void>) => operation()
+  ),
 }));
 
 vi.mock('@/lib/waitlist/signup', () => ({

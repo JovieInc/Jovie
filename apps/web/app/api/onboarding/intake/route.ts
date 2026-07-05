@@ -5,7 +5,10 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { userInterviews } from '@/lib/db/schema/user-interviews';
+import {
+  type InterviewTranscriptEntry,
+  userInterviews,
+} from '@/lib/db/schema/user-interviews';
 import { captureError } from '@/lib/error-tracking';
 import {
   enforceOnboardingRateLimit,
@@ -118,6 +121,7 @@ async function ensureIntakeUser(params: {
 
 async function upsertOnboardingInterview(params: {
   readonly userId: string;
+  readonly transcript: InterviewTranscriptEntry[];
   readonly metadata: Record<string, unknown>;
   readonly outcome?: WaitlistAccessOutcome;
   readonly waitlistEntryId?: string;
@@ -134,14 +138,14 @@ async function upsertOnboardingInterview(params: {
     .values({
       userId: params.userId,
       source: 'onboarding_chat',
-      transcript: [],
+      transcript: params.transcript,
       metadata,
       status: ONBOARDING_CHAT_INTERVIEW_STATUS,
     })
     .onConflictDoUpdate({
       target: [userInterviews.userId, userInterviews.source],
       set: {
-        transcript: [],
+        transcript: params.transcript,
         metadata,
         status: ONBOARDING_CHAT_INTERVIEW_STATUS,
         updatedAt: new Date(),
@@ -235,6 +239,7 @@ export async function POST(request: Request) {
     try {
       interviewId = await upsertOnboardingInterview({
         userId: dbUser.id,
+        transcript: parsed.data.transcript,
         metadata: parsed.data.metadata,
       });
     } catch (error) {
@@ -264,6 +269,7 @@ export async function POST(request: Request) {
     try {
       await upsertOnboardingInterview({
         userId: dbUser.id,
+        transcript: parsed.data.transcript,
         metadata: parsed.data.metadata,
         outcome: access.outcome,
         waitlistEntryId: access.entryId,

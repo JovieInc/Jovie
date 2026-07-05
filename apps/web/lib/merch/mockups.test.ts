@@ -10,6 +10,7 @@ const dbMocks = vi.hoisted(() => ({
   selectLimit: vi.fn(),
   updateWhere: vi.fn(),
   lastUpdatedValues: null as Record<string, unknown> | null,
+  updatedValues: [] as Record<string, unknown>[],
 }));
 
 vi.mock('@/lib/printful/client', () => printful);
@@ -25,6 +26,7 @@ vi.mock('@/lib/db', () => ({
     update: () => ({
       set: (values: Record<string, unknown>) => {
         dbMocks.lastUpdatedValues = values;
+        dbMocks.updatedValues.push(values);
         return {
           where: dbMocks.updateWhere,
         };
@@ -194,6 +196,7 @@ describe('generateProductMockups', () => {
 describe('attachMockupsToDesignOption', () => {
   beforeEach(() => {
     dbMocks.lastUpdatedValues = null;
+    dbMocks.updatedValues = [];
     dbMocks.selectLimit.mockReset();
     dbMocks.updateWhere.mockReset();
     dbMocks.updateWhere.mockResolvedValue(undefined);
@@ -210,11 +213,29 @@ describe('attachMockupsToDesignOption', () => {
       'https://printful.test/mockup-tee.jpg',
     ]);
 
+    expect(dbMocks.updatedValues).toEqual([
+      {
+        mockupUrls: [
+          'https://printful.test/mockup-tee.jpg',
+          'https://cdn.test/internal-mockup.jpg',
+        ],
+        updatedAt: expect.any(Date),
+      },
+      {
+        mockupUrls: [
+          'https://printful.test/mockup-tee.jpg',
+          'https://cdn.test/internal-mockup.jpg',
+        ],
+        primaryImageUrl: 'https://printful.test/mockup-tee.jpg',
+        updatedAt: expect.any(Date),
+      },
+    ]);
     expect(dbMocks.lastUpdatedValues).toEqual({
       mockupUrls: [
-        'https://cdn.test/internal-mockup.jpg',
         'https://printful.test/mockup-tee.jpg',
+        'https://cdn.test/internal-mockup.jpg',
       ],
+      primaryImageUrl: 'https://printful.test/mockup-tee.jpg',
       updatedAt: expect.any(Date),
     });
   });

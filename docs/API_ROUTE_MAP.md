@@ -75,6 +75,16 @@
 |-------|---------|------|-------------|
 | `/api/apple-music/search` | GET | `auth` | Search Apple Music catalog |
 
+### Apple Wallet
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/wallet/apple/profile-pass` | GET | `auth` | Generate and return the current user's Jovie Profile `.pkpass` |
+| `/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]` | GET | Pass auth token | Return changed serial numbers for registered Wallet passes |
+| `/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]/[serialNumber]` | POST, DELETE | Pass auth token | Register or unregister a device for pass updates |
+| `/api/wallet/apple/v1/passes/[passTypeIdentifier]/[serialNumber]` | GET | Pass auth token | Return the latest signed Wallet pass bundle |
+| `/api/wallet/apple/v1/log` | POST | `public` | Receive Apple Wallet client logs with public rate limiting |
+
 ### Artist
 
 | Route | Methods | Auth | Description |
@@ -177,6 +187,7 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/dashboard/activity/recent` | GET | `auth` | Recent activity feed |
+| `/api/dashboard/ai-crawlers` | GET | `auth` | AI crawler analytics (Pro detail; free users get teaser counts) |
 | `/api/dashboard/analytics` | GET | `auth` | Analytics overview |
 | `/api/dashboard/audience/members` | GET | `auth` | Audience member list |
 | `/api/dashboard/audience/source-groups` | GET, POST | `auth` | Audience source group management |
@@ -190,6 +201,7 @@
 | `/api/dashboard/pixels/health` | GET | `auth` | Pixel health check |
 | `/api/dashboard/pixels/test-event` | POST | `auth` | Send test pixel event |
 | `/api/dashboard/profile` | GET, PUT | `auth` | Profile data |
+| `/api/dashboard/releases/artwork-downloads` | POST | `auth` | Toggle allow-artwork-downloads for the active profile |
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |
 | `/api/dashboard/releases/[releaseId]/tracks` | GET | `auth` | Release tracks |

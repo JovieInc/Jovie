@@ -133,7 +133,6 @@ describe('ChatMerchCard', () => {
       '$11.87'
     );
     expect(sellableCard.getByRole('radio', { name: 'Standard' })).toBeChecked();
-    expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Printful product cost must come from Printful before sale.'
@@ -188,5 +187,36 @@ describe('ChatMerchCard', () => {
       'href',
       '/app/library?view=merch'
     );
+  });
+
+  it('submits same-design alternative item prompts from the saved card', () => {
+    const dispatch = vi.spyOn(globalThis, 'dispatchEvent');
+
+    render(
+      <ChatMerchSelectionCard
+        result={{
+          success: true,
+          merchCardId: '00000000-0000-4000-8000-000000000201',
+          status: 'draft',
+          selectedOptionId: '00000000-0000-4000-8000-000000000101',
+          title: 'Signal Tee',
+          publicUrl: null,
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hoodie' }));
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'jovie-chat-submit-prompt',
+        detail: {
+          prompt:
+            'Create a hoodie version of merch card 00000000-0000-4000-8000-000000000201 with the same design.',
+        },
+      })
+    );
+
+    dispatch.mockRestore();
   });
 });

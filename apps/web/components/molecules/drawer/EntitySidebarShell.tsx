@@ -210,7 +210,7 @@ export function EntitySidebarShell({
                       actions={titleBarActions}
                       className={cn(
                         isMinimalHeader &&
-                          'min-h-[34px] px-2.5 py-1 lg:min-h-[36px] lg:px-3'
+                          'min-h-9 px-2.5 py-1 lg:min-h-9 lg:px-3'
                       )}
                     />
                   ) : null}

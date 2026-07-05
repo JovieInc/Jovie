@@ -9,7 +9,7 @@ export default function SmartLinkNotFound() {
       <div className='w-full max-w-sm text-center'>
         <div className='mb-6 select-none'>
           <span
-            className='block text-[100px] font-semibold leading-none tracking-tighter text-primary-token/[0.42]'
+            className='block text-[100px] font-semibold leading-none tracking-tighter text-neutral-600 dark:text-primary-token/[0.42]'
             aria-hidden='true'
           >
             404
@@ -20,14 +20,14 @@ export default function SmartLinkNotFound() {
           <h1 className='text-lg font-semibold tracking-tight'>
             Content Not Found
           </h1>
-          <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
+          <p className='mt-2 text-sm leading-relaxed text-neutral-700 dark:text-muted-foreground'>
             This page may have been removed or the link may be incorrect.
           </p>
 
           <div className='mt-6 flex items-center justify-center gap-3'>
             <Link
               href='/'
-              className='text-muted-foreground hover:text-foreground text-sm transition-colors'
+              className='text-sm text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground'
             >
               Go Home
             </Link>

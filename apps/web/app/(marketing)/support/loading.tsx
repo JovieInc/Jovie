@@ -16,10 +16,14 @@ export default function SupportLoading() {
 
       <MarketingContainer width='prose' className='mt-16'>
         <div className='h-7 w-48 skeleton rounded' />
-        <div className='mt-6 grid gap-8 sm:grid-cols-3'>
+        <div className='mt-6 grid gap-6 sm:grid-cols-3'>
           {SUPPORT_CHANNEL_KEYS.map(channelKey => (
-            <div key={channelKey}>
-              <div className='h-5 w-28 skeleton rounded' />
+            <div
+              key={channelKey}
+              className='rounded-2xl border border-subtle bg-surface-1 p-6'
+            >
+              <div className='h-5 w-5 skeleton rounded' />
+              <div className='mt-4 h-5 w-28 skeleton rounded' />
               <div className='mt-2 h-4 w-full skeleton rounded' />
               <div className='mt-3 h-4 w-16 skeleton rounded' />
             </div>

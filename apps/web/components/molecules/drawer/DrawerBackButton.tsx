@@ -21,7 +21,7 @@ export function DrawerBackButton({
       {...props}
     >
       <ArrowLeft className='h-3.5 w-3.5' aria-hidden='true' />
-      <span className='max-w-[200px] truncate'>{label}</span>
+      <span className='max-w-50 truncate'>{label}</span>
     </DrawerButton>
   );
 }

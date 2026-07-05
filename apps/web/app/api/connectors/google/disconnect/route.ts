@@ -1,7 +1,13 @@
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
+import {
+  type ConnectorProviderId,
+  connectorProviderSchema,
+  GOOGLE_CONNECTOR_PROVIDERS,
+} from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
@@ -13,10 +19,8 @@ export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
   /** Which provider to disconnect. Omit to disconnect both Gmail + Google Calendar. */
-  provider: z.enum(['gmail', 'google_calendar']).optional(),
+  provider: connectorProviderSchema.optional(),
 });
-
-type GoogleProvider = 'gmail' | 'google_calendar';
 
 /**
  * POST /api/connectors/google/disconnect
@@ -49,16 +53,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const providersToDisconnect: GoogleProvider[] = parsed.data.provider
+    const providersToDisconnect: ConnectorProviderId[] = parsed.data.provider
       ? [parsed.data.provider]
-      : ['gmail', 'google_calendar'];
+      : [...GOOGLE_CONNECTOR_PROVIDERS];
 
     for (const provider of providersToDisconnect) {
-      const providerSql = drizzleSql.raw(`'${provider}'::connector_provider`);
       await db
         .update(connectorAccounts)
         .set({
-          status: drizzleSql`'disabled'::connector_status`,
+          status: asConnectorStatusSql('disabled'),
           encryptedAccessToken: null,
           encryptedRefreshToken: null,
           tokenExpiresAt: null,
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(connectorAccounts.userId, dbUser.id),
-            drizzleSql`${connectorAccounts.provider} = ${providerSql}`
+            eq(connectorAccounts.provider, provider)
           )
         );
     }

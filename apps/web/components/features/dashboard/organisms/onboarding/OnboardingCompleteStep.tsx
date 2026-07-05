@@ -1,8 +1,9 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { AuthButton, AuthLinkPreviewCard } from '@/features/auth';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AuthLinkPreviewCard } from '@/features/auth';
+import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 
 interface OnboardingCompleteStepProps {
   readonly title: string;
@@ -74,19 +75,26 @@ export function OnboardingCompleteStep({
         </ContentSurfaceCard>
 
         <div className={FORM_LAYOUT.formInner}>
-          <AuthButton
+          <Button
             onClick={onGoToDashboard}
+            className={AUTH_CLASSES.authCta}
+            static
             disabled={isSpotifyImportInProgress}
             aria-busy={isSpotifyImportInProgress}
           >
             {isSpotifyImportInProgress
               ? 'Finishing setup...'
               : 'Go to Dashboard'}
-          </AuthButton>
+          </Button>
 
-          <AuthButton onClick={onCopyLink} variant='secondary'>
+          <Button
+            onClick={onCopyLink}
+            variant='secondary'
+            className={AUTH_CLASSES.authCta}
+            static
+          >
             Copy Link
-          </AuthButton>
+          </Button>
         </div>
 
         <div className={FORM_LAYOUT.footerHint}>

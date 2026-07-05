@@ -12,7 +12,7 @@
  * Constants: apps/web/lib/profile/nav-constants.ts
  *
  * Tab definitions (spec §2.1, fixed order):
- *   1. Profile  (mode: profile)   — UserRound icon
+ *   1. Home     (mode: profile)   — UserRound icon
  *   2. Music    (mode: listen)    — Music2 icon
  *   3. Events   (mode: tour)      — CalendarDays icon
  *   4. Alerts   (mode: subscribe) — Bell icon
@@ -44,7 +44,7 @@ interface TabDefinition {
  * All four primary tab definitions, in canonical order.
  */
 const ALL_PRIMARY_TABS: ReadonlyArray<TabDefinition> = [
-  { mode: 'profile', label: 'Profile', icon: UserRound },
+  { mode: 'profile', label: 'Home', icon: UserRound },
   { mode: 'listen', label: 'Music', icon: Music2 },
   { mode: 'tour', label: 'Events', icon: CalendarDays },
   { mode: 'subscribe', label: 'Alerts', icon: Bell },
@@ -90,7 +90,7 @@ export interface BottomTabBarProps {
  * Content rendered above this bar must reserve `--profile-bottom-nav-height`
  * — see `CONTENT_SAFE_AREA_BOTTOM_PADDING` in `lib/profile/nav-constants.ts`.
  *
- * Touch targets meet the 44×44pt minimum via `min-h-[50px]` on each button.
+ * Touch targets meet the 44×44pt minimum via `min-h-13` on each button.
  */
 export function BottomTabBar({
   activeTab,
@@ -110,7 +110,7 @@ export function BottomTabBar({
       )}
       data-testid='profile-tab-bar'
     >
-      <nav aria-label='Profile navigation' data-testid='profile-bottom-nav'>
+      <nav aria-label='Profile Navigation' data-testid='profile-bottom-nav'>
         <div
           className='grid items-center gap-1'
           style={{
@@ -129,9 +129,11 @@ export function BottomTabBar({
                 onClick={() => onTabSelect(tab.mode)}
                 // 44×44pt minimum touch target (spec §2 a11y requirement).
                 className={cn(
-                  'relative flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
+                  'relative flex min-h-13 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                  isActive ? 'text-white' : 'text-white/40 hover:text-white/62'
+                  isActive
+                    ? 'text-white dark:text-white'
+                    : 'text-white/40 hover:text-white/62'
                 )}
                 // aria-current="page" marks the active tab for screen readers
                 aria-current={isActive ? 'page' : undefined}
@@ -139,8 +141,8 @@ export function BottomTabBar({
               >
                 <Icon
                   className={cn(
-                    'h-[21px] w-[21px] shrink-0',
-                    isActive ? 'text-white' : 'text-white/52'
+                    'h-5 w-5 shrink-0',
+                    isActive ? 'text-white dark:text-white' : 'text-white/52'
                   )}
                   aria-hidden='true'
                 />

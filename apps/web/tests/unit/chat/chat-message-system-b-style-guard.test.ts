@@ -53,7 +53,6 @@ describe('ChatMessage System B source contract', () => {
       'system-b-chat-assistant-stack',
       'system-b-chat-message-reply',
       'system-b-chat-copy-row',
-      'system-b-chat-copy-button',
       'system-b-chat-copy-icon',
     ];
 
@@ -61,6 +60,9 @@ describe('ChatMessage System B source contract', () => {
       expect(source).toContain(className);
       expect(styles).toContain(`.${className}`);
     }
+
+    expect(source).not.toContain('system-b-chat-copy-button');
+    expect(styles).not.toContain('system-b-chat-copy-button');
   });
 
   it('keeps user-bubble light-surface text on the canonical System B alias', () => {

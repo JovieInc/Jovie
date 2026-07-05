@@ -3,7 +3,11 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
 
-import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import {
+  CanonicalUserState,
+  getRedirectForState,
+  resolveUserState,
+} from '@/lib/auth/gate';
 import type { PlanIntentTier } from '@/lib/auth/plan-intent';
 import {
   DEFAULT_UPSELL_PLAN,
@@ -141,8 +145,11 @@ export default async function OnboardingCheckoutPage({
   const pricing = resolvePriceIds(planIntent);
 
   if (!pricing.monthlyPriceId) {
-    // Price not configured — skip to dashboard
-    redirect(APP_ROUTES.DASHBOARD);
+    // Price not configured — skip checkout. Incomplete profiles must return
+    // to onboarding, not /app (the shell immediately redirects them back to
+    // /start and can loop with /onboarding/checkout — JOV-2454 / ENG-002).
+    const stateRedirect = getRedirectForState(authResult.state);
+    redirect(stateRedirect ?? APP_ROUTES.DASHBOARD);
   }
 
   return (

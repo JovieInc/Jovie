@@ -12,10 +12,18 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useRegisterComposerFocus } from '@/components/features/chat/Composer';
+import { DictationWaveform } from '@/components/shell/DictationWaveform';
+import {
+  insertLargeTextAtCaret,
+  shouldChunkLargePaste,
+} from '@/lib/chat/large-text-paste';
 import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
+import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
+import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
-import type { PendingImage } from '../hooks/useChatImageAttachments';
+import { CHAT_COMPOSER_MAX_WIDTH } from '../chat-layout';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import {
   HIDDEN_DIV_STYLES,
@@ -30,7 +38,6 @@ import {
 import { ChipTray } from './ChipTray';
 import { SPRING_HEIGHT, TRANSITION_SURFACE } from './chat-motion';
 import { EntityPreviewPane } from './EntityPreviewPane';
-import { ImagePreviewStrip } from './ImagePreviewStrip';
 import {
   activeEntityFor,
   SlashCommandMenu,
@@ -52,10 +59,10 @@ export interface ChatInputProps {
   readonly isSubmitting: boolean;
   readonly placeholder?: string;
   readonly variant?: 'default' | 'compact' | 'hero';
-  readonly onImageAttach?: () => void;
-  readonly isImageProcessing?: boolean;
-  readonly pendingImages?: PendingImage[];
-  readonly onRemoveImage?: (id: string) => void;
+  readonly onFileAttach?: () => void;
+  readonly isFileProcessing?: boolean;
+  readonly pendingFiles?: import('../hooks/useChatFileAttachments').PendingFile[];
+  readonly onRemoveFile?: (id: string) => void;
   readonly onPaste?: (e: React.ClipboardEvent) => void;
   readonly quickActions?: readonly ChatQuickAction[];
   readonly onQuickActionSelect?: (prompt: string) => void;
@@ -97,16 +104,17 @@ interface SurfaceGeometry {
 function geometryFor(
   mode: SurfaceMode,
   stacked: boolean,
-  variant: NonNullable<ChatInputProps['variant']>
+  variant: NonNullable<ChatInputProps['variant']>,
+  usePillLayout: boolean
 ): SurfaceGeometry {
   const width = '100%';
-  const isHero = variant === 'hero';
-  const maxWidth = isHero
-    ? 'min(calc(100vw - 32px), 840px)'
-    : 'min(calc(100vw - 32px), 720px)';
+  const maxWidth = `min(calc(100vw - 32px), ${CHAT_COMPOSER_MAX_WIDTH})`;
   if (stacked) return { width, maxWidth, borderRadius: 28 };
-  if (isHero && mode !== 'entity') return { width, maxWidth, borderRadius: 36 };
   if (mode === 'entity') return { width, maxWidth, borderRadius: 24 };
+  if (variant === 'hero' && usePillLayout) {
+    return { width, maxWidth, borderRadius: 999 };
+  }
+  if (variant === 'hero') return { width, maxWidth, borderRadius: 24 };
   return { width, maxWidth, borderRadius: 28 };
 }
 
@@ -124,6 +132,67 @@ function pickerKindArticle(
   return kind === 'artist' || kind === 'event' ? 'an' : 'a';
 }
 
+function dictationErrorMessage(code: TranscriberErrorCode): string {
+  switch (code) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+    case 'audio-capture':
+      return 'Microphone access was denied. You can keep typing your message.';
+    case 'no-speech':
+      return "Didn't catch speech — try again or keep typing.";
+    case 'network':
+      return 'Dictation needs a network connection. You can keep typing.';
+    default:
+      return 'Dictation unavailable right now. You can keep typing.';
+  }
+}
+
+function DictationStatusBanner({
+  isListening,
+  error,
+  onDismissError,
+}: {
+  readonly isListening: boolean;
+  readonly error: TranscriberErrorCode | null;
+  readonly onDismissError: () => void;
+}) {
+  if (!isListening && !error) return null;
+
+  if (error) {
+    return (
+      <div
+        role='alert'
+        className='flex items-center justify-between gap-3 px-3 py-2 text-xs text-tertiary-token'
+      >
+        <span>{dictationErrorMessage(error)}</span>
+        <button
+          type='button'
+          onClick={onDismissError}
+          className='shrink-0 rounded-md px-2 py-1 text-2xs text-primary-token hover:bg-surface-1/60'
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role='status'
+      aria-live='polite'
+      className='flex items-center gap-3 px-3 py-2'
+    >
+      <DictationWaveform active bars={16} className='h-6 w-28' />
+      <div className='min-w-0'>
+        <div className='text-xs font-medium text-primary-token'>Listening</div>
+        <div className='text-2xs text-tertiary-token'>
+          Speak now — release the mic when finished
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
@@ -132,12 +201,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onSubmit,
       isLoading,
       isSubmitting,
-      placeholder = 'Ask Jovie anything',
+      placeholder = 'What are you working on?',
       variant = 'default',
-      onImageAttach,
-      isImageProcessing = false,
-      pendingImages,
-      onRemoveImage,
+      onFileAttach,
+      isFileProcessing = false,
+      pendingFiles,
+      onRemoveFile,
       onPaste,
       quickActions,
       onQuickActionSelect,
@@ -158,10 +227,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const characterCount = value.length;
     const isNearLimit = characterCount > MAX_MESSAGE_LENGTH * 0.9;
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
-    const hasAttachButton = Boolean(onImageAttach);
-    const hasPendingImages = (pendingImages?.length ?? 0) > 0;
+    const hasAttachButton = Boolean(onFileAttach);
+    const hasPendingFiles = (pendingFiles?.length ?? 0) > 0;
     const hasChips = (chips?.length ?? 0) > 0;
 
+    const { setComposerFocused } = useRegisterComposerFocus();
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [isViewportNarrow, setIsViewportNarrow] = useState(false);
@@ -237,6 +307,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Picker queries scope to this profile's catalog when present; absent
     // profileId yields an empty release set (artist search is global).
     const pickerProfileId = profileId ?? '';
+    const { record: recordRecentEntity } = useEntityRecents(pickerProfileId);
     const { items: pickerItems, sections: _sections } = useSlashItems(
       picker.state,
       pickerProfileId
@@ -248,11 +319,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // is open above it and Enter is committing the active row, not sending.
     const sendBlockedByPicker = isPickerOpen && value.trim() === '/';
     const canSend =
-      Boolean(value.trim() || hasPendingImages || hasChips) &&
+      Boolean(value.trim() || hasPendingFiles || hasChips) &&
       !isLoading &&
       !isSubmitting &&
       !isOverLimit &&
-      !isImageProcessing &&
+      !isFileProcessing &&
       !sendBlockedByPicker;
 
     const handlePickerClose = useCallback(() => {
@@ -372,6 +443,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const handleSelectEntity = useCallback(
       (entity: import('@/lib/commands/entities').EntityRef) => {
+        // Remember every tagged entity so it ranks first next time (own graph).
+        recordRecentEntity(entity);
         if (onAddEntity) {
           stripSlashQuery();
           onAddEntity({
@@ -395,6 +468,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [
         handlePickerClose,
         onAddEntity,
+        recordRecentEntity,
         replaceSlashQueryWithToken,
         stripSlashQuery,
       ]
@@ -412,6 +486,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const {
       isSupported: isDictationSupported,
       isListening,
+      error: dictationError,
+      clearError: clearDictationError,
+      start: startDictation,
+      stop: stopDictation,
       toggle: toggleDictation,
     } = useSpeechRecognition({
       onTranscript: sessionTranscript => {
@@ -425,12 +503,27 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }, 0);
     }, []);
 
+    const captureDictationBaseline = useCallback(() => {
+      dictationBaselineRef.current = value;
+    }, [value]);
+
+    const handleMicPushStart = useCallback(() => {
+      if (isListening) return;
+      captureDictationBaseline();
+      startDictation();
+    }, [captureDictationBaseline, isListening, startDictation]);
+
+    const handleMicPushEnd = useCallback(() => {
+      if (!isListening) return;
+      stopDictation();
+    }, [isListening, stopDictation]);
+
     const handleMicToggle = useCallback(() => {
       if (!isListening) {
-        dictationBaselineRef.current = value;
+        captureDictationBaseline();
       }
       toggleDictation();
-    }, [isListening, toggleDictation, value]);
+    }, [captureDictationBaseline, isListening, toggleDictation]);
 
     const handleFormSubmit = useCallback(
       (e: React.FormEvent) => {
@@ -449,6 +542,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
+        // SlashCommandMenu owns Escape while the picker is open (capture phase).
+        if (e.key === 'Escape' && picker.state.status === 'closed') {
+          e.preventDefault();
+          internalTextareaRef.current?.blur();
+          setComposerFocused(false);
+          return;
+        }
         // While the picker is open, swallow Enter — SlashCommandMenu owns it.
         if (picker.state.status !== 'closed' && e.key === 'Enter') return;
         if (e.key === 'Enter' && !e.shiftKey && canSend) {
@@ -475,6 +575,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onRemoveLastChip,
         picker.state,
         scheduleTextareaRefocus,
+        setComposerFocused,
       ]
     );
 
@@ -485,17 +586,56 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       []
     );
 
+    const handlePaste = useCallback(
+      (event: React.ClipboardEvent) => {
+        const hasFileItems = Array.from(event.clipboardData.items).some(
+          item => item.kind === 'file'
+        );
+        if (hasFileItems) {
+          onPaste?.(event);
+          return;
+        }
+
+        const pastedText = event.clipboardData.getData('text/plain');
+        if (!shouldChunkLargePaste(pastedText.length)) {
+          onPaste?.(event);
+          return;
+        }
+
+        const textarea = internalTextareaRef.current;
+        if (!textarea) return;
+
+        event.preventDefault();
+        insertLargeTextAtCaret({
+          textarea,
+          pastedText,
+          currentValue: value,
+          onValueChange: handleChange,
+          maxLength: MAX_MESSAGE_LENGTH + 100,
+        });
+      },
+      [handleChange, onPaste, value]
+    );
+
     // Resolve the surface mode from textarea + picker state. Shell + Chat V1
     // keeps empty focus calm so the composer doesn't reflow just because the
     // textarea received focus.
-    const hasText = Boolean(value.trim()) || hasPendingImages;
+    // Attachment chips render above the composer in ChatComposerSurface;
+    // only typed draft text should expand the inline field geometry.
+    const hasText = Boolean(value.trim());
     const isExpanded = plusMenuOpen || isListening || hasText || isFocused;
     let surfaceMode: SurfaceMode = 'empty';
     if (picker.state.status === 'entity') surfaceMode = 'entity';
     else if (picker.state.status === 'root') surfaceMode = 'root';
     else if (hasText || plusMenuOpen || isListening) surfaceMode = 'typing';
 
-    const geometry = geometryFor(surfaceMode, isStacked, variant);
+    const hasInlineContent = Boolean(value.trim()) || hasChips;
+    const hasOnlyRootSlashQuery =
+      picker.state.status === 'root' &&
+      value.trim().startsWith('/') &&
+      !hasChips;
+    const useHeroPill = isHero && (!hasInlineContent || hasOnlyRootSlashQuery);
+    const geometry = geometryFor(surfaceMode, isStacked, variant, useHeroPill);
     const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
     const reserveInlinePickerSpace =
@@ -529,10 +669,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onPickerOpenChange?.(picker.state.status !== 'closed');
     }, [picker.state.status, onPickerOpenChange]);
 
+    const dictationBanner = (
+      <DictationStatusBanner
+        isListening={isListening}
+        error={dictationError}
+        onDismissError={clearDictationError}
+      />
+    );
+    const showDictationBanner = isListening || Boolean(dictationError);
+
     return (
       <form
         onSubmit={handleFormSubmit}
-        aria-label='Compose a message — type / for skills and references'
+        aria-label='Compose A Message — Type / For Skills And References'
         className='relative z-10 w-full focus-within:outline-none'
       >
         <div className={dockClass}>
@@ -544,7 +693,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 reserveInlinePickerSpace
                   ? 'relative z-[80] flex w-full justify-center'
                   : 'absolute bottom-full left-0 right-0 z-[80] flex justify-center',
-                statusBanner ? 'mb-[34px]' : 'mb-4'
+                statusBanner ? 'mb-9' : 'mb-4'
               )}
             >
               <div
@@ -603,7 +752,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           >
             {showEntitySurface && !isStacked ? (
               <div className='flex w-full'>
-                <aside className='system-b-chat-composer-seam flex w-[264px] shrink-0 flex-col border-r'>
+                <aside className='system-b-chat-composer-seam flex w-66 shrink-0 flex-col border-r'>
                   <SlashCommandMenu
                     profileId={pickerProfileId}
                     state={picker.state}
@@ -631,6 +780,25 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {statusBanner}
                     </div>
                   ) : null}
+                  {/* Grid accordion reserves height while animating dictation
+                      banner in/out — avoids the ~64px jump (JOV-11948). */}
+                  {isDictationSupported ? (
+                    <div
+                      className={cn(
+                        'grid transition-[grid-template-rows] duration-subtle ease-in-out',
+                        showDictationBanner
+                          ? 'grid-rows-[1fr]'
+                          : 'grid-rows-[0fr]'
+                      )}
+                      aria-hidden={!showDictationBanner}
+                    >
+                      <div className='overflow-hidden'>
+                        <div className='system-b-chat-composer-seam border-t'>
+                          {dictationBanner}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className='system-b-chat-composer-seam border-t'>
                     <InputRow
                       containerRef={containerRef}
@@ -639,15 +807,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       value={value}
                       onChange={handleChange}
                       handleKeyDown={handleKeyDown}
-                      onPaste={onPaste}
+                      onPaste={handlePaste}
                       placeholder={placeholder}
                       isAtMaxHeight={isAtMaxHeight}
                       measuredHeight={measuredHeight}
                       reducedMotion={reducedMotion}
                       isNearLimit={isNearLimit}
                       hasAttachButton={hasAttachButton}
-                      onImageAttach={onImageAttach}
-                      isImageProcessing={isImageProcessing}
+                      onFileAttach={onFileAttach}
+                      isFileProcessing={isFileProcessing}
                       isLoading={isLoading}
                       isSubmitting={isSubmitting}
                       plusMenuOpen={plusMenuOpen}
@@ -655,15 +823,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       handlePreserveFocus={handlePreserveFocus}
                       isDictationSupported={isDictationSupported}
                       isListening={isListening}
+                      handleMicPushStart={handleMicPushStart}
+                      handleMicPushEnd={handleMicPushEnd}
                       handleMicToggle={handleMicToggle}
                       canSend={canSend}
                       isStreaming={isStreaming}
                       onSend={handleSendClick}
                       onStop={onStop}
                       setIsFocused={setIsFocused}
-                      hasPendingImages={hasPendingImages}
-                      pendingImages={pendingImages}
-                      onRemoveImage={onRemoveImage}
+                      setComposerFocused={setComposerFocused}
                       chips={chips}
                       onRemoveChipAt={onRemoveChipAt}
                       isPickerOpen={isPickerOpen}
@@ -709,6 +877,26 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 ) : null}
 
+                {/* Grid accordion reserves height while animating dictation
+                    banner in/out — avoids the ~64px jump (JOV-11948). */}
+                {isDictationSupported ? (
+                  <div
+                    className={cn(
+                      'grid transition-[grid-template-rows] duration-subtle ease-in-out',
+                      showDictationBanner
+                        ? 'grid-rows-[1fr]'
+                        : 'grid-rows-[0fr]'
+                    )}
+                    aria-hidden={!showDictationBanner}
+                  >
+                    <div className='overflow-hidden'>
+                      <div className='system-b-chat-composer-seam border-b'>
+                        {dictationBanner}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <InputRow
                   containerRef={containerRef}
                   hiddenDivRef={hiddenDivRef}
@@ -716,15 +904,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   value={value}
                   onChange={handleChange}
                   handleKeyDown={handleKeyDown}
-                  onPaste={onPaste}
+                  onPaste={handlePaste}
                   placeholder={placeholder}
                   isAtMaxHeight={isAtMaxHeight}
                   measuredHeight={measuredHeight}
                   reducedMotion={reducedMotion}
                   isNearLimit={isNearLimit}
                   hasAttachButton={hasAttachButton}
-                  onImageAttach={onImageAttach}
-                  isImageProcessing={isImageProcessing}
+                  onFileAttach={onFileAttach}
+                  isFileProcessing={isFileProcessing}
                   isLoading={isLoading}
                   isSubmitting={isSubmitting}
                   plusMenuOpen={plusMenuOpen}
@@ -732,15 +920,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   handlePreserveFocus={handlePreserveFocus}
                   isDictationSupported={isDictationSupported}
                   isListening={isListening}
+                  handleMicPushStart={handleMicPushStart}
+                  handleMicPushEnd={handleMicPushEnd}
                   handleMicToggle={handleMicToggle}
                   canSend={canSend}
                   isStreaming={isStreaming}
                   onSend={handleSendClick}
                   onStop={onStop}
                   setIsFocused={setIsFocused}
-                  hasPendingImages={hasPendingImages}
-                  pendingImages={pendingImages}
-                  onRemoveImage={onRemoveImage}
+                  setComposerFocused={setComposerFocused}
                   chips={chips}
                   onRemoveChipAt={onRemoveChipAt}
                   hasBorderTop={
@@ -796,8 +984,8 @@ interface InputRowProps {
   readonly reducedMotion: boolean | null;
   readonly isNearLimit: boolean;
   readonly hasAttachButton: boolean;
-  readonly onImageAttach?: () => void;
-  readonly isImageProcessing: boolean;
+  readonly onFileAttach?: () => void;
+  readonly isFileProcessing: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly plusMenuOpen: boolean;
@@ -807,15 +995,15 @@ interface InputRowProps {
   ) => void;
   readonly isDictationSupported: boolean;
   readonly isListening: boolean;
+  readonly handleMicPushStart: () => void;
+  readonly handleMicPushEnd: () => void;
   readonly handleMicToggle: () => void;
   readonly canSend: boolean;
   readonly isStreaming: boolean;
   readonly onSend: () => void;
   readonly onStop?: () => void;
   readonly setIsFocused: (focused: boolean) => void;
-  readonly hasPendingImages: boolean;
-  readonly pendingImages?: import('../hooks/useChatImageAttachments').PendingImage[];
-  readonly onRemoveImage?: (id: string) => void;
+  readonly setComposerFocused: (focused: boolean) => void;
   readonly chips?: readonly import('../hooks/useChipTray').TrayChip[];
   readonly onRemoveChipAt?: (index: number) => void;
   /** Add hairline divider above the input (when picker sits above it). */
@@ -847,8 +1035,8 @@ function InputRow({
   reducedMotion,
   isNearLimit,
   hasAttachButton,
-  onImageAttach,
-  isImageProcessing,
+  onFileAttach,
+  isFileProcessing,
   isLoading,
   isSubmitting,
   plusMenuOpen,
@@ -856,15 +1044,15 @@ function InputRow({
   handlePreserveFocus,
   isDictationSupported,
   isListening,
+  handleMicPushStart,
+  handleMicPushEnd,
   handleMicToggle,
   canSend,
   isStreaming,
   onSend,
   onStop,
   setIsFocused,
-  hasPendingImages,
-  pendingImages,
-  onRemoveImage,
+  setComposerFocused,
   chips,
   onRemoveChipAt,
   hasBorderTop = false,
@@ -880,45 +1068,33 @@ function InputRow({
     isRootPickerOpen &&
     value.trim().startsWith('/') &&
     (chips?.length ?? 0) === 0;
-  const useHeroPill =
-    isHero && !hasPendingImages && (!hasInlineContent || hasOnlyRootSlashQuery);
+  const useHeroPill = isHero && (!hasInlineContent || hasOnlyRootSlashQuery);
 
   return (
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
-      {hasPendingImages && onRemoveImage ? (
-        <div className='px-3 pt-3'>
-          <ImagePreviewStrip
-            images={pendingImages ?? []}
-            onRemove={onRemoveImage}
-          />
-        </div>
-      ) : null}
-
-      <div
+      <motion.div
+        data-testid='chat-composer-input-row'
+        layout={!reducedMotion}
         ref={containerRef}
+        transition={reducedMotion ? undefined : TRANSITION_SURFACE}
         className={cn(
           'relative',
           useHeroPill
-            ? 'flex min-h-[52px] items-center gap-1.5 px-3 py-1.5 sm:min-h-[56px] sm:px-3'
-            : [
-                'grid gap-2',
-                isHero
-                  ? 'min-h-[88px] grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
-                  : 'min-h-[56px] grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
-              ]
+            ? 'flex min-h-13 items-center gap-1.5 px-3 py-1.5 sm:min-h-14 sm:px-3'
+            : 'grid content-start gap-2 grid-rows-[auto_36px] px-3 py-1.5'
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
-        {useHeroPill && hasAttachButton && onImageAttach ? (
+        {useHeroPill && hasAttachButton ? (
           <ComposerAttachButton
-            isImageProcessing={isImageProcessing}
+            isFileProcessing={isFileProcessing}
             isLoading={isLoading}
             isSubmitting={isSubmitting}
             disabled={attachDisabledForPicker}
             plusMenuOpen={plusMenuOpen}
             onOpenChange={setPlusMenuOpen}
             onMouseDown={handlePreserveFocus}
-            onImageAttach={onImageAttach}
+            onFileAttach={onFileAttach ?? (() => undefined)}
           />
         ) : null}
         <div
@@ -928,8 +1104,8 @@ function InputRow({
             useHeroPill
               ? 'min-h-8 flex-1 items-center px-1.5 pt-0'
               : isHero
-                ? 'min-h-7 px-2 pt-0.5'
-                : 'min-h-6 px-1.5 pt-0'
+                ? 'px-2 pt-0.5'
+                : 'px-1.5 pt-0'
           )}
         >
           {chips && chips.length > 0 && onRemoveChipAt ? (
@@ -945,9 +1121,9 @@ function InputRow({
             animate={reducedMotion ? undefined : { height: measuredHeight }}
             transition={reducedMotion ? undefined : SPRING_HEIGHT}
             className={cn(
-              'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token',
+              'min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent placeholder:text-quaternary-token',
               isHero
-                ? 'min-h-7 px-2 py-0.5 text-[15px] font-[450] leading-6 text-primary-token sm:text-[16px]'
+                ? 'min-h-7 px-2 py-0.5 text-[15px] font-book leading-6 text-primary-token sm:text-[16px]'
                 : 'min-h-6 px-1.5 py-[1px] text-[15px] leading-6 text-primary-token',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
@@ -955,7 +1131,7 @@ function InputRow({
               // the suppress intentional for both mouse and keyboard paths since
               // the surface-level glow IS the keyboard focus indicator for this
               // compound widget.
-              'focus:outline-none! focus-visible:outline-none! focus:ring-0! focus-visible:ring-0!',
+              'focus:outline-none! focus-visible:outline-none! focus-visible:ring-0! focus-visible:ring-0!',
               'focus:shadow-none! focus-visible:shadow-none! shadow-none [outline:none]',
               isAtMaxHeight ? 'overflow-y-auto' : 'overflow-hidden'
             )}
@@ -966,10 +1142,16 @@ function InputRow({
             }}
             onKeyDown={handleKeyDown}
             onPaste={onPaste}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
+            onFocus={() => {
+              setIsFocused(true);
+              setComposerFocused(true);
+            }}
+            onBlur={() => {
+              setIsFocused(false);
+              setComposerFocused(false);
+            }}
             maxLength={MAX_MESSAGE_LENGTH + 100}
-            aria-label='Chat message input'
+            aria-label='Chat Message Input'
             aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
             // WAI-ARIA combobox pattern: the textarea is the input that
             // controls the listbox rendered by SlashCommandMenu. Focus stays
@@ -994,16 +1176,16 @@ function InputRow({
           )}
         >
           <div className='flex min-w-0 items-center gap-2'>
-            {!useHeroPill && hasAttachButton && onImageAttach ? (
+            {!useHeroPill && hasAttachButton ? (
               <ComposerAttachButton
-                isImageProcessing={isImageProcessing}
+                isFileProcessing={isFileProcessing}
                 isLoading={isLoading}
                 isSubmitting={isSubmitting}
                 disabled={attachDisabledForPicker}
                 plusMenuOpen={plusMenuOpen}
                 onOpenChange={setPlusMenuOpen}
                 onMouseDown={handlePreserveFocus}
-                onImageAttach={onImageAttach}
+                onFileAttach={onFileAttach ?? (() => undefined)}
               />
             ) : null}
           </div>
@@ -1014,7 +1196,9 @@ function InputRow({
               isLoading={isLoading}
               isSubmitting={isSubmitting}
               isSupported={isDictationSupported}
-              onMouseDown={handlePreserveFocus}
+              onPreserveFocus={handlePreserveFocus}
+              onPushStart={handleMicPushStart}
+              onPushEnd={handleMicPushEnd}
               onToggle={handleMicToggle}
             />
 
@@ -1030,7 +1214,7 @@ function InputRow({
             />
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

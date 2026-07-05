@@ -42,8 +42,8 @@ function StickyPhoneTourFallback({
           <div className={PHONE_TOUR_CONTAINER_CLASS}>
             <div className='relative'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
-                <div className='relative min-h-[320px]'>
-                  <span className='inline-flex items-center gap-1.5 self-start rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
+                <div className='relative min-h-80'>
+                  <span className='inline-flex items-center gap-1.5 self-start rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token'>
                     {introBadge}
                   </span>
 
@@ -55,7 +55,7 @@ function StickyPhoneTourFallback({
                     {modes[0]?.headline}
                   </h3>
 
-                  <p className='mt-5 max-w-[400px] marketing-lead-linear text-secondary-token'>
+                  <p className='mt-5 max-w-100 marketing-lead-linear text-secondary-token'>
                     {modes[0]?.description}
                   </p>
                 </div>
@@ -77,7 +77,7 @@ function StickyPhoneTourFallback({
                     return (
                       <div key={mode.id} className='text-right'>
                         <p
-                          className='font-mono tracking-[-0.02em]'
+                          className='font-mono tracking-tighter'
                           style={{
                             fontSize: isActive ? '20px' : '15px',
                             fontWeight: isActive ? 590 : 400,

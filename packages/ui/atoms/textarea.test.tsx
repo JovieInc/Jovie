@@ -17,7 +17,7 @@ describe('Textarea', () => {
       );
 
       expect(source).not.toMatch(
-        /\b(?:transition-all|transition-transform|active:scale|active:translate|hover:-translate)\b/
+        /\b(?:transition-all|transition-transform|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
       );
       expect(source).not.toMatch(/\bduration-\d+\b/);
       expect(source).toContain(

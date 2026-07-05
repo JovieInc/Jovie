@@ -64,7 +64,7 @@ describe('SidebarThreadsSection', () => {
 
     const threadLink = screen.getByRole('link', { name: 'Pitch tasks' });
     const actionsButton = screen.getByRole('button', {
-      name: 'Chat actions for Pitch tasks',
+      name: 'Chat Actions for Pitch tasks',
     });
 
     fireEvent.contextMenu(threadLink);
@@ -90,7 +90,9 @@ describe('SidebarThreadsSection', () => {
       />
     );
 
-    const allThreadsLink = screen.getByRole('link', { name: 'All Chats' });
+    const allThreadsLink = screen.getByRole('link', {
+      name: 'All Chats',
+    });
 
     expect(allThreadsLink).toHaveAttribute('href', APP_ROUTES.CHATS);
     expect(allThreadsLink).toHaveAttribute('aria-current', 'page');
@@ -136,7 +138,9 @@ describe('SidebarThreadsSection', () => {
       />
     );
 
-    const newThreadButton = screen.getByRole('button', { name: 'New Chat' });
+    const newThreadButton = screen.getByRole('button', {
+      name: 'New Chat',
+    });
 
     fireEvent.click(newThreadButton);
     expect(onNewThread).toHaveBeenCalledTimes(1);

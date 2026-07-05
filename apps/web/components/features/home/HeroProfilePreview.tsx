@@ -45,7 +45,7 @@ export function HeroProfilePreview() {
 
         {/* Artist identity */}
         <div className='flex flex-col items-center px-5 pb-2'>
-          <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
+          <div className='rounded-full p-1 ring-1 ring-white/6 shadow-sm'>
             <Avatar
               src={MOCK_ARTIST.image}
               alt={MOCK_ARTIST.name}
@@ -64,7 +64,7 @@ export function HeroProfilePreview() {
               showLink={false}
               as='p'
             />
-            <p className='mt-0.5 text-[11px] text-secondary-token tracking-[0.2em] uppercase'>
+            <p className='mt-0.5 text-2xs text-secondary-token tracking-[0.2em] uppercase'>
               Artist
             </p>
           </div>
@@ -78,7 +78,7 @@ export function HeroProfilePreview() {
           {MODE_IDS.map((mode, i) => (
             <div
               key={mode}
-              className='absolute inset-0 px-5 transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+              className='absolute inset-0 px-5 transition-opacity duration-cinematic ease-subtle'
               style={{
                 opacity: i === activeIndex ? 1 : 0,
                 pointerEvents: i === activeIndex ? 'auto' : 'none',
@@ -91,7 +91,7 @@ export function HeroProfilePreview() {
 
         {/* Branding */}
         <div className='pb-3 pt-1 text-center'>
-          <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
+          <p className='text-3xs uppercase tracking-[0.15em] text-secondary-token'>
             Powered by Jovie
           </p>
         </div>

@@ -31,7 +31,6 @@ import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
-  adminSettingsNavItem,
   artistSettingsNavigation,
   paymentsNavItem,
   userSettingsNavigation,
@@ -103,7 +102,7 @@ function SettingsNavGroup({
                   const url = `${origin}${item.href}`;
                   const ok = await copyToClipboard(url);
                   if (ok) {
-                    toast.success('Link copied to clipboard');
+                    toast.success('Link copied');
                   } else {
                     toast.error('Failed to copy link');
                   }
@@ -128,7 +127,7 @@ function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
-  const { selectedProfile, isAdmin } = useDashboardData();
+  const { selectedProfile } = useDashboardData();
   const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   // Prefer the TanStack Query cache (updated by profile mutations) over
   // the server-rendered context so the sidebar reflects name edits immediately.
@@ -175,28 +174,17 @@ function SettingsNavigation({
       className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
       <div>
-        <span className='mb-1.5 block px-2.5 text-2xs uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
           Account
         </span>
         <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1.5 block px-2.5 text-2xs uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
           Artist
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
-      {isAdmin && (
-        <div>
-          <span className='mb-1.5 block px-2.5 text-2xs uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-            Administration
-          </span>
-          <SettingsNavGroup
-            items={[adminSettingsNavItem]}
-            pathname={pathname}
-          />
-        </div>
-      )}
     </nav>
   );
 }
@@ -365,7 +353,7 @@ function ShellSidebarInstallBanner() {
       open
       icon={RefreshCw}
       title={title}
-      description='An improved version of Jovie is available. Reload to update.'
+      description='A new version is available. Reload to update.'
       ctaLabel='Reload'
       ctaIcon={RefreshCw}
       onCta={reload}

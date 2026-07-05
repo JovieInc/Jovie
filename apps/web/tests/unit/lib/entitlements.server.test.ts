@@ -83,6 +83,7 @@ describe('getCurrentUserEntitlements', () => {
       aiPitchGenPerRelease: 1,
       canAccessAiRetouching: false,
       aiRetouchDailyLimit: null,
+      chatFileUploadLimit: 5,
     });
   });
 
@@ -237,6 +238,7 @@ describe('getCurrentUserEntitlements', () => {
       aiPitchGenPerRelease: 1,
       canAccessAiRetouching: false,
       aiRetouchDailyLimit: null,
+      chatFileUploadLimit: 5,
     });
   });
 
@@ -309,6 +311,7 @@ describe('getCurrentUserEntitlements', () => {
       aiPitchGenPerRelease: 5,
       canAccessAiRetouching: true,
       aiRetouchDailyLimit: 10,
+      chatFileUploadLimit: null,
     });
   });
 
@@ -445,6 +448,7 @@ describe('getCurrentUserEntitlements', () => {
       aiPitchGenPerRelease: null,
       canAccessAiRetouching: true,
       aiRetouchDailyLimit: 50,
+      chatFileUploadLimit: null,
     });
   });
 

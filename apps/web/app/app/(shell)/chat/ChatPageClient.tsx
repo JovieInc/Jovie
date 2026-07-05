@@ -32,6 +32,7 @@ import { JovieChat } from '@/components/jovie/JovieChat';
 import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
@@ -172,7 +173,7 @@ function getWelcomeChatBootstrapAnnouncement(
     case 'scheduled':
       return 'Still setting up your onboarding chat. Retrying now.';
     case 'failed':
-      return 'We could not start your onboarding chat. Refresh to try again.';
+      return '';
     default:
       return '';
   }
@@ -372,15 +373,9 @@ export function ChatPageClient({
   const panelParam = searchParams.get('panel');
   const enablePreviewPanel = !env.IS_E2E || panelParam === 'profile';
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
-  // Hydrate the profile panel only for explicit profile entry. Entity mentions
-  // use ChatEntityPanelContext and do not need the profile preview fallback.
-  const shouldHydratePreviewPanel =
-    enablePreviewPanel && panelParam === 'profile';
-
-  useEffect(() => {
-    if (shouldHydratePreviewPanel) return;
-    setPreviewData(null);
-  }, [setPreviewData, shouldHydratePreviewPanel]);
+  // Keep live profile preview data warm on chat so sidebar profile clicks and
+  // @artist mentions can open the same rail used in setup/onboarding.
+  const shouldHydratePreviewData = enablePreviewPanel && Boolean(activeProfile);
 
   useEffect(() => {
     return () => {
@@ -398,11 +393,11 @@ export function ChatPageClient({
   }, [dashboardLoadError, needsOnboarding, router, selectedProfile]);
 
   // Fetch social links for the selected profile
-  const profileId = shouldHydratePreviewPanel ? (activeProfile?.id ?? '') : '';
+  const profileId = shouldHydratePreviewData ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
 
   useEffect(() => {
-    if (!shouldHydratePreviewPanel || !fromOnboarding) return;
+    if (!shouldHydratePreviewData || !fromOnboarding) return;
 
     try {
       const rawSnapshot = globalThis.sessionStorage?.getItem(
@@ -417,7 +412,7 @@ export function ChatPageClient({
     } catch {
       // sessionStorage may be unavailable or the payload may be malformed
     }
-  }, [fromOnboarding, setPreviewData, shouldHydratePreviewPanel]);
+  }, [fromOnboarding, setPreviewData, shouldHydratePreviewData]);
 
   // Convert API links to preview panel format
   const previewLinks: PreviewPanelLink[] = useMemo(
@@ -434,7 +429,7 @@ export function ChatPageClient({
 
   // Hydrate preview panel with profile data and links
   useEffect(() => {
-    if (!shouldHydratePreviewPanel || !activeProfile) return;
+    if (!shouldHydratePreviewData || !activeProfile) return;
     const profileSettings = activeProfile.settings as Record<
       string,
       unknown
@@ -466,7 +461,7 @@ export function ChatPageClient({
         },
       },
     });
-  }, [activeProfile, previewLinks, setPreviewData, shouldHydratePreviewPanel]);
+  }, [activeProfile, previewLinks, setPreviewData, shouldHydratePreviewData]);
 
   const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
     onSuccess: () => notifications.success('Session ID copied'),
@@ -493,38 +488,46 @@ export function ChatPageClient({
   }, [conversationId, deleteConversation, router, notifications]);
 
   const headerActions = useMemo(() => {
+    const artistProfileToggle = designV1ChatEntitiesEnabled ? (
+      <ArtistProfileRailToggle />
+    ) : null;
+
     if (!conversationId) {
-      return null;
+      return artistProfileToggle;
     }
 
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <AppIconButton
-            ariaLabel='Thread options'
-            className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
-          >
-            <Ellipsis aria-hidden='true' className='size-4' />
-          </AppIconButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align='end'>
-          <DropdownMenuItem onClick={handleCopyConversationId}>
-            {sessionIdCopied ? (
-              <Check aria-hidden='true' className='size-3.5' />
-            ) : (
-              <Copy aria-hidden='true' className='size-3.5' />
-            )}
-            {sessionIdCopied ? 'Copied!' : 'Copy Session ID'}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleArchive}>
-            <Archive aria-hidden='true' className='size-3.5' />
-            Archive
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className='flex items-center gap-1'>
+        {artistProfileToggle}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <AppIconButton
+              ariaLabel='Thread options'
+              className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
+            >
+              <Ellipsis aria-hidden='true' className='size-4' />
+            </AppIconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end'>
+            <DropdownMenuItem onClick={handleCopyConversationId}>
+              {sessionIdCopied ? (
+                <Check aria-hidden='true' className='size-3.5' />
+              ) : (
+                <Copy aria-hidden='true' className='size-3.5' />
+              )}
+              {sessionIdCopied ? 'Copied!' : 'Copy Session ID'}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleArchive}>
+              <Archive aria-hidden='true' className='size-3.5' />
+              Archive
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     );
   }, [
     conversationId,
+    designV1ChatEntitiesEnabled,
     sessionIdCopied,
     handleCopyConversationId,
     handleArchive,
@@ -705,10 +708,9 @@ export function ChatPageClient({
         welcomeChatRetryCountRef.current >=
           WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length
       ) {
-        setWelcomeChatBootstrapStatus('failed');
-        notifications.error(
-          'We could not start your onboarding chat. Refresh to try again.'
-        );
+        // Welcome chat bootstrap is a non-blocking enhancement. The chat shell
+        // remains usable even when auto-creating the welcome thread fails.
+        setWelcomeChatBootstrapStatus('done');
         return;
       }
 
@@ -754,7 +756,6 @@ export function ChatPageClient({
     activeProfile,
     conversationId,
     fromOnboarding,
-    notifications,
     router,
     setWelcomeChatBootstrapStatus,
   ]);
@@ -855,9 +856,10 @@ export function ChatPageClient({
   return (
     <ChatEntityPanelProvider resetKey={conversationId ?? null}>
       <ChatEntityRightPanelHost
-        enablePreviewPanel={shouldHydratePreviewPanel}
+        enablePreviewPanel={enablePreviewPanel}
         enableChatEntityPanels={designV1ChatEntitiesEnabled}
         profileId={activeProfile.id}
+        profileSpotifyArtistId={activeProfile.spotifyId}
         profileContext={{
           id: activeProfile.id,
           displayName: activeProfile.displayName,

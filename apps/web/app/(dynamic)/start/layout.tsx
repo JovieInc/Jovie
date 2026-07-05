@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
+import { env, isSecureEnv } from '@/lib/env-server';
 import { AppFlagProvider } from '@/lib/flags/client';
+import { resolveStartRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
 
 export const dynamic = 'force-dynamic';
@@ -14,10 +16,21 @@ export default async function StartLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialFlags = await getAppFlagsSnapshot();
+  // Anonymous onboarding never needs a live Clerk bootstrap on loopback E2E/dev
+  // hosts — loading FAPI JS from localhost causes CORS console errors and jank.
+  const forceBypassClerk =
+    !isSecureEnv() &&
+    (env.PUBLIC_NOAUTH_SMOKE === '1' ||
+      process.env.NEXT_PUBLIC_E2E_MODE === '1');
+  const initialFlags = await getAppFlagsSnapshot({
+    flagNames: resolveStartRouteFlagNames(),
+  });
 
   return (
-    <ResolvedClientProviders skipCoreProviders>
+    <ResolvedClientProviders
+      forceBypassClerk={forceBypassClerk}
+      skipCoreProviders
+    >
       <AppFlagProvider initialFlags={initialFlags}>{children}</AppFlagProvider>
     </ResolvedClientProviders>
   );
