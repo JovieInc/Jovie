@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  PR_SIZE_GUARD_CHECK_NAME,
-  SIZE_GUARD_OPT_OUT_LABELS,
   buildSizeGuardOverrideCheckRun,
   isSizeGuardOptOutLabel,
+  PR_SIZE_GUARD_CHECK_NAME,
+  SIZE_GUARD_OPT_OUT_LABELS,
 } from '../pr-size-guard-label-override.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -68,7 +68,9 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
 
     expect(workflow).toContain('types: [opened, synchronize, reopened]');
     expect(workflow).not.toMatch(/types:\s*\[[^\]]*labeled/);
-    expect(workflow).toContain('group: pr-size-${{ github.event.pull_request.number }}');
+    expect(workflow).toContain(
+      'group: pr-size-${{ github.event.pull_request.number }}'
+    );
     expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain('JOV-3580');
   });
@@ -84,7 +86,9 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
       'group: pr-size-label-override-${{ github.event.pull_request.number }}'
     );
     expect(workflow).toContain('cancel-in-progress: false');
-    expect(workflow).not.toContain('group: pr-size-${{ github.event.pull_request.number }}');
+    expect(workflow).not.toContain(
+      'group: pr-size-${{ github.event.pull_request.number }}'
+    );
     expect(workflow).toContain('node scripts/pr-size-guard-label-override.mjs');
     expect(workflow).toContain('JOV-3580');
   });
