@@ -145,6 +145,7 @@ export interface UseReleaseProviderMatrixReturn {
     releaseId: string,
     isrc: string | null
   ) => Promise<void>;
+  handleSaveStatus: (release: ReleaseViewModel, status: ReleaseViewModel['status']) => void;
   handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
   handleFormatLyrics: (releaseId: string, lyrics: string) => Promise<string[]>;
   isLyricsSaving: boolean;
