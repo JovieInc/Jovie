@@ -109,20 +109,23 @@ export function EntityCarousel({
               itemRefs.current[index] = node;
             }}
             data-carousel-index={index}
+            // items-start keeps the deterministic shape in charge: a stretched
+            // cross-axis would override the card's fixed aspect ratio.
             className={cn(
-              'flex shrink-0 snap-start',
-              isFeatured ? 'w-[260px]' : 'w-[180px]'
+              'flex shrink-0 snap-start items-start',
+              isFeatured ? 'w-65' : 'w-45'
             )}
           >
             <EntityCard
               model={model}
               treatment={isFeatured ? 'big' : 'compact'}
+              // Composition rule (#11899): profile cards render as the fixed
+              // standard 4:5 shape — height derives from width, never from
+              // content flow, so no "monster vertical" cards.
+              shape='standard'
               surface={surface}
               priority={isFeatured}
-              // h-full so cards fill the stretched row (the <li>s stretch to the
-              // tallest card via default items-stretch); without it shorter
-              // compact cards top-align and leave a dead gap below.
-              className='h-full w-full'
+              className='w-full'
               onClick={
                 onCardClick ? () => onCardClick(index, model) : undefined
               }

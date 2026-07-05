@@ -268,10 +268,12 @@
   }
 }
 
-/* Compact mobile home hero: reserve room for the showcase release card below. */
+/* Compact mobile home hero: reserve room for the showcase release card below.
+   Composition floor (#11899): hero media never shrinks below 240px — it crops
+   (object-cover), never squashes. Content below the hero scrolls instead. */
 [data-testid="profile-compact-surface"][data-mode="profile"] {
   @media (max-height: 820px) {
-    --cover-height: 178px;
+    --cover-height: 240px;
   }
 }
 

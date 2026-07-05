@@ -404,8 +404,13 @@ export function ProfileCompactSurface({
     'h-9! w-9! border-white/14 bg-black/24 text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+  // Composition rule (#11899, lib/profile/composition.ts): hero media has
+  // priority — it grows with the viewport (flex-1, #11083) but never shrinks
+  // below the 240px floor (min-h-60). On short viewports it locks to exactly
+  // the floor and the rail below scrolls; the image crops (object-cover),
+  // never squashes.
   const heroHeightClassName = isHomeMode
-    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:h-45 [@media(max-height:760px)]:max-h-45'
+    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:min-h-60 [@media(max-height:760px)]:max-h-60'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';

@@ -554,6 +554,11 @@ body {
   --text-2xs: 0.6875rem;
   --text-app: 0.8125rem;
   --text-mid: 0.9375rem;
+  /* Profile composition shapes (#11899, lib/profile/composition.ts):
+     aspect-hero = fixed hero banner crop; aspect-card-standard = the default
+     4:5 portrait card. 1:1 / 16:9 use built-in aspect-square / aspect-video. */
+  --aspect-hero: 16 / 7;
+  --aspect-card-standard: 4 / 5;
   /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
     var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;

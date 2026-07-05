@@ -15,9 +15,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 - [internal] **Computed-contrast gate (GH-12012)**: `scripts/lint-contrast-computed.ts` + `contrast-pairs.config.json` resolve design-token pairs (hex/rgb/lch/oklch, `var()` chains, light+dark themes) via `lib/a11y-gates/contrast-engine.ts` and fail CI when a pair drops below WCAG AA; enforced by `tests/unit/design-system/computed-contrast.test.ts` (Unit Tests merge gate) and chained into `lint:contrast-ratchet` after the regex pre-filter.
 - [internal] **Touch-target ratchet (GH-12012)**: `scripts/lint-touch-target.ts` counts interactive elements with explicit sub-44px heights (WCAG 2.5.5; baseline 224, ratchet only goes down); enforced by `tests/unit/design-system/touch-target-ratchet.test.ts`.
 - [internal] **Reduced motion zeroes ALL duration tokens (GH-12012)**: `--motion-reveal-*` (globals.css), `--clerk-motion-duration` (theme.css), and `--linear-duration-*` (linear-tokens.css) are now zeroed under `prefers-reduced-motion`; `tests/unit/design-system/reduced-motion-tokens.test.ts` guards every current and future literal duration token.
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+- **Profile pages no longer squash the hero image or stretch cards (GH-11899)**: The profile hero now keeps its intended crop with a 240px minimum height at every screen size, and profile cards render in fixed shapes with the action button always anchored at the bottom.
+- [internal] **Profile composition layer (GH-11899)**: New `apps/web/lib/profile/composition.ts` + `--aspect-hero` / `--aspect-card-standard` theme tokens codify the deterministic profile rules (hero 16/7 crop + 240px floor; card shapes compact 1:1 / standard 4:5 / wide 16:9; CTA footer outside the clipped text zone). `EntityCard` gains an opt-in `shape` prop consumed by the profile carousel; hero/skeleton/desktop-cover/media-card instances adopt the tokens; arbitrary-values ratchet lowered. Root-cause fix for GH-8290 (hero squish) and GH-8443 (card height).
+=======
+- [internal] **Settings sidebar nav-row guard promoted to error + parity test (GH-12025)**: `sidebar-nav-row-ratchet.test.ts` flips `WARN_ONLY` off now that the hand-rolled nav-row baseline is 0, the settings row class derivation is extracted to `getSettingsSidebarRowClassName()` in `SettingsPolished.tsx`, and a settings-vs-shell parity test locks row padding/density/active/hover to the canonical `getSidebarNavRowClassName()` chrome.
+>>>>>>> origin/main
+=======
+- **Release rows show stacked provider logos (GH-11493)**: Library table rows and shell release rows now render overlapping DSP avatars with a "+N more" chip and a hover popover listing every provider, replacing the bare provider-count number. The shell row's avatar stack also now reflects the release's full provider coverage instead of capping at four hardcoded majors.
+>>>>>>> origin/main
+>>>>>>> origin/main
 - [internal] **Founder conversion HUD (GH-11500)**: admin Overview opens with the visitor→pay funnel flowchart (onboarding chat → account → profile claimed → onboarding complete → paid) — per-step counts, step-to-step conversion %, 7d/30d/all-time range selector, biggest drop-off highlighted — topped by MRR (same `getAdminFunnelMetrics` source as the hero) and shipping velocity (merges/day from the existing shipping-velocity route). Adds `lib/admin/founder-funnel.ts` + admin-gated `/api/admin/hud/founder-funnel`.
 - [internal] **Settings sidebar nav-row guard promoted to error + parity test (GH-12025)**: `sidebar-nav-row-ratchet.test.ts` flips `WARN_ONLY` off now that the hand-rolled nav-row baseline is 0, the settings row class derivation is extracted to `getSettingsSidebarRowClassName()` in `SettingsPolished.tsx`, and a settings-vs-shell parity test locks row padding/density/active/hover to the canonical `getSidebarNavRowClassName()` chrome.
 - **Release rows show stacked provider logos (GH-11493)**: Library table rows and shell release rows now render overlapping DSP avatars with a "+N more" chip and a hover popover listing every provider, replacing the bare provider-count number. The shell row's avatar stack also now reflects the release's full provider coverage instead of capping at four hardcoded majors.

@@ -1,3 +1,5 @@
+import { PROFILE_HERO_COMPOSITION_CLASSNAME } from '@/lib/profile/composition';
+
 /**
  * Profile loading skeleton — matches the V2 ProfileViewportShell + ArtistHero + ProfileScrollBody layout.
  * Full-bleed hero gradient at top, then rounded panel placeholders in the scroll body zone.
@@ -21,9 +23,11 @@ export function ProfileSkeleton() {
       {/* Viewport shell */}
       <div className='relative mx-auto flex min-h-dvh w-full max-w-170 items-stretch justify-center md:items-center md:px-6 md:py-8'>
         <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-(--profile-shell-card-radius) md:border md:border-white/[0.06]'>
-          {/* Hero placeholder — matches ArtistHero height */}
+          {/* Hero placeholder — matches the ArtistHero composition shape
+              (#11899: fixed 16/7 crop + 240px floor) so skeleton → loaded
+              causes zero layout shift. */}
           <div
-            className={`relative h-[48dvh] max-h-155 min-h-105 w-full overflow-hidden md:h-[56dvh] md:min-h-130 md:rounded-t-[var(--profile-shell-card-radius)] xl:max-h-160 2xl:max-h-170 ${pulse}`}
+            className={`relative overflow-hidden md:rounded-t-[var(--profile-shell-card-radius)] ${PROFILE_HERO_COMPOSITION_CLASSNAME} ${pulse}`}
           >
             {/* Gradient overlay: artistic dark hero fade — intentional profile-stage values */}
             <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(18,20,26,0.6)_50%,rgba(10,11,14,0.95)_100%)]' />

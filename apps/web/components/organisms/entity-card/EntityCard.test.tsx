@@ -117,6 +117,39 @@ describe('EntityCard', () => {
     expect(onCalendar).toHaveBeenCalledTimes(1);
   });
 
+  it('locks shaped cards to a fixed aspect ratio with clipped overflow (#11899)', () => {
+    render(
+      <EntityCard model={merchModel} treatment='compact' shape='standard' />
+    );
+    const card = screen.getByTestId('entity-card-merch');
+    expect(card.className).toContain('aspect-card-standard');
+    expect(card.className).toContain('overflow-hidden');
+  });
+
+  it('keeps the CTA footer anchored outside the clipped text zone when shaped', () => {
+    render(<EntityCard model={merchModel} treatment='big' shape='standard' />);
+    const cta = screen.getByText('Buy');
+    // The footer row (CTA's parent) carries the bottom anchor and never sits
+    // inside the overflow-hidden text block, so the button cannot shift or
+    // clip regardless of title/metadata length.
+    const footer = cta.parentElement as HTMLElement;
+    expect(footer.className).toContain('mt-auto');
+    expect(footer.className).toContain('shrink-0');
+    expect(footer.className).not.toContain('overflow-hidden');
+    // Title lives in the clipped text zone.
+    const title = screen.getByRole('heading', { name: 'Tour Tee 2026' });
+    expect((title.parentElement as HTMLElement).className).toContain(
+      'overflow-hidden'
+    );
+  });
+
+  it('keeps legacy content-driven sizing when no shape is provided', () => {
+    render(<EntityCard model={merchModel} treatment='compact' />);
+    const card = screen.getByTestId('entity-card-merch');
+    expect(card.className).not.toContain('aspect-card-standard');
+    expect(card.className).not.toContain('aspect-square');
+  });
+
   it('renders fallback text when cta.label is empty', () => {
     const onAction = vi.fn();
     const emptyLabel: EntityCardModel = {
