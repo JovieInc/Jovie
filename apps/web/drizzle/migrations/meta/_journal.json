@@ -498,6 +498,13 @@
       "when": 1783000050000,
       "tag": "0069_chat_message_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1783000100000,
+      "tag": "0070_agent_task_analytics",
+      "breakpoints": true
     }
   ]
 }

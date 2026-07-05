@@ -1,10 +1,15 @@
 /**
- * Canonical analytics metric definitions — single source of truth for labels,
- * one-line definitions, and invariant guards used across analytics UIs.
+ * Dashboard analytics metric display definitions — labels, one-line
+ * definitions, and invariant guards used across analytics UIs.
  *
- * Every metric shown in the dashboard reads its label and definition from here.
- * Guards prevent displaying logically impossible number combinations.
+ * Labels and definitions are DERIVED from the canonical metrics layer
+ * (`lib/analytics/metrics.ts`), which is the single source of truth for
+ * every metric's name, definition, source SQL, type, and unit. This module
+ * only narrows that record to the dashboard's metric subset and adds
+ * display-time guards.
  */
+
+import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 
 export interface MetricDefinition {
   readonly label: string;
@@ -12,7 +17,7 @@ export interface MetricDefinition {
   readonly definition: string;
 }
 
-/** All dashboard analytics metric keys. */
+/** All dashboard analytics metric keys (subset of CanonicalMetricKey). */
 export type DashboardMetricKey =
   | 'profile_views'
   | 'unique_users'
@@ -23,47 +28,27 @@ export type DashboardMetricKey =
   | 'total_clicks'
   | 'tip_link_visits';
 
+const DASHBOARD_METRIC_KEYS: readonly DashboardMetricKey[] = [
+  'profile_views',
+  'unique_users',
+  'subscribers',
+  'capture_rate',
+  'listen_clicks',
+  'identified_users',
+  'total_clicks',
+  'tip_link_visits',
+];
+
 export const METRIC_DEFINITIONS: Record<DashboardMetricKey, MetricDefinition> =
-  {
-    profile_views: {
-      label: 'Profile Views',
-      definition:
-        'Total page visits, including repeat visits from the same person.',
-    },
-    unique_users: {
-      label: 'Unique Visitors',
-      definition:
-        'Individual people who visited your profile, counted once per person.',
-    },
-    subscribers: {
-      label: 'Followers',
-      definition:
-        'Fans who opted in to notifications — your capturable audience.',
-    },
-    capture_rate: {
-      label: 'Capture Rate',
-      definition:
-        'Percentage of unique visitors who became followers (subscribers ÷ unique visitors).',
-    },
-    listen_clicks: {
-      label: 'Listen Clicks',
-      definition:
-        'Clicks on streaming links (Spotify, Apple Music, etc.) from your profile.',
-    },
-    identified_users: {
-      label: 'Identified Users',
-      definition:
-        'Visitors matched to a known fan record with an email or phone number.',
-    },
-    total_clicks: {
-      label: 'Total Clicks',
-      definition: 'All link clicks on your profile across the selected period.',
-    },
-    tip_link_visits: {
-      label: 'Tip Link Visits',
-      definition: 'Visits to your tipping page from your profile.',
-    },
-  };
+  Object.fromEntries(
+    DASHBOARD_METRIC_KEYS.map(key => [
+      key,
+      {
+        label: CANONICAL_METRICS[key].label,
+        definition: CANONICAL_METRICS[key].definition,
+      },
+    ])
+  ) as Record<DashboardMetricKey, MetricDefinition>;
 
 /**
  * Analytics invariant guards.

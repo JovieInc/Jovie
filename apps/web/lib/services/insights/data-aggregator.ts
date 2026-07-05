@@ -1,4 +1,8 @@
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
+import {
+  computeCaptureRate,
+  computeRatePercent,
+} from '@/lib/analytics/metrics';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import {
@@ -125,19 +129,15 @@ export async function aggregateMetrics(
     .filter(c => !showCities.has(c.city.toLowerCase()) && c.count >= 10)
     .map(c => ({ city: c.city, country: c.country, audienceCount: c.count }));
 
-  // Compute capture rates
-  const captureRateCurrent =
-    clickAggregates.uniqueVisitorsCurrent > 0
-      ? (subscriberAggregates.newSubscribersCurrent /
-          clickAggregates.uniqueVisitorsCurrent) *
-        100
-      : 0;
-  const captureRatePrevious =
-    clickAggregates.uniqueVisitorsPrevious > 0
-      ? (subscriberAggregates.newSubscribersPrevious /
-          clickAggregates.uniqueVisitorsPrevious) *
-        100
-      : 0;
+  // Canonical capture rate derivation — see lib/analytics/metrics.ts.
+  const captureRateCurrent = computeCaptureRate(
+    subscriberAggregates.newSubscribersCurrent,
+    clickAggregates.uniqueVisitorsCurrent
+  );
+  const captureRatePrevious = computeCaptureRate(
+    subscriberAggregates.newSubscribersPrevious,
+    clickAggregates.uniqueVisitorsPrevious
+  );
 
   return {
     period,
@@ -178,8 +178,8 @@ export async function aggregateMetrics(
       intentDistributionCurrent: audienceAggregates.intentDistributionCurrent,
       intentDistributionPrevious: audienceAggregates.intentDistributionPrevious,
       deviceDistribution: audienceAggregates.deviceDistribution,
-      captureRateCurrent: Math.round(captureRateCurrent * 10) / 10,
-      captureRatePrevious: Math.round(captureRatePrevious * 10) / 10,
+      captureRateCurrent,
+      captureRatePrevious,
     },
     referrers: {
       topReferrersCurrent: clickAggregates.topReferrersCurrent,
@@ -762,7 +762,8 @@ async function aggregateTemporalPatterns(
 
 function computeGrowthPct(current: number, previous: number): number {
   if (previous > 0) {
-    return Math.round(((current - previous) / previous) * 100);
+    // Canonical rate derivation — see lib/analytics/metrics.ts.
+    return computeRatePercent(current - previous, previous, 0);
   }
   return current > 0 ? 100 : 0;
 }
