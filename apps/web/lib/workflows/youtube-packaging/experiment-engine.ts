@@ -27,6 +27,7 @@
  */
 
 import { z } from 'zod';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import {
   DEFAULT_RETRY_POLICY,
   registerWorkflow,
@@ -385,9 +386,9 @@ export function evaluatePackagingExperiment(
 
   // Bayesian decision
   if (prob >= cfg.winThreshold) {
-    const liftPct = (
-      ((rateTreatment - rateControl) / (rateControl || 1)) *
-      100
+    const liftPct = computeRatePercent(
+      rateTreatment - rateControl,
+      rateControl || 1
     ).toFixed(1);
     const kind = state.autoPublishEnabled
       ? 'swap_treatment'
@@ -408,9 +409,9 @@ export function evaluatePackagingExperiment(
   }
 
   if (prob <= cfg.loseThreshold) {
-    const liftPct = (
-      ((rateTreatment - rateControl) / (rateControl || 1)) *
-      100
+    const liftPct = computeRatePercent(
+      rateTreatment - rateControl,
+      rateControl || 1
     ).toFixed(1);
     return {
       kind: 'rollback_control',
