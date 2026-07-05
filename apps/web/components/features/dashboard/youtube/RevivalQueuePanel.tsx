@@ -6,6 +6,7 @@ import { PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
 import type {
   ExperimentRecord,
+  ExperimentStatus,
   QuotaUsage,
   RevivalCandidate,
   RevivalFlag,
@@ -26,7 +27,7 @@ const FLAG_LABELS: Record<RevivalFlag, string> = {
 // Experiment status helpers
 // ---------------------------------------------------------------------------
 
-const EXPERIMENT_STATUS_LABEL: Record<string, string> = {
+const EXPERIMENT_STATUS_LABEL: Record<ExperimentStatus, string> = {
   pending: 'Pending',
   running: 'Running',
   concluded_winner: 'Winner found',
@@ -34,7 +35,7 @@ const EXPERIMENT_STATUS_LABEL: Record<string, string> = {
   rolled_back: 'Rolled back',
 };
 
-const EXPERIMENT_STATUS_ACCENT: Record<string, string> = {
+const EXPERIMENT_STATUS_ACCENT: Record<ExperimentStatus, string> = {
   pending: 'text-tertiary-token',
   running: 'text-accent-blue',
   concluded_winner: 'text-accent-green',
