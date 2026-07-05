@@ -5,14 +5,14 @@ import {
   isPendingDesktopAuthPkceExpired,
   isValidDesktopAuthFlowNonce,
   isValidNativeAuthToken,
-  parseAuthReturnDeepLink,
   type PendingDesktopAuthPkce,
+  parseAuthReturnDeepLink,
 } from '../src/desktop-auth-security.ts';
+import { evaluateTrustedOriginCspHeaders } from '../src/desktop-csp-watchdog.ts';
 import {
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
 } from '../src/desktop-permissions.ts';
-import { evaluateTrustedOriginCspHeaders } from '../src/desktop-csp-watchdog.ts';
 import { sanitizeWindowState } from '../src/window-state.ts';
 
 const VALID_CODE = '00000000000040008000000000000001';
@@ -242,7 +242,7 @@ test('csp watchdog classifies missing and weakened upstream policies', () => {
   expect(
     evaluateTrustedOriginCspHeaders({
       responseHeaders: {
-        'content-security-policy': "default-src *; script-src *; object-src *",
+        'content-security-policy': 'default-src *; script-src *; object-src *',
       },
     })
   ).toBe('weakened');
@@ -256,7 +256,7 @@ test('window state clamps to display bounds', () => {
     sanitizeWindowState(
       { x: -400, y: -200, width: 4000, height: 3000 },
       display,
-      (event) => {
+      event => {
         events.push(event);
       }
     )
