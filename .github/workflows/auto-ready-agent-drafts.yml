@@ -4,11 +4,17 @@ name: Auto-Ready Agent Drafts
 # are green and the PR is mergeable. The merge-queue autoenroll workflow then
 # picks them up. Without this, draft PRs sit idle until a human flips them.
 #
+# Fires on CI completion (immediate), PR events, schedule safety net.
 # Opt out per-PR with any of: needs-human, hold, gated, fast.
 
 on:
   schedule:
     - cron: '*/15 * * * *'   # catch anything missed between CI events
+  pull_request:
+    types: [ready_for_review, reopened, synchronize]
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
