@@ -23,6 +23,34 @@ export type RateLimiterBackend = 'redis' | 'memory';
 const REDIS_RATE_LIMIT_TIMEOUT_MS = 750;
 
 /**
+ * Circuit breaker for a dead/degraded Redis backend.
+ *
+ * When a Redis call fails (error or timeout), the circuit opens for a short
+ * TTL and all limiters skip the Redis call (and its 750ms timeout budget)
+ * during that window, going straight to the memory fallback. This prevents
+ * every rate-limited route from paying +750ms latency per request while the
+ * Redis backend is down (e.g. an archived Upstash DB).
+ *
+ * Module-level by design: serverless instances share limiter modules, and the
+ * failure signal applies to the shared Redis backend, not a single limiter.
+ */
+const REDIS_CIRCUIT_OPEN_MS = 30_000;
+let redisCircuitOpenUntil = 0;
+
+function isRedisCircuitOpen(): boolean {
+  return Date.now() < redisCircuitOpenUntil;
+}
+
+function openRedisCircuit(): void {
+  redisCircuitOpenUntil = Date.now() + REDIS_CIRCUIT_OPEN_MS;
+}
+
+/** Test-only helper to reset the shared Redis circuit breaker. */
+export function resetRedisCircuitBreaker(): void {
+  redisCircuitOpenUntil = 0;
+}
+
+/**
  * Options for creating a rate limiter
  */
 export interface RateLimiterOptions {
@@ -88,8 +116,8 @@ export class RateLimiter {
    * Returns a consistent result regardless of backend
    */
   async limit(identifier: string): Promise<RateLimitResult> {
-    // Try Redis first if available
-    if (this.redisLimiter) {
+    // Try Redis first if available and the shared failure circuit is closed
+    if (this.redisLimiter && !isRedisCircuitOpen()) {
       try {
         const result = await withTimeout(this.redisLimiter.limit(identifier), {
           timeoutMs: REDIS_RATE_LIMIT_TIMEOUT_MS,
@@ -108,6 +136,9 @@ export class RateLimiter {
       } catch (error) {
         // Log error and fall back to memory — this means rate limits for this
         // request are enforced in-memory only and won't persist across deploys.
+        // Open the circuit so subsequent requests skip the Redis timeout
+        // entirely while the backend is known-degraded.
+        openRedisCircuit();
         const message = `[RateLimit:${this.config.name}] Redis error, falling back to in-memory: ${error}`;
         console.error(message);
         this.options.logger(message);
@@ -125,8 +156,15 @@ export class RateLimiter {
       };
     }
 
-    // Fall back to in-memory
-    return this.memoryLimiter.limit(identifier);
+    // Fall back to in-memory. When Redis was expected (preferRedis), flag the
+    // result as degraded so user-critical callers can treat it as advisory —
+    // a per-instance memory bucket over-blocks real users behind shared IPs
+    // (mobile CGNAT) during a Redis outage.
+    const memoryResult = await this.memoryLimiter.limit(identifier);
+    if (this.options.preferRedis) {
+      return { ...memoryResult, degraded: true };
+    }
+    return memoryResult;
   }
 
   /**
