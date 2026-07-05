@@ -139,7 +139,7 @@ export const ChatMessage = memo(function ChatMessage({
     Boolean(messageText) || toolEvents.length > 0 || toolStepCapExhausted;
   // Keep the thinking shimmer up while the stream is open but no renderable
   // content has arrived yet. Without this, the pending→streaming transition
-  // collapses the reply row to blank until the first token lands (#11921).
+  // collapses the reply row to blank until the first token lands (GH-11921).
   const showThinkingIndicator =
     Boolean(isThinking) ||
     (!isUser && Boolean(isStreaming) && !hasAssistantContent);
