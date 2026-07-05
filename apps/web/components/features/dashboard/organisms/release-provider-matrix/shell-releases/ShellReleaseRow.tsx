@@ -247,10 +247,8 @@ const SmartLinkCell = memo(function SmartLinkCell({
  */
 const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
   weeklyStreams,
-  releaseTitle,
 }: {
   readonly weeklyStreams: number | null | undefined;
-  readonly releaseTitle: string;
 }) {
   const hasData = typeof weeklyStreams === 'number' && weeklyStreams > 0;
 
@@ -262,11 +260,6 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
           ? `${weeklyStreams.toLocaleString()} smart-link clicks this week`
           : 'No weekly activity recorded yet'
       }
-      aria-label={
-        hasData
-          ? `${weeklyStreams.toLocaleString()} weekly clicks for ${releaseTitle}`
-          : `No weekly activity for ${releaseTitle}`
-      }
       data-testid='shell-release-weekly-streams'
     >
       {hasData ? (
@@ -275,9 +268,7 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
           <span className='text-quaternary-token'> / wk</span>
         </span>
       ) : (
-        <span className='text-2xs text-quaternary-token' aria-hidden='true'>
-          —
-        </span>
+        <span className='text-2xs text-quaternary-token'>—</span>
       )}
     </div>
   );
@@ -406,10 +397,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <span className='hidden w-28 shrink-0 lg:block' aria-hidden='true' />
       )}
 
-      <WeeklyStreamsCell
-        weeklyStreams={release.weeklyStreams}
-        releaseTitle={release.title}
-      />
+      <WeeklyStreamsCell weeklyStreams={release.weeklyStreams} />
 
       <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
         <DspAvatarStack dsps={dspItems} maxVisible={3} />
