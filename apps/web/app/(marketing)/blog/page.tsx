@@ -1,4 +1,7 @@
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroLayout,
+} from '@/components/marketing';
 import { BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
@@ -37,7 +40,7 @@ export default async function BlogIndexPage() {
   if (!featured) {
     return (
       <div className='min-h-screen'>
-        <MarketingHero variant='left'>
+        <MarketingHeroLayout variant='left'>
           <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
           <h1 className='marketing-h1-linear mb-6 mt-6 max-w-[8ch] text-primary-token'>
             Blog
@@ -45,7 +48,7 @@ export default async function BlogIndexPage() {
           <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
             Posts coming soon.
           </p>
-        </MarketingHero>
+        </MarketingHeroLayout>
       </div>
     );
   }
@@ -60,7 +63,7 @@ export default async function BlogIndexPage() {
   return (
     <div className='min-h-screen'>
       {/* Hero Section */}
-      <MarketingHero variant='left'>
+      <MarketingHeroLayout variant='left'>
         <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
         <h1 className='marketing-h1-linear mb-6 mt-6 max-w-[8ch] text-primary-token'>
           Blog
@@ -69,7 +72,7 @@ export default async function BlogIndexPage() {
           Thoughts on product, strategy, and the craft of building tools for
           artists.
         </p>
-      </MarketingHero>
+      </MarketingHeroLayout>
 
       {/* Posts Grid */}
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>

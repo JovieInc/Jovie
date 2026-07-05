@@ -81,7 +81,14 @@ describe('pricing page System B source contract', () => {
   it('keeps exactly one page-level primary action on pricing', () => {
     const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
 
-    expect(source.match(/data-primary-action='true'/g) ?? []).toHaveLength(1);
+    // The canonical MarketingHero owns the single page-level primary action
+    // (it renders data-primary-action='true' on its primary CTA).
+    expect(source.match(/<MarketingHero/g) ?? []).toHaveLength(1);
+    expect(source.match(/primaryCta=\{\{/g) ?? []).toHaveLength(1);
+    expect(
+      source,
+      `${pageSourcePath} should not hand-roll primary actions`
+    ).not.toMatch(/data-primary-action/);
     expect(
       source,
       `${pageSourcePath} should not use global primary CTAs`
