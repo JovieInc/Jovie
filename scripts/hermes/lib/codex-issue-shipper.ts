@@ -67,15 +67,10 @@ export const CODEX_CLAIM_LABEL = 'codex-in-progress';
 export const CODEX_BLOCKED_LABEL = 'codex-blocked';
 export const HUMAN_REVIEW_LABEL = 'human-review-required';
 export const NO_AUTO_LABEL = 'no-auto';
-export const TYPE_EPIC_LABEL = 'type:epic';
-export const EPIC_LABEL = TYPE_EPIC_LABEL;
+export const EPIC_LABEL = 'type:epic';
 /** Triaged misroutes (foreign codebase, no Jovie match) — never re-claim. */
 export const INVALID_LABEL = 'invalid';
 export const UI_FAST_TRACK_LABEL = 'fast-track-ui';
-
-/** Body/title signals that acceptance is tracker-only (no coder deliverable). */
-const DEPENDENCY_GATED_TRACKER_PATTERN =
-  /\b(tracker-pointer|no implementable deliverable|no shippable code|gated purely on child(?:\s+issues)?|acceptance is gated on child issues|human billing actions|migration pointer)\b/i;
 
 export interface GithubIssueLabel {
   readonly name: string;
@@ -301,7 +296,7 @@ export function isAlreadyClaimedOrBlocked(issue: GithubIssue): boolean {
 // so the shipper claims them, finds nothing to ship, releases, and re-claims in
 // a loop (see #12729/#12846). Treat epics as never directly dispatchable.
 export function isEpicPointer(issue: GithubIssue): boolean {
-  return labelNames(issue).includes(TYPE_EPIC_LABEL);
+  return labelNames(issue).includes(EPIC_LABEL);
 }
 
 export function isTrustedCodexIssue(issue: GithubIssue): boolean {
@@ -310,7 +305,7 @@ export function isTrustedCodexIssue(issue: GithubIssue): boolean {
 
 // Confirmed misroutes keep the `invalid` label after triage; agents cannot
 // close foreign issues, so the shipper must never re-claim them (LYB loop,
-// see #12675-#12678 / #12940).
+// see #12675–#12678 / #12940).
 export function isInvalidMisroute(issue: GithubIssue): boolean {
   return labelNames(issue).includes(INVALID_LABEL);
 }
@@ -334,7 +329,7 @@ export function isUiUxDesignIssue(issue: GithubIssue): boolean {
       return true;
     }
   }
-
+  // fallback keyword scanning
   const text = issueText(issue).toLowerCase();
   const keywords = [
     'interface',
@@ -358,11 +353,13 @@ export function isUiUxDesignIssue(issue: GithubIssue): boolean {
   return keywords.some(k => text.includes(k));
 }
 
-export function isTrackerOrDependencyGated(issue: GithubIssue): boolean {
-  return (
-    isEpicPointer(issue) ||
-    DEPENDENCY_GATED_TRACKER_PATTERN.test(issueText(issue))
-  );
+export function isOvieIssue(issue: GithubIssue): boolean {
+  const text = issueText(issue).toLowerCase();
+  return /\bovie\b/.test(text) || labelNames(issue).includes('area:ovie');
+}
+
+export function isOvieUiUxDesignIssue(issue: GithubIssue): boolean {
+  return isOvieIssue(issue) && isUiUxDesignIssue(issue);
 }
 
 export function eligibleCodexIssues(
@@ -372,9 +369,9 @@ export function eligibleCodexIssues(
     issue =>
       !isHumanReviewRequired(issue) &&
       !isAlreadyClaimedOrBlocked(issue) &&
-      !labelNames(issue).includes(NO_AUTO_LABEL) &&
+      !isEpicPointer(issue) &&
       !isInvalidMisroute(issue) &&
-      !isTrackerOrDependencyGated(issue)
+      !labelNames(issue).includes(NO_AUTO_LABEL)
   );
 }
 
@@ -547,13 +544,32 @@ export function buildGbrainCaptureText(issue: GithubIssue): string {
 
 export function buildGbrainQuery(issue: GithubIssue): string {
   return [
-    'Jovie implementation context for GitHub issue',
+    'Jovie implementation context, agent ownership, and existing work for GitHub issue',
     `#${issue.number}`,
     issue.title,
     labelNames(issue).join(' '),
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+export function gbrainContextBlocker(context: GbrainContext): string | null {
+  // Only block on query failures — the query is the actual coordination gate
+  // (checks ownership/existing work). Capture failures are audit-log writes;
+  // a write failure is non-blocking when gbrain is alive and queries succeed.
+  // Capture can fail under system memory pressure (OOM kills bun) without
+  // affecting gbrain reachability or the coordination data we actually need.
+  const failures = context.queryResult
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => /^gbrain query failed:/i.test(line));
+  if (failures.length === 0) return null;
+  return [
+    'system-blocker: gbrain coordination preflight failed, so no coding agent may start.',
+    '',
+    'Failure evidence:',
+    ...failures.map(failure => `- ${failure}`),
+  ].join('\n');
 }
 
 export function shellQuote(value: string): string {
@@ -597,15 +613,17 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
     `Working directory: ${input.repoRoot}`,
     `GitHub issue: #${input.issue.number} ${issueTitle}`,
     `Issue URL: ${input.issue.url}`,
-    `Branch to use: ${input.branchName}`,
     `Linear context: this work is part of the codex-label issue shipping automation.`,
     '',
     '## Hard Requirements',
     '- Set `JOVIE_AGENT_PROFILE=coder` before editing files.',
     '- Read `AGENTS.md` and the scoped rules for any files you touch.',
-    '- Use gbrain before planning. Start with the gbrain context below, then run a targeted `gbrain query` if the first results are not enough.',
+    '- Use gbrain before planning: fetch `gbrain:agent-org-chart` when available, check `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted `gbrain query` for existing work/ownership if the context below is not enough.',
+    '- If another agent owns the area, delegate via the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`.',
     '- Use gstack workflows. For complex work run `/autoplan`; for bugs run `/investigate`; before shipping run exhaustive `/qa`; for PR creation use `/ship`.',
     '- Use subagents. At minimum dispatch testing and review subagents. Add security, performance, architecture, or design subagents when the risk profile calls for them.',
+    '- Keep progress file-backed: do not rely on chat-only handoff. Put the current state, blockers, and verification evidence in the PR body or GitHub issue comment, and preserve generated prompt/log/state artifact paths when available.',
+    '- When you create or update a PR, include the repo-standard hidden `<!-- agent-run-artifact ... -->` evidence block when the workflow provides one, and keep its verification gate statuses truthful.',
     '- Run local CodeRabbit review before shipping: `coderabbit review --agent -c AGENTS.md -t uncommitted`. Fix actionable issues, then rerun if the diff changed.',
     '- Exhaustively QA your own work. Run typecheck and focused tests. For UI edits, verify layout-shift states and capture screenshots. For backend/control-plane edits, test the failure path and the empty path.',
     '- Create a PR, link this GitHub issue with `Fixes #<issue-number>`, and include exact verification output in the PR body.',
@@ -633,6 +651,19 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
       `- Safe UI-only fast-track lane: if and only if the final diff is limited to visual UI paths allowed by \`.github/MERGE_QUEUE.md\`, add PR labels \`ui\`, \`${UI_FAST_TRACK_LABEL}\`, \`fast\`, and \`merge-queue\` so Graphite can bypass unrelated backend trains after evidence.`,
       '- When requesting UI fast-track, include a PR section titled `## Fast-track UI eligibility` with `Why eligible`, `Before`, `After`, and `Checks run` lines. Evidence must include before/after screenshots or component evidence, narrow typecheck output, narrow lint/Biome output, and affected component/test output or an explicit explanation when none exists. Do not request fast-track for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, or broad refactors.',
       '- If the issue is not UI-focused, do not enforce this skill.',
+    ]);
+  }
+
+  if (isOvieUiUxDesignIssue(input.issue)) {
+    result = result.concat([
+      '',
+      '## Ovie UX Guardrail (JOV-3897)',
+      '- Treat Ovie as a consumer of the make-interfaces-better/design-review guardrail: load `/design-review` for visual QA and `design-taste-frontend` where available.',
+      "- Start every Ovie UI change with this one-line Design Read: 'Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>'.",
+      '- Adapt the guardrail to Ovie as a macOS ops cockpit: dense but calm, fast, native-feeling, no AI-slop decoration, and no random web landing-page patterns.',
+      '- Ovie UI PRs need before/after screenshots or component evidence, plus explicit pass/fail for hierarchy, spacing, typography scale, visual density, interaction states, contrast, macOS-native affordances, and no layout jank.',
+      '- If the local Ovie repo is dirty, inspect and preserve that state before editing it; do not overwrite unrelated uncommitted Ovie work.',
+      '- Reference `docs/ovie-design-guardrails.md` and `DESIGN.md` in the PR body when the change touches Ovie UI/UX.',
     ]);
   }
 
@@ -773,17 +804,97 @@ export function buildFinishCommitMessage(issue: GithubIssue): string {
   ].join('\n');
 }
 
-export function buildFinishPrBody(issue: GithubIssue, logPath: string): string {
+function buildFinisherAgentRunArtifactComment(
+  issue: GithubIssue,
+  logPath: string,
+  statePath?: string
+): string {
+  const now = new Date().toISOString();
+  const queuedGate = (name: string, summary: string) => ({
+    name,
+    required: true,
+    status: 'queued',
+    evidenceUrl: null,
+    summary,
+    checkedAt: now,
+  });
+  const artifact = {
+    id: `hermes-codex-finish-github-${issue.number}`,
+    source: 'hermes',
+    sourceRunId: `github-${issue.number}`,
+    kind: 'workflow',
+    status: 'review',
+    title: `Deterministic finisher for GitHub #${issue.number}`,
+    summary:
+      'The coding agent exited with work but no PR; the Hermes deterministic finisher committed, pushed, and opened this PR for normal CI/review gates.',
+    modelRoute: 'deterministic',
+    allowedActions: ['open_pr'],
+    forbiddenActions: [
+      'merge',
+      'deploy',
+      'mutate_production_data',
+      'change_auth',
+      'change_billing',
+      'change_security',
+    ],
+    humanApprovalRequired: false,
+    humanGate: {
+      required: false,
+      status: 'not_required',
+      reason: null,
+      reviewer: null,
+      reviewedAt: null,
+    },
+    linearIssueId: null,
+    linearIssueUrl: null,
+    pullRequestUrl: null,
+    adminSurface: null,
+    verificationGates: [
+      queuedGate('gstack.qa.exhaustive', 'Awaiting QA evidence or PR update.'),
+      queuedGate('gstack.review', 'Awaiting review evidence or PR update.'),
+      queuedGate('gstack.ship', 'Finisher opened PR; ship gate is queued.'),
+      queuedGate('github.ci', 'PR CI will run after branch push.'),
+    ],
+    costEstimate: null,
+    blockedReason: null,
+    createdAt: now,
+    updatedAt: now,
+    metadata: {
+      issueNumber: issue.number,
+      issueUrl: issue.url,
+      logPath,
+      statePath: statePath ?? null,
+    },
+  };
+
+  return `<!-- agent-run-artifact\n${JSON.stringify(artifact, null, 2)}\n-->`;
+}
+
+export function buildFinishPrBody(
+  issue: GithubIssue,
+  logPath: string,
+  statePath?: string
+): string {
   return [
     `Fixes #${issue.number}`,
     '',
     'Opened by the codex-issue-shipper **deterministic finisher**: the coding',
-    'agent produced this diff but exited without opening a PR. Pre-commit hooks',
-    '(lint-staged, typecheck) passed at commit time; CI is the merge gate as',
-    'usual.',
+    'agent produced this diff but exited without opening a PR. The finisher',
+    'committed with hooks enabled, pushed the branch, and opened this PR so CI',
+    'and bot review can own the merge gate.',
     '',
     `Agent log: \`${logPath}\``,
-  ].join('\n');
+    statePath ? `Dispatch state: \`${statePath}\`` : null,
+    '',
+    'Verification evidence:',
+    '- Deterministic finisher completed `git commit` with repository hooks enabled.',
+    '- PR CI remains required before merge.',
+    '- Review the linked agent log/state artifact for any command output the agent produced before the finisher took over.',
+    '',
+    buildFinisherAgentRunArtifactComment(issue, logPath, statePath),
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 /**
@@ -798,6 +909,7 @@ export function finishDispatch(
     readonly branchName: string;
     readonly issue: GithubIssue;
     readonly logPath: string;
+    readonly statePath?: string;
   }
 ): void {
   const dirty = runInWorktree(['git', 'status', '--porcelain']).trim();
@@ -835,7 +947,7 @@ export function finishDispatch(
       '--title',
       `chore(codex): ${input.issue.title.replace(/\s+/g, ' ').trim().slice(0, 90)} (#${input.issue.number})`,
       '--body',
-      buildFinishPrBody(input.issue, input.logPath),
+      buildFinishPrBody(input.issue, input.logPath, input.statePath),
     ],
     { timeoutMs: 2 * 60 * 1000 }
   );

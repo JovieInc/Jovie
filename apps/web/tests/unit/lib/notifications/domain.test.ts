@@ -110,10 +110,8 @@ import {
 describe('notifications/domain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(db.limit).mockReset();
-    vi.mocked(db.limit).mockResolvedValue([]);
-    vi.mocked(db.execute).mockReset();
-    vi.mocked(db.execute).mockResolvedValue(undefined);
+    vi.mocked(db.limit).mockReset().mockResolvedValue([]);
+    vi.mocked(db.execute).mockReset().mockResolvedValue(undefined);
   });
 
   describe('subscribeToNotificationsDomain', () => {
@@ -168,6 +166,7 @@ describe('notifications/domain', () => {
         artist_id: artistId,
         phone: '+15551234567',
         channel: 'sms',
+        country_code: 'US',
         source: 'alerts-landing',
       });
 

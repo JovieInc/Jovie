@@ -4,6 +4,7 @@ import {
   buildAgentPrompt,
   buildDispatchPlans,
   buildGbrainCaptureText,
+  buildGbrainQuery,
   buildRecoveryStashMessage,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
@@ -17,10 +18,13 @@ import {
   GH_EAGAIN_BACKOFF_MS,
   GH_EAGAIN_BACKOFF_THRESHOLD,
   GhEagainBackoff,
+  gbrainContextBlocker,
+  INVALID_LABEL,
   isAlreadyClaimedOrBlocked,
+  isInvalidMisroute,
+  isOvieUiUxDesignIssue,
   isShipperCriticalPath,
   isSpawnEagain,
-  isTrackerOrDependencyGated,
   isUiUxDesignIssue,
   loadShipperConfig,
   NO_AUTO_LABEL,
@@ -31,7 +35,6 @@ import {
   SpawnEagainError,
   selectTaskRoute,
   shellQuote,
-  TYPE_EPIC_LABEL,
   worktreeHasWork,
 } from '../../hermes/lib/codex-issue-shipper.ts';
 
@@ -54,6 +57,25 @@ function issue(overrides = {}) {
     labels: [{ name: 'codex' }, { name: CODEX_TRUSTED_LABEL }],
     ...overrides,
   };
+}
+
+function buildPromptForIssue(overrides = {}) {
+  const plan = buildDispatchPlans([issue(overrides)], config)[0];
+  const prompt = buildAgentPrompt({
+    issue: plan.issue,
+    branchName: plan.branchName,
+    baseBranch: 'main',
+    integrationBranch: plan.integrationBranch,
+    route: plan.route,
+    repoRoot: '/repo',
+    gbrain: {
+      captureSlug: 'ops/codex-issue-shipper/github-123',
+      queryText: 'Jovie implementation context',
+      queryResult: 'Relevant memory result',
+    },
+  });
+
+  return { plan, prompt };
 }
 
 describe('spawn EAGAIN recovery helpers', () => {
@@ -102,7 +124,7 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters no-auto, claimed, blocked, and epic issues before dispatch', () => {
+  it('filters no-auto, claimed, blocked, epic, and invalid issues before dispatch', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
     const noAuto = issue({
       number: 2,
@@ -121,43 +143,33 @@ describe('codex issue shipper planner', () => {
       number: 5,
       labels: [{ name: 'codex' }, { name: EPIC_LABEL }],
     });
-
-    expect(
-      eligibleCodexIssues([ready, noAuto, claimed, blocked, epic])
-    ).toEqual([ready]);
-    expect(
-      buildDispatchPlans([ready, noAuto, claimed, blocked, epic], config)
-    ).toHaveLength(1);
-  });
-
-  it('skips type:epic and dependency-gated tracker issues', () => {
-    const ready = issue({ number: 1, title: 'Fix docs typo' });
-    const epic = issue({
-      number: 12729,
-      title: 'Linear → GitHub Issues migration pointer',
-      labels: [{ name: 'codex' }, { name: TYPE_EPIC_LABEL }],
-      body: 'Epic tracker with no implementable deliverable.',
-    });
-    const trackerPointer = issue({
-      number: 12730,
-      title: 'Billing rollout tracker-pointer',
-      body: 'Acceptance is gated on child issues and human billing actions.',
-    });
-    const migrationPointer = issue({
-      number: 12731,
-      title: 'Phase 2 migration pointer',
-      body: 'This migration pointer has no shippable code.',
+    // Confirmed misroute: triage labels invalid but cannot close; shipper must
+    // not re-claim after release (#12675–#12678 / #12940).
+    const invalidMisroute = issue({
+      number: 6,
+      title: 'LYB PhotoUploadManager state machine',
+      labels: [
+        { name: 'codex' },
+        { name: INVALID_LABEL },
+        { name: 'blocked' },
+        { name: 'ai:needs-review' },
+      ],
     });
 
-    expect(isTrackerOrDependencyGated(epic)).toBe(true);
-    expect(isTrackerOrDependencyGated(trackerPointer)).toBe(true);
-    expect(isTrackerOrDependencyGated(migrationPointer)).toBe(true);
+    expect(isInvalidMisroute(invalidMisroute)).toBe(true);
     expect(
-      eligibleCodexIssues([ready, epic, trackerPointer, migrationPointer])
+      eligibleCodexIssues([
+        ready,
+        noAuto,
+        claimed,
+        blocked,
+        epic,
+        invalidMisroute,
+      ])
     ).toEqual([ready]);
     expect(
       buildDispatchPlans(
-        [ready, epic, trackerPointer, migrationPointer],
+        [ready, noAuto, claimed, blocked, epic, invalidMisroute],
         config
       )
     ).toHaveLength(1);
@@ -300,7 +312,14 @@ describe('codex issue shipper prompt', () => {
 
     expect(prompt).toContain('Load gstack');
     expect(prompt).toContain('Use gbrain before planning');
+    expect(prompt).toContain('gbrain:agent-org-chart');
+    expect(prompt).toContain('shared-skills/coordination-basics/SKILL.md');
+    expect(prompt).toContain('existing work/ownership');
+    expect(prompt).toContain('delegate via the coordination inbox');
+    expect(prompt).toContain('system-blocker');
     expect(prompt).toContain('Use subagents');
+    expect(prompt).toContain('Keep progress file-backed');
+    expect(prompt).toContain('agent-run-artifact');
     expect(prompt).toContain('/qa');
     expect(prompt).toContain('/ship');
     expect(prompt).toContain(
@@ -313,6 +332,113 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain(
       'Captured slug: ops/codex-issue-shipper/github-123'
     );
+  });
+
+  it('queries gbrain for agent ownership and existing work context', () => {
+    const query = buildGbrainQuery(
+      issue({
+        number: 12962,
+        title: 'Agent Coordination Policy',
+        labels: [{ name: 'codex' }, { name: 'area:ops' }],
+      })
+    );
+
+    expect(query).toContain('agent ownership');
+    expect(query).toContain('existing work');
+    expect(query).toContain('#12962');
+    expect(query).toContain('Agent Coordination Policy');
+    expect(query).toContain('area:ops');
+  });
+
+  it('blocks agent launch when gbrain context collection failed', () => {
+    expect(
+      gbrainContextBlocker({
+        captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
+        queryText: 'Jovie implementation context',
+        queryResult:
+          'gbrain query failed: connect ECONNREFUSED 127.0.0.1:7801\n\ngbrain capture failed: Page not found',
+      })
+    ).toContain('system-blocker');
+
+    expect(
+      gbrainContextBlocker({
+        captureSlug: 'ops/codex-issue-shipper/github-12962',
+        queryText: 'Jovie implementation context',
+        queryResult: 'No results.',
+      })
+    ).toBeNull();
+
+    expect(
+      gbrainContextBlocker({
+        captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
+        queryText: 'Jovie implementation context',
+        queryResult: 'No results.',
+      })
+    ).toContain('system-blocker');
+  });
+
+  it('adds Ovie-specific make-interfaces-better guardrails to Ovie UX prompts', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Ovie UX guardrail: require design review standards',
+      body: 'Update Ovie interface review routing.',
+      labels: [
+        { name: 'codex' },
+        { name: CODEX_TRUSTED_LABEL },
+        { name: 'area:ui' },
+      ],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(true);
+    expect(prompt).toContain('## Ovie UX Guardrail (JOV-3897)');
+    expect(prompt).toContain('make-interfaces-better/design-review');
+    expect(prompt).toContain('macOS ops cockpit');
+    expect(prompt).toContain('before/after screenshots or component evidence');
+    expect(prompt).toContain('macOS-native affordances');
+    expect(prompt).toContain('no layout jank');
+    expect(prompt).toContain('docs/ovie-design-guardrails.md');
+  });
+
+  it('adds Ovie UX guardrails when Ovie is label-only and the body is empty', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Require interface review standards',
+      body: '',
+      labels: [
+        { name: 'codex' },
+        { name: CODEX_TRUSTED_LABEL },
+        { name: 'area:ovie' },
+        { name: 'area:ui' },
+      ],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(true);
+    expect(prompt).toContain('## Ovie UX Guardrail (JOV-3897)');
+  });
+
+  it('does not add Ovie guardrails to non-Ovie UI prompts', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Improve dashboard interface spacing',
+      body: 'Polish the dashboard layout.',
+      labels: [
+        { name: 'codex' },
+        { name: CODEX_TRUSTED_LABEL },
+        { name: 'area:ui' },
+      ],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(false);
+    expect(prompt).toContain('## UI/UX Design Skill Instructions');
+    expect(prompt).not.toContain('## Ovie UX Guardrail (JOV-3897)');
+  });
+
+  it('does not add Ovie UX guardrails to non-UI Ovie prompts', () => {
+    const { plan, prompt } = buildPromptForIssue({
+      title: 'Ovie shipper retry logs',
+      body: 'Improve retry diagnostics for automation.',
+      labels: [{ name: 'codex' }, { name: CODEX_TRUSTED_LABEL }],
+    });
+
+    expect(isOvieUiUxDesignIssue(plan.issue)).toBe(false);
+    expect(prompt).not.toContain('## Ovie UX Guardrail (JOV-3897)');
   });
 
   it('captures issue body and labels for gbrain', () => {
@@ -602,6 +728,7 @@ describe('deterministic finisher', () => {
       branchName: 'codex/gh-12721-x',
       issue,
       logPath: '/tmp/agent.log',
+      statePath: '/tmp/agent.state.json',
     });
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
     expect(cmds).toEqual([
@@ -624,6 +751,21 @@ describe('deterministic finisher', () => {
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      'Dispatch state: `/tmp/agent.state.json`'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      'Verification evidence:'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '<!-- agent-run-artifact'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '"source": "hermes"'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      '"status": "queued"'
+    );
   });
 
   it('finishDispatch skips commit when work is already committed', () => {
@@ -680,7 +822,7 @@ describe('agent fallback chain', () => {
     ).toEqual(['grok', 'claude']);
   });
 
-  it('routeForAgent rewrites the model only for claude attempts', () => {
+  it('routeForAgent rewrites only the fallback model for claude attempts', () => {
     const grokRoute = {
       sessionModel: 'grok-composer-2.5-fast',
       fallbackModel: 'grok-composer-2.5-fast',
@@ -703,7 +845,7 @@ describe('agent fallback chain', () => {
     };
     // grok attempt: untouched
     expect(routeForAgent('grok', grokRoute)).toBe(grokRoute);
-    // claude attempt: sonnet for standard risk
+    // claude attempt: route through Claude's model family.
     const claude = routeForAgent('claude', grokRoute);
     expect(claude.sessionModel).toBe('sonnet');
     expect(claude.fallbackModel).toBe('sonnet');
