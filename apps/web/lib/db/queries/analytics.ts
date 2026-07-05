@@ -382,3 +382,49 @@ export async function recordClickEvent(
 
   return event;
 }
+
+/**
+ * Weekly per-release engagement counts for a profile's releases list.
+ *
+ * Counts non-bot smart-link click-throughs from the trailing 7 days, grouped
+ * by the release id recorded in `click_events.metadata->>'contentId'`
+ * (`contentType = 'release'`) — the same pipeline the per-release analytics
+ * sidebar endpoint reads. No DSP stream-count ingestion exists yet, so this
+ * click-through count is the "weekly streams" metric surfaced in the releases
+ * list until real DSP stream data lands.
+ *
+ * Releases with zero recorded events are simply absent from the returned map
+ * — callers should render a placeholder ("—") for missing ids.
+ */
+export async function getWeeklyReleaseClickCounts(
+  creatorProfileId: string
+): Promise<Map<string, number>> {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const result = await db.execute<{
+    release_id: string;
+    clicks: string | number;
+  }>(
+    drizzleSql`
+      select
+        ${clickEvents.metadata} ->> 'contentId' as release_id,
+        count(*) as clicks
+      from ${clickEvents}
+      where ${clickEvents.creatorProfileId} = ${creatorProfileId}
+        and ${clickEvents.isBot} = false
+        and ${clickEvents.createdAt} >= ${sqlTimestamp(sevenDaysAgo)}
+        and ${clickEvents.metadata} ->> 'contentType' = 'release'
+        and ${clickEvents.metadata} ->> 'contentId' is not null
+      group by release_id
+    `
+  );
+
+  const counts = new Map<string, number>();
+  for (const row of result.rows ?? []) {
+    if (row.release_id) {
+      counts.set(row.release_id, Number(row.clicks));
+    }
+  }
+  return counts;
+}

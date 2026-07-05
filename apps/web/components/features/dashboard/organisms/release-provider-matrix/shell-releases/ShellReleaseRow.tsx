@@ -33,6 +33,7 @@ import { StatusBadge } from '@/components/shell/StatusBadge';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
+import { formatStreams } from '@/lib/format-streams';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
@@ -238,6 +239,50 @@ const SmartLinkCell = memo(function SmartLinkCell({
   );
 });
 
+/**
+ * Weekly performance metric for the release row — smart-link click-throughs
+ * from the trailing 7 days (the click_events analytics pipeline). Renders an
+ * em dash when the release has no recorded weekly data, so rows without
+ * analytics stay quiet instead of showing a noisy zero.
+ */
+const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
+  weeklyStreams,
+  releaseTitle,
+}: {
+  readonly weeklyStreams: number | null | undefined;
+  readonly releaseTitle: string;
+}) {
+  const hasData = typeof weeklyStreams === 'number' && weeklyStreams > 0;
+
+  return (
+    <div
+      className='hidden w-20 shrink-0 justify-end xl:inline-flex'
+      title={
+        hasData
+          ? `${weeklyStreams.toLocaleString()} smart-link clicks this week`
+          : 'No weekly activity recorded yet'
+      }
+      aria-label={
+        hasData
+          ? `${weeklyStreams.toLocaleString()} weekly clicks for ${releaseTitle}`
+          : `No weekly activity for ${releaseTitle}`
+      }
+      data-testid='shell-release-weekly-streams'
+    >
+      {hasData ? (
+        <span className='whitespace-nowrap text-2xs tabular-nums text-tertiary-token'>
+          {formatStreams(weeklyStreams)}
+          <span className='text-quaternary-token'> / wk</span>
+        </span>
+      ) : (
+        <span className='text-2xs text-quaternary-token' aria-hidden='true'>
+          —
+        </span>
+      )}
+    </div>
+  );
+});
+
 // ── Main row component ─────────────────────────────────────────────────────────
 
 /**
@@ -360,6 +405,11 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       ) : (
         <span className='hidden w-28 shrink-0 lg:block' aria-hidden='true' />
       )}
+
+      <WeeklyStreamsCell
+        weeklyStreams={release.weeklyStreams}
+        releaseTitle={release.title}
+      />
 
       <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
         <DspAvatarStack dsps={dspItems} maxVisible={3} />

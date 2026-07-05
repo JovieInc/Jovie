@@ -174,6 +174,13 @@ export interface ReleaseViewModel {
   /** Preview audio URL (typically from the primary track) */
   previewUrl?: string | null;
   previewCounts?: PreviewCounts;
+  /**
+   * Weekly engagement metric for the releases list: non-bot smart-link
+   * click-throughs recorded in the trailing 7 days. Sourced from the
+   * click_events analytics pipeline (no DSP stream-count ingestion exists
+   * yet). `undefined`/`null` means no data — render a placeholder.
+   */
+  weeklyStreams?: number | null;
   providerCounts?: ProviderConfidenceSummary;
   /** Latest AI-generated release pitch draft or legacy per-platform pitch set */
   generatedPitches?: {
