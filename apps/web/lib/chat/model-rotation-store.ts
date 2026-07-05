@@ -144,9 +144,7 @@ export function friendlyModelLabel(modelId: string): string {
     .replace(/-\d{8}$/, '')
     .split('-')
     .map(part =>
-      /^\d/.test(part)
-        ? part
-        : part.charAt(0).toUpperCase() + part.slice(1)
+      /^\d/.test(part) ? part : part.charAt(0).toUpperCase() + part.slice(1)
     )
     .join(' ');
 }
