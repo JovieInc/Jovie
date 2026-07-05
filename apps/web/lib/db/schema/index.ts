@@ -82,6 +82,7 @@ export {
   type NewTip,
   type NotificationSubscription,
   notificationSubscriptions,
+  publicProfileCaptureDismissals,
   selectAudienceBlockSchema,
   selectClickEventSchema,
   selectNotificationSubscriptionSchema,
@@ -431,8 +432,10 @@ export {
 // Feedback
 export {
   type FeedbackItem,
+  type FeedbackVote,
   feedbackItems,
   feedbackStatusEnumValues,
+  feedbackVoteEnumValues,
   insertFeedbackItemSchema,
   type NewFeedbackItem,
   selectFeedbackItemSchema,

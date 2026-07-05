@@ -21,10 +21,12 @@ import {
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
+import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
 import {
   getMerchMvpEnabled,
   getProfileAlertOptInVariant,
+  getProfilePacAssignment,
 } from '@/lib/flags/profile-variant';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { buildProfileAeoContent } from '@/lib/profile/aeo-content';
@@ -246,6 +248,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     allReleases,
     merchCards,
     alertOptInVariant,
+    profilePacAssignment,
     entityLinks,
   ] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
@@ -255,6 +258,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     // AnonCookieBootstrap resolves the per-user variant on the client side.
     // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
     getProfileAlertOptInVariant(null).catch(() => 'button' as const),
+    getProfilePacAssignment(null).catch(() => DEFAULT_PROFILE_PAC_ASSIGNMENT),
     entityLinksPromise.catch(() => []),
   ]);
   const tourDates = [...tourDatesRaw].sort(
@@ -343,6 +347,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         pressPhotos={pressPhotos}
         subscribeTwoStep
         alertOptInVariant={alertOptInVariant}
+        profilePacAssignment={profilePacAssignment}
         genres={genres}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}

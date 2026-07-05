@@ -57,15 +57,19 @@ Key routing rules:
 - Code review, check my diff → invoke `review`
 - Update docs after shipping → invoke `document-release`
 - Weekly retro → invoke `retro`
-- Design system, brand → invoke `design-consultation`
-- Visual audit, design polish → invoke `design-review`
+- Design, UX, taste, design system, brand, Ovie visual work → invoke `design-canonical` first, then the mode-specific design skill if needed
+- Design system, brand → invoke `design-canonical`, then `design-consultation`
+- Visual audit, design polish → invoke `design-canonical`, then `design-review`
 - Architecture review → invoke `plan-eng-review`
 - Clerk user management, instance inspection, auth debugging → invoke `clerk-cli`
 - Continuous QA swarm recipes (diff review, explore, vision, jury, test-gen, flakes) → invoke matching `/qa-swarm-*` command; load `qa-swarm` skill
+- A shared link/tool/product with no context expecting an opinion or evaluation → invoke `tool-discovery` instead of asking the human to research it first
 
 ## gbrain (long-term memory layer)
 
 For cross-session recall and prior-art lookup, consult gbrain via MCP **only when the question touches durable founder/strategic context**. Do not ritually query for purely local code questions.
+
+Exception: the Agent Coordination Preflight in `AGENTS.md` is mandatory for every task. That org-chart/existing-work check is a coordination gate, not optional durable-context lookup. If gbrain is unreachable during the coordination gate, stop and alert with a `system-blocker`.
 
 Conditional triggers:
 - Decisions involving people, companies, customers, fundraising, pricing, or competitive positioning
@@ -90,6 +94,7 @@ After shipping a non-trivial decision, write a brief decision page so the next a
 gstack skill files are part of the agent control plane. Keep them fast, stable, and maintainable:
 
 - Edit `.agents/skills/gstack/**/SKILL.md.tmpl` or generator code first. Regenerate generated `SKILL.md` files; do not hand-edit generated outputs.
+- Do not fork design doctrine across legacy design skills. Shared UX/design rules live in `design-canonical`; legacy design skills should only add their execution mode.
 - Keep leaf skills task-local: trigger conditions, required inputs, workflow, verification, output contract, and escalation only.
 - Put shared routing, safety, telemetry, and generic voice rules in the root gstack template, hooks, settings, or `.claude/rules/*`.
 - Put repeatable commands in scripts. Long copied shell/prose blocks increase latency and drift.

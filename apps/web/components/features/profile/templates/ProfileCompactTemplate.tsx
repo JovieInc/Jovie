@@ -27,6 +27,10 @@ import {
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+} from '@/lib/flags/profile-pac';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
@@ -70,6 +74,7 @@ interface ProfileCompactTemplateProps {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  readonly profilePacAssignment?: ProfilePacAssignment;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -208,6 +213,7 @@ export function ProfileCompactTemplate({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   alertOptInVariant = 'button',
+  profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -227,6 +233,8 @@ export function ProfileCompactTemplate({
   // updates this state, so real visitors see their assigned experiment variant.
   const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
     useState<ProfileAlertOptInVariant>(alertOptInVariant);
+  const [resolvedProfilePacAssignment, setResolvedProfilePacAssignment] =
+    useState<ProfilePacAssignment>(profilePacAssignment);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
   const [drawerPresentation, setDrawerPresentation] =
@@ -700,7 +708,10 @@ export function ProfileCompactTemplate({
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       {/* Resolves the per-user jv_aid variant client-side after ISR hydration.
           Renders null; updates resolvedAlertOptInVariant state on mount. */}
-      <AnonCookieBootstrap onVariantResolved={setResolvedAlertOptInVariant} />
+      <AnonCookieBootstrap
+        onVariantResolved={setResolvedAlertOptInVariant}
+        onProfilePacResolved={setResolvedProfilePacAssignment}
+      />
       <PublicProfileLayoutShell
         artistName={artist.name}
         heroImageUrl={heroImageUrl}
@@ -727,6 +738,7 @@ export function ProfileCompactTemplate({
               enableDynamicEngagement={enableDynamicEngagement}
               subscribeTwoStep={subscribeTwoStep}
               alertOptInVariant={resolvedAlertOptInVariant}
+              profilePacAssignment={resolvedProfilePacAssignment}
               genres={genres}
               pressPhotos={pressPhotos}
               allowPhotoDownloads={allowPhotoDownloads}

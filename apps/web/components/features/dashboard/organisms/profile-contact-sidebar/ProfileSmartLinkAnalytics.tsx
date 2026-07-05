@@ -10,16 +10,12 @@ import {
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { getTimeRangeLabel } from '@/lib/analytics/time-range';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
 
 const numberFormatter = new Intl.NumberFormat();
-
-const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
-  { value: '7d', label: '7D' }, // ui-casing-allow: compact range pill
-  { value: '30d', label: '30D' }, // ui-casing-allow: compact range pill
-];
 
 interface ProfileSmartLinkAnalyticsProps {
   readonly profileUrl: string;
@@ -92,8 +88,7 @@ export function ProfileSmartLinkAnalytics({
 
   const showSkeleton = isLoading && !data;
 
-  const currentRangeLabel =
-    RANGE_OPTIONS.find(o => o.value === range)?.label ?? '30D';
+  const currentRangeLabel = getTimeRangeLabel(range, 'description');
 
   const content = (
     <>
@@ -139,7 +134,7 @@ export function ProfileSmartLinkAnalytics({
               />
             </div>
             <p className='text-3xs leading-[13px] text-tertiary-token'>
-              Last {currentRangeLabel}
+              {currentRangeLabel}
             </p>
           </div>
         )}

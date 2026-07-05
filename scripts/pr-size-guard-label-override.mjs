@@ -19,14 +19,12 @@ if (!repository) {
 
 const payload = buildSizeGuardOverrideCheckRun({ headSha, label, runUrl });
 
-execFileSync(
-  'gh',
-  ['api', `repos/${repository}/check-runs`, '--input', '-'],
-  {
-    input: JSON.stringify(payload),
-    stdio: ['pipe', 'inherit', 'inherit'],
-    encoding: 'utf8',
-  }
-);
+execFileSync('gh', ['api', `repos/${repository}/check-runs`, '--input', '-'], {
+  input: JSON.stringify(payload),
+  stdio: ['pipe', 'inherit', 'inherit'],
+  encoding: 'utf8',
+});
 
-console.log(`Posted passing "${payload.name}" check for ${headSha.slice(0, 7)}`);
+console.log(
+  `Posted passing "${payload.name}" check for ${headSha.slice(0, 7)}`
+);

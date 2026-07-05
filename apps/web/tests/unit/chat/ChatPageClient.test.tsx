@@ -408,17 +408,12 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('keeps the profile panel mounted on chat when closed so the rail can animate shut', () => {
+  it('does not register a right panel when the preview panel is closed', () => {
     mockPreviewPanelState.isOpen = false;
 
     renderChatPage();
 
-    expect(hasRegisteredRightPanel()).toBe(true);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(
-      expect.objectContaining({
-        username: 'testartist',
-      })
-    );
+    expect(hasRegisteredRightPanel()).toBe(false);
   });
 
   it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {

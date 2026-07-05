@@ -10,7 +10,12 @@ import {
   type TeleprompterShowcaseVariant,
 } from './contracts';
 import {
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+} from './profile-pac';
+import {
   getProfileAlertOptInVariantValue,
+  getProfilePacAssignmentValue,
   getSubscribeCTAVariantValue,
   getTeleprompterShowcaseVariantValue,
 } from './statsig';
@@ -88,6 +93,22 @@ export const PROFILE_ALERT_OPTIN_VARIANT_FLAG = flag<
   options: ['button', 'toggle'],
   async decide({ entities }) {
     return getProfileAlertOptInVariantValue(entities?.userId ?? null);
+  },
+});
+
+export const PROFILE_PAC_VARIANT_SLOTS_FLAG = flag<
+  ProfilePacAssignment,
+  FlagEntities
+>({
+  key: 'profile_pac_variant_slots',
+  defaultValue: {
+    ...DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  },
+  description:
+    'Public profile Primary Action Card variant slots: S1 copy arm, S1 trigger threshold, S2 monetization slot',
+  options: [{ label: 'Default', value: DEFAULT_PROFILE_PAC_ASSIGNMENT }],
+  async decide({ entities }) {
+    return getProfilePacAssignmentValue(entities?.userId ?? null);
   },
 });
 

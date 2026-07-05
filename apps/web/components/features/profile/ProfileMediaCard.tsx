@@ -93,7 +93,8 @@ const ACTION_ICONS: Record<ProfileMediaCardIcon, LucideIcon> = {
 
 const RATIO_CLASS_NAMES: Record<ProfileMediaCardRatio, string> = {
   square: 'aspect-square',
-  portrait: 'aspect-[4/5]',
+  // Standard 4:5 card shape from the profile composition layer (#11899).
+  portrait: 'aspect-card-standard',
   landscape: 'aspect-[5/3] min-h-36',
   compact: 'aspect-[3/4]',
 };

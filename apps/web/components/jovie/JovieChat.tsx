@@ -536,6 +536,20 @@ export function JovieChat({
           designV1ChatEntitiesEnabled ? 'true' : undefined
         }
       >
+        {/* Ambient background wash — fills the full chat viewport so the
+            gradient never clips to a content-sized region (#12135 / JOV-3614).
+            Pure background: pointer-events-none, painted behind the positioned
+            siblings below by DOM order; top-weighted so it fades out well
+            above the opaque composer dock. No layout shift. */}
+        <div
+          aria-hidden='true'
+          data-testid='chat-ambient-gradient'
+          className='pointer-events-none absolute inset-0 h-full w-full'
+          style={{
+            background:
+              'radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--color-accent-blue) 6%, transparent), transparent 60%)',
+          }}
+        />
         {/* Registers entity providers (release, artist) for the slash menu */}
         {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
 
@@ -601,6 +615,7 @@ export function JovieChat({
                 inlineChatError={inlineChatError}
                 isStuckToBottom={isStuckToBottom}
                 onScrollToBottom={() => scrollToBottom()}
+                conversationId={activeConversationId ?? conversationId}
               />
             )}
           </div>

@@ -295,8 +295,10 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       ).not.toBeNull();
       expect(metrics.shell?.left ?? 0).toBeGreaterThanOrEqual(-1);
       expect(metrics.shell?.right ?? 0).toBeLessThanOrEqual(viewport.width + 1);
+      // Composition floor (#11899): hero media never renders below 240px —
+      // it crops, never squashes. Mobile keeps the taller 300px band.
       expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(
-        viewport.isMobile ? 300 : 220
+        viewport.isMobile ? 300 : 240
       );
 
       if (

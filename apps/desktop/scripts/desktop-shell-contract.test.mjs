@@ -51,6 +51,31 @@ test('desktop window enters the authenticated chat shell instead of the web root
   );
 });
 
+test('desktop polls build-info and reloads only hud windows on deploy drift', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  for (const symbol of [
+    'HUD_BUILD_INFO_POLL_INTERVAL_MS',
+    'fetchHudBuildFingerprint',
+    'getHudBuildFingerprint',
+    'decideHudBuildReload',
+    'isHudRoutePath',
+    'isHudWindow',
+    'scheduleHudBuildAutoReload',
+  ]) {
+    assert.match(mainSource, new RegExp(`\\b${symbol}\\b`));
+  }
+
+  assert.match(mainSource, /\/api\/health\/build-info/);
+  assert.match(mainSource, /60 \* 1000/);
+  assert.match(
+    mainSource,
+    /BrowserWindow\.getAllWindows\(\)\.some\(isHudWindow\)/
+  );
+  assert.match(mainSource, /win\.webContents\.reload\(\)/);
+  assert.doesNotMatch(mainSource, /commitSha.*deployedAt/);
+});
+
 test('desktop window fails into a branded Jovie recovery surface', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const tokenSource = await readFile(

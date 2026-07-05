@@ -46,6 +46,7 @@ import {
   type GbrainContext,
   GhEagainBackoff,
   type GithubIssue,
+  gbrainContextBlocker,
   HUMAN_REVIEW_LABEL,
   isSpawnEagain,
   labelNames,
@@ -130,6 +131,24 @@ interface AgentRunResult {
   readonly error?: string;
   readonly logPath: string;
   readonly promptPath: string;
+  readonly statePath: string;
+}
+
+interface AgentAttemptState {
+  readonly job: typeof JOB;
+  readonly issue: number;
+  readonly branch: string;
+  readonly agent: ShipperConfig['agent'];
+  readonly model: string;
+  readonly repoRoot: string;
+  readonly promptPath: string;
+  readonly logPath: string;
+  readonly startedAt: string;
+  readonly updatedAt: string;
+  readonly status: 'running' | 'succeeded' | 'failed';
+  readonly exitStatus?: number | null;
+  readonly signal?: NodeJS.Signals | null;
+  readonly error?: string;
 }
 
 interface CapacitySnapshot {
@@ -144,6 +163,22 @@ interface CapacitySnapshot {
 function shortError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function writeAgentAttemptState(
+  statePath: string,
+  state: AgentAttemptState
+): void {
+  try {
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'agent_attempt_state_write_failed',
+      statePath,
+      error: shortError(err),
+    });
+  }
 }
 
 function unquoteEnvValue(value: string): string {
@@ -834,7 +869,22 @@ function runAgent(
   const base = `github-${plan.issue.number}-${timestamp}`;
   const logPath = join(dir, `${base}.log`);
   const promptPath = join(dir, `${base}.prompt.md`);
+  const statePath = join(dir, `${base}.state.json`);
   writeFileSync(promptPath, prompt);
+  const startedAt = new Date().toISOString();
+  writeAgentAttemptState(statePath, {
+    job: JOB,
+    issue: plan.issue.number,
+    branch: plan.branchName,
+    agent: config.agent,
+    model: plan.route.sessionModel,
+    repoRoot,
+    promptPath,
+    logPath,
+    startedAt,
+    updatedAt: startedAt,
+    status: 'running',
+  });
   appendFileSync(
     logPath,
     [
@@ -842,7 +892,8 @@ function runAgent(
       `issue=${plan.issue.number}`,
       `branch=${plan.branchName}`,
       `model=${plan.route.sessionModel}`,
-      `started=${new Date().toISOString()}`,
+      `started=${startedAt}`,
+      `state=${statePath}`,
       '',
     ].join('\n')
   );
@@ -864,13 +915,29 @@ function runAgent(
     });
 
     const finish = (
-      result: Omit<AgentRunResult, 'logPath' | 'promptPath'>
+      result: Omit<AgentRunResult, 'logPath' | 'promptPath' | 'statePath'>
     ): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       closeSync(fd);
-      resolve({ ...result, logPath, promptPath });
+      writeAgentAttemptState(statePath, {
+        job: JOB,
+        issue: plan.issue.number,
+        branch: plan.branchName,
+        agent: config.agent,
+        model: plan.route.sessionModel,
+        repoRoot,
+        promptPath,
+        logPath,
+        startedAt,
+        updatedAt: new Date().toISOString(),
+        status: result.ok ? 'succeeded' : 'failed',
+        exitStatus: result.status,
+        signal: result.signal,
+        error: result.error,
+      });
+      resolve({ ...result, logPath, promptPath, statePath });
     };
 
     timeout = setTimeout(() => {
@@ -937,6 +1004,19 @@ async function dispatchPlan(
   config: ShipperConfig,
   plan: DispatchPlan
 ): Promise<void> {
+  const gbrain = collectGbrainContext(plan);
+  const gbrainBlocker = gbrainContextBlocker(gbrain);
+  if (gbrainBlocker) {
+    markBlocked(config, plan, gbrainBlocker);
+    logJobEvent({
+      job: JOB,
+      event: 'gbrain_coordination_blocked',
+      issue: plan.issue.number,
+      error: gbrainBlocker,
+    });
+    return;
+  }
+
   const prepared = prepareWorktree(config, plan);
   const dispatch = prepared.plan;
   try {
@@ -950,21 +1030,6 @@ async function dispatchPlan(
       pid: process.pid,
       startedAt: new Date().toISOString(),
     });
-
-    let gbrain: GbrainContext;
-    try {
-      gbrain = collectGbrainContext(dispatch);
-    } catch (err) {
-      const reason = `GBrain capture failed, so no coding agent was started.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``;
-      releaseClaimForRetry(config, dispatch, reason);
-      logJobEvent({
-        job: JOB,
-        event: 'gbrain_failed',
-        issue: dispatch.issue.number,
-        error: shortError(err),
-      });
-      return;
-    }
 
     const runInWorktree: FinisherRunner = (args, opts) =>
       execFileSync(args[0], args.slice(1), {
@@ -1021,6 +1086,7 @@ async function dispatchPlan(
         error: agentResult.error,
         logPath: agentResult.logPath,
         promptPath: agentResult.promptPath,
+        statePath: agentResult.statePath,
         gbrainSlug: gbrain.captureSlug,
       });
 
@@ -1059,6 +1125,7 @@ async function dispatchPlan(
           '',
           agentResult.error ? `Error: \`${agentResult.error}\`` : null,
           `Log: \`${agentResult.logPath}\``,
+          `State: \`${agentResult.statePath}\``,
         ]
           .filter((line): line is string => line !== null)
           .join('\n')
@@ -1086,6 +1153,7 @@ async function dispatchPlan(
           agentResult.error ? `Error: \`${agentResult.error}\`` : null,
           `Log: \`${agentResult.logPath}\``,
           `Prompt: \`${agentResult.promptPath}\``,
+          `State: \`${agentResult.statePath}\``,
         ]
           .filter((line): line is string => line !== null)
           .join('\n')
@@ -1109,6 +1177,7 @@ async function dispatchPlan(
             branchName: dispatch.branchName,
             issue: dispatch.issue,
             logPath: agentResult.logPath,
+            statePath: agentResult.statePath,
           });
           pr = findPrForBranch(config, dispatch.branchName);
           logJobEvent({
@@ -1139,6 +1208,7 @@ async function dispatchPlan(
           '',
           `Log: \`${agentResult.logPath}\``,
           `Prompt: \`${agentResult.promptPath}\``,
+          `State: \`${agentResult.statePath}\``,
         ].join('\n')
       );
       logJobEvent({
@@ -1161,6 +1231,7 @@ async function dispatchPlan(
           `PR: ${pr.url}`,
           `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
           `Log: \`${agentResult.logPath}\``,
+          `State: \`${agentResult.statePath}\``,
         ].join('\n')
       );
     } catch (err) {

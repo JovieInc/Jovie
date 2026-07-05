@@ -16,14 +16,14 @@ import { describe, expect, it } from 'vitest';
  * (`getSidebarNavRowClassName` / `SidebarNavItem`) instead of importing the
  * helper. The count may only go DOWN.
  *
- * WARN_ONLY: ships warn-mode first (JOV-3584) so the mechanism lands without
- * blocking unrelated PRs that touch legacy sidebar primitives. Flip to false
- * once remaining offenders are migrated.
+ * ERROR mode (promoted from warn, JOV-3584 → #12025): the baseline converged
+ * to 0 — every shell nav-row surface consumes the canonical helper — so new
+ * hand-rolled rows now fail CI outright.
  *
  * Sibling of component-family-ratchet.test.ts / raw-button-ratchet.test.ts.
  */
 
-const WARN_ONLY = true;
+const WARN_ONLY = false;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(__dirname, '..', '..', '..');
@@ -109,8 +109,7 @@ describe('design-system sidebar-nav-row ratchet', () => {
             note:
               'Hand-rolled shell sidebar nav-row class strings in apps/web/{components,app} ' +
               'outside getSidebarNavRowClassName(). Ratchet only goes down — lower when you ' +
-              'migrate offenders to SidebarNavItem helpers. Flip WARN_ONLY=false in the test ' +
-              'after legacy sidebar primitives converge.',
+              'migrate offenders to SidebarNavItem helpers. Error mode: regressions fail CI.',
           },
           null,
           2

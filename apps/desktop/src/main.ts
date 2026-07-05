@@ -33,6 +33,11 @@ import {
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
 import { APP_ENV, APP_URL } from './env';
 import {
+  decideHudBuildReload,
+  getHudBuildFingerprint,
+  isHudRoutePath,
+} from './hud-build-reload';
+import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
   matchesPathPrefix,
@@ -62,6 +67,7 @@ const NAVIGATION_ABORTED_ERROR_CODE = -3;
 // the window black. Reset to 0 on every successful load so only crash *loops*
 // hit the cap.
 const MAX_RENDERER_CRASH_RELOADS = 2;
+const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
@@ -162,6 +168,7 @@ let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
+let currentHudBuildFingerprint: string | null = null;
 
 function getDesktopAppDisplayName(): string {
   if (APP_ENV === 'staging') return 'Jovie Staging';
@@ -822,6 +829,61 @@ function showDesktopLoadFailure(win: BrowserWindow): void {
   void win.loadURL(buildDesktopLoadFailureUrl());
 }
 
+function isHudWindow(win: BrowserWindow): boolean {
+  if (win.isDestroyed()) return false;
+  const parsed = parseUrl(win.webContents.getURL());
+  return parsed?.origin === APP_ORIGIN && isHudRoutePath(parsed.pathname);
+}
+
+async function fetchHudBuildFingerprint(): Promise<string | null> {
+  const buildInfoUrl = new URL('/api/health/build-info', APP_URL);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const response = await fetch(buildInfoUrl, {
+      headers: {
+        'cache-control': 'no-cache',
+        pragma: 'no-cache',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+
+    const buildInfo: unknown = await response.json();
+    return getHudBuildFingerprint(buildInfo);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function reloadAppWindowsForHudBuildChange(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (isHudWindow(win)) {
+      win.webContents.reload();
+    }
+  }
+}
+
+async function checkHudBuildAndReload(): Promise<void> {
+  if (!BrowserWindow.getAllWindows().some(isHudWindow)) {
+    return;
+  }
+
+  const nextFingerprint = await fetchHudBuildFingerprint();
+  const decision = decideHudBuildReload({
+    currentFingerprint: currentHudBuildFingerprint,
+    nextFingerprint,
+  });
+  currentHudBuildFingerprint = decision.nextFingerprint;
+
+  if (decision.shouldReload) {
+    reloadAppWindowsForHudBuildChange();
+  }
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
@@ -1158,6 +1220,16 @@ function scheduleDesktopAutoUpdate(): void {
       // Same: non-fatal update check failure
     });
   }, UPDATE_INTERVAL_MS);
+}
+
+function scheduleHudBuildAutoReload(): void {
+  void checkHudBuildAndReload();
+
+  const interval = setInterval(() => {
+    void checkHudBuildAndReload();
+  }, HUD_BUILD_INFO_POLL_INTERVAL_MS);
+
+  interval.unref?.();
 }
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
@@ -1498,6 +1570,7 @@ app.whenReady().then(() => {
   );
   pendingLegacyAuthReturnRoute = null;
   scheduleDesktopAutoUpdate();
+  scheduleHudBuildAutoReload();
 
   app.on('activate', () => {
     if (isAuthHandoffOpen() && authHandoffWindow) {

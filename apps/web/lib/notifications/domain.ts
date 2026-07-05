@@ -655,14 +655,15 @@ export const subscribeToNotificationsDomain = async (
 
     if (!result.success) {
       const props = extractPayloadProps(bodyObject);
+      const validationErrors = result.error.issues.map(issue => issue.message);
       await trackSubscribeError({
         artist_id: props.artist_id,
         error_type: 'validation_error',
-        validation_errors: result.error.format()._errors,
+        validation_errors: validationErrors,
         source: props.source,
         source_context: props.source_context,
       });
-      return buildSubscribeValidationError();
+      return buildSubscribeValidationError(validationErrors[0]);
     }
 
     const {
@@ -702,16 +703,21 @@ export const subscribeToNotificationsDomain = async (
       );
     }
 
-    // US-only guard for SMS channel
-    if (channel === 'sms' && country_code && country_code !== 'US') {
+    // US/CAN-only guard for SMS channel. The shared schema already rejects
+    // omitted/unsupported country codes; this branch preserves explicit domain
+    // telemetry for any future call-site that reaches this layer.
+    if (
+      channel === 'sms' &&
+      (!country_code || !['US', 'CA'].includes(country_code.toUpperCase()))
+    ) {
       await trackSubscribeError({
         artist_id,
-        error_type: 'sms_us_only',
+        error_type: 'sms_us_can_only',
         source,
         source_context,
       });
       return buildSubscribeValidationError(
-        'SMS notifications are currently available in the US only.'
+        'SMS notifications are available in the US and Canada only.'
       );
     }
 

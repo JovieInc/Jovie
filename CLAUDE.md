@@ -17,6 +17,10 @@ Canon principles: [`docs/company/operating-principles.md`](docs/company/operatin
 
 Set `JOVIE_AGENT_PROFILE` before editing. Non-coding profiles (`default`, Chief, `cfo-milan-v2`, `founder-os`, `code-orchestrator`) dispatch and verify — never code/commit/push/merge/repair CI. `coder` implements assigned manifests. `no_agent` runs deterministic scripts only. Full contract: [`.claude/rules/linear.md`](.claude/rules/linear.md).
 
+## Agent Coordination Preflight
+
+Before starting any task, agents must query gbrain for both the org chart and existing work in the area. Fetch `gbrain:agent-org-chart` when available, read `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted ownership/current-priorities query for the task. If another agent owns the area, delegate through the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`; do not proceed without the coordination check.
+
 ## Instruction Architecture
 
 - `AGENTS.md` → symlink to this file. Host wrappers (`CODEX.md`, Copilot, etc.) point here — never duplicate policy.
