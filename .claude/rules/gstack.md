@@ -26,6 +26,7 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 | QA Swarm (design jury) | `/qa-swarm-design-jury` | Change-aware capture plus multi-LLM design jury |
 | QA Swarm (test-gen) | `/qa-swarm-test-gen` | Test generation and fuzz swarm for high-risk contracts |
 | QA Swarm (flaky-hunter) | `/qa-swarm-flaky-hunter` | Flake rerun, cluster, and auto-quarantine |
+| Lavish | `/lavish` | Turn agent responses into rich HTML artifacts the user can annotate and send targeted feedback on (design comps, reports, dashboards, review surfaces) |
 | Upgrade | `/gstack-upgrade` | Upgrade gstack to latest version |
 
 ## Setup
@@ -63,6 +64,8 @@ Key routing rules:
 - Architecture review → invoke `plan-eng-review`
 - Clerk user management, instance inspection, auth debugging → invoke `clerk-cli`
 - Continuous QA swarm recipes (diff review, explore, vision, jury, test-gen, flakes) → invoke matching `/qa-swarm-*` command; load `qa-swarm` skill
+- A shared link/tool/product with no context expecting an opinion or evaluation → invoke `tool-discovery` instead of asking the human to research it first
+- HTML artifact, design comp, review surface, dashboard, deck, report for human annotation → invoke `lavish` to open it in the browser-based review loop instead of embedding a screenshot
 
 ## gbrain (long-term memory layer)
 

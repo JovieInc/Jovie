@@ -1,9 +1,9 @@
+import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 // .icns files are macOS-specific and cannot be generated on Linux CI
@@ -41,14 +41,6 @@ async function sha256(filePath) {
   return createHash('sha256')
     .update(await readFile(filePath))
     .digest('hex');
-}
-
-async function assertOpaquePng(filePath, size) {
-  const metadata = await pngMetadata(filePath);
-  assert.equal(metadata.format, 'png');
-  assert.equal(metadata.width, size);
-  assert.equal(metadata.height, size);
-  assert.notEqual(metadata.hasAlpha, true);
 }
 
 async function assertBlackCorners(filePath) {

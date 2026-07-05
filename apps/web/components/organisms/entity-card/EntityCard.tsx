@@ -3,6 +3,11 @@
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import {
+  getProfileCardShapeClassName,
+  PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME,
+  type ProfileCardShape,
+} from '@/lib/profile/composition';
 import { cn } from '@/lib/utils';
 import { accentVar, KIND_PRESETS, statusDotVar } from './kind-presets';
 import type {
@@ -18,6 +23,13 @@ interface EntityCardProps {
   readonly treatment?: EntityTreatment;
   /** App shell surface, or the frosted public-profile pearl. */
   readonly surface?: EntitySurface;
+  /**
+   * Deterministic composition shape (#11899). When set, the card renders at
+   * a fixed aspect ratio: the media zone is fixed, text truncates inside the
+   * shape, and the CTA stays anchored to the bottom edge. When omitted the
+   * card keeps its legacy content-driven height (chat/app consumers).
+   */
+  readonly shape?: ProfileCardShape;
   readonly className?: string;
   readonly priority?: boolean;
   readonly dataTestId?: string;
@@ -50,7 +62,7 @@ const SIZE: Record<EntityTreatment, SizeConfig> = {
     ctaBlock: false,
   },
   big: {
-    artClass: 'aspect-[4/5] rounded-2xl',
+    artClass: 'aspect-card-standard rounded-2xl',
     titleClass: 'text-xl',
     showStatus: true,
     showMeta: true,
@@ -171,12 +183,23 @@ export function EntityCard({
   model,
   treatment = 'compact',
   surface = 'app',
+  shape,
   className,
   priority = false,
   dataTestId,
   onClick,
 }: EntityCardProps) {
   const size = SIZE[treatment];
+  // Composition shape (#11899): fixed card aspect + fixed 16:9 media zone.
+  // Text truncates inside the shape; the CTA footer never moves.
+  const shapeClassName = shape
+    ? cn(getProfileCardShapeClassName(shape), 'overflow-hidden')
+    : null;
+  const artClassName = shape
+    ? cn('aspect-video', treatment === 'big' ? 'rounded-2xl' : 'rounded-xl')
+    : size.artClass;
+  const titleClampClassName =
+    shape && treatment !== 'big' ? 'line-clamp-1' : 'line-clamp-2';
   const preset = KIND_PRESETS[model.kind];
   const accent = model.accent ?? preset.accent;
   const Icon = preset.icon;
@@ -206,13 +229,14 @@ export function EntityCard({
         isPearl
           ? 'rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl hover:bg-(--profile-pearl-bg-hover)'
           : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',
+        shapeClassName,
         className
       )}
     >
       <div
         className={cn(
           'relative flex w-full shrink-0 items-center justify-center overflow-hidden border border-subtle',
-          size.artClass,
+          artClassName,
           treatment === 'big' && 'rounded-none border-0'
         )}
         style={artStyle}
@@ -245,50 +269,64 @@ export function EntityCard({
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-col gap-1.5',
+          shape && 'min-h-0',
           treatment === 'big' && 'p-3'
         )}
       >
-        <div className='flex min-w-0 items-center justify-between gap-2'>
-          <span className='inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token'>
-            <Icon className='h-3 w-3 shrink-0' aria-hidden='true' />
-            <span className='truncate'>{model.eyebrow ?? preset.eyebrow}</span>
-          </span>
-          {size.showStatus && model.status ? (
-            <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-[0.06em] text-secondary-token'>
-              <span
-                className='h-1.5 w-1.5 shrink-0 rounded-full'
-                style={{ background: statusDotVar(model.status.tone) }}
-                aria-hidden='true'
-              />
-              {model.status.label}
+        {/* Text zone — when shaped it clips so the CTA footer below never
+            moves (#11899: content fits the shape, button never shifts). */}
+        <div
+          className={cn(
+            'flex min-w-0 flex-col gap-1.5',
+            shape && 'min-h-0 flex-1 overflow-hidden'
+          )}
+        >
+          <div className='flex min-w-0 items-center justify-between gap-2'>
+            <span className='inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token'>
+              <Icon className='h-3 w-3 shrink-0' aria-hidden='true' />
+              <span className='truncate'>
+                {model.eyebrow ?? preset.eyebrow}
+              </span>
             </span>
+            {size.showStatus && model.status ? (
+              <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-[0.06em] text-secondary-token'>
+                <span
+                  className='h-1.5 w-1.5 shrink-0 rounded-full'
+                  style={{ background: statusDotVar(model.status.tone) }}
+                  aria-hidden='true'
+                />
+                {model.status.label}
+              </span>
+            ) : null}
+          </div>
+
+          <h3
+            className={cn(
+              'min-w-0 font-[590] leading-tight tracking-[-0.02em] text-primary-token',
+              titleClampClassName,
+              size.titleClass
+            )}
+          >
+            {model.title}
+          </h3>
+
+          {size.showMeta && model.meta ? (
+            <p className='min-w-0 truncate text-[11.5px] text-tertiary-token'>
+              {model.meta}
+            </p>
+          ) : null}
+
+          {size.showMeta && model.secondaryMeta ? (
+            <p className='min-w-0 truncate text-[11.5px] text-tertiary-token'>
+              {model.secondaryMeta}
+            </p>
           ) : null}
         </div>
 
-        <h3
-          className={cn(
-            'min-w-0 font-[590] leading-tight tracking-[-0.02em] text-primary-token line-clamp-2',
-            size.titleClass
-          )}
-        >
-          {model.title}
-        </h3>
-
-        {size.showMeta && model.meta ? (
-          <p className='min-w-0 truncate text-[11.5px] text-tertiary-token'>
-            {model.meta}
-          </p>
-        ) : null}
-
-        {size.showMeta && model.secondaryMeta ? (
-          <p className='min-w-0 truncate text-[11.5px] text-tertiary-token'>
-            {model.secondaryMeta}
-          </p>
-        ) : null}
-
         <div
           className={cn(
-            'mt-auto flex gap-2 pt-1',
+            'flex gap-2 pt-1',
+            PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME,
             isInteractive
               ? size.ctaBlock
                 ? 'flex-col items-stretch'

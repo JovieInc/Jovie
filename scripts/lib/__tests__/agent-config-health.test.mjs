@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildAgentConfigHealthBrief,
   parseHermesFallbackProviders,
   validateHermesConfigText,
   validateOpenClawConfig,
@@ -135,5 +136,68 @@ describe('validateOpenClawConfig', () => {
     expect(
       findings.filter(finding => finding.severity === 'error')
     ).toHaveLength(6);
+  });
+});
+
+describe('buildAgentConfigHealthBrief', () => {
+  it('GH #13123: sends Tim the human message, not the raw file/path/code jargon', () => {
+    const brief = buildAgentConfigHealthBrief([
+      {
+        severity: 'error',
+        file: 'hermes',
+        path: 'fallback_providers[line 4].model',
+        code: 'hermes_broken_fallback_model',
+        message:
+          'Hermes fallback model nex-agi/nex-n2-pro is a known broken global fallback for local agents.',
+      },
+    ]);
+
+    expect(brief).toContain(
+      '1. Hermes fallback model nex-agi/nex-n2-pro is a known broken global fallback for local agents.'
+    );
+    expect(brief).toContain('Reply: Do this / Skip / Defer');
+    // Neither the raw code/path pair nor the bracket-index YAML path may
+    // appear next to the problem/action lines — only in the Refs footer.
+    const actionLine = brief
+      .split('\n')
+      .find(line => line.trim().startsWith('Action:'));
+    expect(actionLine).not.toContain('fallback_providers[line 4]');
+    expect(brief).not.toContain(
+      'hermes:fallback_providers[line 4].model hermes_broken_fallback_model'
+    );
+    expect(brief).toContain(
+      'Refs: hermes_broken_fallback_model (fallback_providers[line 4].model)'
+    );
+  });
+
+  it('caps at 3 issues and defers the rest instead of dumping a wall of codes', () => {
+    const errors = Array.from({ length: 5 }, (_, i) => ({
+      severity: 'error',
+      file: 'hermes',
+      path: `fallback_providers[line ${i}].model`,
+      code: `code-${i}`,
+      message: `Problem number ${i}.`,
+    }));
+
+    const brief = buildAgentConfigHealthBrief(errors);
+
+    expect(brief).toContain('1. Problem number 0.');
+    expect(brief).toContain('3. Problem number 2.');
+    expect(brief).not.toContain('4. Problem number 3.');
+    expect(brief).toContain('(+2 more deferred — reply "more" to see them.)');
+  });
+
+  it('uses singular grammar in the title for exactly one issue', () => {
+    const brief = buildAgentConfigHealthBrief([
+      {
+        severity: 'error',
+        file: 'hermes',
+        path: 'fallback_providers[line 0].model',
+        code: 'code-0',
+        message: 'Problem number 0.',
+      },
+    ]);
+
+    expect(brief).toContain('Hermes agent config: 1 issue needs a look');
   });
 });

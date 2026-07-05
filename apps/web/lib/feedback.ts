@@ -2,7 +2,7 @@ import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { feedbackItems } from '@/lib/db/schema/feedback';
+import { type FeedbackVote, feedbackItems } from '@/lib/db/schema/feedback';
 
 export type FeedbackContext = Record<string, unknown> & {
   pathname: string | null;
@@ -156,4 +156,99 @@ export async function getFeedbackCounts() {
     console.error('[feedback] getFeedbackCounts failed:', error);
     return EMPTY_FEEDBACK_COUNTS;
   }
+}
+
+export interface ChatMessageVoteInput {
+  readonly userId: string;
+  readonly messageId: string;
+  readonly vote: FeedbackVote;
+  readonly conversationId?: string | null;
+  readonly turnId?: string | null;
+  readonly toolCallId?: string | null;
+  readonly toolName?: string | null;
+  readonly modelUsed?: string | null;
+  readonly plan?: string | null;
+  readonly messageExcerpt?: string | null;
+  readonly context?: Record<string, unknown>;
+}
+
+/**
+ * Idempotent 👍/👎 vote upsert for a chat message or tool result
+ * (JOV #11460). One row per (user, message, tool call) — re-voting updates
+ * the existing row in place via the `feedback_items_vote_unique` index.
+ */
+export async function upsertChatMessageVote(
+  input: ChatMessageVoteInput
+): Promise<{ id: string }> {
+  const now = new Date();
+  const toolCallId = input.toolCallId ?? '';
+  const message =
+    input.messageExcerpt?.trim() ||
+    `Chat ${toolCallId ? 'tool result' : 'message'} vote`;
+
+  const [item] = await db
+    .insert(feedbackItems)
+    .values({
+      userId: input.userId,
+      message,
+      source: 'chat_thumbs',
+      status: 'pending',
+      context: input.context ?? {},
+      messageId: input.messageId,
+      conversationId: input.conversationId ?? null,
+      turnId: input.turnId ?? null,
+      toolCallId,
+      toolName: input.toolName ?? null,
+      modelUsed: input.modelUsed ?? null,
+      plan: input.plan ?? null,
+      vote: input.vote,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        feedbackItems.userId,
+        feedbackItems.messageId,
+        feedbackItems.toolCallId,
+      ],
+      targetWhere: drizzleSql`${feedbackItems.messageId} IS NOT NULL`,
+      set: {
+        vote: input.vote,
+        message,
+        context: input.context ?? {},
+        conversationId: input.conversationId ?? null,
+        turnId: input.turnId ?? null,
+        toolName: input.toolName ?? null,
+        modelUsed: input.modelUsed ?? null,
+        plan: input.plan ?? null,
+        updatedAt: now,
+      },
+    })
+    .returning({ id: feedbackItems.id });
+
+  if (!item) {
+    throw new Error('Chat vote persistence returned no row');
+  }
+
+  return item;
+}
+
+/**
+ * Removes a previously recorded vote (the user un-voted). Idempotent —
+ * deleting a vote that does not exist is a no-op.
+ */
+export async function deleteChatMessageVote(input: {
+  readonly userId: string;
+  readonly messageId: string;
+  readonly toolCallId?: string | null;
+}): Promise<void> {
+  await db
+    .delete(feedbackItems)
+    .where(
+      and(
+        eq(feedbackItems.userId, input.userId),
+        eq(feedbackItems.messageId, input.messageId),
+        eq(feedbackItems.toolCallId, input.toolCallId ?? '')
+      )
+    );
 }
