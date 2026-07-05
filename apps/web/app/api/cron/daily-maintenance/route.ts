@@ -139,7 +139,7 @@ export async function GET(request: Request) {
     evaluations: await evaluateModelExperiments(),
   }));
 
-  // 8. Data retention — Sundays only (heavy operation)
+  // 10. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)
