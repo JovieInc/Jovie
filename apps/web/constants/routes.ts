@@ -49,6 +49,8 @@ export const APP_ROUTES = {
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
+  /** YouTube packaging optimizer — revival queue + experiment dashboard (GH-10921) */
+  YOUTUBE_REVIVAL: '/app/youtube',
   JOVIE_WORK: '/app/jovie-work',
   LYRICS: '/app/lyrics',
   PRESENCE: '/app/presence',
