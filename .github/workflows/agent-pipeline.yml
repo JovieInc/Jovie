@@ -16,7 +16,7 @@
 # when @claude is mentioned in a CodeRabbit review thread.
 #
 # SAFETY:
-# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
+# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*, fable/*, agent/*, zoe/*, */jov-*)
 # - Max 5 fix attempts per SHA to prevent infinite loops
 # - Escalates to 'needs-human' label after exhaustion
 # - Sensitive path detection prevents auto-merge on high-risk changes
@@ -164,7 +164,7 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) || "$BRANCH" =~ (^|/)jov-[0-9]+ ]]; then
+          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/|fable/|agent/|zoe/) || "$BRANCH" =~ (^|/)jov-[0-9]+ ]]; then
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> "$GITHUB_OUTPUT"
           else
