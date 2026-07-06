@@ -27,7 +27,7 @@ interface OpportunityInboxFeedbackResponse {
 
 async function postSuggestedAction(
   id: string,
-  action: 'approve' | 'reject'
+  action: 'approve' | 'reject' | 'next-step'
 ): Promise<SuggestedActionMutationResponse> {
   const response = await fetch(
     `/api/connectors/suggested-actions/${id}/${action}`,
@@ -111,9 +111,23 @@ export function useOpportunityInboxMutations() {
     },
   });
 
+  const nextStepMutation = useMutation({
+    mutationFn: (id: string) => postSuggestedAction(id, 'next-step'),
+    onSuccess: () => {
+      toast.success('Next step queued — it will appear in your inbox.');
+      router.refresh();
+    },
+    onError: error => {
+      toast.error(
+        error instanceof Error ? error.message : 'Unable to queue next step'
+      );
+    },
+  });
+
   return {
     approveMutation,
     dismissMutation,
     feedbackMutation,
+    nextStepMutation,
   };
 }

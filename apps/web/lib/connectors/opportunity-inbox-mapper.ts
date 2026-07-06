@@ -1,4 +1,8 @@
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  isReportKind,
+  parseReportMeasurement,
+} from './opportunity-inbox-report';
 import { classifySuggestedActionCategory } from './opportunity-inbox-tour-dates';
 import type {
   OpportunityInboxCardCategory,
@@ -31,6 +35,9 @@ function typeLabelFor(
   if (category === 'tour_date') {
     return 'Tour date';
   }
+  if (category === 'report') {
+    return 'Report';
+  }
   return TYPE_LABEL_BY_KIND[kind] ?? 'Suggestion';
 }
 
@@ -44,18 +51,20 @@ function primaryActionLabelFor(
   return PRIMARY_ACTION_LABEL_BY_KIND[kind] ?? 'Approve';
 }
 
-function titleFromPayload(payload: unknown): string {
+function titleFromPayload(payload: unknown, category?: string): string {
+  const fallback =
+    category === 'report' ? 'Experiment result' : 'Untitled suggestion';
   if (!payload || typeof payload !== 'object') {
-    return 'Untitled suggestion';
+    return fallback;
   }
 
   const title = (payload as { title?: unknown }).title;
   return typeof title === 'string' && title.trim().length > 0
     ? title.trim()
-    : 'Untitled suggestion';
+    : fallback;
 }
 
-function whyFromRow(row: SuggestedActionRow): string {
+function whyFromRow(row: SuggestedActionRow, category?: string): string {
   const rationale = row.rationale?.trim();
   if (rationale) {
     return rationale;
@@ -68,22 +77,34 @@ function whyFromRow(row: SuggestedActionRow): string {
     }
   }
 
+  if (category === 'report') {
+    return 'Jovie measured the results of your experiment.';
+  }
   return 'Jovie found a booking signal worth your review.';
 }
 
 export function mapSuggestedActionToInboxCard(
   row: SuggestedActionRow
 ): OpportunityInboxCardViewModel {
-  const category = classifySuggestedActionCategory(row);
+  // Malformed measurement payloads degrade to the plain suggestion card
+  // (report data null) rather than crashing the feed.
+  const report = isReportKind(row.kind)
+    ? parseReportMeasurement(row.payload)
+    : null;
+  const category: OpportunityInboxCardCategory = report
+    ? 'report'
+    : classifySuggestedActionCategory(row);
   return {
     id: row.id,
     typeLabel: typeLabelFor(row.kind, category),
     createdAt: row.createdAt.toISOString(),
-    title: titleFromPayload(row.payload),
-    why: whyFromRow(row),
-    primaryActionLabel: primaryActionLabelFor(row.kind, category),
+    title: titleFromPayload(row.payload, category),
+    why: whyFromRow(row, category),
+    primaryActionLabel:
+      report?.nextStep?.label ?? primaryActionLabelFor(row.kind, category),
     status: 'pending',
     category,
+    ...(report ? { report } : {}),
   };
 }
 
@@ -109,8 +130,13 @@ export function buildOpportunityInboxData(
   rows: readonly SuggestedActionRow[],
   tourDates?: OpportunityInboxTourDates
 ): OpportunityInboxData {
+  const cards = rows.map(mapSuggestedActionToInboxCard);
+  // Report-back cards surface at the top of the inbox (GH #13178) so the
+  // measurement loop visibly closes; relative order is otherwise preserved.
+  const reportCards = cards.filter(card => card.category === 'report');
+  const otherCards = cards.filter(card => card.category !== 'report');
   return {
-    cards: rows.map(mapSuggestedActionToInboxCard),
+    cards: [...reportCards, ...otherCards],
     emptyActionCards: DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS,
     ...(tourDates ? { tourDates } : {}),
   };
