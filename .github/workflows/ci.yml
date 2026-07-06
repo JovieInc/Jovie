@@ -651,7 +651,7 @@ jobs:
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     needs: [ci-path-changes]
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
