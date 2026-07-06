@@ -78,8 +78,8 @@ const STATUS_LABEL: Record<DspStatus, string> = {
  * ```tsx
  * <DspAvatarStack
  *   dsps={[
- *     { id: 'spotify', status: 'live', label: 'Spotify', glyph: 'S', iconPath: SPOTIFY_PATH, color: '#1DB954' },
- *     { id: 'apple', status: 'pending', label: 'Apple Music', glyph: 'A', iconPath: APPLE_PATH, color: '#FA243C' },
+ *     { id: 'spotify', status: 'live', label: 'Spotify', glyph: 'S', iconPath: SPOTIFY_PATH, color: SPOTIFY_BRAND_COLOR },
+ *     { id: 'apple', status: 'pending', label: 'Apple Music', glyph: 'A', iconPath: APPLE_PATH, color: APPLE_BRAND_COLOR },
  *   ]}
  * />
  * ```
