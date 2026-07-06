@@ -25,8 +25,12 @@ on:
   schedule:
     - cron: '*/20 * * * *'   # enroll: catch anything missed between events
     - cron: '*/10 * * * *'   # watchdog: rescue PRs stalled inside the queue
+  # Trigger hygiene (#13349): no `synchronize` — enrollment eligibility only
+  # changes when CI completes (workflow_run below) or a PR flips ready/reopens.
+  # Per-push spawns of this fleet-wide drain were pure duplication behind the
+  # shared mutex.
   pull_request:
-    types: [ready_for_review, reopened, synchronize]
+    types: [ready_for_review, reopened]
   workflow_run:
     workflows: ['CI']
     types: [completed]
