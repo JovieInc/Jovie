@@ -22,7 +22,6 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
-import { composeHomepageSections } from '@/lib/sections/registry';
 
 // Below-the-fold sections are dynamic-loaded so their `motion/react`
 // hydration cost doesn't compete with above-the-fold work.
@@ -227,48 +226,58 @@ function HomepageHero() {
   ).secondary;
 
   return (
-    <MarketingHero
-      headingId='home-hero-heading'
-      testId='homepage-hero-shell'
-      headline={HERO_COPY.headline}
-      subtitle={HERO_COPY.subhead}
-      linkComponent={HomepageTrackedLink}
-      primaryCta={{
-        label: HERO_COPY.primaryCta.label,
-        href: HERO_COPY.primaryCta.href,
-        testId: 'homepage-primary-cta',
-        signUp: true,
-        eventName: 'homepage_hero_cta_clicked',
-        eventProperties: { cta: 'primary', label: HERO_COPY.primaryCta.label },
-      }}
-      secondaryCta={
-        secondaryCta
-          ? {
-              label: (
-                <>
-                  {secondaryCta.label}
-                  <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
-                </>
-              ),
-              href: secondaryCta.href,
-              eventName: 'homepage_hero_cta_clicked',
-              eventProperties: {
-                cta: 'secondary',
-                label: secondaryCta.label,
-              },
-            }
-          : undefined
-      }
-      media={<HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />}
-      logos={
-        <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
-          <HomeTrustSection
-            label='Used By Artists And Teams With Releases Distributed Through'
-            presentation='inline-strip'
-          />
-        </div>
-      }
-    />
+    <>
+      <MarketingHero
+        headingId='home-hero-heading'
+        testId='homepage-hero-shell'
+        headline={HERO_COPY.headline}
+        subtitle={HERO_COPY.subhead}
+        linkComponent={HomepageTrackedLink}
+        primaryCta={{
+          label: HERO_COPY.primaryCta.label,
+          href: HERO_COPY.primaryCta.href,
+          testId: 'homepage-primary-cta',
+          signUp: true,
+          eventName: 'homepage_hero_cta_clicked',
+          eventProperties: {
+            cta: 'primary',
+            label: HERO_COPY.primaryCta.label,
+          },
+        }}
+        secondaryCta={
+          secondaryCta
+            ? {
+                label: (
+                  <>
+                    {secondaryCta.label}
+                    <ArrowRight
+                      aria-hidden='true'
+                      size={15}
+                      strokeWidth={1.9}
+                    />
+                  </>
+                ),
+                href: secondaryCta.href,
+                eventName: 'homepage_hero_cta_clicked',
+                eventProperties: {
+                  cta: 'secondary',
+                  label: secondaryCta.label,
+                },
+              }
+            : undefined
+        }
+        logos={false}
+      />
+      <div className='mx-auto w-full max-w-public-content px-6 sm:px-8 lg:px-10'>
+        <HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />
+      </div>
+      <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
+        <HomeTrustSection
+          label='Artists Distributed Through'
+          presentation='inline-strip'
+        />
+      </div>
+    </>
   );
 }
 
@@ -299,18 +308,16 @@ function HomepageProductStatement() {
             {copy.body}
           </span>
         </h2>
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_AI_COMPOSER_SECTION ? (
-          <div
-            className='homepage-product-statement__ai system-b-mounted-home-product-statement-ai'
-            data-testid='homepage-ai-composer-demo'
-          >
-            <HomeComposerHero />
-            <div className='homepage-product-statement__ai-copy system-b-mounted-home-product-statement-ai-copy'>
-              <h3>{aiCopy.headline}</h3>
-              <p>{aiCopy.body}</p>
-            </div>
+        <div
+          className='homepage-product-statement__ai system-b-mounted-home-product-statement-ai'
+          data-testid='homepage-ai-composer-demo'
+        >
+          <HomeComposerHero />
+          <div className='homepage-product-statement__ai-copy system-b-mounted-home-product-statement-ai-copy'>
+            <h3>{aiCopy.headline}</h3>
+            <p>{aiCopy.body}</p>
           </div>
-        ) : null}
+        </div>
       </div>
     </section>
   );
@@ -358,85 +365,36 @@ function HomepageFaq() {
   );
 }
 
-/**
- * Homepage section renderer — resolves registry section IDs to production
- * components. New sections added to `composeHomepageSections` must have a
- * corresponding case here.
- */
-function HomepageSection({ sectionId }: Readonly<{ sectionId: string }>) {
-  switch (sectionId) {
-    case 'homepage-product-statement':
-      return <HomepageProductStatement />;
-    case 'homepage-go-live-steps':
-      return <HomepageGoLiveStepsSection />;
-    case 'homepage-workspace-section':
-      return <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />;
-    case 'homepage-artist-profiles-carousel':
-      return (
-        <HomepageArtistProfilesCarouselLazy cards={ARTIST_PROFILE_CARDS} />
-      );
-    case 'friday-rhythm-section':
-      return <FridayRhythmSectionLazy />;
-    case 'home-bento-pairs':
-      return <HomeBentoPairs />;
-    case 'home-loop-diagram':
-      return <HomeLoopDiagramSection />;
-    case 'home-stat-quote':
-      return <HomeStatQuoteSection />;
-    case 'homepage-v2-pricing':
-      return <HomepageV2Pricing />;
-    case 'homepage-faq':
-      return <HomepageFaq />;
-    case 'homepage-v2-final-cta':
-      return <HomepageV2FinalCta />;
-    default:
-      return null;
-  }
-}
-
 function HomepageUnlockedSections() {
-  const { bodyIds } = composeHomepageSections({
-    showGoLive: FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION,
-    showFridayRhythm: FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM,
-    showHomeRefresh2026: FEATURE_FLAGS.SHOW_HOME_REFRESH_2026,
-    showV2Pricing: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING,
-    showFaq: FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ,
-    showV2FinalCta: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA,
-  });
-
   return (
     <>
-      {bodyIds.map(sectionId => (
-        <HomepageSection key={sectionId} sectionId={sectionId} />
-      ))}
+      <HomepageProductStatement />
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION ? (
+        <HomepageGoLiveStepsSection />
+      ) : null}
+      <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />
+      <HomepageArtistProfilesCarouselLazy cards={ARTIST_PROFILE_CARDS} />
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (
+        <FridayRhythmSectionLazy />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
+      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
+      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
+      <HomepageV2Pricing />
+      <HomepageFaq />
     </>
   );
 }
 
-function HomepageStoryStack({
-  showUnlockedSections,
-}: Readonly<{ showUnlockedSections: boolean }>) {
-  const { finalCtaId } = composeHomepageSections({
-    showGoLive: FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION,
-    showFridayRhythm: FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM,
-    showHomeRefresh2026: FEATURE_FLAGS.SHOW_HOME_REFRESH_2026,
-    showV2Pricing: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING,
-    showFaq: FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ,
-    showV2FinalCta: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA,
-  });
-
-  const className = showUnlockedSections
-    ? 'homepage-story-stack homepage-story-stack--proof-transition'
-    : 'homepage-story-stack';
-
+function HomepageStoryStack() {
   return (
     <div
-      className={className}
-      data-proof-transition={showUnlockedSections ? 'true' : 'false'}
+      className='homepage-story-stack homepage-story-stack--proof-transition'
+      data-proof-transition='true'
       data-testid='homepage-story-stack'
     >
-      {showUnlockedSections ? <HomepageUnlockedSections /> : null}
-      {finalCtaId ? <HomepageSection sectionId={finalCtaId} /> : null}
+      <HomepageUnlockedSections />
+      <HomepageV2FinalCta />
     </div>
   );
 }
@@ -448,18 +406,13 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS &&
-      FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ ? (
-        <script type='application/ld+json'>{FAQ_SCHEMA}</script>
-      ) : null}
+      <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       {children}
     </>
   );
 }
 
 export default async function HomePage() {
-  const showUnlockedSections = FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS;
-
   if (FEATURE_FLAGS.SHOW_HOME_V1_DESIGN) {
     const { HomeV1Design } = await import(
       '@/components/features/home/HomeV1Design'
@@ -475,7 +428,7 @@ export default async function HomePage() {
   return (
     <HomePageShell>
       <HomepageHero />
-      <HomepageStoryStack showUnlockedSections={showUnlockedSections} />
+      <HomepageStoryStack />
     </HomePageShell>
   );
 }

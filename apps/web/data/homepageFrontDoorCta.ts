@@ -27,7 +27,7 @@ export function getHomepageFrontDoorCtaContract(
   if (waitlistEnabled) {
     return {
       primary: {
-        label: 'Request access',
+        label: 'Get started',
         href: buildHomepageStartHref(HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT),
       },
       secondary: null,

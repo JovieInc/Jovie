@@ -68,7 +68,7 @@ function MarketingHeroCtaLink({
   return (
     <Button
       asChild
-      size='lg'
+      size='md'
       variant={intent === 'primary' ? 'primary' : 'ghost'}
       className='marketing-hero-cta'
     >

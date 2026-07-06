@@ -44,7 +44,7 @@
     calc(100vw - var(--marketing-glass-gutter) * 2)
   ) !important;
   align-items: center;
-  padding-inline: clamp(1.35rem, 2.3vw, 2rem) 0.22rem !important;
+  padding-inline: clamp(1.35rem, 2.3vw, 2rem) !important;
   border: 1px solid transparent;
   border-radius: 999px;
   background: var(--marketing-glass-shell);

@@ -114,7 +114,7 @@ const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
   ...MARKETING_GLASS_DESKTOP_LINKS,
 ] as const;
 const HOMEPAGE_PUBLIC_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
-  ? 'Request access'
+  ? 'Get started'
   : FRONT_DOOR_CTA_LABEL;
 
 export interface MarketingHeaderProps
