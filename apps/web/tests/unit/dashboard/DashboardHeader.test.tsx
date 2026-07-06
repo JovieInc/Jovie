@@ -104,4 +104,28 @@ describe('DashboardHeader', () => {
       within(desktopRow!).getByRole('searchbox', { name: 'Filter releases' })
     ).toBeInTheDocument();
   });
+
+  it('paints an opaque surface fill by default', () => {
+    const { getByTestId } = render(
+      <DashboardHeader breadcrumbs={[{ label: 'Releases' }]} />
+    );
+
+    const header = getByTestId('dashboard-header');
+    expect(header).toHaveClass('bg-(--linear-app-content-surface)');
+    expect(header).not.toHaveClass('bg-transparent');
+  });
+
+  it('drops the opaque fill when transparent so the shell ambient wash bleeds through (#13386)', () => {
+    const { getByTestId, container } = render(
+      <DashboardHeader breadcrumbs={[{ label: 'New Chat' }]} transparent />
+    );
+
+    const header = getByTestId('dashboard-header');
+    expect(header).toHaveClass('bg-transparent');
+    expect(header).not.toHaveClass('bg-(--linear-app-content-surface)');
+    // Layout is unchanged — the desktop row keeps the compact header height.
+    expect(
+      container.querySelector('.h-\\(--linear-app-header-height-compact\\)')
+    ).not.toBeNull();
+  });
 });

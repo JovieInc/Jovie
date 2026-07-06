@@ -20,7 +20,22 @@ interface AppShellFrameProps {
   readonly variant?: AppShellFrameVariant;
   /** When true (desktop), sidebar dims and right rail slides partially off-screen. */
   readonly composerFocusActive?: boolean;
+  /**
+   * Chat routes render the ambient blue wash at the shell level so it spans
+   * the full content panel — including the header band — instead of starting
+   * below the shell header (#13386). Pairs with a transparent DashboardHeader
+   * fill and JovieChat deferring its own gradient layer.
+   */
+  readonly chatAmbientGradient?: boolean;
 }
+
+/**
+ * Single source of truth for the chat ambient wash. Top-weighted radial so it
+ * fades out well above the opaque composer dock; anchored at the top of the
+ * shell content panel so the header band sits inside the wash (full bleed).
+ */
+export const CHAT_AMBIENT_GRADIENT_IMAGE =
+  'radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--color-accent-blue) 6%, transparent), transparent 60%)';
 
 /**
  * AppShellFrame is a presentational shell primitive shared by authenticated,
@@ -45,6 +60,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
   variant = 'legacy',
   composerFocusActive = false,
+  chatAmbientGradient = false,
 }: Readonly<AppShellFrameProps>) {
   const isShellChatV1 = variant === 'shellChatV1';
 
@@ -86,6 +102,20 @@ export const AppShellFrame = memo(function AppShellFrame({
               : 'lg:border-l lg:border-subtle'
           )}
         >
+          {/* Full-bleed ambient wash on chat routes — painted first so it sits
+              behind the (transparent) header and the chat content, reaching
+              the very top of the content panel. Opaque content-surface fill
+              preserves the previous chat canvas tone on all breakpoints.
+              Pure background: pointer-events-none, no layout impact (#13386,
+              preserves the full-viewport guarantee from #12135 / JOV-3614). */}
+          {chatAmbientGradient ? (
+            <div
+              aria-hidden='true'
+              data-testid='chat-ambient-gradient'
+              className='pointer-events-none absolute inset-0 bg-(--linear-app-content-surface)'
+              style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
+            />
+          ) : null}
           {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
           {header}
           <div

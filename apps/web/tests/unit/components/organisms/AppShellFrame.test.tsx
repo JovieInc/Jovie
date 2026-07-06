@@ -116,6 +116,47 @@ describe('AppShellFrame', () => {
     expect(screen.getByTestId('app-shell-right-rail')).toBeInTheDocument();
   });
 
+  it('renders the chat ambient gradient full-bleed behind the header on chat routes', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header data-testid='fixture-header'>Header</header>}
+        main={<div>Main Content</div>}
+        variant='shellChatV1'
+        chatAmbientGradient
+      />
+    );
+
+    const mainContent = screen.getByRole('main');
+    const gradient = screen.getByTestId('chat-ambient-gradient');
+    const header = screen.getByTestId('fixture-header');
+
+    // The gradient is a direct child of the shell content panel, spanning its
+    // full box (inset-0) — its top edge is the top of the panel, above the
+    // header band, not below it (#13386).
+    expect(gradient.parentElement).toBe(mainContent);
+    expect(gradient).toHaveClass('absolute', 'inset-0', 'pointer-events-none');
+    // Painted before the header in DOM order so the (transparent) header row
+    // sits on top of the wash with no flat band above it.
+    expect(
+      gradient.compareDocumentPosition(header) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(gradient.style.backgroundImage).toContain('radial-gradient');
+  });
+
+  it('omits the shell-level ambient gradient on non-chat routes', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    expect(screen.queryByTestId('chat-ambient-gradient')).toBeNull();
+  });
+
   it('renders the shared audio player slot inside the shell frame', () => {
     render(
       <AppShellFrame
