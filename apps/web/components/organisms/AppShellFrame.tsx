@@ -96,23 +96,29 @@ export const AppShellFrame = memo(function AppShellFrame({
         <main
           id='main-content'
           className={cn(
-            'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
+            // `isolate` gives <main> its own stacking context so the negative-z
+            // chat ambient layer below paints above main's background but
+            // beneath the in-flow header/content (#13386).
+            'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
             isShellChatV1
               ? 'lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'
               : 'lg:border-l lg:border-subtle'
           )}
         >
-          {/* Full-bleed ambient wash on chat routes — painted first so it sits
-              behind the (transparent) header and the chat content, reaching
-              the very top of the content panel. Opaque content-surface fill
-              preserves the previous chat canvas tone on all breakpoints.
-              Pure background: pointer-events-none, no layout impact (#13386,
-              preserves the full-viewport guarantee from #12135 / JOV-3614). */}
+          {/* Full-bleed ambient wash on chat routes — spans the whole content
+              panel so its top edge is above the (transparent) header band.
+              Negative z-index is load-bearing: an absolute sibling with z-auto
+              would paint ON TOP of the in-flow static header; `-z-10` inside
+              the isolated <main> paints it above main's background but beneath
+              the header and content. Opaque content-surface fill preserves the
+              previous chat canvas tone on all breakpoints. Pure background:
+              pointer-events-none, no layout impact (#13386, preserves the
+              full-viewport guarantee from #12135 / JOV-3614). */}
           {chatAmbientGradient ? (
             <div
               aria-hidden='true'
               data-testid='chat-ambient-gradient'
-              className='pointer-events-none absolute inset-0 bg-(--linear-app-content-surface)'
+              className='pointer-events-none absolute inset-0 -z-10 bg-(--linear-app-content-surface)'
               style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
             />
           ) : null}
