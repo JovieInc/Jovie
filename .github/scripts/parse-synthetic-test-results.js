@@ -1,6 +1,9 @@
 const fs = require('node:fs');
 
-const DEFAULT_RESULT_FILES = (legacyCanaryEnabled, chatCanaryEnabled = false) => [
+const DEFAULT_RESULT_FILES = (
+  legacyCanaryEnabled,
+  chatCanaryEnabled = false
+) => [
   {
     name: 'synthetic-auth-ui',
     path: 'apps/web/test-results/synthetic-auth-ui-results.json',

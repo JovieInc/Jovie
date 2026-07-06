@@ -64,7 +64,13 @@ function requiredEnv(): {
     ...(userId ? [] : ['E2E_PROD_CHAT_CANARY_USER_ID']),
     ...(profileId ? [] : ['E2E_PROD_CHAT_CANARY_PROFILE_ID']),
   ];
-  return { ok: missing.length === 0, missing, clerkSecretKey, userId, profileId };
+  return {
+    ok: missing.length === 0,
+    missing,
+    clerkSecretKey,
+    userId,
+    profileId,
+  };
 }
 
 async function clerkFetch(
@@ -190,24 +196,20 @@ test.describe('Authenticated prod chat turn', () => {
           streamText,
           `Chat stream carried CHAT_STREAM_FAILED (requestId ${chatRes.headers.get('x-request-id')})`
         ).not.toContain('CHAT_STREAM_FAILED');
-        expect(
-          streamText,
-          'Chat stream carried an error part'
-        ).not.toContain('"type":"error"');
-        expect(
-          streamText,
-          'Chat stream never reached a finish part'
-        ).toContain('"type":"finish"');
+        expect(streamText, 'Chat stream carried an error part').not.toContain(
+          '"type":"error"'
+        );
+        expect(streamText, 'Chat stream never reached a finish part').toContain(
+          '"type":"finish"'
+        );
       } finally {
         clearTimeout(timeout);
       }
     } finally {
       // 4. Revoke the canary session (best-effort hygiene).
-      await clerkFetch(
-        env.clerkSecretKey,
-        `/sessions/${session.id}/revoke`,
-        { method: 'POST' }
-      ).catch(() => null);
+      await clerkFetch(env.clerkSecretKey, `/sessions/${session.id}/revoke`, {
+        method: 'POST',
+      }).catch(() => null);
     }
   });
 });
