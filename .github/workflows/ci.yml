@@ -92,7 +92,7 @@ jobs:
       - id: graphite
         if: steps.graphite-token.outputs.configured == 'true'
         continue-on-error: true
-        uses: withgraphite/graphite-ci-action@main
+        uses: withgraphite/graphite-ci-action@402a89bc8aa6db18ae1f9c61953d001d5f9d828f # v0.0.11
         with:
           graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
 
@@ -533,6 +533,9 @@ jobs:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
     needs: [ci-path-changes]
+    # Merge gate: keep on always-available GitHub runners. The self-hosted
+    # jovie-runner pool is not highly-available (personal OrbStack host) and
+    # took down this gate when it shut down mid-run.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
@@ -593,6 +596,7 @@ jobs:
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
     needs: [ci-path-changes]
+    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true') }}
@@ -616,6 +620,7 @@ jobs:
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
     needs: [ci-path-changes]
+    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true') }}
@@ -636,7 +641,7 @@ jobs:
     # Detect unused files, dependencies, and exports
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -650,8 +655,9 @@ jobs:
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    # Merge gate (feeds PR Ready): keep on always-available GitHub runners (see ci-biome).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -660,7 +666,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo
           # Use content hash for better cache hit rates (not commit SHA which changes every commit)
@@ -1166,18 +1172,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        # This job only has an 8 minute budget. Avoid apt-based `--with-deps` here
-        # because slow font package mirrors can consume the whole lane before tests run.
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         id: download
@@ -1314,16 +1310,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         id: download-build
@@ -1433,16 +1421,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db instead of DATABASE_URL_MAIN.
@@ -1630,18 +1610,9 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
@@ -1783,16 +1754,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
@@ -1925,16 +1888,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -2068,16 +2023,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -2510,18 +2457,9 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check-creds.outputs.skip != 'true'
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check-creds.outputs.skip != 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium only)
-        if: steps.check-creds.outputs.skip != 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Wait for CDN propagation
         if: steps.check-creds.outputs.skip != 'true'
@@ -2672,7 +2610,8 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Merge gate: keep on always-available GitHub runners (see ci-biome).
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -2831,18 +2770,9 @@ jobs:
             exit 1
           fi
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         id: download
@@ -3022,18 +2952,9 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3204,16 +3125,8 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -3368,18 +3281,9 @@ jobs:
           GIT_BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Load quarantined E2E specs
         id: quarantine
@@ -3577,21 +3481,9 @@ jobs:
             exit 1
           fi
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          # Standardized cache key - chromium only for CI (Firefox runs weekly)
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright
-        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        run: |
-          # Always Chrome-only for speed; Firefox runs weekly via e2e-full-matrix workflow
-          pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Load quarantined E2E specs
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -4235,17 +4127,8 @@ jobs:
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact from ci-build
         id: download-build
@@ -4989,15 +4872,9 @@ jobs:
         with:
           fetch-depth: 1
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+
       - name: Probe production Google + Apple OAuth redirect URIs
         id: oauth-probe
         run: |
