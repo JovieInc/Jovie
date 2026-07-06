@@ -533,7 +533,10 @@ jobs:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
     needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Merge gate: keep on always-available GitHub runners. The self-hosted
+    # jovie-runner pool is not highly-available (personal OrbStack host) and
+    # took down this gate when it shut down mid-run.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
@@ -593,7 +596,8 @@ jobs:
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
     needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true') }}
     env:
@@ -616,7 +620,8 @@ jobs:
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
     needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true') }}
     env:
@@ -650,7 +655,8 @@ jobs:
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Merge gate (feeds PR Ready): keep on always-available GitHub runners (see ci-biome).
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
@@ -2672,7 +2678,8 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Merge gate: keep on always-available GitHub runners (see ci-biome).
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       fail-fast: false
