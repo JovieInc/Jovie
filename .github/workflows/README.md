@@ -168,12 +168,12 @@ Sensitive changes are classified deterministically before auto-merge. High-risk 
 
 | Surface | Level | Smoke | Preview | Blocks unattended auto-merge |
 | --- | --- | --- | --- | --- |
-| CI and workflow control plane | high | yes | no | yes |
-| Agent control plane | high | yes | no | yes |
-| Auth and identity | high | yes | yes | yes |
-| Billing and money movement | high | yes | yes | yes |
-| Database and migrations | high | yes | no | yes |
-| Proxy and middleware | high | yes | yes | yes |
-| Environment and runtime config | high | yes | yes | yes |
+| CI and workflow control plane | high | yes | no | no |
+| Agent control plane | high | yes | no | no |
+| Auth and identity | high | yes | yes | no |
+| Billing and money movement | high | yes | yes | no |
+| Database and migrations | high | yes | no | no |
+| Proxy and middleware | high | yes | yes | no |
+| Environment and runtime config | high | yes | yes | no |
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
