@@ -16,6 +16,7 @@ import {
 } from '@/lib/agent-os/visual-qa/paths';
 
 export const VISUAL_QA_REVIEW_FILE_NAME = 'review.json';
+export const VISUAL_QA_ARTIFACT_FILE_NAME = 'artifact.json';
 
 export const VISUAL_QA_REVIEW_DECISIONS = ['accepted', 'rejected'] as const;
 export type VisualQaReviewDecision =
@@ -251,6 +252,41 @@ export async function reviewVisualQaSurface(params: {
   });
 
   return record;
+}
+
+/**
+ * Applies the run's current review decisions to the AgentRunArtifact
+ * persisted at agentos/runs/visual-qa/<runId>/artifact.json (written by the
+ * capture harness when artifact persistence is enabled). Returns false when
+ * no artifact file exists for the run.
+ */
+export async function applyVisualQaReviewToRunArtifactFile(
+  runId: string
+): Promise<boolean> {
+  const safeRunId = assertValidVisualQaRunId(runId);
+  const artifactPath = resolveVisualQaRunRelativePath(
+    safeRunId,
+    VISUAL_QA_ARTIFACT_FILE_NAME
+  );
+
+  let raw: string;
+  try {
+    raw = await readFile(artifactPath, 'utf8');
+  } catch (error) {
+    if (isFileMissingError(error)) return false;
+    throw error;
+  }
+
+  const artifact = parseAgentRunArtifact(JSON.parse(raw));
+  const reviewFile = await readVisualQaRunReview(safeRunId);
+  const updated = applyVisualQaReviewToAgentRunArtifact(artifact, reviewFile);
+
+  await writeFile(
+    artifactPath,
+    `${JSON.stringify(updated, null, 2)}\n`,
+    'utf8'
+  );
+  return true;
 }
 
 /**

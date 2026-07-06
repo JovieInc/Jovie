@@ -1,10 +1,11 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { getVisualQaRootDirectory } from '@/lib/agent-os/visual-qa/paths';
 import {
   applyVisualQaReviewToAgentRunArtifact,
+  applyVisualQaReviewToRunArtifactFile,
   getVisualQaReviewRun,
   listVisualQaReviewRuns,
   readVisualQaRunReview,
@@ -224,6 +225,42 @@ describe('visual-qa review store', () => {
     expect(updated.humanGate.status).toBe('rejected');
     expect(updated.humanGate.reviewer).toBe('admin@jovie.test');
     expect(updated.metadata.visualQaReview).toMatchObject({ runId });
+  });
+
+  it('updates a persisted artifact.json when present and reports absence otherwise', async () => {
+    await seedRun();
+
+    expect(await applyVisualQaReviewToRunArtifactFile(runId)).toBe(false);
+
+    const artifactPath = path.join(
+      getVisualQaRootDirectory(),
+      runId,
+      'artifact.json'
+    );
+    await writeFile(
+      artifactPath,
+      `${JSON.stringify(buildArtifact(), null, 2)}\n`,
+      'utf8'
+    );
+
+    await reviewVisualQaSurface({
+      runId,
+      surfaceId: 'shell-desktop-idle',
+      decision: 'accepted',
+      notes: null,
+      reviewer: 'admin@jovie.test',
+      followUpAction: null,
+      dispatchId: null,
+    });
+
+    expect(await applyVisualQaReviewToRunArtifactFile(runId)).toBe(true);
+
+    const persisted = JSON.parse(await readFile(artifactPath, 'utf8')) as {
+      humanGate: { status: string };
+      metadata: { visualQaReview?: { runId: string } };
+    };
+    expect(persisted.humanGate.status).toBe('approved');
+    expect(persisted.metadata.visualQaReview?.runId).toBe(runId);
   });
 
   it('leaves the artifact untouched when the run id does not match', async () => {
