@@ -15,6 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Plan-locked chat tools now explain and offer an upgrade instead of erroring (GH-13304)**: Asking Jovie for album art, photo retouching, or merch on the Free plan no longer dead-ends the conversation. Jovie describes what it would create, and a single upgrade prompt appears inline — with copy sourced from the plan registry so it always names the right plan.
+
 - [internal] **AEO citation monitoring + brand integrity (GH-11037)**: Pure-function modules `lib/aeo/citation-monitor.ts` and `lib/aeo/brand-integrity.ts` implement share-of-citation measurement (tracks whether Jovie profile URLs are cited by answer engines for canonical artist queries) and same-name entity disambiguation (scores KB-anchor coverage, flags missing MusicBrainz/Wikidata/ISNI identifiers, and produces a disambiguating checklist mapping to schema.org fields). 47 unit tests. No migrations.
 
 - **Chat replies no longer flash blank or flicker while Jovie starts answering (GH-11921)**: On send, the reply row keeps its thinking shimmer until the first real content arrives, and follow-up messages no longer briefly show the previous reply before the new one streams in.
