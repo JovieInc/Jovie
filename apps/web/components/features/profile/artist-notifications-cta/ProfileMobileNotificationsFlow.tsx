@@ -1,6 +1,13 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Switch,
+} from '@jovie/ui';
 import {
   CalendarDays,
   Check,
@@ -257,7 +264,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] dark:text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -399,6 +406,67 @@ function InlineCaptureField({
   );
 }
 
+const BIRTHDAY_SELECT_TRIGGER_CLASSNAME =
+  'h-12 touch-manipulation rounded-3xl border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] text-white hover:border-white/18 focus-visible:border-white/18 focus-visible:ring-0 data-[placeholder]:text-white/42';
+
+/**
+ * The flow overlay renders at PROFILE_Z.FULLSCREEN_FLOW (z-[140]); the Radix
+ * Select content portals to document.body at z-50 by default, so it must be
+ * raised above the takeover to stay visible.
+ */
+const BIRTHDAY_SELECT_CONTENT_CLASSNAME = 'z-[150]';
+
+function BirthdayPartSelect({
+  label,
+  value,
+  options,
+  onValueChange,
+  testId,
+}: Readonly<{
+  label: string;
+  value: string;
+  options: readonly { readonly value: string; readonly label: string }[];
+  onValueChange: (value: string) => void;
+  testId: string;
+}>) {
+  return (
+    <div className='space-y-2'>
+      <span className='block text-app font-medium tracking-[-0.01em] text-white/42'>
+        {label}
+      </span>
+      <Select value={value || undefined} onValueChange={onValueChange}>
+        <SelectTrigger
+          data-testid={testId}
+          aria-label={label}
+          className={BIRTHDAY_SELECT_TRIGGER_CLASSNAME}
+        >
+          <SelectValue placeholder={label} />
+        </SelectTrigger>
+        <SelectContent className={BIRTHDAY_SELECT_CONTENT_CLASSNAME}>
+          {options.map(option => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+const BIRTHDAY_MONTH_SELECT_OPTIONS = MONTH_OPTIONS.map((month, index) => ({
+  value: String(index + 1).padStart(2, '0'),
+  label: month,
+}));
+
+const BIRTHDAY_DAY_SELECT_OPTIONS = Array.from(
+  { length: 31 },
+  (_, index) => index + 1
+).map(day => ({
+  value: String(day).padStart(2, '0'),
+  label: String(day),
+}));
+
 function BirthdaySelectors({
   value,
   onChange,
@@ -408,7 +476,11 @@ function BirthdaySelectors({
 }>) {
   const parts = extractBirthdayParts(value);
   const yearOptions = useMemo(
-    () => Array.from({ length: 100 }, (_, index) => CURRENT_YEAR - index),
+    () =>
+      Array.from({ length: 100 }, (_, index) => {
+        const year = String(CURRENT_YEAR - index);
+        return { value: year, label: year };
+      }),
     []
   );
 
@@ -425,62 +497,27 @@ function BirthdaySelectors({
 
   return (
     <div className='grid grid-cols-3 gap-3'>
-      <label className='block space-y-2'>
-        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
-          Month
-        </span>
-        <select
-          data-testid='mobile-birthday-month'
-          value={parts.month}
-          onChange={event => updatePart('month', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-3xl border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] dark:text-white focus:border-white/18 focus:outline-none'
-        >
-          <option value=''>Month</option>
-          {MONTH_OPTIONS.map((month, index) => (
-            <option key={month} value={String(index + 1).padStart(2, '0')}>
-              {month}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className='block space-y-2'>
-        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
-          Day
-        </span>
-        <select
-          data-testid='mobile-birthday-day'
-          value={parts.day}
-          onChange={event => updatePart('day', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-3xl border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] dark:text-white focus:border-white/18 focus:outline-none'
-        >
-          <option value=''>Day</option>
-          {Array.from({ length: 31 }, (_, index) => index + 1).map(day => (
-            <option key={day} value={String(day).padStart(2, '0')}>
-              {day}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className='block space-y-2'>
-        <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
-          Year
-        </span>
-        <select
-          data-testid='mobile-birthday-year'
-          value={parts.year}
-          onChange={event => updatePart('year', event.target.value)}
-          className='h-12 w-full touch-manipulation appearance-none rounded-3xl border border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] dark:text-white focus:border-white/18 focus:outline-none'
-        >
-          <option value=''>Year</option>
-          {yearOptions.map(year => (
-            <option key={year} value={String(year)}>
-              {year}
-            </option>
-          ))}
-        </select>
-      </label>
+      <BirthdayPartSelect
+        label='Month'
+        value={parts.month}
+        options={BIRTHDAY_MONTH_SELECT_OPTIONS}
+        onValueChange={next => updatePart('month', next)}
+        testId='mobile-birthday-month'
+      />
+      <BirthdayPartSelect
+        label='Day'
+        value={parts.day}
+        options={BIRTHDAY_DAY_SELECT_OPTIONS}
+        onValueChange={next => updatePart('day', next)}
+        testId='mobile-birthday-day'
+      />
+      <BirthdayPartSelect
+        label='Year'
+        value={parts.year}
+        options={yearOptions}
+        onValueChange={next => updatePart('year', next)}
+        testId='mobile-birthday-year'
+      />
     </div>
   );
 }
@@ -957,7 +994,8 @@ export function ProfileMobileNotificationsFlow({
           'relative mx-auto flex w-full max-w-108 flex-col px-5',
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
-            : 'h-full pb-8 pt-6'
+            : 'h-full pb-8 pt-6',
+          presentation === 'modal' && 'min-[1180px]:max-w-130'
         )}
       >
         <header className='flex items-center justify-between pb-5'>
@@ -1038,7 +1076,7 @@ export function ProfileMobileNotificationsFlow({
         aria-modal='true'
         style={contentStyle}
       >
-        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)] min-[1180px]:max-w-160'>
           {contentBody}
         </div>
       </div>

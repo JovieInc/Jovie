@@ -148,9 +148,9 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
       await page.getByTestId('mobile-name-input').fill('Alex');
       await clickStepButton(page, 'name', /^continue$/i);
       await waitForStep(page, 'birthday');
-      await page.getByTestId('mobile-birthday-month').selectOption('04');
-      await page.getByTestId('mobile-birthday-day').selectOption('05');
-      await page.getByTestId('mobile-birthday-year').selectOption('1992');
+      await pickBirthdayOption(page, 'mobile-birthday-month', 'April');
+      await pickBirthdayOption(page, 'mobile-birthday-day', '5');
+      await pickBirthdayOption(page, 'mobile-birthday-year', '1992');
     },
   },
   {
@@ -177,9 +177,9 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
       await page.getByTestId('mobile-name-input').fill('Alex');
       await clickStepButton(page, 'name', /^continue$/i);
       await waitForStep(page, 'birthday');
-      await page.getByTestId('mobile-birthday-month').selectOption('04');
-      await page.getByTestId('mobile-birthday-day').selectOption('24');
-      await page.getByTestId('mobile-birthday-year').selectOption('1994');
+      await pickBirthdayOption(page, 'mobile-birthday-month', 'April');
+      await pickBirthdayOption(page, 'mobile-birthday-day', '24');
+      await pickBirthdayOption(page, 'mobile-birthday-year', '1994');
       await clickStepButton(page, 'birthday', /^continue$/i);
       await waitForStep(page, 'preferences');
       await clickStepButton(page, 'preferences', /save & finish/i);
@@ -466,6 +466,19 @@ async function clickStepButton(
   const button = getActiveStep(page, step).getByRole('button', { name });
   await button.waitFor({ state: 'visible', timeout: 20_000 });
   await button.click({ timeout: 20_000, force: true });
+}
+
+async function pickBirthdayOption(
+  page: Page,
+  testId: string,
+  optionName: string
+) {
+  // Birthday selects are Radix Selects (portal to document.body), not native
+  // <select> elements — open each trigger, then click the option by name.
+  await page.getByTestId(testId).click({ timeout: 20_000 });
+  await page
+    .getByRole('option', { name: optionName, exact: true })
+    .click({ timeout: 20_000 });
 }
 
 async function continueFromAlertsEntry(page: Page) {

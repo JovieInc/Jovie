@@ -47,6 +47,12 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly autoOpen?: boolean;
   readonly hideTrigger?: boolean;
   readonly onFlowClosed?: () => void;
+  /**
+   * Fires whenever the overlay/modal flow opens or closes so host chrome
+   * (e.g. the profile surface back button) can yield to the flow's own
+   * navigation. Inline presentations never report open.
+   */
+  readonly onFlowOpenChange?: (open: boolean) => void;
   readonly onSubscriptionActivated?: () => void;
   readonly source?: NotificationSource;
   readonly sourceContext?: NotificationSourceContext;
@@ -158,6 +164,7 @@ export function ProfileInlineNotificationsCTA({
   autoOpen = false,
   hideTrigger = false,
   onFlowClosed,
+  onFlowOpenChange,
   onSubscriptionActivated,
   source,
   sourceContext,
@@ -382,6 +389,10 @@ export function ProfileInlineNotificationsCTA({
   useEffect(() => {
     onRegisterReveal?.(openFlow);
   }, [onRegisterReveal, openFlow]);
+
+  useEffect(() => {
+    onFlowOpenChange?.(!isInline && isFlowOpen);
+  }, [isFlowOpen, isInline, onFlowOpenChange]);
 
   useEffect(() => {
     if (isSubscribed) {
