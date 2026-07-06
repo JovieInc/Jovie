@@ -104,7 +104,14 @@ regexes = [
 ]
 
 # Specific commit SHAs to ignore (for known false positives in history)
-commits = []
+# 75ef52d12 — introduced .claude/settings.local.json.backup (Neon connection strings)
+# and docs/testing-clerk.md (Clerk sk_test key) in screenshots auto-commit #10692.
+# Both were redacted in JOV-2940 (commit 77cbe76c5). Allowlist the introducing commit so
+# history scans (workflow_dispatch / scheduled full / `--log-opts` ranges that collapse to
+# near-full history on shallow fetches) don't flag already-remediated secrets.
+commits = [
+    "75ef52d12656b4841c3080ea0d20ff2f74b37c63",
+]
 
 # =============================================================================
 # Custom Rules — close gaps that allowed JOV-2940 to land
