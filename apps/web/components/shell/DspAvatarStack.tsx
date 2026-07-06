@@ -130,12 +130,21 @@ export function DspAvatarStack({
                 'bg-surface-2 text-quaternary-token',
                 'ring-2 ring-(--system-b-bg-page)',
                 'transition-colors duration-subtle ease-subtle',
-                'group-hover/dsps:text-(--system-b-dsp-avatar-color)',
-                'group-focus-within/dsps:text-(--system-b-dsp-avatar-color)',
+                // Brand text color on hover applies only to SVG icon avatars —
+                // glyph-only avatars keep white text so the glyph stays visible
+                // against its brand-colored background.
+                dsp.iconPath &&
+                  'group-hover/dsps:text-(--system-b-dsp-avatar-color) group-focus-within/dsps:text-(--system-b-dsp-avatar-color)',
                 index > 0 && '-ml-1.5',
                 dsp.status === 'missing' && 'opacity-40',
                 !dsp.iconPath &&
-                  'font-semibold text-white dark:text-white bg-(--system-b-dsp-avatar-color) opacity-75 group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
+                  'font-semibold text-white dark:text-white bg-(--system-b-dsp-avatar-color)',
+                // opacity-75 must not apply to 'missing' glyph avatars — it wins
+                // the tailwind-merge conflict against opacity-40 and erases the
+                // faded missing state.
+                !dsp.iconPath &&
+                  dsp.status !== 'missing' &&
+                  'opacity-75 group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
               )}
               style={
                 {

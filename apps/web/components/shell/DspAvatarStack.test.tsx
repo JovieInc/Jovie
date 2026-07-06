@@ -102,4 +102,43 @@ describe('DspAvatarStack', () => {
     const liveDot = document.querySelector('.system-b-dsp-status-dot-live');
     expect(liveDot?.className).not.toContain('bg-emerald');
   });
+
+  it('applies brand hover text color only to icon avatars, not glyph avatars', () => {
+    const iconItem: DspAvatarItem = {
+      id: 'spotify',
+      status: 'live',
+      label: 'Spotify',
+      glyph: 'S',
+      iconPath: 'M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12',
+      color: '#1DB954',
+    };
+
+    const { container: iconContainer } = render(
+      <DspAvatarStack dsps={[iconItem]} />
+    );
+    const iconAvatar = iconContainer.querySelector(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    expect(iconAvatar?.className).toContain('group-hover/dsps:text-');
+
+    const { container: glyphContainer } = render(
+      <DspAvatarStack dsps={[ITEMS[1]]} />
+    );
+    const glyphAvatar = glyphContainer.querySelector(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    // Glyph avatars keep white text on hover — the brand bg would make the
+    // glyph invisible if the hover text color matched it.
+    expect(glyphAvatar?.className).not.toContain('group-hover/dsps:text-');
+    expect(glyphAvatar?.className).toContain('text-white');
+  });
+
+  it('keeps missing glyph avatars faded at opacity-40 without opacity-75', () => {
+    const { container } = render(<DspAvatarStack dsps={[ITEMS[2]]} />);
+    const avatar = container.querySelector(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    expect(avatar?.className).toContain('opacity-40');
+    expect(avatar?.className).not.toContain('opacity-75');
+  });
 });
