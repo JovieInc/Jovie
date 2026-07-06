@@ -1,16 +1,10 @@
 import { and, count, eq, gte, isNotNull, min } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { suggestedActions } from '@/lib/db/schema/connectors';
-import {
-  getPlanDisplayName,
-  type PlanId,
-  resolveCanonicalPlanId,
-} from '@/lib/entitlements/registry';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getPlanDisplayName, type PlanId } from '@/lib/entitlements/registry';
 import {
   getRemainingPercent,
   getUsageLimits,
@@ -18,6 +12,7 @@ import {
   LIVE_ACTION_WINDOW_MS,
   type UsageSummaryData,
 } from '@/lib/usage/limits';
+import { requireUsageAuth } from '@/lib/usage/require-usage-auth';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -159,28 +154,11 @@ function buildUsageSummary(params: {
 }
 
 export async function GET() {
-  let userId: string | null;
-  try {
-    ({ userId } = await getCachedAuth());
-  } catch (error) {
-    // Clerk throws when middleware didn't run (e.g., matcher misconfiguration).
-    // Return 401 for that case, but let unexpected errors propagate to Sentry.
-    const message = error instanceof Error ? error.message : '';
-    if (message.includes('clerkMiddleware')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    throw error;
+  const auth = await requireUsageAuth();
+  if (auth.response) {
+    return auth.response;
   }
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const plan = resolveCanonicalPlanId(entitlements.plan) ?? 'free';
+  const { userId, plan } = auth;
 
   const now = new Date();
   const week = getWeeklyUsageWindow(now);
