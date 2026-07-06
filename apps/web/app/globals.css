@@ -422,6 +422,15 @@ body:has(.hud-kiosk-viewport) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Zero the raw motion-reveal duration scale so any consumer of these
+     tokens (not just the selectors below) inherits 0ms. Mirrors the
+     --duration-* / --ds-motion-* zeroing in styles/design-system.css.
+     Guarded by tests/unit/design-system/reduced-motion-tokens.test.ts. */
+  :root {
+    --motion-reveal-duration: 0ms;
+    --motion-reveal-duration-fast: 0ms;
+  }
+
   [data-ui="cta-reveal"] .cta-reveal-shell,
   [data-ui="cta-reveal"] .cta-reveal-panel,
   [data-ui="cta-reveal"] .cta-reveal-support,
