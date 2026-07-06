@@ -14,6 +14,7 @@ import { createStoredAuthState } from '@/lib/auth/routing-state.server';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import type { RateLimitResult } from '@/lib/rate-limit';
 import {
   createRateLimiter,
   createRateLimitHeaders,
@@ -22,6 +23,7 @@ import {
   RATE_LIMITERS,
 } from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -40,17 +42,82 @@ function isLocalRuntime(): boolean {
   return env.NODE_ENV !== 'production';
 }
 
-async function limitAuthStart(key: string) {
+async function limitAuthStart(key: string): Promise<RateLimitResult> {
   const rateLimit = await generalLimiter.limit(key);
-  if (
-    rateLimit.success ||
-    !isLocalRuntime() ||
-    rateLimit.unavailable !== true
-  ) {
+  if (rateLimit.success) {
     return rateLimit;
   }
 
-  return LOCAL_AUTH_START_LIMITER.limit(key);
+  const backendDegraded =
+    rateLimit.unavailable === true || rateLimit.degraded === true;
+  if (!backendDegraded) {
+    // A healthy durable backend rejected the request — enforce the limit.
+    return rateLimit;
+  }
+
+  if (isLocalRuntime()) {
+    return LOCAL_AUTH_START_LIMITER.limit(key);
+  }
+
+  // Production with a degraded/unavailable limiter backend: treat the
+  // auth-start limit as advisory (log + allow). A per-instance memory bucket
+  // keyed by IP over-blocks real users behind carrier CGNAT during a Redis
+  // outage, dead-ending sign-in. Bot defense is unaffected — Clerk still
+  // gates the actual auth attempt; this limiter is only a pre-filter.
+  logger.warn(
+    'Rate-limit backend degraded — allowing auth start (advisory limit)',
+    { key },
+    'auth/start'
+  );
+  return { ...rateLimit, success: true, reason: undefined };
+}
+
+function wantsHtmlResponse(request: Request): boolean {
+  const accept = request.headers.get('accept') ?? '';
+  return accept.includes('text/html');
+}
+
+function getRetryAfterSeconds(rateLimit: RateLimitResult): number {
+  const resetMs =
+    rateLimit.reset instanceof Date ? rateLimit.reset.getTime() : Date.now();
+  return Math.min(60, Math.max(3, Math.ceil((resetMs - Date.now()) / 1000)));
+}
+
+/**
+ * /auth/start is browser-navigated, so a 429 must render a human-readable
+ * page — never raw JSON. Auto-retries via meta refresh honoring Retry-After,
+ * with a manual retry CTA as fallback. Static markup only (no user input).
+ */
+function createRateLimitedHtmlResponse(
+  rateLimit: RateLimitResult
+): NextResponse {
+  const retryAfterSeconds = getRetryAfterSeconds(rateLimit);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="refresh" content="${retryAfterSeconds}" />
+<title>Too many sign-in attempts — Jovie</title>
+</head>
+<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0b0b;color:#f5f4f0;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<main style="max-width:400px;padding:32px 24px;text-align:center;">
+<h1 style="margin:0 0 12px;font-size:20px;font-weight:600;letter-spacing:-0.01em;">Too many sign-in attempts</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#a1a1a6;">Wait a moment and try again. This page will retry automatically in ${retryAfterSeconds} seconds.</p>
+<button type="button" onclick="location.reload()" style="appearance:none;border:0;cursor:pointer;background:#f5f4f0;color:#0b0b0b;font-size:15px;font-weight:600;font-family:inherit;padding:10px 24px;border-radius:9999px;">Try again</button>
+</main>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    status: 429,
+    headers: {
+      ...NO_STORE_HEADERS,
+      ...createRateLimitHeaders(rateLimit),
+      'Content-Type': 'text/html; charset=utf-8',
+      'Retry-After': String(retryAfterSeconds),
+    },
+  });
 }
 
 function getAuthPageForIntent(intent: AuthIntent): string {
@@ -92,6 +159,10 @@ export async function GET(request: Request) {
         result: 'blocked',
         reason: 'rate_limited',
       });
+    }
+
+    if (wantsHtmlResponse(request)) {
+      return createRateLimitedHtmlResponse(rateLimit);
     }
 
     return NextResponse.json(
