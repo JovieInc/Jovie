@@ -58,7 +58,7 @@ jobs:
   # runs first (fail-open), then path detection.
   ci-path-changes:
     name: Path Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
@@ -413,7 +413,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -444,7 +444,7 @@ jobs:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
@@ -477,7 +477,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
     name: Structural Contract
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 8
     env:
       SHELLCHECK_OPTS: >-
@@ -533,7 +533,7 @@ jobs:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
