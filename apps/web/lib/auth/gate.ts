@@ -29,6 +29,7 @@ import {
 import { syncEmailFromClerk } from './clerk-sync';
 import { getServerClerkClient } from './request-clerk-client';
 import { checkUserStatus } from './status-checker';
+import { determineUserStatus, type UserLifecycleStatus } from './user-status';
 
 export type { UserStateInput } from './canonical-user-state';
 // Re-export canonical state enum and utilities so consumers can import from gate.ts
@@ -91,22 +92,8 @@ function createE2ETestAuthGateResult(
   };
 }
 
-/** User status type alias for user lifecycle states */
-type UserLifecycleStatus =
-  | 'waitlist_pending'
-  | 'waitlist_approved'
-  | 'profile_claimed'
-  | 'onboarding_incomplete'
-  | 'active';
-
 const CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS = 4;
 const CLERK_BACKEND_EMAIL_FALLBACK_DELAY_MS = 250;
-
-/** Data structure for existing user profile information */
-interface ExistingUserData {
-  profileId: string | null;
-  onboardingComplete: Date | null;
-}
 
 interface AuthGateRecord {
   id: string;
@@ -157,39 +144,6 @@ function createUnauthenticatedAuthGateResult(): AuthGateResult {
       email: null,
     },
   };
-}
-
-/**
- * Determine user status based on waitlist entry and profile state.
- * Implements the state progression: waitlist_pending → waitlist_approved → active
- */
-function determineUserStatus(
-  waitlistEntryId: string | undefined,
-  existingUserData: ExistingUserData | undefined,
-  waitlistGateEnabled: boolean
-): UserLifecycleStatus {
-  if (!waitlistEntryId) {
-    // When waitlist is disabled, skip waitlist states — treat as approved
-    if (!waitlistGateEnabled) {
-      const hasClaimedProfile = !!existingUserData?.profileId; // joined via activeProfileId = claimed
-      if (!hasClaimedProfile) {
-        return 'waitlist_approved';
-      }
-      return existingUserData.onboardingComplete
-        ? 'active'
-        : 'onboarding_incomplete';
-    }
-    return 'waitlist_pending';
-  }
-
-  const hasClaimedProfile = !!existingUserData?.profileId; // joined via activeProfileId = claimed
-  if (!hasClaimedProfile) {
-    return 'waitlist_approved';
-  }
-
-  return existingUserData.onboardingComplete
-    ? 'active'
-    : 'onboarding_incomplete';
 }
 
 /**
