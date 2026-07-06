@@ -27,17 +27,6 @@ export function PhoneFrame({ children, className }: PhoneFrameProps) {
           ].join(', '),
         }}
       >
-        <div
-          aria-hidden='true'
-          className='absolute left-1/2 top-2 z-10 -translate-x-1/2'
-          style={{
-            width: 80,
-            height: 24,
-            borderRadius: 12,
-            backgroundColor: 'var(--linear-bg-page)',
-          }}
-        />
-
         <div className='relative h-full w-full overflow-hidden rounded-[1.9rem] bg-page'>
           {children}
         </div>
