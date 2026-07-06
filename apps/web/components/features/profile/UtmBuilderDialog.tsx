@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -53,8 +53,9 @@ type UtmField = (typeof UTM_FIELDS)[number]['key'];
 /**
  * Builds a profile URL with UTM tracking params.
  *
- * ponytail: plain controlled inputs + URLSearchParams — no form library for 5
- * optional fields.
+ * ponytail: controlled canonical Input atoms + URLSearchParams — no form
+ * library for 5 fields. Source is required: Copy/Open stay disabled (with an
+ * inline plain-language rule) until utm_source is non-empty.
  */
 export function UtmBuilderDialog({
   open,
@@ -70,6 +71,8 @@ export function UtmBuilderDialog({
   });
   const [copied, setCopied] = useState(false);
 
+  const sourceMissing = values.utm_source.trim() === '';
+
   const resultUrl = useMemo(() => {
     const params = new URLSearchParams();
     for (const { key } of UTM_FIELDS) {
@@ -81,6 +84,7 @@ export function UtmBuilderDialog({
   }, [baseUrl, values]);
 
   const handleCopy = async () => {
+    if (sourceMissing) return;
     const ok = await copyToClipboard(resultUrl);
     if (ok) {
       setCopied(true);
@@ -100,7 +104,7 @@ export function UtmBuilderDialog({
             <Label htmlFor={`utm-${key}`} required={required}>
               {label}
             </Label>
-            <input
+            <Input
               id={`utm-${key}`}
               type='text'
               value={values[key]}
@@ -108,7 +112,6 @@ export function UtmBuilderDialog({
               onChange={event =>
                 setValues(prev => ({ ...prev, [key]: event.target.value }))
               }
-              className='h-9 w-full rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             />
           </div>
         ))}
@@ -118,12 +121,20 @@ export function UtmBuilderDialog({
             {resultUrl}
           </p>
         </div>
+
+        {/* Fixed-height slot so the rule appearing/clearing never reflows the dialog. */}
+        <p className='min-h-4 text-xs text-secondary-token' aria-live='polite'>
+          {sourceMissing
+            ? 'Add a source (like instagram) to create your tracking link.'
+            : null}
+        </p>
       </DialogBody>
 
       <DialogActions>
         <Button
           type='button'
           variant='secondary'
+          disabled={sourceMissing}
           onClick={() =>
             globalThis.open(resultUrl, '_blank', 'noopener,noreferrer')
           }
@@ -131,7 +142,12 @@ export function UtmBuilderDialog({
           <ExternalLink className='mr-2 h-4 w-4' aria-hidden='true' />
           Open
         </Button>
-        <Button type='button' variant='primary' onClick={handleCopy}>
+        <Button
+          type='button'
+          variant='primary'
+          disabled={sourceMissing}
+          onClick={handleCopy}
+        >
           {copied ? (
             <Check className='mr-2 h-4 w-4' aria-hidden='true' />
           ) : (

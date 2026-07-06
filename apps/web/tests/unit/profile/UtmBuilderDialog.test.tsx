@@ -35,4 +35,29 @@ describe('UtmBuilderDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /copy link/i }));
     expect(copyToClipboard).toHaveBeenCalledWith(expected);
   });
+
+  it('disables Copy/Open and names the rule until a source is entered', () => {
+    copyToClipboard.mockClear();
+    render(<UtmBuilderDialog open onClose={vi.fn()} baseUrl={baseUrl} />);
+
+    const copyButton = screen.getByRole('button', { name: /copy link/i });
+    const openButton = screen.getByRole('button', { name: /open/i });
+    expect(copyButton).toBeDisabled();
+    expect(openButton).toBeDisabled();
+    expect(
+      screen.getByText(/add a source .* to create your tracking link/i)
+    ).toBeInTheDocument();
+
+    fireEvent.click(copyButton);
+    expect(copyToClipboard).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/source/i), {
+      target: { value: 'instagram' },
+    });
+    expect(copyButton).toBeEnabled();
+    expect(openButton).toBeEnabled();
+    expect(
+      screen.queryByText(/add a source .* to create your tracking link/i)
+    ).not.toBeInTheDocument();
+  });
 });
