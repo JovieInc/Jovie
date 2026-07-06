@@ -47,9 +47,19 @@ REPO="${REPO:-JovieInc/Jovie}"
 DRY_RUN="${DRY_RUN:-0}"
 STALL_MINUTES="${STALL_MINUTES:-45}"
 COOLDOWN_HOURS="${COOLDOWN_HOURS:-2}"
+# Sanity cap (#13343): a stall longer than this is a data error (unset/epoch-0
+# enqueue timestamp computing a ~56-year stall), never a real queue stall.
+# Skip such PRs instead of kicking them.
+MAX_STALL_MINUTES="${MAX_STALL_MINUTES:-10080}"  # 7 days
+# Hard cap on label-cycle kicks per PR per UTC day, on top of COOLDOWN_HOURS.
+MAX_KICKS_PER_DAY="${MAX_KICKS_PER_DAY:-4}"
 KICK_MARKER="merge-queue-watchdog-kick"
+# Timestamps before this are unset/zeroed data (epoch 0, Go zero time, etc.),
+# not real label events. 2020-01-01T00:00:00Z.
+MIN_VALID_EPOCH=1577836800
 
 now_epoch="$(date -u +%s)"
+today_utc="$(date -u +%Y-%m-%d)"
 
 label() {  # label <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would +$2 on #$1"; return 0; }
@@ -64,19 +74,32 @@ unlabel() {  # unlabel <num> <label>
 }
 
 # Minutes since the most recent `merge-queue` label event on this PR, read
-# from the issue timeline. Empty output means "could not determine" (treated
-# as not-yet-stale so we never act on incomplete data).
+# from the issue timeline, echoed as "<minutes> <timestamp>". Empty output
+# means "could not determine a valid timestamp" (treated as not-yet-stale so
+# we never act on incomplete data).
+#
+# Null-safety (#13343): with --paginate the per-page jq filter can emit `null`
+# lines (pages with no matching event) alongside a real timestamp, and the API
+# can surface unset/zeroed timestamps. Naively parsing those computed stalls
+# from epoch 0 (~29.7M minutes) and mass-kicked freshly-enrolled PRs. We now
+# (a) keep only ISO-8601-shaped lines, (b) reject epochs before
+# MIN_VALID_EPOCH, and (c) validate the parsed epoch is numeric.
 label_age_minutes() {  # label_age_minutes <num>
   local n="$1"
   local labeled_at
   labeled_at="$(gh_retry api "repos/${REPO}/issues/${n}/timeline" --paginate \
     --jq '[.[] | select(.event=="labeled" and .label.name=="merge-queue") | .created_at] | last' \
-    2>/dev/null || true)"
+    2>/dev/null | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' | tail -n1 || true)"
   [[ -z "$labeled_at" || "$labeled_at" == "null" ]] && { echo ""; return 0; }
   local labeled_epoch
   labeled_epoch="$(date -u -d "$labeled_at" +%s 2>/dev/null \
-    || python3 -c "import datetime,sys; print(int(datetime.datetime.strptime(sys.argv[1], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc).timestamp()))" "$labeled_at")"
-  echo $(( (now_epoch - labeled_epoch) / 60 ))
+    || python3 -c "import datetime,sys; print(int(datetime.datetime.strptime(sys.argv[1], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc).timestamp()))" "$labeled_at" 2>/dev/null \
+    || true)"
+  if ! [[ "$labeled_epoch" =~ ^[0-9]+$ ]] || [[ "$labeled_epoch" -lt "$MIN_VALID_EPOCH" ]]; then
+    echo ""
+    return 0
+  fi
+  echo "$(( (now_epoch - labeled_epoch) / 60 )) ${labeled_at}"
 }
 
 # Hours since the last watchdog-kick marker comment on this PR. Empty output
@@ -99,6 +122,18 @@ record_kick() {  # record_kick <num> <body>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would record kick comment on #$n"; return 0; }
   bash "$(dirname "${BASH_SOURCE[0]}")/lib/upsert-pr-comment.sh" "$n" "$KICK_MARKER" "$body" \
     || echo "    !! failed to record kick comment on #$n"
+}
+
+# Kicks recorded today (UTC) for this PR, parsed from the marker comment body
+# ("kicks <YYYY-MM-DD>: <n>"). 0 when never kicked or last kick was another day.
+kick_count_today() {  # kick_count_today <num>
+  local n="$1" body count
+  body="$(gh_retry api "repos/${REPO}/issues/${n}/comments" --paginate \
+    --jq "[.[] | select(.body | contains(\"<!-- bot-comment:${KICK_MARKER} -->\")) | .body] | last" \
+    2>/dev/null || true)"
+  [[ -z "$body" || "$body" == "null" ]] && { echo 0; return 0; }
+  count="$(grep -oE "kicks ${today_utc}: [0-9]+" <<<"$body" | grep -oE '[0-9]+$' | tail -n1 || true)"
+  echo "${count:-0}"
 }
 
 check_failures_for_pr() {  # check_failures_for_pr <num>
@@ -185,9 +220,15 @@ while IFS= read -r pr; do
   m="$(jq -r '.m' <<<"$pr")"
   ms="$(jq -r '.ms' <<<"$pr")"
 
-  age_min="$(label_age_minutes "$n")"
-  if [[ -z "$age_min" ]]; then
-    echo "  #$n  $t  ?? could not determine label age; skipping"
+  age_out="$(label_age_minutes "$n")"
+  if [[ -z "$age_out" ]]; then
+    echo "  #$n  $t  ?? no valid merge-queue label timestamp; skipping (not kicking on incomplete data)"
+    continue
+  fi
+  age_min="${age_out%% *}"
+  labeled_at="${age_out#* }"
+  if [[ "$age_min" -gt "$MAX_STALL_MINUTES" ]]; then
+    echo "  #$n  $t  ?? computed stall ${age_min}m exceeds ${MAX_STALL_MINUTES}m sanity cap (timestamp source: ${labeled_at}); treating as data error and skipping"
     continue
   fi
   if [[ "$age_min" -lt "$STALL_MINUTES" ]]; then
@@ -218,10 +259,17 @@ while IFS= read -r pr; do
     continue
   fi
 
+  kicks_today="$(kick_count_today "$n")"
+  if [[ "$kicks_today" -ge "$MAX_KICKS_PER_DAY" ]]; then
+    echo "  #$n  $t  STALLED but already kicked ${kicks_today}x today (>= ${MAX_KICKS_PER_DAY}/day cap) -> skip"
+    skipped_cooldown=$((skipped_cooldown + 1))
+    continue
+  fi
+
   echo "  #$n  $t  STALLED (age=${age_min}m, clean+green) -> label-cycle merge-queue"
   unlabel "$n" merge-queue
   label "$n" merge-queue
-  record_kick "$n" "Merge-queue watchdog: label-cycled \`merge-queue\` after ${age_min}m stalled with no terminal check failures (kicked at $(date -u +%Y-%m-%dT%H:%M:%SZ))."
+  record_kick "$n" "Merge-queue watchdog: label-cycled \`merge-queue\` after ${age_min}m stalled with no terminal check failures (kicked at $(date -u +%Y-%m-%dT%H:%M:%SZ)). Timestamp source: \`merge-queue\` labeled event at ${labeled_at} from the issue timeline. kicks ${today_utc}: $((kicks_today + 1))"
   kicked=$((kicked + 1))
 done < <(jq -c '.[]' <<<"$CANDIDATES")
 

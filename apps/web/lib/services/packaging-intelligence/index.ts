@@ -17,6 +17,20 @@ import {
 } from './types';
 
 export type {
+  ChannelPackagingRules,
+  DimensionRule,
+  ExperimentOutcome,
+  PackagingDimension,
+  PackagingVariantSpec,
+  ProvenanceEntry,
+} from './channel-rules';
+export {
+  applyExperimentOutcome,
+  CONFIDENCE_THRESHOLD,
+  MIN_SAMPLE_SIZE,
+  resolvePackagingPriors,
+} from './channel-rules';
+export type {
   AnalyzeVideoPackagingInput,
   AnalyzeVideoPackagingOptions,
   PackagingIntelligence,

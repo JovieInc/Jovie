@@ -63,5 +63,5 @@ export interface ChatTelemetry {
   captureException?(
     error: unknown,
     context: { tags?: Record<string, string>; extra?: Record<string, unknown> }
-  ): void;
+  ): void | Promise<void>;
 }
