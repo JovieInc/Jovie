@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  applyVisualQaReviewToRunArtifactFile,
   reviewVisualQaSurface,
   VISUAL_QA_FOLLOW_UP_ACTIONS,
   VISUAL_QA_REVIEW_DECISIONS,
@@ -158,8 +159,27 @@ export async function POST(
       dispatchId,
     });
 
+    // Reflect the decision onto the run's persisted AgentRunArtifact when
+    // the capture harness wrote one (resolves its human gate once all
+    // drifted surfaces are reviewed). The review itself is already durable.
+    let artifactUpdated = false;
+    try {
+      artifactUpdated = await applyVisualQaReviewToRunArtifactFile(
+        params.runId
+      );
+    } catch (artifactError) {
+      logger.error(
+        '[api/admin/hud/visual-qa] Failed to update run artifact',
+        artifactError
+      );
+      await captureError('Visual QA artifact update failed', artifactError, {
+        route: '/api/admin/hud/visual-qa/[runId]/review',
+        runId: params.runId,
+      });
+    }
+
     return NextResponse.json(
-      { ok: true, review },
+      { ok: true, review, artifactUpdated },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
