@@ -106,6 +106,7 @@ import {
   ViewToggle as LibraryViewToggle,
 } from '@/app/exp/library-v1/page';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActionPill } from '@/components/shell/ActionPill';
@@ -175,7 +176,6 @@ import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
 import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { DSP_CONFIGS } from '@/lib/dsp-registry';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';

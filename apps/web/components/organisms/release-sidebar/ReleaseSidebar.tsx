@@ -19,6 +19,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
@@ -38,7 +39,6 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { DrawerHero } from '@/components/shell/DrawerHero';
 import { DropDateChip } from '@/components/shell/DropDateChip';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import {
   type DspAvatarItem,
   DspAvatarStack,

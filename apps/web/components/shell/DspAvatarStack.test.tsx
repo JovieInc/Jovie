@@ -77,16 +77,21 @@ describe('DspAvatarStack', () => {
 
   it('falls back to text glyph when no iconPath is provided', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
-    expect(screen.getByText('S')).toBeInTheDocument();
-    expect(screen.getByText('Y')).toBeInTheDocument();
+    // Glyphs appear in the stacked avatar and/or the popover list.
+    expect(screen.getAllByText('S').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Y').length).toBeGreaterThan(0);
   });
 
   it('surfaces brand color via CSS custom properties', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
 
     // Primary (live) and missing items render with brand color CSS var
-    const avatars = document.querySelectorAll('[style*="--system-b-dsp-avatar-color"]');
-    const styleAttrs = Array.from(avatars).map(el => el.getAttribute('style') ?? '');
+    const avatars = document.querySelectorAll(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    const styleAttrs = Array.from(avatars).map(
+      el => el.getAttribute('style') ?? ''
+    );
 
     expect(styleAttrs.some(s => s.includes('#1DB954'))).toBe(true);
     expect(styleAttrs.some(s => s.includes('#FF0000'))).toBe(true);

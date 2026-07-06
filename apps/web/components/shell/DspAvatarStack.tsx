@@ -129,13 +129,13 @@ export function DspAvatarStack({
                 'relative grid h-5 w-5 shrink-0 place-items-center rounded-full',
                 'bg-surface-2 text-quaternary-token',
                 'ring-2 ring-(--system-b-bg-page)',
-                'transition-all duration-200 ease-subtle',
+                'transition-colors duration-subtle ease-subtle',
                 'group-hover/dsps:text-(--system-b-dsp-avatar-color)',
                 'group-focus-within/dsps:text-(--system-b-dsp-avatar-color)',
                 index > 0 && '-ml-1.5',
                 dsp.status === 'missing' && 'opacity-40',
                 !dsp.iconPath &&
-                  'font-semibold text-white bg-(--system-b-dsp-avatar-color) opacity-75 group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
+                  'font-semibold text-white dark:text-white bg-(--system-b-dsp-avatar-color) opacity-75 group-hover/dsps:opacity-95 group-focus-within/dsps:opacity-95'
               )}
               style={
                 {
@@ -151,14 +151,15 @@ export function DspAvatarStack({
                 <span
                   className={cn(
                     'absolute inset-0 rounded-full opacity-0',
-                    'transition-opacity duration-200 ease-subtle',
+                    'transition-opacity duration-subtle ease-subtle',
                     'group-hover/dsps:opacity-100 group-focus-within/dsps:opacity-100'
                   )}
-                  style={{ backgroundColor: `color-mix(in oklab, ${dsp.color} 10%, transparent)` }}
+                  style={{
+                    backgroundColor: `color-mix(in oklab, ${dsp.color} 10%, transparent)`,
+                  }}
                   aria-hidden='true'
                 />
               )}
-            >
               {dsp.iconPath ? (
                 <svg
                   viewBox='0 0 24 24'
@@ -220,7 +221,7 @@ export function DspAvatarStack({
                 <span
                   className={cn(
                     'grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full',
-                    'bg-(--system-b-dsp-avatar-color) text-white',
+                    'bg-(--system-b-dsp-avatar-color) text-white dark:text-white',
                     dsp.status === 'missing' ? 'opacity-45' : 'opacity-90'
                   )}
                   style={
