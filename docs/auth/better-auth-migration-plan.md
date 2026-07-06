@@ -99,18 +99,32 @@ Post-migration this route mints a **real Better Auth session** with zero externa
 local dev must never require real OAuth or manual OTP. E2E uses the deterministic `424242` OTP
 (gated: `E2E_TEST_MODE=1`, never `VERCEL_ENV=production`, test-email pattern only).
 
-## Human / credential checklist (BLOCKS staging + prod verification and merge)
+## Human / credential checklist — STATUS: DONE except stg cutover batch (2026-07-06)
 
-These require Tim's account access and cannot be automated (drive the consoles via `/auth-console-sync`
-where possible; the .p8 and Doppler steps are manual):
-1. **Google Cloud Console** (client `418036700153-…`, project `jovie-338618`): add redirect URIs
-   `https://jov.ie|staging.jov.ie|http://localhost:3100` + `/api/auth/callback/google` and matching
-   **JavaScript origins** (One Tap). Keep the Clerk URIs until cutover completes.
-2. **Apple Developer** (team `G24T327LXT`, Service ID `ie.jov.signin`): add domains + return URLs
-   `…/api/auth/callback/apple`; **create a new Sign in with Apple `.p8` key** — Clerk held the old one;
-   record the Key ID, download once.
-3. **Doppler** (dev/stg/prd): `BETTER_AUTH_SECRET` (unique per config), `AUTH_GOOGLE_CLIENT_SECRET`,
-   `AUTH_APPLE_*`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `JOVIE_SYNTHETIC_AUTH_TOKEN` (stg), `E2E_TEST_MODE=1` (dev).
+1. ✅ **Google Cloud Console** (client `418036700153-…`, project `jovie-338618`): redirect URIs
+   `https://jov.ie|https://staging.jov.ie|http://localhost:3100` + `/api/auth/callback/google` registered;
+   JavaScript origins incl. `http://localhost:3100` registered (One Tap). Clerk URIs retained. Verified persisted.
+2. ✅ **Apple Developer** (team `G24T327LXT`, Service ID `ie.jov.signin`): domains `jov.ie`, `staging.jov.ie` +
+   return URLs `…/api/auth/callback/apple` registered (7 Website URLs total, Clerk entries retained).
+   New Sign in with Apple key created: **Key ID `W7BX95PP2U`** (.p8 held by Tim; stored in Doppler, never in repo).
+3. ✅ **Doppler**: `BETTER_AUTH_SECRET` (unique per config) dev/stg/prd; `BETTER_AUTH_URL`,
+   `AUTH_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET` (second active
+   Google client secret — Clerk's original stays enabled), `AUTH_APPLE_CLIENT_ID/TEAM_ID/KEY_ID/PRIVATE_KEY`
+   in dev+prd (Apple intentionally absent from dev-local button gating perspective — set in prd; dev hides Apple);
+   `E2E_TEST_MODE=1` dev only.
+4. ✅ **GitHub Actions**: `Production – jovie` environment (used by `deploy-staging` AND promote — staging reuses
+   the production environment per ci.yml) has all 8 Better Auth secrets via the Doppler prd sync.
+   `Preview – jovie` (PR preview lanes) has `BETTER_AUTH_SECRET` + `AUTH_GOOGLE_CLIENT_ID`.
+
+**Deferred to the cutover batch (stg Doppler config is capped at 100 by its GitHub Actions sync):**
+`AUTH_APPLE_*` (4), `BETTER_AUTH_URL`, `NEXT_PUBLIC_GOOGLE_CLIENT_SECRET`→`AUTH_GOOGLE_CLIENT_SECRET`,
+`NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `JOVIE_SYNTHETIC_AUTH_TOKEN` → add to stg in the SAME batch that deletes the
+13 Clerk-era stg secrets (`CLERK_*` ×5, `E2E_CLERK_*` ×5, `NEXT_PUBLIC_CLERK_*` ×3), which frees the slots (net −2).
+Also deleted from stg to free immediate slots (zero repo refs, recoverable via Doppler history):
+`GRANOLA_API_KEY`, `_INSTANTLY_API_KEY`, `GOOGLE_STITCH_API_KEY`.
+
+**Post-cutover decommission additions:** disable+delete the ORIGINAL Google client secret (`****3tiT`, Clerk's)
+after Better Auth is verified in prod, alongside the Clerk console URI removals.
 
 ## Credentials-first merge gate
 
