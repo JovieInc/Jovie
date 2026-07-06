@@ -109,6 +109,21 @@ export {
   userSettings,
   users,
 } from './auth';
+// Better Auth (self-hosted auth core tables)
+export {
+  type BaAccount,
+  type BaSession,
+  type BaUser,
+  type BaVerification,
+  baAccounts,
+  baSessions,
+  baUsers,
+  baVerifications,
+  type NewBaAccount,
+  type NewBaSession,
+  type NewBaUser,
+  type NewBaVerification,
+} from './better-auth';
 // Billing (Stripe, Audit)
 export {
   type BillingAuditLog,
