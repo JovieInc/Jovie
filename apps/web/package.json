@@ -316,7 +316,7 @@
     "@typescript-eslint/parser": "^8.61.1",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/browser": "4.1.8",
-    "@vitest/browser-playwright": "4.1.8",
+    "@vitest/browser-playwright": "4.1.10",
     "@vitest/coverage-v8": "4.1.9",
     "autoprefixer": "^10.4.27",
     "axe-core": "^4.12.1",
