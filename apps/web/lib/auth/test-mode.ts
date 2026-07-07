@@ -159,8 +159,15 @@ export function resolveTestBypassUserId(
       cookieReader?.get(TEST_USER_ID_COOKIE)?.value ??
         getCookieValueFromHeader(headerReader, TEST_USER_ID_COOKIE)
     ) ??
+    // Clerk → Better Auth migration, commit ⑨: the test user id env var
+    // now carries the Better Auth user id (was Clerk's `E2E_CLERK_USER_ID`).
+    // The old env vars are kept as fallback for one release so existing
+    // CI configs don't break mid-cutover.
     normalizeHeaderValue(
-      process.env.E2E_CLERK_USER_ID ?? process.env.TEST_CLERK_USER_ID ?? null
+      process.env.E2E_BETTER_AUTH_USER_ID ??
+        process.env.E2E_CLERK_USER_ID ??
+        process.env.TEST_CLERK_USER_ID ??
+        null
     ) ??
     'user_test'
   );
