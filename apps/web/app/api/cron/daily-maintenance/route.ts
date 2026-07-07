@@ -14,7 +14,6 @@
  * - Data retention: Sundays only (heavy operation)
  * - Under-enriched discography sweep: every day (bounded batch)
  * - AI crawler analytics sync: every day (Cloudflare GraphQL, GH-12748)
- * - Model experiment evaluation: every day (A/B bake-off promotion, GH-11462)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -23,7 +22,6 @@
  */
 
 import { NextResponse } from 'next/server';
-import { evaluateModelExperiments } from '@/lib/ai/experiments/service.server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
@@ -133,13 +131,7 @@ export async function GET(request: Request) {
     syncAiCrawlerAnalyticsCron
   );
 
-  // 9. Model experiment evaluation — auto-promote A/B bake-off winners
-  //    under the cost/quality rule + prune old usage events (GH #11462)
-  results.modelExperiments = await runSubJob('modelExperiments', async () => ({
-    evaluations: await evaluateModelExperiments(),
-  }));
-
-  // 10. Data retention — Sundays only (heavy operation)
+  // 9. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)
