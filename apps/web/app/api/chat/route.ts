@@ -55,6 +55,11 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import {
+  buildLockedToolPromptInfo,
+  buildLockedToolSet,
+  resolveLockedChatTools,
+} from '@/lib/chat/locked-tools';
 import { extractLastUserText } from '@/lib/chat/message-text';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import {
@@ -2575,8 +2580,13 @@ export async function POST(req: Request) {
       turnId: reservation.turn.id,
     };
 
+    // Plan-gated denials no longer short-circuit (GH #13304): the model gets
+    // a locked stub, explains what it would produce, and the UI shows one
+    // upgrade prompt. Only broken states (feature kill, provider down) keep
+    // the terminal preflight message.
     if (
       albumArtCapability.availability !== 'available' &&
+      albumArtCapability.reasonCode !== 'PLAN_UNAVAILABLE' &&
       detectAlbumArtGenerationIntent({ text: userText, toolIntent })
     ) {
       const replyText =
@@ -2609,6 +2619,7 @@ export async function POST(req: Request) {
 
     if (
       retouchCapability.availability !== 'available' &&
+      retouchCapability.reasonCode !== 'PLAN_UNAVAILABLE' &&
       detectRetouchIntent({ text: userText, toolIntent })
     ) {
       const replyText =
@@ -2763,6 +2774,18 @@ export async function POST(req: Request) {
       userId,
       accountContext
     );
+    // Entitlement-locked tools stay visible as stubs returning
+    // { locked: true, reason, plan_required, upgrade_cta } so the model can
+    // explain + upsell instead of dead-ending (GH #13304). Boolean-driven
+    // from the registry, so paid plans (and billing-verification outages
+    // that preserve real plan booleans) never see a false lock. Album art
+    // stays fully hidden when the feature flag is off.
+    const lockedToolNames = resolveLockedChatTools(planLimits.booleans).filter(
+      name => name !== 'generateAlbumArt' || albumArtFeatureEnabled
+    );
+    const lockedToolStubs = buildLockedToolSet(lockedToolNames);
+    const lockedToolPromptInfo = buildLockedToolPromptInfo(lockedToolNames);
+
     // Advanced tools gated behind paid plans
     const tools = canUsePaidChatTools(accountContext)
       ? {
@@ -2781,8 +2804,9 @@ export async function POST(req: Request) {
             currentUserEntitlements,
             reservedTurn
           ),
+          ...lockedToolStubs,
         }
-      : freeTools;
+      : { ...freeTools, ...lockedToolStubs };
 
     // Telemetry hooks bind Sentry into `executeChatTurn` without coupling
     // the pure pipeline to Sentry. Eval scripts pass a no-op telemetry.
@@ -2855,6 +2879,7 @@ export async function POST(req: Request) {
       forceLightModel,
       modelRotationStep,
       lastUserText: userText,
+      lockedTools: lockedToolPromptInfo,
       tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,

@@ -195,8 +195,8 @@ export const ServerEnvSchema = z.object({
   MERCURY_ACCOUNT_ID: z.string().optional(),
 
   // Upstash Redis
-  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+  UPSTASH_REDIS_REST_URL: z.string().trim().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().trim().optional(),
 
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
   SESSION_SECRET: z.string().min(32).optional(),

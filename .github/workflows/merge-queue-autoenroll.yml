@@ -9,7 +9,7 @@ name: Merge Queue Auto-Enroll
 # Phase 2 (/drain): mechanically rebases BLOCKED agent PRs onto latest main so
 # stale CI re-runs after main-side fixes land (see scripts/drain-pr-remediate.mjs).
 #
-# Opt out per-PR with any of: needs-human, hold, gated.
+# Opt out per-PR with any of: needs-human, hold, gated. Taste labels are advisory (2026-07-06) and do not opt out.
 #
 # Two jobs share this workflow:
 #   enroll   — runs the drain (see above) on PR events, CI completion, and the

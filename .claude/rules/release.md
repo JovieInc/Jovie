@@ -93,9 +93,9 @@ Labels are part of the CI control plane, not just project organization. Apply in
 - Add `testing` for changes affecting deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get E2E and preview QA before merge.
 - Note: Build (public routes), Lighthouse, a11y, and layout-guard now run on ALL PRs without the `testing` label. The `testing` label is only needed for E2E/smoke/preview-deploy lanes.
 
-- Add `needs-human` when the PR should be held for human review or automation must stop.
-- Add `needs-human` for risky or ambiguous changes, incidents/hotfixes needing human judgment, unexpected CI/deploy behavior, security-sensitive changes, or any case where the agent is not confident the PR should continue through auto-merge.
+- Add `needs-human` when the PR should be held for human review or automation must stop. This is for physical actions only a human can perform (sign agreement, rotate key, flip dashboard toggle).
 - If a PR has `needs-human`, do **NOT** enable or preserve auto-merge. Treat the label as a hard stop for unattended automation until a human clears it.
+- **Do NOT use `needs-human` for taste/design issues** — taste is advisory and routes to LLM review, not a human queue.
 
 - Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
 - Do **NOT** add `automerge` to high-risk paths or to PRs that also need `needs-human`.
@@ -106,7 +106,7 @@ Labels are part of the CI control plane, not just project organization. Apply in
 - Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
 - If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
 
-- Never hand-edit the taste gate labels (`needs-human-taste`, `needs:taste`, `taste-approved`). The ONLY way to clear the gate is the `/approve` flow (`taste-approve.yml`): screenshot in the PR body + an `/approve`/`lgtm`/👍 comment from a maintainer. Hand-edits with a user token retrigger other label automation and get reverted (JOV-3808); the workflow's bot-token label surgery is the path that sticks.
+- Taste gate labels (`needs-human-taste`, `needs:taste`) are **advisory and do not block merge** per the 2026-07-06 autonomous shipping policy. Taste-flagged PRs route to strong LLM review and ship. Do not hand-edit these labels; the classifier owns them.
 
 ## Auto-Merge Path Guardrails
 
@@ -181,9 +181,9 @@ feature/* ──► main (CI deploys to staging, then promotes to production)
 - **NEVER** push directly to `preview` or `production`.
 - All changes require PR review.
 
-## Bot Review Comments Are Blocking
+## Bot Review Comments Are Advisory
 
-**Before merging any PR (including via `/land-and-deploy`), check for unaddressed bot review comments.** Unaddressed comments are a **BLOCKER** — do not merge until resolved.
+**Bot review comments are informative, not blocking.** Per the Autonomous Shipping Doctrine (2026-07-06), correctness is a machine job. CI gate failures are the only pre-merge blockers. Review unaddressed bot comments post-merge and triage them as follow-up issues.
 
 ### Bots to check
 
@@ -209,18 +209,18 @@ For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 3. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → warning only, not blocking
 4. **Unaddressed** — none of the above → **BLOCKER**
 
-### When blocked
+### When flagged
 
 - List each unaddressed comment: `file:line` — first 80 chars of body — permalink
 - Recommend: "Run `/review` to triage bot comments, or reply to each comment on GitHub"
-- Do NOT merge with option C / "merge anyway" — this is a hard gate
+- These are **advisory** — they do not block merge
 
 ### In the readiness report
 
 ```
 BOT REVIEWS
-├─ CodeRabbit:   PASS / N unaddressed (blocker)
-└─ Greptile:     PASS / N unaddressed (blocker)
+├─ CodeRabbit:   N unaddressed (advisory)
+└─ Greptile:     N unaddressed (advisory)
 ```
 
 ## Deploy Configuration
