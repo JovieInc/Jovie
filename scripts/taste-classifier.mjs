@@ -468,7 +468,7 @@ Options:
   --json          Output raw JSON classification
 
 Classifications:
-  taste-required  → needs-human-taste label, Tim reviews
+  taste-required  → llm-review label; ships autonomously, humans review post-ship in prod walkthroughs (2026-07-06 full-autonomy policy)
   llm-reviewable  → trigger stronger LLM review, no human gate
   auto-ship       → add merge-queue label, ship it
 `);
@@ -519,7 +519,7 @@ Classifications:
   if (!dryRun) {
     // Apply label
     const labelMap = {
-      'taste-required': 'needs-human-taste',
+      'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
       'auto-ship': 'merge-queue',
     };
@@ -543,7 +543,7 @@ Classifications:
     }
   } else {
     const labelMap = {
-      'taste-required': 'needs-human-taste',
+      'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
       'auto-ship': 'merge-queue',
     };

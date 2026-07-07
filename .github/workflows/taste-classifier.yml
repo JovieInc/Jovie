@@ -7,7 +7,10 @@ name: Taste Classifier
 #
 # Outputs:
 #   - Posts classification as a PR comment
-#   - Applies the appropriate label: needs-human-taste, llm-review, or merge-queue
+#   - Applies the appropriate label: llm-review or merge-queue. Full-autonomy
+#     policy (2026-07-06): taste-flagged PRs ship autonomously after strong LLM
+#     review; humans steer via issues + post-ship production walkthroughs, not
+#     pre-merge gates. The classification comment remains the steering signal.
 
 # NOTE: no `labeled` trigger — labels don't change the diff, and re-classifying
 # on label events created a loop where the classifier reverted human unlabels
@@ -126,7 +129,7 @@ jobs:
             }
 
             if (result === 'taste-required') {
-              comment += '> ⚠️ This PR has been flagged for Tim\'s review. A taste call is needed before merge.\n';
+              comment += '> 🎨 Taste surface — ships autonomously after strong LLM review. Flagged for post-ship production walkthrough.\n';
             } else if (result === 'llm-reviewable') {
               comment += '> ✅ No taste gate needed. Strong LLM review will validate correctness.\n';
             } else {
@@ -155,7 +158,7 @@ jobs:
 
             // Apply label
             const labelMap = {
-              'taste-required': 'needs-human-taste',
+              'taste-required': 'llm-review',
               'llm-reviewable': 'llm-review',
               'auto-ship': 'merge-queue',
             };
