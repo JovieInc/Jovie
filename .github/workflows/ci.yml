@@ -1148,7 +1148,7 @@ jobs:
 
       - name: Seed mobile overflow fixtures
         if: matrix.width == 320
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -1330,7 +1330,7 @@ jobs:
 
       - name: Seed public QA fixtures
         if: matrix.shard == 0
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -2656,7 +2656,7 @@ jobs:
 
       - name: Seed public QA fixtures
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -2806,7 +2806,7 @@ jobs:
 
       - name: Seed public QA fixtures
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -3300,7 +3300,7 @@ jobs:
 
       - name: Seed E2E DB
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
