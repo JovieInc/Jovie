@@ -4789,7 +4789,7 @@ jobs:
           # Vercel edge rollout can lag behind a successful `vercel promote`.
           # Keep verification strict, but use a bounded 5-minute window to
           # avoid false negatives on healthy deploys.
-          max_attempts=30
+          max_attempts=15
           for attempt in $(seq 1 "$max_attempts"); do
             # Skip sleep on the first attempt; wait between retries so we
             # don't burn 10s after the final failing attempt.
