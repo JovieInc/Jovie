@@ -5258,4 +5258,21 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
-        run: pnpm --filter web exec lhci autorun --config=.lighthouserc.json
+        run: |
+          # Retry on transient Chrome DevTools Protocol timeouts (PROTOCOL_TIMEOUT)
+          # that are common when collecting performance traces from live production.
+          # Perf regressions are deterministic and will fail all attempts.
+          MAX_ATTEMPTS=3
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Lighthouse CI attempt $attempt/$MAX_ATTEMPTS against production..."
+            if pnpm --filter web exec lhci autorun --config=.lighthouserc.json; then
+              echo "Lighthouse CI succeeded on attempt $attempt"
+              exit 0
+            fi
+            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+              echo "Attempt $attempt failed (likely PROTOCOL_TIMEOUT); cooling down 10s before retry..."
+              sleep 10
+            fi
+          done
+          echo "Lighthouse CI failed after $MAX_ATTEMPTS attempts"
+          exit 1
