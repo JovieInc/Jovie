@@ -148,6 +148,16 @@ export interface ExecuteChatTurnInput {
   /** Precomputed once per turn to avoid repeated message scans. */
   lastUserText?: string;
   /**
+   * Plan-locked tool stubs present in `tools` this turn (GH #13304).
+   * Drives the system-prompt section that instructs the model to explain
+   * what it would produce + relay one upgrade line instead of erroring.
+   */
+  lockedTools?: readonly {
+    readonly name: string;
+    readonly label: string;
+    readonly planRequired: string;
+  }[];
+  /**
    * Pre-built tools for the turn. The caller composes free + paid tool sets
    * based on plan and feature flags before invoking. For `mode='onboarding'`,
    * the caller passes the ONBOARDING_TOOLS palette.
@@ -220,6 +230,7 @@ export async function executeChatTurn(
     forceLightModel,
     modelRotationStep,
     lastUserText,
+    lockedTools,
     tools,
     signal,
     requestId,
@@ -262,6 +273,7 @@ export async function executeChatTurn(
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
       accountContext,
       referencedEntities,
+      lockedTools,
     });
   }
 
