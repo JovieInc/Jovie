@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -59,8 +58,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
           test.skip();
         }
       }
-
-      await setupClerkTestingToken({ page });
     } else {
       // Mock the API endpoint to simulate taken handle
       await page.route('/api/handle/check*', async (route, request) => {

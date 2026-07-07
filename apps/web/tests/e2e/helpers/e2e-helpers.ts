@@ -5,7 +5,6 @@
  * direct Neon HTTP queries (not the pool) to avoid SSR abort races.
  */
 
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
 import { expect, type Page } from '@playwright/test';
 import { ensureClerkTestUser } from '@/lib/testing/test-user-provision.server';
@@ -1233,8 +1232,6 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
     await setTestAuthBypassSession(page, null, clerkUserId);
     return { email, clerkUserId };
   }
-
-  await setupClerkTestingToken({ page });
 
   await smokeNavigateWithRetry(page, '/signin', {
     timeout: 120_000,
