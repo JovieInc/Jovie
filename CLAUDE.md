@@ -107,6 +107,7 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 |-----|----------|
 | `DESIGN.md` | Any UI decision |
 | `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
+| `docs/marketing/AGENT_GUIDE.md` | Generating or editing any marketing/landing page |
 | `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |
 | `docs/company/operating-principles.md` | Product prioritization canon |
 | `docs/company/PRICING-PHILOSOPHY.md` | Pricing decisions |
@@ -115,5 +116,4 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 | `CODEX.md` | Codex bootstrap wrapper |
 
 Indexes (`docs/API_ROUTE_MAP.md`, `docs/CRON_REGISTRY.md`, `docs/WEBHOOK_MAP.md`, …) are system-of-record — navigate via this map.
-
 <!-- doc-freshness:scoped-rules-count:16 -->
