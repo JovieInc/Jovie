@@ -12,7 +12,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
         data-testid='homepage-v2-hero-primary-cta'
         href='/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
       >
-        Request Access
+        Get started
       </Link>
       <Link href='/artist-profiles'>Explore artist profiles</Link>
       <h2>One system for the whole release cycle.</h2>
