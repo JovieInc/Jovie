@@ -45,7 +45,6 @@ function buildHudTestingMetrics(): HudMetrics['testing'] {
     },
   };
 }
-
 export interface BuildDegradedHudMetricsOptions {
   context?: string;
   timeoutMs?: number;
