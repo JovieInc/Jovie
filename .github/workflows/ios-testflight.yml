@@ -40,8 +40,13 @@ jobs:
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
       MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-      CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
       CLERK_ASSOCIATED_DOMAIN: ${{ secrets.CLERK_ASSOCIATED_DOMAIN }}
+      # NOTE: Clerk publishable key dropped (Clerk → Better Auth migration,
+      # plan Phase 11). AppConfiguration no longer consumes ClerkPublishableKey
+      # after commit ⑧. The CLERK_ASSOCIATED_DOMAIN build setting stays — it
+      # feeds `webcredentials:$(CLERK_ASSOCIATED_DOMAIN)` in Jovie.entitlements
+      # (still a required Apple App ID capability); rename deferred to the
+      # env-cleanup pass in commit ⑫ / Linear follow-up.
       APP_STORE_COMPANY_NAME: ${{ secrets.APP_STORE_COMPANY_NAME }}
       JOVIE_IOS_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       JOVIE_IOS_OBSERVABILITY_ENVIRONMENT: production

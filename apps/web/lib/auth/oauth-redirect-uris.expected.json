@@ -1,29 +1,35 @@
 {
-  "$comment": "Single source of truth for the OAuth redirect URIs that MUST be registered in the Google + Apple consoles for Clerk sign-in to work. Derived from each Clerk instance's FAPI host (decode the publishable key with decodeFapiHostFromPublishableKey). The console redirect_uri Clerk hands to Google/Apple is https://<fapi-host>/v1/oauth_callback. If a fapi host below changes, the Google/Apple consoles MUST be re-synced via the /auth-console-sync skill BEFORE shipping, or production sign-in breaks with redirect_uri_mismatch. Consumed by scripts/auth-redirect-uris.ts, apps/web/tests/unit/auth/fapi-host-snapshot.test.ts, and .claude/skills/auth-console-sync.",
+  "$comment": "Single source of truth for the OAuth console registrations that MUST exist for Better Auth sign-in to work. Console redirect_uri handed to Google/Apple is `https://<appHost>/api/auth/callback/<provider>` (plan decision 3, Phase 5). Better Auth owns the callback handler at `apps/web/app/api/auth/[...all]/route.ts`; the Google OAuth client + Apple Service ID consoles are registered against this app host directly (no Clerk FAPI proxy in the path). If an app host below changes, the Google/Apple consoles MUST be re-synced via /auth-console-sync BEFORE shipping, or production sign-in breaks with redirect_uri_mismatch (the 2026-06-26 incident class). Consumed by scripts/auth-redirect-uris.ts, apps/web/tests/unit/auth/redirect-uri-snapshot.test.ts, apps/web/tests/e2e/oauth-providers.spec.ts, and .claude/skills/auth-console-sync.",
   "instances": {
-    "prod": { "appHost": "jov.ie", "fapiHost": "clerk.jov.ie" },
-    "staging": {
-      "appHost": "staging.jov.ie",
-      "fapiHost": "clerk.staging.jov.ie"
-    }
+    "prod": { "appHost": "jov.ie" },
+    "staging": { "appHost": "staging.jov.ie" }
   },
   "google": {
     "clientId": "418036700153-b4cqhpc99ugr5bjgog4pikc16gvv8r2u.apps.googleusercontent.com",
     "consoleUrl": "https://console.cloud.google.com/auth/clients/418036700153-b4cqhpc99ugr5bjgog4pikc16gvv8r2u.apps.googleusercontent.com?project=jovie-338618",
     "requiredRedirectUris": [
-      "https://clerk.jov.ie/v1/oauth_callback",
-      "https://clerk.staging.jov.ie/v1/oauth_callback"
+      "https://jov.ie/api/auth/callback/google",
+      "https://staging.jov.ie/api/auth/callback/google",
+      "http://localhost:3100/api/auth/callback/google"
+    ],
+    "requiredJsOrigins": [
+      "https://jov.ie",
+      "https://staging.jov.ie",
+      "http://localhost:3100"
     ]
   },
   "apple": {
     "serviceId": "ie.jov.signin",
     "teamId": "G24T327LXT",
     "consoleUrl": "https://developer.apple.com/account/resources/identifiers/list/serviceId",
-    "requiredDomains": ["clerk.jov.ie"],
-    "requiredReturnUrls": ["https://clerk.jov.ie/v1/oauth_callback"]
+    "requiredDomains": ["jov.ie", "staging.jov.ie"],
+    "requiredReturnUrls": [
+      "https://jov.ie/api/auth/callback/apple",
+      "https://staging.jov.ie/api/auth/callback/apple"
+    ]
   },
   "native": {
-    "$comment": "Clerk-side allowlist (auth.redirect_urls / native applications), NOT a Google/Apple console setting. Apple App ID ie.jov.Jovie carries the Sign in with Apple capability; the iOS native flow completes back into the app at this scheme.",
+    "$comment": "Better Auth's `oneTap` plugin surfaces Google One Tap in the browser. iOS native auth completes back into the app via this deep-link scheme (provider-agnostic PKCE handoff, Clerk → BA unchanged transport). The Apple App ID `ie.jov.Jovie` carries the Sign in with Apple capability; not a console redirect_uri.",
     "iosScheme": "ie.jov.jovie://auth/complete"
   }
 }
