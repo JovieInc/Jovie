@@ -106,6 +106,7 @@ import {
   ViewToggle as LibraryViewToggle,
 } from '@/app/exp/library-v1/page';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActionPill } from '@/components/shell/ActionPill';
@@ -869,11 +870,18 @@ const DSP_STATUS_DOT: Record<DspStatus, string> = {
 };
 
 function releaseDspItems(release: Release): DspAvatarItem[] {
+  const DSP_LOGO_KEY: Record<DspKey, string> = {
+    spotify: 'spotify',
+    apple: 'apple_music',
+    youtube: 'youtube_music',
+    tidal: 'tidal',
+  };
   return DSP_ORDER.map(dsp => ({
     id: dsp,
     status: release.dsps[dsp],
     label: DSP_LABEL[dsp],
     glyph: DSP_GLYPH[dsp],
+    iconPath: DSP_LOGO_CONFIG[DSP_LOGO_KEY[dsp]]?.iconPath,
     color: DSP_COLOR[dsp],
   }));
 }
