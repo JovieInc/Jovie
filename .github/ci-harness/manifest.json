@@ -252,7 +252,7 @@
       "requiresSmoke": true,
       "requiresPreview": true,
       "blocksUnattendedAutoMerge": false,
-      "reason": "Proxy and middleware changes can break routing, Clerk, CSP, and public access globally."
+      "reason": "Proxy and middleware changes can break routing, auth, CSP, and public access globally."
     },
     {
       "id": "env-config",
