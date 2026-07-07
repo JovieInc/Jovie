@@ -368,7 +368,7 @@ struct JovieApp: App {
     let repository = MeRepository(
       apiClient: APIClient(
         baseURL: configuration.apiBaseURL,
-        tokenProvider: NativeSessionTokenProvider(fallback: ClerkTokenProvider())
+        tokenProvider: NativeSessionTokenProvider()
       ),
       cache: MeCache()
     )
