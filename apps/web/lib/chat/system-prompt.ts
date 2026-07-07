@@ -103,6 +103,17 @@ export function buildSystemPrompt(
      * entity tokens are present.
      */
     referencedEntities?: string;
+    /**
+     * Plan-locked tools present in this turn's tool list as stubs
+     * (GH #13304). Calling one returns `{ locked: true }` instead of doing
+     * the work; the section below instructs the model to explain what it
+     * would produce and relay a single upgrade line.
+     */
+    lockedTools?: readonly {
+      readonly name: string;
+      readonly label: string;
+      readonly planRequired: string;
+    }[];
   }
 ): string {
   return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
@@ -211,7 +222,32 @@ Merch quality standard:
 - The MVP uses Jovie checkout and a manual artist payout ledger. Never say artist payouts are automatic.
 
 ## Feedback
-When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildPlanLimitationsSection(options)}`;
+When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
+}
+
+function buildLockedToolsSection(
+  lockedTools?: readonly {
+    readonly name: string;
+    readonly label: string;
+    readonly planRequired: string;
+  }[]
+): string {
+  if (!lockedTools || lockedTools.length === 0) return '';
+
+  const toolLines = lockedTools
+    .map(t => `- ${t.name} (${t.label} — requires ${t.planRequired})`)
+    .join('\n');
+
+  return `
+
+## Plan-Locked Tools
+Some tools in your tool list are locked on this artist's current plan. Calling one returns { locked: true, reason, plan_required } instead of doing the work — the turn still succeeds; it is not an error.
+${toolLines}
+
+When the artist asks for one of these (or a locked call returns):
+- First describe concretely, in 1-2 sentences, what you WOULD produce for their specific request (e.g. the three cover directions you'd generate for their release) so the value is tangible.
+- Then relay availability in ONE short sentence using the plan name from the tool result (e.g. "Album art generation is on the ${lockedTools[0]?.planRequired ?? 'Pro'} plan."). The chat UI already renders a single upgrade button on the locked result — do not add links, pricing details, or a second upsell.
+- Call a locked tool at most once per turn. Never claim the work was done, and never invent what the output looks like beyond a brief description of the direction you'd take.`;
 }
 
 function buildReferencedEntitiesSection(referencedEntities?: string): string {
