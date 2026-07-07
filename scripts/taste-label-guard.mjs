@@ -68,7 +68,7 @@ function processPr(pr, apply) {
   }
 
   for (const label of result.offendingLabels) {
-    // Tolerate a concurrent removal (e.g. taste-approve cleared it first) — a
+    // Tolerate a concurrent removal (label was already cleared) — a
     // missing label makes `gh pr edit --remove-label` exit non-zero.
     try {
       gh(['pr', 'edit', String(pr.number), '--remove-label', label]);
