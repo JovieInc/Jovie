@@ -99,7 +99,7 @@ Post-migration this route mints a **real Better Auth session** with zero externa
 local dev must never require real OAuth or manual OTP. E2E uses the deterministic `424242` OTP
 (gated: `E2E_TEST_MODE=1`, never `VERCEL_ENV=production`, test-email pattern only).
 
-## Human / credential checklist — STATUS: DONE except stg cutover batch (2026-07-06)
+## Human / credential checklist — STATUS: DONE (stg cutover batch landed 2026-07-06)
 
 1. ✅ **Google Cloud Console** (client `418036700153-…`, project `jovie-338618`): redirect URIs
    `https://jov.ie|https://staging.jov.ie|http://localhost:3100` + `/api/auth/callback/google` registered;
@@ -107,31 +107,45 @@ local dev must never require real OAuth or manual OTP. E2E uses the deterministi
 2. ✅ **Apple Developer** (team `G24T327LXT`, Service ID `ie.jov.signin`): domains `jov.ie`, `staging.jov.ie` +
    return URLs `…/api/auth/callback/apple` registered (7 Website URLs total, Clerk entries retained).
    New Sign in with Apple key created: **Key ID `W7BX95PP2U`** (.p8 held by Tim; stored in Doppler, never in repo).
-3. ✅ **Doppler**: `BETTER_AUTH_SECRET` (unique per config) dev/stg/prd; `BETTER_AUTH_URL`,
+3. ✅ **Doppler dev + prd**: `BETTER_AUTH_SECRET` (unique per config), `BETTER_AUTH_URL`,
    `AUTH_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET` (second active
    Google client secret — Clerk's original stays enabled), `AUTH_APPLE_CLIENT_ID/TEAM_ID/KEY_ID/PRIVATE_KEY`
-   in dev+prd (Apple intentionally absent from dev-local button gating perspective — set in prd; dev hides Apple);
+   in dev+prd (Apple intentionally absent from dev-local button gating perspective — set in prd; dev hides Apple),
    `E2E_TEST_MODE=1` dev only.
 4. ✅ **GitHub Actions**: `Production – jovie` environment (used by `deploy-staging` AND promote — staging reuses
    the production environment per ci.yml) has all 8 Better Auth secrets via the Doppler prd sync.
    `Preview – jovie` (PR preview lanes) has `BETTER_AUTH_SECRET` + `AUTH_GOOGLE_CLIENT_ID`.
 
-**Deferred to the cutover batch (stg Doppler config is capped at 100 by its GitHub Actions sync):**
-`AUTH_APPLE_*` (4), `BETTER_AUTH_URL`, `NEXT_PUBLIC_GOOGLE_CLIENT_SECRET`→`AUTH_GOOGLE_CLIENT_SECRET`,
-`NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `JOVIE_SYNTHETIC_AUTH_TOKEN` → add to stg in the SAME batch that deletes the
-13 Clerk-era stg secrets (`CLERK_*` ×5, `E2E_CLERK_*` ×5, `NEXT_PUBLIC_CLERK_*` ×3), which frees the slots (net −2).
-Also deleted from stg to free immediate slots (zero repo refs, recoverable via Doppler history):
-`GRANOLA_API_KEY`, `_INSTANTLY_API_KEY`, `GOOGLE_STITCH_API_KEY`.
+5. ✅ **Stg Doppler cutover batch landed (2026-07-06)**: deleted 13 Clerk-era stg secrets (`CLERK_*` ×5,
+   `E2E_CLERK_*` ×5, `NEXT_PUBLIC_CLERK_*` ×3) → stg went 100 → 87; then copied 6 shared BA secrets from prd
+   (`AUTH_APPLE_CLIENT_ID/TEAM_ID/KEY_ID/PRIVATE_KEY`, `AUTH_GOOGLE_CLIENT_SECRET`,
+   `NEXT_PUBLIC_GOOGLE_CLIENT_ID`), set `BETTER_AUTH_URL=https://staging.jov.ie` (stg-specific, not prd's
+   `https://jov.ie`), and generated `JOVIE_SYNTHETIC_AUTH_TOKEN` (32-byte hex). Stg now at 95 secrets
+   (under the 100 GA-sync cap); `Preview – jovie` GH Actions env re-synced to 95 secrets.
+   `Production – jovie` env untouched (98 secrets, both BA + Clerk intact) — staging deploys via prd env
+   stay on Clerk until the PR merges and production cutover (Phase 13) runs.
+   Note: plan previously listed 3 zero-reference cleanup deletions (`GRANOLA_API_KEY`, `_INSTANTLY_API_KEY`,
+   `GOOGLE_STITCH_API_KEY`) — these were already absent from stg (only in prd), so no action was needed.
 
 **Post-cutover decommission additions:** disable+delete the ORIGINAL Google client secret (`****3tiT`, Clerk's)
-after Better Auth is verified in prod, alongside the Clerk console URI removals.
+after Better Auth is verified in prod, alongside the Clerk console URI removals. Also delete the remaining
+Clerk-era secrets from prd Doppler + `Production – jovie` GA env once Phase 13 cutover completes and the
+soak-gated decommission follow-up runs.
 
 ## Credentials-first merge gate
 
 The PR may open as a **draft** with dev evidence (bypass personas, `424242` OTP, unit/E2E, builds, iOS/desktop
 local) before credentials exist. It **must not merge** until the console + Doppler steps above are done AND the
 staging OAuth probe (`oauth-providers.spec.ts` against the new `/api/auth/callback/*` redirect URIs) is green.
-Merging first would leave `main` red at the staging canary.
+
+**Credentials status (2026-07-06):** Google + Apple consoles ✅, Doppler dev + prd ✅, stg cutover batch ✅
+(landed — stg now holds all 10 BA secrets + `JOVIE_SYNTHETIC_AUTH_TOKEN`, Clerk-era stg secrets purged,
+`Preview – jovie` GH Actions env re-synced to 95 secrets under the 100 cap). `Production – jovie` env
+untouched (Clerk secrets retained there for staging-on-main safety until Phase 13 cutover).
+
+**Remaining gate:** staging OAuth probe (`oauth-providers.spec.ts` against the new `/api/auth/callback/*`
+redirect URIs) — requires the PR to be deployed to a staging/preview environment first. Merging before
+the probe is green would leave `main` red at the staging canary.
 
 ## Verification matrix
 
