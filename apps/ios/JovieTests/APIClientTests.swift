@@ -260,7 +260,7 @@ struct APIClientTests {
 }
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .disabled("Clerk live auth integration test — disabled under Better Auth. Commit ⑫ of the Clerk→BA migration will delete this suite. The native session flow is covered by MobileAuthFinalization + native-exchange.test.ts."))
 struct ClerkLiveAuthIntegrationTests {
   private static let verificationCode = "424242"
 
@@ -291,7 +291,7 @@ struct ClerkLiveAuthIntegrationTests {
       try await Clerk.shared.auth.setActive(sessionId: sessionID)
     }
 
-    let tokenProvider = ClerkTokenProvider()
+    let tokenProvider = NativeSessionTokenProvider()
     let token = try await tokenProvider.bearerToken(forceRefresh: false)
     #expect(token.isEmpty == false)
 

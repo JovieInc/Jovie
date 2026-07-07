@@ -146,7 +146,7 @@ private enum LiveAuthBootstrapper {
     }
 
     do {
-      _ = try await ClerkTokenProvider().bearerToken(forceRefresh: false)
+      _ = try await NativeSessionTokenProvider().bearerToken(forceRefresh: false)
     } catch {
       throw LiveAuthBootstrapError.bootstrapFailed(
         stage: "getToken",
@@ -292,7 +292,7 @@ private struct AppContentView: View {
             loadAppleWalletProfilePass: {
               try await APIClient(
                 baseURL: appState.configuration.apiBaseURL,
-                tokenProvider: ClerkTokenProvider()
+                tokenProvider: NativeSessionTokenProvider()
               ).fetchAppleWalletProfilePass()
             },
             onRetry: { await appState.retry() }
@@ -346,7 +346,7 @@ private struct AppContentView: View {
         let repository = ChatRepository(
           client: MobileChatClient(
             baseURL: appState.configuration.apiBaseURL,
-            tokenProvider: ClerkTokenProvider()
+            tokenProvider: NativeSessionTokenProvider()
           ),
           cache: ChatCache(),
           clerkUserID: activeUserID,
@@ -404,7 +404,7 @@ private struct AppContentView: View {
     let repository = AudienceHighlightsRepository(
       apiClient: APIClient(
         baseURL: appState.configuration.apiBaseURL,
-        tokenProvider: ClerkTokenProvider()
+        tokenProvider: NativeSessionTokenProvider()
       )
     )
 
