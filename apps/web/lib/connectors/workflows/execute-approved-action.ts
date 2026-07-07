@@ -15,6 +15,7 @@
  */
 
 import { and, eq } from 'drizzle-orm';
+import { recordWorkflowStepResult } from '@/lib/analytics/agent-task-metrics';
 import type { CalendarApiClient } from '@/lib/connectors/google-calendar/create-event';
 import { createCalendarEvent } from '@/lib/connectors/google-calendar/create-event';
 import { db } from '@/lib/db';
@@ -22,6 +23,9 @@ import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { recordWorkflowRunOutcome } from './outcome-attribution';
+
+/** Agent identifier written to workflow_step_results rows for this executor. */
+const EXECUTOR_AGENT = 'execute_approved_action';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,7 +46,14 @@ export async function markWorkflowCompleted(
 ): Promise<void> {
   await db
     .update(workflowRuns)
-    .set({ status: 'completed', stepOutputs: result, updatedAt: new Date() })
+    .set({
+      status: 'completed',
+      stepOutputs: result,
+      // Opportunity lifecycle end (#12140): the automation's output is
+      // published/sent when the run reaches completed.
+      shippedAt: new Date(),
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(workflowRuns.id, workflowRunId),
@@ -101,6 +112,7 @@ export async function executeApprovedAction(
   input: ExecuteApprovedActionInput
 ): Promise<void> {
   const { workflowRunId, calendarClient } = input;
+  const executionStartedAtMs = Date.now();
 
   // 1. Load the workflow_runs row
   const [run] = await db
@@ -185,10 +197,23 @@ export async function executeApprovedAction(
     });
 
     // 6. CAS: running → completed
-    await markWorkflowCompleted(
-      workflowRunId,
-      result as unknown as Record<string, unknown>
-    );
+    // Merge into existing stepOutputs so approvalId survives completion —
+    // the cycle-time join (#12140) and outcome attribution both read
+    // step_outputs ->> 'approvalId' on completed runs.
+    await markWorkflowCompleted(workflowRunId, {
+      ...stepOutputs,
+      ...(result as unknown as Record<string, unknown>),
+    });
+
+    // Workflow-level result log (#12145) — fail-soft, never throws.
+    await recordWorkflowStepResult({
+      runId: workflowRunId,
+      step: 'execute_approved_action',
+      agent: EXECUTOR_AGENT,
+      status: 'success',
+      latencyMs: Date.now() - executionStartedAtMs,
+      linkedOpportunityId: approvalId,
+    });
 
     logger.info('[execute-approved-action] Workflow completed', {
       workflowRunId,
@@ -207,5 +232,15 @@ export async function executeApprovedAction(
       approvalId,
     });
     await markWorkflowFailed(workflowRunId, errorMessage);
+
+    // Workflow-level result log (#12145) — fail-soft, never throws.
+    await recordWorkflowStepResult({
+      runId: workflowRunId,
+      step: 'execute_approved_action',
+      agent: EXECUTOR_AGENT,
+      status: 'failed',
+      latencyMs: Date.now() - executionStartedAtMs,
+      linkedOpportunityId: approvalId,
+    });
   }
 }

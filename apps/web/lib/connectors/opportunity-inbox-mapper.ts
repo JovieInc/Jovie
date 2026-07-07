@@ -1,8 +1,11 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { classifySuggestedActionCategory } from './opportunity-inbox-tour-dates';
 import type {
+  OpportunityInboxCardCategory,
   OpportunityInboxCardViewModel,
   OpportunityInboxData,
   OpportunityInboxEmptyActionCard,
+  OpportunityInboxTourDates,
 } from './opportunity-inbox-types';
 
 interface SuggestedActionRow {
@@ -21,11 +24,23 @@ const TYPE_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Suggestion',
 };
 
-function typeLabelForKind(kind: string): string {
+function typeLabelFor(
+  kind: string,
+  category: OpportunityInboxCardCategory
+): string {
+  if (category === 'tour_date') {
+    return 'Tour date';
+  }
   return TYPE_LABEL_BY_KIND[kind] ?? 'Suggestion';
 }
 
-function primaryActionLabelForKind(kind: string): string {
+function primaryActionLabelFor(
+  kind: string,
+  category: OpportunityInboxCardCategory
+): string {
+  if (category === 'tour_date') {
+    return 'Confirm date';
+  }
   return PRIMARY_ACTION_LABEL_BY_KIND[kind] ?? 'Approve';
 }
 
@@ -59,14 +74,16 @@ function whyFromRow(row: SuggestedActionRow): string {
 export function mapSuggestedActionToInboxCard(
   row: SuggestedActionRow
 ): OpportunityInboxCardViewModel {
+  const category = classifySuggestedActionCategory(row);
   return {
     id: row.id,
-    typeLabel: typeLabelForKind(row.kind),
+    typeLabel: typeLabelFor(row.kind, category),
     createdAt: row.createdAt.toISOString(),
     title: titleFromPayload(row.payload),
     why: whyFromRow(row),
-    primaryActionLabel: primaryActionLabelForKind(row.kind),
+    primaryActionLabel: primaryActionLabelFor(row.kind, category),
     status: 'pending',
+    category,
   };
 }
 
@@ -89,10 +106,12 @@ export const DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS: readonly OpportunityI
   ] as const;
 
 export function buildOpportunityInboxData(
-  rows: readonly SuggestedActionRow[]
+  rows: readonly SuggestedActionRow[],
+  tourDates?: OpportunityInboxTourDates
 ): OpportunityInboxData {
   return {
     cards: rows.map(mapSuggestedActionToInboxCard),
     emptyActionCards: DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS,
+    ...(tourDates ? { tourDates } : {}),
   };
 }

@@ -21,6 +21,10 @@ import {
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import {
+  type InterviewResponses,
+  scoreOnboardingInterview,
+} from '@/lib/waitlist/interview-scoring';
+import {
   evaluateWaitlistQualification,
   type QualificationDecision,
 } from '@/lib/waitlist/qualification';
@@ -52,6 +56,12 @@ export interface WaitlistAccessRequestInput {
   readonly fullName: string;
   readonly data: WaitlistRequestPayload;
   readonly source?: string;
+  /**
+   * Free-text answers from the qualifying onboarding interview. When
+   * provided, they are scored deterministically and can admit a gate-on
+   * signup (`qualified_interview_signal`).
+   */
+  readonly interviewResponses?: InterviewResponses;
 }
 
 export interface WaitlistAccessRequestResult {
@@ -248,6 +258,7 @@ async function decideAccess(params: {
   readonly emailRaw: string;
   readonly email: string;
   readonly data: WaitlistRequestPayload;
+  readonly interviewResponses?: InterviewResponses;
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
@@ -264,10 +275,16 @@ async function decideAccess(params: {
 
   const settings = await getWaitlistSettings(params.tx);
   const mode = settings.gateEnabled ? 'waitlist_enabled' : 'open_signup';
+  const interview = params.interviewResponses
+    ? scoreOnboardingInterview({
+        payload: params.data,
+        responses: params.interviewResponses,
+      })
+    : null;
   const qualification = evaluateWaitlistQualification({
     email: params.email,
     payload: params.data,
-    config: { mode },
+    config: { mode, interview },
   });
 
   if (qualification.status === 'blocked') {
@@ -459,6 +476,7 @@ export async function submitWaitlistAccessRequest(
           emailRaw,
           email: normalizedEmail,
           data: input.data,
+          interviewResponses: input.interviewResponses,
         });
 
         const nextStatus = decision.qualification.status;

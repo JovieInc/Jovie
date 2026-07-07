@@ -54,6 +54,63 @@ describe('evaluateWaitlistQualification', () => {
     });
   });
 
+  it('admits gate-on signups when the interview score clears the threshold', () => {
+    expect(
+      evaluateWaitlistQualification({
+        email: 'artist@example.com',
+        payload,
+        config: {
+          mode: 'waitlist_enabled',
+          interview: {
+            score: 75,
+            admit: true,
+            signals: ['spotify_artist_identity', 'active_release_language'],
+          },
+        },
+      })
+    ).toMatchObject({
+      qualified: true,
+      status: 'approved',
+      reasonCode: 'qualified_interview_signal',
+      details: { interviewScore: 75 },
+    });
+  });
+
+  it('keeps gate-on signups waitlisted when the interview score is below threshold', () => {
+    expect(
+      evaluateWaitlistQualification({
+        email: 'artist@example.com',
+        payload,
+        config: {
+          mode: 'waitlist_enabled',
+          interview: { score: 20, admit: false, signals: [] },
+        },
+      })
+    ).toMatchObject({
+      qualified: true,
+      status: 'waitlisted',
+      reasonCode: 'waitlist_gate_enabled',
+    });
+  });
+
+  it('does not let interview signal bypass a blocked email domain', () => {
+    expect(
+      evaluateWaitlistQualification({
+        email: 'artist@blocked.test',
+        payload,
+        config: {
+          mode: 'waitlist_enabled',
+          blockedEmailDomains: ['blocked.test'],
+          interview: { score: 100, admit: true, signals: ['spotify_url'] },
+        },
+      })
+    ).toMatchObject({
+      qualified: false,
+      status: 'blocked',
+      reasonCode: 'blocked_email_domain',
+    });
+  });
+
   it('blocks configured email domains', () => {
     expect(
       evaluateWaitlistQualification({

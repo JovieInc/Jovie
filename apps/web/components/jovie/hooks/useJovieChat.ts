@@ -5,7 +5,14 @@ import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
@@ -13,6 +20,12 @@ import {
   readComposerDraft,
   saveComposerDraft,
 } from '@/lib/chat/composer-draft-store';
+import {
+  modelRotationNoticeForStep,
+  readModelRotationStep,
+  recordAssistantTurnClean,
+  subscribeModelRotation,
+} from '@/lib/chat/model-rotation-store';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
@@ -248,6 +261,12 @@ export function useJovieChat({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const activeClientTurnIdRef = useRef<string | null>(null);
+  // Assistant SDK message ids that existed BEFORE the active turn started.
+  // Between send and stream start, the SDK's "last assistant message" is still
+  // the previous turn's reply; reading its parts for the new turn flashes the
+  // old reply into the fresh assistant row and then destructively re-renders
+  // when the real stream begins (#11921).
+  const preTurnAssistantMessageIdsRef = useRef<Set<string>>(new Set());
   const streamRevisionRef = useRef(0);
   const lastAssistantPartsSignatureRef = useRef<string | null>(null);
   const sdkMessagesRef = useRef<UIMessage[]>([]);
@@ -501,6 +520,24 @@ export function useJovieChat({
     [activeConversationId, dispatchTimelineEvent, profileId]
   );
 
+  /**
+   * Parts of the assistant message that belongs to the ACTIVE turn. Returns []
+   * when the SDK's last assistant message predates the active turn (the
+   * previous reply), so stale content is never dispatched into the fresh
+   * assistant row (#11921).
+   */
+  const getActiveTurnAssistantParts = useCallback(
+    (candidateMessages: readonly UIMessage[]): UIMessage['parts'] => {
+      const assistantMessage = getLastAssistantMessage(candidateMessages);
+      if (!assistantMessage) return [];
+      if (preTurnAssistantMessageIdsRef.current.has(assistantMessage.id)) {
+        return [];
+      }
+      return getMessageParts(assistantMessage);
+    },
+    []
+  );
+
   const {
     messages: sdkMessages,
     sendMessage,
@@ -531,6 +568,11 @@ export function useJovieChat({
         adoptServerConversationId(metadata.conversationId, 'completed');
       }
 
+      // 👎 recovery loop (JOV-3362 / #11461): count clean assistant turns so
+      // a rotated conversation auto-reverts to the default model after 3
+      // completions without a new thumbs-down.
+      recordAssistantTurnClean(finishedConversationId);
+
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
       });
@@ -548,8 +590,9 @@ export function useJovieChat({
     },
     onError: error => {
       const clientTurnId = activeClientTurnIdRef.current;
-      const assistantMessage = getLastAssistantMessage(sdkMessagesRef.current);
-      const assistantParts = getMessageParts(assistantMessage);
+      const assistantParts = getActiveTurnAssistantParts(
+        sdkMessagesRef.current
+      );
 
       if (
         clientTurnId &&
@@ -649,8 +692,7 @@ export function useJovieChat({
     const clientTurnId = activeClientTurnIdRef.current;
     if (!clientTurnId) return;
 
-    const assistantMessage = getLastAssistantMessage(sdkMessages);
-    const parts = getMessageParts(assistantMessage);
+    const parts = getActiveTurnAssistantParts(sdkMessages);
     if (status === 'streaming' && parts.length === 0) {
       dispatchTimelineEvent({
         type: 'assistant.stream.started',
@@ -677,14 +719,19 @@ export function useJovieChat({
       revision: streamRevisionRef.current,
       now: Date.now(),
     });
-  }, [activeConversationId, dispatchTimelineEvent, sdkMessages, status]);
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    getActiveTurnAssistantParts,
+    sdkMessages,
+    status,
+  ]);
 
   // Wrap stop to clear submission state so the composer re-enables immediately
   // instead of waiting for the 30s safety timeout.
   const stop = useCallback(() => {
     const clientTurnId = activeClientTurnIdRef.current;
-    const assistantMessage = getLastAssistantMessage(sdkMessagesRef.current);
-    const assistantParts = getMessageParts(assistantMessage);
+    const assistantParts = getActiveTurnAssistantParts(sdkMessagesRef.current);
     rawStop();
     if (clientTurnId) {
       dispatchTimelineEvent({
@@ -698,10 +745,29 @@ export function useJovieChat({
       activeClientTurnIdRef.current = null;
     }
     setIsSubmitting(false);
-  }, [activeConversationId, dispatchTimelineEvent, rawStop]);
+  }, [
+    activeConversationId,
+    dispatchTimelineEvent,
+    getActiveTurnAssistantParts,
+    rawStop,
+  ]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
+
+  // Reactive view of the 👎 model-rotation state (JOV-3362 / #11461). The
+  // store mutates from ChatFeedbackControl (a different component), so the
+  // hook subscribes rather than reading module state during render only.
+  const rotationSnapshot = useCallback(
+    () => readModelRotationStep(activeConversationId),
+    [activeConversationId]
+  );
+  const modelRotationStep = useSyncExternalStore(
+    subscribeModelRotation,
+    rotationSnapshot,
+    () => 0
+  );
+  const modelRotationNotice = modelRotationNoticeForStep(modelRotationStep);
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -850,10 +916,23 @@ export function useJovieChat({
       setIsSubmitting(true);
       const clientTurnId = crypto.randomUUID();
       activeClientTurnIdRef.current = clientTurnId;
+      // Snapshot which assistant messages already exist so this turn never
+      // treats a previous reply as its own streaming content (#11921).
+      preTurnAssistantMessageIdsRef.current = new Set(
+        sdkMessagesRef.current
+          .filter(message => message.role === 'assistant')
+          .map(message => message.id)
+      );
       streamRevisionRef.current = 0;
       lastAssistantPartsSignatureRef.current = null;
       const toolIntent =
         options?.toolIntent ?? inferToolIntentFromPrompt(trimmedText);
+
+      // 👎 recovery loop (JOV-3362 / #11461): after a thumbs-down, route this
+      // conversation's next turn to the next model in the fallback chain. The
+      // client only transmits an integer step; the server resolves + clamps
+      // the actual model from its own vetted chain.
+      const modelRotationStep = readModelRotationStep(activeConversationId);
 
       const sendOptions = {
         body: {
@@ -861,6 +940,7 @@ export function useJovieChat({
           clientMessageId: `${clientTurnId}:user`,
           source: options?.source ?? 'typed',
           ...(toolIntent ? { toolIntent } : {}),
+          ...(modelRotationStep > 0 ? { modelRotationStep } : {}),
         },
       };
       dispatchTimelineEvent({
@@ -1053,6 +1133,8 @@ export function useJovieChat({
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */
     conversationTitle,
+    /** Quiet status line while the conversation is rotated off the default model (👎 recovery). */
+    modelRotationNotice,
     // Refs
     inputRef,
     // Handlers

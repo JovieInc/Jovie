@@ -3,6 +3,10 @@
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import {
+  recordThumbsDownRotation,
+  undoThumbsDownRotation,
+} from '@/lib/chat/model-rotation-store';
 import { addBreadcrumb } from '@/lib/sentry/client-lite';
 import { cn } from '@/lib/utils';
 
@@ -83,11 +87,25 @@ export function ChatFeedbackControl({
       // Clicking the active vote undoes it.
       const resolvedVote = previousVote === nextVote ? null : nextVote;
       setVote(resolvedVote);
+      // 👎 recovery loop (JOV-3362 / #11461): a thumbs-down rotates the
+      // conversation's NEXT turn to a different model in the fallback chain.
+      // Applied optimistically alongside the vote; rolled back with it.
+      if (resolvedVote === 'down') {
+        recordThumbsDownRotation(target.conversationId);
+      } else if (previousVote === 'down') {
+        // Undo or flip to 👍 — either way the dislike was retracted.
+        undoThumbsDownRotation(target.conversationId);
+      }
       inFlightRef.current = true;
       void postVote(target, resolvedVote).then(ok => {
         inFlightRef.current = false;
         if (!ok) {
           setVote(previousVote);
+          if (resolvedVote === 'down') {
+            undoThumbsDownRotation(target.conversationId);
+          } else if (previousVote === 'down') {
+            recordThumbsDownRotation(target.conversationId);
+          }
           addBreadcrumb({
             category: 'ai-chat',
             message: 'chat_feedback_vote_failed',

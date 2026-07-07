@@ -10,6 +10,7 @@ const CARD = {
   why: 'Promoter email matched your Detroit growth spike.',
   primaryActionLabel: 'Review pitch',
   status: 'pending' as const,
+  category: 'suggestion' as const,
 };
 
 describe('OpportunityInboxCard', () => {
