@@ -642,24 +642,24 @@ async function fetchDashboardBaseWithSession(
         activeProfileId: users.activeProfileId,
       })
       .from(users)
-      .where(eq(users.clerkId, sessionUserId))
+      .where(eq(users.id, sessionUserId))
       .limit(1);
 
   let [userData] = await dashboardQuery(selectUser, 'User lookup query');
 
   if (!userData?.id && options?.allowMissingUserProvisioning !== false) {
     try {
-      // Pass knownClerkUserId so resolveUserState does not call auth() or
-      // currentUser() — both access headers() and will throw ClerkUseCacheError
-      // when this function is invoked inside an unstable_cache boundary.
-      // (JOV-2441)
+      // Pass knownClerkUserId (the app `users.id` UUID post-cutover) so
+      // resolveUserState does not call `auth.api.getSession` /
+      // `headers()` — both will throw when this function is invoked
+      // inside an unstable_cache boundary. (JOV-2441)
       const resolvedUserState = await resolveUserState({
         createDbUserIfMissing: true,
         knownClerkUserId: sessionUserId,
       });
 
       if (
-        resolvedUserState.clerkUserId === sessionUserId &&
+        resolvedUserState.dbUserId === sessionUserId &&
         resolvedUserState.dbUserId
       ) {
         [userData] = await dashboardQuery(

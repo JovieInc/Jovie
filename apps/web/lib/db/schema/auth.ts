@@ -16,10 +16,11 @@ export const users = pgTable(
   'users',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // Goes nullable at the identity-flip commit of the Clerk → Better Auth
-    // cutover (see docs/auth/better-auth-migration-plan.md); retained one
-    // release afterwards as a rollback breadcrumb.
-    clerkId: text('clerk_id').unique().notNull(),
+    // Nullable as of the server identity-flip commit of the Clerk → Better
+    // Auth cutover (migration 0073; see docs/auth/better-auth-migration-plan.md).
+    // Retained one release afterwards as a rollback breadcrumb — rows created
+    // post-cutover carry `betterAuthUserId` and leave `clerkId` null.
+    clerkId: text('clerk_id').unique(),
     // Link to the Better Auth identity row (ba_users.id). Nullable: Clerk-era
     // rows are adopted by verified email on first Better Auth sign-in.
     betterAuthUserId: text('better_auth_user_id').unique(),

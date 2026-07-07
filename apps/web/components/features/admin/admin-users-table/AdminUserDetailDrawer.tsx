@@ -242,8 +242,8 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>Clerk ID</dt>
             <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>
-              <span className='truncate max-w-35'>{user.clerkId}</span>
-              <CopyButton value={user.clerkId} label='Clerk ID' />
+              <span className='truncate max-w-35'>{user.clerkId ?? '—'}</span>
+              <CopyButton value={user.clerkId ?? ''} label='Clerk ID' />
             </dd>
           </div>
 

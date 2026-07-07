@@ -35,6 +35,7 @@ const ABBREVIATIONS = new Set([
 /** Brand or product words that keep internal capitalization. */
 const BRAND_WORDS = new Set([
   'Apple',
+  'Clerk',
   'GitHub',
   'Instagram',
   'iOS',

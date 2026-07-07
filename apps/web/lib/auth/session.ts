@@ -55,7 +55,12 @@ export function validateClerkUserId(userId: string): void {
 
 /**
  * Sets up the database session for the authenticated user
- * This enables RLS policies to work properly with Clerk user ID
+ * This enables RLS policies to work properly with the app user id.
+ *
+ * `getCachedAuth().userId` is the app `users.id` UUID post-cutover
+ * (Clerk → Better Auth identity flip). RLS `set_config` is keyed on
+ * the same value; legacy Clerk-era RLS policies that compared against
+ * `clerk_user_id` are updated in lockstep with this commit.
  */
 async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   if (clerkUserId) {
@@ -233,7 +238,7 @@ export async function requireAuth() {
  */
 export interface DbUserContext {
   id: string;
-  clerkId: string;
+  clerkId: string | null;
   email: string | null;
   isAdmin: boolean;
   isPro: boolean | null;
@@ -273,10 +278,12 @@ export interface SessionContext {
 }
 
 /**
- * Get the current user's database record by Clerk ID.
+ * Get the current user's database record by app user id.
  * This is the single source of truth for user lookups.
  *
- * @param clerkUserId - Clerk user ID (uses auth() if not provided)
+ * @param clerkUserId - App `users.id` UUID (uses auth() if not provided).
+ *   Parameter name preserved for churn reduction; was a Clerk user id
+ *   pre-cutover.
  * @returns User record or null if not found
  */
 export async function getDbUser(
@@ -294,7 +301,7 @@ export async function getDbUser(
       userStatus: users.userStatus,
     })
     .from(users)
-    .where(eq(users.clerkId, userId))
+    .where(eq(users.id, userId))
     .limit(1);
 
   return user ?? null;
@@ -382,7 +389,7 @@ export async function getSessionContext(options?: {
     })
     .from(users)
     .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, clerkUserId))
     .limit(1);
 
   // User not found

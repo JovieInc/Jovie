@@ -519,6 +519,20 @@
       "when": 1783200000000,
       "tag": "0072_artist_revenue_cohorts",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1783369251822,
+      "tag": "0072_better_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1783456000000,
+      "tag": "0073_drop_clerk_id_not_null",
+      "breakpoints": true
     }
   ]
 }
