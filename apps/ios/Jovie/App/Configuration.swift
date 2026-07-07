@@ -1,28 +1,27 @@
 import Foundation
 
 struct AppConfiguration: Sendable {
-  let clerkPublishableKey: String
   let apiBaseURL: URL
   let webBaseURL: URL
   let sentryDSN: String?
   let observabilityIngestURL: URL?
   let observabilityIngestSecret: String?
   let observabilityEnvironment: String
-  // Clerk redirect config for iOS native SDK (gh-9806 / JOV-2652).
-  // Must match allowed redirect URLs registered in Clerk dashboard for the
-  // publishable key's native/iOS application (explicit per-env via plist/env).
-  let clerkRedirectUrl: String
+  /// Native auth callback scheme (Clerk → Better Auth migration, plan
+  /// decision 9). The deep-link scheme is provider-agnostic — used by the
+  /// PKCE native handoff to return from the browser OAuth flow to the app.
+  /// Field name kept as `clerkCallbackUrlScheme` for source compat with
+  /// existing callers; old-key fallback preserved so existing plist/env
+  /// configs keep working through the cutover.
   let clerkCallbackUrlScheme: String
 
   static let mock = AppConfiguration(
-    clerkPublishableKey: "pk_test_mock",
     apiBaseURL: URL(string: "http://localhost:3100")!,
     webBaseURL: URL(string: "https://jov.ie")!,
     sentryDSN: nil,
     observabilityIngestURL: nil,
     observabilityIngestSecret: nil,
     observabilityEnvironment: "test",
-    clerkRedirectUrl: "ie.jov.jovie://callback",
     clerkCallbackUrlScheme: "ie.jov.jovie"
   )
 
@@ -72,10 +71,6 @@ struct AppConfiguration: Sendable {
       return nil
     }
 
-    let publishableKey = stringValue(
-      key: "ClerkPublishableKey",
-      envKey: "CLERK_PUBLISHABLE_KEY"
-    )
     let apiBaseURL = URL(
       string: stringValue(
         key: "ApiBaseUrl",
@@ -123,36 +118,36 @@ struct AppConfiguration: Sendable {
       ]
     )
 
-    // Clerk iOS redirect config (HOT ZONE gh-9806/JOV-2652): explicit, env-driven
-    // so each Clerk instance (dev/staging/prod) can have its matching allowed
-    // redirect URLs registered in the Clerk dashboard. Falls back to current
-    // values for backward compat. 6 principles: explicit > clever, pragmatic.
-    let clerkRedirectUrl = optionalStringValue(
-      key: "ClerkRedirectUrl",
-      envKeys: ["CLERK_REDIRECT_URL", "JOVIE_IOS_CLERK_REDIRECT_URL"]
-    ) ?? "ie.jov.jovie://callback"
-
+    // Native auth callback scheme (Clerk → Better Auth migration, plan
+    // decision 9). Provider-agnostic — the deep-link scheme used by the
+    // PKCE handoff. Old key (`CLERK_CALLBACK_URL_SCHEME` / `ClerkCallbackUrlScheme`)
+    // kept as the primary source for now; a new `JOVIE_IOS_AUTH_CALLBACK_SCHEME`
+    // key takes precedence if set, so the rename lands without breaking
+    // existing plist/env configs (old-key fallback per the plan).
     let clerkCallbackUrlScheme = optionalStringValue(
-      key: "ClerkCallbackUrlScheme",
-      envKeys: ["CLERK_CALLBACK_URL_SCHEME", "JOVIE_IOS_CLERK_CALLBACK_URL_SCHEME"]
+      key: "AuthCallbackUrlScheme",
+      envKeys: [
+        "JOVIE_IOS_AUTH_CALLBACK_SCHEME",
+        "CLERK_CALLBACK_URL_SCHEME",
+        "JOVIE_IOS_CLERK_CALLBACK_URL_SCHEME",
+      ]
     ) ?? "ie.jov.jovie"
 
     return AppConfiguration(
-      clerkPublishableKey: publishableKey,
       apiBaseURL: apiBaseURL,
       webBaseURL: webBaseURL,
       sentryDSN: sentryDSN,
       observabilityIngestURL: observabilityIngestURL,
       observabilityIngestSecret: observabilityIngestSecret,
       observabilityEnvironment: observabilityEnvironment,
-      clerkRedirectUrl: clerkRedirectUrl,
       clerkCallbackUrlScheme: clerkCallbackUrlScheme
     )
   }
 
   static func loadForLiveLaunch() throws -> AppConfiguration {
-    let configuration = load()
-    try ClerkPublishableKeyValidator.validateForDistribution(configuration.clerkPublishableKey)
-    return configuration
+    // Clerk → Better Auth migration: the Clerk publishable key validation
+    // is removed — BA needs no client-side key. The function is kept for
+    // source compat with existing callers (`AppRouter` / launch modes).
+    return load()
   }
 }

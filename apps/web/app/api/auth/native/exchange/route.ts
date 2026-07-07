@@ -5,7 +5,7 @@ import {
   type NativeAuthClient,
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
-import { getRequestClerkClient } from '@/lib/auth/request-clerk-client';
+import { auth } from '@/lib/auth/better-auth';
 import { consumeStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
@@ -19,9 +19,23 @@ import { trackServerEvent } from '@/lib/server-analytics';
 
 export const runtime = 'nodejs';
 
-const SIGN_IN_TOKEN_TTL_SECONDS = 60;
-const SESSION_TOKEN_TTL_SECONDS = 60 * 60 * 12;
-const DEFAULT_SESSION_TOKEN_TEMPLATE = '';
+/**
+ * Native auth exchange (Clerk → Better Auth migration, plan decision 9).
+ *
+ * PKCE verify → OTT verify → fresh native session per client (audit row 12:
+ * independent native sessions — sign out of the Mac app no longer signs you
+ * out of Safari). One path per client, no fallbacks.
+ *
+ *   iOS     → server redeems `verifyOneTimeToken` and returns the raw
+ *             `session.token` from a freshly created `ba_sessions` row.
+ *             The iOS client stores the raw token in Keychain and uses the
+ *             bearer plugin for subsequent API calls.
+ *
+ *   Electron → returns the OTT. The `native-complete` page POSTs it to the
+ *             built-in `/api/auth/one-time-token/verify` which sets the
+ *             session cookie itself (verified from plugin source — no
+ *             setActive, no custom cookie code).
+ */
 
 interface NativeExchangeRequest {
   client?: unknown;
@@ -30,15 +44,20 @@ interface NativeExchangeRequest {
   codeVerifier?: unknown;
 }
 
+/**
+ * Response shape — kept stable with the iOS `NativeAuthExchangeResponse`
+ * Swift struct (`ticket`/`sessionToken`/`sessionId`/`userId`/
+ * `expiresInSeconds`/`returnTo`). iOS decodes unchanged.
+ */
 type NativeExchangePayload =
   | {
-      ticket: string;
+      sessionToken: string;
+      sessionId: string;
       userId: string;
       expiresInSeconds: number;
     }
   | {
-      sessionToken: string;
-      sessionId: string;
+      ticket: string;
       userId: string;
       expiresInSeconds: number;
     };
@@ -76,67 +95,15 @@ async function trackAuthEvent(
   );
 }
 
-function isNotFoundError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-
-  const record = error as {
-    status?: unknown;
-    statusCode?: unknown;
-    message?: unknown;
-  };
-  if (record.status === 404 || record.statusCode === 404) {
-    return true;
-  }
-
-  return (
-    typeof record.message === 'string' &&
-    record.message.toLowerCase().includes('not found')
-  );
-}
-
-function hasClerkErrorCode(error: unknown, code: string): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-
-  const record = error as { errors?: unknown };
-  if (!Array.isArray(record.errors)) {
-    return false;
-  }
-
-  return record.errors.some(
-    entry =>
-      Boolean(entry) &&
-      typeof entry === 'object' &&
-      (entry as { code?: unknown }).code === code
-  );
-}
-
-function isIosSessionTokenUnavailableError(error: unknown): boolean {
-  return (
-    (isNotFoundError(error) &&
-      !hasClerkErrorCode(error, 'resource_not_found')) ||
-    hasClerkErrorCode(error, 'request_invalid_for_environment')
-  );
-}
-
-async function createNativeSignInTicketPayload(
-  clerk: Awaited<ReturnType<typeof getRequestClerkClient>>,
-  userId: string
-): Promise<NativeExchangePayload> {
-  const signInToken = await clerk.signInTokens.createSignInToken({
-    userId,
-    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-  });
-
-  return {
-    ticket: signInToken.token,
-    userId,
-    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-  };
-}
+/**
+ * Fresh session expiry handed to native clients. Better Auth's session
+ * `expiresIn` is 7 days (better-auth.ts); we surface that so the client
+ * knows when to expect a `set-auth-token` roll (updateAge = 1 day). The
+ * client-side expiry-clearing path is removed (eng row 31) — the bearer
+ * plugin's `set-auth-token` response header refreshes the stored token +
+ * expiry on each API call.
+ */
+const NATIVE_SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 export async function POST(request: Request) {
   try {
@@ -210,32 +177,41 @@ export async function POST(request: Request) {
       );
     }
 
-    const clerk = await getRequestClerkClient(request);
+    // OTT is required for both native clients under BA. Missing OTT means
+    // the auth callback failed to mint one — surface as `ott_missing` so the
+    // client can restart the flow with a clear message (plan design row 24).
+    if (!result.ott) {
+      void trackAuthEvent('auth_exchange_failed', {
+        client,
+        intent: 'sign_in',
+        result: 'failed',
+        reason: 'ott_missing',
+      });
+
+      return NextResponse.json(
+        {
+          error: 'Native auth exchange missing one-time token',
+          reason: 'ott_missing',
+        },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
     let exchangePayload: NativeExchangePayload;
-    try {
-      exchangePayload =
-        client === 'ios'
-          ? await createIosNativeExchangePayload(clerk, result.userId)
-          : await createDesktopNativeExchangePayload(clerk, result.userId);
-    } catch (error) {
-      if (client === 'electron' && isNotFoundError(error)) {
-        void trackAuthEvent('auth_exchange_failed', {
-          client,
-          intent: 'sign_in',
-          result: 'failed',
-          reason: 'desktop_sign_in_token_unavailable',
-        });
-
-        return NextResponse.json(
-          {
-            error: 'Desktop native auth unavailable',
-            reason: 'desktop_sign_in_token_unavailable',
-          },
-          { status: 503, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      throw error;
+    if (client === 'ios') {
+      exchangePayload = await createIosNativeExchangePayload(
+        result.ott,
+        result.userId
+      );
+    } else {
+      // Electron: return the OTT. The native-complete page POSTs it to
+      // `/api/auth/one-time-token/verify` which sets the session cookie.
+      // `ticket` field name is preserved for Swift/Electron decode compat.
+      exchangePayload = {
+        ticket: result.ott,
+        userId: result.userId,
+        expiresInSeconds: 300, // OTT TTL (5 min) — matches the plugin config
+      };
     }
 
     void trackAuthEvent('auth_exchange_succeeded', {
@@ -264,42 +240,44 @@ export async function POST(request: Request) {
   }
 }
 
-async function createDesktopNativeExchangePayload(
-  clerk: Awaited<ReturnType<typeof getRequestClerkClient>>,
-  userId: string
-): Promise<NativeExchangePayload> {
-  return createNativeSignInTicketPayload(clerk, userId);
-}
-
+/**
+ * iOS: verify the OTT server-side, then create a FRESH `ba_sessions` row
+ * independent of the completing browser's session (audit row 12 — kills the
+ * "sign out of the Mac app signs you out of Safari" bug). Return the raw
+ * `session.token` for Keychain + bearer plugin auth.
+ *
+ * `verifyOneTimeToken` consumes the OTT (single-use) and returns the
+ * user. `internalAdapter.createSession` mints a new session row bound
+ * to that user. The returned `expiresInSeconds` matches Better Auth's
+ * `session.expiresIn` (7 days). The iOS client never needs to refresh —
+ * the bearer plugin's `set-auth-token` response header refreshes the
+ * stored token + expiry on each API call (eng row 31).
+ */
 async function createIosNativeExchangePayload(
-  clerk: Awaited<ReturnType<typeof getRequestClerkClient>>,
-  userId: string
+  ott: string,
+  expectedUserId: string
 ): Promise<NativeExchangePayload> {
-  try {
-    const session = await clerk.sessions.createSession({ userId });
-    const token = await clerk.sessions.getToken(
-      session.id,
-      DEFAULT_SESSION_TOKEN_TEMPLATE,
-      SESSION_TOKEN_TTL_SECONDS
-    );
+  const verification = await auth.api.verifyOneTimeToken({
+    body: { token: ott },
+  });
 
-    return {
-      sessionToken: token.jwt,
-      sessionId: session.id,
-      userId: session.userId,
-      expiresInSeconds: SESSION_TOKEN_TTL_SECONDS,
-    };
-  } catch (error) {
-    if (!isIosSessionTokenUnavailableError(error)) {
-      throw error;
-    }
-
-    /*
-     * Clerk only allows server-created sessions in development instances.
-     * Staging/production still complete native auth through the same one-time,
-     * PKCE-bound ticket flow that Electron uses; the iOS client then mints and
-     * persists its Clerk session token before calling /api/mobile/v1/me.
-     */
-    return createNativeSignInTicketPayload(clerk, userId);
+  const verifiedUserId =
+    (verification as { userId?: string } | null)?.userId ?? null;
+  if (!verifiedUserId || verifiedUserId !== expectedUserId) {
+    throw new Error('OTT user mismatch');
   }
+
+  const ctx = await auth.$context;
+  const session = await ctx.internalAdapter.createSession(verifiedUserId);
+
+  if (!session?.token || !session.id) {
+    throw new Error('Native session creation failed');
+  }
+
+  return {
+    sessionToken: session.token,
+    sessionId: session.id,
+    userId: verifiedUserId,
+    expiresInSeconds: NATIVE_SESSION_EXPIRES_IN_SECONDS,
+  };
 }
