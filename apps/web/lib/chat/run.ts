@@ -6,6 +6,11 @@ import {
   type ToolSet,
   type UIMessage,
 } from 'ai';
+import {
+  CHAT_WORKFLOW,
+  recordModelUsage,
+  resolveWorkflowModel,
+} from '@/lib/ai/experiments/service.server';
 import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
@@ -33,6 +38,7 @@ import type {
   ReleaseContext,
 } from '@/lib/chat/types';
 import {
+  CHAT_MODEL,
   CHAT_MODEL_LIGHT,
   resolveRotatedChatModel,
 } from '@/lib/constants/ai-models';
@@ -293,9 +299,30 @@ export async function executeChatTurn(
   // 👎 rotation (JOV-3362 / #11461): a disliked response routes the next
   // turn to a different chain model. Light-model routing wins — it is the
   // incident cost lever and the free-plan/onboarding path.
-  const selectedModel = shouldUseLightModel
-    ? CHAT_MODEL_LIGHT
-    : resolveRotatedChatModel(modelRotationStep);
+  //
+  // Per-workflow model A/B bake-off (GH #11462): when no rotation step is
+  // active, split default-model traffic across experiment candidate arms
+  // (deterministic per user). Experiment-store failures fail open to
+  // CHAT_MODEL.
+  let selectedModel: string;
+  let isExperimentArm = false;
+  if (shouldUseLightModel) {
+    selectedModel = CHAT_MODEL_LIGHT;
+  } else if (
+    typeof modelRotationStep === 'number' &&
+    Number.isInteger(modelRotationStep) &&
+    modelRotationStep > 0
+  ) {
+    selectedModel = resolveRotatedChatModel(modelRotationStep);
+  } else {
+    const resolved = await resolveWorkflowModel(
+      CHAT_WORKFLOW,
+      CHAT_MODEL,
+      userId ?? requestId
+    );
+    selectedModel = resolved.model;
+    isExperimentArm = resolved.isExperimentArm;
+  }
 
   // Tag the request scope with chat-specific dimensions so all telemetry
   // events for this turn (errors, perf, breadcrumbs) are filterable
@@ -376,7 +403,19 @@ export async function executeChatTurn(
         chatToolStepLimit: toolStepLimit,
       },
     }),
-    onFinish: async ({ steps, text }) => {
+    onFinish: async ({ steps, text, totalUsage }) => {
+      // Cost log for active bake-off arms only (GH #11462) — fire-and-forget,
+      // recordModelUsage never throws.
+      if (isExperimentArm && !blockedForDisclosure) {
+        void recordModelUsage({
+          workflow: CHAT_WORKFLOW,
+          model: selectedModel,
+          inputTokens: totalUsage?.inputTokens,
+          outputTokens: totalUsage?.outputTokens,
+          requestId,
+        });
+      }
+
       let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {
         const sanitized = sanitizeAssistantResponse(text);
