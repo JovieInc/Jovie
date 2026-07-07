@@ -5,6 +5,7 @@ export type WaitlistMode = 'open_signup' | 'waitlist_enabled' | 'hard_closed';
 export type QualificationReasonCode =
   | 'qualified_open_signup'
   | 'qualified_auto_accept'
+  | 'qualified_interview_signal'
   | 'waitlist_gate_enabled'
   | 'waitlist_capacity_full'
   | 'hard_closed'
@@ -15,6 +16,17 @@ export interface QualificationConfig {
   readonly mode: WaitlistMode;
   readonly autoAcceptReserved?: boolean;
   readonly blockedEmailDomains?: readonly string[];
+  /**
+   * Deterministic interview-score result from
+   * `lib/waitlist/interview-scoring.ts`. When present and `admit` is true,
+   * a gate-on signup is approved instead of waitlisted
+   * (`qualified_interview_signal`).
+   */
+  readonly interview?: {
+    readonly score: number;
+    readonly admit: boolean;
+    readonly signals: readonly string[];
+  } | null;
 }
 
 export interface QualificationDecision {
@@ -82,6 +94,19 @@ export function evaluateWaitlistQualification(params: {
       status: 'approved',
       reasonCode: 'qualified_open_signup',
       details: { mode: params.config.mode },
+    };
+  }
+
+  if (params.config.interview?.admit) {
+    return {
+      qualified: true,
+      status: 'approved',
+      reasonCode: 'qualified_interview_signal',
+      details: {
+        mode: params.config.mode,
+        interviewScore: params.config.interview.score,
+        interviewSignals: params.config.interview.signals,
+      },
     };
   }
 

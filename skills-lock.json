@@ -12,6 +12,15 @@
       "sourceType": "github",
       "skillPath": "skills/lavish/SKILL.md",
       "computedHash": "c3a0299d820bc3b30613d7740718b194511201319047fa9d3075e0ab1e596bde"
+    },
+    "last30days": {
+      "source": "mvanhorn/last30days-skill",
+      "sourceType": "github",
+      "skillPath": "skills/last30days/SKILL.md",
+      "computedHash": "7a17dc6cd15eed851dac592324911b1e984cbe9bc5b8d584ee0aa602acf59cbb",
+      "globalInstall": true,
+      "globalPath": "~/.claude/skills/last30days/SKILL.md",
+      "version": "3.8.3"
     }
   }
 }
