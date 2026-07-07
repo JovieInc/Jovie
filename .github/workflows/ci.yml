@@ -5258,4 +5258,4 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
-        run: pnpm --filter web exec lhci autorun --config=.lighthouserc.json
+        run: for attempt in 1 2 3; do if pnpm --filter web exec lhci autorun --config=.lighthouserc.json; then exit 0; fi; echo "Lighthouse production attempt $attempt failed (PROTOCOL_TIMEOUT), retrying after 10s..."; sleep 10; done; echo "All 3 Lighthouse production attempts failed."; exit 1

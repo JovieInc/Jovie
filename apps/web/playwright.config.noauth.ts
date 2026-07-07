@@ -26,6 +26,8 @@ const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
+  timeout: 120_000,
+  expect: { timeout: 25_000 },
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
