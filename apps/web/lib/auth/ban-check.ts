@@ -102,6 +102,9 @@ function recordFailOpenTelemetry(clerkUserId: string, error: unknown): void {
 /**
  * Invalidate the Redis cache for a user's ban status.
  * Call after ban/unban or other status transitions that affect blocking.
+ *
+ * @param clerkUserId - App `users.id` UUID (post-cutover identity key).
+ *   Parameter name preserved for churn reduction.
  */
 export async function invalidateBanStatusCache(
   clerkUserId: string
@@ -126,8 +129,9 @@ export async function invalidateBanStatusCache(
  * (proxy.ts:581-585), so the middleware-level ban check never fires
  * for dashboard pages. This function fills that gap.
  *
- * Note: accepts a Clerk user ID (from getCachedAuth().userId) and
- * queries by users.clerkId, not users.id.
+ * @param clerkUserId - App `users.id` UUID (post-cutover identity key,
+ *   from `getCachedAuth().userId`). Parameter name preserved for
+ *   churn reduction; queries by `users.id`, not `users.clerkId`.
  *
  * Wrapped in React cache() so it's deduplicated per request when
  * called from both the layout and child components.
@@ -141,7 +145,7 @@ export const getUserBanStatus = cache(
           deletedAt: users.deletedAt,
         })
         .from(users)
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.id, clerkUserId))
         .limit(1);
 
       if (!user) {

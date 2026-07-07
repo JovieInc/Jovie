@@ -3,11 +3,9 @@ import 'server-only';
 import {
   getPlaylistEngineSettings,
   getPlaylistSpotifyStatus,
-  isSpotifyAccount,
   readAccountLabel,
   readExternalAccountScopes,
 } from '@/lib/admin/platform-connections';
-import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { REQUIRED_PLAYLIST_SPOTIFY_SCOPES } from '@/lib/spotify/system-account';
 
 export interface AdminPlatformConnectionsData {
@@ -32,14 +30,17 @@ export interface AdminPlatformConnectionsData {
 }
 
 export async function loadAdminPlatformConnectionsData(): Promise<AdminPlatformConnectionsData> {
-  const [spotifyStatus, engineSettings, user] = await Promise.all([
+  const [spotifyStatus, engineSettings] = await Promise.all([
     getPlaylistSpotifyStatus(),
     getPlaylistEngineSettings(),
-    getCachedCurrentUser(),
   ]);
 
-  const currentSpotifyAccount =
-    user?.externalAccounts?.find(isSpotifyAccount) ?? null;
+  // Clerk-era surface: `user.externalAccounts` was a Clerk User resource
+  // field. The Better Auth-backed `JovieUser` shape does not model OAuth
+  // external accounts as sub-resources, so this is null post-cutover.
+  // Spotify connection status moves to a Better Auth account-based reader
+  // in a later commit of the migration.
+  const currentSpotifyAccount = null;
   const approvedScopes = readExternalAccountScopes(currentSpotifyAccount);
   const missingScopes = REQUIRED_PLAYLIST_SPOTIFY_SCOPES.filter(
     scope => !approvedScopes.includes(scope)

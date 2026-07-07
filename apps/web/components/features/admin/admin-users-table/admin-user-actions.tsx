@@ -35,13 +35,13 @@ export function buildAdminUserActions(
     // ── Copy group ──
     {
       id: 'copy-clerk-id',
-      label: 'Copy Clerk user ID',
+      label: 'Copy Clerk User ID',
       icon: ICON_COPY,
       onClick: () => callbacks.onCopyClerkId(user),
     },
     {
       id: 'copy-email',
-      label: 'Copy email',
+      label: 'Copy Email',
       icon: ICON_COPY,
       onClick: () => callbacks.onCopyEmail(user),
       disabled: !user.email,
@@ -55,12 +55,12 @@ export function buildAdminUserActions(
   ];
 
   // ── External links group ──
-  if (user.clerkId.length > 0) {
+  if (user.clerkId && user.clerkId.length > 0) {
     items.push(
       { type: 'separator' as const },
       {
         id: 'open-in-clerk',
-        label: 'Open in Clerk',
+        label: 'Open In Clerk',
         icon: ICON_EXTERNAL,
         onClick: () => callbacks.onOpenInClerk(user),
       }
@@ -76,13 +76,13 @@ export function buildAdminUserActions(
     isBanned
       ? {
           id: 'restore-user',
-          label: 'Restore user',
+          label: 'Restore User',
           icon: ICON_RESTORE,
           onClick: () => callbacks.onUnbanUser(user),
         }
       : {
           id: 'suspend-user',
-          label: 'Suspend user',
+          label: 'Suspend User',
           icon: ICON_SUSPEND,
           onClick: () => callbacks.onBanUser(user),
           destructive: true,

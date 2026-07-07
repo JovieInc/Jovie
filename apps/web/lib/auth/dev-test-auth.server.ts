@@ -3,6 +3,7 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
+import { auth } from '@/lib/auth/better-auth';
 import type {
   ClientAuthBootstrap,
   DevTestAuthActor,
@@ -19,6 +20,7 @@ import {
 } from '@/lib/auth/test-mode';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { baUsers } from '@/lib/db/schema/better-auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   DEVELOPMENT_ONLY_ERROR,
@@ -231,7 +233,7 @@ async function findDevTestAuthSession(
   let matchedUser:
     | {
         dbUserId: string;
-        clerkUserId: string;
+        clerkUserId: string | null;
         email: string | null;
         fullName: string | null;
         isAdmin: boolean;
@@ -283,7 +285,7 @@ async function findDevTestAuthSession(
   return {
     dbUserId: matchedUser.dbUserId,
     persona,
-    clerkUserId: matchedUser.clerkUserId,
+    clerkUserId: matchedUser.clerkUserId ?? clerkUserId,
     email: matchedUser.email ?? config.email,
     username,
     fullName,
@@ -522,6 +524,22 @@ async function ensureDevTestAuthActorForClerkUser(
     );
   }
 
+  await mintBetterAuthSessionForDevTestActor({
+    dbUserId,
+    email: config.email,
+    fullName: config.fullName,
+  }).catch(error => {
+    logger.warn(
+      'Failed to mint Better Auth session for dev test actor',
+      {
+        dbUserId,
+        email: config.email,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'dev-test-auth'
+    );
+  });
+
   return {
     persona,
     clerkUserId,
@@ -531,6 +549,76 @@ async function ensureDevTestAuthActorForClerkUser(
     isAdmin: config.isAdmin,
     profilePath,
   };
+}
+
+/**
+ * Mint a real Better Auth session for a dev/E2E bypass persona (plan
+ * decision 10, audit row 39 — TTHW acceptance criterion). The bypass path
+ * in `cached.ts` still short-circuits before `auth.api.getSession`, so the
+ * test-mode cookie continues to drive the cached auth result; minting the
+ * BA row + session means any direct `auth.api.getSession` call site
+ * (auth-page signed-in redirects per audit row 16) and the ba_sessions
+ * audit trail see a real session.
+ *
+ * Best-effort: never throws. Failures are logged via `logger.warn` so the
+ * dev bypass route stays available when Better Auth infra is absent (local
+ * dev without Redis, fresh clone without ba_users seeded, etc.).
+ */
+async function mintBetterAuthSessionForDevTestActor(params: {
+  dbUserId: string;
+  email: string;
+  fullName: string;
+}): Promise<void> {
+  const { dbUserId, email, fullName } = params;
+
+  const [appUser] = await db
+    .select({ id: users.id, betterAuthUserId: users.betterAuthUserId })
+    .from(users)
+    .where(eq(users.id, dbUserId))
+    .limit(1);
+  if (!appUser) {
+    return;
+  }
+
+  let baUserId = appUser.betterAuthUserId;
+
+  if (!baUserId) {
+    const [inserted] = await db
+      .insert(baUsers)
+      .values({
+        id: `dev_${dbUserId}`,
+        name: fullName,
+        email,
+        emailVerified: true,
+      })
+      .onConflictDoUpdate({
+        target: baUsers.email,
+        set: { name: fullName, emailVerified: true, updatedAt: new Date() },
+      })
+      .returning({ id: baUsers.id });
+    baUserId = inserted?.id;
+    if (!baUserId) {
+      const [existing] = await db
+        .select({ id: baUsers.id })
+        .from(baUsers)
+        .where(eq(baUsers.email, email))
+        .limit(1);
+      baUserId = existing?.id;
+    }
+    if (baUserId) {
+      await db
+        .update(users)
+        .set({ betterAuthUserId: baUserId, updatedAt: new Date() })
+        .where(eq(users.id, dbUserId));
+    }
+  }
+
+  if (!baUserId) {
+    return;
+  }
+
+  const ctx = await auth.$context;
+  await ctx.internalAdapter.createSession(baUserId, false);
 }
 
 export function buildDevTestAuthCookieDescriptors(

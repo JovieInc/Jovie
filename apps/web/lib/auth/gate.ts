@@ -2,7 +2,9 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { headers } from 'next/headers';
 import { cache } from 'react';
+import { auth } from '@/lib/auth/better-auth';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -20,14 +22,12 @@ import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
 } from '@/lib/waitlist/state-machine';
-import { getCachedCurrentUser, getOptionalAuth } from './cached';
 import {
   CanonicalUserState,
   getRedirectForState,
   resolveCanonicalState,
 } from './canonical-user-state';
-import { syncEmailFromClerk } from './clerk-sync';
-import { getServerClerkClient } from './request-clerk-client';
+import { getCachedDevTestAuthSession } from './dev-test-auth.server';
 import { checkUserStatus } from './status-checker';
 import { determineUserStatus, type UserLifecycleStatus } from './user-status';
 
@@ -45,19 +45,18 @@ export {
 /**
  * Result of resolving user state. Contains all information needed
  * to make auth gating decisions and redirect users appropriately.
+ *
+ * `clerkUserId` is preserved as the field name for churn reduction; after
+ * the Clerk → Better Auth cutover it holds the Better Auth user id
+ * (resolved from `auth.api.getSession`). `dbUserId` remains the app
+ * `users.id` UUID.
  */
 export interface AuthGateResult {
-  /** The resolved user state */
   state: CanonicalUserState;
-  /** Clerk user ID if authenticated */
   clerkUserId: string | null;
-  /** Database user ID if exists */
   dbUserId: string | null;
-  /** Creator profile ID if exists */
   profileId: string | null;
-  /** Suggested redirect path based on state, or null if no redirect needed */
   redirectTo: string | null;
-  /** Additional context for the caller */
   context: {
     isAdmin: boolean;
     isPro: boolean;
@@ -91,9 +90,6 @@ function createE2ETestAuthGateResult(
     },
   };
 }
-
-const CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS = 4;
-const CLERK_BACKEND_EMAIL_FALLBACK_DELAY_MS = 250;
 
 interface AuthGateRecord {
   id: string;
@@ -149,10 +145,10 @@ function createUnauthenticatedAuthGateResult(): AuthGateResult {
 /**
  * Check if an error is a permanent error that should not be retried.
  * Email uniqueness violations are NOT permanent — they're handled by
- * the clerk_id adoption path in createUserWithRetry.
+ * the better_auth_user_id adoption path in createUserWithRetry.
  */
 function isPermanentError(error: Error): boolean {
-  // Email uniqueness conflicts are recoverable via clerk_id adoption
+  // Email uniqueness conflicts are recoverable via better_auth_user_id adoption
   if (isUniqueViolation(error, 'users_email_unique')) {
     return false;
   }
@@ -163,13 +159,17 @@ function isPermanentError(error: Error): boolean {
 
 /**
  * Check if an insert error is an email uniqueness conflict and attempt
- * to adopt the existing row by updating its clerk_id.
+ * to adopt the existing row by updating its better_auth_user_id.
  * Returns the adopted user ID, or null if not an email conflict.
+ *
+ * Post-cutover: the existing row may be a Clerk-era row with clerk_id set
+ * and better_auth_user_id null. We adopt it by setting better_auth_user_id
+ * to the BA identity, preserving clerk_id as the rollback breadcrumb.
  */
 async function tryAdoptExistingUser(
   insertError: unknown,
   email: string | null,
-  clerkUserId: string,
+  betterAuthUserId: string,
   userStatus: UserLifecycleStatus
 ): Promise<string | null> {
   if (!email) return null;
@@ -183,7 +183,7 @@ async function tryAdoptExistingUser(
   const [adopted] = await db
     .update(users)
     .set({
-      clerkId: clerkUserId,
+      betterAuthUserId,
       userStatus,
       updatedAt: new Date(),
     })
@@ -219,7 +219,7 @@ function buildErrorSummary(error: unknown): {
 
 /** Upsert a user row, handling email uniqueness conflicts via adoption. */
 async function upsertUser(
-  clerkUserId: string,
+  betterAuthUserId: string,
   email: string | null,
   userStatus: UserLifecycleStatus,
   waitlistEntryId: string | undefined
@@ -228,13 +228,13 @@ async function upsertUser(
     const [createdUser] = await db
       .insert(users)
       .values({
-        clerkId: clerkUserId,
+        betterAuthUserId,
         email,
         userStatus,
         waitlistEntryId,
       })
       .onConflictDoUpdate({
-        target: users.clerkId,
+        target: users.betterAuthUserId,
         set: {
           ...(email ? { email } : {}),
           userStatus,
@@ -248,7 +248,7 @@ async function upsertUser(
     const adoptedId = await tryAdoptExistingUser(
       insertError,
       email,
-      clerkUserId,
+      betterAuthUserId,
       userStatus
     );
     if (adoptedId) return adoptedId;
@@ -261,17 +261,11 @@ async function upsertUser(
 /**
  * Helper function to create a DB user with exponential backoff retry logic.
  *
- * Handles transient database errors that might occur during the Clerk
- * session propagation window after OTP verification.
- *
- * @param clerkUserId - The Clerk user ID
- * @param email - User's email address
- * @param waitlistEntryId - Optional waitlist entry ID
- * @param maxRetries - Maximum retry attempts (default: 3)
- * @returns Created/updated user ID or null if all retries fail
+ * Handles transient database errors that might occur during the Better Auth
+ * session propagation window after OAuth callback / OTP verification.
  */
 async function createUserWithRetry(
-  clerkUserId: string,
+  betterAuthUserId: string,
   email: string | null,
   waitlistEntryId: string | undefined,
   waitlistGateEnabled: boolean,
@@ -298,7 +292,7 @@ async function createUserWithRetry(
           creatorProfiles,
           eq(creatorProfiles.id, users.activeProfileId)
         )
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.betterAuthUserId, betterAuthUserId))
         .limit(1);
 
       const userStatus = determineUserStatus(
@@ -306,7 +300,12 @@ async function createUserWithRetry(
         existingUserData,
         waitlistGateEnabled
       );
-      return await upsertUser(clerkUserId, email, userStatus, waitlistEntryId);
+      return await upsertUser(
+        betterAuthUserId,
+        email,
+        userStatus,
+        waitlistEntryId
+      );
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
       const { summary, dbErrorCode, dbConstraint, dbDetail } =
@@ -315,7 +314,7 @@ async function createUserWithRetry(
         `User creation failed (attempt ${attempt + 1}/${maxRetries}): ${summary}`,
         lastError,
         {
-          clerkUserId,
+          betterAuthUserId,
           email,
           attempt: attempt + 1,
           maxRetries,
@@ -336,7 +335,7 @@ async function createUserWithRetry(
     `User creation failed after ${maxRetries} attempts`,
     lastError,
     {
-      clerkUserId,
+      betterAuthUserId,
       email,
       maxRetries,
       operation: 'createUserWithRetry',
@@ -351,26 +350,27 @@ async function createUserWithRetry(
 /** Context for handling missing DB user scenarios */
 interface MissingDbUserContext {
   createDbUserIfMissing: boolean;
-  clerkUserId: string;
+  betterAuthUserId: string;
   email: string | null;
   baseContext: { isAdmin: boolean; isPro: boolean; email: string | null };
 }
 
 /**
- * Handle the case where no DB user exists for an authenticated Clerk user.
- * Returns either a complete AuthGateResult (for early return) or the new user ID.
+ * Handle the case where no DB user exists for an authenticated Better Auth
+ * identity. Returns either a complete AuthGateResult (for early return) or
+ * the new user ID.
  */
 async function handleMissingDbUser(
   ctx: MissingDbUserContext,
   waitlistGateEnabled: boolean
 ): Promise<AuthGateResult | { dbUserId: string }> {
-  const { createDbUserIfMissing, clerkUserId, email, baseContext } = ctx;
+  const { createDbUserIfMissing, betterAuthUserId, email, baseContext } = ctx;
 
   // Don't create user - return NEEDS_DB_USER state
   if (!createDbUserIfMissing) {
     return {
       state: CanonicalUserState.NEEDS_DB_USER,
-      clerkUserId,
+      clerkUserId: betterAuthUserId,
       dbUserId: null,
       profileId: null,
       redirectTo: '/start?fresh_signup=true',
@@ -384,12 +384,12 @@ async function handleMissingDbUser(
     await captureError(
       'Cannot create user without email',
       new TypeError('Email is required for user creation'),
-      { clerkUserId, operation: 'resolveUserState' }
+      { betterAuthUserId, operation: 'resolveUserState' }
     );
 
     return {
       state: CanonicalUserState.USER_CREATION_FAILED,
-      clerkUserId,
+      clerkUserId: betterAuthUserId,
       dbUserId: null,
       profileId: null,
       redirectTo: '/error/user-creation-failed',
@@ -410,7 +410,7 @@ async function handleMissingDbUser(
   if (isWaitlistPendingStatus(waitlistResult.status)) {
     return {
       state: CanonicalUserState.WAITLIST_PENDING,
-      clerkUserId,
+      clerkUserId: betterAuthUserId,
       dbUserId: null,
       profileId: null,
       redirectTo: '/waitlist',
@@ -421,7 +421,7 @@ async function handleMissingDbUser(
   if (!waitlistResult.status) {
     return {
       state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
-      clerkUserId,
+      clerkUserId: betterAuthUserId,
       dbUserId: null,
       profileId: null,
       redirectTo: '/waitlist',
@@ -432,7 +432,7 @@ async function handleMissingDbUser(
   if (!isWaitlistApprovedStatus(waitlistResult.status)) {
     return {
       state: CanonicalUserState.WAITLIST_PENDING,
-      clerkUserId,
+      clerkUserId: betterAuthUserId,
       dbUserId: null,
       profileId: null,
       redirectTo: '/waitlist',
@@ -444,7 +444,7 @@ async function handleMissingDbUser(
 
   // Create the user (without waitlist entry when waitlist is disabled)
   const newUserId = await createUserWithRetry(
-    clerkUserId,
+    betterAuthUserId,
     email,
     waitlistEntryId,
     waitlistGateEnabled
@@ -455,7 +455,7 @@ async function handleMissingDbUser(
       'User creation failed after retries',
       new Error('User creation failed after maximum retry attempts'),
       {
-        clerkUserId,
+        betterAuthUserId,
         email,
         waitlistEntryId,
         context: 'resolveUserState',
@@ -464,7 +464,7 @@ async function handleMissingDbUser(
 
     return {
       state: CanonicalUserState.USER_CREATION_FAILED,
-      clerkUserId,
+      clerkUserId: betterAuthUserId,
       dbUserId: null,
       profileId: null,
       redirectTo: '/error/user-creation-failed',
@@ -475,112 +475,80 @@ async function handleMissingDbUser(
   return { dbUserId: newUserId };
 }
 
-async function resolveClerkIdentity(knownClerkUserId?: string): Promise<{
+/**
+ * Resolve the current Better Auth identity. Reads `auth.api.getSession`
+ * directly (NOT through cached.ts) so gate.ts sees the BA user id — the
+ * app `users` lookup then goes through `users.better_auth_user_id`.
+ *
+ * The `clerkUserId` field name is preserved in the return shape for
+ * churn reduction; it holds the BA user id post-cutover.
+ *
+ * `knownAppUserId` lets callers that already have the app `users.id` UUID
+ * (e.g. inside `unstable_cache` boundaries that can't call `headers()`)
+ * short-circuit the session read. The app user's `betterAuthUserId` is
+ * resolved from the DB.
+ */
+async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
   clerkUserId: string | null;
   email: string | null;
 }> {
-  if (knownClerkUserId) {
-    return { clerkUserId: knownClerkUserId, email: null };
+  if (knownAppUserId) {
+    const [appUser] = await db
+      .select({
+        betterAuthUserId: users.betterAuthUserId,
+        email: users.email,
+      })
+      .from(users)
+      .where(eq(users.id, knownAppUserId))
+      .limit(1);
+    if (!appUser?.betterAuthUserId) {
+      return { clerkUserId: null, email: appUser?.email ?? null };
+    }
+    return {
+      clerkUserId: appUser.betterAuthUserId,
+      email: appUser.email,
+    };
   }
 
-  const authResult = await getOptionalAuth();
-  const clerkUserId = authResult.userId;
-  if (!clerkUserId) {
+  const bypassSession = await getCachedDevTestAuthSession();
+  if (bypassSession) {
+    return {
+      clerkUserId: bypassSession.dbUserId,
+      email: bypassSession.email,
+    };
+  }
+
+  try {
+    const headerStore = await headers();
+    const session = await auth.api.getSession({ headers: headerStore });
+    if (!session) {
+      return { clerkUserId: null, email: null };
+    }
+    return {
+      clerkUserId: session.user.id,
+      email: session.user.email,
+    };
+  } catch {
+    // Outside a request scope (unstable_cache, scripts) — degrade to
+    // unauthenticated. Callers that need the user inside cache boundaries
+    // must pass `knownAppUserId`.
     return { clerkUserId: null, email: null };
   }
-
-  let email: string | null = null;
-  try {
-    const clerkUser = await getCachedCurrentUser();
-    email = selectVerifiedClerkEmail(clerkUser?.emailAddresses);
-  } catch {
-    // Email is optional for redirect-only auth entry routes.
-  }
-
-  return { clerkUserId, email };
-}
-
-function selectVerifiedClerkEmail(
-  emailAddresses:
-    | ReadonlyArray<{
-        readonly emailAddress?: string | null;
-        readonly verification?: { readonly status?: string | null } | null;
-      }>
-    | null
-    | undefined
-): string | null {
-  return (
-    emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ?? null
-  );
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function resolveVerifiedEmailFromClerkBackend(
-  clerkUserId: string
-): Promise<string | null> {
-  const clerk = await getServerClerkClient();
-  if (!clerk) {
-    Sentry.addBreadcrumb({
-      category: 'auth-gate',
-      level: 'warning',
-      message: 'Clerk backend email fallback skipped: missing secret key',
-      data: { clerkUserId },
-    });
-    return null;
-  }
-
-  let lastError: unknown = null;
-
-  for (
-    let attempt = 1;
-    attempt <= CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS;
-    attempt++
-  ) {
-    try {
-      const clerkUser = await clerk.users.getUser(clerkUserId);
-      const email = selectVerifiedClerkEmail(clerkUser.emailAddresses);
-      if (email) return email;
-    } catch (error) {
-      lastError = error;
-    }
-
-    if (attempt < CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS) {
-      await sleep(CLERK_BACKEND_EMAIL_FALLBACK_DELAY_MS * attempt);
-    }
-  }
-
-  Sentry.addBreadcrumb({
-    category: 'auth-gate',
-    level: 'warning',
-    message: 'Clerk backend email fallback failed',
-    data: {
-      clerkUserId,
-      attempts: CLERK_BACKEND_EMAIL_FALLBACK_ATTEMPTS,
-      error: lastError instanceof Error ? lastError.message : String(lastError),
-    },
-  });
-  return null;
 }
 
 async function loadAuthGateRecord(
-  clerkUserId: string,
+  betterAuthUserId: string,
   email: string | null
 ): Promise<AuthGateRecord | AuthGateResult | undefined> {
   try {
     const [dbResult] = await db
       .select({
-        // User fields
         id: users.id,
         email: users.email,
         userStatus: users.userStatus,
         isAdmin: users.isAdmin,
         isPro: users.isPro,
         deletedAt: users.deletedAt,
-        // Profile fields (nullable from LEFT JOIN)
         profileId: creatorProfiles.id,
         profileUsername: creatorProfiles.username,
         profileUsernameNormalized: creatorProfiles.usernameNormalized,
@@ -591,7 +559,7 @@ async function loadAuthGateRecord(
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-      .where(eq(users.clerkId, clerkUserId))
+      .where(eq(users.betterAuthUserId, betterAuthUserId))
       .limit(1);
 
     return dbResult;
@@ -602,11 +570,11 @@ async function loadAuthGateRecord(
         level: 'warning',
         message: 'Using E2E test auth fallback after DB lookup failure',
         data: {
-          clerkUserId,
+          betterAuthUserId,
           error: error instanceof Error ? error.message : String(error),
         },
       });
-      return createE2ETestAuthGateResult(clerkUserId, email);
+      return createE2ETestAuthGateResult(betterAuthUserId, email);
     }
     throw error;
   }
@@ -648,38 +616,19 @@ function toAuthGateProfile(
   };
 }
 
-async function syncVerifiedEmailIfNeeded(
-  dbUser: AuthGateDbUser | null,
-  email: string | null
-) {
-  if (!dbUser || !email || dbUser.email === email) {
-    return;
-  }
-
-  // Best-effort sync - don't block auth on sync failure
-  await syncEmailFromClerk(dbUser.id, email).catch(err => {
-    Sentry.addBreadcrumb({
-      category: 'auth-gate',
-      message: 'Email sync failed',
-      level: 'warning',
-      data: {
-        error: err instanceof Error ? err.message : String(err),
-        userId: dbUser.id,
-      },
-    });
-  });
-}
-
 export interface ResolveUserStateOptions {
   createDbUserIfMissing?: boolean;
   /**
-   * Pre-resolved Clerk user ID. When provided, skips calling auth() and
-   * currentUser() — both of which read request headers and must NOT be
-   * called inside unstable_cache or "use cache" boundaries.
+   * Pre-resolved app `users.id` UUID. When provided, skips the Better Auth
+   * session read (which calls `headers()` and must NOT be invoked inside
+   * `unstable_cache` / `"use cache"` boundaries).
    *
-   * Pass this when the Clerk user ID is already known (e.g. from a cached
-   * function that received it as a parameter). In this case the verified
-   * email is resolved from Clerk's backend API if a DB user must be created.
+   * Pass this when the app user id is already known (e.g. from a cached
+   * function that received it as a parameter). gate.ts resolves the
+   * user's `betterAuthUserId` from the DB and proceeds.
+   *
+   * (Field name preserved for churn reduction; was `knownClerkUserId` in
+   * the Clerk era and accepted a Clerk user id.)
    */
   knownClerkUserId?: string;
 }
@@ -700,7 +649,7 @@ function serializeResolveUserStateOptions(
  * scattered auth checks in layout.tsx, onboarding/page.tsx, and claim/[token]/page.tsx.
  *
  * Resolution order:
- * 1. Check Clerk authentication → UNAUTHENTICATED
+ * 1. Check Better Auth session → UNAUTHENTICATED
  * 2. Check DB user existence → NEEDS_DB_USER (auto-creates)
  * 3. Check user status → BANNED
  * 4. Check waitlist/profile state → WAITLIST_*, NEEDS_ONBOARDING, ACTIVE
@@ -709,16 +658,15 @@ function serializeResolveUserStateOptions(
  * reuse one DB/auth resolution pass (JOV-2993).
  *
  * @param options.createDbUserIfMissing - If true, creates a DB user row when missing (default: true)
+ * @param options.knownClerkUserId - Pre-resolved app `users.id` UUID (see ResolveUserStateOptions)
  */
 async function resolveUserStateInternal(
   options: ResolveUserStateOptions = {}
 ): Promise<AuthGateResult> {
   const { createDbUserIfMissing = true, knownClerkUserId } = options;
 
-  // 1. Resolve Clerk identity and prefetch waitlist gate in parallel.
-  // Gate status is needed for every authenticated path; starting it early
-  // overlaps with identity resolution and the DB JOIN below (JOV-2993).
-  const identityPromise = resolveClerkIdentity(knownClerkUserId);
+  // 1. Resolve Better Auth identity and prefetch waitlist gate in parallel.
+  const identityPromise = resolveAuthIdentity(knownClerkUserId);
   const waitlistGatePromise = isWaitlistGateEnabled();
   const { clerkUserId, email } = await identityPromise;
 
@@ -727,8 +675,6 @@ async function resolveUserStateInternal(
   }
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
-  // This reduces database round trips from 2 to 1. Run in parallel with the
-  // waitlist gate lookup started above (matches proxy-state.ts hot-path pattern).
   const [lookupResult, waitlistGateEnabled] = await Promise.all([
     loadAuthGateRecord(clerkUserId, email),
     waitlistGatePromise,
@@ -737,25 +683,15 @@ async function resolveUserStateInternal(
     return lookupResult;
   }
 
-  // Extract user data from result (may be undefined if no user exists)
   const dbResult = lookupResult;
   const dbUser = toAuthGateDbUser(dbResult);
-  const resolvedEmail =
-    !dbUser && !email
-      ? await resolveVerifiedEmailFromClerkBackend(clerkUserId)
-      : email;
+  const resolvedEmail = email ?? dbUser?.email ?? null;
 
   const baseContext = {
     isAdmin: dbUser?.isAdmin ?? false,
     isPro: dbUser?.isPro ?? false,
     email: resolvedEmail,
   };
-
-  // Sync email from Clerk if different (Clerk is source of truth for identity)
-  // Only sync verified emails to prevent hijacking. `resolvedEmail` is selected
-  // from verified Clerk email addresses, either from currentUser() or the
-  // backend fallback.
-  await syncVerifiedEmailIfNeeded(dbUser, resolvedEmail);
 
   // Check if user is blocked (banned, suspended, or deleted)
   const statusCheck = checkUserStatus(
@@ -788,26 +724,23 @@ async function resolveUserStateInternal(
     return createE2ETestAuthGateResult(clerkUserId, resolvedEmail);
   }
 
-  // Profile from the JOIN query (only valid if dbUser exists)
   let profile = toAuthGateProfile(dbResult);
 
   if (!dbUserId) {
     const creationResult = await handleMissingDbUser(
       {
         createDbUserIfMissing,
-        clerkUserId,
+        betterAuthUserId: clerkUserId,
         email: resolvedEmail,
         baseContext,
       },
       waitlistGateEnabled
     );
 
-    // If creationResult is a full AuthGateResult, return it early
     if ('state' in creationResult) {
       return creationResult;
     }
 
-    // Otherwise, we got the new user ID
     dbUserId = creationResult.dbUserId;
     const [createdUser] = await db
       .select({
@@ -819,7 +752,6 @@ async function resolveUserStateInternal(
       .limit(1);
     currentUserStatus = createdUser?.userStatus ?? null;
     currentDeletedAt = createdUser?.deletedAt ?? null;
-    // New user won't have a profile yet
     profile = null;
   }
 

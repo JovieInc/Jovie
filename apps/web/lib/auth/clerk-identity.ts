@@ -25,7 +25,7 @@ export interface ClerkPrivateMetadata {
 
 export interface ClerkUserIdentityInput {
   primaryEmailAddress?: ClerkEmailAddress | null;
-  emailAddresses?: ClerkEmailAddress[] | null;
+  emailAddresses?: ReadonlyArray<ClerkEmailAddress> | null;
   fullName?: string | null;
   firstName?: string | null;
   lastName?: string | null;

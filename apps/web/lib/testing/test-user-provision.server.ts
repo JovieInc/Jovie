@@ -17,7 +17,6 @@ const PRIVILEGED_TEST_ACCOUNT_EMAIL_REGEX =
 
 type SeededUserValues = Pick<
   typeof users.$inferInsert,
-  | 'clerkId'
   | 'email'
   | 'name'
   | 'userStatus'
@@ -25,7 +24,11 @@ type SeededUserValues = Pick<
   | 'plan'
   | 'isPro'
   | 'billingUpdatedAt'
->;
+> & {
+  // clerk_id is nullable in the schema as of migration 0073; the dev/E2E
+  // seed path always carries a stable Clerk id, so narrow it back to string.
+  clerkId: string;
+};
 
 type SeededCreatorProfileValues = Pick<
   typeof creatorProfiles.$inferInsert,

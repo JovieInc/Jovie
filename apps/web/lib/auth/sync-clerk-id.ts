@@ -11,7 +11,7 @@ export type SyncClerkIdOutcome =
   | {
       kind: 'synced';
       userId: string;
-      oldClerkId: string;
+      oldClerkId: string | null;
       newClerkId: string;
     }
   | { kind: 'ambiguous_email'; matchCount: number }

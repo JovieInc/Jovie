@@ -1,11 +1,8 @@
 import 'server-only';
-import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import {
-  isTestAuthBypassEnabled,
-  resolveTestBypassUserId,
-} from '@/lib/auth/test-mode';
+import { getCachedDevTestAuthSession } from '@/lib/auth/dev-test-auth.server';
+import { isTestAuthBypassEnabled } from '@/lib/auth/test-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 /**
@@ -63,14 +60,9 @@ export async function requireAuth(options?: {
   const { message = 'Unauthorized', noCache = true } = options ?? {};
 
   if (isTestAuthBypassEnabled()) {
-    try {
-      const headerStore = await headers();
-      const testUserId = resolveTestBypassUserId(headerStore);
-      if (testUserId) {
-        return { userId: testUserId, error: null };
-      }
-    } catch {
-      // Ignore missing request context in test-only paths.
+    const bypassSession = await getCachedDevTestAuthSession();
+    if (bypassSession) {
+      return { userId: bypassSession.dbUserId, error: null };
     }
   }
 
@@ -106,14 +98,9 @@ export async function requireAuth(options?: {
  */
 export async function getAuthUserId(): Promise<string | null> {
   if (isTestAuthBypassEnabled()) {
-    try {
-      const headerStore = await headers();
-      const testUserId = resolveTestBypassUserId(headerStore);
-      if (testUserId) {
-        return testUserId;
-      }
-    } catch {
-      // Ignore missing request context in test-only paths.
+    const bypassSession = await getCachedDevTestAuthSession();
+    if (bypassSession) {
+      return bypassSession.dbUserId;
     }
   }
 
