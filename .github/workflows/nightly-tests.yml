@@ -152,7 +152,7 @@ jobs:
         if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
         run: |
           cd apps/web
-          pnpm exec tsx tests/seed-test-data.ts
+          pnpm run seed:test-data
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test

@@ -145,6 +145,7 @@
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "doppler run -- tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:ci": "tsx scripts/drizzle-migrate.ts",
+    "seed:test-data": "tsx --import ./tests/eval/promptfoo/server-only-preload.mjs tests/seed-test-data.ts",
     "drizzle:verify": "doppler run -- tsx scripts/drizzle-migrate-verify.ts",
     "drizzle:verify:ci": "tsx scripts/drizzle-migrate-verify.ts",
     "drizzle:migrate:preflight": "doppler run -- tsx scripts/drizzle-migrate-preflight.ts",
