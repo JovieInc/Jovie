@@ -274,7 +274,7 @@ function ProfileBentoView({
           />
         }
         footer={
-          <div className='space-y-2 pt-1.5'>
+          <div className='space-y-2 px-1.5 pb-1.5 pt-1.5 lg:px-0 lg:pb-0'>
             <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
             <Button
               type='button'
@@ -846,9 +846,10 @@ export function ProfileContactSidebar() {
         ariaLabel='Profile Contact'
         headerMode='minimal'
         hideMinimalHeaderBar
+        contentBleed
       >
         {emailSignatureModal}
-        <div className='space-y-2.5 pt-0.5'>
+        <div className='space-y-2.5 px-1.5 pb-1.5 pt-2 lg:px-0 lg:pb-0 lg:pt-0.5'>
           <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
@@ -910,6 +911,7 @@ export function ProfileContactSidebar() {
         ariaLabel='Profile Preview'
         headerMode='minimal'
         hideMinimalHeaderBar
+        contentBleed
       >
         {emailSignatureModal}
         <ProfileBentoView
