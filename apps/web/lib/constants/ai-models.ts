@@ -57,3 +57,6 @@ export const TITLE_MODEL = 'google/gemini-2.0-flash';
 /** Model used for YouTube packaging intelligence extraction */
 export const PACKAGING_INTELLIGENCE_MODEL =
   'anthropic/claude-haiku-4-5-20251001';
+
+/** Vision-capable model used for the golden-journey design-taste sweep */
+export const DESIGN_TASTE_SWEEP_MODEL = 'anthropic/claude-haiku-4-5-20251001';

@@ -495,3 +495,14 @@
   --linear-color-border: var(--linear-border-default);
   --linear-color-divider: var(--linear-border-subtle);
 }
+
+/* Reduced motion — zero the raw linear duration scale so every consumer
+   inherits 0ms (mirrors the --duration-* zeroing in design-system.css).
+   Guarded by tests/unit/design-system/reduced-motion-tokens.test.ts. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --linear-duration-fast: 0ms;
+    --linear-duration-normal: 0ms;
+    --linear-duration-slow: 0ms;
+  }
+}

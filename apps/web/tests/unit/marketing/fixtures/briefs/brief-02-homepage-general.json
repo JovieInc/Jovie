@@ -1,0 +1,29 @@
+{
+  "id": "brief-02-homepage-general",
+  "description": "General audience, home traffic, category intent, no verified proof assets. Tests the zero-proof path: social-proof and logo-cloud must be DROPPED deterministically.",
+  "brief": {
+    "businessObjective": "Convert general visitors to start",
+    "targetAudience": "general",
+    "desiredConversion": "start",
+    "trafficSource": "home",
+    "intent": "category",
+    "availableAssets": {
+      "socialProofVerified": false,
+      "statsVerified": false,
+      "logoCloudVerified": false,
+      "productScreenshots": true,
+      "artistFaces": false,
+      "artistFacesTwoRung": false,
+      "takeRateReal": false,
+      "phoneProfileAsset": false,
+      "videoAsset": false
+    },
+    "brandConstraints": {
+      "darkOnly": true,
+      "fullyStatic": true,
+      "waitlistEnabled": false
+    }
+  },
+  "expectedRecipeId": "homepage",
+  "expectedPrimaryCtaLabel": "Get started"
+}

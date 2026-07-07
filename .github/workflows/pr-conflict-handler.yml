@@ -1,5 +1,15 @@
 name: PR Conflict Handler
 
+# Automatically resolves merge conflicts on agent PRs.
+# Fires on:
+#   - CI completion (conflict may surface as test failure)
+#   - Schedule weekday safety net
+#   - Manual dispatch
+#
+# NOTE: no `pull_request: synchronize` trigger. This is a FLEET-WIDE scan that
+# lists all open PRs, so per-push spawns are pure duplication: every push
+# already triggers CI, which fires the workflow_run below. Removed in #13359.
+
 on:
   workflow_dispatch:
     inputs:
@@ -18,6 +28,9 @@ on:
   schedule:
     # Read-only audit. Do not auto-push/rebase the fleet on a tight cadence.
     - cron: '17 15 * * 1-5'
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
 
 permissions:
   contents: write

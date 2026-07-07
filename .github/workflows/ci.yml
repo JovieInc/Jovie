@@ -92,7 +92,7 @@ jobs:
       - id: graphite
         if: steps.graphite-token.outputs.configured == 'true'
         continue-on-error: true
-        uses: withgraphite/graphite-ci-action@main
+        uses: withgraphite/graphite-ci-action@402a89bc8aa6db18ae1f9c61953d001d5f9d828f # v0.0.11
         with:
           graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
 
@@ -533,6 +533,9 @@ jobs:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
     needs: [ci-path-changes]
+    # Merge gate: keep on always-available GitHub runners. The self-hosted
+    # jovie-runner pool is not highly-available (personal OrbStack host) and
+    # took down this gate when it shut down mid-run.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
@@ -593,6 +596,7 @@ jobs:
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
     needs: [ci-path-changes]
+    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true') }}
@@ -616,6 +620,7 @@ jobs:
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
     needs: [ci-path-changes]
+    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true') }}
@@ -636,7 +641,7 @@ jobs:
     # Detect unused files, dependencies, and exports
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -650,8 +655,9 @@ jobs:
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    # Runs on GitHub-hosted runners (typecheck --force means no turbo cache benefit).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -660,7 +666,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .turbo
           # Use content hash for better cache hit rates (not commit SHA which changes every commit)
@@ -1051,23 +1057,23 @@ jobs:
   ci-integration-ready:
     name: Integration Fast
     # Lightweight gate for integration/* PRs (agent batch lanes). Full CI runs on train PRs to main.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast]
+    needs: [ci-path-changes, ci-risk-classifier, ci-build-public]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Evaluate integration fast checks
         run: |
-          FAST_RESULT="${{ needs.ci-fast.result }}"
+          BUILD_RESULT="${{ needs.ci-build-public.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
-          echo "ci-fast: $FAST_RESULT"
+          echo "ci-build-public: $BUILD_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT"
           if [[ "$RISK_RESULT" != "success" ]]; then
             echo "Integration fast lane failed: risk classifier"
             exit 1
           fi
-          if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
-            echo "Integration fast lane failed: ci-fast"
+          if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
+            echo "Integration fast lane failed: build"
             exit 1
           fi
           echo "Integration fast lane passed"
@@ -1166,18 +1172,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        # This job only has an 8 minute budget. Avoid apt-based `--with-deps` here
-        # because slow font package mirrors can consume the whole lane before tests run.
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         id: download
@@ -1228,7 +1224,7 @@ jobs:
 
   ci-mobile-overflow:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
-    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -1314,16 +1310,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         id: download-build
@@ -1433,16 +1421,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db instead of DATABASE_URL_MAIN.
@@ -1598,7 +1578,7 @@ jobs:
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
-    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1630,18 +1610,9 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
@@ -1772,7 +1743,7 @@ jobs:
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
-    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1783,16 +1754,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
@@ -1914,7 +1877,7 @@ jobs:
   ci-lighthouse-admin-pr:
     name: Lighthouse (admin PR)
     # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
-    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1925,16 +1888,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -2056,7 +2011,7 @@ jobs:
     # Informational baseline run — first PR establishes the budget; once
     # baselines stabilize this can be promoted to a hard gate by removing
     # `continue-on-error` and adding the job to ci-pr-ready.needs.
-    needs: [ci-fast, ci-path-changes, neon-db, ci-build-public]
+    needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     continue-on-error: true
     runs-on: ubuntu-latest
@@ -2068,16 +2023,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download Neon DB connection artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -2510,18 +2457,9 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check-creds.outputs.skip != 'true'
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check-creds.outputs.skip != 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium only)
-        if: steps.check-creds.outputs.skip != 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Wait for CDN propagation
         if: steps.check-creds.outputs.skip != 'true'
@@ -2557,9 +2495,9 @@ jobs:
     name: Build
     needs: [ci-path-changes]
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    # Skipped in merge queue: no merge-queue jobs depend on the full build.
+    # Heavy job: runs on self-hosted jovie-runner pool for ARM64 + local turbo cache.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: [self-hosted, jovie-runner]
     timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -2672,7 +2610,8 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # 5-shard unit tests on GitHub-hosted runners for reliability (turbo remote cache works on any runner).
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -2831,18 +2770,9 @@ jobs:
             exit 1
           fi
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         id: download
@@ -2933,7 +2863,7 @@ jobs:
     # Gated: runs with 'testing' label or deterministic high-risk classification.
     # Full E2E runs on merge to main anyway.
     # Dependabot PRs cannot access NEON_API_KEY or other Preview-environment secrets.
-    needs: [ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
+    needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -3022,18 +2952,9 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3133,7 +3054,7 @@ jobs:
     # E2E_USE_TEST_AUTH_BYPASS — those make golden-path.spec.ts self-skip.
     # Path-triggered (not always-on): the spec has a 600s timeout, so always-on would
     # blow the CI budget and churn the Clerk dev-instance 100-user cap.
-    needs: [ci-fast, ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
+    needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || contains(github.event.pull_request.labels.*.name, 'testing')) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -3204,16 +3125,8 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -3308,7 +3221,7 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label (admin tests need auth credentials).
     # Removed push-to-main trigger — merge queue validates PRs before merge.
-    needs: [ci-fast, ci-path-changes, neon-db]
+    needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -3368,18 +3281,9 @@ jobs:
           GIT_BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Load quarantined E2E specs
         id: quarantine
@@ -3447,7 +3351,7 @@ jobs:
   ci-e2e-migrate:
     name: E2E DB Migrate
     environment: Preview – jovie
-    needs: [ci-fast, ci-build, neon-db, ci-path-changes]
+    needs: [ci-path-changes, ci-build-public, neon-db]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -3527,7 +3431,7 @@ jobs:
     name: Full E2E (Preview)
     environment: Preview – jovie
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
-    needs: [ci-path-changes, ci-fast, ci-build, neon-db, ci-e2e-migrate]
+    needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-migrate]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -3577,21 +3481,9 @@ jobs:
             exit 1
           fi
 
-      - name: Cache Playwright Browsers
+      - name: Setup Playwright (Chromium)
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          # Standardized cache key - chromium only for CI (Firefox runs weekly)
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright
-        if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        run: |
-          # Always Chrome-only for speed; Firefox runs weekly via e2e-full-matrix workflow
-          pnpm --filter=@jovie/web exec playwright install chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Load quarantined E2E specs
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -3789,7 +3681,7 @@ jobs:
     name: Preview Deploy (PR)
     # Preview deploys are the default QA surface for internal PRs.
     # Keep this independent from the main deploy gate so review happens before merge.
-    needs: [ci-fast, ci-path-changes, ci-risk-classifier]
+    needs: [ci-path-changes, ci-risk-classifier]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-risk-classifier.outputs.requires_preview == 'true' || contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -3900,7 +3792,6 @@ jobs:
       - ci-pr-ready
       - ci-e2e-smoke
       - ci-pr-neon-migrate
-      - ci-build
       - ci-unit-tests
       - ci-test-performance
       - ci-e2e-migrate
@@ -3930,7 +3821,6 @@ jobs:
           RISK_BLOCKS_UNATTENDED: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
           RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
           CI_HARNESS_JOB_CI_RISK_CLASSIFIER: ${{ needs.ci-risk-classifier.result }}
-          CI_HARNESS_JOB_CI_FAST: ${{ needs.ci-fast.result }}
           CI_HARNESS_JOB_CI_STRUCTURAL_CONTRACT: ${{ needs.ci-structural-contract.result }}
           CI_HARNESS_JOB_CI_UNIT_TESTS: ${{ needs.ci-unit-tests.result }}
           CI_HARNESS_JOB_CI_BUILD_PUBLIC: ${{ needs.ci-build-public.result }}
@@ -3995,7 +3885,7 @@ jobs:
       - name: Post CI summary to PR
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
+          BUILD_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_build }}
           DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
           E2E_RUN_FULL_CI: ${{ needs.ci-e2e-migrate.outputs.run_full_ci }}
           E2E_SMOKE_RUN_FULL_CI: ${{ needs.ci-e2e-smoke.outputs.run_full_ci }}
@@ -4196,8 +4086,8 @@ jobs:
   # This remains available for opt-in PR validation but does not block production deploys.
   ci-smoke-required:
     name: Extended Smoke (Preview)
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
+    needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-tests]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && ((github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
@@ -4235,21 +4125,12 @@ jobs:
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Download build artifact from ci-build
         id: download-build
-        if: ${{ needs.ci-build.outputs.run_full_ci == 'true' }}
+        if: ${{ needs.ci-path-changes.outputs.run_build == 'true' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
@@ -4259,7 +4140,7 @@ jobs:
       - name: Extract or rebuild for smoke tests
         run: |
           if [ -f /tmp/nextjs-build-download/nextjs-build.tar ]; then
-            echo "Reusing build artifact from ci-build (saves ~3-4 min)"
+            echo "Reusing build artifact (saves ~3-4 min)"
             tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
           else
             echo "Build artifact not available, building from scratch"
@@ -4363,7 +4244,7 @@ jobs:
   # Post-deploy verification is handled by canary-health-gate.
   ci-homepage-smoke:
     name: Homepage Smoke (Informational)
-    needs: [ci-fast, ci-build]
+    needs: [ci-build-public]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -4431,7 +4312,7 @@ jobs:
   # proceeds to deploy-staging. Older intermediates short-circuit cleanly.
   deploy-gate:
     name: Deploy Gate (HEAD-only)
-    needs: [ci-fast]
+    needs: [ci-path-changes, ci-build-public]
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -4459,7 +4340,7 @@ jobs:
           fi
 
   deploy-staging:
-    needs: [ci-fast, deploy-gate]
+    needs: [deploy-gate]
     # Fast main path: merge on deterministic checks, deploy a production build to
     # a preview URL, verify it on staging, then promote only if it passes.
     # Intermediate commits (not main HEAD at gate time) skip so they don't
@@ -4556,7 +4437,20 @@ jobs:
             exit 1
           fi
 
+          # Fetch current Vercel env once, then diff to avoid
+          # 24 sequential API calls when ~95% of vars are unchanged.
+          current_env=$(./node_modules/.bin/vercel env ls production --json \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" 2>/dev/null || echo "[]")
+
           for key in "${required_vercel_env[@]}"; do
+            current_value=$(echo "$current_env" | jq -r ".[] | select(.key == \"$key\") | .value // empty" 2>/dev/null || echo "")
+
+            if [ -n "$current_value" ] && [ "$current_value" = "${!key}" ]; then
+              echo "Skipping ${key} (unchanged)."
+              continue
+            fi
+
             ./node_modules/.bin/vercel env rm "$key" production \
               --yes \
               --token "$VERCEL_TOKEN" \
@@ -4989,15 +4883,9 @@ jobs:
         with:
           fetch-depth: 1
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+
       - name: Probe production Google + Apple OAuth redirect URIs
         id: oauth-probe
         run: |
