@@ -1,0 +1,29 @@
+{
+  "id": "brief-01-artist-claim",
+  "description": "Artist audience, claim-handle conversion, full artist LP recipe with verified social proof and take-rate. The canonical worked example for AGENT_GUIDE.md.",
+  "brief": {
+    "businessObjective": "Convert artists to claim their Jovie profile",
+    "targetAudience": "artist",
+    "desiredConversion": "claim-handle",
+    "trafficSource": "social",
+    "intent": "artist-profile",
+    "availableAssets": {
+      "socialProofVerified": true,
+      "statsVerified": false,
+      "logoCloudVerified": false,
+      "productScreenshots": true,
+      "artistFaces": true,
+      "artistFacesTwoRung": true,
+      "takeRateReal": true,
+      "phoneProfileAsset": true,
+      "videoAsset": false
+    },
+    "brandConstraints": {
+      "darkOnly": true,
+      "fullyStatic": true,
+      "waitlistEnabled": false
+    }
+  },
+  "expectedRecipeId": "artist-lp",
+  "expectedPrimaryCtaLabel": "Claim your Jovie"
+}
