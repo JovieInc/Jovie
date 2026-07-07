@@ -2873,6 +2873,7 @@ jobs:
           export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
           export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
           export E2E_SKIP_WARMUP=1
+          export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
           # Arms the onboarding LLM-failure fallback spec; matches playwright.config.smoke.ts
           export CHAT_LLM_FAILURE_INJECTION=1
 

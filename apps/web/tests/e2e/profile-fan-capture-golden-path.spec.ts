@@ -178,10 +178,11 @@ async function enterOtpCode(page: Page, code: string) {
 
   // The email→OTP transition includes an OTP send (Resend) + write on a
   // cold ephemeral Neon branch; the first mobile run in CI regularly needs
-  // longer than the standard visibility budget (3×20s timeouts observed).
+  // longer than the standard visibility budget (3×20s timeouts observed),
+  // and some runs push past 5× as Neon branch cold-start latency varies.
   await otpStep.waitFor({
     state: 'visible',
-    timeout: SMOKE_TIMEOUTS.VISIBILITY * 3,
+    timeout: SMOKE_TIMEOUTS.VISIBILITY * 5,
   });
   await firstDigitInput.click();
   await firstDigitInput.pressSequentially(code);
