@@ -1,25 +1,14 @@
 'use client';
 
-import { ClerkProvider } from '@clerk/nextjs';
-import { ui } from '@clerk/ui';
 import { TooltipProvider } from '@jovie/ui';
 import React from 'react';
-import { APP_ROUTES } from '@/constants/routes';
 import {
-  ClerkSafeBootstrapProvider,
   ClerkSafeDefaultsProvider,
   ClerkSafeValuesProvider,
 } from '@/hooks/useClerkSafe';
 import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
-import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
-import { clerkAppearanceBase } from './clerkAppearance';
-import {
-  getClerkJSUrl,
-  getClerkProxyUrl,
-  shouldBypassClerk,
-} from './clerkAvailability';
 import { QueryProvider } from './QueryProvider';
 
 interface ClientProvidersProps {
@@ -27,11 +16,11 @@ interface ClientProvidersProps {
   readonly authBootstrap?: ClientAuthBootstrap | null;
   readonly forceBypassClerk?: boolean;
   readonly initialThemeMode?: ThemeMode;
-  readonly publishableKey: string | undefined;
+  readonly publishableKey?: string | undefined;
   readonly skipCoreProviders?: boolean;
 }
 
-// Inner component that uses Clerk hooks (must be inside ClerkProvider)
+// Inner component that wraps children with CoreProviders or QueryProvider
 interface WrappedProvidersOptions {
   children: React.ReactNode;
   initialThemeMode: ThemeMode;
@@ -55,68 +44,52 @@ function wrapWithCoreProviders({
 
   return content;
 }
-// Main export - wraps children with ClerkProvider
+
+/**
+ * Client providers root (Clerk → Better Auth migration, client-flip commit ⑦).
+ *
+ * Better Auth needs no provider — `authClient.useSession()` reads the session
+ * cookie directly. The context fan-out architecture from the Clerk era is
+ * preserved (plan decision 7): `JovieAuthValuesProvider` (aliased here as
+ * `ClerkSafeValuesProvider`) subscribes to the session ONCE and fans the
+ * user/auth/session slices out through context so the 36
+ * `useUserSafe`/`useAuthSafe`/`useSessionSafe` consumers don't churn.
+ *
+ * The legacy `publishableKey` / `forceBypassClerk` / `authBootstrap` props are
+ * kept in the interface for source compatibility with existing callers
+ * (`ResolvedClientProviders`) but are functionally inert under Better Auth:
+ *   - `publishableKey` — no Clerk JS to load.
+ *   - `forceBypassClerk` — routes to `ClerkSafeDefaultsProvider` (signed-out
+ *     safe defaults) for mock/DB-less mode.
+ *   - `authBootstrap` — under Clerk this synthesized a fake user because
+ *     Clerk's client SDK couldn't see the dev test cookie. Under BA the dev
+ *     bypass mints a REAL `ba_sessions` row + session cookie (commit ⑤'s
+ *     `mintBetterAuthSessionForDevTestActor`), so `authClient.useSession()`
+ *     observes it through the standard cookie path and the bootstrap provider
+ *     collapses into the live values provider.
+ */
 export function ClientProviders({
   children,
   authBootstrap = null,
   forceBypassClerk = false,
   initialThemeMode = 'dark',
-  publishableKey,
   skipCoreProviders = false,
 }: ClientProvidersProps) {
-  const shouldSkipClerk =
-    forceBypassClerk ||
-    shouldBypassClerk(
-      publishableKey,
-      publicEnv.NEXT_PUBLIC_CLERK_MOCK,
-      globalThis.location
-    );
+  const wrappedChildren = wrapWithCoreProviders({
+    children,
+    initialThemeMode,
+    skipCoreProviders,
+  });
 
-  if (shouldSkipClerk) {
-    const wrappedChildren = wrapWithCoreProviders({
-      children,
-      initialThemeMode,
-      skipCoreProviders,
-    });
-
-    if (authBootstrap?.isAuthenticated) {
-      return (
-        <ClerkSafeBootstrapProvider bootstrap={authBootstrap}>
-          {wrappedChildren}
-        </ClerkSafeBootstrapProvider>
-      );
-    }
-
+  // `forceBypassClerk` routes to signed-out safe defaults (mock/DB-less mode,
+  // build-time rendering, tests). Under BA this is the only remaining branch
+  // — the bootstrap branch collapsed because the dev bypass now mints a real
+  // BA session cookie that `authClient.useSession()` observes directly.
+  if (forceBypassClerk && !authBootstrap?.isAuthenticated) {
     return (
       <ClerkSafeDefaultsProvider>{wrappedChildren}</ClerkSafeDefaultsProvider>
     );
   }
 
-  const clerkJSUrl = getClerkJSUrl(publishableKey);
-  const clerkScriptProps = clerkJSUrl
-    ? { __internal_clerkJSUrl: clerkJSUrl }
-    : {};
-
-  return (
-    <ClerkProvider
-      {...clerkScriptProps}
-      publishableKey={publishableKey}
-      proxyUrl={getClerkProxyUrl(globalThis.location)}
-      appearance={clerkAppearanceBase}
-      ui={ui}
-      prefetchUI={false}
-      signInUrl={APP_ROUTES.SIGNIN}
-      signUpUrl={APP_ROUTES.SIGNUP}
-      signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
-      signUpFallbackRedirectUrl={APP_ROUTES.START}
-    >
-      <ClerkSafeValuesProvider>
-        {wrapWithCoreProviders({
-          children,
-          initialThemeMode,
-          skipCoreProviders,
-        })}
-      </ClerkSafeValuesProvider>
-    </ClerkProvider>
-  );
+  return <ClerkSafeValuesProvider>{wrappedChildren}</ClerkSafeValuesProvider>;
 }

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { CLERK_COOKIE_PREFIXES } from '@/lib/auth/clerk-cookie-names';
+import { isBetterAuthCookieName } from '@/app/api/auth/reset/route';
 import { DEV_TEST_AUTH_COOKIE_NAMES } from '@/lib/auth/dev-test-auth.server';
 import {
   developmentOnlyForbiddenJson,
@@ -48,10 +48,10 @@ export async function POST() {
     // Skip preserved cookies
     if (PRESERVE_PREFIXES.some(p => name.startsWith(p))) continue;
 
-    const isClerkCookie = CLERK_COOKIE_PREFIXES.some(p => name.startsWith(p));
+    const isAuthCookie = isBetterAuthCookieName(name);
     const isAppCookie = APP_COOKIES.has(name);
 
-    if (isClerkCookie || isAppCookie) {
+    if (isAuthCookie || isAppCookie) {
       cookieStore.delete(name);
       deleted.push(name);
     }

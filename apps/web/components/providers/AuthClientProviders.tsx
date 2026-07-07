@@ -1,94 +1,43 @@
 'use client';
 
-import { ClerkProvider } from '@clerk/nextjs';
-import { ui } from '@clerk/ui';
-import * as Sentry from '@sentry/nextjs';
-import { type ReactNode, useEffect } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
-import {
-  ClerkSafeDefaultsProvider,
-  ClerkSafeValuesProvider,
-} from '@/hooks/useClerkSafe';
-import { publicEnv } from '@/lib/env-public';
-import { authClerkAppearance } from './clerkAppearance';
-import {
-  getClerkJSUrl,
-  getClerkProxyUrl,
-  isPublicAuthHost,
-  shouldBypassClerk,
-} from './clerkAvailability';
-import { authClerkLocalization } from './clerkLocalization';
+import { type ReactNode } from 'react';
+import { ClerkSafeValuesProvider } from '@/hooks/useClerkSafe';
 import { QueryProvider } from './QueryProvider';
 
 interface AuthClientProvidersProps {
   readonly children: ReactNode;
   readonly forceEnableClerk?: boolean;
-  readonly publishableKey: string | undefined;
+  readonly publishableKey?: string | undefined;
 }
 
 function wrapChildren(children: ReactNode) {
   return <QueryProvider>{children}</QueryProvider>;
 }
 
+/**
+ * Auth-scoped client providers (Clerk → Better Auth migration, client-flip
+ * commit ⑦). Better Auth needs no provider — `authClient.useSession()` reads
+ * the session cookie directly. The context fan-out from `useJovieAuth` is
+ * mounted via `ClerkSafeValuesProvider` (an alias for
+ * `JovieAuthValuesProvider`) so `useUserSafe`/`useAuthSafe`/`useSessionSafe`
+ * consumers inside the (auth)/ and @auth layouts keep working.
+ *
+ * The legacy `forceEnableClerk` / `publishableKey` props are kept in the
+ * interface for source compatibility with `(auth)/layout.tsx` and
+ * `@auth/layout.tsx` but are functionally inert under Better Auth.
+ */
 export function AuthClientProviders({
   children,
   forceEnableClerk = false,
   publishableKey,
 }: AuthClientProvidersProps) {
-  const shouldSkipClerk =
-    !forceEnableClerk &&
-    shouldBypassClerk(
-      publishableKey,
-      publicEnv.NEXT_PUBLIC_CLERK_MOCK,
-      globalThis.location
-    );
+  // `forceEnableClerk` was the "always mount ClerkProvider on auth pages"
+  // signal. Under BA there is no provider to mount — the values provider is
+  // always the right choice. `publishableKey` is unused.
+  void forceEnableClerk;
+  void publishableKey;
 
-  const bypassOnPublicHost =
-    shouldSkipClerk && isPublicAuthHost(globalThis.location);
-
-  useEffect(() => {
-    if (!bypassOnPublicHost) return;
-    Sentry.captureMessage('clerk_bypass_on_public_host', {
-      level: 'error',
-      tags: {
-        hostname: globalThis.location?.hostname ?? 'unknown',
-        has_runtime_pk: publishableKey ? '1' : '0',
-      },
-    });
-  }, [bypassOnPublicHost, publishableKey]);
-
-  if (shouldSkipClerk) {
-    return (
-      <ClerkSafeDefaultsProvider>
-        {wrapChildren(children)}
-      </ClerkSafeDefaultsProvider>
-    );
-  }
-
-  const clerkJSUrl = getClerkJSUrl(publishableKey);
-  const clerkScriptProps = clerkJSUrl
-    ? { __internal_clerkJSUrl: clerkJSUrl }
-    : {};
-
-  // @clerk/ui bundled locally to avoid CDN loading issues with frontendApiProxy.
-  // Added to transpilePackages in next.config.js to resolve Turbopack + pnpm symlink issues.
   return (
-    <ClerkProvider
-      {...clerkScriptProps}
-      publishableKey={publishableKey}
-      proxyUrl={getClerkProxyUrl(globalThis.location)}
-      appearance={authClerkAppearance}
-      localization={authClerkLocalization}
-      ui={ui}
-      prefetchUI={false}
-      signInUrl={APP_ROUTES.SIGNIN}
-      signUpUrl={APP_ROUTES.SIGNUP}
-      signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
-      signUpFallbackRedirectUrl={APP_ROUTES.START}
-    >
-      <ClerkSafeValuesProvider>
-        {wrapChildren(children)}
-      </ClerkSafeValuesProvider>
-    </ClerkProvider>
+    <ClerkSafeValuesProvider>{wrapChildren(children)}</ClerkSafeValuesProvider>
   );
 }

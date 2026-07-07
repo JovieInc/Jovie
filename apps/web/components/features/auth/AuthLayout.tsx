@@ -1,6 +1,5 @@
 'use client';
 
-import { SignOutButton } from '@clerk/nextjs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +13,7 @@ import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
@@ -204,6 +204,7 @@ export function AuthLayout({
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
   const designV1 = useAppFlag('DESIGN_V1');
+  const { signOut } = useAuthSafe();
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
 
@@ -308,9 +309,13 @@ export function AuthLayout({
               </AppIconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' sideOffset={8}>
-              <SignOutButton redirectUrl={logoutRedirectUrl}>
-                <DropdownMenuItem>Log out</DropdownMenuItem>
-              </SignOutButton>
+              <DropdownMenuItem
+                onSelect={() => {
+                  void signOut({ redirectUrl: logoutRedirectUrl });
+                }}
+              >
+                Log out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

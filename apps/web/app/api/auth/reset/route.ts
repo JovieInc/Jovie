@@ -1,9 +1,28 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { CLERK_COOKIE_PREFIXES } from '@/lib/auth/clerk-cookie-names';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+/**
+ * Better Auth cookie name prefixes. Catches suffixed variants like
+ * `better-auth.session_token_<suffix>` that Better Auth may emit for
+ * chunked cookies. Shared with `/api/dev/clear-session` so both stay in sync.
+ *
+ * The canonical session cookie is `better-auth.session_token`. The
+ * `__Secure-` and `__Host-` prefixes are added on HTTPS origins by Better
+ * Auth automatically; we strip them when matching so the delete works on
+ * both dev (http) and prod (https) origins.
+ */
+export const BETTER_AUTH_COOKIE_PREFIXES = [
+  'better-auth.',
+  '__Secure-better-auth.',
+  '__Host-better-auth.',
+] as const;
+
+export function isBetterAuthCookieName(name: string): boolean {
+  return BETTER_AUTH_COOKIE_PREFIXES.some(prefix => name.startsWith(prefix));
+}
 
 /**
  * Derive the parent cookie scope (e.g. `.jov.ie` for `staging.jov.ie`) so
@@ -21,13 +40,15 @@ function parentDomainScope(hostname: string): string | null {
 }
 
 /**
- * Public cookie-clear endpoint. Deletes Clerk auth cookies on both the current
- * host and the parent `.jov.ie` scope, then redirects to `/signin?reset=1` so
- * the signin page can surface a confirmation toast.
+ * Public cookie-clear endpoint (Clerk → Better Auth migration, client-flip
+ * commit ⑦). Deletes Better Auth session cookies on both the current host
+ * and the parent `.jov.ie` scope, then redirects to `/signin?reset=1` so the
+ * signin page can surface a confirmation toast (plan design row 23: cutover
+ * bounce reuses the `?reset=1` session-cleared toast).
  *
- * Safe to expose without auth: this only deletes the caller's own cookies.
- * Used by the signin-page timeout escape and the Clerk-unavailable notice
- * when cross-environment cookie collisions break auth.
+ * Plan design row 21: rewrote from Clerk cookie clearing to Better Auth
+ * cookie clearing. Safe to expose without auth: this only deletes the
+ * caller's own cookies.
  */
 async function handleReset(req: NextRequest): Promise<NextResponse> {
   const hostname = req.nextUrl.hostname;
@@ -40,13 +61,13 @@ async function handleReset(req: NextRequest): Promise<NextResponse> {
 
   const incomingCookies = req.cookies.getAll();
 
-  // Use headers.append instead of response.cookies.set so cookies with the same
-  // name but different Domain attributes both land in Set-Cookie. The Next
-  // cookies helper dedupes by name and collapses host-scoped + parent-scoped
-  // deletes into a single header, which leaves the parent-scoped cookie alive.
+  // Use headers.append instead of response.cookies.set so cookies with the
+  // same name but different Domain attributes both land in Set-Cookie. The
+  // Next cookies helper dedupes by name and collapses host-scoped +
+  // parent-scoped deletes into a single header, which leaves the
+  // parent-scoped cookie alive.
   for (const { name } of incomingCookies) {
-    const isClerkCookie = CLERK_COOKIE_PREFIXES.some(p => name.startsWith(p));
-    if (!isClerkCookie) continue;
+    if (!isBetterAuthCookieName(name)) continue;
 
     response.headers.append(
       'set-cookie',

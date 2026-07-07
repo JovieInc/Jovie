@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
+import { useAuthSafe, useUserSafe } from '@/hooks/useJovieAuth';
 import { identify } from '@/lib/analytics';
 
 /**
- * Stub component to support Clerk analytics in the client.
- * Extend this to integrate Clerk analytics events as needed.
+ * Identifies the signed-in user to the analytics layer (Clerk → Better Auth
+ * migration, client-flip commit ⑦). Replaces the Clerk-era `ClerkAnalytics`
+ * stub; the contract is identical — subscribe to the auth session and call
+ * `identify()` with the user's stable id + traits.
  */
-export function ClerkAnalytics() {
+export function JovieAnalytics() {
   const { isLoaded, isSignedIn, userId } = useAuthSafe();
   const { user } = useUserSafe();
 
