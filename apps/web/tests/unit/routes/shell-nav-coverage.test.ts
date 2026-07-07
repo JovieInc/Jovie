@@ -45,6 +45,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Unified autonomous work feed is reachable from direct app links until nav placement is finalised',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
+  '/app/settings/referral':
+    'Referral code page reached from share/referral flows; Settings IA nav placement lands with the Settings sidebar consolidation (#13134)',
 };
 
 interface ShellPage {
