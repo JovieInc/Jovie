@@ -4089,7 +4089,7 @@ jobs:
   ci-smoke-required:
     name: Extended Smoke (Preview)
     needs: [ci-fast, ci-build, neon-db, ci-e2e-tests, ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && ((github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
