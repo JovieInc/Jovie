@@ -4437,7 +4437,20 @@ jobs:
             exit 1
           fi
 
+          # Fetch current Vercel env once, then diff to avoid
+          # 24 sequential API calls when ~95% of vars are unchanged.
+          current_env=$(./node_modules/.bin/vercel env ls production --json \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" 2>/dev/null || echo "[]")
+
           for key in "${required_vercel_env[@]}"; do
+            current_value=$(echo "$current_env" | jq -r ".[] | select(.key == \"$key\") | .value // empty" 2>/dev/null || echo "")
+
+            if [ -n "$current_value" ] && [ "$current_value" = "${!key}" ]; then
+              echo "Skipping ${key} (unchanged)."
+              continue
+            fi
+
             ./node_modules/.bin/vercel env rm "$key" production \
               --yes \
               --token "$VERCEL_TOKEN" \
