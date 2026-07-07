@@ -1,66 +1,71 @@
 import 'server-only';
 
-import { clerkClient } from '@clerk/nextjs/server';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+import { baUsers } from '@/lib/db/schema/better-auth';
 
-type ClerkClient = Awaited<ReturnType<typeof clerkClient>>;
+/**
+ * Resolve a configured Better Auth user id for native test auth (Clerk →
+ * Better Auth migration, commit ⑨). Replaces the Clerk-era
+ * `resolveConfiguredNativeTestClerkUserId` which queried the Clerk API.
+ * Under BA, the test user is a direct drizzle row — no external API call.
+ *
+ * Reads `JOVIE_IOS_LIVE_AUTH_BETTER_AUTH_USER_ID` (new) or
+ * `JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID` (old, fallback) from env. The value
+ * is a BA user id; we verify it exists in `ba_users` before returning it.
+ * If the env value is an old Clerk id that's now linked to a BA user via
+ * `users.clerkId`, we resolve through to the BA user id.
+ */
+export async function resolveConfiguredNativeTestBetterAuthUserId(): Promise<
+  string | null
+> {
+  const explicitBaUserId = readTrimmedEnv(
+    'JOVIE_IOS_LIVE_AUTH_BETTER_AUTH_USER_ID'
+  );
+  const legacyClerkId = readTrimmedEnv('JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID');
+  const e2eEmail = readTrimmedEnv('E2E_CLERK_USER_USERNAME');
+  const e2eUserId = readTrimmedEnv('E2E_CLERK_USER_ID');
+
+  if (!explicitBaUserId && !legacyClerkId && !e2eEmail && !e2eUserId) {
+    return null;
+  }
+
+  // Direct BA user id from env — verify it exists.
+  if (explicitBaUserId) {
+    const [baUser] = await db
+      .select({ id: baUsers.id })
+      .from(baUsers)
+      .where(eq(baUsers.id, explicitBaUserId))
+      .limit(1);
+    return baUser?.id ?? null;
+  }
+
+  // Legacy Clerk id — resolve through to the linked BA user id.
+  if (legacyClerkId || e2eUserId) {
+    const clerkId = legacyClerkId ?? e2eUserId!;
+    const [appUser] = await db
+      .select({ betterAuthUserId: users.betterAuthUserId })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    return appUser?.betterAuthUserId ?? null;
+  }
+
+  // Email lookup — find the BA user by email.
+  if (e2eEmail) {
+    const [baUser] = await db
+      .select({ id: baUsers.id })
+      .from(baUsers)
+      .where(eq(baUsers.email, e2eEmail))
+      .limit(1);
+    return baUser?.id ?? null;
+  }
+
+  return null;
+}
 
 function readTrimmedEnv(name: string): string | null {
   const value = process.env[name]?.trim();
   return value ? value : null;
-}
-
-async function getExistingUserId(
-  clerk: ClerkClient,
-  userId: string
-): Promise<string | null> {
-  try {
-    const user = await clerk.users.getUser(userId);
-    return user.id.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-async function getUserIdByEmail(
-  clerk: ClerkClient,
-  email: string
-): Promise<string | null> {
-  try {
-    const users = await clerk.users.getUserList({
-      emailAddress: [email],
-    });
-    return users.data[0]?.id?.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-export async function resolveConfiguredNativeTestClerkUserId(): Promise<
-  string | null
-> {
-  const explicitUserId = readTrimmedEnv('JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID');
-  const e2eEmail = readTrimmedEnv('E2E_CLERK_USER_USERNAME');
-  const e2eUserId = readTrimmedEnv('E2E_CLERK_USER_ID');
-  if (!explicitUserId && !e2eEmail && !e2eUserId) {
-    return null;
-  }
-
-  const clerk = await clerkClient();
-
-  if (explicitUserId) {
-    return getExistingUserId(clerk, explicitUserId);
-  }
-
-  if (e2eEmail) {
-    const emailUserId = await getUserIdByEmail(clerk, e2eEmail);
-    if (emailUserId) {
-      return emailUserId;
-    }
-  }
-
-  if (e2eUserId) {
-    return getExistingUserId(clerk, e2eUserId);
-  }
-
-  return null;
 }

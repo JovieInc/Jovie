@@ -1,14 +1,31 @@
-import { createClerkClient } from '@clerk/backend';
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
+import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { baUsers } from '@/lib/db/schema/better-auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { normalizeEmail } from '@/lib/utils/email';
 
 export const DEFAULT_TEST_AVATAR_URL = '/avatars/default-user.png';
+
+/**
+ * Lazy Clerk client factory (Clerk → Better Auth migration, commit ⑨).
+ * The dev bypass path no longer calls Clerk — `ensureBetterAuthTestUser`
+ * does direct drizzle upserts. But the legacy `ensureClerkTestUser` /
+ * `ensureLiveClerkTestUser` functions are still used by standalone scripts
+ * (`scripts/setup-e2e-users.ts`, `scripts/cleanup-e2e-users.ts`). The
+ * dynamic import keeps `@clerk/backend` out of the module-level import
+ * graph so the dev bypass hot path never loads Clerk code.
+ */
+async function lazyCreateClerkClient(opts: { secretKey: string }) {
+  const { createClerkClient } = await import('@clerk/backend');
+  return createClerkClient(opts);
+}
+
+type ClerkClient = Awaited<ReturnType<typeof lazyCreateClerkClient>>;
 
 const TEST_ACCOUNT_EMAIL_REGEX =
   /^(?:e2e(?:-[a-z0-9]+)?|browse(?:-[a-z0-9]+)?)(?:\+clerk_test)?@jov\.ie$/i;
@@ -24,6 +41,7 @@ type SeededUserValues = Pick<
   | 'plan'
   | 'isPro'
   | 'billingUpdatedAt'
+  | 'betterAuthUserId'
 > & {
   // clerk_id is nullable in the schema as of migration 0073; the dev/E2E
   // seed path always carries a stable Clerk id, so narrow it back to string.
@@ -191,11 +209,63 @@ export function getDeterministicTestClerkId(email: string): string {
   return `user_dev_${stableId || 'browse'}`;
 }
 
+/**
+ * Deterministic Better Auth user id for dev/E2E test users (Clerk → Better
+ * Auth migration, plan decision 10 / commit ⑨). Replaces the Clerk-era
+ * `getDeterministicTestClerkId` for the BA path. The id is stable per email
+ * so re-running `ensureBetterAuthTestUser` is idempotent.
+ */
+export function getDeterministicTestBetterAuthUserId(email: string): string {
+  const normalizedEmail = normalizeEmail(email);
+  const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
+  return `ba_dev_${stableId || 'browse'}`;
+}
+
 function shouldUseDeterministicClerkTestUser(): boolean {
   return (
     process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
   );
+}
+
+/**
+ * Ensure a Better Auth test user exists in `ba_users` and return the BA user
+ * id (plan decision 10, commit ⑨). Direct drizzle upsert — no Clerk API
+ * call. The BA user id is deterministic per email so the caller can link it
+ * to the app `users` row via `betterAuthUserId`. The caller then mints a
+ * real `ba_sessions` row via `auth.$context.internalAdapter.createSession`.
+ */
+export async function ensureBetterAuthTestUser({
+  email,
+  fullName,
+}: {
+  email: string;
+  fullName: string;
+}): Promise<string> {
+  const normalizedEmail = normalizeEmail(email) ?? email;
+  const baUserId = getDeterministicTestBetterAuthUserId(normalizedEmail);
+
+  // Upsert into ba_users — idempotent. `onConflictDoUpdate` on the
+  // primary key (id) so concurrent callers converge.
+  await db
+    .insert(baUsers)
+    .values({
+      id: baUserId,
+      name: fullName,
+      email: normalizedEmail,
+      emailVerified: true,
+    })
+    .onConflictDoUpdate({
+      target: baUsers.id,
+      set: {
+        name: fullName,
+        email: normalizedEmail,
+        emailVerified: true,
+        updatedAt: new Date(),
+      },
+    });
+
+  return baUserId;
 }
 
 function resolveMatchedSeedUser(
@@ -297,7 +367,7 @@ export async function resolveClerkTestUserId(
     return deterministicClerkId;
   }
 
-  const clerk = createClerkClient({ secretKey });
+  const clerk = await lazyCreateClerkClient({ secretKey });
   let existingUsers;
   try {
     existingUsers = await clerk.users.getUserList({
@@ -342,7 +412,7 @@ export async function ensureClerkTestUser({
     return deterministicClerkId;
   }
 
-  const clerk = createClerkClient({ secretKey });
+  const clerk = await lazyCreateClerkClient({ secretKey });
   let existingUser: { id: string } | undefined;
   try {
     const existingUsers = await clerk.users.getUserList({
@@ -411,7 +481,7 @@ export async function ensureLiveClerkTestUser({
     );
   }
 
-  const clerk = createClerkClient({ secretKey });
+  const clerk = await lazyCreateClerkClient({ secretKey });
   const existingUsers = await clerk.users.getUserList({
     emailAddress: [normalizedEmail],
   });
@@ -442,7 +512,7 @@ export async function ensureLiveClerkTestUser({
 }
 
 async function resolveRacedClerkUser(
-  clerk: ReturnType<typeof createClerkClient>,
+  clerk: ClerkClient,
   normalizedEmail: string,
   fallbackClerkId: string | undefined,
   originalError: unknown

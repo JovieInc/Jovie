@@ -29,9 +29,8 @@ import {
 } from '@/lib/security/development-only';
 import {
   DEFAULT_TEST_AVATAR_URL,
-  ensureClerkTestUser,
+  ensureBetterAuthTestUser,
   ensureCreatorProfileRecord,
-  ensureLiveClerkTestUser,
   ensureSocialLinkRecord,
   ensureUserProfileClaim,
   ensureUserRecord,
@@ -227,13 +226,14 @@ function getFallbackActorFromPersona(
 }
 
 async function findDevTestAuthSession(
-  clerkUserId: string,
+  betterAuthUserId: string,
   requestedPersona: DevTestAuthPersona | null
 ): Promise<DevTestAuthSession> {
   let matchedUser:
     | {
         dbUserId: string;
         clerkUserId: string | null;
+        betterAuthUserId: string | null;
         email: string | null;
         fullName: string | null;
         isAdmin: boolean;
@@ -247,6 +247,7 @@ async function findDevTestAuthSession(
       .select({
         dbUserId: users.id,
         clerkUserId: users.clerkId,
+        betterAuthUserId: users.betterAuthUserId,
         email: users.email,
         fullName: users.name,
         isAdmin: users.isAdmin,
@@ -255,22 +256,22 @@ async function findDevTestAuthSession(
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-      .where(eq(users.clerkId, clerkUserId))
+      .where(eq(users.betterAuthUserId, betterAuthUserId))
       .limit(1);
   } catch (error) {
     logger.warn('Falling back to synthetic dev test auth actor', {
-      clerkUserId,
+      betterAuthUserId,
       error,
     });
     return getFallbackActorFromPersona(
-      clerkUserId,
+      betterAuthUserId,
       requestedPersona ?? 'creator'
     );
   }
 
   if (!matchedUser) {
     return getFallbackActorFromPersona(
-      clerkUserId,
+      betterAuthUserId,
       requestedPersona ?? 'creator'
     );
   }
@@ -285,7 +286,7 @@ async function findDevTestAuthSession(
   return {
     dbUserId: matchedUser.dbUserId,
     persona,
-    clerkUserId: matchedUser.clerkUserId ?? clerkUserId,
+    clerkUserId: matchedUser.betterAuthUserId ?? betterAuthUserId,
     email: matchedUser.email ?? config.email,
     username,
     fullName,
@@ -368,9 +369,12 @@ export const getCachedDevTestAuthSession = cache(async () => {
   try {
     const headerStore = await headers();
     const cookieStore = await cookies();
-    const clerkUserId = resolveTestBypassUserId(headerStore, cookieStore);
+    // The test-mode cookie/header now carries the Better Auth user id
+    // (Clerk → Better Auth migration, commit ⑨). The `resolveTestBypassUserId`
+    // return value is treated as the BA user id for lookup.
+    const betterAuthUserId = resolveTestBypassUserId(headerStore, cookieStore);
 
-    if (!clerkUserId) {
+    if (!betterAuthUserId) {
       return null;
     }
 
@@ -378,7 +382,7 @@ export const getCachedDevTestAuthSession = cache(async () => {
       cookieStore.get(TEST_PERSONA_COOKIE)?.value
     );
 
-    return findDevTestAuthSession(clerkUserId, requestedPersona);
+    return findDevTestAuthSession(betterAuthUserId, requestedPersona);
   } catch (error) {
     logger.warn(
       'Failed to resolve cached dev test auth session',
@@ -445,54 +449,46 @@ export async function ensureDevTestAuthActor(
   persona: DevTestAuthPersona
 ): Promise<DevTestAuthActor> {
   const config = resolvePersonaSeedConfig(persona);
-  const fallbackClerkId =
-    persona === 'admin' ? process.env.E2E_CLERK_ADMIN_ID : undefined;
-  const clerkUserId = await ensureClerkTestUser({
+
+  // Clerk → Better Auth migration, commit ⑨: replace Clerk user creation
+  // with direct drizzle upsert into ba_users. The BA user id is
+  // deterministic per email and used as the `betterAuthUserId` on the app
+  // `users` row. No Clerk API call — the dev bypass path needs zero external
+  // services (plan decision 10, TTHW acceptance criterion).
+  const betterAuthUserId = await ensureBetterAuthTestUser({
     email: config.email,
-    username: config.username,
-    firstName: config.firstName,
-    lastName: config.lastName,
-    fallbackClerkId,
-    metadata: {
-      role: persona,
-      env: 'dev',
-      purpose: 'browse-auth-bootstrap',
-    },
+    fullName: config.fullName,
   });
 
-  return ensureDevTestAuthActorForClerkUser(persona, config, clerkUserId);
+  return ensureDevTestAuthActorForBetterAuthUser(
+    persona,
+    config,
+    betterAuthUserId
+  );
 }
 
 export async function ensureLiveDevTestAuthActor(
   persona: DevTestAuthPersona
 ): Promise<DevTestAuthActor> {
-  const config = resolvePersonaSeedConfig(persona);
-  const clerkUserId = await ensureLiveClerkTestUser({
-    email: config.email,
-    username: config.username,
-    firstName: config.firstName,
-    lastName: config.lastName,
-    metadata: {
-      role: persona,
-      env: 'dev',
-      purpose: 'native-auth-bootstrap',
-    },
-  });
-
-  return ensureDevTestAuthActorForClerkUser(persona, config, clerkUserId);
+  // Under Better Auth the live/deterministic distinction collapses —
+  // `ensureBetterAuthTestUser` is always direct drizzle (no Clerk API to
+  // be live vs deterministic about). Kept as a separate export for source
+  // compat with the mobile-callback route.
+  return ensureDevTestAuthActor(persona);
 }
 
-async function ensureDevTestAuthActorForClerkUser(
+async function ensureDevTestAuthActorForBetterAuthUser(
   persona: DevTestAuthPersona,
   config: PersonaSeedConfig,
-  clerkUserId: string
+  betterAuthUserId: string
 ): Promise<DevTestAuthActor> {
   const { id: dbUserId, previousClerkId } = await ensureUserRecord(db, {
-    clerkId: clerkUserId,
+    clerkId: betterAuthUserId, // clerk_id column is the legacy field; now carries BA user id for dev test users
     email: config.email,
     name: config.fullName,
     userStatus: 'active',
     isAdmin: config.isAdmin,
+    betterAuthUserId,
     ...(persona === 'admin'
       ? { plan: 'max' as const, isPro: true, billingUpdatedAt: new Date() }
       : {}),
@@ -507,7 +503,7 @@ async function ensureDevTestAuthActorForClerkUser(
 
   try {
     await invalidateTestUserCaches(
-      [previousClerkId, clerkUserId].filter(
+      [previousClerkId, betterAuthUserId].filter(
         (value): value is string =>
           typeof value === 'string' && value.length > 0
       )
@@ -516,7 +512,7 @@ async function ensureDevTestAuthActorForClerkUser(
     logger.warn(
       'Failed to invalidate dev test auth caches',
       {
-        clerkUserId,
+        betterAuthUserId,
         previousClerkId,
         error: error instanceof Error ? error.message : String(error),
       },
@@ -524,25 +520,20 @@ async function ensureDevTestAuthActorForClerkUser(
     );
   }
 
+  // Mint a real Better Auth session — this is the primary path now (not
+  // best-effort). The session cookie is set by the dev bypass route's
+  // `buildDevTestAuthCookieDescriptors`; the BA session row means any
+  // direct `auth.api.getSession` call site sees a real session.
   await mintBetterAuthSessionForDevTestActor({
     dbUserId,
+    betterAuthUserId,
     email: config.email,
     fullName: config.fullName,
-  }).catch(error => {
-    logger.warn(
-      'Failed to mint Better Auth session for dev test actor',
-      {
-        dbUserId,
-        email: config.email,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      'dev-test-auth'
-    );
   });
 
   return {
     persona,
-    clerkUserId,
+    clerkUserId: betterAuthUserId, // field name preserved for shape compat; carries BA user id
     email: config.email,
     username: config.username,
     fullName: config.fullName,
@@ -566,11 +557,13 @@ async function ensureDevTestAuthActorForClerkUser(
  */
 async function mintBetterAuthSessionForDevTestActor(params: {
   dbUserId: string;
+  betterAuthUserId: string;
   email: string;
   fullName: string;
 }): Promise<void> {
-  const { dbUserId, email, fullName } = params;
+  const { dbUserId, betterAuthUserId, email, fullName } = params;
 
+  // Link the app users row to the BA user id if not already linked.
   const [appUser] = await db
     .select({ id: users.id, betterAuthUserId: users.betterAuthUserId })
     .from(users)
@@ -580,45 +573,30 @@ async function mintBetterAuthSessionForDevTestActor(params: {
     return;
   }
 
-  let baUserId = appUser.betterAuthUserId;
-
-  if (!baUserId) {
-    const [inserted] = await db
-      .insert(baUsers)
-      .values({
-        id: `dev_${dbUserId}`,
-        name: fullName,
-        email,
-        emailVerified: true,
-      })
-      .onConflictDoUpdate({
-        target: baUsers.email,
-        set: { name: fullName, emailVerified: true, updatedAt: new Date() },
-      })
-      .returning({ id: baUsers.id });
-    baUserId = inserted?.id;
-    if (!baUserId) {
-      const [existing] = await db
-        .select({ id: baUsers.id })
-        .from(baUsers)
-        .where(eq(baUsers.email, email))
-        .limit(1);
-      baUserId = existing?.id;
-    }
-    if (baUserId) {
-      await db
-        .update(users)
-        .set({ betterAuthUserId: baUserId, updatedAt: new Date() })
-        .where(eq(users.id, dbUserId));
-    }
+  if (appUser.betterAuthUserId !== betterAuthUserId) {
+    await db
+      .update(users)
+      .set({ betterAuthUserId, updatedAt: new Date() })
+      .where(eq(users.id, dbUserId));
   }
 
-  if (!baUserId) {
-    return;
-  }
+  // Ensure the ba_users row exists (idempotent with ensureBetterAuthTestUser
+  // but safe to repeat in case the upsert raced).
+  await db
+    .insert(baUsers)
+    .values({
+      id: betterAuthUserId,
+      name: fullName,
+      email,
+      emailVerified: true,
+    })
+    .onConflictDoUpdate({
+      target: baUsers.id,
+      set: { name: fullName, emailVerified: true, updatedAt: new Date() },
+    });
 
   const ctx = await auth.$context;
-  await ctx.internalAdapter.createSession(baUserId, false);
+  await ctx.internalAdapter.createSession(betterAuthUserId, false);
 }
 
 export function buildDevTestAuthCookieDescriptors(
