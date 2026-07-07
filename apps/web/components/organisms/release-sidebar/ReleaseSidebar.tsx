@@ -19,6 +19,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
@@ -245,6 +246,7 @@ function getDspAvatarItems(
       }),
       label,
       glyph: getProviderGlyph(label, provider.key),
+      iconPath: DSP_LOGO_CONFIG[provider.key]?.iconPath,
       color: providerConfig[provider.key]?.accent ?? DEFAULT_DSP_COLOR,
     };
   });
@@ -258,6 +260,7 @@ function getDspAvatarItems(
         status: 'missing' as const,
         label,
         glyph: getProviderGlyph(label, key),
+        iconPath: DSP_LOGO_CONFIG[key]?.iconPath,
         color: providerConfig[key]?.accent ?? DEFAULT_DSP_COLOR,
       };
     });
