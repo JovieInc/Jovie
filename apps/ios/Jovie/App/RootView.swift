@@ -1058,121 +1058,14 @@ struct LiveRootContainer: View {
           LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
 #endif
           return
-
-        case .requiresClerkTicketFlow:
-          break
         }
 
-        try await runMobileAuthFinalizationStage("waitForClerkStartup") {
-          try await waitForClerkLoaded(clerk)
-        }
-
-        guard let ticket = exchangeResponse.ticket, ticket.isEmpty == false else {
-          throw MobileAuthReturnError.missingExchangeCredential
-        }
-
-        MobileAuthDiagnostics.record("native_exchange_ticket_received")
-
-        let signIn = try await runMobileAuthFinalizationStage("signInWithTicket") {
-          try await clerk.auth.signInWithTicket(ticket)
-        }
-        Observability.addBreadcrumb(
-          .clerkSessionExchangeSucceeded,
-          context: ["stage": "clerk_ticket_sign_in"]
-        )
-        MobileAuthDiagnostics.record(
-          "clerk_ticket_sign_in_succeeded",
-          detail: "status=\(signIn.status.rawValue),createdSession=\(signIn.createdSessionId != nil)"
-        )
-
-        _ = try await runMobileAuthFinalizationStage("refreshClientAfterTicket") {
-          try await clerk.refreshClient()
-        }
-        MobileAuthDiagnostics.record(
-          "clerk_client_refreshed",
-          detail: "sessionCount=\(clerk.auth.sessions.count)"
-        )
-
-        if let sessionID = signIn.createdSessionId,
-           clerk.session?.id != sessionID
-        {
-          var setActiveSummary = "activeSession=\(clerk.session != nil),sessionCount=\(clerk.auth.sessions.count)"
-#if DEBUG
-          if let diagnostics = NativeTicketSignInDiagnostics.summary() {
-            setActiveSummary += ",\(diagnostics)"
-          }
-#endif
-          try await runMobileAuthFinalizationStage("setActiveCreatedSession(\(setActiveSummary))") {
-            try await clerk.auth.setActive(sessionId: sessionID)
-          }
-          _ = try await runMobileAuthFinalizationStage("refreshClientAfterSetActive") {
-            try await clerk.refreshClient()
-          }
-        }
-
-        var sessionToken = try await runMobileAuthFinalizationStage("getTokenAfterTicket") {
-          try await clerk.auth.getToken()
-        }
-
-        if sessionToken?.isEmpty != false {
-          _ = try await runMobileAuthFinalizationStage("refreshClientAfterTicket") {
-            try await clerk.refreshClient()
-          }
-          sessionToken = try await runMobileAuthFinalizationStage("getTokenAfterRefresh") {
-            try await clerk.auth.getToken()
-          }
-        }
-
-        if sessionToken?.isEmpty != false {
-          let fallbackSessionID = signIn.createdSessionId ?? clerk.auth.sessions.first?.id
-          var signInSummary = "status=\(signIn.status.rawValue),createdSession=\(signIn.createdSessionId != nil),activeSession=\(clerk.session != nil),sessionCount=\(clerk.auth.sessions.count)"
-#if DEBUG
-          if let diagnostics = NativeTicketSignInDiagnostics.summary() {
-            signInSummary += ",\(diagnostics)"
-          }
-#endif
-
-          guard let sessionID = fallbackSessionID else {
-            throw MobileAuthReturnError.missingSessionToken(
-              status: signIn.status.rawValue,
-              createdSessionID: signIn.createdSessionId,
-              activeSessionID: clerk.session?.id,
-              sessionCount: clerk.auth.sessions.count
-            )
-          }
-
-          try await runMobileAuthFinalizationStage("setActiveFallbackSession(\(signInSummary))") {
-            try await clerk.auth.setActive(sessionId: sessionID)
-          }
-          _ = try await runMobileAuthFinalizationStage("refreshClientAfterFallbackSession") {
-            try await clerk.refreshClient()
-          }
-          sessionToken = try await runMobileAuthFinalizationStage("getTokenAfterFallbackSession") {
-            try await clerk.auth.getToken()
-          }
-        }
-
-        guard sessionToken?.isEmpty == false else {
-          MobileAuthDiagnostics.record("clerk_token_missing")
-          throw MobileAuthReturnError.missingSessionToken(
-            status: signIn.status.rawValue,
-            createdSessionID: signIn.createdSessionId,
-            activeSessionID: clerk.session?.id,
-            sessionCount: clerk.auth.sessions.count
-          )
-        }
-        MobileAuthDiagnostics.record("clerk_token_ready")
-
-        guard let userID = clerk.user?.id else {
-          MobileAuthDiagnostics.record("clerk_user_missing")
-          throw MobileAuthReturnError.missingSignedInUser
-        }
-
-        Observability.addBreadcrumb(.nativeSessionPersisted)
-        await appState.handleSignedInUserChange(userID)
-#if DEBUG
-        LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
-#endif
+        // MobileAuthFinalizationPlan is now exhaustive under Better Auth
+        // (plan decision 9 — the `requiresClerkTicketFlow` case is deleted).
+        // The control-flow reachability here is impossible; the switch above
+        // returns on the only case. The code below is unreachable but kept
+        // for defensive clarity until the next-purge commit removes it.
+        throw MobileAuthReturnError.missingExchangeCredential
       } catch {
         guard !(error is CancellationError), !Task.isCancelled else {
           return
@@ -1194,7 +1087,9 @@ struct LiveRootContainer: View {
         )
 
         if error is MobileAuthReturnError {
-          try? await clerk.auth.signOut()
+          // Clerk → Better Auth migration: `clerk.auth.signOut()` is gone.
+          // `appState.signOut()` clears Keychain + state, which is the
+          // complete signed-out transition under BA.
           await appState.signOut()
           authErrorMessage = "Couldn't finish sign-in. Try again."
           MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)
@@ -1209,11 +1104,7 @@ struct LiveRootContainer: View {
           return
         }
 
-        if let existingUserID = clerk.user?.id {
-          await appState.handleSignedInUserChange(existingUserID)
-        } else {
-          await appState.signOut()
-        }
+        await appState.signOut()
 
         authErrorMessage = "Couldn't finish sign-in. Try again."
         MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)

@@ -102,25 +102,20 @@ enum NativeSessionTokenStore {
   }
 }
 
+/**
+ * Sole token provider under Better Auth (Clerk → Better Auth migration,
+ * plan decision 9 + eng row 31). The raw session token lives in Keychain;
+ * the bearer plugin authenticates API calls with it. No client refresh —
+ * the server rolls `expiresAt` per `updateAge`, and the bearer plugin's
+ * `set-auth-token` response header refreshes the stored token + expiry on
+ * each API call (handled in `APIClient`). A terminal 401 from the server
+ * clears the Keychain (handled in `APIClient`'s 401 path).
+ */
 struct NativeSessionTokenProvider: TokenProviding {
-  private let fallback: any TokenProviding
-
-  init(fallback: any TokenProviding) {
-    self.fallback = fallback
-  }
-
   func bearerToken(forceRefresh: Bool) async throws -> String {
-    if !forceRefresh, let session = NativeSessionTokenStore.load() {
-      return session.token
+    guard let session = NativeSessionTokenStore.load() else {
+      throw APIClientError.missingToken
     }
-
-    do {
-      return try await fallback.bearerToken(forceRefresh: forceRefresh)
-    } catch {
-      if let session = NativeSessionTokenStore.load() {
-        return session.token
-      }
-      throw error
-    }
+    return session.token
   }
 }
