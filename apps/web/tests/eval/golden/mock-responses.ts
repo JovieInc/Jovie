@@ -52,6 +52,9 @@ export const GOLDEN_MOCK_RESPONSES: Readonly<Record<string, string>> = {
 
   'Profile: Spotify Canvas importance':
     'Canvas can lift engagement on a track because the looping visual gives listeners another reason to save and share. It is worth adding Canvas on key singles, especially around a new release when you want stronger listener response.',
+
+  'Entitlement gate: album art upsell on free plan':
+    "For this single I'd generate three cover directions built from your genre and title — one bold typographic treatment, one photo-led concept, and one minimal graphic mark, each delivered as release-ready square album art. Album art generation is on the Pro plan, so upgrading unlocks it for this and future releases.",
 };
 
 export function getGoldenMockResponse(caseName: string): string {
