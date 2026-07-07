@@ -302,31 +302,31 @@ Linear follow-up filed at ship time.
 
 ## 15. Linear follow-ups (filed at ship time per no-orphan rule)
 
-1. **JOV-TBD**: Migrate `artistProfilePageOrder.ts` to be an instance of the
+1. **JOV-4064**: Migrate `artistProfilePageOrder.ts` to be an instance of the
    general marketing registry (E6 derivation). Order-equivalence test.
-2. **JOV-TBD**: Render-time recipe verification via layout-guard/E2E lanes
+2. **JOV-4065**: Render-time recipe verification via layout-guard/E2E lanes
    (DX8): sections render `data-testid`; proven-recipe reference routes
    import components 1:1 with recipe sectionIds.
-3. **JOV-TBD**: `fan-lp` recipe (stub) — arc: consume → discover → follow →
+3. **JOV-4066**: `fan-lp` recipe (stub) — arc: consume → discover → follow →
    listen. Removes the `fan` phantom-audience gap (adversarial J1).
-4. **JOV-TBD**: `newsletter-signup` recipe (stub) — `hero → capture → faq →
+4. **JOV-4067**: `newsletter-signup` recipe (stub) — `hero → capture → faq →
    cta` for standalone newsletter signup pages (adversarial C1). Today
    `desiredConversion='subscribe'` with `intent≠'blog-index'` falls to seo.
-5. **JOV-TBD**: `security` / `trust-center` recipe (stub) — enterprise
+5. **JOV-4068**: `security` / `trust-center` recipe (stub) — enterprise
    security/compliance page with SOC2/GDPR badges, sub-processor list
    (adversarial C2). Today enterprise security is in `faq`; a standalone
    `/security` LP needs its own recipe.
-6. **JOV-TBD**: `integrations-lp` recipe (stub) — integrations catalog with
+6. **JOV-4069**: `integrations-lp` recipe (stub) — integrations catalog with
    per-integration detail (adversarial C3). Today `/integrations` has no recipe.
-7. **JOV-TBD**: `founder-letter` vs `release-notes` variant disambiguation
+7. **JOV-4070**: `founder-letter` vs `release-notes` variant disambiguation
    (adversarial B2) — add an `editorialForm` Brief field OR allow 2
    `content-prose` slots in `launch`. Today both variants target the same
    slot; `founder-letter` wins on declared order, `release-notes` is unreachable.
-8. **JOV-TBD**: DESIGN.md System A marketing-theme prose deletion — coordinated
+8. **JOV-4071**: DESIGN.md System A marketing-theme prose deletion — coordinated
    with the ongoing System A retirement (2026-06-18 founder-directed). The
    registry references "charter delta #9 + AGENT_GUIDE §Inherited" as the
    binding contract; the physical DESIGN.md deletion ships in a later PR.
-9. **JOV-TBD**: Split `trafficSource='home'` into `routeRole` vs `trafficSource`
+9. **JOV-4072**: Split `trafficSource='home'` into `routeRole` vs `trafficSource`
    (adversarial A6) — semantic clarity for v2.0.
 
 ## 16. Documentation map
