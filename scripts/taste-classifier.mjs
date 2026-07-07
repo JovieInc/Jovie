@@ -10,7 +10,8 @@
  *
  * Exit codes:
  *   0 = classified successfully
- *   2 = classification uncertain (default to taste-required)
+ *   2 = classification uncertain (defaults to llm-reviewable — the taste
+ *       gate only applies on a positive material-UX signal, JOV-3592)
  */
 
 import { execSync } from 'node:child_process';
@@ -423,11 +424,17 @@ export function classifyTaste(pr) {
     };
   }
 
-  // Uncertain → default to taste-required
+  // Uncertain → default to llm-reviewable, NOT taste-required. Standing owner
+  // rule (2026-06-26, JOV-3592): the taste label applies ONLY on a positive
+  // material-UX-change signal; uncertain/non-visual work must auto-flow to
+  // strong LLM review. Defaulting uncertain to taste-required grew the human
+  // gate to 51% of bot PRs (#13348). Flipped-by-default cases carry a
+  // `default:flipped-to-llm-reviewable` signal for the weekly audit.
+  signals.push('default:flipped-to-llm-reviewable');
   return {
-    classification: 'taste-required',
+    classification: 'llm-reviewable',
     confidence: 0.5,
-    reason: `Uncertain classification (score: +${tasteScore.toFixed(1)} vs -${nonTasteScore.toFixed(1)}), defaulting to taste-required`,
+    reason: `Uncertain classification (score: +${tasteScore.toFixed(1)} vs -${nonTasteScore.toFixed(1)}) — no positive taste signal, defaulting to llm-reviewable (JOV-3592; logged for weekly audit)`,
     signals: signals.slice(0, 10),
     stats: {
       tasteFiles,
@@ -461,7 +468,7 @@ Options:
   --json          Output raw JSON classification
 
 Classifications:
-  taste-required  → needs-human-taste label, Tim reviews
+  taste-required  → llm-review label; ships autonomously, humans review post-ship in prod walkthroughs (2026-07-06 full-autonomy policy)
   llm-reviewable  → trigger stronger LLM review, no human gate
   auto-ship       → add merge-queue label, ship it
 `);
@@ -512,7 +519,7 @@ Classifications:
   if (!dryRun) {
     // Apply label
     const labelMap = {
-      'taste-required': 'needs-human-taste',
+      'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
       'auto-ship': 'merge-queue',
     };
@@ -536,7 +543,7 @@ Classifications:
     }
   } else {
     const labelMap = {
-      'taste-required': 'needs-human-taste',
+      'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
       'auto-ship': 'merge-queue',
     };
