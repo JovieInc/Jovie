@@ -34,6 +34,12 @@ export interface EntitySidebarShellProps {
   readonly headerMode?: 'standard' | 'minimal';
   /** Hide the utility-only top bar in minimal mode. */
   readonly hideMinimalHeaderBar?: boolean;
+  /**
+   * Drops the shell's sub-lg outer padding so children can paint full-bleed to
+   * the drawer edges (e.g. the profile preview gradient hero). Callers own
+   * their content insets when enabled.
+   */
+  readonly contentBleed?: boolean;
 
   /**
    * Persistent pre-tab region — pinned above tabs in standard mode and above the
@@ -110,6 +116,7 @@ export function EntitySidebarShell({
   headerActions,
   headerMode = 'standard',
   hideMinimalHeaderBar = false,
+  contentBleed = false,
   entityHeader,
   entityHeaderSurface = 'card',
   actionsInEntityHeader = false,
@@ -198,7 +205,12 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
+      <div
+        className={cn(
+          'flex h-full min-h-0 flex-col gap-1.5',
+          !contentBleed && 'px-1.5 py-1.5 lg:px-0 lg:py-0'
+        )}
+      >
         {hasTopRailContent || minimalEntityHeaderContent ? (
           <div className='shrink-0 space-y-2.5'>
             {hasTopRailContent ? (
