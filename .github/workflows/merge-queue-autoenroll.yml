@@ -13,7 +13,7 @@ name: Merge Queue Auto-Enroll
 #
 # Two jobs share this workflow:
 #   enroll   — runs the drain (see above) on PR events, CI completion, and the
-#              */20 cron safety net.
+#              */5 cron safety net (serialized with watchdog via concurrency group).
 #   watchdog — runs scripts/merge-queue-watchdog.sh on a separate */10 cron tick
 #              (and workflow_dispatch) to rescue PRs that are clean, green, and
 #              enrolled but stuck in the queue itself (Graphite-side stall, not
@@ -23,7 +23,7 @@ name: Merge Queue Auto-Enroll
 
 on:
   schedule:
-    - cron: '*/20 * * * *'   # enroll: catch anything missed between events
+    - cron: '*/5 * * * *'    # enroll: catch anything missed between events (low overhead — drain is cheap, concurrency serializes with watchdog)
     - cron: '*/10 * * * *'   # watchdog: rescue PRs stalled inside the queue
   # Trigger hygiene (#13349): no `synchronize` — enrollment eligibility only
   # changes when CI completes (workflow_run below) or a PR flips ready/reopens.
@@ -47,7 +47,6 @@ permissions:
 jobs:
   enroll:
     if: >-
-      github.event.schedule != '*/10 * * * *' &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
     runs-on: ubuntu-latest
     steps:
