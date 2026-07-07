@@ -655,8 +655,8 @@ jobs:
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     needs: [ci-path-changes]
-    # Merge gate (feeds PR Ready): keep on always-available GitHub runners (see ci-biome).
-    runs-on: ubuntu-latest
+    # Heavy job: runs on self-hosted jovie-runner pool for ARM64 + local turbo cache.
+    runs-on: [self-hosted, jovie-runner]
     timeout-minutes: 20
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
@@ -2495,9 +2495,9 @@ jobs:
     name: Build
     needs: [ci-path-changes]
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    # Skipped in merge queue: no merge-queue jobs depend on the full build.
+    # Heavy job: runs on self-hosted jovie-runner pool for ARM64 + local turbo cache.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: [self-hosted, jovie-runner]
     timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -2610,8 +2610,8 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    # Merge gate: keep on always-available GitHub runners (see ci-biome).
-    runs-on: ubuntu-latest
+    # Heavy job (5 shards): runs on self-hosted jovie-runner pool for speed + local deps.
+    runs-on: [self-hosted, jovie-runner]
     timeout-minutes: 40
     strategy:
       fail-fast: false
