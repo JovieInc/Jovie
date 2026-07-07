@@ -17,7 +17,6 @@
  *
  * Run: pnpm run test:web:e2e -- tests/e2e/auth-oauth-walk.spec.ts
  */
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { Browser, expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -121,17 +120,13 @@ async function createAnonPage(browser: Browser) {
 // /signin — Clerk testing token attaches; form renders within 10s
 // ---------------------------------------------------------------------------
 test.describe('/signin — OAuth walk with testing token', () => {
-  test('setupClerkTestingToken attaches without error and sign-in UI renders within 10s', async ({
-    browser,
-  }) => {
+  test('better auth sign-in UI renders within 10s', async ({ browser }) => {
     const { page, context } = await createAnonPage(browser);
 
     try {
       await blockAnalytics(page);
 
-      // Per .claude/rules/auth.md: setupClerkTestingToken MUST run before navigation
       if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
-        await setupClerkTestingToken({ page });
       } else {
         console.log(
           '[auth-oauth-walk] CLERK_TESTING_SETUP_SUCCESS not set — skipping token setup'
@@ -181,7 +176,6 @@ test.describe('/signin — OAuth walk with testing token', () => {
       await blockAnalytics(page);
 
       if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
-        await setupClerkTestingToken({ page });
       }
 
       await page.goto(APP_ROUTES.SIGNIN, {
@@ -204,17 +198,13 @@ test.describe('/signin — OAuth walk with testing token', () => {
 // /signup — Clerk testing token attaches; form renders within 10s
 // ---------------------------------------------------------------------------
 test.describe('/signup — OAuth walk with testing token', () => {
-  test('setupClerkTestingToken attaches without error and sign-up UI renders within 10s', async ({
-    browser,
-  }) => {
+  test('better auth sign-up UI renders within 10s', async ({ browser }) => {
     const { page, context } = await createAnonPage(browser);
 
     try {
       await blockAnalytics(page);
 
-      // Per .claude/rules/auth.md: setupClerkTestingToken MUST run before navigation
       if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
-        await setupClerkTestingToken({ page });
       } else {
         console.log(
           '[auth-oauth-walk] CLERK_TESTING_SETUP_SUCCESS not set — skipping token setup'
@@ -264,7 +254,6 @@ test.describe('/signup — OAuth walk with testing token', () => {
       await blockAnalytics(page);
 
       if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
-        await setupClerkTestingToken({ page });
       }
 
       await page.goto(APP_ROUTES.SIGNUP, {

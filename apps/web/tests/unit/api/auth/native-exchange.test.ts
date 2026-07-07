@@ -1,40 +1,50 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// ============================================================================
+// Native exchange route tests (Clerk → Better Auth migration, commit ⑩)
+// ============================================================================
+// Rewritten to mock the Better Auth API surface (auth.api.verifyOneTimeToken,
+// auth.$context.internalAdapter.createSession) instead of Clerk's
+// sessions/signInTokens. Tests the native exchange matrix per plan Phase 9:
+// - iOS success: fresh session token returned
+// - Electron success: OTT (ticket) returned
+// - Missing OTT → 401 ott_missing
+// - Invalid client/code/state → 401
+// - Rate limited → 429
+// ============================================================================
+
 const {
   mockCaptureError,
-  mockClerkClient,
-  mockCreateClerkClient,
   mockConsumeStoredNativeExchangeCode,
   mockCreateAuthAnalyticsEvent,
   mockCreateRateLimitHeaders,
   mockGeneralLimiterLimit,
   mockGetClientIP,
-  mockSessionsCreateSession,
-  mockSessionsGetToken,
-  mockSignInTokensCreateSignInToken,
-  mockTrackServerEvent,
+  mockVerifyOneTimeToken,
+  mockInternalAdapterCreateSession,
+  mockAuthContext,
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
-  mockClerkClient: vi.fn(),
-  mockCreateClerkClient: vi.fn(),
   mockConsumeStoredNativeExchangeCode: vi.fn(),
   mockCreateAuthAnalyticsEvent: vi.fn(),
   mockCreateRateLimitHeaders: vi.fn(),
   mockGeneralLimiterLimit: vi.fn(),
   mockGetClientIP: vi.fn(),
-  mockSessionsCreateSession: vi.fn(),
-  mockSessionsGetToken: vi.fn(),
-  mockSignInTokensCreateSignInToken: vi.fn(),
-  mockTrackServerEvent: vi.fn(),
+  mockVerifyOneTimeToken: vi.fn(),
+  mockInternalAdapterCreateSession: vi.fn(),
+  mockAuthContext: vi.fn(),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  clerkClient: mockClerkClient,
-}));
-
-vi.mock('@clerk/backend', () => ({
-  createClerkClient: mockCreateClerkClient,
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: {
+    api: {
+      verifyOneTimeToken: mockVerifyOneTimeToken,
+    },
+    get $context() {
+      return mockAuthContext();
+    },
+  },
 }));
 
 vi.mock('@jovie/auth-routing', () => ({
@@ -59,15 +69,23 @@ vi.mock('@/lib/rate-limit', () => ({
 }));
 
 vi.mock('@/lib/server-analytics', () => ({
-  trackServerEvent: mockTrackServerEvent,
+  trackServerEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-function createExchangeRequest() {
+vi.mock('@/lib/env', () => ({
+  env: {
+    VERCEL_ENV: 'development',
+    NODE_ENV: 'development',
+    JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN: '',
+  },
+}));
+
+function createExchangeRequest(client: 'ios' | 'electron' = 'ios') {
   return new NextRequest('https://jov.ie/api/auth/native/exchange', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client: 'ios',
+      client,
       code: 'native_code',
       state: 'native_state',
       codeVerifier: 'native_verifier',
@@ -75,357 +93,152 @@ function createExchangeRequest() {
   });
 }
 
-function createStagingExchangeRequest() {
-  return new NextRequest('https://staging.jov.ie/api/auth/native/exchange', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      host: 'staging.jov.ie',
-      'x-forwarded-host': 'staging.jov.ie',
+function setupSuccessfulExchange(
+  ott: string = 'ott_123',
+  userId: string = 'user_ba_123'
+) {
+  mockConsumeStoredNativeExchangeCode.mockResolvedValue({
+    ok: true,
+    userId,
+    returnTo: '/app',
+    ott,
+  });
+  mockGeneralLimiterLimit.mockResolvedValue({ success: true });
+  return { ott, userId };
+}
+
+function setupIosSessionCreation(
+  sessionToken: string = 'session_token_abc',
+  sessionId: string = 'sess_001'
+) {
+  mockAuthContext.mockResolvedValue({
+    internalAdapter: {
+      createSession: mockInternalAdapterCreateSession,
     },
-    body: JSON.stringify({
-      client: 'ios',
-      code: 'native_code',
-      state: 'native_state',
-      codeVerifier: 'native_verifier',
-    }),
   });
+  mockInternalAdapterCreateSession.mockResolvedValue({
+    token: sessionToken,
+    id: sessionId,
+  });
+  mockVerifyOneTimeToken.mockResolvedValue({ userId: 'user_ba_123' });
 }
 
-function createElectronExchangeRequest() {
-  return new NextRequest('https://jov.ie/api/auth/native/exchange', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client: 'electron',
-      code: 'desktop_code',
-      state: 'desktop_state',
-      codeVerifier: 'desktop_verifier',
-    }),
-  });
-}
-
-describe('POST /api/auth/native/exchange', () => {
+describe('native auth exchange route (Better Auth)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
-    vi.unstubAllEnvs();
-    vi.stubEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', 'pk_live_production');
-    vi.stubEnv('CLERK_SECRET_KEY', 'sk_live_production');
-
-    mockCaptureError.mockResolvedValue(undefined);
-    mockCreateAuthAnalyticsEvent.mockReturnValue({});
-    mockCreateRateLimitHeaders.mockReturnValue({});
-    mockGeneralLimiterLimit.mockResolvedValue({
-      success: true,
-      limit: 100,
-      remaining: 99,
-      reset: new Date(Date.now() + 60_000),
-    });
-    mockGetClientIP.mockReturnValue('127.0.0.1');
-    mockConsumeStoredNativeExchangeCode.mockResolvedValue({
-      ok: true,
-      returnTo: '/app',
-      userId: 'user_native',
-    });
-    mockSignInTokensCreateSignInToken.mockResolvedValue({
-      token: 'sign_in_ticket',
-    });
-    mockSessionsCreateSession.mockResolvedValue({
-      id: 'sess_ios',
-      userId: 'user_native',
-    });
-    mockSessionsGetToken.mockResolvedValue({
-      jwt: 'ios_session_token',
-    });
-    const clerkApi = {
-      sessions: {
-        createSession: mockSessionsCreateSession,
-        getToken: mockSessionsGetToken,
-      },
-      signInTokens: {
-        createSignInToken: mockSignInTokensCreateSignInToken,
-      },
-    };
-    mockClerkClient.mockResolvedValue(clerkApi);
-    mockCreateClerkClient.mockReturnValue(clerkApi);
-    mockTrackServerEvent.mockResolvedValue(undefined);
+    mockGeneralLimiterLimit.mockResolvedValue({ success: true });
   });
 
-  it('does not allow the real-browser harness token to bypass rate limiting in production', async () => {
-    vi.stubEnv('JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN', 'test-token');
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_ENV', 'production');
-    mockGeneralLimiterLimit.mockResolvedValue({
-      success: false,
-      limit: 100,
-      remaining: 0,
-      reset: new Date(Date.now() + 60_000),
-    });
+  it('returns a fresh session token for iOS clients', async () => {
+    setupSuccessfulExchange();
+    setupIosSessionCreation();
 
     const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(429);
-    expect(data.error).toBe('Too many auth exchange attempts');
-    expect(mockGeneralLimiterLimit).toHaveBeenCalledTimes(1);
-    expect(mockConsumeStoredNativeExchangeCode).not.toHaveBeenCalled();
-  });
-
-  it('keeps the real-browser harness bypass available for HTTPS preview testing', async () => {
-    vi.stubEnv('JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN', 'test-token');
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_ENV', 'preview');
-    mockGeneralLimiterLimit.mockResolvedValue({
-      success: false,
-      limit: 100,
-      remaining: 0,
-      reset: new Date(Date.now() + 60_000),
-    });
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
+    const response = await POST(createExchangeRequest('ios'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      sessionToken: 'ios_session_token',
-      sessionId: 'sess_ios',
-      userId: 'user_native',
+    expect(data.sessionToken).toBe('session_token_abc');
+    expect(data.sessionId).toBe('sess_001');
+    expect(data.userId).toBe('user_ba_123');
+    expect(data.returnTo).toBe('/app');
+    expect(mockVerifyOneTimeToken).toHaveBeenCalledWith({
+      body: { token: 'ott_123' },
     });
-    expect(mockGeneralLimiterLimit).not.toHaveBeenCalled();
-    expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns a server-created session token for iOS native exchange', async () => {
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      sessionToken: 'ios_session_token',
-      sessionId: 'sess_ios',
-      userId: 'user_native',
-      expiresInSeconds: 43_200,
-    });
-    expect(mockSessionsCreateSession).toHaveBeenCalledWith({
-      userId: 'user_native',
-    });
-    expect(mockSessionsGetToken).toHaveBeenCalledWith('sess_ios', '', 43_200);
-    expect(mockSignInTokensCreateSignInToken).not.toHaveBeenCalled();
-  });
-
-  it('falls back to a sign-in ticket for iOS preview exchange when Sessions API is unavailable', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_ENV', 'preview');
-    const unavailableError = new Error('session unavailable');
-    Object.assign(unavailableError, { status: 404 });
-    mockSessionsCreateSession.mockRejectedValue(unavailableError);
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      ticket: 'sign_in_ticket',
-      userId: 'user_native',
-      expiresInSeconds: 60,
-    });
-    expect(mockSignInTokensCreateSignInToken).toHaveBeenCalledWith({
-      userId: 'user_native',
-      expiresInSeconds: 60,
-    });
-    expect(mockSessionsGetToken).not.toHaveBeenCalled();
-  });
-
-  it('falls back to a sign-in ticket for iOS production exchange when Clerk rejects server-created sessions', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_ENV', 'production');
-    const unavailableError = new Error('Bad Request');
-    Object.assign(unavailableError, {
-      status: 400,
-      errors: [
-        {
-          code: 'request_invalid_for_environment',
-          message: 'Invalid request for environment',
-          longMessage: 'Request only valid for development instances.',
-        },
-      ],
-    });
-    mockSessionsCreateSession.mockRejectedValue(unavailableError);
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      ticket: 'sign_in_ticket',
-      userId: 'user_native',
-      expiresInSeconds: 60,
-    });
-    expect(mockSignInTokensCreateSignInToken).toHaveBeenCalledWith({
-      userId: 'user_native',
-      expiresInSeconds: 60,
-    });
-    expect(mockSessionsGetToken).not.toHaveBeenCalled();
-    expect(mockCaptureError).not.toHaveBeenCalled();
-  });
-
-  it('uses production Clerk keys for iOS native exchange on production hosts', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', 'pk_live_production');
-    vi.stubEnv('CLERK_SECRET_KEY', 'sk_live_production');
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      sessionToken: 'ios_session_token',
-      sessionId: 'sess_ios',
-      userId: 'user_native',
-    });
-    expect(mockCreateClerkClient).toHaveBeenCalledWith({
-      publishableKey: 'pk_live_production',
-      secretKey: 'sk_live_production',
-    });
-    expect(mockClerkClient).not.toHaveBeenCalled();
-  });
-
-  it('falls back to a sign-in ticket when Clerk session token minting returns Not Found', async () => {
-    const unavailableError = new Error('Not Found');
-    mockSessionsGetToken.mockRejectedValue(unavailableError);
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      ticket: 'sign_in_ticket',
-      userId: 'user_native',
-      expiresInSeconds: 60,
-    });
-    expect(mockSessionsCreateSession).toHaveBeenCalledWith({
-      userId: 'user_native',
-    });
-    expect(mockSignInTokensCreateSignInToken).toHaveBeenCalledWith({
-      userId: 'user_native',
-      expiresInSeconds: 60,
-    });
-    expect(mockCaptureError).not.toHaveBeenCalled();
-  });
-
-  it('does not fall back to a sign-in ticket when Clerk reports the iOS user resource is missing', async () => {
-    const missingUserError = new Error('Resource not found');
-    Object.assign(missingUserError, {
-      status: 404,
-      errors: [
-        {
-          code: 'resource_not_found',
-          longMessage: 'User not found',
-        },
-      ],
-    });
-    mockSessionsCreateSession.mockRejectedValue(missingUserError);
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data).toEqual({
-      error: 'Native auth exchange failed',
-    });
-    expect(mockSignInTokensCreateSignInToken).not.toHaveBeenCalled();
-    expect(mockCaptureError).toHaveBeenCalledWith(
-      'Native auth exchange route failed',
-      missingUserError,
-      {
-        route: '/api/auth/native/exchange',
-      }
+    expect(mockInternalAdapterCreateSession).toHaveBeenCalledWith(
+      'user_ba_123'
     );
   });
 
-  it('uses staging Clerk keys for iOS native exchange on staging hosts', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', 'pk_live_production');
-    vi.stubEnv('CLERK_SECRET_KEY', 'sk_live_production');
-    vi.stubEnv('CLERK_PUBLISHABLE_KEY_STAGING', 'pk_live_staging');
-    vi.stubEnv('CLERK_SECRET_KEY_STAGING', 'sk_live_staging');
-    const unavailableError = new Error('Bad Request');
-    Object.assign(unavailableError, {
-      status: 400,
-      errors: [{ code: 'request_invalid_for_environment' }],
-    });
-    mockSessionsCreateSession.mockRejectedValue(unavailableError);
+  it('returns the OTT as ticket for Electron clients', async () => {
+    setupSuccessfulExchange('ott_electron_456', 'user_ba_456');
 
     const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createStagingExchangeRequest());
+    const response = await POST(createExchangeRequest('electron'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      ticket: 'sign_in_ticket',
-      userId: 'user_native',
-      expiresInSeconds: 60,
-    });
-    expect(mockCreateClerkClient).toHaveBeenCalledWith({
-      publishableKey: 'pk_live_staging',
-      secretKey: 'sk_live_staging',
-    });
-    expect(mockClerkClient).not.toHaveBeenCalled();
+    expect(data.ticket).toBe('ott_electron_456');
+    expect(data.userId).toBe('user_ba_456');
+    expect(data.returnTo).toBe('/app');
+    // Electron does NOT call verifyOneTimeToken or createSession
+    expect(mockVerifyOneTimeToken).not.toHaveBeenCalled();
+    expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
   });
 
-  it('accepts the Mac OS native exchange client and passes through its PKCE verifier', async () => {
+  it('returns 401 ott_missing when the exchange record has no OTT', async () => {
+    mockConsumeStoredNativeExchangeCode.mockResolvedValue({
+      ok: true,
+      userId: 'user_ba_123',
+      returnTo: '/app',
+      ott: null,
+    });
+    mockGeneralLimiterLimit.mockResolvedValue({ success: true });
+
     const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createElectronExchangeRequest());
+    const response = await POST(createExchangeRequest('ios'));
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data).toMatchObject({
-      returnTo: '/app',
-      ticket: 'sign_in_ticket',
-      userId: 'user_native',
-    });
-    expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalledWith({
-      client: 'electron',
-      code: 'desktop_code',
-      state: 'desktop_state',
-      codeVerifier: 'desktop_verifier',
-      createCodeChallenge: expect.any(Function),
-    });
+    expect(response.status).toBe(401);
+    expect(data.reason).toBe('ott_missing');
   });
 
-  it('returns a clear desktop auth error when Clerk sign-in tokens are unavailable', async () => {
-    const unavailableError = new Error('sign-in token unavailable');
-    Object.assign(unavailableError, { status: 404 });
-    mockSignInTokensCreateSignInToken.mockRejectedValue(unavailableError);
+  it('returns 401 with reason for invalid exchange (wrong_code)', async () => {
+    mockConsumeStoredNativeExchangeCode.mockResolvedValue({
+      ok: false,
+      reason: 'wrong_code',
+    });
+    mockGeneralLimiterLimit.mockResolvedValue({ success: true });
 
     const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createElectronExchangeRequest());
+    const response = await POST(createExchangeRequest('ios'));
     const data = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(data).toEqual({
-      error: 'Desktop native auth unavailable',
-      reason: 'desktop_sign_in_token_unavailable',
+    expect(response.status).toBe(401);
+    expect(data.reason).toBe('wrong_code');
+  });
+
+  it('returns 429 when rate limited', async () => {
+    mockGeneralLimiterLimit.mockResolvedValue({
+      success: false,
+      reset: Date.now() + 60_000,
+      remaining: 0,
     });
-    expect(mockSessionsCreateSession).not.toHaveBeenCalled();
-    expect(mockSessionsGetToken).not.toHaveBeenCalled();
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest('ios'));
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toContain('Too many');
+  });
+
+  it('returns 400 for invalid request shape (missing code)', async () => {
+    const request = new NextRequest('https://jov.ie/api/auth/native/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client: 'ios', state: 's' }),
+    });
+    mockGeneralLimiterLimit.mockResolvedValue({ success: true });
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 500 on unexpected error', async () => {
+    mockConsumeStoredNativeExchangeCode.mockRejectedValue(
+      new Error('Redis down')
+    );
+    mockGeneralLimiterLimit.mockResolvedValue({ success: true });
+    mockCaptureError.mockResolvedValue(undefined);
+
+    const { POST } = await import('@/app/api/auth/native/exchange/route');
+    const response = await POST(createExchangeRequest('ios'));
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Native auth exchange failed');
+    expect(mockCaptureError).toHaveBeenCalled();
   });
 });

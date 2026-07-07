@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Page } from '@playwright/test';
 import { HOMEPAGE_INTENTS_KEY } from '@/components/homepage/intent-store';
 import { expect, test } from './setup';
@@ -8,16 +7,9 @@ const INTENTS_KEY = HOMEPAGE_INTENTS_KEY;
 test.use({ storageState: { cookies: [], origins: [] } });
 
 async function setupClerkTokenIfAvailable(page: Page) {
-  if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
-    return;
-  }
-
-  await setupClerkTestingToken({ page }).catch((error: unknown) => {
-    console.warn(
-      '[homepage-intent.spec] setupClerkTestingToken skipped:',
-      error instanceof Error ? error.message : String(error)
-    );
-  });
+  // Clerk → Better Auth migration: setupClerkTestingToken removed.
+  // Kept as a no-op for source compat with the openHomepageIntentInput call.
+  void page;
 }
 
 async function openHomepageIntentInput(page: Page) {

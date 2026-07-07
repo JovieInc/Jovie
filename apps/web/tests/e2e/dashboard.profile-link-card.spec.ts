@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { hasClerkCredentials, signInUser } from '../helpers/clerk-auth';
@@ -48,7 +47,6 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     await context.grantPermissions(['clipboard-read']);
 
     // Set up Clerk testing token and sign in
-    await setupClerkTestingToken({ page });
 
     try {
       await signInUser(page);
