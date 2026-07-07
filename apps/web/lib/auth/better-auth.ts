@@ -139,17 +139,41 @@ function buildPlugins() {
       // (`generateOTP(...) || defaultOTPGenerator(...)` at 1.6.23).
       generateOTP: ({ email }) =>
         isDeterministicTestOtpEmail(email) ? DETERMINISTIC_TEST_OTP : '',
-      sendVerificationOTP: async ({ email, type }) => {
+      sendVerificationOTP: async ({ email, type, otp }) => {
         if (isDeterministicTestOtpEmail(email)) {
           // Deterministic E2E path: specs type 424242, nothing is sent.
           return;
         }
-        // Real Resend sender lands with the client-flip commit of this
-        // migration (plan build order ⑦, lib/email/templates/auth-otp).
-        logger.warn(
-          '[auth] email OTP sender not wired yet; OTP was not delivered',
-          { type }
-        );
+        // Real Resend sender (plan decision 8, client-flip commit ⑦).
+        // Lazy import to avoid pulling the email stack into the auth module's
+        // hot path when the OTP hook is never called.
+        try {
+          const { sendEmail } = await import('@/lib/email/send');
+          const {
+            getAuthOtpHtml,
+            getAuthOtpFromEmail,
+            getAuthOtpSubject,
+            getAuthOtpText,
+          } = await import('@/lib/email/templates/auth-otp');
+          await sendEmail({
+            to: email,
+            from: getAuthOtpFromEmail(),
+            subject: getAuthOtpSubject(),
+            text: getAuthOtpText({ otpCode: otp }),
+            html: getAuthOtpHtml({ otpCode: otp }),
+          });
+        } catch (error) {
+          // Never throw from the OTP hook — a Resend failure should surface
+          // to the user via the form's aria-live error state, not crash the
+          // BA callback. The caller (EmailCodeAuthForm) sees a generic
+          // "Could not send the code" error.
+          await captureError('Email OTP send failed', error, {
+            email: email.replace(/@.*/, '@[redacted]'),
+            type,
+            operation: 'sendVerificationOTP',
+          });
+          throw error;
+        }
       },
     }),
     ...(googleOneTapClientId

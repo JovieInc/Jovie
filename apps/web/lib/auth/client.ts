@@ -36,7 +36,18 @@ const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 export const authClient = createAuthClient({
   plugins: [
     emailOTPClient(),
-    ...(googleClientId ? [oneTapClient({ clientId: googleClientId })] : []),
+    ...(googleClientId
+      ? [
+          oneTapClient({
+            clientId: googleClientId,
+            // Plan design row 20: FedCM on. Dismissal cooldown = Google
+            // default. The dark-theme spec point applies to button-mode
+            // (GsiButtonConfiguration.theme); One Tap prompt chrome is
+            // Google-controlled, so no theme config is needed here.
+            promptOptions: { fedCM: true },
+          }),
+        ]
+      : []),
   ],
 });
 
