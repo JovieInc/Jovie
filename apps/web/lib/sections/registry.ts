@@ -117,3 +117,70 @@ export function getCanonicalForCategory(
   const inCategory = getSectionsByCategory(category);
   return inCategory.find(v => v.canonical) ?? inCategory[0];
 }
+
+// ─── Homepage composition ───────────────────────────────────────────────────
+
+/** Feature flags that affect homepage section composition. */
+export interface HomepageCompositionFlags {
+  /** `SHOW_HOMEPAGE_GO_LIVE_SECTION` */
+  readonly showGoLive: boolean;
+  /** `SHOW_HOMEPAGE_FRIDAY_RHYTHM` */
+  readonly showFridayRhythm: boolean;
+  /** `SHOW_HOME_REFRESH_2026` */
+  readonly showHomeRefresh2026: boolean;
+  /** `SHOW_HOMEPAGE_V2_PRICING` */
+  readonly showV2Pricing: boolean;
+  /** `SHOW_HOMEPAGE_FAQ` */
+  readonly showFaq: boolean;
+  /** `SHOW_HOMEPAGE_V2_FINAL_CTA` */
+  readonly showV2FinalCta: boolean;
+}
+
+/**
+ * Composes ordered homepage body-section IDs from feature flags.
+ *
+ * The hero is rendered separately (outside the story stack) and is NOT
+ * included here. Returns body sections and a separate final CTA so the
+ * page can keep the CTA outside the `showUnlockedSections` gate.
+ *
+ * Every id returned by this function must have a corresponding case in
+ * the page's `HomepageSection` renderer switch.
+ */
+export function composeHomepageSections(flags: HomepageCompositionFlags): {
+  readonly bodyIds: readonly string[];
+  readonly finalCtaId: string | null;
+} {
+  const sections: string[] = [];
+
+  sections.push('homepage-product-statement');
+
+  if (flags.showGoLive) {
+    sections.push('homepage-go-live-steps');
+  }
+
+  sections.push('homepage-workspace-section');
+  sections.push('homepage-artist-profiles-carousel');
+
+  if (flags.showFridayRhythm) {
+    sections.push('friday-rhythm-section');
+  }
+
+  if (flags.showHomeRefresh2026) {
+    sections.push('home-bento-pairs');
+    sections.push('home-loop-diagram');
+    sections.push('home-stat-quote');
+  }
+
+  if (flags.showV2Pricing) {
+    sections.push('homepage-v2-pricing');
+  }
+
+  if (flags.showFaq) {
+    sections.push('homepage-faq');
+  }
+
+  return {
+    bodyIds: sections,
+    finalCtaId: flags.showV2FinalCta ? 'homepage-v2-final-cta' : null,
+  };
+}

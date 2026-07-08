@@ -414,7 +414,7 @@ export function ProfileCompactSurface({
   // never squashes.
   const heroHeightClassName = isHomeMode
     ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:min-h-60 [@media(max-height:760px)]:max-h-60'
-    : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
+    : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
@@ -557,11 +557,8 @@ export function ProfileCompactSurface({
 
               <div className='profile-cover-home-gradient pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
               <div className='profile-cover-home-fade pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
-              <div className='profile-cover-mode-backdrop absolute inset-0 hidden bg-black/94 backdrop-blur-2xl' />
             </>
-          ) : (
-            <div className='absolute inset-0 bg-black/94 backdrop-blur-2xl' />
-          )}
+          ) : null}
 
           <div
             className={cn(
