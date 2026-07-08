@@ -158,13 +158,16 @@ export function ProfilePreviewBento({
             style={BOTTOM_FADE_STYLE}
           />
         )}
-        {caption && (
-          <span className='pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 text-2xs font-medium text-white/60 dark:text-white/60'>
-            {caption}
-          </span>
-        )}
         {overlay}
       </div>
+
+      {caption && (
+        <div className='flex justify-center pt-2.5'>
+          <span className='text-2xs font-medium text-tertiary-token'>
+            {caption}
+          </span>
+        </div>
+      )}
 
       {footer}
     </div>
