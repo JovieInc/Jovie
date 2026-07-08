@@ -148,6 +148,14 @@ cron tick and rescues those PRs:
 | `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
 
+### Runner label policy
+
+Self-hosted runners must use explicit self-hosted labels only (`jovie-runner`,
+architecture labels, machine labels). Never add GitHub-hosted labels such as
+`ubuntu-latest`, `macos-latest`, or `windows-latest` to self-hosted runners: that
+routes ordinary hosted-runner jobs onto local machines with different toolchains.
+`runner-health-monitor` fails fast if this drift reappears.
+
 ## What broke on 2026-06-22
 
 The queue stalled for 6 hours and looked like "Graphite is paused." It wasn't.
