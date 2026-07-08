@@ -304,7 +304,7 @@ jobs:
 
             LOG_PREVIEW=$(head -n 180 /tmp/autofix-context/failed-logs.txt)
             SUSPECT_FILES=$(cat /tmp/autofix-context/suspect-files.txt)
-            COMMITS_RANGE=$(cat /tmp/autofix-context/commits-since-green.txt 2>/dev/null | tr '\n' ' ' | tr -s ' ')
+            COMMITS_RANGE=$(tr '\n' ' ' < /tmp/autofix-context/commits-since-green.txt 2>/dev/null | tr -s ' ')
 
             SYSTEM_PROMPT=$(
               cat <<'SYSTEMEOF'

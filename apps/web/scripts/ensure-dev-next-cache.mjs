@@ -1,4 +1,4 @@
-import { readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const ROUTE_FILE_NAMES = new Set([
@@ -7,6 +7,13 @@ const ROUTE_FILE_NAMES = new Set([
   'route.ts',
   'route.tsx',
 ]);
+
+/** Config files that, when changed, invalidate the entire compiled cache. */
+const CONFIG_FILE_CANDIDATES = [
+  'next.config.js',
+  'next.config.mjs',
+  'next.config.ts',
+];
 
 /**
  * @param {string} dir
@@ -111,17 +118,34 @@ export function getCompiledRoutesMtimeMs(compiledRoutesDir) {
 }
 
 /**
+ * @param {string} webRoot
+ * @param {number} compiledMtimeMs
+ * @returns {boolean}
+ */
+function isConfigStale(webRoot, compiledMtimeMs) {
+  for (const candidate of CONFIG_FILE_CANDIDATES) {
+    const configPath = path.join(webRoot, candidate);
+    if (!existsSync(configPath)) continue;
+    const { mtimeMs } = statSync(configPath);
+    if (mtimeMs > compiledMtimeMs) return true;
+  }
+  return false;
+}
+
+/**
  * @param {{
  *   appDir: string;
  *   nextDir: string;
  *   forceReset?: boolean;
  *   skipStaleCheck?: boolean;
+ *   webRoot?: string;
  * }} options
  */
 export function ensureDevNextCacheFresh(options) {
   const {
     appDir,
     nextDir,
+    webRoot = path.resolve(nextDir, '..'),
     forceReset = process.env.JOVIE_DEV_RESET_NEXT_CACHE === '1',
     skipStaleCheck = process.env.JOVIE_DEV_SKIP_STALE_CACHE_CHECK === '1',
   } = options;
@@ -130,15 +154,17 @@ export function ensureDevNextCacheFresh(options) {
   const compiledRoutesDir = path.join(nextDir, 'server', 'app');
   const compiledMtimeMs = getCompiledRoutesMtimeMs(compiledRoutesDir);
 
-  /** @type {'forced' | 'stale' | 'fresh' | 'missing'} */
+  /** @type {'forced' | 'stale' | 'stale-config' | 'fresh' | 'missing'} */
   let cacheState = 'missing';
 
   if (forceReset) {
     cacheState = 'forced';
     rmSync(nextDir, { force: true, recursive: true });
   } else if (!skipStaleCheck && compiledMtimeMs !== null) {
-    if (routeSources.newestMtimeMs > compiledMtimeMs) {
-      cacheState = 'stale';
+    const routesStale = routeSources.newestMtimeMs > compiledMtimeMs;
+    const configStale = isConfigStale(webRoot, compiledMtimeMs);
+    if (routesStale || configStale) {
+      cacheState = configStale ? 'stale-config' : 'stale';
       rmSync(nextDir, { force: true, recursive: true });
     } else {
       cacheState = 'fresh';
@@ -156,7 +182,7 @@ export function ensureDevNextCacheFresh(options) {
  * @param {{
  *   pageRoutes: number;
  *   apiRoutes: number;
- *   cacheState: 'forced' | 'stale' | 'fresh' | 'missing';
+ *   cacheState: 'forced' | 'stale' | 'stale-config' | 'fresh' | 'missing';
  * }} summary
  */
 export function formatDevRouteDiscoveryLog(summary) {
@@ -164,11 +190,13 @@ export function formatDevRouteDiscoveryLog(summary) {
   const cacheMessage =
     summary.cacheState === 'forced'
       ? 'wiped .next (JOVIE_DEV_RESET_NEXT_CACHE=1)'
-      : summary.cacheState === 'stale'
-        ? 'wiped stale .next (source routes newer than compiled cache)'
-        : summary.cacheState === 'fresh'
-          ? 'compiled route cache is fresh'
-          : 'no compiled route cache yet';
+      : summary.cacheState === 'stale-config'
+        ? 'wiped .next (next.config.* newer than compiled cache)'
+        : summary.cacheState === 'stale'
+          ? 'wiped stale .next (source routes newer than compiled cache)'
+          : summary.cacheState === 'fresh'
+            ? 'compiled route cache is fresh'
+            : 'no compiled route cache yet';
 
   return `[jovie-dev] Route discovery: ${totalRoutes} source routes (${summary.pageRoutes} pages, ${summary.apiRoutes} handlers); ${cacheMessage}`;
 }
