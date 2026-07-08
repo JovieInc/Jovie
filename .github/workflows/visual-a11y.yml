@@ -19,9 +19,8 @@ concurrency:
 jobs:
   storybook-a11y:
     name: Storybook A11y Checks
-    # Advisory — Storybook component a11y signal, not a merge gate. PR Ready
-    # aggregates deterministic checks only; promote to blocking via ci-pr-ready.needs.
-    continue-on-error: true
+    # Blocking — Storybook component a11y signal, path-gated to component/storybook changes.
+    # Failures block PRs via required status check in branch protection.
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -46,28 +45,18 @@ jobs:
 
       - name: Run Storybook A11y Tests
         id: a11y-test
-        run: |
-          set +e
-          pnpm --filter web test:a11y
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" -ne 0 ]; then
-            echo "::warning::Storybook a11y exited $code (advisory — not a merge gate)"
-          fi
-          exit 0
+        run: pnpm --filter web test:a11y
 
       - name: A11y Results Summary
         if: always()
         run: |
           if [ "${{ steps.a11y-test.outcome }}" == "failure" ]; then
-            echo "::warning::⚠️ Accessibility violations detected in Storybook components. Check the test output above for details."
-            echo ""
             echo "## 🔍 A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "⚠️ **Accessibility violations detected**" >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ **Accessibility violations detected** — blocking this PR." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Some components have accessibility issues (contrast, labels, etc.)." >> "$GITHUB_STEP_SUMMARY"
-            echo "These are logged as warnings - review the job output for details." >> "$GITHUB_STEP_SUMMARY"
+            echo "Review the job logs for details." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "To run locally: \`pnpm --filter web test:a11y\`" >> "$GITHUB_STEP_SUMMARY"
           else
@@ -78,8 +67,8 @@ jobs:
 
   playwright-visual:
     name: Playwright Visual Regression
-    # Advisory — visual diff signal for component PRs, not a merge gate.
-    continue-on-error: true
+    # Blocking — visual diff gate for component PRs, path-gated to component/ui changes.
+    # Failures block PRs via required status check in branch protection.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Skip on forks — secrets (DATABASE_URL) are not available
@@ -106,15 +95,7 @@ jobs:
 
       - name: Run Visual Regression Tests
         id: visual-test
-        run: |
-          set +e
-          pnpm --filter web e2e:visual
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" -ne 0 ]; then
-            echo "::warning::Playwright visual exited $code (advisory — not a merge gate)"
-          fi
-          exit 0
+        run: pnpm --filter web e2e:visual
         env:
           CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -135,11 +116,9 @@ jobs:
         if: always()
         run: |
           if [ "${{ steps.visual-test.outcome }}" == "failure" ]; then
-            echo "::warning::⚠️ Visual differences detected. Check the artifacts for diff images."
-            echo ""
             echo "## 🖼️ Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "⚠️ **Visual differences detected**" >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ **Visual differences detected** — blocking this PR." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Some pages have visual changes from the baseline." >> "$GITHUB_STEP_SUMMARY"
             echo "Download the artifacts to review diff images." >> "$GITHUB_STEP_SUMMARY"
