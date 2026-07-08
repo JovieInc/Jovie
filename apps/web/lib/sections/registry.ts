@@ -184,3 +184,90 @@ export function composeHomepageSections(flags: HomepageCompositionFlags): {
     finalCtaId: flags.showV2FinalCta ? 'homepage-v2-final-cta' : null,
   };
 }
+// ----- Presets ---------------------------------------------------------------
+
+/**
+ * A named preset — an ordered list of section variant IDs that compose a
+ * full landing page. The page-builder and homepage share these directly
+ * so ordering decisions live in one place.
+ */
+export interface SectionPreset {
+  /** Stable kebab-case id for URL/API routing. */
+  readonly id: string;
+  /** Human-readable label for the page-builder toolbar, dropdowns, etc. */
+  readonly label: string;
+  /** Ordered list of section variant ids. */
+  readonly sections: readonly string[];
+}
+
+/**
+ * All named presets.
+ *
+ * The page-builder reads this array directly for its "Load preset" dropdown.
+ * The homepage reads the `'homepage'` entry as its source of truth.
+ *
+ * Categories covered: header, hero, logo-bar, feature-card, testimonial,
+ * faq, footer-cta, footer — in canonical display order top → bottom.
+ */
+export const SECTION_PRESETS: readonly SectionPreset[] = [
+  {
+    id: 'homepage',
+    label: 'Homepage starter',
+    sections: [
+      'marketing-header-homepage',
+      'marketing-hero',
+      'home-trust-inline',
+      'feature-card-grid-3up',
+      'testimonial-card-3up',
+      'faq-section-default',
+      'marketing-final-cta-default',
+      'marketing-footer-expanded',
+    ],
+  },
+  {
+    id: 'default',
+    label: 'Default landing page',
+    sections: [
+      'marketing-header-landing',
+      'marketing-hero',
+      'home-trust-default',
+      'feature-card-grid-3up',
+      'testimonial-card-3up',
+      'faq-section-default',
+      'marketing-final-cta-default',
+      'marketing-footer-expanded',
+    ],
+  },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    sections: [
+      'marketing-header-minimal',
+      'marketing-hero',
+      'marketing-final-cta-default',
+      'marketing-footer-minimal',
+    ],
+  },
+];
+
+/**
+ * Returns the ordered list of section IDs for a canonical homepage.
+ * Convenience alias for consumers that only need the homepage preset
+ * (e.g. the homepage route itself).
+ */
+export function getHomepagePreset(): readonly string[] {
+  return SECTION_PRESETS.find(p => p.id === 'homepage')!.sections;
+}
+
+/** Returns all named presets for the page-builder to offer as options. */
+export function getPresets(): readonly SectionPreset[] {
+  return SECTION_PRESETS;
+}
+
+/**
+ * Looks up a single preset by id. Returns `undefined` when no match is found
+ * so callers can gracefully fall back or surface an error.
+ */
+export function getPresetById(id: string): SectionPreset | undefined {
+  return SECTION_PRESETS.find(p => p.id === id);
+}
