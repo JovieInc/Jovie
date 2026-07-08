@@ -2826,6 +2826,13 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
+      - name: Materialize standalone assets (PR smoke)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          # Tarred .next artifacts can omit sibling paths the standalone server needs at runtime.
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+
       - name: Run E2E Smoke (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
@@ -2837,6 +2844,8 @@ jobs:
           fi
 
           # Standalone production server (not next dev --webpack) to avoid CI OOM/timeouts.
+          # Keep env aligned with the post-merge smoke lane (ci-e2e-tests) so manifest
+          # specs behave the same against the shared ci-build-public artifact.
           export DATABASE_URL="${{ env.DATABASE_URL }}"
           export NODE_ENV=test
           export CI=true
@@ -2851,11 +2860,18 @@ jobs:
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
+          export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+          export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+          export NEXT_PUBLIC_E2E_MODE=1
+          export NEXT_DISABLE_TOOLBAR=1
+          export CHAT_LLM_FAILURE_INJECTION=1
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
           export E2E_CLERK_USER_USERNAME="${{ secrets.E2E_CLERK_USER_USERNAME }}"
           export E2E_CLERK_USER_PASSWORD="${{ secrets.E2E_CLERK_USER_PASSWORD }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
+          export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
+          export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
           export E2E_SKIP_WARMUP=1
 
           PORT=3100 node .next/standalone/apps/web/server.js &
@@ -2996,6 +3012,11 @@ jobs:
       - name: Extract build artifact
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
+      - name: Materialize standalone assets (golden path)
+        run: |
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+
       - name: Run Golden Path (Chromium, real Clerk)
         run: |
           cd apps/web
@@ -3012,6 +3033,7 @@ jobs:
           export NODE_ENV=test
           export CI=true
           export VERCEL_ENV=development
+          export NEXT_PUBLIC_APP_URL=http://localhost:3100
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
