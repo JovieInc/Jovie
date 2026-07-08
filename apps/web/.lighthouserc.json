@@ -2,6 +2,11 @@
   "ci": {
     "collect": {
       "numberOfRuns": 3,
+      "settings": {
+        "chromeFlags": "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage",
+        "maxWaitForLoad": 60000,
+        "maxWaitForFcp": 30000
+      },
       "url": ["https://jov.ie/", "https://jov.ie/tim"]
     },
     "assert": {
