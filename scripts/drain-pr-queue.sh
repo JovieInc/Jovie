@@ -233,7 +233,7 @@ echo "$SNAP" | jq -c '.[]
   | select(.fail|length==0)
   | select(.head|startswith("gtmq_")|not)
   | select([.L[]] | index("merge-queue"))
-  | select(.ms != "CLEAN" and .ms != "UNSTABLE") | not)' \
+  | select(.ms == "CLEAN" or .ms == "UNSTABLE")' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr")
     t=$(jq -r '.t' <<<"$pr")
