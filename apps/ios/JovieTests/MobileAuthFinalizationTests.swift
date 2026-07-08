@@ -25,7 +25,7 @@ struct MobileAuthFinalizationTests {
     )
   }
 
-  @Test func ticketPlanRequiresClerkStartup() {
+  @Test func ticketOnlyPlanIsNilUnderBetterAuth() {
     let response = NativeAuthExchangeResponse(
       ticket: "ticket_only",
       sessionToken: nil,
@@ -37,7 +37,7 @@ struct MobileAuthFinalizationTests {
 
     let plan = MobileAuthFinalizationPlanner.plan(for: response)
 
-    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_only"))
+    #expect(plan == nil)
   }
 
   @Test func planIsNilWhenNeitherSessionTokenNorTicketPresent() {
@@ -55,7 +55,7 @@ struct MobileAuthFinalizationTests {
     #expect(plan == nil)
   }
 
-  @Test func planFallsBackToTicketWhenSessionTokenIsEmptyString() {
+  @Test func planIsNilWhenSessionTokenIsEmptyString() {
     let response = NativeAuthExchangeResponse(
       ticket: "ticket_fallback",
       sessionToken: "",
@@ -67,10 +67,10 @@ struct MobileAuthFinalizationTests {
 
     let plan = MobileAuthFinalizationPlanner.plan(for: response)
 
-    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_fallback"))
+    #expect(plan == nil)
   }
 
-  @Test func planFallsBackToTicketWhenUserIdIsEmptyString() {
+  @Test func planIsNilWhenUserIdIsEmptyString() {
     let response = NativeAuthExchangeResponse(
       ticket: "ticket_fallback",
       sessionToken: "native-session-token",
@@ -82,7 +82,7 @@ struct MobileAuthFinalizationTests {
 
     let plan = MobileAuthFinalizationPlanner.plan(for: response)
 
-    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_fallback"))
+    #expect(plan == nil)
   }
 
   @Test func planIsNilWhenSessionTokenValidButTicketIsEmptyStringAndUserIdMissing() {
