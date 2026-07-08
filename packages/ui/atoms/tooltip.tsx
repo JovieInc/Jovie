@@ -61,6 +61,9 @@ interface TooltipContentProps
 /**
  * Tooltip content with tokenized surface styling.
  * z-[150] to sit above shell chrome, right rails, popovers, and drawers.
+ * Collision-safe by default: avoidCollisions + collisionPadding (8px) keep the
+ * content fully inside the viewport for far-edge triggers (e.g. header rail
+ * toggle at the far right) while flipping/shifting as needed.
  * Pure opacity reveal only (fade-in/out) — no decorative zoom or slide/translate
  * per DESIGN.md + .claude/rules/ui.md "No Decorative Hover Motion" + subtraction.
  * Complements shell Tooltip (support-8) + DspAvatarStack pure opacity updates.
@@ -74,6 +77,7 @@ const TooltipContent = React.forwardRef<
     {
       className,
       sideOffset = 4,
+      collisionPadding = 8,
       showArrow = false,
       children,
       testId = 'tooltip-content',
@@ -85,6 +89,7 @@ const TooltipContent = React.forwardRef<
       <TooltipPrimitive.Content
         ref={ref}
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         data-testid={testId}
         className={cn(
           // Base layout + spacing

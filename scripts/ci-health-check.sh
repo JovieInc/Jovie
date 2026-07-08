@@ -106,7 +106,7 @@ while IFS= read -r pr; do
   fail="[]"
   if jq -e '
     (.m == "MERGEABLE")
-    and (([.L[]] | any(. == "needs-human-taste" or . == "needs-human" or . == "hold" or . == "gated")) | not)
+    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -118,7 +118,7 @@ SNAP="$ENRICHED"
 CLASSIFIED="$(echo "$SNAP" | jq --arg re "$AGENT_RE" --arg cutoff "$orphan_cutoff_iso" '
   [.[] | . + {
     bucket: (
-      if ([.L[]] | any(. == "needs-human-taste" or . == "needs-human" or . == "hold" or . == "gated")) then "needs-human"
+      if ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated")) then "needs-human"
       elif .m == "CONFLICTING" then "superseded"
       elif .m != "MERGEABLE" then "superseded"
       elif .draft and ((.head | test($re)) and (.fail | length == 0) and ((.updated // "9999-01-01") < $cutoff)) then "needs-ready-flip"
