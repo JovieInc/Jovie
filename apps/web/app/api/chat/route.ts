@@ -55,6 +55,11 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import {
+  buildLockedToolPromptInfo,
+  buildLockedToolSet,
+  resolveLockedChatTools,
+} from '@/lib/chat/locked-tools';
 import { extractLastUserText } from '@/lib/chat/message-text';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import {
@@ -115,6 +120,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
+import { captureError } from '@/lib/error-tracking';
 import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
 import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
@@ -180,6 +186,14 @@ import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 export const dynamic = 'force-dynamic';
 
 export const maxDuration = 60;
+
+/**
+ * How long to wait for Sentry to deliver buffered events before letting the
+ * lambda suspend. Streaming responses freeze the function as soon as the last
+ * chunk (or the error response) is sent, which silently drops undelivered
+ * events — the reason GH #13300's day-long outage never reached Sentry.
+ */
+const SENTRY_FLUSH_TIMEOUT_MS = 2000;
 
 /**
  * Statsig gate keys for the chat kill switch. Declared as const so typos fail
@@ -453,6 +467,16 @@ function normalizeToolIntent(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return /^[a-z][a-z0-9_:-]{0,63}$/i.test(trimmed) ? trimmed : null;
+}
+
+/**
+ * 👎 model-rotation step (JOV-3362 / #11461). Only a small non-negative
+ * integer is accepted; the actual model is resolved server-side from the
+ * vetted rotation chain, so the client can never name a model directly.
+ */
+function normalizeModelRotationStep(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return 0;
+  return Math.min(Math.max(value, 0), 8);
 }
 
 function normalizeClientId(value: unknown): string | null {
@@ -2191,8 +2215,16 @@ async function fetchOptionalReleases(
 
 /**
  * Build a standardized error response for chat streaming failures.
+ *
+ * Uses `captureError` (canonical wrapper) instead of raw
+ * `Sentry.captureException`: it logs the real exception to stdout so the
+ * failure is findable in Vercel logs by the on-screen reference id
+ * (`requestId`) even when the Sentry event is dropped, and it guards on SDK
+ * initialization. `Sentry.flush` afterwards guarantees the event leaves the
+ * lambda before the 500 response suspends it (GH #13300: a full day of
+ * CHAT_STREAM_FAILED produced zero Sentry events).
  */
-function buildChatErrorResponse(
+async function buildChatErrorResponse(
   error: unknown,
   userId: string,
   messageCount: number,
@@ -2201,10 +2233,16 @@ function buildChatErrorResponse(
   conversationId: string | null,
   corsHeaders: Record<string, string>
 ) {
-  Sentry.captureException(error, {
-    tags: { feature: 'ai-chat' },
-    extra: { userId, messageCount, requestId, profileId, conversationId },
+  await captureError('Chat stream failed', error, {
+    feature: 'ai-chat',
+    mode: 'route-catch',
+    userId,
+    messageCount,
+    requestId,
+    profileId,
+    conversationId,
   });
+  await Sentry.flush(SENTRY_FLUSH_TIMEOUT_MS).catch(() => null);
 
   const message =
     error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -2417,6 +2455,7 @@ export async function POST(req: Request) {
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
   const toolIntent = normalizeToolIntent(body.toolIntent);
+  const modelRotationStep = normalizeModelRotationStep(body.modelRotationStep);
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
   const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
@@ -2541,8 +2580,13 @@ export async function POST(req: Request) {
       turnId: reservation.turn.id,
     };
 
+    // Plan-gated denials no longer short-circuit (GH #13304): the model gets
+    // a locked stub, explains what it would produce, and the UI shows one
+    // upgrade prompt. Only broken states (feature kill, provider down) keep
+    // the terminal preflight message.
     if (
       albumArtCapability.availability !== 'available' &&
+      albumArtCapability.reasonCode !== 'PLAN_UNAVAILABLE' &&
       detectAlbumArtGenerationIntent({ text: userText, toolIntent })
     ) {
       const replyText =
@@ -2575,6 +2619,7 @@ export async function POST(req: Request) {
 
     if (
       retouchCapability.availability !== 'available' &&
+      retouchCapability.reasonCode !== 'PLAN_UNAVAILABLE' &&
       detectRetouchIntent({ text: userText, toolIntent })
     ) {
       const replyText =
@@ -2729,6 +2774,18 @@ export async function POST(req: Request) {
       userId,
       accountContext
     );
+    // Entitlement-locked tools stay visible as stubs returning
+    // { locked: true, reason, plan_required, upgrade_cta } so the model can
+    // explain + upsell instead of dead-ending (GH #13304). Boolean-driven
+    // from the registry, so paid plans (and billing-verification outages
+    // that preserve real plan booleans) never see a false lock. Album art
+    // stays fully hidden when the feature flag is off.
+    const lockedToolNames = resolveLockedChatTools(planLimits.booleans).filter(
+      name => name !== 'generateAlbumArt' || albumArtFeatureEnabled
+    );
+    const lockedToolStubs = buildLockedToolSet(lockedToolNames);
+    const lockedToolPromptInfo = buildLockedToolPromptInfo(lockedToolNames);
+
     // Advanced tools gated behind paid plans
     const tools = canUsePaidChatTools(accountContext)
       ? {
@@ -2747,8 +2804,9 @@ export async function POST(req: Request) {
             currentUserEntitlements,
             reservedTurn
           ),
+          ...lockedToolStubs,
         }
-      : freeTools;
+      : { ...freeTools, ...lockedToolStubs };
 
     // Telemetry hooks bind Sentry into `executeChatTurn` without coupling
     // the pure pipeline to Sentry. Eval scripts pass a no-op telemetry.
@@ -2765,8 +2823,23 @@ export async function POST(req: Request) {
             data: breadcrumb.data,
           })
         ),
-      captureException: (error, context) =>
-        Sentry.captureException(error, context),
+      // Mid-stream failures (`streamText.onError` in `executeChatTurn`) are
+      // the path that stamps CHAT_STREAM_FAILED on the turn while the HTTP
+      // response is already 200 — the lambda suspends right after the stream
+      // closes, so capture through `captureError` (stdout log keyed by the
+      // on-screen requestId + SDK-guarded Sentry send) and flush before
+      // yielding (GH #13300).
+      captureException: async (error, context) => {
+        await captureError('Chat stream failed', error, {
+          feature: 'ai-chat',
+          mode: 'stream',
+          requestId,
+          userId,
+          ...(context?.tags ?? {}),
+          ...(context?.extra ?? {}),
+        });
+        await Sentry.flush(SENTRY_FLUSH_TIMEOUT_MS).catch(() => null);
+      },
     };
     let streamFailurePersisted = false;
     const persistStreamFailure = async (error: unknown) => {
@@ -2804,7 +2877,9 @@ export async function POST(req: Request) {
       accountContext,
       insightsEnabled,
       forceLightModel,
+      modelRotationStep,
       lastUserText: userText,
+      lockedTools: lockedToolPromptInfo,
       tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,

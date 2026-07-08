@@ -127,6 +127,24 @@ sub_agents:
       - merge_pr
       - push_branch
 
+  - name: idea-radar
+    description: Weekly idea discovery sweep using last30days. Searches creator/SaaS signals, evaluates via 10x pipeline, posts Slack cards, reconciles reactions.
+    mcp_allowlist: [gbrain, linear]
+    skills:
+      - idea-radar
+      - last30days
+    cost_cap_usd: 1.00
+    cannot:
+      - edit_code
+      - spend_money
+
+schedules:
+  - name: idea-radar-sweep
+    cron: "0 9 * * 1"   # Monday 09:00 local (Idea Radar weekly sweep — GH-10926 / GH-10354)
+    agent: idea-radar
+    skill: idea-radar
+    cost_cap_usd: 1.00
+
 routing:
   default: chief
   intent_map:
@@ -141,3 +159,6 @@ routing:
     pr: code-orchestrator
     ci: code-orchestrator
     deploy: code-orchestrator
+    idea-radar: idea-radar
+    market-research: idea-radar
+    idea: idea-radar

@@ -133,11 +133,24 @@ async function ghJson(args, { retries = 3 } = {}) {
       return JSON.parse(stdout);
     } catch (error) {
       const stderr = error.stderr ?? '';
-      const rateLimited = /rate limit|secondary rate|abuse/i.test(stderr);
-      if (!rateLimited || attempt === retries) throw error;
+      // Retry transient API failures, not just rate limits: the bulk
+      // `gh pr list --json statusCheckRollup` GraphQL query times out or
+      // errors under load at blitz-scale open-PR counts (#13347).
+      const transient =
+        /rate limit|secondary rate|abuse|something went wrong|timeout|timed out|502|503|504|connection reset|unexpected end of JSON/i.test(
+          `${stderr}${error.message ?? ''}`
+        );
+      if (!transient || attempt === retries) {
+        if (stderr) {
+          console.error(
+            `[gh] ${args.slice(0, 3).join(' ')} failed (attempt ${attempt}/${retries}): ${stderr.slice(0, 2000)}`
+          );
+        }
+        throw error;
+      }
       const delayMs = Math.min(30_000, 2000 * 2 ** (attempt - 1));
       console.error(
-        `[gh-retry] ${args.join(' ')} hit rate limit; retry ${attempt}/${retries} in ${delayMs}ms`
+        `[gh-retry] ${args.join(' ')} transient failure; retry ${attempt}/${retries} in ${delayMs}ms`
       );
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
@@ -162,13 +175,12 @@ async function fetchOpenPrs(options) {
     'headRepositoryOwner',
     'isCrossRepository',
     'labels',
-    'statusCheckRollup',
     'changedFiles',
     'additions',
     'deletions',
     'maintainerCanModify',
   ];
-  return ghJson([
+  const listArgs = [
     'pr',
     'list',
     '--repo',
@@ -178,8 +190,27 @@ async function fetchOpenPrs(options) {
     '--limit',
     String(options.limit),
     '--json',
-    fields.join(','),
-  ]);
+  ];
+  try {
+    return {
+      prs: await ghJson([
+        ...listArgs,
+        [...fields, 'statusCheckRollup'].join(','),
+      ]),
+      degradedChecks: false,
+    };
+  } catch (error) {
+    // statusCheckRollup is by far the heaviest field in this query — at
+    // blitz-scale open-PR counts the combined GraphQL query fails while the
+    // same query without rollups succeeds (#13347). Fall back to a degraded
+    // fetch so the handler keeps classifying from mergeable/mergeStateStatus
+    // instead of dying on every run.
+    console.error(
+      `[degraded] bulk PR fetch with statusCheckRollup failed (${error.message}); retrying without check rollups`
+    );
+    const prs = await ghJson([...listArgs, fields.join(',')]);
+    return { prs, degradedChecks: true };
+  }
 }
 
 async function ensureLabel(repo, label, color, description) {
@@ -360,7 +391,16 @@ async function executePlan(plan, options) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const prs = await fetchOpenPrs(options);
+  const { prs, degradedChecks } = await fetchOpenPrs(options);
+  if (degradedChecks) {
+    // Without check rollups, "required check missing" is indistinguishable
+    // from "not fetched" — drop required-check-based BLOCKED classification
+    // and rely on GitHub's own mergeStateStatus, which is still fetched.
+    options.requiredChecks = [];
+    console.error(
+      '[degraded] classifying without check rollups: required-check gating disabled for this run; mergeStateStatus still applies'
+    );
+  }
   const plan = buildPlan(prs, options);
 
   console.log(formatPlan(plan, { dryRun: options.dryRun }));
@@ -377,5 +417,11 @@ async function main() {
 
 main().catch(error => {
   console.error(error);
+  // Surface subprocess stderr — `console.error(error)` alone hides the gh
+  // CLI's actual failure reason, which made the 100%-failing-runs incident
+  // (#13347) undiagnosable from the Actions UI.
+  if (error?.stderr) {
+    console.error(`stderr: ${String(error.stderr).slice(0, 4000)}`);
+  }
   process.exitCode = 1;
 });

@@ -171,7 +171,7 @@
       ],
       "requiresSmoke": true,
       "requiresPreview": false,
-      "blocksUnattendedAutoMerge": true,
+      "blocksUnattendedAutoMerge": false,
       "reason": "Workflow and CI-control changes can silently alter merge, deploy, or agent feedback behavior."
     },
     {
@@ -188,7 +188,7 @@
       ],
       "requiresSmoke": true,
       "requiresPreview": false,
-      "blocksUnattendedAutoMerge": true,
+      "blocksUnattendedAutoMerge": false,
       "reason": "Agent policy, evidence, and automation changes affect unattended code shipping."
     },
     {
@@ -206,7 +206,7 @@
       ],
       "requiresSmoke": true,
       "requiresPreview": true,
-      "blocksUnattendedAutoMerge": true,
+      "blocksUnattendedAutoMerge": false,
       "reason": "Identity regressions can lock out users or invalidate auth handoff paths."
     },
     {
@@ -221,7 +221,7 @@
       ],
       "requiresSmoke": true,
       "requiresPreview": true,
-      "blocksUnattendedAutoMerge": true,
+      "blocksUnattendedAutoMerge": false,
       "reason": "Billing and entitlement regressions can create revenue, access, or trust failures."
     },
     {
@@ -237,7 +237,7 @@
       ],
       "requiresSmoke": true,
       "requiresPreview": false,
-      "blocksUnattendedAutoMerge": true,
+      "blocksUnattendedAutoMerge": false,
       "reason": "Schema and database changes need isolated migration evidence and human-readable rollback context."
     },
     {
@@ -251,7 +251,7 @@
       ],
       "requiresSmoke": true,
       "requiresPreview": true,
-      "blocksUnattendedAutoMerge": true,
+      "blocksUnattendedAutoMerge": false,
       "reason": "Proxy and middleware changes can break routing, Clerk, CSP, and public access globally."
     },
     {
@@ -269,7 +269,7 @@
       ],
       "requiresSmoke": true,
       "requiresPreview": true,
-      "blocksUnattendedAutoMerge": true,
+      "blocksUnattendedAutoMerge": false,
       "reason": "Runtime config and dependency changes can alter build, deploy, or secret-bound behavior."
     },
     {

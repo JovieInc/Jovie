@@ -557,6 +557,16 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
     }
   });
 
+  // ci-golden-path deliberately uses ONE constant repo-wide group: it must
+  // serialize the Clerk dev instance (purgeStaleClerkTestUsers deletes ALL
+  // gp-* users, so two concurrent runs would delete each other's sessions)
+  // as well as the Neon pool. See the concurrency comment on the
+  // ci-golden-path job in ci.yml — do not parameterize that group. Every
+  // other pool group must stay per-job scoped per JOV-2497.
+  const intentionallySerializedPoolGroups = [
+    'group: neon-endpoint-pool-ci-golden-path',
+  ] as const;
+
   it('scopes branch-creation pool per job so siblings in one workflow are not cancelled', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const poolGroups =
@@ -564,7 +574,22 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 
     expect(poolGroups.length).toBeGreaterThan(0);
     for (const group of poolGroups) {
+      if (
+        intentionallySerializedPoolGroups.includes(
+          group.trim() as (typeof intentionallySerializedPoolGroups)[number]
+        )
+      ) {
+        continue;
+      }
       expect(group).toContain('${{ github.job }}');
+    }
+  });
+
+  it('keeps the serialized-group allowlist accurate against the workflow', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    for (const group of intentionallySerializedPoolGroups) {
+      expect(workflow).toContain(group);
     }
   });
 

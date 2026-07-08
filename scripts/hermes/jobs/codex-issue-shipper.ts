@@ -515,8 +515,9 @@ interface ListCodexIssuesResult {
 }
 
 function listCodexIssues(config: ShipperConfig): ListCodexIssuesResult {
-  // Fixed: gh CLI does not support --page; use single fetch with max limit
-  const fetchLimit = Math.min(100, config.issueFetchLimit || 100);
+  // gh CLI supports --limit up to 1000; honor the configured issueFetchLimit.
+  // ponytail: was Math.min(100,...) — hard cap was ignoring plist FETCH_LIMIT=200 env var
+  const fetchLimit = config.issueFetchLimit || 200;
   try {
     const raw = run(
       [

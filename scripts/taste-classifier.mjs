@@ -1,16 +1,16 @@
 /**
  * Taste-call classifier for Jovie's autonomous shipping system.
  *
- * Analyzes a PR diff + metadata to determine whether it genuinely needs
- * Tim's eyes (taste/UX/copy/design judgment) vs. can be handled by stronger
- * LLM review vs. auto-shipped.
+ * Analyzes a PR diff + metadata to determine whether it needs stronger
+ * LLM review (taste/UX/copy/design judgment) vs. can be auto-shipped.
  *
  * Usage:
  *   node scripts/taste-classifier.mjs --pr <number> [--dry-run] [--json]
  *
  * Exit codes:
  *   0 = classified successfully
- *   2 = classification uncertain (default to taste-required)
+ *   2 = classification uncertain (defaults to llm-reviewable — the taste
+ *       gate only applies on a positive material-UX signal, JOV-3592)
  */
 
 import { execSync } from 'node:child_process';
@@ -142,9 +142,9 @@ const NON_TASTE_BODY_KEYWORDS = [
 const FORCE_TASTE_LABELS = ['design', 'ui', 'ux'];
 
 /**
- * Terminal human decision: taste-approve.yml adds this when a maintainer
- * clears the gate via /approve. Approval is final for the PR — the classifier
- * must never re-gate it, even on later pushes.
+ * Terminal label from the former taste-approve workflow (removed 2026-07-07).
+ * Kept for backward compatibility: if a reopened PR still carries this label,
+ * the classifier treats it as auto-ship and never re-gates.
  */
 const TASTE_APPROVED_LABEL = 'taste-approved';
 
@@ -423,11 +423,17 @@ export function classifyTaste(pr) {
     };
   }
 
-  // Uncertain → default to taste-required
+  // Uncertain → default to llm-reviewable, NOT taste-required. Standing owner
+  // rule (2026-06-26, JOV-3592): the taste label applies ONLY on a positive
+  // material-UX-change signal; uncertain/non-visual work must auto-flow to
+  // strong LLM review. Defaulting uncertain to taste-required grew the human
+  // gate to 51% of bot PRs (#13348). Flipped-by-default cases carry a
+  // `default:flipped-to-llm-reviewable` signal for the weekly audit.
+  signals.push('default:flipped-to-llm-reviewable');
   return {
-    classification: 'taste-required',
+    classification: 'llm-reviewable',
     confidence: 0.5,
-    reason: `Uncertain classification (score: +${tasteScore.toFixed(1)} vs -${nonTasteScore.toFixed(1)}), defaulting to taste-required`,
+    reason: `Uncertain classification (score: +${tasteScore.toFixed(1)} vs -${nonTasteScore.toFixed(1)}) — no positive taste signal, defaulting to llm-reviewable (JOV-3592; logged for weekly audit)`,
     signals: signals.slice(0, 10),
     stats: {
       tasteFiles,
@@ -461,7 +467,7 @@ Options:
   --json          Output raw JSON classification
 
 Classifications:
-  taste-required  → needs-human-taste label, Tim reviews
+  taste-required  → llm-review label; ships autonomously, humans review post-ship in prod walkthroughs (2026-07-06 full-autonomy policy)
   llm-reviewable  → trigger stronger LLM review, no human gate
   auto-ship       → add merge-queue label, ship it
 `);
@@ -512,7 +518,7 @@ Classifications:
   if (!dryRun) {
     // Apply label
     const labelMap = {
-      'taste-required': 'needs-human-taste',
+      'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
       'auto-ship': 'merge-queue',
     };
@@ -536,7 +542,7 @@ Classifications:
     }
   } else {
     const labelMap = {
-      'taste-required': 'needs-human-taste',
+      'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
       'auto-ship': 'merge-queue',
     };
@@ -568,7 +574,7 @@ function buildComment(classification, prNumber) {
 
   if (classification.classification === 'taste-required') {
     comment +=
-      "> ⚠️ This PR has been flagged for Tim's review. A taste call is needed before merge.\n";
+      '> 🎨 This PR has been flagged for taste review. Strong LLM review will validate it pre-merge; review the output in a prod walkthrough post-ship.\n';
   } else if (classification.classification === 'llm-reviewable') {
     comment +=
       '> ✅ No taste gate needed. Strong LLM review will validate correctness.\n';

@@ -49,7 +49,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Promptfoo
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/promptfoo
           key: ${{ runner.os }}-promptfoo-${{ hashFiles('apps/web/promptfooconfig.yaml', 'apps/web/promptfooconfig.judge.yaml', 'apps/web/tests/eval/golden/promptfoo-cases-generator.ts') }}

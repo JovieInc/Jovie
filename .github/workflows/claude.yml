@@ -3,8 +3,11 @@ name: Claude Code
 on:
   issue_comment:
     types: [created]
+  # Trigger hygiene (#13349): `assigned` dropped — the job-level `if:` already
+  # gates on @claude in body/title, which `opened` covers. Assignment events
+  # were pure duplicates that booted runners for no work.
   issues:
-    types: [opened, assigned]
+    types: [opened]
   # NOTE: pull_request_review AND pull_request_review_comment both removed.
   # Bot-submitted reviews/comments (CodeRabbit, Copilot) create
   # action_required runs that clog the CI queue and consume runner slots.

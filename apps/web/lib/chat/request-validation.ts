@@ -26,6 +26,7 @@ export type ChatRequestBody = {
   clientMessageId?: unknown;
   source?: unknown;
   toolIntent?: unknown;
+  modelRotationStep?: unknown;
 };
 
 type MessagePart = { type: string; text?: string };

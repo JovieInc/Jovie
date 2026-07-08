@@ -180,6 +180,41 @@ describe('ChatMessage', () => {
     expect(loading.querySelector('.system-b-chat-loading-line')).toBeTruthy();
   });
 
+  it('keeps the thinking shimmer while streaming before any renderable content arrives (#11921)', () => {
+    // pending→streaming flips isThinking off before the first token lands;
+    // the reply row must keep the shimmer instead of collapsing to blank.
+    const messageProps = {
+      id: 'assistant-streaming-empty',
+      role: 'assistant' as const,
+      parts: [],
+      isThinking: false,
+      isStreaming: true,
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    expect(screen.getByTestId('chat-loading-indicator')).toBeInTheDocument();
+  });
+
+  it('replaces the shimmer with the reply once streamed content arrives', () => {
+    const messageProps = {
+      id: 'assistant-streaming-content',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'First tokens' }],
+      isThinking: false,
+      isStreaming: true,
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    expect(
+      screen.queryByTestId('chat-loading-indicator')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-message-reply')).toHaveTextContent(
+      'First tokens'
+    );
+  });
+
   it('copies assistant markdown through the rich clipboard helper', () => {
     copyMarkdownToClipboardMock.mockClear();
     const messageProps = {

@@ -137,6 +137,12 @@ export const ChatMessage = memo(function ChatMessage({
   })();
   const hasAssistantContent =
     Boolean(messageText) || toolEvents.length > 0 || toolStepCapExhausted;
+  // Keep the thinking shimmer up while the stream is open but no renderable
+  // content has arrived yet. Without this, the pending→streaming transition
+  // collapses the reply row to blank until the first token lands (GH-11921).
+  const showThinkingIndicator =
+    Boolean(isThinking) ||
+    (!isUser && Boolean(isStreaming) && !hasAssistantContent);
   const useUserPillBubble =
     isUser &&
     imageChips.length === 0 &&
@@ -184,7 +190,7 @@ export const ChatMessage = memo(function ChatMessage({
         </div>
       ) : (
         <div className='system-b-chat-assistant-frame'>
-          {isThinking ? (
+          {showThinkingIndicator ? (
             <div
               data-testid='chat-loading-indicator'
               className='system-b-chat-loading-indicator'
@@ -215,7 +221,7 @@ export const ChatMessage = memo(function ChatMessage({
             </div>
           ) : null}
 
-          {!isThinking && hasAssistantContent ? (
+          {!showThinkingIndicator && hasAssistantContent ? (
             <div className='system-b-chat-assistant-stack'>
               {messageText ? (
                 <div
@@ -251,7 +257,7 @@ export const ChatMessage = memo(function ChatMessage({
               height and prevent a layout shift when streaming ends (JOV-11948).
               The button is hidden via aria-hidden + pointer-events while
               streaming; CSS opacity:0 already hides it visually on non-hover. */}
-          {!isThinking && messageText ? (
+          {!showThinkingIndicator && messageText ? (
             <div
               className='system-b-chat-copy-row'
               aria-hidden={isStreaming ? true : undefined}

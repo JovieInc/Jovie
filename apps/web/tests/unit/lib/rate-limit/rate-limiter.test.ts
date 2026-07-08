@@ -59,6 +59,7 @@ import {
   createRateLimiter,
   isRateLimitingEnabled,
   RateLimiter,
+  resetRedisCircuitBreaker,
 } from '@/lib/rate-limit/rate-limiter';
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ const baseConfig = {
 describe('rate-limiter.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetRedisCircuitBreaker();
     MockMemoryClass.mock.calls = [];
     MockMemoryClass.mock.instances = [];
     // Default: Redis is available (factory returns the mock)
@@ -217,10 +219,10 @@ describe('rate-limiter.ts', () => {
       expect(logger).toHaveBeenCalledWith(
         expect.stringContaining('Redis error')
       );
-      expect(result).toEqual(memoryResult);
+      expect(result).toEqual({ ...memoryResult, degraded: true });
     });
 
-    it('uses memory limiter directly when Redis is not configured', async () => {
+    it('uses memory limiter directly (flagged degraded) when Redis is not configured', async () => {
       mockCreateRedisRateLimiter.mockReturnValue(null);
       const memoryResult = {
         success: true,
@@ -233,8 +235,24 @@ describe('rate-limiter.ts', () => {
       const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
       const result = await limiter.limit('user-1');
 
-      expect(result).toEqual(memoryResult);
+      expect(result).toEqual({ ...memoryResult, degraded: true });
       expect(mockRedisLimiter.limit).not.toHaveBeenCalled();
+    });
+
+    it('does not flag memory results as degraded when preferRedis is false', async () => {
+      const memoryResult = {
+        success: true,
+        limit: 10,
+        remaining: 7,
+        reset: new Date(),
+      };
+      mockMemoryInstance.limit.mockResolvedValue(memoryResult);
+
+      const limiter = new RateLimiter(baseConfig, { preferRedis: false });
+      const result = await limiter.limit('user-1');
+
+      expect(result).toEqual(memoryResult);
+      expect(result.degraded).toBeUndefined();
     });
 
     it('returns bounded failure when Redis is unavailable and requireRedis is true', async () => {
@@ -266,6 +284,84 @@ describe('rate-limiter.ts', () => {
       expect(result.remaining).toBe(0);
       expect(result.reason).toContain('temporarily unavailable');
       expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── 3b. Circuit breaker ───────────────────────────────────────────
+  describe('circuit breaker', () => {
+    it('skips Redis for subsequent requests after a Redis failure', async () => {
+      mockRedisLimiter.limit.mockRejectedValue(new Error('Redis down'));
+      const memoryResult = {
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: new Date(),
+      };
+      mockMemoryInstance.limit.mockResolvedValue(memoryResult);
+
+      const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
+
+      // First call hits Redis, fails, opens the circuit
+      await limiter.limit('user-1');
+      expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+
+      // Second call skips Redis entirely while the circuit is open
+      const result = await limiter.limit('user-1');
+      expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+      expect(result.degraded).toBe(true);
+    });
+
+    it('shares the open circuit across limiter instances', async () => {
+      mockRedisLimiter.limit.mockRejectedValue(new Error('Redis down'));
+      mockMemoryInstance.limit.mockResolvedValue({
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: new Date(),
+      });
+
+      const first = new RateLimiter(baseConfig, { warnOnFallback: false });
+      await first.limit('user-1');
+      expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+
+      const second = new RateLimiter(baseConfig, { warnOnFallback: false });
+      await second.limit('user-1');
+      expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries Redis after the circuit TTL elapses', async () => {
+      vi.useFakeTimers();
+      try {
+        mockRedisLimiter.limit.mockRejectedValueOnce(new Error('Redis down'));
+        mockMemoryInstance.limit.mockResolvedValue({
+          success: true,
+          limit: 10,
+          remaining: 9,
+          reset: new Date(),
+        });
+
+        const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
+        await limiter.limit('user-1');
+        expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+
+        // Circuit open: Redis skipped
+        await limiter.limit('user-1');
+        expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+
+        // After the 30s TTL, Redis is retried
+        vi.advanceTimersByTime(30_001);
+        mockRedisLimiter.limit.mockResolvedValue({
+          success: true,
+          limit: 10,
+          remaining: 9,
+          reset: Date.now() + 60_000,
+        });
+        const result = await limiter.limit('user-1');
+        expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(2);
+        expect(result.degraded).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

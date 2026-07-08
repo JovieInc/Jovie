@@ -79,6 +79,7 @@ export function JovieChat({
     hasMessages,
     isLoadingConversation,
     conversationTitle,
+    modelRotationNotice,
     status,
     activeConversationId,
     inputRef,
@@ -498,21 +499,35 @@ export function JovieChat({
   } as const;
 
   const composerSurface = (
-    <ChatComposerSurface
-      chatInputProps={chatInputProps}
-      showThreadView={showThreadView}
-      isRateLimited={isRateLimited}
-      showManifest={showManifest}
-      manifestCollapsed={manifestCollapsed}
-      showChips={showChips}
-      pendingFiles={pendingFiles}
-      aggregate={aggregate}
-      isUploading={isUploading}
-      isPro={isProUser}
-      onRemoveFile={removeFile}
-      onCollapseManifest={() => setManifestCollapsed(true)}
-      onExpandManifest={() => setManifestCollapsed(false)}
-    />
+    <>
+      {/* 👎 recovery loop (JOV-3362 / #11461): quiet status line while the
+          conversation is rotated onto a fallback model. aria-live so screen
+          readers hear the switch; auto-clears after 3 clean turns. */}
+      {modelRotationNotice ? (
+        <p
+          aria-live='polite'
+          data-testid='chat-model-rotation-notice'
+          className='mb-1.5 px-1 text-xs text-secondary-token'
+        >
+          {modelRotationNotice}
+        </p>
+      ) : null}
+      <ChatComposerSurface
+        chatInputProps={chatInputProps}
+        showThreadView={showThreadView}
+        isRateLimited={isRateLimited}
+        showManifest={showManifest}
+        manifestCollapsed={manifestCollapsed}
+        showChips={showChips}
+        pendingFiles={pendingFiles}
+        aggregate={aggregate}
+        isUploading={isUploading}
+        isPro={isProUser}
+        onRemoveFile={removeFile}
+        onCollapseManifest={() => setManifestCollapsed(true)}
+        onExpandManifest={() => setManifestCollapsed(false)}
+      />
+    </>
   );
 
   const inlineChatError =

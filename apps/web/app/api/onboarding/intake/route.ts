@@ -22,6 +22,7 @@ import {
   submitWaitlistAccessRequest,
   type WaitlistAccessOutcome,
 } from '@/lib/waitlist/access-request';
+import { scoreOnboardingInterview } from '@/lib/waitlist/interview-scoring';
 
 export const runtime = 'nodejs';
 
@@ -235,12 +236,31 @@ export async function POST(request: Request) {
     });
     const dbUser = await ensureIntakeUser({ clerkUserId, email: emailRaw });
 
+    const interviewResponses = {
+      currentWorkflow: parsed.data.metadata.currentWorkflow ?? null,
+      biggestBlocker: parsed.data.metadata.biggestBlocker ?? null,
+      launchGoal: parsed.data.metadata.launchGoal ?? null,
+    };
+    const interviewScore = scoreOnboardingInterview({
+      payload: parsed.data.waitlist,
+      responses: interviewResponses,
+    });
+    // Enrich the stored interview with the canonical problem statement and
+    // the deterministic score so Eve can query demand signal directly from
+    // `user_interviews.metadata` without re-deriving it.
+    const interviewMetadata = {
+      ...parsed.data.metadata,
+      problemStatement: interviewResponses.biggestBlocker,
+      interviewScore: interviewScore.score,
+      interviewSignals: interviewScore.signals,
+    };
+
     let interviewId: string;
     try {
       interviewId = await upsertOnboardingInterview({
         userId: dbUser.id,
         transcript: parsed.data.transcript,
-        metadata: parsed.data.metadata,
+        metadata: interviewMetadata,
       });
     } catch (error) {
       await captureError('onboarding intake transcript save failed', error, {
@@ -259,6 +279,7 @@ export async function POST(request: Request) {
       fullName,
       data: parsed.data.waitlist,
       source: 'onboarding_chat',
+      interviewResponses,
     });
 
     // Best-effort attach of the access decision to the interview row. The
@@ -270,7 +291,7 @@ export async function POST(request: Request) {
       await upsertOnboardingInterview({
         userId: dbUser.id,
         transcript: parsed.data.transcript,
-        metadata: parsed.data.metadata,
+        metadata: interviewMetadata,
         outcome: access.outcome,
         waitlistEntryId: access.entryId,
       });

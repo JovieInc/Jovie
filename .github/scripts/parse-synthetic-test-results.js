@@ -1,6 +1,9 @@
 const fs = require('node:fs');
 
-const DEFAULT_RESULT_FILES = legacyCanaryEnabled => [
+const DEFAULT_RESULT_FILES = (
+  legacyCanaryEnabled,
+  chatCanaryEnabled = false
+) => [
   {
     name: 'synthetic-auth-ui',
     path: 'apps/web/test-results/synthetic-auth-ui-results.json',
@@ -25,6 +28,11 @@ const DEFAULT_RESULT_FILES = legacyCanaryEnabled => [
     name: 'synthetic-legacy-otp',
     path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
     required: legacyCanaryEnabled,
+  },
+  {
+    name: 'synthetic-chat-turn',
+    path: 'apps/web/test-results/synthetic-chat-turn-results.json',
+    required: chatCanaryEnabled,
   },
 ];
 

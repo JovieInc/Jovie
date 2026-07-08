@@ -394,6 +394,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Zero the raw Clerk motion duration token so every consumer inherits 0ms.
+     Guarded by tests/unit/design-system/reduced-motion-tokens.test.ts. */
+  :is(.cl-signIn-root, .cl-signUp-root) {
+    --clerk-motion-duration: 0ms;
+  }
+
   :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary,
   :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton,
   :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput,

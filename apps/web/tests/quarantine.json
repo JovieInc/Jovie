@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "retryBudget": {
-    "unitDefaultRetries": 2,
+    "unitDefaultRetries": 0,
     "quarantineUnitRetries": 2,
     "e2eDefaultRetries": 0,
     "quarantineE2eRetries": 2,

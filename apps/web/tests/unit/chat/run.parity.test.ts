@@ -25,7 +25,11 @@ import type {
   ChatTelemetry,
   ReleaseContext,
 } from '@/lib/chat/types';
-import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
+import {
+  CHAT_MODEL,
+  CHAT_MODEL_LIGHT,
+  CHAT_MODEL_ROTATION_CHAIN,
+} from '@/lib/constants/ai-models';
 
 // Mock the AI SDK so tests don't hit the gateway. We only care that
 // `streamText` is invoked with the right shape; the returned object is
@@ -178,6 +182,47 @@ describe('executeChatTurn — parity assertions', () => {
       planLimits: paidPlanLimits,
     });
     expect(turn.selectedModel).toBe(CHAT_MODEL);
+  });
+
+  it('rotates to the fallback chain model when modelRotationStep is set (👎 recovery, #11461)', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [
+        userMessage(
+          'walk me through how Spotify editorial pitching actually works for an indie artist with 500 followers'
+        ),
+      ],
+      planLimits: paidPlanLimits,
+      modelRotationStep: 1,
+    });
+    expect(turn.selectedModel).toBe(CHAT_MODEL_ROTATION_CHAIN[1]);
+    expect(turn.selectedModel).not.toBe(CHAT_MODEL);
+  });
+
+  it('rotation never overrides the light-model path', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [userMessage('change my bio to: New bio text')],
+      planLimits: freePlanLimits,
+      modelRotationStep: 1,
+    });
+    expect(turn.selectedModel).toBe(CHAT_MODEL_LIGHT);
+  });
+
+  it('clamps out-of-range rotation steps to the end of the chain', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [
+        userMessage(
+          'walk me through how Spotify editorial pitching actually works for an indie artist with 500 followers'
+        ),
+      ],
+      planLimits: paidPlanLimits,
+      modelRotationStep: 999,
+    });
+    expect(turn.selectedModel).toBe(
+      CHAT_MODEL_ROTATION_CHAIN[CHAT_MODEL_ROTATION_CHAIN.length - 1]
+    );
   });
 
   it('honors forceLightModel override regardless of heuristic', async () => {

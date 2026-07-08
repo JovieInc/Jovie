@@ -51,3 +51,66 @@ describe('buildOpportunityInboxData', () => {
     expect(data.emptyActionCards[0]?.id).toBe('connect-spotify');
   });
 });
+
+describe('tour-date classification in the mapper', () => {
+  it('labels tour-date-looking calendar signals as tour date cards', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'action-3',
+      kind: 'calendar.create_event',
+      payload: {
+        title: 'Show at Saint Andrews Hall',
+        venueName: 'Saint Andrews Hall',
+        city: 'Detroit',
+      },
+      rationale: 'Promoter email proposed a Detroit tour stop.',
+      createdAt: new Date('2026-06-28T10:00:00.000Z'),
+    });
+
+    expect(card.category).toBe('tour_date');
+    expect(card.typeLabel).toBe('Tour date');
+    expect(card.primaryActionLabel).toBe('Confirm date');
+  });
+
+  it('keeps non-tour calendar signals as suggestions', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'action-4',
+      kind: 'calendar.create_event',
+      payload: { title: 'Weekly catalog review' },
+      rationale: 'Recurring planning block.',
+      createdAt: new Date('2026-06-28T10:00:00.000Z'),
+    });
+
+    expect(card.category).toBe('suggestion');
+    expect(card.typeLabel).toBe('Suggestion');
+    expect(card.primaryActionLabel).toBe('Add to calendar');
+  });
+});
+
+describe('buildOpportunityInboxData tour-date sections', () => {
+  it('passes tour-date sections through when provided', () => {
+    const tourDates = {
+      pending: [
+        {
+          id: 'td-1',
+          title: 'Saint Andrews Hall',
+          startDate: '2026-08-14T00:00:00.000Z',
+          startTime: null,
+          venueName: 'Saint Andrews Hall',
+          location: 'Detroit, MI',
+          providerLabel: 'Bandsintown',
+          status: 'pending' as const,
+        },
+      ],
+      confirmed: [],
+      rejected: [],
+    };
+
+    const data = buildOpportunityInboxData([], tourDates);
+    expect(data.tourDates).toEqual(tourDates);
+  });
+
+  it('omits tour-date sections when not provided', () => {
+    const data = buildOpportunityInboxData([]);
+    expect(data.tourDates).toBeUndefined();
+  });
+});

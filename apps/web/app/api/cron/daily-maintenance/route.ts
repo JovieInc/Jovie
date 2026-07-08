@@ -131,7 +131,7 @@ export async function GET(request: Request) {
     syncAiCrawlerAnalyticsCron
   );
 
-  // 8. Data retention — Sundays only (heavy operation)
+  // 9. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

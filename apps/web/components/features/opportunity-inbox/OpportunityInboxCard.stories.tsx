@@ -22,6 +22,7 @@ export const SuggestionCard: Story = {
       why: 'A promoter at the Magic Stick reached out yesterday. Jovie tied it to your Spotify growth there.',
       primaryActionLabel: 'Review pitch',
       status: 'pending',
+      category: 'suggestion',
     },
     onApprove: () => undefined,
     onDismiss: () => undefined,

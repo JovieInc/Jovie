@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CHAT_MODEL, TITLE_MODEL } from '@/lib/constants/ai-models';
+import {
+  CHAT_MODEL,
+  CHAT_MODEL_ROTATION_CHAIN,
+  TITLE_MODEL,
+} from '@/lib/constants/ai-models';
 
 /**
  * Tests that AI Gateway model identifiers use the correct format.
@@ -36,5 +40,16 @@ describe('AI Gateway model identifiers', () => {
 
   it('TITLE_MODEL specifies the google provider', () => {
     expect(TITLE_MODEL.split('/')[0]).toBe('google');
+  });
+
+  it('every CHAT_MODEL_ROTATION_CHAIN entry uses provider/model format', () => {
+    for (const identifier of CHAT_MODEL_ROTATION_CHAIN) {
+      expect(identifier).toMatch(GATEWAY_ID_PATTERN);
+      expect(identifier).not.toContain(':');
+    }
+  });
+
+  it('CHAT_MODEL_ROTATION_CHAIN starts with the default chat model', () => {
+    expect(CHAT_MODEL_ROTATION_CHAIN[0]).toBe(CHAT_MODEL);
   });
 });

@@ -42,6 +42,8 @@ import { captureError, captureWarning } from '@/lib/error-tracking';
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '@/lib/release-to-revenue/types';
 import { initializeReleaseToRevenueRun } from '@/lib/release-to-revenue/workflows/initialize-run';
 import { logger } from '@/lib/utils/logger';
+import { executePackagingSwapExperiment } from '@/lib/workflows/youtube-packaging/swap-executor';
+import { PACKAGING_SWAP_EXPERIMENT_WORKFLOW_KIND } from '@/lib/workflows/youtube-packaging/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -139,6 +141,9 @@ export async function GET(request: Request): Promise<Response> {
               processed++;
             } else if (run.kind === RELEASE_TO_REVENUE_WORKFLOW_KIND) {
               await initializeReleaseToRevenueRun({ workflowRunId: run.id });
+              processed++;
+            } else if (run.kind === PACKAGING_SWAP_EXPERIMENT_WORKFLOW_KIND) {
+              await executePackagingSwapExperiment({ workflowRunId: run.id });
               processed++;
             } else {
               logger.warn('[process-workflow-runs] unknown workflow kind', {

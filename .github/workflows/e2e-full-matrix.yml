@@ -52,7 +52,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
@@ -84,6 +84,7 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
 
       - name: Upload Playwright Report on Failure
         if: failure()
@@ -106,6 +107,10 @@ jobs:
         continue-on-error: true
         run: |
           cd apps/web
+          if [[ "${CLERK_SECRET_KEY:-}" != sk_test_* ]]; then
+            echo "Skipping Clerk E2E cleanup because CLERK_SECRET_KEY is not a Clerk test secret."
+            exit 0
+          fi
           pnpm tsx scripts/cleanup-e2e-users.ts --force
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}

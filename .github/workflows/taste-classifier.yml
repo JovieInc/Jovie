@@ -7,7 +7,10 @@ name: Taste Classifier
 #
 # Outputs:
 #   - Posts classification as a PR comment
-#   - Applies the appropriate label: needs-human-taste, llm-review, or merge-queue
+#   - Applies the appropriate label: llm-review or merge-queue. Full-autonomy
+#     policy (2026-07-06): taste-flagged PRs ship autonomously after strong LLM
+#     review; humans steer via issues + post-ship production walkthroughs, not
+#     pre-merge gates. The classification comment remains the steering signal.
 
 # NOTE: no `labeled` trigger — labels don't change the diff, and re-classifying
 # on label events created a loop where the classifier reverted human unlabels
@@ -30,23 +33,57 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Dedup guard (#13348): classify once per head SHA, not once per event.
+      # Re-fires on synchronize bursts were posting 2-3 duplicate classification
+      # comments per PR. The marker comment records the classified SHA; if it
+      # matches the current head, skip the whole run.
+      - name: Check for existing classification of this head SHA
+        id: dedupe
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const marker = '<!-- bot-comment:taste-classifier -->';
+            const headSha = context.payload.pull_request.head.sha;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+            const alreadyClassified = Boolean(
+              existing?.body?.includes(`<!-- classified-sha:${headSha} -->`)
+            );
+            core.setOutput('skip', alreadyClassified ? 'true' : 'false');
+            core.setOutput('comment_id', existing ? String(existing.id) : '');
+            if (alreadyClassified) {
+              core.info(`Head ${headSha} already classified in comment ${existing.id}; skipping.`);
+            }
+
       - name: Checkout repository
+        if: steps.dedupe.outputs.skip != 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Enable corepack
-        run: corepack enable
-
       - name: Setup Node 24
+        if: steps.dedupe.outputs.skip != 'true'
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '24'
           cache: 'pnpm'
 
+      - name: Enable corepack
+        if: steps.dedupe.outputs.skip != 'true'
+        env:
+          COREPACK_HOME: /tmp/corepack
+        run: corepack enable --install-directory /tmp/corepack
+
       - name: Install dependencies
+        if: steps.dedupe.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Run taste classifier
         id: classify
+        if: steps.dedupe.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -57,8 +94,10 @@ jobs:
           echo "classification=$CLASSIFICATION" >> "$GITHUB_OUTPUT"
 
       - name: Post classification comment and apply label
-        if: steps.classify.outputs.classification != ''
+        if: steps.dedupe.outputs.skip != 'true' && steps.classify.outputs.classification != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXISTING_COMMENT_ID: ${{ steps.dedupe.outputs.comment_id }}
         with:
           script: |
             const fs = require('fs');
@@ -66,7 +105,11 @@ jobs:
 
             const { pr: prNumber, classification: result, confidence, reason, signals } = classification;
 
-            // Build comment
+            // Build comment with dedupe markers
+            const marker = '<!-- bot-comment:taste-classifier -->';
+            const headSha = context.payload.pull_request.head.sha;
+            const shaMarker = `<!-- classified-sha:${headSha} -->`;
+
             const emoji = {
               'taste-required': '🎨',
               'llm-reviewable': '🤖',
@@ -74,7 +117,8 @@ jobs:
             };
             const emojiIcon = emoji[result] || '🔍';
 
-            let comment = `## ${emojiIcon} Taste Classifier: \`${result}\`\n\n`;
+            let comment = `${marker}\n${shaMarker}\n`;
+            comment += `## ${emojiIcon} Taste Classifier: \`${result}\`\n\n`;
             comment += `**Confidence:** ${(confidence * 100).toFixed(0)}%\n`;
             comment += `**Reason:** ${reason}\n\n`;
 
@@ -87,7 +131,7 @@ jobs:
             }
 
             if (result === 'taste-required') {
-              comment += '> ⚠️ This PR has been flagged for Tim\'s review. A taste call is needed before merge.\n';
+              comment += '> 🎨 Taste surface — ships autonomously after strong LLM review. Flagged for post-ship production walkthrough.\n';
             } else if (result === 'llm-reviewable') {
               comment += '> ✅ No taste gate needed. Strong LLM review will validate correctness.\n';
             } else {
@@ -96,17 +140,27 @@ jobs:
 
             comment += '\n*— Taste classifier v1.0 (autonomous shipping system)*';
 
-            // Post comment
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: comment,
-            });
+            // Upsert: edit existing comment if one exists
+            const existingId = process.env.EXISTING_COMMENT_ID;
+            if (existingId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: parseInt(existingId),
+                body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+            }
 
             // Apply label
             const labelMap = {
-              'taste-required': 'needs-human-taste',
+              'taste-required': 'llm-review',
               'llm-reviewable': 'llm-review',
               'auto-ship': 'merge-queue',
             };

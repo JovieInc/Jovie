@@ -27,6 +27,13 @@ env:
 jobs:
   guard:
     name: Guard + Deduplicate
+    # Trigger hygiene (#13349): `issues: labeled` fires for EVERY label event on
+    # every issue repo-wide, and GitHub cannot filter label names at the `on:`
+    # level. Gate at the job level so non-agent-ready label events conclude
+    # `skipped` without ever provisioning a runner — previously this job booted
+    # a runner just to echo "Label is not agent-ready; skipping".
+    # Keep in sync with env.AGENT_READY_LABEL (job-level `if:` cannot read env).
+    if: github.event_name != 'issues' || github.event.label.name == 'agent-ready'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

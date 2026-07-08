@@ -48,6 +48,12 @@ export interface InterviewMetadata {
   submittedFrom?: string | null;
   summary_structured?: InterviewSummaryStructured | null;
   summary_error?: string | null;
+  /** Canonical problem statement captured for demand analysis (Eve). */
+  problemStatement?: string | null;
+  /** Deterministic admit-or-waitlist score (0-100) from interview-scoring. */
+  interviewScore?: number | null;
+  /** Signal names that contributed to interviewScore. */
+  interviewSignals?: readonly string[] | null;
 }
 
 export const userInterviews = pgTable(

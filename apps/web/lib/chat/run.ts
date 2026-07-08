@@ -32,7 +32,10 @@ import type {
   ChatTelemetry,
   ReleaseContext,
 } from '@/lib/chat/types';
-import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
+import {
+  CHAT_MODEL_LIGHT,
+  resolveRotatedChatModel,
+} from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
 import { startChatTurnLangfuseTrace } from '@/lib/observability/langfuse';
 
@@ -134,8 +137,26 @@ export interface ExecuteChatTurnInput {
   insightsEnabled: boolean;
   accountContext?: ChatAccountContext;
   forceLightModel: boolean;
+  /**
+   * 👎 model-rotation step for this conversation (JOV-3362 / #11461).
+   * 0/undefined = default model. Positive values select the matching entry
+   * in `CHAT_MODEL_ROTATION_CHAIN` (clamped server-side) so a disliked
+   * response is retried on a different model. Never overrides the
+   * light-model path (cost lever / onboarding stay on Haiku).
+   */
+  modelRotationStep?: number;
   /** Precomputed once per turn to avoid repeated message scans. */
   lastUserText?: string;
+  /**
+   * Plan-locked tool stubs present in `tools` this turn (GH #13304).
+   * Drives the system-prompt section that instructs the model to explain
+   * what it would produce + relay one upgrade line instead of erroring.
+   */
+  lockedTools?: readonly {
+    readonly name: string;
+    readonly label: string;
+    readonly planRequired: string;
+  }[];
   /**
    * Pre-built tools for the turn. The caller composes free + paid tool sets
    * based on plan and feature flags before invoking. For `mode='onboarding'`,
@@ -207,7 +228,9 @@ export async function executeChatTurn(
     insightsEnabled,
     accountContext,
     forceLightModel,
+    modelRotationStep,
     lastUserText,
+    lockedTools,
     tools,
     signal,
     requestId,
@@ -250,6 +273,7 @@ export async function executeChatTurn(
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
       accountContext,
       referencedEntities,
+      lockedTools,
     });
   }
 
@@ -266,7 +290,12 @@ export async function executeChatTurn(
       planLimits.booleans.aiCanUseTools,
       lastUserText
     );
-  const selectedModel = shouldUseLightModel ? CHAT_MODEL_LIGHT : CHAT_MODEL;
+  // 👎 rotation (JOV-3362 / #11461): a disliked response routes the next
+  // turn to a different chain model. Light-model routing wins — it is the
+  // incident cost lever and the free-plan/onboarding path.
+  const selectedModel = shouldUseLightModel
+    ? CHAT_MODEL_LIGHT
+    : resolveRotatedChatModel(modelRotationStep);
 
   // Tag the request scope with chat-specific dimensions so all telemetry
   // events for this turn (errors, perf, breadcrumbs) are filterable
@@ -276,6 +305,7 @@ export async function executeChatTurn(
   telemetry?.setTags?.({
     chat_model: selectedModel,
     chat_force_light: String(forceLightModel),
+    chat_model_rotation_step: String(modelRotationStep ?? 0),
     chat_has_tools: String(planLimits.booleans.aiCanUseTools),
   });
   if (resolvedConversationId) {

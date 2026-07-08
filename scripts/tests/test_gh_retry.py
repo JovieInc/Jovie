@@ -582,8 +582,24 @@ JSON
             f'bash "{_WATCHDOG_SCRIPT}"'
         )
 
+    @staticmethod
+    def _stale_ts(minutes: int = 120) -> str:
+        """A merge-queue label timestamp `minutes` in the past — recently stale.
+
+        Fixtures must use realistic stall ages: the watchdog now treats stalls
+        beyond MAX_STALL_MINUTES (7 days) as data errors from unset/zeroed
+        timestamps and skips them (#13343), so a hardcoded 2020 date would be
+        rejected rather than kicked.
+        """
+        import datetime
+
+        return (
+            datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(minutes=minutes)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     def test_stale_clean_pr_gets_label_cycled(self, tmp_path: Path) -> None:
-        stale_ts = "2020-01-01T00:00:00Z"
+        stale_ts = self._stale_ts()
         pr_list = (
             '[{"n":100,"t":"Stale clean PR","m":"MERGEABLE","ms":"CLEAN",'
             '"head":"tim/jov-100","L":["merge-queue"]}]'
@@ -636,7 +652,7 @@ JSON
         assert "skipped (fresh, <45m): 1" in result.stdout
 
     def test_recent_kick_is_skipped_via_cooldown(self, tmp_path: Path) -> None:
-        stale_ts = "2020-01-01T00:00:00Z"
+        stale_ts = self._stale_ts()
         recent_kick_ts = subprocess.run(
             ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True, check=True
         ).stdout.strip()
@@ -672,7 +688,7 @@ JSON
     def test_conflicting_pr_gets_conflict_label_without_dequeue(
         self, tmp_path: Path
     ) -> None:
-        stale_ts = "2020-01-01T00:00:00Z"
+        stale_ts = self._stale_ts()
         pr_list = (
             '[{"n":103,"t":"Conflicting PR","m":"CONFLICTING","ms":"DIRTY",'
             '"head":"tim/jov-103","L":["merge-queue"]}]'
@@ -696,7 +712,7 @@ JSON
         assert "conflicts flagged: 1" in result.stdout
 
     def test_terminal_red_check_dequeues(self, tmp_path: Path) -> None:
-        stale_ts = "2020-01-01T00:00:00Z"
+        stale_ts = self._stale_ts()
         pr_list = (
             '[{"n":104,"t":"Red CI PR","m":"MERGEABLE","ms":"CLEAN",'
             '"head":"tim/jov-104","L":["merge-queue"]}]'
@@ -725,7 +741,7 @@ JSON
     ) -> None:
         # gh pr checks --required with --jq exits 8 on pending checks even with
         # valid JSON output (same behavior drain-pr-queue.sh guards against).
-        stale_ts = "2020-01-01T00:00:00Z"
+        stale_ts = self._stale_ts()
         pr_list = (
             '[{"n":105,"t":"Pending checks PR","m":"MERGEABLE","ms":"UNSTABLE",'
             '"head":"tim/jov-105","L":["merge-queue"]}]'
@@ -749,3 +765,57 @@ JSON
         # it falls through to the stuck-clean kick path instead.
         assert "dequeued (terminal red): 0" in result.stdout
         assert "kicked (label-cycled): 1" in result.stdout
+
+    def test_epoch_zero_timestamp_is_skipped_not_kicked(self, tmp_path: Path) -> None:
+        # Regression for #13343: an unset/epoch-0 enqueue timestamp computed a
+        # ~29.7M-minute "stall" and mass label-cycled freshly-enrolled PRs.
+        # Timestamps before 2020 are unset/zeroed data — skip, never kick.
+        pr_list = (
+            '[{"n":106,"t":"Epoch-zero PR","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-106","L":["merge-queue"]}]'
+        )
+        timeline = (
+            '[{"event":"labeled","label":{"name":"merge-queue"},'
+            '"created_at":"1970-01-01T00:00:00Z"}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={106: timeline},
+            comments_by_pr={106: "[]"},
+            checks_by_pr={106: ("[]", 0)},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45")
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "no valid merge-queue label timestamp" in result.stdout
+        assert "kicked (label-cycled): 0" in result.stdout
+        assert "would -merge-queue" not in result.stdout
+
+    def test_absurdly_old_stall_is_treated_as_data_error(self, tmp_path: Path) -> None:
+        # Regression for #13343: a computed stall beyond MAX_STALL_MINUTES
+        # (default 7 days) can only come from bad timestamp data — the
+        # watchdog must skip it rather than kick, and must cite the timestamp.
+        pr_list = (
+            '[{"n":107,"t":"Ancient stall PR","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-107","L":["merge-queue"]}]'
+        )
+        timeline = (
+            '[{"event":"labeled","label":{"name":"merge-queue"},'
+            '"created_at":"2024-01-01T00:00:00Z"}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={107: timeline},
+            comments_by_pr={107: "[]"},
+            checks_by_pr={107: ("[]", 0)},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45")
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "sanity cap" in result.stdout
+        assert "2024-01-01T00:00:00Z" in result.stdout
+        assert "kicked (label-cycled): 0" in result.stdout

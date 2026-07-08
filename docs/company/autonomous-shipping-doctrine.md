@@ -1,7 +1,16 @@
 # Autonomous Shipping Doctrine (Jovie Technology Inc.)
 
-**Effective:** 2026-06-22  
+**Effective:** 2026-06-22 · **Amended:** 2026-07-06 (no pre-merge human gates, including taste)  
 **Status:** Company policy — overrides informal “ask Tim before merge” habits.
+
+> **2026-07-06 amendment:** All CI assumes 100% autonomous shipping with **no
+> human in the loop pre-merge — including taste**. Humans steer by opening
+> issues and giving app-walkthrough feedback in production; shipping those
+> issues is autonomous end to end. Taste-flagged PRs route to strong LLM review
+> (`llm-review`) and ship; the taste-classifier comment remains as the signal
+> for post-ship walkthroughs. The risk classifier no longer sets
+> `blocksUnattendedAutoMerge` for any surface — high-risk surfaces get
+> **stricter CI** (smoke + preview evidence), not a human queue.
 
 ## Principle
 

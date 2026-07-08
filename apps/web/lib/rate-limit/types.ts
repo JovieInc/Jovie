@@ -22,6 +22,12 @@ export interface RateLimitResult {
   reason?: string;
   /** Whether the backing limiter is unavailable rather than exhausted */
   unavailable?: boolean;
+  /**
+   * Whether the result came from the per-instance memory fallback because the
+   * durable (Redis) backend was expected but unavailable. Callers on
+   * user-critical paths may treat a degraded limit as advisory.
+   */
+  degraded?: boolean;
 }
 
 /**

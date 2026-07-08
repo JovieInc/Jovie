@@ -24,7 +24,7 @@ describe('ci-harness manifest', () => {
     expect(docs).toContain(
       '`PR Ready` may require only jobs declared as merge gates'
     );
-    expect(docs).toContain('| Auth and identity | high | yes | yes | yes |');
+    expect(docs).toContain('| Auth and identity | high | yes | yes | no |');
   });
 
   it('replaces an existing generated docs block', () => {
@@ -44,12 +44,12 @@ describe('ci-harness manifest', () => {
 });
 
 describe('ci-harness risk classifier', () => {
-  it('requires smoke, preview, and human review for auth changes', () => {
+  it('requires smoke and preview for auth changes (autonomous merge)', () => {
     const risk = classifyCiRisk(['apps/web/lib/auth/gate.ts'], manifest);
     expect(risk.riskLevel).toBe('high');
     expect(risk.requiresSmoke).toBe(true);
     expect(risk.requiresPreview).toBe(true);
-    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
     expect(risk.matchedRules.map(rule => rule.id)).toContain('auth-identity');
   });
 
@@ -124,7 +124,7 @@ describe('ci-harness risk classifier', () => {
     expect(risk.riskLevel).toBe('high');
     expect(risk.requiresSmoke).toBe(true);
     expect(risk.requiresPreview).toBe(true);
-    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
     expect(risk.matchedRules.map(rule => rule.id)).toContain('env-config');
   });
 
@@ -133,7 +133,7 @@ describe('ci-harness risk classifier', () => {
     expect(risk.riskLevel).toBe('high');
     expect(risk.requiresSmoke).toBe(true);
     expect(risk.requiresPreview).toBe(false);
-    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
   });
 
   it('does not require web smoke for iOS-only workflow dependency bumps', () => {
@@ -162,7 +162,7 @@ describe('ci-harness risk classifier', () => {
     const risk = classifyCiRisk(['.claude/hooks/lint-check.sh'], manifest);
     expect(risk.riskLevel).toBe('high');
     expect(risk.requiresSmoke).toBe(true);
-    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.blocksUnattendedAutoMerge).toBe(false);
     expect(risk.matchedRules.map(rule => rule.id)).toContain(
       'agent-control-plane'
     );

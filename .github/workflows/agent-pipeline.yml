@@ -16,7 +16,7 @@
 # when @claude is mentioned in a CodeRabbit review thread.
 #
 # SAFETY:
-# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
+# - Runs on all branches except known infrastructure branches (main, dependabot/*, gh-readonly-queue/*, renovate/*)
 # - Max 5 fix attempts per SHA to prevent infinite loops
 # - Escalates to 'needs-human' label after exhaustion
 # - Sensitive path detection prevents auto-merge on high-risk changes
@@ -164,11 +164,11 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) || "$BRANCH" =~ (^|/)jov-[0-9]+ ]]; then
+          if ! [[ "$BRANCH" =~ ^(main|dependabot/|gh-readonly-queue/|renovate/) ]]; then
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Not an agent branch. Skipping."
+            echo "Not an agent branch (infrastructure). Skipping."
             echo "is_agent_branch=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -189,7 +189,7 @@ jobs:
           steps.trigger.outputs.should_continue == 'true' &&
           steps.branch-check.outputs.is_agent_branch == 'true' &&
           steps.trigger.outputs.trigger_type == 'ci_failure'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           sparse-checkout: |
             scripts/lib/pr-check-failures.mjs
@@ -428,7 +428,7 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           sparse-checkout: |
             scripts/lib/upsert-pr-comment.sh
@@ -497,7 +497,7 @@ jobs:
           echo "PR is from the same repository. Proceeding."
 
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           sparse-checkout: |
             scripts/lib/upsert-pr-comment.sh
@@ -873,7 +873,7 @@ jobs:
           # Find open agent PRs with needs-human label
           STALE_PRS=$(gh pr list --state open --label needs-human --json number,headRefName,updatedAt,title --limit 50 \
             | jq -c --arg cutoff "$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-48H +%Y-%m-%dT%H:%M:%SZ)" \
-            '[.[] | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("(^|/)jov-[0-9]+"; "i")) | select(.updatedAt < $cutoff)] | .[]')
+            '[.[] | select(.headRefName | test("^(main|dependabot/|gh-readonly-queue/|renovate/)") | not) | select(.updatedAt < $cutoff)] | .[]')
 
           if [[ -z "$STALE_PRS" ]]; then
             echo "No stale agent PRs found"
