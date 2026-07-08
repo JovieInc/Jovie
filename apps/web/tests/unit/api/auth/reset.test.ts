@@ -24,32 +24,39 @@ describe('POST /api/auth/reset', () => {
     expect(res.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('deletes clerk cookies on both host and parent scope for subdomain hosts', async () => {
+  it('deletes Better Auth cookies on both host and parent scope for subdomain hosts', async () => {
     const res = await POST(
       buildRequest(
         'https://staging.jov.ie/api/auth/reset',
-        '__session=stale; __client_uat=123; jv_country=US'
+        '__Secure-better-auth.session_token=stale; jv_country=US'
       )
     );
     const setCookies = res.headers.getSetCookie();
 
-    const sessionCookies = setCookies.filter(c => c.startsWith('__session='));
+    const sessionCookies = setCookies.filter(c =>
+      c.startsWith('__Secure-better-auth.session_token=')
+    );
     expect(sessionCookies.length).toBe(2);
     expect(
       sessionCookies.some(c => c.toLowerCase().includes('domain=.jov.ie'))
     ).toBe(true);
     expect(sessionCookies.every(c => c.includes('Expires='))).toBe(true);
 
-    // Non-clerk cookies are untouched
+    // Non-auth cookies are untouched
     expect(setCookies.some(c => c.startsWith('jv_country='))).toBe(false);
   });
 
   it('deletes only on host scope for apex hosts', async () => {
     const res = await POST(
-      buildRequest('https://jov.ie/api/auth/reset', '__session=stale')
+      buildRequest(
+        'https://jov.ie/api/auth/reset',
+        'better-auth.session_token=stale'
+      )
     );
     const setCookies = res.headers.getSetCookie();
-    const sessionCookies = setCookies.filter(c => c.startsWith('__session='));
+    const sessionCookies = setCookies.filter(c =>
+      c.startsWith('better-auth.session_token=')
+    );
     // Apex has only 2 parts so no parent scope delete
     expect(sessionCookies.length).toBe(1);
   });
