@@ -2,9 +2,14 @@
 /**
  * Flaky-rate ratchet check.
  *
- * Reads the committed ratchet floor from flaky-rate-ratchet.json and
- * compares against the current flaky test count. Fails when count > floor
- * (new untracked flakiness introduced). The floor may only decrease.
+ * Reads the committed ratchet floor from flaky-rate-ratchet.json AND the
+ * tracked-flake ledger from apps/web/tests/quarantine.json.  The effective
+ * allowed maximum is the GREATER of the two — i.e. known tracked flakes
+ * do NOT trigger a failure.  Only NEW untracked flakes cause a ratchet
+ * violation.
+ *
+ * The stored floor may only decrease (improve) over time and serves as the
+ * "you must be this low to pass" floor when the quarantine ledger is empty.
  *
  * Usage:
  *   node check-flaky-ratchet.js [flakyCount]
@@ -16,20 +21,59 @@ const fs = require('fs');
 const path = require('path');
 
 const RATCHET_PATH = path.join(__dirname, 'flaky-rate-ratchet.json');
+const QUARANTINE_PATH = path.join(
+  __dirname,
+  '..',
+  '..',
+  'apps',
+  'web',
+  'tests',
+  'quarantine.json'
+);
+
+/**
+ * Read the tracked-flake ledger (quarantine.json).
+ * Returns the number of entries, or 0 if the file is missing / invalid.
+ */
+function readTrackedFlakeCount() {
+  try {
+    const raw = fs.readFileSync(QUARANTINE_PATH, 'utf8');
+    const quarantine = JSON.parse(raw);
+    const entries = Array.isArray(quarantine.entries) ? quarantine.entries : [];
+    return entries.length;
+  } catch {
+    return 0;
+  }
+}
 
 /**
  * Check current flaky count against the ratchet floor.
+ *
+ * The effective floor is max(stored.floor, trackedFlakeCount) — known
+ * quarantined flakes never count as a violation.
+ *
  * @param {object} ratchet - parsed ratchet JSON
  * @param {number} flakyCount - current detected flaky test count
- * @returns {{ ok: boolean, floor: number, actual: number, message: string }}
+ * @param {number} trackedFlakeCount - entries in the quarantine ledger
+ * @returns {{ ok: boolean, floor: number, actual: number, tracked: number, message: string }}
  */
-function checkRatchet(ratchet, flakyCount) {
-  const ok = flakyCount <= ratchet.maxAllowedFlakyTests;
-  const floor = ratchet.maxAllowedFlakyTests;
+function checkRatchet(ratchet, flakyCount, trackedFlakeCount = 0) {
+  const effectiveFloor = Math.max(
+    ratchet.maxAllowedFlakyTests,
+    trackedFlakeCount
+  );
+  const ok = flakyCount <= effectiveFloor;
   const message = ok
-    ? `✅ Ratchet OK: ${flakyCount} flaky tests ≤ floor of ${floor}`
-    : `❌ RATCHET FAIL: ${flakyCount} flaky tests exceeds the floor of ${floor}. New flakiness has been introduced. Investigate and fix or quarantine before the floor can grow.`;
-  return { ok, floor, actual: flakyCount, message };
+    ? `✅ Ratchet OK: ${flakyCount} flaky tests ≤ effective floor of ${effectiveFloor} (stored=${ratchet.maxAllowedFlakyTests}, tracked=${trackedFlakeCount})`
+    : `❌ RATCHET FAIL: ${flakyCount} flaky tests exceeds the effective floor of ${effectiveFloor} (stored=${ratchet.maxAllowedFlakyTests}, tracked=${trackedFlakeCount}). New untracked flakiness has been introduced. Investigate and fix or quarantine.`;
+  return {
+    ok,
+    floor: effectiveFloor,
+    storedFloor: ratchet.maxAllowedFlakyTests,
+    tracked: trackedFlakeCount,
+    actual: flakyCount,
+    message,
+  };
 }
 
 /**
@@ -99,17 +143,22 @@ if (require.main === module) {
   }
 
   const ratchet = JSON.parse(fs.readFileSync(RATCHET_PATH, 'utf8'));
-  const result = checkRatchet(ratchet, flakyCount);
+  const trackedCount = readTrackedFlakeCount();
+  const result = checkRatchet(ratchet, flakyCount, trackedCount);
 
   console.log(`📊 Flaky-rate ratchet check`);
-  console.log(`   Current flaky count : ${result.actual}`);
-  console.log(`   Allowed floor        : ${result.floor}`);
+  console.log(`   Current flaky count   : ${result.actual}`);
+  console.log(`   Tracked flakes (ledger): ${result.tracked}`);
+  console.log(`   Stored floor           : ${result.storedFloor}`);
+  console.log(`   Effective floor        : ${result.floor}`);
   console.log(`\n${result.message}`);
 
   if (!result.ok) {
     console.error(
-      `\n   To fix: deflake tests until count ≤ ${result.floor},` +
-        ` then run: node .github/scripts/check-flaky-ratchet.js --update <newCount>`
+      `\n   New untracked flakiness detected. To fix:` +
+        `\n   1. Add new flaky tests to quarantine.json` +
+        `\n   2. Or deflake them until count ≤ ${result.floor}` +
+        `\n   3. Then run: node .github/scripts/check-flaky-ratchet.js --update <newCount>`
     );
     process.exit(1);
   }

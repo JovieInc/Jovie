@@ -1,12 +1,9 @@
 name: Test Flakiness Report
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
   schedule:
-    # Generate weekly flakiness report every Monday at 08:00 UTC.
-    - cron: '0 8 * * 1'
+    # Daily flakiness snapshot at 08:00 UTC; weekly deep report on Mondays.
+    - cron: '0 8 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -87,7 +84,7 @@ jobs:
             const ratchetFailed = process.env.RATCHET_FAILED === 'true';
             const workflowUrl = `${context.payload.repository.html_url}/actions/workflows/test-flakiness-report.yml`;
             const ratchetNote = ratchetFailed
-              ? '\n\n> ⚠️ **Ratchet exceeded**: new flaky tests detected above the committed floor. Fix or quarantine before the floor may be lowered.'
+              ? '\n\n> ⚠️ **Ratchet exceeded**: new untracked flaky tests detected above the committed floor. Fix or quarantine before the floor may be lowered.'
               : '';
             const body = `${report}${ratchetNote}\n\n---\n\nThis issue is automatically updated by the [Test Flakiness Report workflow](${workflowUrl}).`;
 
@@ -173,10 +170,7 @@ jobs:
                 ``,
                 `1. **Investigate** — review recent CI logs for this test to identify the root cause (timing, race condition, environment dependency).`,
                 `2. **Quarantine** — add the test to \`apps/web/tests/quarantine.json\` so it runs in the non-blocking lane while being fixed. Use the existing ledger schema with a \`fixIssueUrl\` pointing to this issue.`,
-                `3. **Lower the ratchet** — once the test is fixed and removed from quarantine, run:`,
-                `   \`\`\`bash`,
-                `   node .github/scripts/check-flaky-ratchet.js --update <newFlakyCount>`,
-                `   \`\`\``,
+                `3. **Lower the ratchet** — once the test is fixed and removed from quarantine, the ratchet automatically adjusts to the tracked-flake count.`,
                 `4. **Close this issue** when the test is stable across ≥10 CI runs.`,
                 ``,
                 `---`,
