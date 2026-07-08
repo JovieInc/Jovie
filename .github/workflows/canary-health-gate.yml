@@ -284,7 +284,7 @@ jobs:
             local expected_commit="${COMMIT_SHA:0:7}"
             local build_info_url="${base_url%/}/api/health/build-info"
             local attempt=1
-            local max_attempts=30
+            local max_attempts=15
             local response status body actual
 
             echo "Verifying ${base_url%/} serves commit ${expected_commit}..."

@@ -1,9 +1,8 @@
 /**
  * Taste-call classifier for Jovie's autonomous shipping system.
  *
- * Analyzes a PR diff + metadata to determine whether it genuinely needs
- * Tim's eyes (taste/UX/copy/design judgment) vs. can be handled by stronger
- * LLM review vs. auto-shipped.
+ * Analyzes a PR diff + metadata to determine whether it needs stronger
+ * LLM review (taste/UX/copy/design judgment) vs. can be auto-shipped.
  *
  * Usage:
  *   node scripts/taste-classifier.mjs --pr <number> [--dry-run] [--json]
@@ -143,9 +142,9 @@ const NON_TASTE_BODY_KEYWORDS = [
 const FORCE_TASTE_LABELS = ['design', 'ui', 'ux'];
 
 /**
- * Terminal human decision: taste-approve.yml adds this when a maintainer
- * clears the gate via /approve. Approval is final for the PR — the classifier
- * must never re-gate it, even on later pushes.
+ * Terminal label from the former taste-approve workflow (removed 2026-07-07).
+ * Kept for backward compatibility: if a reopened PR still carries this label,
+ * the classifier treats it as auto-ship and never re-gates.
  */
 const TASTE_APPROVED_LABEL = 'taste-approved';
 
@@ -575,7 +574,7 @@ function buildComment(classification, prNumber) {
 
   if (classification.classification === 'taste-required') {
     comment +=
-      "> ⚠️ This PR has been flagged for Tim's review. A taste call is needed before merge.\n";
+      '> 🎨 This PR has been flagged for taste review. Strong LLM review will validate it pre-merge; review the output in a prod walkthrough post-ship.\n';
   } else if (classification.classification === 'llm-reviewable') {
     comment +=
       '> ✅ No taste gate needed. Strong LLM review will validate correctness.\n';

@@ -53,4 +53,4 @@ constraint; spawn noise is the cheapest capacity to buy back.
 | `merge-queue-autoenroll.yml` | Dropped `pull_request: synchronize` (same) |
 | `pr-conflict-handler.yml` | Dropped `pull_request: synchronize` (same; see #13347) |
 | `claude.yml` | Dropped `issues: assigned` (no coverage beyond `opened`); documented broad-trigger rationale |
-| `taste-approve.yml` | Documented broad-trigger rationale (content triggers cannot be narrowed) |
+| ~~`taste-approve.yml`~~ | Removed 2026-07-07 — replaced by autonomous shipping (taste is advisory, not a human gate) |
