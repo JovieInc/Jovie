@@ -30,7 +30,7 @@ runs:
     # stalling at 0 B/s and eating the whole job timeout (Typecheck cancelled
     # at 10m during the "Post Run" cache save, 2026-07-06).
     - name: Setup Node.js with pnpm cache
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
         node-version: '22'
         cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
