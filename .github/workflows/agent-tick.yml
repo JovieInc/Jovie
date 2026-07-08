@@ -402,6 +402,9 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
+    outputs:
+      should_alert: ${{ steps.evaluate.outputs.should_alert }}
+      failed_run_id: ${{ steps.evaluate.outputs.failed_run_id }}
 
     steps:
       - name: Checkout
