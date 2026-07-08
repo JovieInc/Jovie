@@ -3,7 +3,8 @@ import { Tooltip } from './Tooltip';
 
 // SidebarNavItem — single nav row in the shell sidebar. Icon + label with
 // collapsed (icon-only) + nested (workspace child) + tight density modes.
-// Active state: filled bg + white text. Nested inactive: dimmer icon.
+// Active state: filled bg + white text, no border (borderless chrome per #13217).
+// Nested inactive: dimmer icon.
 // Always wrapped in a Tooltip so collapsed mode still shows the label.
 
 export interface ShellNavItem {
@@ -34,10 +35,10 @@ interface SidebarNavChromeOptions {
 }
 
 const SIDEBAR_PRIMARY_CHROME =
-  'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_78%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
+  'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
 
 const SIDEBAR_ACTIVE_CHROME =
-  'border-sidebar-border bg-sidebar-accent-active text-primary-token font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)]';
+  'bg-sidebar-accent-active text-primary-token font-medium';
 
 function getInactiveColor(nested?: boolean): string {
   if (nested) {
@@ -74,7 +75,7 @@ export function getSidebarNavRowClassName({
   const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-7 px-2.5';
 
   return cn(
-    'relative grid items-center rounded-full w-full border border-transparent transition-[background-color,border-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    'relative grid items-center rounded-full w-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
     'font-normal',
     'before:pointer-events-none before:absolute before:inset-y-1.5 before:left-6 before:w-px before:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_32%,transparent)]',
     'after:pointer-events-none after:absolute after:inset-y-1.5 after:left-10 after:w-px after:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_32%,transparent)]',
