@@ -290,7 +290,6 @@ html[data-profile-initial-mode]
   [data-testid="profile-cover"] {
   height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
   max-height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
-  border-bottom: 1px solid rgb(255 255 255 / 0.075);
 }
 
 html[data-profile-initial-mode]
@@ -314,9 +313,6 @@ html[data-profile-initial-mode]
   display: none !important;
 }
 
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-mode-backdrop,
 html[data-profile-initial-mode]
   [data-testid="profile-compact-surface"][data-mode="profile"]
   .profile-cover-mode-title {

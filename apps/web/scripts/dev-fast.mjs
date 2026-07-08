@@ -29,7 +29,7 @@ if (!existingNodeOptions.includes(networkFamilyFlag)) {
 }
 
 const nodeOptions = nodeOptionParts.filter(Boolean).join(' ');
-const routeSummary = ensureDevNextCacheFresh({ appDir, nextDir });
+const routeSummary = ensureDevNextCacheFresh({ appDir, nextDir, webRoot });
 
 console.error(formatDevRouteDiscoveryLog(routeSummary));
 
