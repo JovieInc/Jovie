@@ -53,10 +53,6 @@
       "schedule": "*/6 * * * *"
     },
     {
-      "path": "/api/cron/clerk-config-audit",
-      "schedule": "*/30 * * * *"
-    },
-    {
       "path": "/api/cron/voice-pipeline",
       "schedule": "*/5 * * * *"
     }

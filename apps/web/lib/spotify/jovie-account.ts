@@ -16,13 +16,11 @@
  */
 
 import 'server-only';
-import { clerkClient } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { getPlaylistSpotifyClerkUserId } from '@/lib/admin/platform-connections';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { SPOTIFY_API_BASE, SPOTIFY_DEFAULT_TIMEOUT_MS } from './env';
-import { SPOTIFY_OAUTH_TOKEN_STRATEGY } from './system-account';
 
 // ============================================================================
 // Configuration
@@ -68,42 +66,20 @@ export class SpotifyApiError extends Error {
 export async function getSpotifyTokenForClerkUser(
   clerkUserId: string
 ): Promise<string> {
-  try {
-    const clerk = await clerkClient();
-    const tokens = await clerk.users.getUserOauthAccessToken(
-      clerkUserId,
-      SPOTIFY_OAUTH_TOKEN_STRATEGY
-    );
+  const token = env.JOVIE_SPOTIFY_ACCESS_TOKEN?.trim();
+  if (token) return token;
 
-    if (!tokens.data || tokens.data.length === 0) {
-      throw new SpotifyAuthError(
-        'No Spotify account linked to the Jovie system user. ' +
-          'Link Spotify via the admin Platform Connections page.'
-      );
-    }
-
-    const token = tokens.data[0]?.token;
-    if (!token) {
-      throw new SpotifyAuthError(
-        'Spotify OAuth token is empty. The account may need to be re-linked.'
-      );
-    }
-
-    return token;
-  } catch (error) {
-    if (error instanceof SpotifyAuthError) throw error;
-
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    captureError('[Jovie Spotify] Token retrieval failed', error, {
-      userId: clerkUserId,
-    });
-    Sentry.captureException(error, {
-      tags: { component: 'jovie-spotify-account' },
-      extra: { userId: clerkUserId },
-    });
-
-    throw new SpotifyAuthError(`Failed to retrieve Spotify token: ${msg}`);
-  }
+  const error = new SpotifyAuthError(
+    'Spotify OAuth token is unavailable after Better Auth cutover. Reconnect Spotify with the new provider path.'
+  );
+  captureError('[Jovie Spotify] Token retrieval failed', error, {
+    userId: clerkUserId,
+  });
+  Sentry.captureException(error, {
+    tags: { component: 'jovie-spotify-account' },
+    extra: { userId: clerkUserId },
+  });
+  throw error;
 }
 
 /**

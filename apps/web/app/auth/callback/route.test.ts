@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  auth: vi.fn(),
+  authGetSession: vi.fn(),
+  authGenerateOneTimeToken: vi.fn(),
   consumeStoredAuthState: vi.fn(),
   captureError: vi.fn().mockResolvedValue(undefined),
   createStoredNativeExchangeCode: vi.fn(),
   trackServerEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: hoisted.auth,
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: {
+    api: {
+      getSession: hoisted.authGetSession,
+      generateOneTimeToken: hoisted.authGenerateOneTimeToken,
+    },
+  },
 }));
 
 vi.mock('@/lib/auth/routing-state.server', () => ({
@@ -33,7 +39,8 @@ describe('GET /auth/callback', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       '00000000-0000-4000-8000-000000000001'
     );
-    hoisted.auth.mockResolvedValue({ userId: 'user_123' });
+    hoisted.authGetSession.mockResolvedValue({ user: { id: 'user_123' } });
+    hoisted.authGenerateOneTimeToken.mockResolvedValue({ token: 'ott_123' });
     hoisted.consumeStoredAuthState.mockResolvedValue({
       client: 'electron',
       intent: 'sign_in',
@@ -84,6 +91,7 @@ describe('GET /auth/callback', () => {
       userId: 'user_123',
       returnTo: '/app/chat?runtime=electron',
       codeChallenge: 'challenge_123',
+      ott: 'ott_123',
     });
     expect(
       hoisted.consumeStoredAuthState.mock.invocationCallOrder[0]

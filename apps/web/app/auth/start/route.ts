@@ -1,4 +1,3 @@
-import { auth } from '@clerk/nextjs/server';
 import {
   type AuthClient,
   type AuthIntent,
@@ -10,6 +9,7 @@ import {
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { createStoredAuthState } from '@/lib/auth/routing-state.server';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
@@ -243,7 +243,7 @@ export async function GET(request: Request) {
       returnTo,
     });
 
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (userId) {
       return NextResponse.redirect(
         new URL(buildAuthCallbackPath(record.state), request.url),

@@ -15,9 +15,7 @@ const {
   mockRevalidatePath,
   mockSanitizeReturnTo,
   mockSanitizeDevTestAuthRedirectPath,
-  mockClerkClient,
-  mockClerkGetUser,
-  mockClerkGetUserList,
+  mockResolveConfiguredNativeTestBetterAuthUserId,
 } = vi.hoisted(() => ({
   mockBuildIosAuthCompleteUrl: vi.fn(),
   mockBuildDevTestAuthCookieDescriptors: vi.fn(),
@@ -31,9 +29,7 @@ const {
   mockRevalidatePath: vi.fn(),
   mockSanitizeReturnTo: vi.fn(),
   mockSanitizeDevTestAuthRedirectPath: vi.fn(),
-  mockClerkClient: vi.fn(),
-  mockClerkGetUser: vi.fn(),
-  mockClerkGetUserList: vi.fn(),
+  mockResolveConfiguredNativeTestBetterAuthUserId: vi.fn(),
 }));
 
 vi.mock('@jovie/auth-routing', () => ({
@@ -64,8 +60,9 @@ vi.mock('@/lib/auth/test-mode', () => ({
   isTrustedTestBypassRequest: mockIsTrustedTestBypassRequest,
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  clerkClient: mockClerkClient,
+vi.mock('@/lib/auth/native-test-clerk-user.server', () => ({
+  resolveConfiguredNativeTestBetterAuthUserId:
+    mockResolveConfiguredNativeTestBetterAuthUserId,
 }));
 
 vi.mock('next/cache', () => ({
@@ -80,18 +77,7 @@ describe('dev test-auth routes', () => {
     vi.stubEnv('E2E_CLERK_USER_ID', '');
     vi.stubEnv('E2E_CLERK_USER_USERNAME', '');
     vi.stubEnv('JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID', '');
-    mockClerkClient.mockResolvedValue({
-      users: {
-        getUser: mockClerkGetUser,
-        getUserList: mockClerkGetUserList,
-      },
-    });
-    mockClerkGetUser.mockImplementation((userId: string) =>
-      Promise.resolve({ id: userId })
-    );
-    mockClerkGetUserList.mockResolvedValue({
-      data: [{ id: 'user_from_email' }],
-    });
+    mockResolveConfiguredNativeTestBetterAuthUserId.mockResolvedValue(null);
 
     mockGetDevTestAuthAvailability.mockReturnValue({
       enabled: true,
@@ -685,8 +671,10 @@ describe('dev test-auth routes', () => {
     expect(mockCreateStoredNativeExchangeCode).not.toHaveBeenCalled();
   });
 
-  it('uses configured real Clerk user id for the iOS native callback route when present', async () => {
-    vi.stubEnv('E2E_CLERK_USER_ID', 'user_live_clerk');
+  it('uses configured real Better Auth user id for the iOS native callback route when present', async () => {
+    mockResolveConfiguredNativeTestBetterAuthUserId.mockResolvedValueOnce(
+      'ba_live_user'
+    );
 
     const { POST } = await import(
       '@/app/api/dev/test-auth/mobile-callback/route'
@@ -703,25 +691,24 @@ describe('dev test-auth routes', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockClerkGetUser).toHaveBeenCalledWith('user_live_clerk');
+    expect(mockResolveConfiguredNativeTestBetterAuthUserId).toHaveBeenCalled();
     expect(mockEnsureDevTestAuthActor).not.toHaveBeenCalled();
     expect(mockEnsureLiveDevTestAuthActor).not.toHaveBeenCalled();
     expect(mockCreateStoredNativeExchangeCode).toHaveBeenCalledWith(
       expect.objectContaining({
-        userId: 'user_live_clerk',
+        userId: 'ba_live_user',
       })
     );
     expect(await response.json()).toEqual(
       expect.objectContaining({
-        userId: 'user_live_clerk',
+        userId: 'ba_live_user',
         persona: 'creator-ready',
       })
     );
   });
 
-  it('falls back to a provisioned actor when configured Clerk user id is stale', async () => {
-    vi.stubEnv('E2E_CLERK_USER_ID', 'user_stale_clerk');
-    mockClerkGetUser.mockRejectedValueOnce(new Error('Not Found'));
+  it('falls back to a provisioned actor when configured Better Auth user id is unavailable', async () => {
+    mockResolveConfiguredNativeTestBetterAuthUserId.mockResolvedValueOnce(null);
     mockEnsureLiveDevTestAuthActor.mockResolvedValueOnce({
       persona: 'creator-ready',
       clerkUserId: 'user_creator_ready',
@@ -742,7 +729,7 @@ describe('dev test-auth routes', () => {
     );
 
     expect(response.status).toBe(307);
-    expect(mockClerkGetUser).toHaveBeenCalledWith('user_stale_clerk');
+    expect(mockResolveConfiguredNativeTestBetterAuthUserId).toHaveBeenCalled();
     expect(mockEnsureLiveDevTestAuthActor).toHaveBeenCalledWith(
       'creator-ready'
     );

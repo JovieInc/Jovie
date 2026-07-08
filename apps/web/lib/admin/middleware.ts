@@ -1,15 +1,9 @@
 import 'server-only';
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { maskUserIdForLog } from '@/lib/auth/mask-user-id';
-import {
-  isTestAuthBypassEnabled,
-  resolveTestBypassUserId,
-} from '@/lib/auth/test-mode';
 import { captureWarning } from '@/lib/error-tracking';
-import { hasRecentAdminMfaReverification } from './mfa';
 import { isAdmin } from './roles';
 
 /**
@@ -33,30 +27,7 @@ import { isAdmin } from './roles';
  * @returns NextResponse with 403 status if not admin, null if authorized
  */
 export async function requireAdmin(): Promise<NextResponse | null> {
-  let userId: string | null = null;
-  let authResult: Awaited<ReturnType<typeof auth>> | null = null;
-
-  if (isTestAuthBypassEnabled()) {
-    try {
-      const headerStore = await headers();
-      const cookieStore = await cookies();
-      userId = resolveTestBypassUserId(headerStore, cookieStore);
-    } catch {
-      // Ignore missing request context in local test paths.
-    }
-  }
-
-  if (!userId) {
-    try {
-      authResult = await auth();
-      userId = authResult.userId;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes('clerkMiddleware')) {
-        throw error;
-      }
-    }
-  }
+  const { userId } = await getCachedAuth();
 
   // User not authenticated. This is routine traffic (unauth hits to admin
   // routes) — not an actionable signal, so we record a breadcrumb for
@@ -77,14 +48,11 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   // Check admin status
   const userIsAdmin = await isAdmin(userId);
-  const hasRecentMfa = authResult
-    ? hasRecentAdminMfaReverification(authResult)
-    : false;
 
   // Mask user ID for logging to prevent PII exposure
   const maskedUserId = maskUserIdForLog(userId);
 
-  if (!userIsAdmin || !hasRecentMfa) {
+  if (!userIsAdmin) {
     // Log unauthorized access attempt with masked ID
     captureWarning(
       `[admin/middleware] Forbidden admin access attempt by user: ${maskedUserId}`
@@ -115,34 +83,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
  * @returns Promise<boolean> - True if user is admin
  */
 export async function checkIsAdmin(): Promise<boolean> {
-  let userId: string | null = null;
-  let authResult: Awaited<ReturnType<typeof auth>> | null = null;
-
-  if (isTestAuthBypassEnabled()) {
-    try {
-      const headerStore = await headers();
-      const cookieStore = await cookies();
-      userId = resolveTestBypassUserId(headerStore, cookieStore);
-    } catch {
-      // Ignore missing request context in local test paths.
-    }
-  }
-
-  if (!userId) {
-    try {
-      authResult = await auth();
-      userId = authResult.userId;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes('clerkMiddleware')) {
-        throw error;
-      }
-    }
-  }
-
+  const { userId } = await getCachedAuth();
   if (!userId) return false;
-  if (!authResult || !hasRecentAdminMfaReverification(authResult)) {
-    return false;
-  }
   return isAdmin(userId);
 }

@@ -209,7 +209,7 @@ export function SettingsPolished({
 
   const renderAccountSection = useCallback(
     () =>
-      publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+      publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL ? (
         <AccountSettingsSection isGrowth={isGrowth} />
       ) : (
         <div className='text-center py-4'>
@@ -217,8 +217,8 @@ export function SettingsPolished({
             Account Settings Unavailable
           </h3>
           <p className='text-app text-secondary-token'>
-            Clerk is not configured (missing publishable key). Set
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
+            Account management is not configured. Set
+            NEXT_PUBLIC_BETTER_AUTH_URL to enable account management.
           </p>
         </div>
       ),

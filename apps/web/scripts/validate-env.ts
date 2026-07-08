@@ -20,14 +20,9 @@ const CRITICAL_VARS = [
     validate: (v: string) => v.startsWith('postgres'),
   },
   {
-    key: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-    label: 'Auth (Clerk)',
-    validate: (v: string) => v.startsWith('pk_'),
-  },
-  {
-    key: 'CLERK_SECRET_KEY',
-    label: 'Auth Secret',
-    validate: (v: string) => v.startsWith('sk_'),
+    key: 'BETTER_AUTH_SECRET',
+    label: 'Auth Secret (Better Auth)',
+    validate: (v: string) => v.length >= 32,
   },
   {
     key: 'STRIPE_SECRET_KEY',

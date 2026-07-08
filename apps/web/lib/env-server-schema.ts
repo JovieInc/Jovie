@@ -102,6 +102,7 @@ export const ServerEnvSchema = z.object({
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
   JOVIE_SYSTEM_CLERK_USER_ID: z.string().optional(),
+  JOVIE_SPOTIFY_ACCESS_TOKEN: z.string().optional(),
   APPLE_MUSIC_DEVELOPER_TOKEN: z.string().optional(),
   IOS_TESTFLIGHT_PUBLIC_LINK: z.string().url().optional(),
 
@@ -433,6 +434,7 @@ export const ENV_KEYS = [
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
   'JOVIE_SYSTEM_CLERK_USER_ID',
+  'JOVIE_SPOTIFY_ACCESS_TOKEN',
   'APPLE_MUSIC_DEVELOPER_TOKEN',
   'IOS_TESTFLIGHT_PUBLIC_LINK',
   'APPLE_WALLET_PASS_TYPE_IDENTIFIER',

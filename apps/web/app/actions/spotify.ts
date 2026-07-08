@@ -16,9 +16,9 @@
  * @see /docs/spotify-ingest-hardening.md
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { logSearchEvent, logSearchRateLimited } from '@/lib/audit/ingest';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import {
   handleIngestError,
@@ -96,7 +96,7 @@ export async function searchArtists(
 ): Promise<SpotifyActionResult<SearchArtistResult[]>> {
   try {
     // 1. Auth check
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       throw unauthorizedError();
     }
@@ -241,7 +241,7 @@ export async function getArtist(
 ): Promise<SpotifyActionResult<SanitizedArtist>> {
   try {
     // 1. Auth check
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       throw unauthorizedError();
     }
@@ -301,7 +301,7 @@ export async function checkArtistExists(
 ): Promise<SpotifyActionResult<boolean>> {
   try {
     // 1. Auth check
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       throw unauthorizedError();
     }

@@ -351,10 +351,14 @@ struct JovieApp: App {
     )
 
     if launchConfiguration.shouldConfigureClerk {
+      // Better Auth migration: no client-side Clerk publishable key — the
+      // native handoff uses OTT + deep-link callback scheme only. Clerk SDK
+      // is configured with an empty key so its singleton stays initialized
+      // for the remaining sign-out paths during the cutover.
       Clerk.configure(
-        publishableKey: configuration.clerkPublishableKey,
+        publishableKey: "",
         options: makeJovieClerkOptions(
-          redirectUrl: configuration.clerkRedirectUrl,
+          redirectUrl: "ie.jov.jovie://callback",
           callbackUrlScheme: configuration.clerkCallbackUrlScheme,
           keychainService: launchMode.clerkKeychainService
         )

@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { signGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { userId: clerkId } = await auth();
+    const { userId: clerkId } = await getCachedAuth();
     if (!clerkId) {
       return NextResponse.redirect(`${origin}/sign-in`, { status: 302 });
     }

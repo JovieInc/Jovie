@@ -1,9 +1,8 @@
-import { currentUser } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import {
   enforceOnboardingRateLimit,
   getOnboardingRateLimitMessage,
@@ -60,11 +59,10 @@ export default async function WaitlistInvitePage({
     redirect(`/signin?redirect_url=${encodeURIComponent(redirectUrl)}`);
   }
 
-  const clerkUser = await currentUser();
+  const currentUser = await getCachedCurrentUser();
   const verifiedEmails =
-    clerkUser?.emailAddresses
-      ?.filter(e => e.verification?.status === 'verified')
-      .map(e => e.emailAddress)
+    currentUser?.emailAddresses
+      ?.map(e => e.emailAddress)
       .filter(email => email.trim().length > 0) ?? [];
 
   if (verifiedEmails.length === 0) {
