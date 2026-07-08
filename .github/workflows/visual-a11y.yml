@@ -43,89 +43,59 @@ jobs:
 
   storybook-a11y:
     name: Storybook A11y Checks
-    # Blocking — Storybook component a11y signal, path-gated to component/storybook changes.
-    # Failures block PRs via required status check in branch protection.
     needs: [ci-visual-path-changes]
     if: ${{ needs.ci-visual-path-changes.outputs.has_visual_changes == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright
-        run: pnpm --filter web exec playwright install chromium --with-deps
-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web exec playwright install chromium --with-deps
       - name: Run Storybook A11y Tests
         id: a11y-test
         run: pnpm --filter web test:a11y
-
       - name: A11y Results Summary
         if: always()
         run: |
           if [ "${{ steps.a11y-test.outcome }}" == "failure" ]; then
-            echo "## 🔍 A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "❌ **Accessibility violations detected** — blocking this PR." >> "$GITHUB_STEP_SUMMARY"
+            echo "FAIL: Accessibility violations detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Some components have accessibility issues (contrast, labels, etc.)." >> "$GITHUB_STEP_SUMMARY"
-            echo "Review the job logs for details." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "To run locally: \`pnpm --filter web test:a11y\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "To run locally: pnpm --filter web test:a11y" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## ✅ A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
+            echo "PASS: All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   playwright-visual:
     name: Playwright Visual Regression
-    # Blocking — visual diff gate for component PRs, path-gated to component/ui changes.
-    # Failures block PRs via required status check in branch protection.
     needs: [ci-visual-path-changes]
     if: ${{ needs.ci-visual-path-changes.outputs.has_visual_changes == 'true' && (github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository) }}
-
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright
-        run: pnpm --filter web exec playwright install chromium chromium-headless-shell --with-deps
-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web exec playwright install chromium chromium-headless-shell --with-deps
       - name: Run Visual Regression Tests
         id: visual-test
         run: pnpm --filter web e2e:visual
         env:
           CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          # Skip auth-required tests in CI without secrets
           E2E_SKIP_AUTH: true
-
       - name: Upload Visual Diff Artifacts
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -135,24 +105,18 @@ jobs:
             apps/web/test-results/
             apps/web/playwright-report/
           retention-days: 7
-
       - name: Visual Test Results Summary
         if: always()
         run: |
           if [ "${{ steps.visual-test.outcome }}" == "failure" ]; then
-            echo "## 🖼️ Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "## Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "❌ **Visual differences detected** — blocking this PR." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Some pages have visual changes from the baseline." >> "$GITHUB_STEP_SUMMARY"
-            echo "Download the artifacts to review diff images." >> "$GITHUB_STEP_SUMMARY"
+            echo "FAIL: Visual differences detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "If changes are intentional, update snapshots:" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`\`\`bash" >> "$GITHUB_STEP_SUMMARY"
             echo "pnpm --filter web e2e:visual:update" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## ✅ Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "## Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "All visual tests passed - no unexpected changes detected." >> "$GITHUB_STEP_SUMMARY"
+            echo "PASS: All visual tests passed - no unexpected changes detected." >> "$GITHUB_STEP_SUMMARY"
           fi
