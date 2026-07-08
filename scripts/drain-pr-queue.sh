@@ -124,6 +124,11 @@ while IFS= read -r pr; do
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
+  # Guard: check_failures_for_pr might return non-JSON under transient gh errors.
+  # Default to empty array if $fail isn't valid JSON.
+  if ! jq -e . <<<"$fail" >/dev/null 2>&1; then
+    fail='[]'
+  fi
   ENRICHED="$(jq -c --argjson pr "$pr" --argjson fail "$fail" '. + [$pr + {fail: $fail}]' <<<"$ENRICHED")"
 done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
