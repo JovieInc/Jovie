@@ -2,7 +2,6 @@ import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
-import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { baUsers } from '@/lib/db/schema/better-auth';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -172,6 +171,11 @@ export async function ensureBetterAuthTestUser({
 }): Promise<string> {
   const normalizedEmail = normalizeEmail(email) ?? email;
   const baUserId = getDeterministicTestBetterAuthUserId(normalizedEmail);
+
+  // Lazy import keeps `@/lib/db` (and its `server-only` env module) out of
+  // the Playwright global-setup module graph, which would otherwise trip
+  // the `server-only` guard when this file is imported from globalSetup.
+  const { db } = await import('@/lib/db');
 
   // Upsert into ba_users — idempotent. `onConflictDoUpdate` on the
   // primary key (id) so concurrent callers converge.
