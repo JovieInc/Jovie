@@ -198,7 +198,7 @@ echo "$SNAP" | jq -c '.[]
 # CLEAN meant those PRs never entered the queue. Enrolling a not-yet-green PR is
 # safe — Graphite re-validates and the dequeue step above removes any that truly
 # fail. `.fail` only counts terminal failing checks, not pending/queued ones.
-echo "=== ENROLL (mergeable + not failing → +merge-queue) ==="
+echo "=== ENROLL (mergeable + not failing → +merge-queue + auto-merge) ==="
 echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
@@ -209,6 +209,46 @@ echo "$SNAP" | jq -c '.[]
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     echo "  #$n  $t"
     label "$n" merge-queue
+    # Enable GitHub native auto-merge (squash) so the PR merges as soon as
+    # CI goes green. The `merge-queue` label alone is a status marker, not a
+    # merge trigger — the old mq-guard.sh cron controlled actual auto-merge.
+    # Since that cron was disabled during CI consolidation (2026-07-08),
+    # this step closes the pipeline gap inline.
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "    [dry-run] would enable auto-merge on #$n"
+    else
+      gh_retry pr merge "$n" -R "$REPO" --auto --squash >/dev/null 2>&1 \
+        && echo "    +auto-merge on #$n" \
+        || echo "    !! failed to enable auto-merge on #$n"
+    fi
+  done
+
+# --- CATCH-UP: labeled but no auto-merge ---
+# PRs that got the `merge-queue` label from an earlier drain run (before this
+# auto-merge step existed) or from manual labeling need auto-merge enabled too.
+echo "=== CATCH-UP (+auto-merge on labeled PRs missing it) ==="
+echo "$SNAP" | jq -c '.[]
+  | select(.draft|not)
+  | select(.m=="MERGEABLE")
+  | select(.fail|length==0)
+  | select(.head|startswith("gtmq_")|not)
+  | select([.L[]] | index("merge-queue"))
+  | select(.ms != "CLEAN" and .ms != "UNSTABLE") | not)' \
+| while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr")
+    t=$(jq -r '.t' <<<"$pr")
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "    [dry-run] would check auto-merge on #$n $t"
+    else
+      if gh pr view "$n" -R "$REPO" --json autoMergeRequest --jq '.autoMergeRequest' 2>/dev/null | grep -q 'mergeMethod'; then
+        echo "  #$n  $t  auto-merge already enabled"
+      else
+        echo "  #$n  $t  enabling auto-merge (catch-up)"
+        gh_retry pr merge "$n" -R "$REPO" --auto --squash >/dev/null 2>&1 \
+          && echo "    +auto-merge on #$n" \
+          || echo "    !! failed to enable auto-merge on #$n"
+      fi
+    fi
   done
 
 # --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---
