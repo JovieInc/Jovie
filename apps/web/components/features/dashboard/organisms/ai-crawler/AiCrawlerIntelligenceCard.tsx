@@ -103,16 +103,16 @@ export function AiCrawlerIntelligenceCard({
           aria-hidden='true'
         />
       )}
-      <span className='shrink-0 text-sm font-[590] tracking-[-0.01em] text-primary-token'>
+      <span className='shrink-0 text-sm font-semibold text-primary-token'>
         AI Visibility
       </span>
-      <span className='min-w-0 flex-1 truncate text-left text-[11.5px] text-tertiary-token'>
+      <span className='min-w-0 flex-1 truncate text-left text-2xs text-tertiary-token'>
         {showTeaser
           ? 'See which AI services read your pages'
           : `${model.title} · ${model.meta}`}
       </span>
       {model.status ? (
-        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-[0.06em] text-secondary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-wide text-secondary-token'>
           <span
             className='h-1.5 w-1.5 shrink-0 rounded-full'
             style={{ background: statusDotVar(model.status.tone) }}
@@ -147,7 +147,7 @@ export function AiCrawlerIntelligenceCard({
       onClick={handleOpen}
       className={cn(
         ROW_CLASS,
-        'text-left transition-colors duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]',
+        'text-left transition-colors duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
         className
       )}
       data-testid='ai-crawler-intelligence-card'
