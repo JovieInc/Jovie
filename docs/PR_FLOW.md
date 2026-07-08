@@ -147,6 +147,19 @@ cron tick and rescues those PRs:
 | `drain-pr-queue.sh` (terminal-failure-only) | Zombie-check churn dequeuing green PRs |
 | `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
+| `runner-health-monitor.yml` label-drift guard | Self-hosted runners impersonating GitHub-hosted labels |
+
+### Runner label policy
+
+Self-hosted runners must use **explicit labels only** (`self-hosted`, `Linux`,
+`ARM64`, `jovie-runner`) and must **never** carry GitHub-hosted labels
+(`ubuntu-latest`, `macos-latest`, `windows-latest`). A self-hosted runner
+labeled `ubuntu-latest` hijacks every `runs-on: ubuntu-latest` workflow onto an
+incomplete toolchain — on 2026-07-08 this stranded 37 open PRs on OrbStack
+runners missing `gh`, Docker, and `unzip`. The scheduled
+`runner-health-monitor.yml` fails loudly (`::error::` + red workflow) when any
+self-hosted runner carries a forbidden label; fix by removing that label from
+the runner, never by renaming workflows around it.
 
 ## What broke on 2026-06-22
 
