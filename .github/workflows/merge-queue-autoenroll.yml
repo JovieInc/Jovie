@@ -1,39 +1,33 @@
 name: Merge Queue Auto-Enroll
 
-# Root-cause fix for PRs sitting un-merged for days: they were never enrolled.
-# Sweeps open PRs and adds the `merge-queue` label to every clean, ready,
-# non-opted-out one so the Graphite queue picks them up. Graphite re-tests each
-# against latest main before landing, so enrolling a not-yet-green PR is safe —
-# the queue dequeues failures; main never goes red.
+# Fully event-driven — zero polling crons.
 #
-# Phase 2 (/drain): mechanically rebases BLOCKED agent PRs onto latest main so
-# stale CI re-runs after main-side fixes land (see scripts/drain-pr-remediate.mjs).
+# Every state change that affects enrollment eligibility fires exactly one
+# workflow run. The drain script adds the `merge-queue` label to clean PRs,
+# which is the enqueue signal for Graphite's merge queue. Graphite handles
+# batch processing, rebasing, and merging — no `gh pr merge --auto` needed.
 #
-# Opt out per-PR with any of: needs-human, hold, gated.
+# Triggers:
+#   pull_request      — PR label changes, ready, reopen (eligibility change)
+#   workflow_run      — CI completion (green PRs are now enrollable)
+#   push (main)       — main moved → queued PRs may conflict or get stale
+#   workflow_dispatch — manual rescue if needed
 #
-# Two jobs share this workflow:
-#   enroll   — runs the drain (see above) on PR events, CI completion, and the
-#              */20 cron safety net.
-#   watchdog — runs scripts/merge-queue-watchdog.sh on a separate */10 cron tick
-#              (and workflow_dispatch) to rescue PRs that are clean, green, and
-#              enrolled but stuck in the queue itself (Graphite-side stall, not
-#              an enrollment gap — see docs/PR_FLOW.md).
-# Both jobs share one concurrency group so they never mutate merge-queue labels
-# at the same time.
+# Two jobs run (not at the same time — concurrency group serializes):
+#   enroll    — classify open PRs, enroll green ones, dequeue broken ones,
+#               flag conflicts for the fix agent
+#   rebase    — mechanically rebase blocked agent PRs onto latest main
+#
+# No schedule. No watchdog label-cycling. No polling.
 
 on:
-  schedule:
-    - cron: '*/20 * * * *'   # enroll: catch anything missed between events
-    - cron: '*/10 * * * *'   # watchdog: rescue PRs stalled inside the queue
-  # Trigger hygiene (#13349): no `synchronize` — enrollment eligibility only
-  # changes when CI completes (workflow_run below) or a PR flips ready/reopens.
-  # Per-push spawns of this fleet-wide drain were pure duplication behind the
-  # shared mutex.
   pull_request:
-    types: [ready_for_review, reopened]
+    types: [ready_for_review, reopened, labeled, unlabeled]
   workflow_run:
     workflows: ['CI']
     types: [completed]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -47,7 +41,6 @@ permissions:
 jobs:
   enroll:
     if: >-
-      github.event.schedule != '*/10 * * * *' &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
     runs-on: ubuntu-latest
     steps:
@@ -65,6 +58,13 @@ jobs:
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
         run: bash scripts/drain-pr-queue.sh
+
+  rebase:
+    if: >-
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
       - name: Enable pnpm
         run: corepack enable
       - name: Setup Node
@@ -79,23 +79,3 @@ jobs:
           DRAIN_REMEDIATE_MAX_PER_RUN: '3'
           DRAIN_REMEDIATE_COOLDOWN_HOURS: '4'
         run: node scripts/drain-pr-remediate.mjs --apply
-
-  watchdog:
-    if: >-
-      github.event.schedule == '*/10 * * * *' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-      - name: Run merge-queue drain regression tests
-        run: pip install pytest --quiet && pytest scripts/tests/test_gh_retry.py -v
-      - name: Rescue stalled merge-queue PRs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          GH_RETRY_ATTEMPTS: 8
-          GH_RETRY_MAX_DELAY: 60
-        run: bash scripts/merge-queue-watchdog.sh

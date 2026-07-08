@@ -75,17 +75,70 @@ describe('DspAvatarStack', () => {
     expect(popover).toHaveClass('group-focus-within/dsps:pointer-events-auto');
   });
 
-  it('uses canonical DSP brand colors instead of Tailwind color classes', () => {
+  it('falls back to text glyph when no iconPath is provided', () => {
+    render(<DspAvatarStack dsps={ITEMS} />);
+    // Glyphs appear in the stacked avatar and/or the popover list.
+    expect(screen.getAllByText('S').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Y').length).toBeGreaterThan(0);
+  });
+
+  it('surfaces brand color via CSS custom properties', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
 
-    const primary = screen.getAllByText('S')[0];
-    const missing = screen.getAllByText('Y')[0];
-    const liveDot = document.querySelector('.system-b-dsp-status-dot-live');
+    // Primary (live) and missing items render with brand color CSS var
+    const avatars = document.querySelectorAll(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    const styleAttrs = Array.from(avatars).map(
+      el => el.getAttribute('style') ?? ''
+    );
 
-    expect(primary).toHaveStyle({ '--system-b-dsp-avatar-color': '#1DB954' });
-    expect(primary.className).not.toContain('bg-emerald');
-    expect(missing).toHaveStyle({ '--system-b-dsp-avatar-color': '#FF0000' });
-    expect(missing.className).toContain('opacity-45');
+    expect(styleAttrs.some(s => s.includes('#1DB954'))).toBe(true);
+    expect(styleAttrs.some(s => s.includes('#FF0000'))).toBe(true);
+  });
+
+  it('avoids Tailwind color utility classes for DSP brand colors', () => {
+    render(<DspAvatarStack dsps={ITEMS} />);
+    const liveDot = document.querySelector('.system-b-dsp-status-dot-live');
     expect(liveDot?.className).not.toContain('bg-emerald');
+  });
+
+  it('applies brand hover text color only to icon avatars, not glyph avatars', () => {
+    const iconItem: DspAvatarItem = {
+      id: 'spotify',
+      status: 'live',
+      label: 'Spotify',
+      glyph: 'S',
+      iconPath: 'M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12',
+      color: '#1DB954',
+    };
+
+    const { container: iconContainer } = render(
+      <DspAvatarStack dsps={[iconItem]} />
+    );
+    const iconAvatar = iconContainer.querySelector(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    expect(iconAvatar?.className).toContain('group-hover/dsps:text-');
+
+    const { container: glyphContainer } = render(
+      <DspAvatarStack dsps={[ITEMS[1]]} />
+    );
+    const glyphAvatar = glyphContainer.querySelector(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    // Glyph avatars keep white text on hover — the brand bg would make the
+    // glyph invisible if the hover text color matched it.
+    expect(glyphAvatar?.className).not.toContain('group-hover/dsps:text-');
+    expect(glyphAvatar?.className).toContain('text-white');
+  });
+
+  it('keeps missing glyph avatars faded at opacity-40 without opacity-75', () => {
+    const { container } = render(<DspAvatarStack dsps={[ITEMS[2]]} />);
+    const avatar = container.querySelector(
+      '[style*="--system-b-dsp-avatar-color"]'
+    );
+    expect(avatar?.className).toContain('opacity-40');
+    expect(avatar?.className).not.toContain('opacity-75');
   });
 });

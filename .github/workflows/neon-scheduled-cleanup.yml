@@ -2,9 +2,9 @@ name: Neon Scheduled Branch Cleanup
 
 on:
   schedule:
-    # JOV-2497: run every 30 minutes so orphaned CI branches release endpoint slots
+    # JOV-2497: run every 15 minutes so orphaned CI branches release endpoint slots
     # between bulk rebase/drain bursts (PR-close cleanup alone is too slow).
-    - cron: '*/30 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       cleanup_threshold:

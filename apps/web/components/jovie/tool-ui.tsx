@@ -1,12 +1,14 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   type ProfileEditPreview,
   ProfileEditPreviewCard,
 } from '@/components/features/dashboard/organisms/ProfileEditPreviewCard';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { isLockedToolOutput } from '@/lib/chat/locked-tools';
 import { resolveToolFailurePresentation } from '@/lib/chat/tool-errors';
 import {
   encodeToolEvents,
@@ -121,8 +123,26 @@ function isSocialLinkRemovalResult(
   );
 }
 
+/**
+ * Plan-locked tool result (GH #13304): success-shaped output carrying
+ * `locked: true`. Renders as a quiet status row + one upgrade prompt,
+ * never an error.
+ */
+function isLockedToolEvent(event: PersistedToolEvent): boolean {
+  return event.state === 'succeeded' && isLockedToolOutput(event.output);
+}
+
+function getLockedPlanRequired(event: PersistedToolEvent): string {
+  const plan = event.output?.plan_required;
+  return typeof plan === 'string' && plan.length > 0 ? plan : 'Pro';
+}
+
 function getToolStatusTitle(event: PersistedToolEvent): string {
   const config = getToolUiConfig(event.toolName);
+
+  if (isLockedToolEvent(event)) {
+    return `${config.label} is a ${getLockedPlanRequired(event)} feature`;
+  }
 
   switch (event.state) {
     case 'running':
@@ -139,6 +159,13 @@ function getToolStatusTitle(event: PersistedToolEvent): string {
 }
 
 function getToolStatusBody(event: PersistedToolEvent): string | undefined {
+  if (isLockedToolEvent(event)) {
+    const reason = event.output?.reason;
+    return typeof reason === 'string' && reason.length > 0
+      ? reason
+      : event.summary;
+  }
+
   switch (event.state) {
     case 'running':
       return event.summary;
@@ -220,7 +247,8 @@ function ToolActivityRow({
   const isInline = variant === 'inline';
   const isError = event.state === 'failed' || event.state === 'denied';
   const isRunning = event.state === 'running';
-  const Icon = TOOL_STATUS_ICONS[event.state];
+  const isLocked = isLockedToolEvent(event);
+  const Icon = isLocked ? Lock : TOOL_STATUS_ICONS[event.state];
   const showVerboseDetails = isVerboseToolModeEnabled();
 
   return (
@@ -228,6 +256,7 @@ function ToolActivityRow({
       data-testid='tool-status-row'
       data-tool-name={event.toolName}
       data-tool-state={event.state}
+      data-tool-locked={isLocked ? 'true' : undefined}
       role={isError ? 'alert' : 'status'}
       className={cn(
         'relative flex w-full items-start gap-2.5 text-primary-token',
@@ -250,7 +279,8 @@ function ToolActivityRow({
           'relative z-10 mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-(--linear-app-content-surface)',
           isRunning && 'text-secondary-token',
           isError && 'text-red-500',
-          !isRunning && !isError && 'text-cyan-300'
+          isLocked && 'text-secondary-token',
+          !isRunning && !isError && !isLocked && 'text-cyan-300'
         )}
       >
         <Icon
@@ -738,8 +768,10 @@ function renderToolActivityGroups({
 
   for (const event of events) {
     const config = getToolUiConfig(event.toolName);
+    // Locked results always render as status rows — artifact cards expect
+    // real generation payloads.
     const artifactCard =
-      config.renderer === 'artifact'
+      config.renderer === 'artifact' && !isLockedToolEvent(event)
         ? renderArtifactCard(event, profileId)
         : null;
 
@@ -765,6 +797,24 @@ function renderToolActivityGroups({
   }
 
   flushStatusEvents();
+
+  // One upgrade prompt per message, never stacked — even when the model
+  // touched multiple locked tools (GH #13304).
+  const firstLocked = events.find(isLockedToolEvent);
+  if (firstLocked) {
+    const planRequired = getLockedPlanRequired(firstLocked);
+    elements.push(
+      <div
+        key='plan-upgrade-prompt'
+        data-testid='chat-plan-upgrade-prompt'
+        className='mt-2'
+      >
+        <UpgradeButton size='sm' variant='secondary'>
+          Upgrade to {planRequired}
+        </UpgradeButton>
+      </div>
+    );
+  }
 
   return elements;
 }

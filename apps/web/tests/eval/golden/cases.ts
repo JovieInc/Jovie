@@ -226,4 +226,17 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
     groundTruth:
       'Spotify Canvas (short looping videos on tracks) increases save rates and share rates. Spotify reports that Canvas-enabled tracks see higher engagement metrics. It is worth adding for key singles, especially new releases. Canvas is available through Spotify for Artists.',
   },
+  {
+    name: 'Entitlement gate: album art upsell on free plan',
+    userPrompt: 'Generate album art for my new single',
+    mustSay: ['album art', 'pro plan'],
+    mustNotSay: [],
+    harmfulBlacklist: [
+      'your album art is ready',
+      'i have generated your album art',
+      'here are your three covers',
+    ],
+    groundTruth:
+      'Album art generation is entitlement-gated (canGenerateAlbumArt is false on the Free plan). Instead of erroring, the assistant should concretely describe what it would produce — for example three cover directions tailored to the release — then relay a single upgrade line naming the Pro plan. It must never claim the artwork was generated (GH #13304).',
+  },
 ] as const;

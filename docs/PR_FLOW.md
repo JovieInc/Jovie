@@ -10,10 +10,10 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
 
 ## North star
 
-- **Non-taste + CI-green → auto-merge.** No human. Correctness is a machine job.
-- **Taste-touching → one click.** A screenshot in the PR body + a 👍/`/approve`
-  comment from a maintainer clears it (the `taste-approve` workflow). Nothing else
-  needs a human.
+- **CI-green → auto-merge.** No human. Correctness is a machine job.
+- **Taste → LLM review + ship.** Taste-touching PRs get strong LLM review and
+  ship autonomously; the taste classifier comment is a signal for post-ship
+  walkthroughs. Nothing needs a human pre-merge.
 - **Throughput ceiling is CI cost and queue reliability, not merge wiring.** Keep
   the per-PR gate cheap; push everything heavy off the PR path.
 
@@ -75,19 +75,14 @@ Most PRs auto-merge on the fast gate. These paths are the exceptions — know th
 before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 | If your diff touches… | What happens |
-|---|---|
-| `auth-identity`, `billing-money`, `db-migrations`, `proxy-middleware`, `env-config`, `agent-control-plane`, CI workflows | **High risk** → smoke + preview evidence required, and **unattended auto-merge is blocked** (a human/orchestrator must clear it). Expect a `needs-human` hold — that's by design, not a bug. |
-| Public UI / profile surfaces | **Medium** → preview deploy + Lighthouse/a11y run; does *not* block auto-merge. |
+|---|---|---|
+| `auth-identity`, `billing-money`, `db-migrations`, `proxy-middleware`, `env-config`, `agent-control-plane`, CI workflows | **High risk** → smoke + preview evidence required. All surfaces are unattended-auto-merge (2026-07-06 policy). |
+| Public UI / profile surfaces | **Medium** → preview deploy + Lighthouse/a11y run. |
+| Design / UX / copy | **Taste-flagged** → `llm-review` label; strong LLM review + ship; classifier comment signals post-ship walkthrough. |
 | Anything else (logic, tests, docs, internal app) | Fast gate only → auto-merges when green. |
 
 - **Want a preview deploy** when it isn't auto-triggered? Add the `deploy-preview`
   (or `testing`) label — see [`release.md`](../.claude/rules/release.md).
-- **Taste-touching change** (design / UX / copy)? Put a **screenshot in the PR body**
-  and a maintainer's 👍/`/approve` clears `needs-human-taste`. Accepted screenshot
-  forms (the `taste-approve` matcher): markdown `![alt](url)`, an `<img>` tag, a
-  direct image URL (`.png/.jpg/.gif/.webp`), or a `github.com/user-attachments` /
-  `user-images.githubusercontent.com` link. A non-matching link silently fails the
-  gate — use one of these.
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
@@ -130,27 +125,36 @@ cron tick and rescues those PRs:
   watchdog jobs share one concurrency group so they never mutate labels
   concurrently.
 
-## 4. The one human gate: taste
+## 4. Taste: advisory, not a gate
 
-- Taste-touching changes (design / UX / copy) get `needs-human-taste` **and a
-  screenshot in the PR body**.
-- A maintainer clears it with an approving review or a `/approve` | `lgtm` | 👍
-  comment — the `taste-approve` workflow verifies the screenshot, removes the
-  label, and hands the PR to the queue. No checkout, one click.
-- **Everything else is lights-out.** A `needs-human` / `needs-human-taste` on an
-  automated, CI-gated, non-taste PR (a dep bump, a screenshot regen) is a **bug** —
-  a false-positive labeler kills a PR's autonomy. Fix the labeler (e.g. #11712,
-  where a `@radix-ui` bump was tagged auth because the guard grepped the lockfile).
+- Taste-touching changes (design / UX / copy) get classified as `taste-required`
+  by the taste classifier, which applies the `llm-review` label and posts a
+  comment. The PR **ships autonomously** — taste does not block merge.
+- The classifier comment is a signal for post-ship prod walkthroughs. Strong LLM
+  review validates correctness pre-merge.
+- `taste-approved` is no longer a human gate label — it was the old `taste-approve`
+  workflow's terminal marker, which is now removed (2026-07-06). The classifier
+  treats it as auto-ship if found on a reopened PR.
+- A `needs-human` label on a CI-gated, non-taste PR (a dep bump, a screenshot
+  regen) is still a **bug** — a false-positive labeler kills a PR's autonomy.
 
 ## 5. Guardrails that enforce this
 
 | Guardrail | Stops |
-|---|---|
+|---|---|---|
 | `pr-size-guard` | Oversized PRs (codemods use `big-pr`) |
 | stack-depth guard (JOV-3457) | Runaway base-on-base agent stacks |
 | `drain-pr-queue.sh` (terminal-failure-only) | Zombie-check churn dequeuing green PRs |
-| `taste-approve` | Taste merges without a screenshot / by non-maintainers |
+| `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
+
+### Runner label policy
+
+Self-hosted runners must use explicit self-hosted labels only (`jovie-runner`,
+architecture labels, machine labels). Never add GitHub-hosted labels such as
+`ubuntu-latest`, `macos-latest`, or `windows-latest` to self-hosted runners: that
+routes ordinary hosted-runner jobs onto local machines with different toolchains.
+`runner-health-monitor` fails fast if this drift reappears.
 
 ## What broke on 2026-06-22
 
