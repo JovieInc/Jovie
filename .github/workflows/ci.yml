@@ -1419,7 +1419,7 @@ jobs:
     # Runs on push to main (post-merge validation), workflow_dispatch, or PRs with 'testing' label.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing'))) && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
     # HEAVY_RUNNER defaults to ubuntu-latest; set CI_HEAVY_RUNNER repo var for self-hosted.
-    runs-on: ${{ env.HEAVY_RUNNER }}
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -2620,7 +2620,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
     # 6-shard unit tests on heavy runners (turbo remote cache works on any runner).
     # HEAVY_RUNNER defaults to ubuntu-latest; set CI_HEAVY_RUNNER repo var for self-hosted.
-    runs-on: ${{ env.HEAVY_RUNNER }}
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
