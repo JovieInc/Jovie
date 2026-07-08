@@ -102,6 +102,13 @@ done < <(pro_labels)
 render_plist "$CODEX_SHIPPER_PLIST_TEMPLATE" "${LAUNCH_AGENTS}/co.jovie.hermes.cron-codex-issue-shipper.plist"
 ok "rendered co.jovie.hermes.cron-codex-issue-shipper"
 
+AGENTCOOKIE_SENDER_TEMPLATE="${PRO_TEMPLATE_DIR}/co.jovie.hermes.agentcookie-sender.plist.template"
+if [[ -f "$AGENTCOOKIE_SENDER_TEMPLATE" ]]; then
+  render_plist "$AGENTCOOKIE_SENDER_TEMPLATE" \
+    "${LAUNCH_AGENTS}/co.jovie.hermes.agentcookie-sender.plist"
+  ok "rendered co.jovie.hermes.agentcookie-sender"
+fi
+
 if [[ "$MODE" == "reconfigure" ]]; then
   log "Reconfigure complete. Restart with:"
   echo "  launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-kanban-ship"
@@ -124,6 +131,17 @@ for label in co.jovie.hermes.cron-codex-issue-shipper; do
   launchctl bootstrap "gui/$(id -u)" "$plist"
   ok "bootstrapped $label"
 done
+
+# agentcookie sender (optional — only if binary is installed and env vars are set)
+AGENTCOOKIE_PLIST="${LAUNCH_AGENTS}/co.jovie.hermes.agentcookie-sender.plist"
+if [[ -f "$AGENTCOOKIE_PLIST" ]] && command -v agentcookie >/dev/null 2>&1; then
+  launchctl bootout "gui/$(id -u)/co.jovie.hermes.agentcookie-sender" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$AGENTCOOKIE_PLIST"
+  ok "bootstrapped co.jovie.hermes.agentcookie-sender"
+elif [[ -f "$AGENTCOOKIE_PLIST" ]]; then
+  printf "\033[1;33m!\033[0m agentcookie sender plist rendered but binary not found; skipping bootstrap.\n" >&2
+  printf "\033[1;33m!\033[0m Install agentcookie, then: launchctl bootstrap gui/\$(id -u) %s\n" "$AGENTCOOKIE_PLIST" >&2
+fi
 
 ok "Houston launchd bootstrap complete."
 log "Force a run: launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-kanban-ship"
