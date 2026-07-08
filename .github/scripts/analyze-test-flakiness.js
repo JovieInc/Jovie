@@ -262,9 +262,13 @@ async function analyzeFlakiness(token, owner, repo) {
 /**
  * Extract concrete test executions from a workflow job.
  *
- * Unit test jobs can fail for non-test reasons (dependency install, environment setup),
- * which creates noisy "Unit Tests" flakiness reports. Prefer explicit test run steps when
- * available and fall back to job-level status otherwise.
+ * Unit test jobs can fail for non-test reasons (dependency install, environment setup,
+ * runner drift), which creates noisy "Unit Tests" flakiness reports. When a Unit Tests
+ * job has NO test steps that actually ran (e.g. setup failed before the test step was
+ * created), we skip it entirely — it was an infra failure, not a flaky test.
+ *
+ * Prefer explicit test run steps when available; only fall back to job-level status
+ * for non-Unit-Tests jobs that have no test steps defined.
  */
 function extractTestExecutions(job) {
   const runStepRegex = /^run .*tests?/i;
@@ -289,7 +293,14 @@ function extractTestExecutions(job) {
     }));
   }
 
-  // Only fall back to job-level conclusion when there are genuinely no test steps
+  // Unit Tests jobs with no test steps at all: the failure was in setup/infra
+  // (runner drift, dependency install, etc.), NOT in the tests themselves.
+  // Do not count these as test flakiness.
+  if (normalizedJobName === 'Unit Tests') {
+    return [];
+  }
+
+  // Fall back to job-level conclusion for non-Unit-Tests jobs
   if (['success', 'failure'].includes(job.conclusion)) {
     return [{ name: normalizedJobName, conclusion: job.conclusion }];
   }
