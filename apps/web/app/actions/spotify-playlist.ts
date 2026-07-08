@@ -12,7 +12,7 @@
  * 4. Sanitized output
  */
 
-import { auth } from '@clerk/nextjs/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import {
   handleIngestError,
@@ -51,7 +51,7 @@ export async function extractPlaylistArtists(
 ): Promise<SpotifyActionResult<SanitizedArtist[]>> {
   try {
     // 1. Auth check
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       throw unauthorizedError();
     }

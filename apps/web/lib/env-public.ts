@@ -24,6 +24,10 @@ export const publicEnv = {
   get NEXT_PUBLIC_GOOGLE_CLIENT_ID() {
     return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || undefined;
   },
+  // Better Auth: public base URL for the auth server
+  get NEXT_PUBLIC_BETTER_AUTH_URL() {
+    return process.env.NEXT_PUBLIC_BETTER_AUTH_URL || undefined;
+  },
   get NEXT_PUBLIC_CLERK_FRONTEND_API() {
     return process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || undefined;
   },

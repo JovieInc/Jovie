@@ -14,12 +14,12 @@ export default function SettingsAccountPage() {
       title='Account'
       description='Security, theme, and notifications.'
     >
-      {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+      {publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL ? (
         <AccountSettingsSection isGrowth={isGrowth} />
       ) : (
         <div className='py-4 text-center'>
           <h3 className='mb-3 text-sm font-caption text-primary-token'>
-            Account settings unavailable
+            Account Settings Unavailable
           </h3>
           <p className='text-app text-secondary'>
             Account management is currently unavailable. Please contact support

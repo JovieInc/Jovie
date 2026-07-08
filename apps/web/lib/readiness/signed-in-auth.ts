@@ -1,12 +1,3 @@
-import { HOSTNAME, STAGING_HOSTNAMES } from '@/constants/domains';
-import type { ClerkKeyStatus } from '@/lib/auth/clerk-key-status';
-import { CLERK_KEY_STATUS_HEADER } from '@/lib/auth/clerk-key-status';
-import { resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
-import {
-  TEST_AUTH_BYPASS_MODE,
-  TEST_MODE_HEADER,
-} from '@/lib/auth/test-mode-constants';
-
 export type SignedInAuthTarget = 'local' | 'stg' | 'prd';
 export type SignedInAuthSource = 'env' | 'vercel-file';
 
@@ -31,15 +22,14 @@ export interface SignedInAuthProbeResult {
   readonly ok: boolean;
   readonly baseUrl: string;
   readonly hostname: string;
-  readonly clerkKeyStatus: ClerkKeyStatus | 'missing';
   readonly authUnavailable: boolean;
   readonly testAuthSessionOk: boolean | null;
   readonly checks: readonly SignedInAuthCheck[];
 }
 
 export const REQUIRED_SIGNED_IN_AUTH_ENV_KEYS = [
-  'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-  'CLERK_SECRET_KEY',
+  'NEXT_PUBLIC_BETTER_AUTH_URL',
+  'BETTER_AUTH_SECRET',
   'SESSION_SECRET',
   'DATABASE_URL',
 ] as const;
@@ -47,30 +37,14 @@ export const REQUIRED_SIGNED_IN_AUTH_ENV_KEYS = [
 export type SignedInAuthEnvKey =
   (typeof REQUIRED_SIGNED_IN_AUTH_ENV_KEYS)[number];
 
-const AUTH_UNAVAILABLE_PHRASES = [
-  'auth unavailable',
-  'authentication unavailable',
-  'temporarily unavailable',
-  'clerk is not configured',
-] as const;
-
 function hasValue(value: string | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
-}
-
-function publishableKeyPrefix(value: string | undefined): string | null {
-  if (!hasValue(value)) return null;
-  if (value!.startsWith('pk_live_')) return 'pk_live';
-  if (value!.startsWith('pk_test_')) return 'pk_test';
-  return 'unknown';
 }
 
 export function resolveSignedInAuthHostname(
   target: SignedInAuthTarget
 ): string {
-  if (target === 'stg') return `staging.${HOSTNAME}`;
-  if (target === 'prd') return HOSTNAME;
-  return 'localhost';
+  return target;
 }
 
 function checkRequiredEnvKeys(
@@ -112,177 +86,42 @@ function checkRequiredEnvKeys(
   ];
 }
 
-interface ClerkEnvSnapshot {
-  readonly publishableKey?: string;
-  readonly secretKey?: string;
-  readonly stagingPublishableKey?: string;
-  readonly stagingSecretKey?: string;
-}
-
-function snapshotClerkEnv(): ClerkEnvSnapshot {
-  return {
-    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY,
-    stagingPublishableKey: process.env.CLERK_PUBLISHABLE_KEY_STAGING,
-    stagingSecretKey: process.env.CLERK_SECRET_KEY_STAGING,
-  };
-}
-
-function restoreClerkEnv(snapshot: ClerkEnvSnapshot): void {
-  if (snapshot.publishableKey === undefined) {
-    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  } else {
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = snapshot.publishableKey;
-  }
-
-  if (snapshot.secretKey === undefined) {
-    delete process.env.CLERK_SECRET_KEY;
-  } else {
-    process.env.CLERK_SECRET_KEY = snapshot.secretKey;
-  }
-
-  if (snapshot.stagingPublishableKey === undefined) {
-    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-  } else {
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING = snapshot.stagingPublishableKey;
-  }
-
-  if (snapshot.stagingSecretKey === undefined) {
-    delete process.env.CLERK_SECRET_KEY_STAGING;
-  } else {
-    process.env.CLERK_SECRET_KEY_STAGING = snapshot.stagingSecretKey;
-  }
-}
-
-function withClerkEnv<T>(
+function checkBetterAuthUrl(
   env: Partial<Record<string, string | undefined>>,
-  run: () => T
-): T {
-  const snapshot = snapshotClerkEnv();
-
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-    env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  process.env.CLERK_SECRET_KEY = env.CLERK_SECRET_KEY;
-  process.env.CLERK_PUBLISHABLE_KEY_STAGING = env.CLERK_PUBLISHABLE_KEY_STAGING;
-  process.env.CLERK_SECRET_KEY_STAGING = env.CLERK_SECRET_KEY_STAGING;
-
-  try {
-    return run();
-  } finally {
-    restoreClerkEnv(snapshot);
-  }
-}
-
-function checkClerkKeyRouting(
-  env: Partial<Record<string, string | undefined>>,
-  target: SignedInAuthTarget,
-  hostname: string
-): SignedInAuthCheck[] {
-  return withClerkEnv(env, () => {
-    const keys = resolveClerkKeys(hostname);
-
-    if (target === 'stg' && keys.status === 'staging_inherits_prod') {
-      return [
-        {
-          id: 'clerk-key-routing',
-          status: 'fail',
-          message:
-            'Staging host would inherit production Clerk keys; staging must use its own Clerk instance',
-          evidence: `hostname=${hostname} status=${keys.status}`,
-        },
-      ];
-    }
-
-    if (target === 'stg' && keys.status === 'staging_missing') {
-      return [
-        {
-          id: 'clerk-key-routing',
-          status: 'fail',
-          message:
-            'Staging Clerk keys are missing or incomplete for the staging hostname',
-          evidence: `hostname=${hostname} status=${keys.status}`,
-        },
-      ];
-    }
-
-    if (keys.status !== 'ok') {
-      return [
-        {
-          id: 'clerk-key-routing',
-          status: 'fail',
-          message: `Clerk key routing failed for ${hostname}`,
-          evidence: `status=${keys.status}`,
-        },
-      ];
-    }
-
-    return [
-      {
-        id: 'clerk-key-routing',
-        status: 'pass',
-        message: `Clerk key routing resolved for ${hostname}`,
-        evidence: `status=${keys.status} publishableKeyPrefix=${publishableKeyPrefix(keys.publishableKey) ?? 'missing'}`,
-      },
-    ];
-  });
-}
-
-function checkPublishableKeyType(
-  env: Partial<Record<string, string | undefined>>,
-  target: SignedInAuthTarget,
-  hostname: string
+  target: SignedInAuthTarget
 ): SignedInAuthCheck {
   if (target === 'local') {
     return {
-      id: 'publishable-key-type',
+      id: 'better-auth-url',
       status: 'skip',
-      message: 'Local target does not enforce publishable key prefix',
+      message: 'Local target does not enforce Better Auth URL',
     };
   }
 
-  const keys = resolveClerkKeysForEnv(env, hostname);
-  const prefix = publishableKeyPrefix(keys.publishableKey);
-
-  if (target === 'prd' && prefix !== 'pk_live') {
+  const url = env.NEXT_PUBLIC_BETTER_AUTH_URL;
+  if (!hasValue(url)) {
     return {
-      id: 'publishable-key-type',
+      id: 'better-auth-url',
       status: 'fail',
-      message: 'Production target must use a pk_live_ Clerk publishable key',
-      evidence: `prefix=${prefix ?? 'missing'}`,
+      message: 'NEXT_PUBLIC_BETTER_AUTH_URL is required for non-local targets',
+      evidence: 'missing',
+    };
+  }
+
+  if (!/^https?:\/\//.test(url!)) {
+    return {
+      id: 'better-auth-url',
+      status: 'fail',
+      message: 'NEXT_PUBLIC_BETTER_AUTH_URL must be an absolute http(s) URL',
+      evidence: url,
     };
   }
 
   return {
-    id: 'publishable-key-type',
+    id: 'better-auth-url',
     status: 'pass',
-    message: `Publishable key prefix is acceptable for ${target}`,
-    evidence: `prefix=${prefix ?? 'missing'}`,
-  };
-}
-
-function resolveClerkKeysForEnv(
-  env: Partial<Record<string, string | undefined>>,
-  hostname: string
-) {
-  return withClerkEnv(env, () => resolveClerkKeys(hostname));
-}
-
-function checkStagingHostnames(): SignedInAuthCheck {
-  const expected = [`staging.${HOSTNAME}`, `main.${HOSTNAME}`];
-  const actual = Array.from(STAGING_HOSTNAMES).sort((a, b) =>
-    a.localeCompare(b)
-  );
-  const matches =
-    expected.every(hostname => STAGING_HOSTNAMES.has(hostname)) &&
-    actual.length === expected.length;
-
-  return {
-    id: 'staging-hostnames',
-    status: matches ? 'pass' : 'fail',
-    message: matches
-      ? 'Staging hostnames are configured for Clerk key routing'
-      : 'Staging hostname set does not match expected Clerk routing hosts',
-    evidence: `expected=${expected.join(',')} actual=${actual.join(',')}`,
+    message: 'Better Auth URL is configured',
+    evidence: url,
   };
 }
 
@@ -305,9 +144,7 @@ export function verifySignedInAuthConfig({
   const hostname = resolveSignedInAuthHostname(target);
   const checks: SignedInAuthCheck[] = [
     ...checkRequiredEnvKeys(env, target),
-    ...checkClerkKeyRouting(env, target, hostname),
-    checkPublishableKeyType(env, target, hostname),
-    checkStagingHostnames(),
+    checkBetterAuthUrl(env, target),
   ];
 
   const ok = checks.every(
@@ -350,28 +187,8 @@ function isLoopbackHost(hostname: string): boolean {
   );
 }
 
-interface ProbeSignedInAuthDeploymentOptions {
-  readonly timeoutMs?: number;
-}
-
-function resolveClerkKeyStatus(
-  headerValue: string | null
-): ClerkKeyStatus | 'missing' {
-  if (
-    headerValue === 'ok' ||
-    headerValue === 'no_publishable_key' ||
-    headerValue === 'staging_missing' ||
-    headerValue === 'staging_inherits_prod'
-  ) {
-    return headerValue;
-  }
-
-  return 'missing';
-}
-
 function buildSignInProbeChecks(
   signInResponse: Response,
-  clerkKeyStatus: ClerkKeyStatus | 'missing',
   authUnavailable: boolean
 ): SignedInAuthCheck[] {
   return [
@@ -382,15 +199,6 @@ function buildSignInProbeChecks(
         ? 'Sign-in page responded successfully'
         : `Sign-in page returned HTTP ${signInResponse.status}`,
       evidence: `status=${signInResponse.status}`,
-    },
-    {
-      id: 'clerk-key-status-header',
-      status: clerkKeyStatus === 'ok' ? 'pass' : 'fail',
-      message:
-        clerkKeyStatus === 'ok'
-          ? 'Middleware reported healthy Clerk key routing'
-          : `Middleware reported Clerk key status ${clerkKeyStatus}`,
-      evidence: `${CLERK_KEY_STATUS_HEADER}=${clerkKeyStatus}`,
     },
     {
       id: 'auth-unavailable-copy',
@@ -407,7 +215,6 @@ async function probeSignInPage(
   timeoutMs: number,
   checks: SignedInAuthCheck[]
 ): Promise<{
-  readonly clerkKeyStatus: ClerkKeyStatus | 'missing';
   readonly authUnavailable: boolean;
 }> {
   const signInResponse = await fetch(new URL('/signin', baseUrl), {
@@ -418,27 +225,22 @@ async function probeSignInPage(
     checks.push({
       id: 'signin-reachable',
       status: 'fail',
-      message: 'Failed to reach /signin for Clerk key status probe',
+      message: 'Failed to reach /signin for Better Auth probe',
       evidence: error instanceof Error ? error.message : String(error),
     });
     return null;
   });
 
   if (!signInResponse) {
-    return { clerkKeyStatus: 'missing', authUnavailable: false };
+    return { authUnavailable: false };
   }
 
-  const clerkKeyStatus = resolveClerkKeyStatus(
-    signInResponse.headers.get(CLERK_KEY_STATUS_HEADER)
-  );
   const bodyText = await signInResponse.text().catch(() => '');
   const authUnavailable = hasAuthUnavailableCopy(bodyText);
 
-  checks.push(
-    ...buildSignInProbeChecks(signInResponse, clerkKeyStatus, authUnavailable)
-  );
+  checks.push(...buildSignInProbeChecks(signInResponse, authUnavailable));
 
-  return { clerkKeyStatus, authUnavailable };
+  return { authUnavailable };
 }
 
 async function probeDevTestAuthSession(
@@ -463,7 +265,6 @@ async function probeDevTestAuthSession(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
       },
       body: JSON.stringify({ persona: 'creator-ready' }),
       signal: AbortSignal.timeout(timeoutMs),
@@ -497,17 +298,13 @@ async function probeDevTestAuthSession(
 
 export async function probeSignedInAuthDeployment(
   baseUrl: string,
-  options: ProbeSignedInAuthDeploymentOptions = {}
+  options: { timeoutMs?: number } = {}
 ): Promise<SignedInAuthProbeResult> {
   const timeoutMs = options.timeoutMs ?? 15_000;
   const hostname = new URL(baseUrl).hostname;
   const checks: SignedInAuthCheck[] = [];
 
-  const { clerkKeyStatus, authUnavailable } = await probeSignInPage(
-    baseUrl,
-    timeoutMs,
-    checks
-  );
+  const { authUnavailable } = await probeSignInPage(baseUrl, timeoutMs, checks);
   const testAuthSessionOk = await probeDevTestAuthSession(
     baseUrl,
     hostname,
@@ -523,7 +320,6 @@ export async function probeSignedInAuthDeployment(
     ok,
     baseUrl,
     hostname,
-    clerkKeyStatus,
     authUnavailable,
     testAuthSessionOk,
     checks,
@@ -535,7 +331,7 @@ export function formatSignedInAuthProbeReport(
 ): string {
   const lines = [
     `[signed-in-auth-probe] baseUrl=${result.baseUrl} hostname=${result.hostname}`,
-    `[signed-in-auth-probe] clerkKeyStatus=${result.clerkKeyStatus} authUnavailable=${result.authUnavailable} testAuthSessionOk=${result.testAuthSessionOk}`,
+    `[signed-in-auth-probe] authUnavailable=${result.authUnavailable} testAuthSessionOk=${result.testAuthSessionOk}`,
   ];
 
   for (const check of result.checks) {
@@ -551,3 +347,9 @@ export function formatSignedInAuthProbeReport(
   );
   return lines.join('\n');
 }
+
+const AUTH_UNAVAILABLE_PHRASES = [
+  'auth unavailable',
+  'authentication unavailable',
+  'temporarily unavailable',
+] as const;

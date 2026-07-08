@@ -186,7 +186,7 @@ export function getEnvironmentInfo() {
     platform,
     nodeVersion,
     hasDatabase: !!env.DATABASE_URL,
-    hasClerk: !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+    hasClerk: !!env.BETTER_AUTH_SECRET,
     hasStripe: !!(
       env.STRIPE_SECRET_KEY && publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     ),

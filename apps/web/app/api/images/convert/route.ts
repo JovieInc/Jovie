@@ -1,5 +1,5 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   HEIC_MIME_TYPES,
@@ -31,7 +31,7 @@ function toJpegFilename(filename: string): string {
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return errorResponse('Unauthorized', UPLOAD_ERROR_CODES.UNAUTHORIZED, 401);
   }
