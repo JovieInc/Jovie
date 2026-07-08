@@ -746,6 +746,23 @@ export {
   selectMetadataSubmissionSnapshotSchema,
   selectMetadataSubmissionTargetSchema,
 } from './metadata-submissions';
+// Model experiments (per-workflow A/B bake-off + cost-aware promotion, GH #11462)
+export {
+  insertModelExperimentSchema,
+  type ModelExperiment,
+  type ModelExperimentCandidate,
+  type ModelExperimentStatus,
+  type ModelPromotion,
+  type ModelUsageEvent,
+  modelExperimentStatusEnumValues,
+  modelExperiments,
+  modelPromotions,
+  modelUsageEvents,
+  type NewModelExperiment,
+  type NewModelPromotion,
+  type NewModelUsageEvent,
+  selectModelExperimentSchema,
+} from './model-experiments';
 // Notifications (SMS subscribe intents, cross-artist contact identity)
 export {
   insertNotificationContactSchema,
