@@ -44,6 +44,9 @@ env:
   # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
   # or leave as "ubuntu-latest" for default 2-core runners.
   FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+  # Self-hosted runner selector for CPU-heavy jobs (unit tests, build).
+  # Defaults to GitHub-hosted unless CI_HEAVY_RUNNER repo variable is set.
+  HEAVY_RUNNER: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
   # JOV-2497: four-slot cross-PR pool caps Neon branch *creation* (one endpoint per branch).
   # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
   # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
@@ -642,8 +645,9 @@ jobs:
   ci-knip:
     name: Knip (dead code)
     # Detect unused files, dependencies, and exports
+    # Runs on PRs with code changes, main pushes, and manual dispatch.
     needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
@@ -1414,7 +1418,8 @@ jobs:
     # Blocks PRs when triggered (path-gated to public-route changes).
     # Runs on push to main (post-merge validation), workflow_dispatch, or PRs with 'testing' label.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing'))) && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
-    runs-on: ubuntu-latest
+    # HEAVY_RUNNER defaults to ubuntu-latest; set CI_HEAVY_RUNNER repo var for self-hosted.
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -2613,13 +2618,14 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'main' || startsWith(github.event.pull_request.base.ref, 'gtmq_'))) || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    # 5-shard unit tests on GitHub-hosted runners for reliability (turbo remote cache works on any runner).
-    runs-on: ubuntu-latest
+    # 6-shard unit tests on heavy runners (turbo remote cache works on any runner).
+    # HEAVY_RUNNER defaults to ubuntu-latest; set CI_HEAVY_RUNNER repo var for self-hosted.
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/5', '2/5', '3/5', '4/5', '5/5']
+        shard: ['1/6', '2/6', '3/6', '4/6', '5/6', '6/6']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
