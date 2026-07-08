@@ -22,6 +22,7 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { composeHomepageSections } from '@/lib/sections/registry';
 
 // Below-the-fold sections are dynamic-loaded so their `motion/react`
 // hydration cost doesn't compete with above-the-fold work.
@@ -357,23 +358,57 @@ function HomepageFaq() {
   );
 }
 
+/**
+ * Homepage section renderer — resolves registry section IDs to production
+ * components. New sections added to `composeHomepageSections` must have a
+ * corresponding case here.
+ */
+function HomepageSection({ sectionId }: Readonly<{ sectionId: string }>) {
+  switch (sectionId) {
+    case 'homepage-product-statement':
+      return <HomepageProductStatement />;
+    case 'homepage-go-live-steps':
+      return <HomepageGoLiveStepsSection />;
+    case 'homepage-workspace-section':
+      return <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />;
+    case 'homepage-artist-profiles-carousel':
+      return (
+        <HomepageArtistProfilesCarouselLazy cards={ARTIST_PROFILE_CARDS} />
+      );
+    case 'friday-rhythm-section':
+      return <FridayRhythmSectionLazy />;
+    case 'home-bento-pairs':
+      return <HomeBentoPairs />;
+    case 'home-loop-diagram':
+      return <HomeLoopDiagramSection />;
+    case 'home-stat-quote':
+      return <HomeStatQuoteSection />;
+    case 'homepage-v2-pricing':
+      return <HomepageV2Pricing />;
+    case 'homepage-faq':
+      return <HomepageFaq />;
+    case 'homepage-v2-final-cta':
+      return <HomepageV2FinalCta />;
+    default:
+      return null;
+  }
+}
+
 function HomepageUnlockedSections() {
+  const { bodyIds } = composeHomepageSections({
+    showGoLive: FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION,
+    showFridayRhythm: FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM,
+    showHomeRefresh2026: FEATURE_FLAGS.SHOW_HOME_REFRESH_2026,
+    showV2Pricing: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING,
+    showFaq: FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ,
+    showV2FinalCta: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA,
+  });
+
   return (
     <>
-      <HomepageProductStatement />
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION ? (
-        <HomepageGoLiveStepsSection />
-      ) : null}
-      <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />
-      <HomepageArtistProfilesCarouselLazy cards={ARTIST_PROFILE_CARDS} />
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (
-        <FridayRhythmSectionLazy />
-      ) : null}
-      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
-      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
-      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ ? <HomepageFaq /> : null}
+      {bodyIds.map(sectionId => (
+        <HomepageSection key={sectionId} sectionId={sectionId} />
+      ))}
     </>
   );
 }
@@ -381,6 +416,15 @@ function HomepageUnlockedSections() {
 function HomepageStoryStack({
   showUnlockedSections,
 }: Readonly<{ showUnlockedSections: boolean }>) {
+  const { finalCtaId } = composeHomepageSections({
+    showGoLive: FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION,
+    showFridayRhythm: FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM,
+    showHomeRefresh2026: FEATURE_FLAGS.SHOW_HOME_REFRESH_2026,
+    showV2Pricing: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING,
+    showFaq: FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ,
+    showV2FinalCta: FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA,
+  });
+
   const className = showUnlockedSections
     ? 'homepage-story-stack homepage-story-stack--proof-transition'
     : 'homepage-story-stack';
@@ -392,7 +436,7 @@ function HomepageStoryStack({
       data-testid='homepage-story-stack'
     >
       {showUnlockedSections ? <HomepageUnlockedSections /> : null}
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? <HomepageV2FinalCta /> : null}
+      {finalCtaId ? <HomepageSection sectionId={finalCtaId} /> : null}
     </div>
   );
 }
