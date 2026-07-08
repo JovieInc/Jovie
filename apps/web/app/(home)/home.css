@@ -42,7 +42,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-radius: 1rem;
   --homepage-hero-top: calc(
     var(--linear-header-height) +
-    clamp(6.4rem, 11.6vh, 8.35rem)
+    clamp(4.5rem, 8.5vh, 6.5rem)
   );
   --homepage-hero-copy-max: min(
     67.5rem,
@@ -70,12 +70,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .home-viewport
   [data-testid="header-nav"]:not([data-presentation="marketing-glass"]) {
-  --linear-text-primary: rgb(252, 252, 252);
+  --linear-text-primary: var(--color-text-primary-token);
   top: 0 !important;
   min-height: var(--linear-header-height);
   border-bottom: 1px solid transparent !important;
   background: transparent !important;
-  color: rgb(252, 252, 252);
+  color: var(--color-text-primary-token);
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   transition:
@@ -134,7 +134,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-header-auth a:first-child {
   padding-inline: 0;
-  color: rgb(252, 252, 252);
+  color: var(--color-text-primary-token);
 }
 
 .homepage-header-auth a:last-child {
@@ -302,7 +302,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.005em;
-  color: rgb(252, 252, 252);
+  color: var(--color-text-primary-token);
   transition:
     color 140ms ease,
     opacity 140ms ease;
@@ -310,7 +310,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-header-nav-link:hover,
 .homepage-header-nav-link:focus-visible {
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary-token);
 }
 
 .homepage-hero-eyebrow {
@@ -327,15 +327,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
   font-size: clamp(46px, 5.45vw, 72px);
-  /* Match --linear-h1-weight 800 from Claude Design home-page-hero spec. */
-  font-weight: 800;
+  /* Per DESIGN.md: homepage H1 uses weight 600 */
+  font-weight: 600;
   line-height: 1.04;
   letter-spacing: -0.03em;
   text-wrap: balance;
   margin-left: auto;
   margin-right: auto;
   max-width: min(20ch, var(--homepage-hero-copy-max));
-  color: rgb(252, 252, 252);
+  color: var(--color-text-primary-token);
 }
 
 .homepage-hero-headline__desktop {
@@ -361,38 +361,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   line-height: 1.55;
   letter-spacing: -0.008em;
   text-wrap: balance;
-  color: rgba(234, 234, 255, 0.62);
-}
-
-.homepage-hero-actions {
-  margin-top: 1.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--homepage-hero-cta-gap);
-}
-
-.homepage-hero-actions .public-action-primary,
-.homepage-hero-actions .public-action-secondary {
-  min-height: 40px;
-  border-radius: 100px;
-  padding-inline: 24px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.homepage-hero-actions .public-action-primary {
-  border: 0;
-  background: rgb(252, 252, 252);
-  color: rgb(0, 0, 0);
-}
-
-.homepage-hero-actions .public-action-secondary {
-  border: 0;
-  background: transparent;
-  color: rgb(252, 252, 252);
+  color: var(--color-text-tertiary-token);
 }
 
 .homepage-hero-showcase {
@@ -520,7 +489,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border: 0;
   border-radius: 100%;
   background: transparent;
-  color: rgb(252, 252, 252);
+  color: var(--color-text-primary-token);
   opacity: 0.7;
   transition: opacity 180ms ease;
 }
@@ -538,7 +507,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-hero-carousel__side:hover,
 .homepage-hero-carousel__side:focus-visible {
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary-token);
   opacity: 1;
 }
 
@@ -563,7 +532,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-trust-section {
   position: relative;
   z-index: 1;
-  background: #020303;
+  background: var(--color-bg-base);
   isolation: isolate;
 }
 
@@ -579,7 +548,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-story-stack {
   position: relative;
-  background: #020303;
+  background: var(--color-bg-base);
   border-radius: 30px 30px 0 0;
   overflow: hidden;
 }
@@ -664,7 +633,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
       rgba(45, 83, 142, 0.1) 0%,
       rgba(5, 6, 8, 0) 70%
     ),
-    linear-gradient(180deg, #050608 0%, #020303 100%);
+    linear-gradient(180deg, #050608 0%, var(--color-bg-base) 100%);
 }
 
 .homepage-profile-outcome-inner {
@@ -1278,13 +1247,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     line-height: 1.42;
   }
 
-  .homepage-hero-actions {
-    margin-top: 1.55rem;
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-
-  .homepage-hero-showcase {
+.homepage-hero-showcase {
     margin-top: 3.35rem;
     padding-bottom: 0.9rem;
     mask-image: linear-gradient(
@@ -1567,16 +1530,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   letter-spacing: -0.005em;
 }
 
-.homepage-hero-fallback-action .public-action-primary {
-  min-height: 36px;
-  padding-inline: 1.15rem;
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  background: rgb(252, 252, 252);
-  color: rgb(5, 5, 6);
-  font-size: 13px;
-  font-weight: 620;
-}
-
 .homepage-hero-showcase {
   width: min(100%, var(--homepage-section-max));
   margin: clamp(1.35rem, 2.6vw, 2.25rem) auto 0;
@@ -1793,7 +1746,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-workflow-strip,
 .homepage-profile-proof-band,
 .homepage-faq-section {
-  background: #020303;
+  background: var(--color-bg-base);
 }
 
 .homepage-workflow-strip {
@@ -1817,7 +1770,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-workflow-strip h2,
 .homepage-profile-proof-band h2 {
   margin: 0;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary-token);
   font-size: clamp(2rem, 3.4vw, 3rem);
   font-weight: 680;
   line-height: 1.05;
@@ -1828,7 +1781,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-workflow-strip__copy > p:not(.homepage-section-eyebrow),
 .homepage-profile-proof-band__copy > p:not(.homepage-section-eyebrow) {
   margin-top: 0.95rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-tertiary-token);
   font-size: 16px;
   line-height: 1.62;
   letter-spacing: -0.005em;
@@ -1860,7 +1813,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-workflow-strip__steps strong {
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary-token);
   font-size: 15px;
   font-weight: 620;
   letter-spacing: -0.015em;
@@ -2163,41 +2116,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: clamp(1.06rem, 1.45vw, 1.32rem);
   line-height: 1.45;
   text-wrap: balance;
-}
-
-.homepage-hero-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin-top: clamp(1.7rem, 2.8vw, 2.25rem);
-}
-
-.homepage-hero-actions .public-action-primary {
-  min-height: 42px;
-  padding-inline: 1.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: rgb(244, 246, 255);
-  color: rgb(6, 7, 10);
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.homepage-hero-secondary-link {
-  display: inline-flex;
-  min-height: 42px;
-  align-items: center;
-  gap: 0.45rem;
-  padding-inline: 0.45rem;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 14px;
-  font-weight: 610;
-  text-decoration: none;
-}
-
-.homepage-hero-secondary-link:hover,
-.homepage-hero-secondary-link:focus-visible {
-  color: rgb(255, 255, 255);
 }
 
 .homepage-hero-showcase {
@@ -2530,7 +2448,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
       rgba(43, 51, 78, 0.28),
       rgba(2, 3, 3, 0) 58%
     ),
-    #020303;
+    var(--color-bg-base);
   view-timeline-axis: block;
   view-timeline-name: --homepage-proof-strip;
 }
@@ -2672,7 +2590,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
       rgba(92, 118, 170, 0.075),
       transparent 31rem
     ),
-    #020303;
+    var(--color-bg-base);
 }
 
 .homepage-product-statement {
@@ -2716,7 +2634,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: grid;
   max-width: min(100%, 58rem);
   margin: 0;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--color-text-quaternary-token);
   font-size: clamp(2.35rem, 3.35vw, 3.35rem);
   font-weight: 620;
   line-height: 1.08;
@@ -2725,11 +2643,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-product-statement__lead {
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary-token);
 }
 
 .homepage-product-statement__body {
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--color-text-tertiary-token);
 }
 
 .homepage-product-statement__ai {
@@ -2750,7 +2668,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-product-statement__ai-copy h3 {
   max-width: none;
   margin: 0 auto;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary-token);
   font-size: clamp(1.55rem, 2.35vw, 2.35rem);
   font-weight: 650;
   line-height: 1.08;
@@ -2761,7 +2679,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-product-statement__ai-copy p {
   max-width: 27rem;
   margin: 0.7rem auto 0;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-tertiary-token);
   font-size: 0.98rem;
   line-height: 1.55;
   text-wrap: pretty;
@@ -2805,7 +2723,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .home-composer-action p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--color-text-secondary-token);
   font-family: Inter, system-ui, sans-serif;
   font-size: 12px;
   font-weight: 600;
@@ -2850,7 +2768,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-go-live-section h2 {
   max-width: 11ch;
   margin: 0;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary-token);
   font-size: clamp(1.9rem, 3.2vw, 3.05rem);
   font-weight: 630;
   line-height: 1.06;
@@ -2952,7 +2870,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-spec-wall-section__header h2 {
   margin: 0;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary-token);
   font-size: clamp(2.1rem, 3.25vw, 3rem);
   font-weight: 640;
   line-height: 1.08;
@@ -3141,7 +3059,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 2;
   margin: 1rem 0 0;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary-token);
   font-size: 1.08rem;
   font-weight: 640;
   line-height: 1.16;
@@ -3232,7 +3150,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-workspace-section__copy h2 {
   display: grid;
   margin: 0;
-  color: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary-token);
   font-size: clamp(2.35rem, 3.25vw, 3.25rem);
   font-weight: 620;
   line-height: 1.08;
@@ -3318,7 +3236,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-workspace-callout h3 {
   margin: 0;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary-token);
   font-size: 1.08rem;
   font-weight: 640;
   line-height: 1.18;
@@ -3978,7 +3896,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
       rgba(70, 91, 142, 0.16),
       rgba(2, 3, 3, 0) 36rem
     ),
-    #020303;
+    var(--color-bg-base);
 }
 
 [data-testid="homepage-v2-pricing"] .homepage-pricing-shell {
@@ -4081,7 +3999,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-pricing-card__title {
   margin: 0;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary-token);
   font-size: 1rem;
   font-weight: 650;
   line-height: 1.2;
@@ -4114,7 +4032,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-pricing-card__price {
   margin: clamp(1.35rem, 2.4vw, 1.8rem) 0 0;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary-token);
   font-size: clamp(2.1rem, 3.2vw, 2.65rem);
   font-weight: 650;
   line-height: 0.95;
@@ -4264,12 +4182,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     line-height: 1.48;
   }
 
-  .homepage-hero-actions {
-    flex-wrap: wrap;
-    gap: 0.8rem 1rem;
-  }
-
-  .homepage-hero-showcase {
+.homepage-hero-showcase {
     margin-top: 3rem;
   }
 
@@ -4609,7 +4522,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-hero-headline {
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family:
+      var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
     max-width: 11.8ch;
     font-size: clamp(2.8rem, 11.6vw, 3.65rem);
     letter-spacing: 0;
