@@ -1552,6 +1552,45 @@ html[data-profile-initial-mode]
 }
 
 /* ============================================
+   OV MODE (internal/admin brand skin — JOV-4083 / #13493)
+   Class-based token override, same mechanism as the :root.dark blocks above.
+   Applied on the shell/sidebar root when the OV skin is active. Overrides
+   only color tokens — zero layout impact by construction.
+
+   OV identity accent: System B violet (--color-accent-purple). PLACEHOLDER
+   pending Tim's taste call on the OV mark/accent; swap the single
+   --ov-brand-accent line once decided.
+   ============================================ */
+.ov-mode {
+  --ov-brand-accent: var(--color-accent-purple);
+
+  /* Sidebar chrome flips to the ink/dark ladder in OV mode regardless of
+     theme — the inversion is the skin in light mode; near-no-op in dark. */
+  --sidebar-background: 8 9 10;
+  --sidebar-foreground: 227 228 229;
+  --sidebar-primary: 227 228 229;
+  --sidebar-primary-foreground: 12 12 12;
+  --sidebar-accent: 255 255 255 / 0.03;
+  --sidebar-accent-active: 255 255 255 / 0.06;
+  --sidebar-accent-foreground: 227 228 229;
+  --sidebar-border: 255 255 255 / 0.06;
+  --sidebar-muted: 138 143 152;
+  --sidebar-muted-foreground: 138 143 152;
+  --sidebar-surface: 8 9 10;
+  --sidebar-surface-hover: 255 255 255 / 0.04;
+  --sidebar-input-background: 255 255 255 / 0.06;
+  --sidebar-input-border: 255 255 255 / 0.06;
+  --sidebar-item-foreground: 214 218 226;
+  --sidebar-item-icon: 116 120 128;
+}
+
+/* OV mark carries the identity accent; treatment is CSS-driven so the
+   taste-gated mark decision can land without touching components. */
+.ov-mode [data-brand-variant='ov'] {
+  color: var(--ov-brand-accent);
+}
+
+/* ============================================
    MENU/DROPDOWN TOKENS
    ============================================ */
 :root {

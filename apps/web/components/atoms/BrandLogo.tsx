@@ -1,5 +1,10 @@
 import type { CSSProperties } from 'react';
-import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
+import {
+  BRAND_PATHS,
+  BRAND_WORDMARKS,
+  type BrandVariant,
+  JOVIE_VIEWBOX,
+} from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 export type BrandLogoTone = 'auto' | 'white' | 'color' | 'muted';
@@ -8,6 +13,7 @@ export interface BrandLogoProps {
   readonly size?: number;
   readonly className?: string;
   readonly tone?: BrandLogoTone;
+  readonly variant?: BrandVariant;
   readonly alt?: string;
   readonly rounded?: boolean;
   readonly style?: CSSProperties;
@@ -27,11 +33,13 @@ export function BrandLogo({
   size = 48,
   className,
   tone = 'auto',
-  alt = 'Jovie',
+  variant = 'jovie',
+  alt,
   rounded = true,
   style,
   'aria-hidden': ariaHidden,
 }: BrandLogoProps) {
+  const resolvedAlt = alt ?? BRAND_WORDMARKS[variant];
   return (
     <span
       className={cn(
@@ -42,6 +50,7 @@ export function BrandLogo({
       )}
       style={style}
       aria-hidden={ariaHidden}
+      data-brand-variant={variant}
     >
       <svg
         xmlns='http://www.w3.org/2000/svg'
@@ -51,10 +60,10 @@ export function BrandLogo({
         fill='currentColor'
         shapeRendering='geometricPrecision'
         role={ariaHidden ? undefined : 'img'}
-        aria-label={ariaHidden ? undefined : alt}
+        aria-label={ariaHidden ? undefined : resolvedAlt}
       >
-        {!ariaHidden && <title>{alt}</title>}
-        <path d={JOVIE_PATH} />
+        {!ariaHidden && <title>{resolvedAlt}</title>}
+        <path d={BRAND_PATHS[variant]} />
       </svg>
     </span>
   );
