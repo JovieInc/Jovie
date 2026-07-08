@@ -5,8 +5,10 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ClipboardCopy,
   Copy,
   ExternalLink,
+  Home,
   Layers,
   LayoutTemplate,
   Music2,
@@ -14,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
@@ -56,6 +58,18 @@ const DEFAULT_BODY: readonly string[] = [
   'testimonial-card-3up',
   'faq-section-default',
 ];
+
+/**
+ * Homepage preset — the canonical homepage body + chrome configuration.
+ * Same body as DEFAULT_BODY with explicit chrome toggles (transparent
+ * header, full footer, CTA on).
+ */
+const HOMEPAGE_PRESET = {
+  body: DEFAULT_BODY,
+  header: 'transparent' as HeaderMode,
+  footer: 'full' as FooterMode,
+  cta: 'on' as CtaMode,
+};
 
 /** Body categories — `header`, `footer-cta`, and `footer` are chrome, not body. */
 const BODY_CATEGORIES: readonly SectionCategory[] =
@@ -168,6 +182,25 @@ export function PageBuilderClient({
     [bodyIds]
   );
 
+  /** Load the homepage preset — canonical body + transparent header + full chrome. */
+  const applyHomepagePreset = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('body', HOMEPAGE_PRESET.body.join(','));
+    params.set('header', HOMEPAGE_PRESET.header);
+    params.set('footer', HOMEPAGE_PRESET.footer);
+    params.set('cta', HOMEPAGE_PRESET.cta);
+    router.replace(`/exp/page-builder?${params.toString()}`);
+  }, [router, searchParams]);
+
+  /** Copy the current page URL to clipboard. */
+  const copyPageUrl = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+    } catch {
+      // Clipboard API may fail; silently ignore.
+    }
+  }, []);
+
   return (
     <div className='relative min-h-screen w-full overflow-x-hidden bg-(--linear-app-content-surface)'>
       <Toolbar
@@ -184,6 +217,8 @@ export function PageBuilderClient({
         onSetFooter={mode => setParam({ footer: mode })}
         onSetCta={mode => setParam({ cta: mode })}
         onOpenDrawer={() => setDrawerOpen(true)}
+        onCopyPageUrl={copyPageUrl}
+        onApplyHomepagePreset={applyHomepagePreset}
       />
 
       {mode === 'pages' ? (
@@ -191,17 +226,27 @@ export function PageBuilderClient({
           The composed landing page. Padding-top = toolbar height so the
           header always renders below the toolbar without overlap.
         */
-        <div className='pt-16'>
+        <div className='pt-14'>
           <MarketingHeader
             variant={headerMode === 'transparent' ? 'homepage' : 'landing'}
           />
 
           <main>
-            {bodyVariants.map(({ variant, idx }) => (
-              <div key={`${variant.id}-${idx}`} data-body-section={variant.id}>
-                {variant.render()}
-              </div>
-            ))}
+            {bodyVariants.length === 0 ? (
+              <EmptyCompositionState
+                onOpenDrawer={() => setDrawerOpen(true)}
+                onApplyPreset={applyHomepagePreset}
+              />
+            ) : (
+              bodyVariants.map(({ variant, idx }) => (
+                <div
+                  key={`${variant.id}-${idx}`}
+                  data-body-section={variant.id}
+                >
+                  {variant.render()}
+                </div>
+              ))
+            )}
           </main>
 
           {ctaMode === 'on' && <MarketingFinalCTA />}
@@ -227,6 +272,50 @@ export function PageBuilderClient({
   );
 }
 
+/** Empty state shown when no body sections are composed. */
+function EmptyCompositionState({
+  onOpenDrawer,
+  onApplyPreset,
+}: Readonly<{
+  onOpenDrawer: () => void;
+  onApplyPreset: () => void;
+}>) {
+  return (
+    <div className='flex min-h-[50vh] flex-col items-center justify-center gap-6 px-6 text-center'>
+      <div className='rounded-full border border-white/10 bg-white/[0.03] p-4'>
+        <LayoutTemplate className='h-8 w-8 text-white/40' />
+      </div>
+      <div className='max-w-xs'>
+        <p className='text-base font-semibold text-white/80'>
+          No body sections
+        </p>
+        <p className='mt-1 text-sm text-white/50'>
+          Add landing-page sections to compose a page, or load the homepage
+          preset to get started quickly.
+        </p>
+      </div>
+      <div className='flex gap-3'>
+        <button
+          type='button'
+          onClick={onOpenDrawer}
+          className='inline-flex h-9 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition-colors hover:bg-white/10'
+        >
+          <Plus className='h-4 w-4' />
+          Add sections
+        </button>
+        <button
+          type='button'
+          onClick={onApplyPreset}
+          className='inline-flex h-9 items-center gap-2 rounded-md bg-white text-sm font-semibold text-black transition-colors hover:bg-white/90'
+        >
+          <Home className='h-4 w-4' />
+          Homepage preset
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface ToolbarProps {
   readonly headerMode: HeaderMode;
   readonly footerMode: FooterMode;
@@ -239,6 +328,8 @@ interface ToolbarProps {
   readonly onSetFooter: (mode: FooterMode) => void;
   readonly onSetCta: (mode: CtaMode) => void;
   readonly onOpenDrawer: () => void;
+  readonly onCopyPageUrl: () => void;
+  readonly onApplyHomepagePreset: () => void;
 }
 
 function Toolbar({
@@ -253,9 +344,19 @@ function Toolbar({
   onSetFooter,
   onSetCta,
   onOpenDrawer,
+  onCopyPageUrl,
+  onApplyHomepagePreset,
 }: ToolbarProps) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
+
+  const handleCopyPage = useCallback(async () => {
+    await onCopyPageUrl();
+    setCopyState('copied');
+    window.setTimeout(() => setCopyState('idle'), 1200);
+  }, [onCopyPageUrl]);
+
   return (
-    <div className='fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white dark:text-white shadow-lg backdrop-blur-md'>
+    <div className='fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white shadow-lg backdrop-blur-md'>
       <span
         className={
           designV1Enabled
@@ -289,7 +390,7 @@ function Toolbar({
                 className={cn(
                   'inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-2xs font-semibold transition-colors',
                   mode === option.value
-                    ? 'bg-white text-black dark:text-white'
+                    ? 'bg-white text-black'
                     : 'text-white/70 hover:text-white'
                 )}
               >
@@ -303,40 +404,72 @@ function Toolbar({
 
       {mode === 'pages' ? (
         <>
-          <Toggle
-            label='Header'
-            value={headerMode}
-            options={[
-              { value: 'solid', label: 'Solid' },
-              { value: 'transparent', label: 'Transparent' },
-            ]}
-            onChange={onSetHeader}
-          />
+          {/* Chrome toggles — visible on larger screens, hidden on small */}
+          <div className='hidden items-center gap-4 sm:flex'>
+            <Toggle
+              label='Header'
+              value={headerMode}
+              options={[
+                { value: 'solid', label: 'Solid' },
+                { value: 'transparent', label: 'Transparent' },
+              ]}
+              onChange={onSetHeader}
+            />
 
-          <Toggle
-            label='Footer'
-            value={footerMode}
-            options={[
-              { value: 'full', label: 'Full' },
-              { value: 'minimal', label: 'Minimal' },
-            ]}
-            onChange={onSetFooter}
-          />
+            <Toggle
+              label='Footer'
+              value={footerMode}
+              options={[
+                { value: 'full', label: 'Full' },
+                { value: 'minimal', label: 'Minimal' },
+              ]}
+              onChange={onSetFooter}
+            />
 
-          <Toggle
-            label='CTA'
-            value={ctaMode}
-            options={[
-              { value: 'on', label: 'On' },
-              { value: 'off', label: 'Off' },
-            ]}
-            onChange={onSetCta}
-          />
+            <Toggle
+              label='CTA'
+              value={ctaMode}
+              options={[
+                { value: 'on', label: 'On' },
+                { value: 'off', label: 'Off' },
+              ]}
+              onChange={onSetCta}
+            />
+          </div>
 
+          {/* Homepage preset button */}
+          <button
+            type='button'
+            onClick={onApplyHomepagePreset}
+            className='hidden h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white md:inline-flex'
+            title='Load the canonical homepage composition'
+          >
+            <Home className='h-3.5 w-3.5' />
+            <span className='hidden lg:inline'>Homepage</span>
+          </button>
+
+          {/* Copy page URL button */}
+          <button
+            type='button'
+            onClick={handleCopyPage}
+            className='hidden h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white md:inline-flex'
+            title='Copy composition URL to clipboard'
+          >
+            {copyState === 'copied' ? (
+              <Check className='h-3.5 w-3.5' />
+            ) : (
+              <ClipboardCopy className='h-3.5 w-3.5' />
+            )}
+            <span className='hidden lg:inline'>
+              {copyState === 'copied' ? 'Copied' : 'Copy page'}
+            </span>
+          </button>
+
+          {/* Sections button (always right-aligned) */}
           <button
             type='button'
             onClick={onOpenDrawer}
-            className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white dark:text-white transition-colors hover:bg-white/10'
+            className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/10'
           >
             <Plus className='h-3.5 w-3.5' />
             Sections ({bodyCount})
@@ -380,7 +513,7 @@ function Toggle<T extends string>({
             className={cn(
               'inline-flex h-6 items-center rounded px-2.5 text-2xs font-semibold transition-colors',
               opt.value === value
-                ? 'bg-white text-black dark:text-white'
+                ? 'bg-white text-black'
                 : 'text-white/70 hover:text-white'
             )}
           >
@@ -416,7 +549,7 @@ export function DesignStudioWorkspace({
 }: Readonly<{ mode: Exclude<StudioMode, 'pages'> }>) {
   return (
     <main
-      className='min-h-screen bg-surface-1 px-4 pb-12 pt-20 text-white dark:text-white sm:px-6 lg:px-8'
+      className='min-h-screen bg-surface-1 px-4 pb-12 pt-20 text-white sm:px-6 lg:px-8'
       data-testid={`design-studio-${mode}`}
     >
       {renderDesignStudio(mode)}
@@ -702,26 +835,41 @@ function SectionDrawer({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  // Trap focus within the drawer when open — auto-focus the close button.
+  const drawerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = drawerRef.current;
+    if (!el) return;
+    const closeBtn = el.querySelector<HTMLButtonElement>(
+      'button[aria-label="Close drawer"]'
+    );
+    closeBtn?.focus();
+  }, []);
+
   return (
     <div
-      className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-95 flex-col border-l border-white/10 bg-black dark:bg-black text-white dark:text-white shadow-2xl'
+      ref={drawerRef}
+      className='fixed right-0 top-0 z-[60] flex h-full w-full max-w-95 flex-col border-l border-white/10 bg-black text-white shadow-2xl sm:max-w-md'
       role='dialog'
       aria-modal='true'
       aria-label='Body section composer'
     >
-      <div className='flex h-14 items-center justify-between border-b border-white/10 px-4'>
+      {/* Drawer header */}
+      <div className='flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-4'>
         <span className='text-sm font-semibold'>Body sections</span>
         <button
           type='button'
           onClick={onClose}
           aria-label='Close drawer'
-          className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-white/70 hover:bg-white/5 hover:text-white'
+          className='inline-flex h-7 w-7 items-center justify-center rounded-full text-white/70 hover:bg-white/5 hover:text-white'
         >
           <X className='h-4 w-4' />
         </button>
       </div>
 
+      {/* Drawer body — scrollable */}
       <div className='flex-1 overflow-y-auto'>
+        {/* Current composition */}
         <section className='border-b border-white/10 px-4 py-4'>
           <div className='mb-2 text-2xs font-semibold uppercase tracking-wider text-white/50'>
             Current order ({bodyIds.length})
@@ -741,7 +889,7 @@ function SectionDrawer({
                     key={`${id}-${idx}`}
                     className='flex items-center gap-2 rounded border border-white/10 bg-white/[0.03] px-2 py-1.5'
                   >
-                    <span className='flex-1 truncate text-xs text-white dark:text-white'>
+                    <span className='flex-1 truncate text-xs text-white'>
                       {variant?.label ?? id}
                     </span>
                     <button
@@ -777,6 +925,7 @@ function SectionDrawer({
           )}
         </section>
 
+        {/* Available section categories with thumbnail previews */}
         {BODY_CATEGORIES.map(category => {
           const variants = getSectionsByCategory(category);
           if (variants.length === 0) return null;
@@ -788,16 +937,40 @@ function SectionDrawer({
               <div className='mb-2 text-2xs font-semibold uppercase tracking-wider text-white/50'>
                 {SECTION_CATEGORY_LABELS[category]}
               </div>
-              <ul className='flex flex-col gap-1'>
+              <ul className='flex flex-col gap-2'>
                 {variants.map(variant => (
                   <li key={variant.id}>
                     <button
                       type='button'
                       onClick={() => onAdd(variant.id)}
-                      className='flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs text-white/85 hover:bg-white/[0.04] hover:text-white'
+                      className='group flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/[0.03]'
                     >
-                      <span className='flex-1 truncate'>{variant.label}</span>
-                      <Plus className='h-3 w-3 shrink-0 text-white/40' />
+                      {/* Thumbnail preview — clipped render of the variant */}
+                      <div
+                        className='relative h-14 w-20 shrink-0 overflow-hidden rounded-md border border-white/10 bg-(--linear-app-content-surface)'
+                        aria-hidden='true'
+                      >
+                        <div
+                          className='pointer-events-none'
+                          style={{
+                            width: 400,
+                            height: 280,
+                            transform: 'scale(0.2)',
+                            transformOrigin: 'top left',
+                          }}
+                        >
+                          {variant.render()}
+                        </div>
+                      </div>
+                      <div className='min-w-0 flex-1'>
+                        <div className='text-sm font-medium text-white transition-colors group-hover:text-white'>
+                          {variant.label}
+                        </div>
+                        <div className='mt-0.5 line-clamp-2 text-2xs leading-4 text-white/50'>
+                          {variant.description}
+                        </div>
+                      </div>
+                      <Plus className='h-3.5 w-3.5 shrink-0 text-white/30 transition-colors group-hover:text-white/70' />
                     </button>
                   </li>
                 ))}
