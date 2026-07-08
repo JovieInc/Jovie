@@ -19,11 +19,7 @@ on:
 
 permissions:
   contents: read
-  actions: write
-  administration: read       # needed to list self-hosted runners
-  checks: read
-  repository-projects: read
-  statuses: read             # needed to read runners + update repo variables
+  actions: write             # needed to read runners + update repo variables
 
 jobs:
   monitor:
