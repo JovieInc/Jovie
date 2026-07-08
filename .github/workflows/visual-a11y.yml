@@ -3,10 +3,6 @@ name: Visual & A11y Tests
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'apps/web/components/**'
-      - 'apps/web/.storybook/**'
-      - 'packages/ui/**'
 
 permissions:
   contents: read
@@ -17,10 +13,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ci-visual-path-changes:
+    name: Visual Path Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      has_visual_changes: ${{ steps.detect.outputs.has_visual_changes }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Fetch base ref for diff comparison
+        if: github.event_name == 'pull_request'
+        run: git fetch origin "${{ github.base_ref }}" --depth=1 --no-tags
+      - name: Detect visual-relevant changes
+        id: detect
+        run: |
+          VISUAL_PATTERNS='^apps/web/components/|^apps/web/.storybook/|^packages/ui/'
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD 2>/dev/null || echo "")
+            if echo "$CHANGED_FILES" | grep -qE "$VISUAL_PATTERNS"; then
+              echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_visual_changes=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
   storybook-a11y:
     name: Storybook A11y Checks
     # Blocking — Storybook component a11y signal, path-gated to component/storybook changes.
     # Failures block PRs via required status check in branch protection.
+    needs: [ci-visual-path-changes]
+    if: ${{ needs.ci-visual-path-changes.outputs.has_visual_changes == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -69,10 +95,8 @@ jobs:
     name: Playwright Visual Regression
     # Blocking — visual diff gate for component PRs, path-gated to component/ui changes.
     # Failures block PRs via required status check in branch protection.
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # Skip on forks — secrets (DATABASE_URL) are not available
-    if: ${{ github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: [ci-visual-path-changes]
+    if: ${{ needs.ci-visual-path-changes.outputs.has_visual_changes == 'true' && (github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository) }}
 
     steps:
       - name: Checkout
