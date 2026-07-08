@@ -3007,6 +3007,8 @@ jobs:
           export E2E_CLERK_USER_PASSWORD="${{ secrets.E2E_CLERK_USER_PASSWORD }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           export E2E_SKIP_WARMUP=1
+          # Arms the onboarding LLM-failure fallback spec; matches playwright.config.smoke.ts
+          export CHAT_LLM_FAILURE_INJECTION=1
 
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
