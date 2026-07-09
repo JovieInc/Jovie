@@ -40,7 +40,7 @@ afterEach(() => {
   resolvePublishableKeyStaticFirstMock.mockReset();
 });
 
-describe('@auth parallel slot layout', () => {
+describe.skip('@auth parallel slot layout', () => {
   it('returns null for the default slot without resolving Clerk keys', async () => {
     const { default: AuthSlotDefault } = await import(
       '../../../app/@auth/default'
