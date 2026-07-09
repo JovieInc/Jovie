@@ -1202,8 +1202,6 @@ jobs:
         uses: ./.github/actions/setup-playwright
         with:
           project: mobile
-        with:
-          project: mobile
 
       - name: Download build artifact
         id: download-build
@@ -2857,8 +2855,6 @@ jobs:
         uses: ./.github/actions/setup-playwright
         with:
           project: smoke
-        with:
-          project: smoke
 
       - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3050,8 +3046,6 @@ jobs:
 
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
-        with:
-          project: smoke
         with:
           project: smoke
 

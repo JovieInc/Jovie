@@ -35,8 +35,6 @@ runs:
         node-version: '22'
         cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
         cache-dependency-path: '**/pnpm-lock.yaml'
-        # Normalize cache key with node version and OS to prevent cross-env pollution
-        key: ${{ runner.os }}-node-22-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
 
 
     - name: Warm pnpm store
