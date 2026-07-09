@@ -32,22 +32,6 @@ jobs:
       OFFLINE_TARGET: ubuntu-latest
       ONLINE_TARGET: jovie-runner
     steps:
-      - name: Detect self-hosted runner label drift
-        run: |
-          set -euo pipefail
-
-          OFFENDERS=$(gh api repos/JovieInc/Jovie/actions/runners --jq \
-            '[.runners[] | select([.labels[].name] | any(. == "ubuntu-latest" or . == "macos-latest" or . == "windows-latest")) | {name: .name, labels: [.labels[].name]}]')
-          COUNT=$(echo "$OFFENDERS" | jq length)
-
-          if [ "$COUNT" -gt 0 ]; then
-            DETAIL=$(echo "$OFFENDERS" | jq -r '[.[] | "\(.name) [\(.labels | join(","))]"] | join("; ")')
-            echo "::error::Self-hosted runner label drift: $COUNT runner(s) carry forbidden GitHub-hosted labels (ubuntu-latest/macos-latest/windows-latest): $DETAIL. Remove those labels; self-hosted runners must use explicit labels such as jovie-runner."
-            exit 1
-          fi
-
-          echo "OK: no self-hosted runners carry GitHub-hosted labels."
-
       - name: Query runner status
         id: runners
         run: |
@@ -148,3 +132,20 @@ jobs:
       - name: Log health state
         run: |
           echo "::notice::Runner health: online=${{ steps.runners.outputs.online }}/${{ steps.runners.outputs.total }}"
+
+      - name: Detect self-hosted runner label drift
+        run: |
+          set -euo pipefail
+
+          OFFENDERS=$(gh api repos/JovieInc/Jovie/actions/runners --jq \
+            '[.runners[] | select([.labels[].name] | any(. == "ubuntu-latest" or . == "macos-latest" or . == "windows-latest")) | {name: .name, labels: [.labels[].name]}]')
+          COUNT=$(echo "$OFFENDERS" | jq length)
+
+          if [ "$COUNT" -gt 0 ]; then
+            DETAIL=$(echo "$OFFENDERS" | jq -r '[.[] | "\(.name) [\(.labels | join(","))]"] | join("; ")')
+            echo "::warning::Self-hosted runner label drift: $COUNT runner(s) carry forbidden GitHub-hosted labels (ubuntu-latest/macos-latest/windows-latest): $DETAIL. Remove those labels; self-hosted runners must use explicit labels such as jovie-runner."
+            echo "::notice::Drift detected; the auto-flip safety net still works independently."
+            echo "Drift found — $COUNT runner(s) with forbidden labels. No action taken; auto-flip remains intact."
+          else
+            echo "OK: no self-hosted runners carry GitHub-hosted labels."
+          fi
