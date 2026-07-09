@@ -136,7 +136,7 @@ describe('TaskListRow', () => {
       />
     );
 
-    expect(queryByText('You')).not.toBeInTheDocument();
+    expect(queryByText('Me')).not.toBeInTheDocument();
   });
 
   it('hides the title and due chip when the detail pane already shows them', () => {
