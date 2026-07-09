@@ -61,7 +61,7 @@ export function ArtistProfileHowItWorks({
         <div className='mt-10 grid gap-5 lg:grid-cols-3 lg:gap-5'>
           <article className='flex flex-col gap-3'>
             <StepNumber value={1} />
-            <div className='relative min-h-[10.5rem] space-y-3 pt-1'>
+            <div className='relative min-h-42 space-y-3 pt-1'>
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
@@ -185,7 +185,7 @@ export function ArtistProfileHowItWorks({
 
           <article className='flex flex-col gap-3'>
             <StepNumber value={3} />
-            <div className='relative min-h-[10.5rem] space-y-3 pt-1'>
+            <div className='relative min-h-42 space-y-3 pt-1'>
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
@@ -288,7 +288,7 @@ function HoverPopover({
         side='bottom'
         align='start'
         showArrow
-        className='w-auto rounded-[1rem] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3 shadow-[0_22px_54px_rgba(0,0,0,0.24)]'
+        className='w-auto rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3 shadow-[0_22px_54px_rgba(0,0,0,0.24)]'
       >
         {content}
       </PopoverContent>

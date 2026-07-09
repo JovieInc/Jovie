@@ -21,6 +21,7 @@ export function HeroScrollSection() {
               </p>
 
               <h1 className='marketing-h1-linear mt-5 max-w-[12ch] text-primary-token lg:text-left'>
+                {/* ui-casing-allow: marketing sentence-style headline */}
                 The link your music deserves.
               </h1>
 
@@ -33,14 +34,14 @@ export function HeroScrollSection() {
                 <ClaimHandleForm size='hero' />
               </div>
 
-              <p className='mt-3.5 text-2xs tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
+              <p className='mt-3.5 text-2xs tracking-wide text-quaternary-token md:mt-4 lg:text-left'>
                 Private launch access with your artist page and next release
                 ready to go.
               </p>
             </div>
 
             <div className='relative mt-10 w-full md:mt-13 lg:mt-15'>
-              <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
+              <div className='homepage-surface-card relative overflow-hidden rounded-xl md:rounded-[1.1rem]'>
                 <MarketingScreenshot
                   scenarioId='dashboard-releases-desktop'
                   altOverride='Jovie release dashboard showing releases table with smart link details'

@@ -39,7 +39,7 @@ export function GoLiveInSixtySection() {
         className='absolute left-1/2 top-1/2 h-80 w-[80vw] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(94,106,210,0.13),transparent_64%)] blur-3xl'
       />
 
-      <div className='relative mx-auto grid w-full max-w-[var(--homepage-section-max)] gap-12 px-[var(--homepage-page-gutter)] lg:grid-cols-[minmax(24rem,0.95fr)_minmax(0,1.05fr)] lg:items-end lg:gap-14'>
+      <div className='relative mx-auto grid w-full max-w-(--homepage-section-max) gap-12 px-(--homepage-page-gutter) lg:grid-cols-[minmax(24rem,0.95fr)_minmax(0,1.05fr)] lg:items-end lg:gap-14'>
         <h2
           id='go-live-sixty-heading'
           className='max-w-[12.5ch] text-[3rem] font-semibold leading-[0.94] tracking-[-0.035em] text-white dark:text-white sm:text-[4.15rem] lg:text-[4.55rem] lg:leading-[0.92] xl:text-[4.95rem]'

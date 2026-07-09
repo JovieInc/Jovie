@@ -28,6 +28,7 @@ export function IGComparisonAside() {
               color: 'var(--linear-text-primary)',
             }}
           >
+            {/* ui-casing-allow: marketing sentence-style headline */}
             Stop sending fans through a maze.
           </h2>
           <p
@@ -42,7 +43,7 @@ export function IGComparisonAside() {
           </p>
         </div>
 
-        <div className='grid grid-cols-1 md:grid-cols-2 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-lg'>
+        <div className='grid grid-cols-1 md:grid-cols-2 overflow-hidden bg-(--linear-border-subtle) gap-px rounded-lg'>
           {/* Linktree side (dimmed) */}
           <div className='flex flex-col gap-3 p-4 bg-surface-0 opacity-50'>
             <span className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
@@ -53,7 +54,7 @@ export function IGComparisonAside() {
               linktr.ee/timwhite
             </div>
 
-            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-tertiary-token'>
+            <p className='text-[length:var(--linear-body-sm-size)] leading-(--linear-body-sm-leading) text-tertiary-token'>
               Fan taps → Linktree page → scrolls to find link → taps again
             </p>
 
@@ -91,7 +92,7 @@ export function IGComparisonAside() {
               ))}
             </div>
 
-            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-tertiary-token'>
+            <p className='text-[length:var(--linear-body-sm-size)] leading-(--linear-body-sm-leading) text-tertiary-token'>
               Fan taps → arrives exactly where they need to be
             </p>
 

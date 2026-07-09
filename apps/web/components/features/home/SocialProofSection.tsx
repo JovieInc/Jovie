@@ -1,10 +1,10 @@
 export function SocialProofSection() {
   return (
-    <section className='py-[var(--linear-section-pt-sm)] px-5 sm:px-6'>
+    <section className='py-(--linear-section-pt-sm) px-5 sm:px-6'>
       <div className='mx-auto flex max-w-linear-content flex-col items-center gap-8 text-center'>
         {/* Founder credibility */}
         <div className='flex flex-col items-center gap-3'>
-          <p className='text-[var(--linear-label-size)] font-medium uppercase tracking-[0.1em] text-tertiary-token'>
+          <p className='text-(--linear-label-size) font-medium uppercase tracking-[0.1em] text-tertiary-token'>
             Built by a musician
           </p>
           <p className='max-w-120 text-base leading-relaxed text-secondary-token'>

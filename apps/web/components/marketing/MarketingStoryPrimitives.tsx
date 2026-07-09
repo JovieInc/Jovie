@@ -206,7 +206,7 @@ export function ArtistProfileCaptureVisual({
     >
       <style>{CAPTURE_ANIMATION_STYLES}</style>
 
-      <div className='mx-auto flex max-w-[32rem] justify-center'>
+      <div className='mx-auto flex max-w-lg justify-center'>
         <CaptureActionPill capture={capture} phase={phase} />
       </div>
 

@@ -83,7 +83,7 @@ export function MarketingSurfaceCard({
           />
           <div
             aria-hidden='true'
-            className='pointer-events-none absolute inset-[1px] rounded-[inherit] border border-white/6'
+            className='pointer-events-none absolute inset-px rounded-[inherit] border border-white/6'
           />
         </>
       ) : null}

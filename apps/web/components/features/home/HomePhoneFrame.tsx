@@ -31,7 +31,7 @@ export function HomePhoneFrame({
       <div className='homepage-phone-device relative w-full rounded-[2.65rem] p-2 shadow-[0_28px_84px_rgba(0,0,0,0.42)]'>
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-[1px] rounded-[2.55rem] border border-white/12'
+          className='pointer-events-none absolute inset-px rounded-[2.55rem] border border-white/12'
         />
         <div
           aria-hidden='true'

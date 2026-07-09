@@ -94,7 +94,7 @@ export function ArtistProfilePlaceholderShot({
     return (
       <div className={cn('flex h-full flex-col px-5 pb-5 pt-14', className)}>
         <div className='mx-auto grid h-40 w-40 place-items-center rounded-[1.8rem] border border-white/10 bg-white/[0.045]'>
-          <div className='h-24 w-24 rounded-[1rem] bg-white/8' />
+          <div className='h-24 w-24 rounded-xl bg-white/8' />
         </div>
         <div className='mt-6 grid grid-cols-3 gap-3'>
           <Panel className='h-14 border-white/10 bg-white/[0.08]' />

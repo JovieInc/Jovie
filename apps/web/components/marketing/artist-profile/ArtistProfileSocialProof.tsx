@@ -47,7 +47,7 @@ export function ArtistProfileSocialProof({
 
       {!proofData.hasRealQuotes && proofData.founderQuote ? (
         <article className='mx-auto mt-6 max-w-280 overflow-hidden rounded-[1.9rem] border border-black/10 bg-white dark:bg-surface-1 px-6 py-6 text-black dark:text-white shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
-          <blockquote className='max-w-[48rem] text-pretty text-[clamp(1.375rem,2.4vw,2rem)] font-semibold leading-[1.18] tracking-[-0.025em] text-black dark:text-white'>
+          <blockquote className='max-w-3xl text-pretty text-[clamp(1.375rem,2.4vw,2rem)] font-semibold leading-[1.18] tracking-[-0.025em] text-black dark:text-white'>
             “{proofData.founderQuote.quote}”
           </blockquote>
           <div className='mt-6 flex flex-col gap-1 text-left'>

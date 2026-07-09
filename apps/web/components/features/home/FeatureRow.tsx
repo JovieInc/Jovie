@@ -53,7 +53,7 @@ export function FeatureRow({
             </div>
 
             {/* Right: screenshot */}
-            <div className='homepage-surface-card overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
+            <div className='homepage-surface-card overflow-hidden rounded-xl md:rounded-[1.1rem]'>
               <ProductScreenshot
                 src={screenshotSrc}
                 alt={screenshotAlt}

@@ -7,4 +7,4 @@ export const PUBLIC_SHELL_FOOTER_LINKS = [
 ] as const;
 
 export const PUBLIC_SHELL_MAIN_OFFSET_CLASS =
-  'pt-[var(--public-shell-header-offset)]';
+  'pt-(--public-shell-header-offset)';

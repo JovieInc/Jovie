@@ -90,7 +90,7 @@ function ButtonChipVisual({
     <div
       role='img'
       aria-label={`${chipLabel} preview`}
-      className='flex h-full min-h-[9rem] items-center justify-center rounded-[0.9rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,255,255,0.08),transparent_38%),#070a0f]'
+      className='flex h-full min-h-36 items-center justify-center rounded-[0.9rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,255,255,0.08),transparent_38%),#070a0f]'
     >
       <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white dark:bg-surface-1 px-4 py-2.5 text-xs font-semibold text-black dark:text-white shadow-[0_14px_26px_rgba(0,0,0,0.22)]'>
         <Icon className='h-3.5 w-3.5' strokeWidth={2} />
@@ -120,7 +120,7 @@ function IconBadgeVisual({
     <div
       role='img'
       aria-label={`${badgeLabel} preview`}
-      className='flex h-full min-h-[9rem] items-center justify-center rounded-[0.9rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,255,255,0.08),transparent_38%),#070a0f]'
+      className='flex h-full min-h-36 items-center justify-center rounded-[0.9rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,255,255,0.08),transparent_38%),#070a0f]'
     >
       <div className='flex flex-col items-center gap-3 text-center'>
         <span className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white dark:bg-surface-1 text-black dark:text-white shadow-[0_16px_28px_rgba(0,0,0,0.22)]'>
@@ -201,7 +201,7 @@ function AudienceQualityFilterVisual() {
       />
       <div
         aria-hidden='true'
-        className='absolute left-1/2 top-[42%] h-px w-[120%] -translate-x-1/2 rotate-[-18deg] bg-gradient-to-r from-transparent via-[var(--tile-accent)]/50 to-transparent opacity-70'
+        className='absolute left-1/2 top-[42%] h-px w-[120%] -translate-x-1/2 rotate-[-18deg] bg-gradient-to-r from-transparent via-(--tile-accent)/50 to-transparent opacity-70'
       />
       <div className='relative z-10 grid w-full grid-cols-[minmax(0,1fr)_3.25rem_minmax(0,1fr)] items-center gap-3'>
         <div className='space-y-2'>
@@ -226,10 +226,10 @@ function AudienceQualityFilterVisual() {
         </div>
 
         <div className='flex flex-col items-center gap-2 text-white/50'>
-          <span className='flex h-10 w-10 items-center justify-center rounded-full border border-[var(--tile-accent)]/30 bg-[var(--tile-accent)]/10 text-[var(--tile-accent)] shadow-[0_0_34px_rgba(94,106,210,0.18)]'>
+          <span className='flex h-10 w-10 items-center justify-center rounded-full border border-(--tile-accent)/30 bg-(--tile-accent)/10 text-(--tile-accent) shadow-[0_0_34px_rgba(94,106,210,0.18)]'>
             <Filter aria-hidden='true' className='h-4 w-4' />
           </span>
-          <span className='h-10 w-px bg-gradient-to-b from-[var(--tile-accent)]/45 to-transparent' />
+          <span className='h-10 w-px bg-gradient-to-b from-(--tile-accent)/45 to-transparent' />
         </div>
 
         <div className='rounded-[0.8rem] border border-emerald-300/18 bg-emerald-300/[0.07] p-3 text-left shadow-[0_18px_52px_rgba(16,185,129,0.12)]'>
@@ -273,11 +273,11 @@ function ArtistProfilePowerFeatureTile({
       <div className='relative flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-(--color-bg-base) p-4'>
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--tile-accent)]/60 to-transparent opacity-80'
+          className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-(--tile-accent)/60 to-transparent opacity-80'
         />
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute -right-16 -top-16 hidden h-44 w-44 rounded-full bg-[var(--tile-accent)]/12 blur-3xl sm:block'
+          className='pointer-events-none absolute -right-16 -top-16 hidden h-44 w-44 rounded-full bg-(--tile-accent)/12 blur-3xl sm:block'
         />
         <div className='relative flex-1'>
           {tile.visual === 'audience-quality-filter' ? (
@@ -328,7 +328,7 @@ function ArtistProfilePowerFeatureTile({
             />
           ) : null}
         </div>
-        <div className='relative z-10 mt-4 max-w-[24rem]'>
+        <div className='relative z-10 mt-4 max-w-sm'>
           <h3 className='max-w-[20ch] text-[1.08rem] font-semibold tracking-normal text-white dark:text-white sm:text-[1.16rem]'>
             {tile.title}
           </h3>
@@ -347,14 +347,14 @@ export function ArtistProfileSpecWall({
 }: Readonly<ArtistProfileSpecWallProps>) {
   return (
     <ArtistProfileSectionShell width='page' containerClassName='max-w-none'>
-      <div className='mx-auto max-w-[var(--linear-content-max)]'>
+      <div className='mx-auto max-w-(--linear-content-max)'>
         <ArtistProfileSectionHeader
           align='left'
           headline={specWall.headline}
           body={specWall.subhead}
           className='max-w-[44rem]'
           headlineClassName=''
-          bodyClassName='max-w-[36rem]'
+          bodyClassName='max-w-xl'
         />
 
         <div className='mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>

@@ -35,7 +35,7 @@ export function ArtistProfileSectionHeader({
   return (
     <div
       className={cn(
-        isCentered ? 'mx-auto max-w-[46rem] text-center' : 'max-w-[42rem]',
+        isCentered ? 'mx-auto max-w-[46rem] text-center' : 'max-w-2xl',
         className
       )}
     >
@@ -50,7 +50,7 @@ export function ArtistProfileSectionHeader({
           className={cn(
             SHELL_LEAD_CLASS,
             'mt-5 sm:mt-6',
-            isCentered ? 'mx-auto max-w-[38rem]' : 'max-w-[42rem]',
+            isCentered ? 'mx-auto max-w-[38rem]' : 'max-w-2xl',
             bodyClassName
           )}
         >

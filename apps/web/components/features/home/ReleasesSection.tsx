@@ -46,7 +46,7 @@ export function ReleasesSection() {
       subItems={SUB_ITEMS}
       className='relative overflow-hidden bg-page'
     >
-      <div className='homepage-surface-card relative mt-4 overflow-hidden rounded-[1rem] p-3.5 sm:mt-5 sm:p-4 md:p-[1.15rem] lg:p-5'>
+      <div className='homepage-surface-card relative mt-4 overflow-hidden rounded-xl p-3.5 sm:mt-5 sm:p-4 md:p-[1.15rem] lg:p-5'>
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-0 top-0 h-px'

@@ -94,7 +94,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
         {MODES.map((mode, i) => (
           <div
             key={mode.id}
-            className='rounded-full transition-colors duration-[var(--linear-duration-slow)] ease-subtle'
+            className='rounded-full transition-colors duration-(--linear-duration-slow) ease-subtle'
             style={{
               width: i === activeIndex ? 16 : 6,
               height: 6,
@@ -275,10 +275,10 @@ export function DeeplinksGrid() {
               }}
             />
 
-            <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+            <div className='relative mx-auto max-w-(--linear-content-max)'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
                 <div className='flex flex-col gap-6'>
-                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
                     One profile. Every way fans support you.
                   </span>
 
@@ -322,7 +322,7 @@ export function DeeplinksGrid() {
                     {MODES.map((mode, i) => (
                       <div
                         key={mode.id}
-                        className='h-1 rounded-full transition-colors duration-[var(--linear-duration-slow)] ease-subtle'
+                        className='h-1 rounded-full transition-colors duration-(--linear-duration-slow) ease-subtle'
                         style={{
                           width: i === activeIndex ? 32 : 8,
                           backgroundColor:
@@ -341,7 +341,7 @@ export function DeeplinksGrid() {
                     href='https://jov.ie/tim'
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-[var(--linear-duration-normal)]'
+                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-(--linear-duration-normal)'
                     style={{
                       color: 'var(--linear-text-tertiary)',
                       border: '1px solid var(--linear-border-subtle)',
@@ -379,7 +379,7 @@ export function DeeplinksGrid() {
                       }}
                     >
                       <p
-                        className='font-mono tracking-[-0.02em]'
+                        className='font-mono tracking-tighter'
                         style={{
                           fontSize: i === activeIndex ? '20px' : '15px',
                           fontWeight: i === activeIndex ? 590 : 400,
@@ -436,9 +436,9 @@ export function DeeplinksGrid() {
             }}
           />
 
-          <div className='mx-auto max-w-[var(--linear-content-max)]'>
+          <div className='mx-auto max-w-(--linear-content-max)'>
             <div className='flex flex-col items-center text-center gap-6 mb-12'>
-              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
                 One profile. Every way fans support you.
               </span>
               <h2 className='marketing-h2-linear text-primary-token'>

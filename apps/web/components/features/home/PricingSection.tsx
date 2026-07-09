@@ -54,6 +54,7 @@ export function PricingSection() {
           <div className='homepage-section-intro reveal-on-scroll'>
             <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
               <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
+                {/* ui-casing-allow: marketing sentence-style headline */}
                 Simple pricing.
               </h2>
             </div>
@@ -69,14 +70,14 @@ export function PricingSection() {
             data-delay='80'
           >
             <div
-              className='relative flex h-full flex-col rounded-[1rem] p-6 md:p-7'
+              className='relative flex h-full flex-col rounded-xl p-6 md:p-7'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
                 boxShadow: 'var(--linear-shadow-card)',
               }}
             >
-              <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
+              <p className='text-sm font-medium tracking-tight text-tertiary-token'>
                 {freePlan.displayName}
               </p>
               <div className='mt-4 flex items-baseline gap-1'>
@@ -123,7 +124,7 @@ export function PricingSection() {
             </div>
 
             <div
-              className='relative flex h-full flex-col rounded-[1rem] p-6 md:p-7'
+              className='relative flex h-full flex-col rounded-xl p-6 md:p-7'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
@@ -131,11 +132,11 @@ export function PricingSection() {
               }}
             >
               <div className='flex items-center justify-between'>
-                <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
+                <p className='text-sm font-medium tracking-tight text-tertiary-token'>
                   {proPlan.displayName}
                 </p>
                 <Badge variant='default' size='lg'>
-                  Limited time
+                  Limited Time
                 </Badge>
               </div>
               <div className='mt-4 flex items-baseline gap-1'>

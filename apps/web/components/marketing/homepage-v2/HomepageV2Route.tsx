@@ -71,7 +71,7 @@ function HomepageV2Hero() {
   return (
     <section
       data-testid='homepage-v2-shell'
-      className='relative overflow-hidden pb-16 pt-[5.75rem] sm:pb-20 md:pt-[6.25rem] lg:pb-24'
+      className='relative overflow-hidden pb-16 pt-23 sm:pb-20 md:pt-25 lg:pb-24'
       aria-labelledby='homepage-v2-hero-heading'
     >
       <style>{`
@@ -192,7 +192,7 @@ function HomepageV2Hero() {
                 altOverride='Audience insights showing top cities and engagement signals'
                 title='Audience insight'
                 chrome='minimal'
-                className='rounded-[1rem]'
+                className='rounded-xl'
               />
             </div>
 
@@ -210,7 +210,7 @@ function HomepageV2Hero() {
                 altOverride='Tracked link share menu with campaign routing controls'
                 title='Share and route'
                 chrome='minimal'
-                className='rounded-[1rem]'
+                className='rounded-xl'
               />
             </div>
 
@@ -241,8 +241,8 @@ export function HomepageV2SystemOverview() {
           align='center'
           headline={HOMEPAGE_V2_COPY.systemOverview.headline}
           body={HOMEPAGE_V2_COPY.systemOverview.subhead}
-          className='max-w-[42rem]'
-          bodyClassName='max-w-[32rem]'
+          className='max-w-2xl'
+          bodyClassName='max-w-lg'
         />
 
         <div className='homepage-overview-grid'>
@@ -303,14 +303,14 @@ export function HomepageV2Spotlight() {
         }
       `}</style>
       <MarketingContainer width='page'>
-        <div className='mx-auto grid max-w-[72rem] gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
+        <div className='mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
           <div className='max-w-[23rem] lg:self-center'>
             <div className='max-w-[23rem]'>
               <h2 className='homepage-story-heading max-w-[11ch]'>
                 <span className='block'>One Link.</span>
                 <span className='block whitespace-nowrap'>Always In Sync.</span>
               </h2>
-              <p className='homepage-story-body max-w-[20rem]'>
+              <p className='homepage-story-body max-w-xs'>
                 {HOMEPAGE_V2_COPY.spotlight.body}
               </p>
             </div>
@@ -343,7 +343,7 @@ export function HomepageV2CaptureReactivate() {
           align='center'
           headline={HOMEPAGE_V2_COPY.captureReactivation.headline}
           body={HOMEPAGE_V2_COPY.captureReactivation.body}
-          className='max-w-[42rem]'
+          className='max-w-2xl'
           headlineClassName='whitespace-pre-line'
           bodyClassName='mx-auto max-w-[29rem]'
         />
@@ -404,14 +404,14 @@ function HomepageV2SocialProof() {
           headline={HOMEPAGE_V2_COPY.socialProof.headline}
           body={HOMEPAGE_V2_COPY.socialProof.body}
           className='max-w-[40rem]'
-          bodyClassName='mx-auto max-w-[28rem]'
+          bodyClassName='mx-auto max-w-md'
         />
 
         <div className='mt-8 grid gap-4 lg:grid-cols-3'>
           {ARTIST_PROFILE_SOCIAL_PROOF.profileCards.map(card => (
             <article
               key={card.id}
-              className='overflow-hidden rounded-[1.25rem] bg-white/[0.03]'
+              className='overflow-hidden rounded-2xl bg-white/[0.03]'
             >
               <div className='relative aspect-[4/3]'>
                 <Image

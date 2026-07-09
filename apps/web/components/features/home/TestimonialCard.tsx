@@ -13,7 +13,7 @@ export function TestimonialCard({
 }: TestimonialCardProps) {
   return (
     <div
-      className='relative flex flex-col items-center rounded-xl p-8 text-center transition-colors duration-[var(--linear-duration-normal)]'
+      className='relative flex flex-col items-center rounded-xl p-8 text-center transition-colors duration-(--linear-duration-normal)'
       style={{
         backgroundColor: 'var(--linear-bg-surface-0)',
         border: '1px solid var(--linear-border-subtle)',

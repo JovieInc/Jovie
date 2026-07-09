@@ -254,7 +254,7 @@ function FridayRhythmContent({
   const graphSummary = `Jovie rhythm model showing ${activeFridays} of ${totalFridays} Fridays active`;
 
   return (
-    <div className='homepage-friday-rhythm-content mx-auto w-full max-w-[var(--homepage-section-max)] px-[var(--homepage-page-gutter)] py-20 sm:py-24 md:py-0'>
+    <div className='homepage-friday-rhythm-content mx-auto w-full max-w-(--homepage-section-max) px-(--homepage-page-gutter) py-20 sm:py-24 md:py-0'>
       <div className='homepage-friday-rhythm-copy max-w-[45rem] text-left'>
         <h2 className='homepage-friday-rhythm-title text-white dark:text-white'>
           <span className='block'>Make Every Friday</span>

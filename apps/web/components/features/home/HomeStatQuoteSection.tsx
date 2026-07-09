@@ -47,11 +47,11 @@ export function HomeStatQuoteSection({
         ))}
       </svg>
       <div className='relative mx-auto max-w-300 text-left'>
-        <h3 className='m-0 max-w-[22ch] font-[var(--marketing-font-display)] text-[clamp(1.875rem,4vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.025em] text-primary-token'>
+        <h3 className='m-0 max-w-[22ch] font-(--marketing-font-display) text-[clamp(1.875rem,4vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.025em] text-primary-token'>
           <span>Jovie delivers {stat}</span>
           <span className='text-tertiary-token'> {body}</span>
         </h3>
-        <div className='mt-7 font-[var(--marketing-font-body)] text-sm italic text-tertiary-token'>
+        <div className='mt-7 font-(--marketing-font-body) text-sm italic text-tertiary-token'>
           {source}
         </div>
       </div>

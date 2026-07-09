@@ -37,12 +37,12 @@ export function ReleaseNotificationsSection() {
       />
 
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-(--linear-content-max)'>
           {/* ── Desktop: side-by-side · Mobile: stacked ── */}
           <div className='grid lg:grid-cols-[0.4fr_0.6fr] gap-12 lg:gap-16 lg:items-start'>
             {/* ─── Left column: copy + stat ─── */}
             <div className='flex flex-col reveal-on-scroll'>
-              <span className='inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
+              <span className='inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
                 <Zap className='h-3 w-3' aria-hidden='true' />
                 Automatic
               </span>
@@ -75,10 +75,10 @@ export function ReleaseNotificationsSection() {
                   />
                 </div>
                 <div>
-                  <p className='text-[var(--linear-caption-size)] font-[number:var(--linear-font-weight-medium)] text-primary-token'>
+                  <p className='text-(--linear-caption-size) font-[number:var(--linear-font-weight-medium)] text-primary-token'>
                     4,218 fans notified
                   </p>
-                  <p className='text-[var(--linear-label-size)] text-tertiary-token'>
+                  <p className='text-(--linear-label-size) text-tertiary-token'>
                     Zero emails written
                   </p>
                 </div>
@@ -121,7 +121,7 @@ export function ReleaseNotificationsSection() {
                         <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-3xs font-medium text-quaternary-token bg-surface-2'>
                           {i + 1}
                         </span>
-                        <span className='text-app text-tertiary-token line-through decoration-[var(--linear-text-quaternary)]'>
+                        <span className='text-app text-tertiary-token line-through decoration-(--linear-text-quaternary)'>
                           {step}
                         </span>
                       </div>
@@ -205,7 +205,7 @@ export function ReleaseNotificationsSection() {
                       {/* Listen Now button */}
                       <button
                         type='button'
-                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-[var(--linear-duration-normal)] ease-subtle'
+                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-(--linear-duration-normal) ease-subtle'
                         style={{
                           background:
                             'linear-gradient(135deg, oklch(72% 0.16 75), oklch(68% 0.14 60))',
