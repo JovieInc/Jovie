@@ -19,8 +19,10 @@ const hoisted = vi.hoisted(() => ({
   captureExceptionMock: vi.fn(),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: hoisted.authMock,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: hoisted.authMock,
+  getOptionalAuth: hoisted.authMock,
+  getCachedSessionTokenAuth: hoisted.authMock,
 }));
 
 vi.mock('@/lib/db', () => ({

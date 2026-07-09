@@ -48,8 +48,8 @@ describe('POST /api/dev/clear-session', () => {
     vi.stubEnv('VERCEL_ENV', 'development');
 
     mockAllCookies = [
-      { name: '__session', value: 'abc' },
-      { name: '__clerk_db_jwt', value: 'xyz' },
+      { name: 'better-auth.session_token', value: 'abc' },
+      { name: '__Secure-better-auth.session_token', value: 'xyz' },
       { name: 'jv_country', value: 'US' },
     ];
 
@@ -59,7 +59,11 @@ describe('POST /api/dev/clear-session', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.deleted).toEqual(
-      expect.arrayContaining(['__session', '__clerk_db_jwt', 'jv_country'])
+      expect.arrayContaining([
+        'better-auth.session_token',
+        '__Secure-better-auth.session_token',
+        'jv_country',
+      ])
     );
   });
 
@@ -71,28 +75,24 @@ describe('POST /api/dev/clear-session', () => {
     expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('deletes Clerk cookies by prefix including suffixed variants', async () => {
+  it('deletes Better Auth cookies by prefix including secure variants', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('VERCEL_ENV', 'development');
 
     mockAllCookies = [
-      { name: '__session', value: '1' },
-      { name: '__session_abc123', value: '2' },
-      { name: '__clerk_handshake', value: '3' },
-      { name: '__clerk_redirect_count', value: '4' },
-      { name: '__client_uat', value: '5' },
-      { name: '__refresh', value: '6' },
+      { name: 'better-auth.session_token', value: '1' },
+      { name: 'better-auth.session_token_0', value: '2' },
+      { name: '__Secure-better-auth.session_token', value: '3' },
+      { name: '__Host-better-auth.session_data', value: '4' },
     ];
 
     await POST();
     expect(deletedCookies).toEqual(
       expect.arrayContaining([
-        '__session',
-        '__session_abc123',
-        '__clerk_handshake',
-        '__clerk_redirect_count',
-        '__client_uat',
-        '__refresh',
+        'better-auth.session_token',
+        'better-auth.session_token_0',
+        '__Secure-better-auth.session_token',
+        '__Host-better-auth.session_data',
       ])
     );
   });
@@ -129,25 +129,25 @@ describe('POST /api/dev/clear-session', () => {
 
     mockAllCookies = [
       { name: '__dev_toolbar', value: '1' },
-      { name: '__session', value: '2' },
+      { name: 'better-auth.session_token', value: '2' },
     ];
 
     await POST();
     expect(deletedCookies).not.toContain('__dev_toolbar');
-    expect(deletedCookies).toContain('__session');
+    expect(deletedCookies).toContain('better-auth.session_token');
   });
 
-  it('ignores cookies that are neither Clerk nor app cookies', async () => {
+  it('ignores cookies that are neither Better Auth nor app cookies', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('VERCEL_ENV', 'development');
 
     mockAllCookies = [
       { name: 'some_random_cookie', value: '1' },
-      { name: '__session', value: '2' },
+      { name: 'better-auth.session_token', value: '2' },
     ];
 
     await POST();
     expect(deletedCookies).not.toContain('some_random_cookie');
-    expect(deletedCookies).toContain('__session');
+    expect(deletedCookies).toContain('better-auth.session_token');
   });
 });
