@@ -16,7 +16,7 @@ const { mockSonnerToast } = vi.hoisted(() => ({
 
 vi.mock('sonner', () => ({ toast: mockSonnerToast }));
 
-import { banner } from '@/components/feedback/banner';
+import { banner } from '@/components/feedback/banner-store';
 import {
   getFeedbackErrorMessage,
   TOAST_DURATIONS,

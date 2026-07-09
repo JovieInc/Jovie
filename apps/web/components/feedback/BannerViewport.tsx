@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { Banner } from './Banner';
-import { type BannerItem, banner } from './banner';
+import { type BannerItem, banner } from './banner-store';
 
 const EMPTY: readonly BannerItem[] = [];
 
@@ -28,7 +28,7 @@ export function BannerViewport() {
 
   return (
     <section
-      aria-label='System notifications'
+      aria-label='System Notifications'
       className='pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col gap-2 px-4 pb-2'
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}
     >

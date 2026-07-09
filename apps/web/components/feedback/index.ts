@@ -18,8 +18,8 @@ export type {
   BannerInput,
   BannerItem,
   BannerVariant,
-} from './banner';
-export { banner } from './banner';
+} from './banner-store';
+export { banner } from './banner-store';
 export { FeedbackProvider } from './FeedbackProvider';
 export {
   getFeedbackErrorMessage,

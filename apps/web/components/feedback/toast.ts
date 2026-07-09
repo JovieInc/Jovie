@@ -73,26 +73,24 @@ function baseToast(message: ToastMessage, ...rest: ToastRest): ToastId {
  * accent) — all auto-dismiss (provider default 4s) with a manual close
  * button. `warning`, `loading`, `message`, `promise`, `custom`, and
  * `dismiss` cover the full range of existing call sites.
+ *
+ * Methods are the renderer methods themselves (not thin wrappers) so
+ * module mocks of `sonner` remain spy-identical when tests import
+ * `toast` from `@/components/feedback`.
  */
 export const toast = Object.assign(baseToast, {
-  success: (message: ToastMessage, ...rest: ToastRest): ToastId =>
-    sonnerToast.success(message, ...rest),
-  error: (message: ToastMessage, ...rest: ToastRest): ToastId =>
-    sonnerToast.error(message, ...rest),
-  info: (message: ToastMessage, ...rest: ToastRest): ToastId =>
-    sonnerToast.info(message, ...rest),
-  warning: (message: ToastMessage, ...rest: ToastRest): ToastId =>
-    sonnerToast.warning(message, ...rest),
-  message: (message: ToastMessage, ...rest: ToastRest): ToastId =>
-    sonnerToast.message(message, ...rest),
-  loading: (message: ToastMessage, ...rest: ToastRest): ToastId =>
-    sonnerToast.loading(message, ...rest),
+  success: sonnerToast.success,
+  error: sonnerToast.error,
+  info: sonnerToast.info,
+  warning: sonnerToast.warning,
+  message: sonnerToast.message,
+  loading: sonnerToast.loading,
   /** Promise toast: loading → success/error. Passthrough to the renderer. */
   promise: sonnerToast.promise,
   /** Custom render passthrough for advanced cases. */
   custom: sonnerToast.custom,
   /** Dismiss one toast by id, or all when called with no argument. */
-  dismiss: (id?: ToastId): ToastId | undefined => sonnerToast.dismiss(id),
+  dismiss: sonnerToast.dismiss,
 });
 
 const GENERIC_ERROR_MESSAGE = 'Something went wrong. Please try again.';

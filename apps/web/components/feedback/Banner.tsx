@@ -3,7 +3,7 @@
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import type { BannerAction, BannerVariant } from './banner';
+import type { BannerAction, BannerVariant } from './banner-store';
 
 /**
  * Canonical Banner — persistent, top-of-page system feedback.
@@ -57,7 +57,7 @@ export function Banner({
 }: BannerProps) {
   const Icon = VARIANT_ICON[variant];
   const actionClassName =
-    'inline-flex shrink-0 items-center justify-center rounded-full border border-default bg-surface-1 px-3 py-1 text-sm font-medium text-primary-token transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
+    'inline-flex shrink-0 items-center justify-center rounded-full border border-default bg-surface-1 px-3 py-1 text-sm font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
 
   return (
     <div
@@ -112,7 +112,7 @@ export function Banner({
           type='button'
           onClick={onDismiss}
           aria-label='Dismiss'
-          className='shrink-0 rounded-full p-1 text-tertiary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          className='shrink-0 rounded-full p-1 text-tertiary-token transition-colors duration-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
         >
           <X className='h-4 w-4' aria-hidden='true' />
         </button>
