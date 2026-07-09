@@ -1,30 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  mockCachedAuth,
-  mockCachedCurrentUser,
-  mockDbSelect,
-  mockCheckUserStatus,
-  mockIsWaitlistGateEnabled,
-  mockCache,
-} = vi.hoisted(() => ({
-  mockCachedAuth: vi.fn(),
-  mockCachedCurrentUser: vi.fn(),
-  mockDbSelect: vi.fn(),
-  mockCheckUserStatus: vi.fn(),
-  mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(false),
-  mockCache: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => {
-    const cacheByKey = new Map<string, ReturnType<T>>();
+/**
+ * Request-cache coverage for resolveUserState under Better Auth.
+ * React.cache is mocked to a real per-fn memo so we can assert dedupe.
+ */
 
-    return ((...args: never[]) => {
-      const key = JSON.stringify(args);
-      if (!cacheByKey.has(key)) {
-        cacheByKey.set(key, fn(...args) as ReturnType<T>);
-      }
-      return cacheByKey.get(key)!;
-    }) as T;
+const {
+  mockGetSession,
+  mockGetCachedDevTestAuthSession,
+  mockDbSelect,
+  mockIsWaitlistGateEnabled,
+  mockCheckUserStatus,
+} = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockGetCachedDevTestAuthSession: vi.fn(),
+  mockDbSelect: vi.fn(),
+  mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(false),
+  mockCheckUserStatus: vi.fn().mockReturnValue({
+    isBlocked: false,
+    blockedState: null,
+    redirectTo: null,
   }),
 }));
+
+const cacheStore = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock('server-only', () => ({}));
 
@@ -32,32 +31,44 @@ vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof import('react')>();
   return {
     ...actual,
-    cache: mockCache,
+    cache: <T extends (...args: never[]) => unknown>(fn: T) => {
+      return ((...args: never[]) => {
+        const key = JSON.stringify(args);
+        if (!cacheStore.has(key)) {
+          cacheStore.set(key, fn(...args));
+        }
+        return cacheStore.get(key);
+      }) as T;
+    },
   };
 });
 
-vi.mock('@/lib/auth/cached', () => ({
-  getOptionalAuth: mockCachedAuth,
-  getCachedCurrentUser: mockCachedCurrentUser,
+vi.mock('next/headers', () => ({
+  headers: vi.fn(async () => new Headers()),
+}));
+
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: { api: { getSession: mockGetSession } },
+}));
+
+vi.mock('@/lib/auth/dev-test-auth.server', () => ({
+  getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-    insert: vi.fn(),
-    update: vi.fn(),
-  },
+  db: { select: mockDbSelect, insert: vi.fn(), update: vi.fn() },
 }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
   users: {
     id: 'users.id',
-    clerkId: 'users.clerkId',
+    betterAuthUserId: 'users.betterAuthUserId',
     email: 'users.email',
     userStatus: 'users.userStatus',
     isAdmin: 'users.isAdmin',
     isPro: 'users.isPro',
     deletedAt: 'users.deletedAt',
+    activeProfileId: 'users.activeProfileId',
   },
 }));
 
@@ -74,27 +85,16 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 }));
 
 vi.mock('@/lib/db/schema/waitlist', () => ({
-  waitlistEntries: {
-    id: 'waitlistEntries.id',
-    email: 'waitlistEntries.email',
-    emailNormalized: 'waitlistEntries.emailNormalized',
-    status: 'waitlistEntries.status',
-    canonical: 'waitlistEntries.canonical',
-    createdAt: 'waitlistEntries.createdAt',
-  },
+  waitlistEntries: { id: 'id', email: 'email', status: 'status' },
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn().mockResolvedValue(undefined),
-  captureCriticalError: vi.fn().mockResolvedValue(undefined),
+  captureError: vi.fn(),
+  captureCriticalError: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/email', () => ({
-  normalizeEmail: vi.fn((email: string) => email.toLowerCase().trim()),
-}));
-
-vi.mock('@/lib/auth/clerk-sync', () => ({
-  syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
+  normalizeEmail: (e: string) => e?.toLowerCase().trim(),
 }));
 
 vi.mock('@/lib/auth/status-checker', () => ({
@@ -106,94 +106,52 @@ vi.mock('@/lib/waitlist/settings', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
-  eq: vi.fn((_col, val) => ({ eq: val })),
-  sql: vi.fn((strings, ...values) => ({ sql: strings, values })),
-  desc: vi.fn(col => ({ desc: col })),
+  eq: vi.fn(),
+  and: vi.fn(),
+  sql: Object.assign((s: TemplateStringsArray, ...v: unknown[]) => ({ s, v }), {
+    raw: vi.fn(),
+  }),
+  desc: vi.fn(),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(),
   addBreadcrumb: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/request-clerk-client', () => ({
-  getServerClerkClient: vi.fn().mockResolvedValue(null),
-}));
+import { resolveUserState } from '@/lib/auth/gate';
 
-function createJoinSelectChain(result: unknown[]) {
-  const mockLimit = vi.fn().mockResolvedValue(result);
-  const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
-  const mockLeftJoin = vi.fn().mockReturnValue({ where: mockWhere });
-  const mockFrom = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin });
-  return { from: mockFrom };
-}
-
-describe.skip('resolveUserState request cache', () => {
+describe('resolveUserState request cache (Better Auth)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
-    mockCachedAuth.mockResolvedValue({ userId: 'clerk_cached' });
-    mockCachedCurrentUser.mockResolvedValue({
-      emailAddresses: [
-        {
-          emailAddress: 'cached@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
-    });
-    mockCheckUserStatus.mockReturnValue({
-      isBlocked: false,
-      blockedState: null,
-      redirectTo: null,
-    });
-    mockDbSelect.mockReturnValue(
-      createJoinSelectChain([
-        {
-          id: 'db-user-1',
-          email: 'cached@example.com',
-          userStatus: 'active',
-          isAdmin: false,
-          isPro: false,
-          deletedAt: null,
-          profileId: 'profile-1',
-          profileUsername: 'cached',
-          profileUsernameNormalized: 'cached',
-          profileDisplayName: 'Cached User',
-          profileIsPublic: true,
-          profileAvatarUrl: null,
-          profileOnboardingCompletedAt: new Date(),
-        },
-      ])
-    );
+    cacheStore.clear();
+    mockGetCachedDevTestAuthSession.mockResolvedValue(null);
+    mockIsWaitlistGateEnabled.mockResolvedValue(false);
+    mockGetSession.mockResolvedValue(null);
   });
 
   it('deduplicates repeated resolveUserState calls within one request', async () => {
-    const { resolveUserState } = await import('@/lib/auth/gate');
+    mockGetSession.mockResolvedValue(null);
 
-    const [first, second, third] = await Promise.all([
+    const [a, b, c] = await Promise.all([
       resolveUserState(),
       resolveUserState(),
       resolveUserState(),
     ]);
 
-    expect(first).toEqual(second);
-    expect(second).toEqual(third);
-    expect(mockCachedAuth).toHaveBeenCalledTimes(1);
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
-    expect(mockIsWaitlistGateEnabled).toHaveBeenCalledTimes(1);
+    expect(a).toBe(b);
+    expect(b).toBe(c);
+    // session read once thanks to React.cache on the serialized options key
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
   });
 
   it('keeps separate cache entries for different option shapes', async () => {
-    const { resolveUserState } = await import('@/lib/auth/gate');
+    mockGetSession.mockResolvedValue(null);
 
     await resolveUserState();
-    expect(mockCachedAuth).toHaveBeenCalledTimes(1);
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    await resolveUserState({ createDbUserIfMissing: false });
 
-    mockCachedAuth.mockClear();
-
-    await resolveUserState({ knownClerkUserId: 'clerk_cached' });
-
-    expect(mockCachedAuth).not.toHaveBeenCalled();
-    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+    // Different serialize keys → two cache entries → two session reads.
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
   });
 });
