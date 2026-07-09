@@ -22,6 +22,7 @@ import {
   type SelectionResult,
   selectTasks,
 } from '@/lib/release-tasks/select-tasks';
+import { computeTaskDueDate } from '@/lib/tasks/task-due-date';
 import { requireProfileId } from '../requireProfileId';
 import { getReleaseTasks } from './task-actions';
 
@@ -40,12 +41,6 @@ async function requireReleaseAccess(
     )
     .limit(1);
   if (!release) throw new Error('Release not found or access denied');
-}
-
-function computeDueDate(releaseDate: Date, offsetDays: number): Date {
-  const d = new Date(releaseDate);
-  d.setDate(d.getDate() + offsetDays);
-  return d;
 }
 
 async function loadCatalog(): Promise<CatalogRow[]> {
@@ -154,10 +149,7 @@ export async function instantiateReleaseTasksFromCatalog(
         agentStatus: 'idle' as const,
         releaseId,
         category: row.category,
-        dueAt:
-          releaseDate === null || row.flowStageDaysOffset === null
-            ? null
-            : computeDueDate(releaseDate, row.flowStageDaysOffset),
+        dueAt: computeTaskDueDate(releaseDate, row.flowStageDaysOffset),
         position: startPosition + index,
         sourceTemplateId: null,
         metadata: {
@@ -409,10 +401,7 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
         agentStatus: 'idle' as const,
         releaseId,
         category: row.category,
-        dueAt:
-          releaseDate === null || row.flowStageDaysOffset === null
-            ? null
-            : computeDueDate(releaseDate, row.flowStageDaysOffset),
+        dueAt: computeTaskDueDate(releaseDate, row.flowStageDaysOffset),
         position,
         sourceTemplateId: null,
         metadata: {
