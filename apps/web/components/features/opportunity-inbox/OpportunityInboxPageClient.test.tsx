@@ -252,7 +252,7 @@ describe('OpportunityInboxPageClient', () => {
       screen.queryByTestId('opportunity-inbox-empty-state')
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Confirm date/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm tour date/ }));
 
     expect(
       screen.queryByTestId('opportunity-inbox-tour-date-review')
@@ -281,7 +281,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reject tour date' }));
 
     const rejectedSection = screen.getByTestId(
       'opportunity-inbox-rejected-tour-dates'
