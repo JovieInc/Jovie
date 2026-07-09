@@ -121,6 +121,7 @@ function getTriggerChild({
 
   // Non-element / multi-child fallback: layout wrapper only. Seam offset is
   // measured via ref callback (no pointer/focus handlers on a static span).
+  // Handlers on a static <span> would trip a11y noStaticElementInteractions.
   return (
     <span
       ref={triggerRef}
