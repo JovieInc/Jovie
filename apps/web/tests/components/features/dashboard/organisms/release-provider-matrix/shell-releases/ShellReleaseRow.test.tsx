@@ -392,3 +392,77 @@ describe('ShellReleaseRow enrichment', () => {
     expect(syncingRow?.className).toContain('h-14');
   });
 });
+
+describe('ShellReleaseRow weekly streams metric', () => {
+  it('renders the formatted weekly metric when data exists', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-weekly',
+          title: 'Weekly Hit',
+          weeklyStreams: 12_400,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    const cell = screen.getByTestId('shell-release-weekly-streams');
+    expect(cell.textContent).toContain('12.4K');
+    expect(cell.textContent).toContain('/ wk');
+  });
+
+  it('renders a placeholder when no weekly data exists', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-no-data',
+          title: 'Quiet Release',
+          weeklyStreams: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    const cell = screen.getByTestId('shell-release-weekly-streams');
+    expect(cell.textContent).toContain('—');
+    expect(cell.textContent).not.toContain('/ wk');
+  });
+
+  it('treats a zero count as no data (quiet placeholder, not a noisy zero)', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-zero',
+          title: 'Zero Week',
+          weeklyStreams: 0,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    expect(
+      screen.getByTestId('shell-release-weekly-streams').textContent
+    ).toContain('—');
+  });
+
+  it('always renders the fixed-width cell so states cannot shift layout', () => {
+    const { container } = render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-layout',
+          title: 'Layout Check',
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    const cell = container.querySelector(
+      '[data-testid="shell-release-weekly-streams"]'
+    );
+    expect(cell?.className).toContain('w-20');
+  });
+});

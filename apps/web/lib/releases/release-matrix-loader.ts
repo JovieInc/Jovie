@@ -8,6 +8,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TTL } from '@/lib/cache/tags';
+import { getWeeklyReleaseClickCounts } from '@/lib/db/queries/analytics';
 import {
   getReleaseForProfileById,
   getReleasesForProfile as getReleasesFromDb,
@@ -50,11 +51,25 @@ async function fetchReleaseMatrixCore(
   profileHandle: string
 ): Promise<ReleaseViewModel[]> {
   const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profileId, { includeDrafts: true });
+  const [releases, weeklyClickCounts] = await Promise.all([
+    getReleasesFromDb(profileId, { includeDrafts: true }),
+    // Weekly metric degrades gracefully: a failed aggregate never blocks the
+    // releases list — rows just render the "—" placeholder.
+    getWeeklyReleaseClickCounts(profileId).catch(
+      () => new Map<string, number>()
+    ),
+  ]);
 
-  return releases.map(release =>
-    mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
-  );
+  return releases.map(release => {
+    const viewModel = mapReleaseToViewModel(
+      release,
+      providerLabels,
+      profileId,
+      profileHandle
+    );
+    viewModel.weeklyStreams = weeklyClickCounts.get(viewModel.id) ?? null;
+    return viewModel;
+  });
 }
 
 async function fetchReleaseEntityCore(
