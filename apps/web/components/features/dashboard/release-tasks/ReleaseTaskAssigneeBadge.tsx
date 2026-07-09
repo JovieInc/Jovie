@@ -22,7 +22,7 @@ export function ReleaseTaskAssigneeBadge({
 }: ReleaseTaskAssigneeBadgeProps) {
   return (
     <DotBadge
-      label={assigneeType === 'human' ? 'You' : 'AI'}
+      label={assigneeType === 'human' ? 'Me' : 'Jovie'}
       size='sm'
       variant={ASSIGNEE_VARIANTS[assigneeType]}
     />
