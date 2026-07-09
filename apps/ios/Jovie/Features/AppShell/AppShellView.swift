@@ -50,6 +50,16 @@ func resolveShellInitialTab(_ initialTab: AppShellTab, chatEnabled: Bool) -> App
   }
 }
 
+// GH-12949: the recessed drawer base plane must be fully invisible while closed.
+// Content chrome (composer, toolbar) can be translucent, so occlusion alone is
+// not enough — opacity 0 when idle prevents thread rows from peeking through.
+func appShellDrawerBasePlaneOpacity(
+  isShowingDrawer: Bool,
+  drawerDragOffset: CGFloat
+) -> Double {
+  (isShowingDrawer || drawerDragOffset != 0) ? 1 : 0
+}
+
 private enum AppShellRoute: Hashable {
   case settings
 }
@@ -150,6 +160,10 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
         // Drawer is the recessed BASE plane of the ZStack: it never overlays or
         // dims content. The content container is the elevated plane that slides
         // right to reveal it, matching the ChatGPT/desktop-app model.
+        // When fully closed the base plane is opacity 0 (GH-12949) so translucent
+        // composer/toolbar regions cannot show drawer rows underneath.
+        let isDrawerBasePlaneVisible = isShowingDrawer || drawerDragOffset != 0
+
         ZStack(alignment: .leading) {
           AppShellLeftDrawer(
             isPresented: isShowingDrawer,
@@ -177,13 +191,20 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
               navigationPath.append(.settings)
             }
           )
-          // reduceMotion: the drawer beneath is otherwise fully static, so
-          // crossfade its opacity with the content card instead of relying on
-          // the (also-disabled) spatial slide to reveal it.
-          .opacity(reduceMotion ? (isShowingDrawer ? 1 : 0) : 1)
-          .animation(reduceMotion ? drawerAnimation : nil, value: isShowingDrawer)
+          .opacity(
+            appShellDrawerBasePlaneOpacity(
+              isShowingDrawer: isShowingDrawer,
+              drawerDragOffset: drawerDragOffset
+            )
+          )
+          .animation(drawerAnimation, value: isShowingDrawer)
+          .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
+          .accessibilityHidden(!isDrawerBasePlaneVisible)
 
           shellContent
+            // Full-bleed elevated card so the base plane cannot peek at bottom
+            // or trailing edges when closed (post–bottom-bar safeAreaInset removal).
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .offset(x: reduceMotion ? 0 : contentOffset(openOffset: openOffset))
             .opacity(reduceMotion && isShowingDrawer ? 0 : 1)
             .animation(drawerAnimation, value: isShowingDrawer)
@@ -268,8 +289,17 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
           .accessibilityHidden(true)
       }
     }
+    // Opaque full-size card. Clip first when elevated (rounded card). When
+    // closed, paint an unclipped bottom-safe-area underlay after clip so the
+    // home-indicator band cannot expose the recessed drawer (GH-12949).
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(JovieColor.backgroundBase)
     .clipShape(shellContentClipShape(isElevated: isElevated))
+    .background {
+      if !isElevated {
+        JovieColor.backgroundBase.ignoresSafeArea(edges: .bottom)
+      }
+    }
     .overlay(alignment: .leading) {
       if isElevated {
         Rectangle()
