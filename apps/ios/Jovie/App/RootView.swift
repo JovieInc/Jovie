@@ -322,7 +322,7 @@ private struct AppContentView: View {
     // Cross-fade between top-level routes (notably splash → app) so the first
     // content paint feels intentional rather than a hard cut. Opacity-only, so
     // no layout shift and no decorative spatial motion.
-    .animation(.easeInOut(duration: 0.28), value: appState.route)
+    .animation(JovieMotion.easeOut(duration: JovieMotion.slowDuration), value: appState.route)
     .task(id: "\(appState.route)-\(appState.launchMode)") {
       guard appState.route == .ready else { return }
       await reloadAudienceHighlights(for: appState.activeUserID)

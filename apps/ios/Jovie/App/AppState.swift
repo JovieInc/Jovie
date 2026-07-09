@@ -38,6 +38,9 @@ final class AppState {
   private let repository: AppStateRepository
   private let launchDate = Date()
   private var loadingUserID: String?
+  // Matches SplashView's cinematic entrance (JovieMotion.cinematicDuration)
+  // so the primary logo reveal completes before the route crossfade starts.
+  private let minimumSplashDuration = JovieMotion.cinematicDuration
 
   init(
     configuration: AppConfiguration,
@@ -53,7 +56,7 @@ final class AppState {
 
   func completeLaunch() async {
     let elapsed = Date().timeIntervalSince(launchDate)
-    let delay = max(0, 0.35 - elapsed)
+    let delay = max(0, minimumSplashDuration - elapsed)
     if delay > 0 {
       try? await Task.sleep(for: .seconds(delay))
     }
