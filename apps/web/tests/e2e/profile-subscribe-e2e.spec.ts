@@ -181,16 +181,19 @@ async function completeNameStep(page: Page, name: string) {
   await continueButton.click();
 }
 
-async function pickBirthdayOption(
-  page: Page,
-  flow: Locator,
-  testId: string,
-  optionName: string
-) {
-  await flow.locator(`[data-testid="${testId}"]`).click();
-  await page
-    .getByRole('option', { name: optionName, exact: true })
-    .click({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+/**
+ * Fill the segmented BirthdayInput (MMDDYYYY digits). No dropdown — typing
+ * into the first month digit auto-advances through the remaining boxes.
+ */
+async function fillBirthdayDigits(flow: Locator, digits: string) {
+  const firstDigit = flow
+    .getByTestId('mobile-birthday-month')
+    .locator('input')
+    .first();
+  await firstDigit.click();
+  await firstDigit.pressSequentially(digits, {
+    delay: 20,
+  });
 }
 
 async function completeBirthdayStep(page: Page) {
@@ -202,11 +205,8 @@ async function completeBirthdayStep(page: Page) {
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  // Birthday selects are Radix Selects (portal to document.body), not native
-  // <select> elements — open each trigger, then click the option by name.
-  await pickBirthdayOption(page, flow, 'mobile-birthday-month', 'April');
-  await pickBirthdayOption(page, flow, 'mobile-birthday-day', '24');
-  await pickBirthdayOption(page, flow, 'mobile-birthday-year', '1994');
+  // Birthday uses segmented BirthdayInput (GH-13389) — type MMDDYYYY digits.
+  await fillBirthdayDigits(flow, '04241994');
   const continueButton = birthdayStep.getByRole('button', {
     name: /^continue$/i,
   });

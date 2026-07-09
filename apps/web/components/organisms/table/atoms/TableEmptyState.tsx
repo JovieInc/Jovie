@@ -1,6 +1,7 @@
 'use client';
 
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { cn } from '@/lib/utils';
 
 export interface TableEmptyStateProps {
@@ -10,7 +11,11 @@ export interface TableEmptyStateProps {
   readonly description?: string;
   /** Optional icon to display */
   readonly icon?: React.ReactNode;
-  /** Primary action button/link */
+  /**
+   * Primary action. Prefer a pre-built node for table-specific CTAs that
+   * already exist in toolbars; new call sites should pass structured
+   * `EmptyState` actions via the molecule directly when possible.
+   */
   readonly action?: React.ReactNode;
   /** Secondary action button/link */
   readonly secondaryAction?: React.ReactNode;
@@ -18,29 +23,12 @@ export interface TableEmptyStateProps {
   readonly className?: string;
   /** If provided, wraps content in <tr><td colSpan={colSpan}> */
   readonly colSpan?: number;
+  readonly testId?: string;
 }
 
 /**
- * Unified table empty state component.
- *
- * Displayed when a table has no data. Supports icon, title, description,
- * and primary/secondary action buttons.
- *
- * @example
- * // Basic usage
- * <TableEmptyState
- *   icon={<Users className="h-6 w-6" />}
- *   title="No users found"
- *   description="Try adjusting your search or filters"
- *   action={<Button>Add User</Button>}
- * />
- *
- * @example
- * // With colSpan for table row rendering
- * <TableEmptyState
- *   title="No data"
- *   colSpan={columns.length}
- * />
+ * Table-scoped empty state. Composes the canonical EmptyState molecule and
+ * optionally wraps in a table row for `<tbody>` placement.
  */
 export function TableEmptyState({
   title,
@@ -50,28 +38,27 @@ export function TableEmptyState({
   secondaryAction,
   className,
   colSpan,
+  testId,
 }: TableEmptyStateProps) {
+  const hasLegacyActions = Boolean(action || secondaryAction);
+
   const content = (
     <DrawerSurfaceCard
       variant='card'
       className={cn(
-        'flex min-h-55 flex-1 flex-col items-center justify-center gap-3 rounded-lg bg-surface-0 px-4 py-10 text-center',
+        'flex min-h-55 flex-1 flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-6 text-center',
         className
       )}
     >
-      {icon && (
-        <div className='flex h-9 w-9 items-center justify-center rounded-md bg-surface-0 text-tertiary-token'>
-          {icon}
-        </div>
-      )}
-      <div className='space-y-1.5'>
-        <p className='text-app font-caption text-secondary-token'>{title}</p>
-        {description && (
-          <p className='max-w-md text-app text-tertiary-token'>{description}</p>
-        )}
-      </div>
-      {(action || secondaryAction) && (
-        <div className='flex items-center gap-3'>
+      <EmptyState
+        icon={icon}
+        heading={title}
+        description={description}
+        testId={testId}
+        className='py-4'
+      />
+      {hasLegacyActions && (
+        <div className='flex items-center gap-3 pb-4'>
           {action}
           {secondaryAction}
         </div>

@@ -533,6 +533,13 @@
       "when": 1783456000000,
       "tag": "0073_drop_clerk_id_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1783456100000,
+      "tag": "0074_suggested_actions_signal_type",
+      "breakpoints": true
     }
   ]
 }

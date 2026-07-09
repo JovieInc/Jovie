@@ -8,6 +8,7 @@ import { ChatEmptyStateOpportunityCards } from './ChatEmptyStateOpportunityCards
 const cards: readonly OpportunityInboxCardViewModel[] = [
   {
     id: 'card-1',
+    signalType: 'other',
     typeLabel: 'Suggestion',
     createdAt: '2026-07-01T12:00:00.000Z',
     title: 'Detroit listeners up 340%',
@@ -18,6 +19,7 @@ const cards: readonly OpportunityInboxCardViewModel[] = [
   },
   {
     id: 'card-2',
+    signalType: 'other',
     typeLabel: 'Suggestion',
     createdAt: '2026-07-02T12:00:00.000Z',
     title: 'Playlist window this week',
@@ -28,6 +30,7 @@ const cards: readonly OpportunityInboxCardViewModel[] = [
   },
   {
     id: 'card-3',
+    signalType: 'other',
     typeLabel: 'Report',
     createdAt: '2026-07-03T12:00:00.000Z',
     title: 'Campaign results',
@@ -38,6 +41,7 @@ const cards: readonly OpportunityInboxCardViewModel[] = [
   },
   {
     id: 'card-4',
+    signalType: 'other',
     typeLabel: 'Suggestion',
     createdAt: '2026-07-04T12:00:00.000Z',
     title: 'Should not render',

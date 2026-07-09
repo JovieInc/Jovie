@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { EmptyState } from '@/components/organisms/EmptyState';
+import { EmptyState } from '@/components/molecules/EmptyState';
 
 vi.mock('next/link', () => {
   return {
@@ -22,11 +22,11 @@ vi.mock('next/link', () => {
   };
 });
 
-describe('EmptyState', () => {
-  it('renders heading, description, and icon', () => {
+describe('EmptyState (canonical molecule API)', () => {
+  it('renders heading, description, and greyscale icon chip', () => {
     render(
       <EmptyState
-        heading='No data yet'
+        heading='No Data Yet'
         description='Add content to see insights'
         icon={<span data-testid='test-icon'>*</span>}
       />
@@ -38,17 +38,17 @@ describe('EmptyState', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/add content/i)).toBeInTheDocument();
     expect(screen.getByTestId('test-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('test-icon').parentElement?.className).toContain(
-      'h-9'
-    );
+    const iconWrapper = screen.getByTestId('test-icon').parentElement;
+    expect(iconWrapper?.className).toContain('h-9');
+    expect(iconWrapper?.className).toContain('text-tertiary-token');
   });
 
   it('invokes primary action callback when clicked', () => {
     const handleClick = vi.fn();
     render(
       <EmptyState
-        heading='Invite your audience'
-        action={{ label: 'Share profile', onClick: handleClick }}
+        heading='Invite Your Audience'
+        action={{ label: 'Share Profile', onClick: handleClick }}
       />
     );
 
@@ -59,8 +59,8 @@ describe('EmptyState', () => {
   it('renders primary action as link when href is provided', () => {
     render(
       <EmptyState
-        heading='Upgrade your plan'
-        action={{ label: 'View pricing', href: '/pricing' }}
+        heading='Upgrade Your Plan'
+        action={{ label: 'View Pricing', href: '/pricing' }}
       />
     );
 
@@ -68,12 +68,31 @@ describe('EmptyState', () => {
     expect(link).toHaveAttribute('href', '/pricing');
   });
 
-  it('supports secondary actions as link or button', () => {
+  it('supports disabled primary action', () => {
+    const handleClick = vi.fn();
+    render(
+      <EmptyState
+        heading='No Insights Yet'
+        action={{
+          label: 'Generating...',
+          onClick: handleClick,
+          disabled: true,
+        }}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: /generating/i });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(handleClick).not.toHaveBeenCalled();
+  });
+
+  it('renders secondary action as a text link (button or href)', () => {
     const handleSecondary = vi.fn();
     render(
       <EmptyState
-        heading='Need permissions'
-        secondaryAction={{ label: 'Request access', onClick: handleSecondary }}
+        heading='Need Permissions'
+        secondaryAction={{ label: 'Request Access', onClick: handleSecondary }}
       />
     );
 
@@ -82,8 +101,8 @@ describe('EmptyState', () => {
 
     render(
       <EmptyState
-        heading='Learn more'
-        secondaryAction={{ label: 'Open docs', href: 'https://docs.jov.ie' }}
+        heading='Learn More'
+        secondaryAction={{ label: 'Open Docs', href: 'https://docs.jov.ie' }}
       />
     );
 
@@ -93,16 +112,45 @@ describe('EmptyState', () => {
     );
   });
 
-  it('applies variant styles', () => {
+  it('keeps error variant greyscale-first (semantic icon only)', () => {
     render(
       <EmptyState
-        heading='Access denied'
+        heading='Access Denied'
         variant='error'
         description='You do not have access'
+        icon={<span data-testid='error-icon'>*</span>}
       />
     );
 
     const heading = screen.getByRole('heading', { name: /access denied/i });
-    expect(heading.className).toContain('text-rose');
+    expect(heading.className).toContain('text-secondary-token');
+    expect(screen.getByTestId('error-icon').parentElement?.className).toContain(
+      'text-error'
+    );
+  });
+
+  it('exposes a stable props surface for consumers', () => {
+    const props = {
+      icon: <span />,
+      heading: 'Stable API',
+      description: 'One sentence.',
+      action: { label: 'Primary', onClick: () => undefined },
+      secondaryAction: { label: 'Secondary', href: '/x' },
+      variant: 'default' as const,
+      size: 'sm' as const,
+      className: 'custom',
+      testId: 'empty-contract',
+    };
+
+    render(<EmptyState {...props} />);
+    expect(screen.getByTestId('empty-contract')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Stable API' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Primary' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Secondary' })).toHaveAttribute(
+      'href',
+      '/x'
+    );
   });
 });

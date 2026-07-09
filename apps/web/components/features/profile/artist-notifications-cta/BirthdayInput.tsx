@@ -18,7 +18,12 @@ interface BirthdayInputProps {
   readonly error?: boolean;
 }
 
-const GROUP_LABELS = ['Month', 'Day', 'Year'];
+const GROUP_LABELS = ['Month', 'Day', 'Year'] as const;
+const GROUP_TEST_IDS = [
+  'mobile-birthday-month',
+  'mobile-birthday-day',
+  'mobile-birthday-year',
+] as const;
 
 export function BirthdayInput({
   value: controlledValue,
@@ -78,12 +83,16 @@ export function BirthdayInput({
     <div className='relative' ref={containerRef}>
       <fieldset
         className='flex items-center justify-center gap-1 border-0 p-0 m-0'
-        aria-label='Birthday month, day, and year'
+        aria-label='Birthday Month, Day, And Year'
         onPaste={handlePaste}
       >
         <legend className='sr-only'>Birthday (MM/DD/YYYY)</legend>
         {groups.map((group, gIdx) => (
-          <div key={group.label} className='flex items-center gap-1'>
+          <div
+            key={group.label}
+            className='flex items-center gap-1'
+            data-testid={GROUP_TEST_IDS[group.groupIdx]}
+          >
             {gIdx > 0 && (
               <span
                 className='px-0.5 text-mid text-secondary-token/40 select-none'

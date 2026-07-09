@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Switch,
-} from '@jovie/ui';
+import { Switch } from '@jovie/ui';
 import {
   CalendarDays,
   Check,
@@ -20,13 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import {
-  type CSSProperties,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import {
@@ -36,6 +23,7 @@ import {
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
+import { BirthdayInput } from './BirthdayInput';
 
 export type ProfileMobileNotificationsFlowStep =
   | 'email'
@@ -106,23 +94,6 @@ const FLOW_TRANSITION = {
 const CAPTURE_CONSENT_COPY =
   'By submitting, you agree to receive updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.';
 
-const MONTH_OPTIONS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const;
-
-const CURRENT_YEAR = new Date().getFullYear();
-
 const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
   {
@@ -145,22 +116,6 @@ const PREFERENCE_META: Record<
 };
 
 const JOVIE_ALERT_KEYS = ['newMusic', 'tourDates', 'merch'] as const;
-
-function extractBirthdayParts(value: string) {
-  return {
-    month: value.slice(0, 2),
-    day: value.slice(2, 4),
-    year: value.slice(4, 8),
-  };
-}
-
-function combineBirthdayParts(params: {
-  month: string;
-  day: string;
-  year: string;
-}) {
-  return `${params.month}${params.day}${params.year}`.slice(0, 8);
-}
 
 function formatCountdown(endTime: number) {
   const remainingMs = endTime - Date.now();
@@ -402,122 +357,6 @@ function InlineCaptureField({
           <Send className='size-4' />
         </button>
       </div>
-    </div>
-  );
-}
-
-const BIRTHDAY_SELECT_TRIGGER_CLASSNAME =
-  'h-12 touch-manipulation rounded-3xl border-white/10 bg-white/[0.03] px-3 text-base font-medium tracking-[-0.005em] text-white hover:border-white/18 focus-visible:border-white/18 focus-visible:ring-0 data-[placeholder]:text-white/42';
-
-/**
- * The flow overlay renders at PROFILE_Z.FULLSCREEN_FLOW (z-[140]); the Radix
- * Select content portals to document.body at z-50 by default, so it must be
- * raised above the takeover to stay visible.
- */
-const BIRTHDAY_SELECT_CONTENT_CLASSNAME = 'z-[150]';
-
-function BirthdayPartSelect({
-  label,
-  value,
-  options,
-  onValueChange,
-  testId,
-}: Readonly<{
-  label: string;
-  value: string;
-  options: readonly { readonly value: string; readonly label: string }[];
-  onValueChange: (value: string) => void;
-  testId: string;
-}>) {
-  return (
-    <div className='space-y-2'>
-      <span className='block text-app font-medium tracking-[-0.01em] text-white/42'>
-        {label}
-      </span>
-      <Select value={value || undefined} onValueChange={onValueChange}>
-        <SelectTrigger
-          data-testid={testId}
-          aria-label={label}
-          className={BIRTHDAY_SELECT_TRIGGER_CLASSNAME}
-        >
-          <SelectValue placeholder={label} />
-        </SelectTrigger>
-        <SelectContent className={BIRTHDAY_SELECT_CONTENT_CLASSNAME}>
-          {options.map(option => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-const BIRTHDAY_MONTH_SELECT_OPTIONS = MONTH_OPTIONS.map((month, index) => ({
-  value: String(index + 1).padStart(2, '0'),
-  label: month,
-}));
-
-const BIRTHDAY_DAY_SELECT_OPTIONS = Array.from(
-  { length: 31 },
-  (_, index) => index + 1
-).map(day => ({
-  value: String(day).padStart(2, '0'),
-  label: String(day),
-}));
-
-function BirthdaySelectors({
-  value,
-  onChange,
-}: Readonly<{
-  value: string;
-  onChange: (value: string) => void;
-}>) {
-  const parts = extractBirthdayParts(value);
-  const yearOptions = useMemo(
-    () =>
-      Array.from({ length: 100 }, (_, index) => {
-        const year = String(CURRENT_YEAR - index);
-        return { value: year, label: year };
-      }),
-    []
-  );
-
-  const updatePart = (key: 'month' | 'day' | 'year', nextValue: string) => {
-    const nextParts = { ...parts, [key]: nextValue };
-    onChange(
-      combineBirthdayParts({
-        month: nextParts.month,
-        day: nextParts.day,
-        year: nextParts.year,
-      })
-    );
-  };
-
-  return (
-    <div className='grid grid-cols-3 gap-3'>
-      <BirthdayPartSelect
-        label='Month'
-        value={parts.month}
-        options={BIRTHDAY_MONTH_SELECT_OPTIONS}
-        onValueChange={next => updatePart('month', next)}
-        testId='mobile-birthday-month'
-      />
-      <BirthdayPartSelect
-        label='Day'
-        value={parts.day}
-        options={BIRTHDAY_DAY_SELECT_OPTIONS}
-        onValueChange={next => updatePart('day', next)}
-        testId='mobile-birthday-day'
-      />
-      <BirthdayPartSelect
-        label='Year'
-        value={parts.year}
-        options={yearOptions}
-        onValueChange={next => updatePart('year', next)}
-        testId='mobile-birthday-year'
-      />
     </div>
   );
 }
@@ -852,9 +691,18 @@ export function ProfileMobileNotificationsFlow({
             </div>
           }
         >
-          <BirthdaySelectors
+          {/*
+            Segmented BirthdayInput (not native/Radix selects): avoids OS listbox
+            overflow on desktop and reuses the existing on-system MM/DD/YYYY primitive
+            (GH-13389). Testids live on each digit group for keyboard + e2e parity.
+          */}
+          <BirthdayInput
             value={birthdayInput}
             onChange={onBirthdayChange}
+            onSubmit={() => onBirthdaySubmit()}
+            disabled={isBirthdaySaving}
+            error={birthdayHintShown}
+            autoFocus
           />
         </ScreenShell>
       );

@@ -1,3 +1,5 @@
+import type { OpportunitySignalType } from './opportunity-inbox-signal-type';
+
 export type OpportunityInboxCardStatus = 'pending';
 
 export type OpportunityInboxCardCategory =
@@ -32,6 +34,7 @@ export interface OpportunityInboxReportData {
 
 export interface OpportunityInboxCardViewModel {
   readonly id: string;
+  readonly signalType: OpportunitySignalType;
   readonly typeLabel: string;
   readonly createdAt: string;
   readonly title: string;

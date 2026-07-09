@@ -8,7 +8,7 @@ import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { EmptyState } from '@/components/organisms/EmptyState';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   AudienceMobileCard,

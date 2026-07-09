@@ -331,16 +331,24 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(await screen.findByTestId('mobile-name-input')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
-    // Regression #13391: birthday inputs are themed Radix Select triggers, not
-    // native <select> elements that pop an unstyled OS listbox.
+    // Regression GH-13389 / #13391: birthday uses segmented BirthdayInput
+    // digit groups (not native <select> or portaled listboxes that escape the
+    // dark card on desktop). Groups keep mobile-birthday-* testids.
     for (const testId of [
       'mobile-birthday-month',
       'mobile-birthday-day',
       'mobile-birthday-year',
     ]) {
-      const trigger = await screen.findByTestId(testId);
-      expect(trigger.tagName).toBe('BUTTON');
+      const group = await screen.findByTestId(testId);
+      expect(group.querySelectorAll('input[inputmode="numeric"]').length).toBe(
+        testId === 'mobile-birthday-year' ? 4 : 2
+      );
+      expect(group.querySelector('select')).toBeNull();
     }
+
+    expect(
+      screen.getByRole('group', { name: /birthday/i })
+    ).toBeInTheDocument();
   });
 
   it('renders nothing while notification hydration is checking', async () => {

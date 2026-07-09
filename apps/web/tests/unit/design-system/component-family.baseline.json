@@ -2,8 +2,8 @@
   "counts": {
     "button": 41,
     "palette": 4,
-    "emptyState": 14,
+    "emptyState": 9,
     "shell": 21
   },
-  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 12→13 on 2026-06-28 (JOV-3386): OpportunityInboxEmptyState is a domain-specific inbox empty surface, not a duplicate of the generic EmptyState family. emptyState 13→14 on 2026-07-04 (#12883/#12638): canonical EmptyState was promoted from organisms to molecules with a deprecated organism shim, preserving imports during the migration."
+  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule."
 }

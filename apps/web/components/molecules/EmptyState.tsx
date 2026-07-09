@@ -5,6 +5,21 @@ import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
 
+/**
+ * Canonical empty-state primitive (GH-12638).
+ *
+ * Contract:
+ * - Lucide (or any) greyscale icon in a quiet surface chip
+ * - Title Case heading
+ * - One supporting sentence
+ * - One primary CTA (button or link) — required for product empty states
+ * - Optional secondary text link (not a second filled button)
+ *
+ * Prefer this over bespoke *EmptyState components. Domain-specific multi-step
+ * flows (Bandsintown connect, multi-card inbox starters) may still own their
+ * own surface, but simple hierarchy empty states must compose this primitive.
+ */
+
 type EmptyStateVariant = 'default' | 'search' | 'error' | 'permission';
 
 type PrimaryAction =
@@ -13,6 +28,7 @@ type PrimaryAction =
       onClick: () => void;
       variant?: ButtonProps['variant'];
       ariaLabel?: string;
+      disabled?: boolean;
       /** Keyboard shortcut to display (e.g., "N then I" or "Ctrl+N") */
       shortcut?: string;
     }
@@ -24,6 +40,7 @@ type PrimaryAction =
       variant?: ButtonProps['variant'];
       ariaLabel?: string;
       prefetch?: boolean;
+      disabled?: boolean;
       /** Keyboard shortcut to display (e.g., "N then I" or "Ctrl+N") */
       shortcut?: string;
     };
@@ -70,19 +87,19 @@ const variantStyles: Record<
     descriptionClassName: 'text-secondary-token',
   },
   search: {
-    iconWrapper: 'text-sky-600 dark:text-sky-300',
-    heading: 'text-sky-800 dark:text-sky-200',
-    descriptionClassName: 'text-sky-700/70 dark:text-sky-300/70',
+    iconWrapper: 'text-tertiary-token',
+    heading: 'text-secondary-token',
+    descriptionClassName: 'text-secondary-token',
   },
   error: {
-    iconWrapper: 'text-rose-600 dark:text-rose-300',
-    heading: 'text-rose-700 dark:text-rose-200',
-    descriptionClassName: 'text-rose-600/70 dark:text-rose-300/70',
+    iconWrapper: 'text-error',
+    heading: 'text-secondary-token',
+    descriptionClassName: 'text-secondary-token',
   },
   permission: {
-    iconWrapper: 'text-amber-600 dark:text-amber-300',
-    heading: 'text-amber-800 dark:text-amber-200',
-    descriptionClassName: 'text-amber-700/70 dark:text-amber-300/70',
+    iconWrapper: 'text-tertiary-token',
+    heading: 'text-secondary-token',
+    descriptionClassName: 'text-secondary-token',
   },
 };
 
@@ -136,6 +153,19 @@ export function EmptyState({
     );
 
     if ('href' in action) {
+      if (action.disabled) {
+        return (
+          <Button
+            variant={action.variant ?? 'primary'}
+            size={buttonSize}
+            disabled
+            aria-label={action.ariaLabel ?? action.label}
+          >
+            {buttonContent}
+          </Button>
+        );
+      }
+
       return (
         <Button asChild variant={action.variant ?? 'primary'} size={buttonSize}>
           <Link
@@ -156,6 +186,7 @@ export function EmptyState({
         variant={action.variant ?? 'primary'}
         size={buttonSize}
         onClick={action.onClick}
+        disabled={action.disabled}
         aria-label={action.ariaLabel ?? action.label}
       >
         {buttonContent}
@@ -166,9 +197,10 @@ export function EmptyState({
   const renderSecondaryAction = (): React.ReactNode => {
     if (!secondaryAction) return null;
 
+    // Secondary is always a quiet text link (not a second filled button).
     if ('href' in secondaryAction) {
       return (
-        <Button asChild variant='outline' size={buttonSize}>
+        <Button asChild variant='link' size={buttonSize}>
           <Link
             href={secondaryAction.href}
             prefetch={secondaryAction.prefetch ?? false}
@@ -184,7 +216,7 @@ export function EmptyState({
 
     return (
       <Button
-        variant='outline'
+        variant='link'
         size={buttonSize}
         onClick={secondaryAction.onClick}
         aria-label={secondaryAction.ariaLabel ?? secondaryAction.label}
@@ -236,7 +268,7 @@ export function EmptyState({
       )}
 
       {(action || secondaryAction) && (
-        <div className='flex items-center gap-3'>
+        <div className='flex flex-col items-center gap-2 sm:flex-row sm:gap-3'>
           {renderPrimaryAction()}
           {renderSecondaryAction()}
         </div>

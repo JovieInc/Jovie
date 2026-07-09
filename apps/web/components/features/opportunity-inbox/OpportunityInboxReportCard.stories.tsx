@@ -16,6 +16,7 @@ export const PositiveLift: Story = {
   args: {
     card: {
       id: 'story-report-1',
+      signalType: 'other',
       typeLabel: 'Report',
       createdAt: '2026-07-04T10:00:00.000Z',
       title: 'Thumbnail experiment finished',
@@ -53,6 +54,7 @@ export const NegativeResult: Story = {
     ...PositiveLift.args,
     card: {
       id: 'story-report-2',
+      signalType: 'other',
       typeLabel: 'Report',
       createdAt: '2026-07-03T10:00:00.000Z',
       title: 'Smart link CTA experiment finished',

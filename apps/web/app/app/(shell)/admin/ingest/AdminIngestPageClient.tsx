@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { EmptyState } from '@/components/organisms/EmptyState';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { BatchIngestForm } from '@/features/admin/BatchIngestForm';
 import type { IngestHistoryRow } from '@/features/admin/ingest-history.types';

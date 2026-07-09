@@ -7,6 +7,7 @@ import { ChatPinnedOpportunityHeader } from './ChatPinnedOpportunityHeader';
 
 const card: OpportunityInboxCardViewModel = {
   id: 'pin-1',
+  signalType: 'other',
   typeLabel: 'Suggestion',
   createdAt: '2026-07-01T12:00:00.000Z',
   title: 'Detroit listeners up 340%',
