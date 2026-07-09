@@ -1094,6 +1094,8 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
+      # Cap concurrent widths so 3 PRs don't open 9 overflow runners at once.
+      max-parallel: 1
       matrix:
         width: [320, 390, 430]
     steps:
@@ -1279,6 +1281,8 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # Serial shards: Lighthouse is CPU-heavy; 2 concurrent shards × N PRs saturates hosts.
+      max-parallel: 1
       matrix:
         shard: [0, 1]
     steps:
@@ -2478,6 +2482,8 @@ jobs:
     timeout-minutes: 40
     strategy:
       fail-fast: false
+      # Cap shard concurrency so multi-PR bursts don't open 5×N runners at once.
+      max-parallel: 3
       matrix:
         shard: ['1/5', '2/5', '3/5', '4/5', '5/5']
     outputs:
@@ -3325,6 +3331,8 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: true
+      # Cap E2E shard concurrency (preview env + Playwright is heavy).
+      max-parallel: 2
       matrix:
         shard: [1, 2, 3, 4]
     steps:
