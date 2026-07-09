@@ -107,7 +107,7 @@ export function MarketingRenderSurface({
     case 'profile':
       return (
         <RenderShell emphasize>
-          <div className='w-full max-w-[24rem]'>
+          <div className='w-full max-w-96'>
             <ShowcaseCrop stateId='streams-latest' hideChrome={hideChrome} />
           </div>
         </RenderShell>
@@ -115,7 +115,7 @@ export function MarketingRenderSurface({
     case 'notification':
       return (
         <RenderShell emphasize>
-          <div className='w-full max-w-[22rem]'>
+          <div className='w-full max-w-88'>
             <HomeNotificationCard />
           </div>
         </RenderShell>
@@ -123,7 +123,7 @@ export function MarketingRenderSurface({
     case 'tips':
       return (
         <RenderShell>
-          <div className='w-full max-w-[24rem]'>
+          <div className='w-full max-w-96'>
             <HomeProfileShowcase
               stateId='tips-apple-pay'
               presentation='drawer-crop'
@@ -139,7 +139,7 @@ export function MarketingRenderSurface({
     case 'countdown':
       return (
         <RenderShell>
-          <div className='grid w-full max-w-[24rem] gap-3'>
+          <div className='grid w-full max-w-96 gap-3'>
             <ShowcaseCrop stateId='streams-presave' hideChrome={hideChrome} />
             <ShowcaseCrop stateId='streams-latest' hideChrome={hideChrome} />
           </div>
@@ -148,7 +148,7 @@ export function MarketingRenderSurface({
     case 'fans':
       return (
         <RenderShell>
-          <div className='w-full max-w-[24rem] rounded-[1.25rem] bg-white/[0.03] p-3'>
+          <div className='w-full max-w-96 rounded-[1.25rem] bg-white/[0.03] p-3'>
             <HomeRelationshipPanel />
           </div>
         </RenderShell>
@@ -156,7 +156,7 @@ export function MarketingRenderSurface({
     case 'tour':
       return (
         <RenderShell>
-          <div className='w-full max-w-[24rem]'>
+          <div className='w-full max-w-96'>
             <ShowcaseCrop stateId='tour' hideChrome={hideChrome} />
           </div>
         </RenderShell>

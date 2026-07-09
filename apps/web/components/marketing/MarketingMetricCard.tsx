@@ -26,10 +26,7 @@ export function MarketingMetricCard({
   return (
     <div
       data-testid={testId}
-      className={cn(
-        'homepage-surface-card rounded-[1rem] px-4 py-3.5',
-        className
-      )}
+      className={cn('homepage-surface-card rounded-xl px-4 py-3.5', className)}
     >
       <div className='flex items-center gap-2 text-xs font-medium text-secondary-token'>
         {icon}

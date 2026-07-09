@@ -22,7 +22,7 @@ export function DashboardMockup({
 
   return (
     <div
-      className='relative overflow-hidden rounded-[0.95rem] md:rounded-[1rem]'
+      className='relative overflow-hidden rounded-[0.95rem] md:rounded-xl'
       style={{
         border: '1px solid var(--linear-border-subtle)',
         backgroundColor: 'var(--linear-bg-surface-0)',

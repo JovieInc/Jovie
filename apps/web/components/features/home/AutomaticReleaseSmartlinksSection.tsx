@@ -100,7 +100,7 @@ export function AutomaticReleaseSmartlinksSection() {
                     <div className='w-3 h-3 rounded-full bg-(--color-accent-orange) border border-black/10' />
                     <div className='w-3 h-3 rounded-full bg-(--color-accent-green) border border-black/10' />
                   </div>
-                  <div className='flex-1 text-center text-[var(--linear-caption-size)] text-tertiary-token'>
+                  <div className='flex-1 text-center text-(--linear-caption-size) text-tertiary-token'>
                     Jovie Dashboard
                   </div>
                   <div className='w-13' />
@@ -179,7 +179,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
                   {/* Release info */}
                   <div className='mt-4 w-full text-center'>
-                    <h3 className='text-lg font-[var(--linear-font-weight-semibold)] leading-snug tracking-tight'>
+                    <h3 className='text-lg font-(--linear-font-weight-semibold) leading-snug tracking-tight'>
                       The Deep End
                     </h3>
                     <p className='mt-1 text-sm text-secondary-token'>
@@ -213,7 +213,7 @@ export function AutomaticReleaseSmartlinksSection() {
                   <div className='mt-3 pt-3 text-center'>
                     <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-secondary-token'>
                       <span>Powered by</span>
-                      <span className='font-[var(--linear-font-weight-semibold)]'>
+                      <span className='font-(--linear-font-weight-semibold)'>
                         Jovie
                       </span>
                     </span>

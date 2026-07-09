@@ -30,6 +30,7 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-primary-token'
           >
+            {/* ui-casing-allow: marketing sentence-style headline */}
             Claim your handle.
           </h2>
 
@@ -44,7 +45,7 @@ export function FinalCTASection() {
             <ClaimHandleForm submitButtonTestId='final-cta-action' />
           </div>
 
-          <p className='mt-5 text-2xs tracking-[0.01em] text-quaternary-token'>
+          <p className='mt-5 text-2xs tracking-wide text-quaternary-token'>
             Be one of the first artists on Jovie.
           </p>
         </div>

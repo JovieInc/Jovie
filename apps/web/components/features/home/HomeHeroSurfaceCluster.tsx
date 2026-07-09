@@ -58,7 +58,7 @@ function HeroTaskPanel() {
   return (
     <div className='space-y-2'>
       <div className='flex items-center justify-between px-1'>
-        <p className='text-3xs font-medium tracking-[0.02em] text-white/42'>
+        <p className='text-3xs font-medium tracking-wider text-white/42'>
           Release Tasks
         </p>
         <span className='rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-3xs font-medium text-white/62'>
@@ -85,7 +85,7 @@ function HeroTaskPanel() {
                   icon={statusStyle.icon}
                   className={statusStyle.iconClassName}
                 />
-                <p className='text-xs font-semibold leading-5 tracking-[-0.01em] text-white dark:text-white truncate'>
+                <p className='text-xs font-semibold leading-5 tracking-tight text-white dark:text-white truncate'>
                   {task.title}
                 </p>
               </div>
@@ -153,13 +153,13 @@ export function HomeHeroSurfaceCluster() {
   return (
     <>
       {/* Mobile: profile dominant, release + tasks below */}
-      <div className='relative mx-auto w-full max-w-[34rem] lg:hidden'>
+      <div className='relative mx-auto w-full max-w-136 lg:hidden'>
         <div className='space-y-4'>
-          <div className='mx-auto max-w-[14rem]'>
+          <div className='mx-auto max-w-56'>
             <HeroProfilePanel />
           </div>
           <div className='grid grid-cols-2 gap-3'>
-            <div className='mx-auto w-full max-w-[10rem]'>
+            <div className='mx-auto w-full max-w-40'>
               <HeroSmartLinkPanel />
             </div>
             <div className='flex items-center'>
@@ -183,7 +183,7 @@ export function HomeHeroSurfaceCluster() {
         <div className='relative flex items-start justify-center gap-4 xl:gap-6'>
           {/* Left: release card, tilted + dropped */}
           <div
-            className='w-[9.5rem] shrink-0 pt-14 xl:w-[10.5rem]'
+            className='w-38 shrink-0 pt-14 xl:w-42'
             style={{
               transform: 'rotateY(6deg) rotateZ(-1deg)',
               transformStyle: 'preserve-3d',
@@ -193,13 +193,13 @@ export function HomeHeroSurfaceCluster() {
           </div>
 
           {/* Center: dominant profile phone, elevated */}
-          <div className='z-10 w-[12.5rem] shrink-0 xl:w-[14rem]'>
+          <div className='z-10 w-50 shrink-0 xl:w-56'>
             <HeroProfilePanel />
           </div>
 
           {/* Right: task panel, tilted opposite + dropped further */}
           <div
-            className='w-[11.5rem] shrink-0 pt-20 xl:w-[12.5rem]'
+            className='w-46 shrink-0 pt-20 xl:w-50'
             style={{
               transform: 'rotateY(-4deg) rotateZ(1deg)',
               transformStyle: 'preserve-3d',

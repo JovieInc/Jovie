@@ -40,7 +40,7 @@ export type ModeData = PhoneShowcaseModeData;
 export const MODES: readonly ModeData[] = PHONE_SHOWCASE_MODES;
 
 export const PHONE_TOUR_CONTAINER_CLASS =
-  'mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0';
+  'mx-auto w-full max-w-(--linear-content-max) px-5 sm:px-6 lg:px-0';
 
 export const PHONE_TOUR_SHOWCASE_SHADOW =
   'drop-shadow(0 25px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 30px rgba(94,106,210,0.15))';
@@ -66,7 +66,7 @@ export function PhoneTourMobileSection() {
 
         <div>
           <div className='mb-12 flex flex-col items-center gap-6 text-center'>
-            <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
+            <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token'>
               One profile. Every way fans support you.
             </span>
             <h2 className='marketing-h2-linear text-primary-token'>
@@ -403,10 +403,10 @@ export function PhoneShowcase({
               ref={node => {
                 tabRefs.current[i] = node;
               }}
-              className={`relative z-10 rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-colors duration-cinematic ${
+              className={`relative z-10 rounded-full px-3 py-1 text-2xs font-mono tracking-tighter transition-colors duration-cinematic ${
                 i === activeIndex
-                  ? 'text-[var(--linear-text-primary)]'
-                  : 'text-[var(--linear-text-quaternary)] hover:text-[var(--linear-text-secondary)]'
+                  ? 'text-(--linear-text-primary)'
+                  : 'text-(--linear-text-quaternary) hover:text-(--linear-text-secondary)'
               }`}
             >
               {MODE_TAB_LABELS[mode.id] ?? `/${mode.id}`}

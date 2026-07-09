@@ -14,10 +14,7 @@ export interface FigCardProps {
 export function FigCard({ title, description, icon, className }: FigCardProps) {
   return (
     <div
-      className={cn(
-        'homepage-surface-card rounded-[1rem] p-6 md:p-7',
-        className
-      )}
+      className={cn('homepage-surface-card rounded-xl p-6 md:p-7', className)}
     >
       {icon && (
         <div className='mb-5 flex h-9 w-9 items-center justify-center rounded-xl border border-subtle bg-surface-1 text-secondary-token'>

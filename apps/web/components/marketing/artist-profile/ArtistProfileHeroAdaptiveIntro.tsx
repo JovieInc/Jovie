@@ -32,7 +32,7 @@ export function ArtistProfileHeroAdaptiveIntro({
       >
         <MarketingContainer
           width='page'
-          className='relative !max-w-[var(--linear-content-max)] !px-5 sm:!px-6 lg:!px-0'
+          className='relative !max-w-(--linear-content-max) !px-5 sm:!px-6 lg:!px-0'
         >
           <div className='artist-profile-intro-stage'>
             <div className='artist-profile-intro-rail'>

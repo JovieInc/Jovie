@@ -11,7 +11,7 @@ export function ArtistProfileModesShowcase() {
 
   return (
     <div className='grid gap-6 lg:grid-cols-[10rem_15.5rem] lg:justify-end lg:gap-8 lg:items-center'>
-      <div className='order-2 lg:order-1 lg:w-[10rem]'>
+      <div className='order-2 lg:order-1 lg:w-40'>
         <div className='flex flex-wrap gap-2 lg:flex-col lg:items-start'>
           {PHONE_SHOWCASE_MODES.map((mode, index) => {
             const isActive = index === activeIndex;
@@ -35,13 +35,13 @@ export function ArtistProfileModesShowcase() {
           })}
         </div>
 
-        <p className='mt-3 max-w-[9rem] pl-1 text-2xs leading-5 text-tertiary-token'>
+        <p className='mt-3 max-w-36 pl-1 text-2xs leading-5 text-tertiary-token'>
           {activeMode?.summary}
         </p>
       </div>
 
       <div className='order-1 flex justify-center lg:order-2 lg:justify-end'>
-        <div className='w-[13.5rem] sm:w-[14rem] lg:w-[15.5rem]'>
+        <div className='w-54 sm:w-56 lg:w-62'>
           <PhoneShowcase
             activeIndex={activeIndex}
             onIndexChange={setActiveIndex}

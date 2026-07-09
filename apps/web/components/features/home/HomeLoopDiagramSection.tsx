@@ -49,12 +49,12 @@ export function HomeLoopDiagramSection() {
     <section className='border-t border-white/[0.04] bg-black dark:bg-black px-6 py-32 sm:py-40'>
       <div className='mx-auto grid max-w-300 gap-16 lg:grid-cols-[320px_1fr] lg:items-center'>
         <div>
-          <h2 className='m-0 font-[var(--marketing-font-display)] text-[clamp(2rem,4.5vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-primary-token'>
+          <h2 className='m-0 font-(--marketing-font-display) text-[clamp(2rem,4.5vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-primary-token'>
             Stop Letting
             <br />
             Momentum Decay.
           </h2>
-          <p className='mt-5 mb-7 max-w-[32ch] font-[var(--marketing-font-body)] text-base leading-[1.5] text-tertiary-token'>
+          <p className='mt-5 mb-7 max-w-[32ch] font-(--marketing-font-body) text-base leading-[1.5] text-tertiary-token'>
             Jovie shortens the time between fan signal and next action.
           </p>
         </div>
@@ -62,7 +62,7 @@ export function HomeLoopDiagramSection() {
         <div className='grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]'>
           {/* Flatline card */}
           <article className='min-h-90 rounded-xl border border-white/[0.06] bg-(--color-bg-surface-0) p-5'>
-            <div className='font-[var(--marketing-font-body)] text-3xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+            <div className='font-(--marketing-font-body) text-3xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
               Flatline marketing
             </div>
             <svg
@@ -93,7 +93,7 @@ export function HomeLoopDiagramSection() {
               {FLATLINE_ITEMS.map(item => (
                 <li
                   key={item}
-                  className='flex items-center gap-2 py-1 font-[var(--marketing-font-body)] text-xs text-tertiary-token'
+                  className='flex items-center gap-2 py-1 font-(--marketing-font-body) text-xs text-tertiary-token'
                 >
                   <span
                     aria-hidden='true'
@@ -108,7 +108,7 @@ export function HomeLoopDiagramSection() {
           {/* vs */}
           <div
             aria-hidden='true'
-            className='mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/10 font-[var(--marketing-font-display)] text-sm font-bold text-tertiary-token'
+            className='mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/10 font-(--marketing-font-display) text-sm font-bold text-tertiary-token'
           >
             vs
           </div>
@@ -116,7 +116,7 @@ export function HomeLoopDiagramSection() {
           {/* Loop card */}
           <article className='min-h-90 rounded-xl border border-white/[0.06] bg-(--color-bg-surface-0) p-5'>
             <div
-              className='font-[var(--marketing-font-body)] text-3xs font-semibold uppercase tracking-[0.12em]'
+              className='font-(--marketing-font-body) text-3xs font-semibold uppercase tracking-[0.12em]'
               style={{ color: ACCENT }}
             >
               The Jovie Loop
@@ -185,7 +185,7 @@ export function HomeLoopDiagramSection() {
               {LOOP_ITEMS.map(item => (
                 <li
                   key={item}
-                  className='flex items-center gap-2 py-1 font-[var(--marketing-font-body)] text-xs text-tertiary-token'
+                  className='flex items-center gap-2 py-1 font-(--marketing-font-body) text-xs text-tertiary-token'
                 >
                   <span
                     aria-hidden='true'

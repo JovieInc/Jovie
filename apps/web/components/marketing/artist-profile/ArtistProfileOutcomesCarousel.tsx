@@ -74,7 +74,7 @@ export function ArtistProfileOutcomesCarousel({
       width='page'
     >
       <div>
-        <div className='mx-auto max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
+        <div className='mx-auto max-w-(--linear-content-max) px-5 sm:px-6 lg:px-0'>
           <ArtistProfileSectionHeader
             align='left'
             headline={outcomes.headline}
@@ -397,7 +397,7 @@ function ShareProof({
           {proof.title}
         </p>
 
-        <div className='mt-3.5 flex h-[9.75rem] w-[9.75rem] items-center justify-center rounded-[1rem] bg-white dark:bg-surface-1 shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'>
+        <div className='mt-3.5 flex h-39 w-39 items-center justify-center rounded-xl bg-white dark:bg-surface-1 shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'>
           <div className='grid grid-cols-7 gap-2'>
             {QR_CELLS.map(cell => (
               <span

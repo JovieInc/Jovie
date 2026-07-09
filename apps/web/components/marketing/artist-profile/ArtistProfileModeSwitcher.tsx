@@ -128,11 +128,11 @@ export function ArtistProfileModeSwitcher({
   return (
     <div
       ref={rootRef}
-      className='artist-profile-mode-switcher mx-auto flex w-full max-w-[32rem] flex-col items-center text-center'
+      className='artist-profile-mode-switcher mx-auto flex w-full max-w-lg flex-col items-center text-center'
     >
       {showIntroHeading ? (
         <motion.div
-          className='artist-profile-mode-switcher-heading mx-auto max-w-[24rem]'
+          className='artist-profile-mode-switcher-heading mx-auto max-w-sm'
           initial={false}
           animate={
             introVisible

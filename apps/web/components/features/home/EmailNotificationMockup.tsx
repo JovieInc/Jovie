@@ -30,7 +30,7 @@ export function EmailNotificationMockup() {
         {/* Email body — flex-1 so it stretches */}
         <div className='flex flex-1 flex-col justify-between px-4 pb-4 pt-3'>
           <div>
-            <p className='text-xs font-semibold tracking-[-0.01em] text-white dark:text-white'>
+            <p className='text-xs font-semibold tracking-tight text-white dark:text-white'>
               New music from Tim White
             </p>
             <p className='mt-2 text-2xs leading-[1.6] text-white/45'>
@@ -41,7 +41,7 @@ export function EmailNotificationMockup() {
 
           {/* CTA button — white */}
           <div className='mt-4 text-center'>
-            <div className='inline-flex items-center rounded-full bg-white dark:bg-surface-1 px-5 py-2 text-2xs font-semibold tracking-[-0.01em] text-black dark:text-white shadow-[0_2px_8px_rgba(255,255,255,0.1)]'>
+            <div className='inline-flex items-center rounded-full bg-white dark:bg-surface-1 px-5 py-2 text-2xs font-semibold tracking-tight text-black dark:text-white shadow-[0_2px_8px_rgba(255,255,255,0.1)]'>
               Listen now
             </div>
           </div>

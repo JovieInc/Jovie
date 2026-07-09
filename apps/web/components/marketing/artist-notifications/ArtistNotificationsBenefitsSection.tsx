@@ -20,7 +20,7 @@ export function ArtistNotificationsBenefitsSection({
           align='left'
           headline={benefits.headline}
           body={benefits.body}
-          className='max-w-[42rem]'
+          className='max-w-2xl'
           headlineClassName='max-w-[11ch] text-[clamp(2.8rem,4.8vw,4.35rem)]'
           bodyClassName='max-w-[34rem]'
         />

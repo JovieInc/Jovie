@@ -54,7 +54,7 @@ export function HeroCinematic({
                     {heroPrimaryAction}
                   </div>
 
-                  <p className='mt-3.5 text-2xs tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
+                  <p className='mt-3.5 text-2xs tracking-wide text-quaternary-token md:mt-4 lg:text-left'>
                     Private launch access with your artist page and next release
                     ready to go.
                   </p>
@@ -90,7 +90,7 @@ export function HeroCinematic({
       />
       <div className='hero-glow pointer-events-none absolute inset-0 max-lg:hidden' />
 
-      <div className='relative z-10 mx-auto w-full max-w-[var(--linear-content-max)] px-5 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-10 lg:hidden'>
+      <div className='relative z-10 mx-auto w-full max-w-(--linear-content-max) px-5 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-10 lg:hidden'>
         <div className='max-w-[30rem] text-left'>
           <p className='homepage-section-eyebrow'>
             Built for independent artists
@@ -113,7 +113,7 @@ export function HeroCinematic({
             {heroPrimaryAction}
           </div>
 
-          <p className='mt-2.5 text-2xs tracking-[0.01em] text-quaternary-token sm:mt-3'>
+          <p className='mt-2.5 text-2xs tracking-wide text-quaternary-token sm:mt-3'>
             Private launch access with your artist page and next release ready
             to go.
           </p>
@@ -121,7 +121,7 @@ export function HeroCinematic({
       </div>
 
       <div className='relative z-10 max-lg:hidden min-h-0 flex-1 items-center justify-center w-full lg:flex'>
-        <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
+        <div className='mx-auto w-full max-w-(--linear-content-max) px-5 sm:px-6 lg:px-0'>
           <div className='grid grid-cols-2 items-center gap-0'>
             <div className='max-w-[31rem] text-left'>
               <p className='homepage-section-eyebrow'>
@@ -144,7 +144,7 @@ export function HeroCinematic({
                 {heroPrimaryAction}
               </div>
 
-              <p className='mt-2.5 text-2xs tracking-[0.01em] text-quaternary-token sm:mt-3'>
+              <p className='mt-2.5 text-2xs tracking-wide text-quaternary-token sm:mt-3'>
                 Private launch access with your artist page and next release
                 ready to go.
               </p>
@@ -171,7 +171,7 @@ export function HeroCinematic({
         {['/profile', '/tour', '/tip', '/listen'].map((label, i) => (
           <span
             key={label}
-            className='rounded-full px-3 py-1 text-2xs font-mono tracking-[-0.02em] transition-colors duration-slower'
+            className='rounded-full px-3 py-1 text-2xs font-mono tracking-tighter transition-colors duration-slower'
             style={{
               backgroundColor:
                 i === 0 ? 'var(--linear-bg-surface-2)' : 'transparent',

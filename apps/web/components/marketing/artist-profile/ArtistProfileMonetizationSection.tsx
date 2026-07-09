@@ -214,7 +214,7 @@ export function ArtistProfileMonetizationSection({
       width='page'
     >
       <div>
-        <div className='mx-auto max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
+        <div className='mx-auto max-w-(--linear-content-max) px-5 sm:px-6 lg:px-0'>
           <div className='max-w-[34rem]'>
             <h2 className={SHELL_H2_CLASS}>
               <span className='block'>Get paid.</span>
@@ -497,7 +497,7 @@ function ReengageVisual({
           <div
             key={output.id}
             className={cn(
-              'relative rounded-[1rem] bg-(--color-bg-input) px-3.5 py-3.5 text-white dark:text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
+              'relative rounded-xl bg-(--color-bg-input) px-3.5 py-3.5 text-white dark:text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
               getOutputTransformClass(index),
               index > 0 && 'mt-2.5'
             )}
