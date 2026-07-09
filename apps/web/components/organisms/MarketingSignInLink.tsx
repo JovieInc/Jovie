@@ -36,7 +36,7 @@ export function MarketingSignInLink({
       prefetch
       className={cn(
         'focus-ring-themed',
-        'text-[13px] text-neutral-700 hover:text-neutral-950 dark:text-white/60 dark:hover:text-white/90'
+        'text-app text-neutral-700 hover:text-neutral-950 dark:text-white/60 dark:hover:text-white/90'
       )}
     >
       Sign in

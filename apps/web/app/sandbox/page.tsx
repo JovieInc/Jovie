@@ -29,7 +29,7 @@ export default function SandboxPage() {
                 <h2 className='text-app font-semibold text-primary-token'>
                   Buttons
                 </h2>
-                <p className='text-[12px] text-secondary-token'>
+                <p className='text-xs text-secondary-token'>
                   Core actions in their default product styles.
                 </p>
               </div>
@@ -45,7 +45,7 @@ export default function SandboxPage() {
                 <h2 className='text-app font-semibold text-primary-token'>
                   Inputs
                 </h2>
-                <p className='text-[12px] text-secondary-token'>
+                <p className='text-xs text-secondary-token'>
                   Baseline form controls for product-surface checks.
                 </p>
               </div>

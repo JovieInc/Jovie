@@ -94,9 +94,9 @@ export default async function HudTvPage({
 
           <div className='space-y-4 px-5 py-5 sm:px-6'>
             <p className='text-app leading-6 text-secondary-token'>{message}</p>
-            <div className='rounded-[12px] border border-subtle bg-surface-0 px-4 py-3 text-[12px] leading-5 text-tertiary-token'>
+            <div className='rounded-[12px] border border-subtle bg-surface-0 px-4 py-3 text-xs leading-5 text-tertiary-token'>
               Tip: open{' '}
-              <span className='font-mono text-[11px] text-primary-token'>
+              <span className='font-mono text-2xs text-primary-token'>
                 /hud-tv?kiosk=YOUR_TOKEN
               </span>{' '}
               on the TV.

@@ -742,7 +742,7 @@ body {
   }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-[background-color,transform] duration-normal ease-subtle disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-full text-app font-medium transition-[background-color,transform] duration-normal ease-subtle disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
     @apply active:scale-[0.96];
   }

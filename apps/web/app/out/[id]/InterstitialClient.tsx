@@ -84,14 +84,14 @@ export function InterstitialClient({
       </noscript>
 
       <ContentSurfaceCard surface='nested' className='space-y-1.5 p-4'>
-        <p className='text-[11px] uppercase tracking-[0.14em] text-tertiary-token'>
+        <p className='text-2xs uppercase tracking-[0.14em] text-tertiary-token'>
           Destination
         </p>
         <p className='text-app font-semibold text-primary-token'>
           {titleAlias}
         </p>
         {domain === 'External Site' ? null : (
-          <p className='text-[12px] text-tertiary-token'>Domain: {domain}</p>
+          <p className='text-xs text-tertiary-token'>Domain: {domain}</p>
         )}
       </ContentSurfaceCard>
 
@@ -115,7 +115,7 @@ export function InterstitialClient({
         Continue to link
       </Button>
 
-      <p className='text-center text-[12px] text-tertiary-token'>
+      <p className='text-center text-xs text-tertiary-token'>
         By continuing, you acknowledge this link leads to external content.
       </p>
     </div>

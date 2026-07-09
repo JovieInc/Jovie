@@ -152,7 +152,7 @@ export default async function InterstitialPage({
             }
           />
 
-          <p className='text-center text-[12px] text-tertiary-token'>
+          <p className='text-center text-xs text-tertiary-token'>
             This confirmation helps protect against automated access.
           </p>
         </div>

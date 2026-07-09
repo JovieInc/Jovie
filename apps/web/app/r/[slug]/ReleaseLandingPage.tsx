@@ -249,14 +249,14 @@ function SmartLinkArtistLine({
 
   if (!hasFeatured) {
     return (
-      <p className='mt-1 text-[14px] font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+      <p className='mt-1 text-sm font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
         {primaryName}
       </p>
     );
   }
 
   return (
-    <p className='mt-1 text-[14px] font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+    <p className='mt-1 text-sm font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
       {primaryName}
       <span className='text-white/40'> feat. </span>
       {featuredArtists.map((fa, i) => (

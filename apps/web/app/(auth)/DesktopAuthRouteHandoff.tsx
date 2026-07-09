@@ -86,7 +86,7 @@ export function DesktopAuthRouteHandoff() {
         {isWaitingInBrowser ? null : (
           <button
             type='button'
-            className='mt-8 inline-flex h-11 w-full items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 text-[13px] font-medium text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
+            className='mt-8 inline-flex h-11 w-full items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 text-app font-medium text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
             disabled={openState === 'opening'}
             onClick={openAuthUrl}
           >
@@ -98,7 +98,7 @@ export function DesktopAuthRouteHandoff() {
         <p
           aria-live='polite'
           role='status'
-          className='mt-3 min-h-5 text-[12px] leading-5 text-white/56'
+          className='mt-3 min-h-5 text-xs leading-5 text-white/56'
         >
           {statusText}
         </p>

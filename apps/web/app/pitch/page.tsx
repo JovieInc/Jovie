@@ -17,7 +17,7 @@ const PDF_FILENAME = 'Jovie-Pitch-Deck.pdf';
 const CONTACT_EMAIL = 't@meetjovie.com';
 
 const CHROME_LINK_CLASS =
-  'group inline-flex items-center gap-1.5 -mx-2 -my-1 px-2 py-1 text-[11px] font-medium uppercase tracking-[0.04em] text-white/45 transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 rounded';
+  'group inline-flex items-center gap-1.5 -mx-2 -my-1 px-2 py-1 text-2xs font-medium uppercase tracking-[0.04em] text-white/45 transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 rounded';
 
 export default function PitchPage() {
   return (
@@ -73,7 +73,7 @@ export default function PitchPage() {
           />
           <p
             aria-hidden='true'
-            className='pointer-events-none absolute bottom-3 right-4 font-mono text-[10px] tracking-[0.08em] text-white/15'
+            className='pointer-events-none absolute bottom-3 right-4 font-mono text-3xs tracking-[0.08em] text-white/15'
           >
             Jovie · Seed · 2026
           </p>
@@ -84,7 +84,7 @@ export default function PitchPage() {
       <div className='flex min-h-svh w-full flex-col items-center justify-center gap-10 bg-black dark:bg-black px-6 py-16 sm:hidden'>
         <Logo variant='word' tone='white' size='sm' />
         <div className='flex flex-col items-center gap-3 text-center'>
-          <p className='font-mono text-[10px] uppercase tracking-[0.18em] text-white/35'>
+          <p className='font-mono text-3xs uppercase tracking-[0.18em] text-white/35'>
             Pitch Deck
           </p>
           <p className='max-w-[18rem] text-balance text-base leading-snug text-white/70'>

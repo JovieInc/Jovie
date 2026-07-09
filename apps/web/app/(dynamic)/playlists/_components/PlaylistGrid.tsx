@@ -22,7 +22,7 @@ export function PlaylistGrid({
   if (playlists.length === 0) {
     return (
       <div className='mt-16 text-center'>
-        <p className='text-[15px] text-white/40'>{emptyMessage}</p>
+        <p className='text-mid text-white/40'>{emptyMessage}</p>
       </div>
     );
   }
@@ -47,16 +47,14 @@ export function PlaylistGrid({
               />
             ) : (
               <div className='flex h-full items-center justify-center text-white/20'>
-                <span className='text-[13px]'>No cover</span>
+                <span className='text-app'>No cover</span>
               </div>
             )}
           </div>
-          <h2 className='mt-2 text-[13px] font-book leading-[1.3] text-white/80 group-hover:text-white'>
+          <h2 className='mt-2 text-app font-book leading-[1.3] text-white/80 group-hover:text-white'>
             {playlist.title}
           </h2>
-          <p className='text-[11px] text-white/40'>
-            {playlist.trackCount} tracks
-          </p>
+          <p className='text-2xs text-white/40'>{playlist.trackCount} tracks</p>
         </Link>
       ))}
     </div>
