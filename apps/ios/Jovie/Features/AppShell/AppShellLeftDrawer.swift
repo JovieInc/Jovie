@@ -29,10 +29,12 @@ enum AppShellDrawerThreadsFilter {
   }
 }
 
-// The drawer is always mounted as the recessed BASE plane behind the
-// elevated content card (see AppShellView.body). It never overlays, dims, or
-// offsets itself — AppShellView owns all drag/open state and moves the
-// content plane instead. This view is a pure, stateless surface switcher.
+// The drawer is mounted as the recessed BASE plane behind the elevated content
+// card (see AppShellView.body). It never overlays, dims, or offsets itself —
+// AppShellView owns all drag/open state, moves the content plane, and sets
+// base-plane opacity to 0 while fully closed (GH-12949) so translucent content
+// chrome cannot show drawer rows underneath. This view is a pure surface
+// switcher; hit-testing is gated on isPresented.
 struct AppShellLeftDrawer: View {
   let isPresented: Bool
   let profile: AppShellProfile
