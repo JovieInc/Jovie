@@ -14,9 +14,10 @@ const DESIGN_SYSTEM = join(process.cwd(), 'styles', 'design-system.css');
 
 /**
  * Public profile home hero must flex-grow on tall viewports instead of capping
- * at a fixed --cover-height band (GitHub #11083), and must never shrink below
- * the 240px composition floor (GitHub #11899 — hero has priority: crop, never
- * squash; content below the hero scrolls instead).
+ * at a fixed --cover-height band (GitHub #11083). On short viewports
+ * (height ≤820px, iPhone SE class) it must compress to ≤190px so the bento
+ * release card stays above the fold (profile-mobile-viewport-stability).
+ * Media crops via object-cover — never the old 180px squish band (#11899).
  */
 describe('ProfileCompactSurface home hero layout', () => {
   it('grows the home hero with flex-1 and a min-height floor', () => {
@@ -30,15 +31,15 @@ describe('ProfileCompactSurface home hero layout', () => {
     );
   });
 
-  it('locks short viewports to the 240px composition floor, never below', () => {
+  it('locks short viewports (≤820px tall) to a 190px hero cap for the bento fold', () => {
     const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
 
-    expect(contents).toMatch(/\[@media\(max-height:760px\)\]:flex-none/);
-    expect(contents).toMatch(/\[@media\(max-height:760px\)\]:min-h-60/);
-    expect(contents).toMatch(/\[@media\(max-height:760px\)\]:max-h-60/);
+    expect(contents).toMatch(/\[@media\(max-height:820px\)\]:flex-none/);
+    expect(contents).toMatch(/\[@media\(max-height:820px\)\]:max-h-\[190px\]/);
     // The pre-composition 180px squish band (#11899) must not come back.
     expect(contents).not.toMatch(/\[@media\(max-height:760px\)\]:h-45\b/);
     expect(contents).not.toMatch(/\[@media\(max-height:760px\)\]:max-h-45\b/);
+    expect(contents).not.toMatch(/\[@media\(max-height:820px\)\]:h-45\b/);
     expect(contents).toMatch(
       /homeContentColumnClassName\s*=\s*'min-h-0 flex-1'/
     );
@@ -47,23 +48,17 @@ describe('ProfileCompactSurface home hero layout', () => {
     );
   });
 
-  it('keeps every fixed --cover-height value at or above the 240px hero floor', () => {
+  it('sets the short-viewport --cover-height token to 190px (not the old 240px band)', () => {
     const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
 
-    // Fixed px assignments only — clamp()/calc() bands have their own floors
-    // (the calc(3.5rem…) value is the collapsed non-home mode header, where
-    // hero media is display:none, not a hero band).
-    const fixedCoverHeights = [
-      ...contents.matchAll(/--cover-height:\s*(\d+(?:\.\d+)?)px\s*;/g),
-    ].map(match => Number(match[1]));
-
-    expect(fixedCoverHeights.length).toBeGreaterThan(0);
-    for (const value of fixedCoverHeights) {
-      expect(
-        value,
-        `--cover-height: ${value}px is below the 240px composition floor (#11899)`
-      ).toBeGreaterThanOrEqual(240);
-    }
+    expect(contents).toMatch(
+      /max-height:\s*820px\)[\s\S]{0,120}--cover-height:\s*190px/
+    );
+    // Collapsed non-home mode uses calc(3.5rem…) with hero media hidden —
+    // fixed px short-viewport band is the only compact home hero assignment.
+    expect(contents).not.toMatch(
+      /max-height:\s*820px\)[\s\S]{0,120}--cover-height:\s*240px/
+    );
   });
 
   it('does not shrink the mid-height band hero via the removed 761-880 override', () => {
