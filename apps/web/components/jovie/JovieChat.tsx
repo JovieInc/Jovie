@@ -61,6 +61,7 @@ export function JovieChat({
   displayName,
   avatarUrl,
   username,
+  ambientOwnedByShell = false,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
@@ -544,7 +545,13 @@ export function JovieChat({
     <EntityResolutionProvider profileId={profileId}>
       <div
         ref={dropZoneRef}
-        className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
+        className={cn(
+          'relative flex h-full flex-col',
+          // On chat routes the shell frame paints the canvas fill + ambient
+          // wash behind a transparent header (#13386); an opaque fill here
+          // would occlude it below the header band.
+          !ambientOwnedByShell && 'bg-(--linear-app-content-surface)'
+        )}
         data-testid='chat-content'
         data-picker-open={composerPickerOpen ? 'true' : undefined}
         data-design-v1-chat-entities={
@@ -555,16 +562,20 @@ export function JovieChat({
             gradient never clips to a content-sized region (#12135 / JOV-3614).
             Pure background: pointer-events-none, painted behind the positioned
             siblings below by DOM order; top-weighted so it fades out well
-            above the opaque composer dock. No layout shift. */}
-        <div
-          aria-hidden='true'
-          data-testid='chat-ambient-gradient'
-          className='pointer-events-none absolute inset-0 h-full w-full'
-          style={{
-            background:
-              'radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--color-accent-blue) 6%, transparent), transparent 60%)',
-          }}
-        />
+            above the opaque composer dock. No layout shift.
+            On chat routes the shell frame owns this layer instead so the wash
+            is full-bleed behind the header to the top of the panel (#13386). */}
+        {ambientOwnedByShell ? null : (
+          <div
+            aria-hidden='true'
+            data-testid='chat-ambient-gradient'
+            className='pointer-events-none absolute inset-0 h-full w-full'
+            style={{
+              background:
+                'radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--color-accent-blue) 6%, transparent), transparent 60%)',
+            }}
+          />
+        )}
         {/* Registers entity providers (release, artist) for the slash menu */}
         {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
 

@@ -22,6 +22,12 @@ export interface DashboardHeaderProps {
   /** Profile button slot shown on the far right of the mobile header */
   readonly mobileProfileSlot?: ReactNode;
   readonly showDivider?: boolean;
+  /**
+   * Renders the header without its opaque surface fill so a shell-level
+   * ambient wash can bleed through (chat routes, #13386). Height, layout,
+   * and content are unchanged — only the background fill differs.
+   */
+  readonly transparent?: boolean;
   readonly className?: string;
 }
 
@@ -133,6 +139,7 @@ export function DashboardHeader({
   isSearchActive = false,
   mobileProfileSlot,
   showDivider = false,
+  transparent = false,
   className,
 }: DashboardHeaderProps) {
   const currentLabel = breadcrumbs.at(-1)?.label ?? '';
@@ -145,7 +152,11 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
-      className={cn('z-20 bg-(--linear-app-content-surface)', className)}
+      className={cn(
+        'z-20',
+        transparent ? 'bg-transparent' : 'bg-(--linear-app-content-surface)',
+        className
+      )}
     >
       <MobileHeader
         currentLabel={currentLabel}

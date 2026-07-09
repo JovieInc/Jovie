@@ -29,6 +29,12 @@ export interface AuthShellProps {
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
   readonly isLyricsRoute?: boolean;
+  /**
+   * Chat routes lift the ambient gradient to the shell frame and render the
+   * header with a transparent fill so the wash is full-bleed to the top of
+   * the content panel (#13386).
+   */
+  readonly isChatRoute?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
@@ -47,6 +53,7 @@ function AuthShellInner({
   showMobileTabs = false,
   isTableRoute = false,
   isLyricsRoute = false,
+  isChatRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state: sidebarState } = useSidebar();
@@ -109,9 +116,11 @@ function AuthShellInner({
               <MobileProfileDrawer onOpen={previewPanelState.toggle} />
             }
             showDivider={isTableRoute}
+            transparent={isChatRoute}
           />
         )
       }
+      chatAmbientGradient={isChatRoute}
       main={children}
       rightPanel={rightPanel}
       audioPlayer={audioPlayer}

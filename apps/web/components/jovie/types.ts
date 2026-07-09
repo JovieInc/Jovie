@@ -57,6 +57,14 @@ export interface JovieChatProps {
   readonly isFirstSession?: boolean;
   /** Contextual, production-backed actions surfaced in an empty thread */
   readonly actionCards?: readonly ChatActionCard[];
+  /**
+   * When the app shell owns the ambient gradient (chat routes render it at
+   * the shell frame level so it bleeds behind the header to the top of the
+   * content panel — #13386), the chat surface skips its own gradient layer
+   * and opaque fill so the shell wash shows through. Standalone mounts
+   * (profile page chat, experiments) keep the default self-owned gradient.
+   */
+  readonly ambientOwnedByShell?: boolean;
 }
 
 export interface ChatActionCard {

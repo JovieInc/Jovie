@@ -908,6 +908,7 @@ export function ChatPageClient({
             username={activeProfile.username ?? undefined}
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
             actionCards={chatActionCards}
+            ambientOwnedByShell
           />
         </ChatWorkspaceSurface>
       </ErrorBoundary>

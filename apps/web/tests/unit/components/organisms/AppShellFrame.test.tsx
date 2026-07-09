@@ -116,6 +116,49 @@ describe('AppShellFrame', () => {
     expect(screen.getByTestId('app-shell-right-rail')).toBeInTheDocument();
   });
 
+  it('renders the chat ambient gradient full-bleed behind the header on chat routes', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header data-testid='fixture-header'>Header</header>}
+        main={<div>Main Content</div>}
+        variant='shellChatV1'
+        chatAmbientGradient
+      />
+    );
+
+    const mainContent = screen.getByRole('main');
+    const gradient = screen.getByTestId('chat-ambient-gradient');
+    const header = screen.getByTestId('fixture-header');
+
+    // The gradient is a direct child of the shell content panel, spanning its
+    // full box (inset-0) — its top edge is the top of the panel, above the
+    // header band, not below it (#13386).
+    expect(gradient.parentElement).toBe(mainContent);
+    expect(gradient).toHaveClass('absolute', 'inset-0', 'pointer-events-none');
+    // Stacking guard: the wash is opaque, so it MUST paint beneath the
+    // in-flow header — that requires a negative z-index inside an isolated
+    // <main> (an absolute z-auto sibling would paint on top of static
+    // content regardless of DOM order). jsdom can't compute stacking, so pin
+    // the classes that make it correct.
+    expect(gradient).toHaveClass('-z-10');
+    expect(mainContent).toHaveClass('isolate');
+    expect(mainContent).toContainElement(header);
+    expect(gradient.style.backgroundImage).toContain('radial-gradient');
+  });
+
+  it('omits the shell-level ambient gradient on non-chat routes', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    expect(screen.queryByTestId('chat-ambient-gradient')).toBeNull();
+  });
+
   it('renders the shared audio player slot inside the shell frame', () => {
     render(
       <AppShellFrame
