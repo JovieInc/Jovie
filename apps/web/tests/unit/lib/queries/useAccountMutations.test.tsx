@@ -35,6 +35,10 @@ vi.mock('@/lib/queries/keys', () => ({
       conversation: (id: string) => ['chat', 'conversation', id] as const,
       usage: () => ['chat', 'usage'] as const,
     },
+    usage: {
+      all: ['usage'] as const,
+      summary: () => ['usage', 'summary'] as const,
+    },
     user: {
       all: ['user'] as const,
       profile: () => ['user', 'profile'] as const,

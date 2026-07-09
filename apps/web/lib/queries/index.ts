@@ -486,7 +486,6 @@ export {
 } from './useReleaseMutations';
 // Release queries and mutations
 export { useReleasesQuery } from './useReleasesQuery';
-
 export {
   type ReleaseTrack,
   useReleaseTracksQuery,
@@ -535,6 +534,12 @@ export {
 export { useTrackingMutation } from './useTrackingMutation';
 // Unified artist search query
 export { useUnifiedArtistSearchQuery } from './useUnifiedArtistSearchQuery';
+// Plan usage summary (header usage pill + limits popover)
+export {
+  type UsageSummaryData,
+  usageSummaryQueryOptions,
+  useUsageSummaryQuery,
+} from './useUsageSummaryQuery';
 // User avatar upload mutation
 export {
   type UseUserAvatarMutationOptions,
