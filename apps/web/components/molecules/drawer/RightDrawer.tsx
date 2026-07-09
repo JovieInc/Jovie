@@ -152,6 +152,7 @@ export function RightDrawer({
       aria-hidden={!isOpen}
       aria-label={ariaLabel}
       tabIndex={isOpen ? -1 : undefined}
+      inert={isOpen ? undefined : true}
       className={cn(
         'z-10 shrink-0 h-full min-h-0 flex flex-col',
         'outline-none focus:outline-none focus-visible:ring-0',
