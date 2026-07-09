@@ -66,6 +66,10 @@ struct MobileChatMerchOptionsView: View {
               accent: merchAccent(for: design.optionNumber)
             )
             .overlay {
+              // The mockup square keeps a fixed `aspectRatio(1)` footprint
+              // (see `mockupImage`) in every state, so this overlay only
+              // needs an opacity crossfade -- no size/position ever moves
+              // when "Rendering" clears.
               if !design.isReady {
                 VStack(spacing: JovieSpacing.xSmall) {
                   ProgressView().tint(JovieColor.textTertiary)
@@ -73,8 +77,10 @@ struct MobileChatMerchOptionsView: View {
                     .font(JovieFont.body(size: 11, weight: .medium))
                     .foregroundStyle(JovieColor.textTertiary)
                 }
+                .transition(.opacity)
               }
             }
+            .animation(JovieMotion.subtle, value: design.isReady)
 
             Text(design.designName)
               .font(JovieFont.body(size: 14, weight: .semibold))

@@ -5,11 +5,17 @@ struct MobileChatToolCardView: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: JovieSpacing.medium) {
+      // `.id(model.state)` forces a view-identity swap on state change so the
+      // old icon fades out and the new one fades in via `.transition`,
+      // instead of jump-cutting; the frame stays fixed at 20x20 across every
+      // state so the crossfade never shifts the card's layout.
       Image(systemName: iconName)
         .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(iconColor)
         .frame(width: 20, height: 20)
         .padding(.top, 1)
+        .id(model.state)
+        .transition(.opacity)
 
       VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
         Text(model.title)
@@ -34,6 +40,7 @@ struct MobileChatToolCardView: View {
       RoundedRectangle(cornerRadius: 16, style: .continuous)
         .stroke(JovieColor.borderDefault, lineWidth: 1)
     }
+    .animation(JovieMotion.subtle, value: model.state)
     .accessibilityElement(children: .combine)
     .accessibilityLabel(accessibilityLabel)
     .accessibilityIdentifier("mobile-chat-tool-card")
