@@ -17,6 +17,7 @@ import {
   type DefaultTemplateItem,
 } from '@/lib/release-tasks/default-template';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { computeTaskDueDate } from '@/lib/tasks/task-due-date';
 import type { TaskView } from '@/lib/tasks/types';
 import { requireProfileId } from '../requireProfileId';
 import { createTask, deleteTask, updateTask } from '../tasks/task-actions';
@@ -84,12 +85,6 @@ function mapTaskToReleaseTaskView(task: TaskView): ReleaseTaskView {
   };
 }
 
-function computeDueDate(releaseDate: Date, offsetDays: number): Date {
-  const date = new Date(releaseDate);
-  date.setDate(date.getDate() + offsetDays);
-  return date;
-}
-
 export async function instantiateReleaseTasks(releaseId: string) {
   await requireReleasePlanGenerationAccess();
   const profileId = await requireProfileId();
@@ -110,7 +105,7 @@ export async function instantiateReleaseTasks(releaseId: string) {
     return getReleaseTasks(releaseId);
   }
 
-  const [release, positionRow, counterRow] = await Promise.all([
+  const [release, positionRow] = await Promise.all([
     db
       .select({ releaseDate: discogReleases.releaseDate })
       .from(discogReleases)
@@ -124,16 +119,34 @@ export async function instantiateReleaseTasks(releaseId: string) {
         and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt))
       )
       .then(rows => rows[0]),
-    db
-      .update(creatorProfiles)
-      .set({
-        nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${DEFAULT_RELEASE_TASK_TEMPLATE.length}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profileId))
-      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber })
-      .then(rows => rows[0]),
   ]);
+
+  // Re-check immediately before allocating task numbers / inserting so a
+  // second concurrent call is less likely to double-seed the template.
+  // List-layer dedupe (dedupeReleaseTasks) is the hard guarantee for
+  // remaining races / historical duplicates (GH-12331).
+  const [freshExisting] = await db
+    .select({ taskCount: count() })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.releaseId, releaseId),
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt)
+      )
+    );
+  if (freshExisting && freshExisting.taskCount > 0) {
+    return getReleaseTasks(releaseId);
+  }
+
+  const [counterRow] = await db
+    .update(creatorProfiles)
+    .set({
+      nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${DEFAULT_RELEASE_TASK_TEMPLATE.length}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profileId))
+    .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber });
 
   const firstTaskNumber =
     (counterRow?.nextTaskNumber ?? DEFAULT_RELEASE_TASK_TEMPLATE.length + 1) -
@@ -157,10 +170,7 @@ export async function instantiateReleaseTasks(releaseId: string) {
       agentStatus: 'idle' as const,
       releaseId,
       category: item.category,
-      dueAt:
-        releaseDate === null
-          ? null
-          : computeDueDate(releaseDate, item.dueDaysOffset),
+      dueAt: computeTaskDueDate(releaseDate, item.dueDaysOffset),
       position: startPosition + index,
       sourceTemplateId: null,
       metadata: {
