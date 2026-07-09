@@ -807,7 +807,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/neon-db-artifact
           # Prefer the file written by neon-create-branch-with-retry (avoids
-          # re-interpolating DB passwords through ${{ }} expression expansion).
+          # re-interpolating DB passwords through GitHub expression expansion).
           if [ -n "${CONNECTION_FILE:-}" ] && [ -f "$CONNECTION_FILE" ]; then
             cp "$CONNECTION_FILE" /tmp/neon-db-artifact/connection.json
           elif [ -f "${RUNNER_TEMP:-/tmp}/neon-connection/connection.json" ]; then
