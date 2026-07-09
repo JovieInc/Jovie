@@ -7,7 +7,7 @@ import {
 const findDirective = (csp: string, directive: string) =>
   csp.split('; ').find(section => section.startsWith(directive));
 
-describe.skip('buildContentSecurityPolicy', () => {
+describe('buildContentSecurityPolicy', () => {
   it('includes a nonce and excludes unsafe-inline in script-src', () => {
     const nonce = 'test-nonce';
     const csp = buildContentSecurityPolicy({ nonce, isDev: false });

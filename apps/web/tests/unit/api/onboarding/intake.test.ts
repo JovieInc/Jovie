@@ -174,7 +174,7 @@ function upsertInterviewRows(rows: Array<Record<string, unknown>>) {
   return { values, onConflictDoUpdate, returning };
 }
 
-describe.skip('POST /api/onboarding/intake — email verification gate', () => {
+describe('POST /api/onboarding/intake — Better Auth email gate', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
@@ -184,16 +184,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
 
   it('returns 403 with email_unverified when user has no verified email', async () => {
     mockCurrentUser.mockResolvedValue({
-      emailAddresses: [
-        {
-          emailAddress: 'unverified@example.com',
-          verification: { status: 'unverified' },
-        },
-      ],
-      primaryEmailAddress: {
-        emailAddress: 'unverified@example.com',
-        verification: { status: 'unverified' },
-      },
+      emailAddresses: [], // BA has no unverified secondary emails
+      primaryEmailAddress: null, // BA only exposes verified primary
     });
 
     const res = await POST(makeRequest(VALID_BODY));
@@ -219,22 +211,14 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
     expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when primary email is unverified even if it is the only address', async () => {
-    // Regression test: previously, the route fell back to
-    // `primaryEmailAddress?.emailAddress` even when unverified, which
-    // allowed an attacker to add a victim's email to their Clerk account
-    // and submit intake before verifying it.
+  it('returns 403 when Better Auth session has no primary email address', async () => {
+    // BA only surfaces verified emails on the session user. Missing primary
+    // is the post-cutover equivalent of the old unverified-primary gate.
     mockCurrentUser.mockResolvedValue({
-      emailAddresses: [
-        {
-          emailAddress: 'victim@example.com',
-          verification: { status: 'unverified' },
-        },
-      ],
-      primaryEmailAddress: {
-        emailAddress: 'victim@example.com',
-        verification: { status: 'unverified' },
-      },
+      emailAddresses: [],
+      primaryEmailAddress: null,
+      fullName: null,
+      username: null,
     });
 
     const res = await POST(makeRequest(VALID_BODY));
@@ -279,12 +263,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
       new Error('[RATE_LIMITED] should not run')
     );
     mockCurrentUser.mockResolvedValue({
-      emailAddresses: [
-        {
-          emailAddress: 'dev@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'dev@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'dev@example.com' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'accepted',
@@ -304,12 +284,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
 
   it('returns 400 when payload is invalid', async () => {
     mockCurrentUser.mockResolvedValue({
-      emailAddresses: [
-        {
-          emailAddress: 'user@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'user@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'user@example.com' },
     });
 
     const res = await POST(makeRequest({ bogus: true }));
@@ -320,12 +296,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'User Person',
       username: 'userhandle',
-      emailAddresses: [
-        {
-          emailAddress: 'User@Example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'User@Example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'User@Example.com' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'waitlisted_gate_on',
@@ -369,12 +341,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
 
   it('rejects transcript entries with unknown question ids before persistence', async () => {
     mockCurrentUser.mockResolvedValue({
-      emailAddresses: [
-        {
-          emailAddress: 'user@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'user@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'user@example.com' },
     });
 
     const res = await POST(
@@ -397,12 +365,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
   it('creates the intake user without overwriting concurrent status fields', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'New User',
-      emailAddresses: [
-        {
-          emailAddress: 'new@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'new@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'new@example.com' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'accepted',
@@ -440,12 +404,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
   it('re-selects the intake user when a concurrent insert wins the conflict', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'Racing User',
-      emailAddresses: [
-        {
-          emailAddress: 'race@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'race@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'race@example.com' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'accepted',
@@ -479,12 +439,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
   it('re-selects an existing interview row when upsert returning is empty', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'Interview User',
-      emailAddresses: [
-        {
-          emailAddress: 'interview@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'interview@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'interview@example.com' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'waitlisted_capacity_full',
@@ -518,12 +474,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
     mockCurrentUser.mockResolvedValue({
       fullName: null,
       username: 'fallbackuser',
-      emailAddresses: [
-        {
-          emailAddress: 'fb@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'fb@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'fb@example.com' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'accepted',
@@ -541,12 +493,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
     mockCurrentUser.mockResolvedValue({
       fullName: '',
       username: null,
-      emailAddresses: [
-        {
-          emailAddress: 'onlylocal@domain.test',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'onlylocal@domain.test' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'onlylocal@domain.test' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'waitlisted_capacity_full',
@@ -562,12 +510,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
   it('returns 500 and captures when first interview upsert fails (before waitlist submit)', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'Err User',
-      emailAddresses: [
-        {
-          emailAddress: 'err@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'err@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'err@example.com' },
     });
     // Make insert throw for the first upsert
     const badReturning = vi
@@ -603,12 +547,8 @@ describe.skip('POST /api/onboarding/intake — email verification gate', () => {
   it('logs and still returns the accepted outcome when attaching access metadata fails', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'Accepted User',
-      emailAddresses: [
-        {
-          emailAddress: 'accepted@example.com',
-          verification: { status: 'verified' },
-        },
-      ],
+      emailAddresses: [{ id: 'e1', emailAddress: 'accepted@example.com' }],
+      primaryEmailAddress: { id: 'e1', emailAddress: 'accepted@example.com' },
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'accepted',
