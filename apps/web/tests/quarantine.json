@@ -85,8 +85,7 @@
       "fixIssueUrl": "https://linear.app/jovie/issue/JOV-782",
       "expiresAt": "2026-09-30",
       "consecutiveSuccesses": 0
-    }
-,
+    },
     {
       "id": "e2e-fan-capture-otp-timeout",
       "kind": "e2e",
@@ -95,6 +94,17 @@
       "firstSeenAt": "2026-07-05",
       "reproductionCommand": "cd apps/web && pnpm playwright test tests/e2e/profile-fan-capture-golden-path.spec.ts --project=chromium",
       "fixIssueUrl": "https://linear.app/jovie/issue/JOV-13254",
+      "expiresAt": "2026-09-30",
+      "consecutiveSuccesses": 0
+    },
+    {
+      "id": "e2e-onboarding-llm-failure",
+      "kind": "e2e",
+      "path": "apps/web/tests/e2e/start-onboarding-llm-failure.spec.ts",
+      "owner": "platform",
+      "firstSeenAt": "2026-07-08",
+      "reproductionCommand": "cd apps/web && pnpm playwright test tests/e2e/start-onboarding-llm-failure.spec.ts --project=chromium",
+      "fixIssueUrl": "https://linear.app/jovie/issue/JOV-13628",
       "expiresAt": "2026-09-30",
       "consecutiveSuccesses": 0
     }
