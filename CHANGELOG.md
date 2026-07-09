@@ -15,6 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Motion doctrine + easing gap tokens (GH-13636)**: `.claude/rules/motion.md` adapts Emil Kowalski's motion-craft rules (MIT, attribution in-file) onto System B tokens — duration table, easing decision tree, press/enter/popover/perf/a11y rules, review checklist. `design-system.css` gains `--ease-drawer` (iOS-like drawer settle curve) and `--scale-press` (0.96 canonical press feedback). Doctrine + additive tokens only; no component changes.
+
 - **Plan-locked chat tools now explain and offer an upgrade instead of erroring (GH-13304)**: Asking Jovie for album art, photo retouching, or merch on the Free plan no longer dead-ends the conversation. Jovie describes what it would create, and a single upgrade prompt appears inline — with copy sourced from the plan registry so it always names the right plan.
 
 - [internal] **AEO citation monitoring + brand integrity (GH-11037)**: Pure-function modules `lib/aeo/citation-monitor.ts` and `lib/aeo/brand-integrity.ts` implement share-of-citation measurement (tracks whether Jovie profile URLs are cited by answer engines for canonical artist queries) and same-name entity disambiguation (scores KB-anchor coverage, flags missing MusicBrainz/Wikidata/ISNI identifiers, and produces a disambiguating checklist mapping to schema.org fields). 47 unit tests. No migrations.

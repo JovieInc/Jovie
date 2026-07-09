@@ -1436,6 +1436,13 @@ html[data-profile-initial-mode]
   /* Legacy alias */
   --ease-subtle: var(--ds-motion-subtle-easing);
   --ease-cinematic: var(--ds-motion-cinematic-easing);
+  /* Drawer/sheet settle curve (iOS-like; adapted from emil-design-eng, MIT —
+     see .claude/rules/motion.md for the easing decision tree) */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Canonical press-feedback scale for pressable elements
+     (.claude/rules/ui.md + .claude/rules/motion.md — tactile, interruptible) */
+  --scale-press: 0.96;
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */
