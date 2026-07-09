@@ -10,6 +10,7 @@
  * Pure module: safe to import from both server routes and client components.
  */
 
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { PlanId } from '@/lib/entitlements/registry';
 
 // ---------------------------------------------------------------------------
@@ -69,9 +70,8 @@ export function getWeeklyUsageWindow(now = new Date()): WeeklyUsageWindow {
 
 /** Percent of a quota still remaining, clamped to 0–100. */
 export function getRemainingPercent(used: number, limit: number): number {
-  if (limit <= 0) return 0;
   const remaining = Math.max(0, limit - used);
-  return Math.round(Math.min(1, remaining / limit) * 100);
+  return computeRatePercent(remaining, limit, 0);
 }
 
 // ---------------------------------------------------------------------------

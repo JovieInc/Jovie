@@ -10,8 +10,15 @@ export type { UsageSummaryData };
 
 const fetchUsageSummary = createQueryFn<UsageSummaryData>('/api/usage/summary');
 
+/**
+ * Query options for the plan usage summary. `queryKey` is a getter so
+ * importing `@/lib/queries` does not crash tests that mock a partial
+ * `queryKeys` object without a `usage` namespace.
+ */
 export const usageSummaryQueryOptions = {
-  queryKey: queryKeys.usage.summary(),
+  get queryKey() {
+    return queryKeys.usage.summary();
+  },
   queryFn: fetchUsageSummary,
   ...FREQUENT_BACKGROUND_CACHE,
   retry: (failureCount: number, error: Error) => {
@@ -21,13 +28,14 @@ export const usageSummaryQueryOptions = {
     return failureCount < 1;
   },
   retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-} as const;
+};
 
 export function useUsageSummaryQuery(options?: { enabled?: boolean }) {
   const { enabled = true } = options ?? {};
 
   return useQuery<UsageSummaryData, Error>({
     ...usageSummaryQueryOptions,
+    queryKey: queryKeys.usage.summary(),
     enabled,
   });
 }

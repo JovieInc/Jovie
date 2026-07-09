@@ -37,6 +37,10 @@ vi.mock('@/lib/queries/keys', () => ({
       all: ['chat'],
       usage: () => ['chat', 'usage'],
     },
+    usage: {
+      all: ['usage'],
+      summary: () => ['usage', 'summary'],
+    },
     dashboard: {
       socialLinks: (id: string) => ['dashboard', 'social-links', id],
     },

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { type PlanId, resolveCanonicalPlanId } from '@/lib/entitlements/registry';
+import {
+  type PlanId,
+  resolveCanonicalPlanId,
+} from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 interface UsageAuthSuccess {
