@@ -2,7 +2,7 @@
   "_comment": "Contrast ratchet baseline — counts of hardcoded raw-color violations (JOV-11026/11038). To reduce: fix violations then run `pnpm --filter web lint:contrast-ratchet --update`. CI fails if counts exceed these baselines.",
   "bareTextBlack": 1,
   "bareBgWhite": 5,
-  "bareTextWhite": 20,
+  "bareTextWhite": 19,
   "bareBgBlack": 5,
   "arbitraryHex": 2
 }

@@ -33,6 +33,11 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
       variables: undefined,
       mutate: mutateMock,
     },
+    nextStepMutation: {
+      isPending: false,
+      variables: undefined,
+      mutate: mutateMock,
+    },
   }),
 }));
 
