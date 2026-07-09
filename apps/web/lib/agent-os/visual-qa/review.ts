@@ -89,9 +89,7 @@ function isDiffRunSummary(value: unknown): value is VisualQaDiffRunSummary {
 }
 
 function isFileMissingError(error: unknown): boolean {
-  return (
-    error instanceof Error && 'code' in error && error.code === 'ENOENT'
-  );
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
 async function readDiffRunSummary(
@@ -193,12 +191,11 @@ export async function listVisualQaReviewRuns(
     if (run) runs.push(run);
   }
 
-  return runs
-    .sort(
-      (a, b) =>
-        new Date(b.computedAt).getTime() - new Date(a.computedAt).getTime()
-    )
-    .slice(0, limit);
+  const sortedRuns = runs.toSorted(
+    (a, b) =>
+      new Date(b.computedAt).getTime() - new Date(a.computedAt).getTime()
+  );
+  return sortedRuns.slice(0, limit);
 }
 
 export async function reviewVisualQaSurface(params: {
@@ -212,20 +209,14 @@ export async function reviewVisualQaSurface(params: {
 }): Promise<VisualQaSurfaceReviewRecord> {
   const summary = await readDiffRunSummary(params.runId);
   if (!summary) {
-    throw new VisualQaReviewError(
-      'Visual QA run not found.',
-      'not_found'
-    );
+    throw new VisualQaReviewError('Visual QA run not found.', 'not_found');
   }
 
-  const surface = summary.surfaces.find(
+  const surfaceExists = summary.surfaces.some(
     candidate => candidate.surfaceId === params.surfaceId
   );
-  if (!surface) {
-    throw new VisualQaReviewError(
-      'Visual QA surface not found.',
-      'not_found'
-    );
+  if (!surfaceExists) {
+    throw new VisualQaReviewError('Visual QA surface not found.', 'not_found');
   }
 
   const reviewFile = await readVisualQaRunReview(params.runId);
@@ -242,7 +233,8 @@ export async function reviewVisualQaSurface(params: {
     reviewer: params.reviewer,
     reviewedAt: new Date().toISOString(),
     notes: params.notes?.trim() ? params.notes.trim() : null,
-    followUpAction: params.decision === 'rejected' ? params.followUpAction : null,
+    followUpAction:
+      params.decision === 'rejected' ? params.followUpAction : null,
     dispatchId: params.dispatchId,
   };
 
@@ -300,7 +292,10 @@ export function applyVisualQaReviewToAgentRunArtifact(
   reviewFile: VisualQaRunReviewFile
 ): AgentRunArtifact {
   const visualQaDiff = artifact.metadata?.visualQaDiff as
-    | { runId?: unknown; surfaces?: readonly { surfaceId?: unknown; status?: unknown }[] }
+    | {
+        runId?: unknown;
+        surfaces?: readonly { surfaceId?: unknown; status?: unknown }[];
+      }
     | undefined;
 
   if (!visualQaDiff || visualQaDiff.runId !== reviewFile.runId) {
@@ -321,10 +316,13 @@ export function applyVisualQaReviewToAgentRunArtifact(
     driftedSurfaceIds.length > 0 &&
     decisions.length === driftedSurfaceIds.length;
   const anyRejected = decisions.some(record => record.decision === 'rejected');
-  const latestReviewedAt = decisions
-    .map(record => record.reviewedAt)
-    .sort()
-    .at(-1);
+  const latestReviewedAt = decisions.reduce<string | undefined>(
+    (latest, record) =>
+      latest === undefined || record.reviewedAt > latest
+        ? record.reviewedAt
+        : latest,
+    undefined
+  );
 
   const shouldResolveHumanGate = allReviewed && artifact.humanGate.required;
 
