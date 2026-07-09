@@ -873,7 +873,7 @@ export const DashboardAudienceTableUnified = memo(
               <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
               <div className='flex-1 min-h-0 flex flex-col'>
-                <div className='shrink-0 border-b border-subtle px-4 py-3'>
+                <div className='shrink-0 border-b border-subtle px-4 py-2'>
                   <AiCrawlerIntelligenceCard
                     onOpenDetail={() => {
                       openPanel('ai-crawlers');

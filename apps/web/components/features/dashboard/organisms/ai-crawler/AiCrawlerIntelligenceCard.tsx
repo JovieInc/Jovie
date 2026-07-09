@@ -1,75 +1,35 @@
 'use client';
 
-import { Bot, Lock } from 'lucide-react';
+import { ChevronRight, Lock } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
-import { EntityCard } from '@/components/organisms/entity-card';
 import { aiCrawlerAnalyticsToEntityCard } from '@/components/organisms/entity-card/adapters';
+import {
+  KIND_PRESETS,
+  statusDotVar,
+} from '@/components/organisms/entity-card/kind-presets';
 import { track } from '@/lib/analytics';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
-import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 
 interface AiCrawlerIntelligenceCardProps {
   readonly onOpenDetail?: () => void;
   readonly className?: string;
 }
 
-function CardSkeleton({ className }: { readonly className?: string }) {
+const ROW_CLASS =
+  'flex min-h-12 w-full items-center gap-3 rounded-xl border border-subtle bg-surface-1 px-3 py-2';
+
+function RowSkeleton({ className }: { readonly className?: string }) {
   return (
     <div
-      className={cn(
-        'min-h-45 rounded-2xl border border-subtle bg-surface-1 p-4',
-        className
-      )}
+      className={cn(ROW_CLASS, className)}
       data-testid='ai-crawler-card-skeleton'
     >
-      <LoadingSkeleton
-        height='h-4'
-        width='w-28'
-        rounded='sm'
-        className='mb-3'
-      />
-      <LoadingSkeleton
-        height='h-8'
-        width='w-20'
-        rounded='sm'
-        className='mb-4'
-      />
-      <div className='space-y-2'>
-        <LoadingSkeleton height='h-3' width='w-full' rounded='sm' />
-        <LoadingSkeleton height='h-3' width='w-4/5' rounded='sm' />
-        <LoadingSkeleton height='h-3' width='w-3/5' rounded='sm' />
-      </div>
-    </div>
-  );
-}
-
-function TeaserOverlay({
-  analytics,
-}: {
-  readonly analytics: AiCrawlerAnalyticsResponse;
-}) {
-  return (
-    <div
-      className='absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-surface-1/90 px-4 text-center backdrop-blur'
-      data-testid='ai-crawler-card-teaser'
-    >
-      <div className='flex h-9 w-9 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
-        <Lock className='h-4 w-4' aria-hidden='true' />
-      </div>
-      <div className='space-y-1'>
-        <p className='text-app font-semibold text-primary-token'>
-          {analytics.totalRequests > 0
-            ? `${analytics.totalRequests.toLocaleString()} AI reads in 30 days`
-            : 'See which AI services read your pages'}
-        </p>
-        <p className='text-xs text-secondary-token'>
-          Upgrade to Pro for named crawlers, counts, and trends.
-        </p>
-      </div>
-      <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+      <LoadingSkeleton height='h-4' width='w-4' rounded='sm' />
+      <LoadingSkeleton height='h-4' width='w-24' rounded='sm' />
+      <LoadingSkeleton height='h-3' width='w-40' rounded='sm' />
     </div>
   );
 }
@@ -80,6 +40,7 @@ export function AiCrawlerIntelligenceCard({
 }: AiCrawlerIntelligenceCardProps) {
   const { data, isLoading, isError } = useAiCrawlerAnalyticsQuery();
   const hasTrackedViewRef = useRef(false);
+  const BotIcon = KIND_PRESETS.ai.icon;
 
   useEffect(() => {
     if (!data || hasTrackedViewRef.current) {
@@ -96,55 +57,107 @@ export function AiCrawlerIntelligenceCard({
   }, [data]);
 
   if (isLoading) {
-    return <CardSkeleton className={className} />;
+    return <RowSkeleton className={className} />;
   }
 
   if (isError || !data) {
     return (
       <div
-        className={cn(
-          'min-h-45 rounded-2xl border border-subtle bg-surface-1 p-4',
-          className
-        )}
+        className={cn(ROW_CLASS, className)}
         data-testid='ai-crawler-card-error'
       >
-        <div className='flex items-center gap-2 text-secondary-token'>
-          <Bot className='h-4 w-4' aria-hidden='true' />
-          <p className='text-app'>
-            AI crawler analytics temporarily unavailable.
-          </p>
-        </div>
+        <BotIcon
+          className='h-4 w-4 shrink-0 text-tertiary-token'
+          aria-hidden='true'
+        />
+        <p className='min-w-0 truncate text-app text-secondary-token'>
+          AI crawler analytics temporarily unavailable.
+        </p>
       </div>
     );
   }
 
-  const model = aiCrawlerAnalyticsToEntityCard(data);
+  const handleOpen = () => {
+    track('ai_crawler_card_opened', {
+      total_requests: data.totalRequests,
+      crawler_count: data.crawlers.length,
+    });
+    onOpenDetail?.();
+  };
+
+  const model = aiCrawlerAnalyticsToEntityCard(data, {
+    onOpenDetail: handleOpen,
+  });
   const showTeaser = data.isTeaser;
 
+  const rowContent = (
+    <>
+      {showTeaser ? (
+        <Lock
+          className='h-4 w-4 shrink-0 text-tertiary-token'
+          aria-hidden='true'
+        />
+      ) : (
+        <BotIcon
+          className='h-4 w-4 shrink-0 text-secondary-token'
+          aria-hidden='true'
+        />
+      )}
+      <span className='shrink-0 text-sm font-semibold text-primary-token'>
+        AI Visibility
+      </span>
+      <span className='min-w-0 flex-1 truncate text-left text-2xs text-tertiary-token'>
+        {showTeaser
+          ? 'See which AI services read your pages'
+          : `${model.title} · ${model.meta}`}
+      </span>
+      {model.status ? (
+        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-wide text-secondary-token'>
+          <span
+            className='h-1.5 w-1.5 shrink-0 rounded-full'
+            style={{ background: statusDotVar(model.status.tone) }}
+            aria-hidden='true'
+          />
+          {model.status.label}
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (showTeaser) {
+    return (
+      <div
+        className={cn(ROW_CLASS, className)}
+        data-testid='ai-crawler-intelligence-card'
+      >
+        <div
+          className='flex min-w-0 flex-1 items-center gap-3'
+          data-testid='ai-crawler-card-teaser'
+        >
+          {rowContent}
+        </div>
+        <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={cn('relative min-h-45', className)}
+    <button
+      type='button'
+      onClick={handleOpen}
+      className={cn(
+        ROW_CLASS,
+        'text-left transition-colors duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
+        className
+      )}
       data-testid='ai-crawler-intelligence-card'
+      aria-label='View AI visibility details'
     >
-      <EntityCard
-        model={model}
-        treatment='detailed'
-        surface='app'
-        className={cn(showTeaser && 'pointer-events-none select-none blur-sm')}
-        onClick={
-          !showTeaser
-            ? () => {
-                track('ai_crawler_card_opened', {
-                  total_requests: data.totalRequests,
-                  crawler_count: data.crawlers.length,
-                });
-                onOpenDetail?.();
-              }
-            : undefined
-        }
-        dataTestId='ai-crawler-entity-card'
+      {rowContent}
+      <ChevronRight
+        className='h-4 w-4 shrink-0 text-tertiary-token'
+        aria-hidden='true'
       />
-      {showTeaser ? <TeaserOverlay analytics={data} /> : null}
-    </div>
+    </button>
   );
 }

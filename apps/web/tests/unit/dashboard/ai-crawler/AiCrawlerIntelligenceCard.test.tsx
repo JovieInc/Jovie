@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AiCrawlerIntelligenceCard } from '@/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
@@ -79,7 +79,7 @@ const teaserAnalytics: AiCrawlerAnalyticsResponse = {
 };
 
 describe('AiCrawlerIntelligenceCard', () => {
-  it('reserves min-height while loading', () => {
+  it('reserves compact row height while loading', () => {
     hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -89,10 +89,10 @@ describe('AiCrawlerIntelligenceCard', () => {
     renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     const skeleton = screen.getByTestId('ai-crawler-card-skeleton');
-    expect(skeleton).toHaveClass('min-h-45');
+    expect(skeleton).toHaveClass('min-h-12');
   });
 
-  it('reserves min-height on error without layout collapse', () => {
+  it('reserves compact row height on error without layout collapse', () => {
     hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -102,13 +102,13 @@ describe('AiCrawlerIntelligenceCard', () => {
     renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     const errorCard = screen.getByTestId('ai-crawler-card-error');
-    expect(errorCard).toHaveClass('min-h-45');
+    expect(errorCard).toHaveClass('min-h-12');
     expect(
       screen.getByText('AI crawler analytics temporarily unavailable.')
     ).toBeInTheDocument();
   });
 
-  it('renders pro analytics without teaser overlay', () => {
+  it('renders pro analytics as a compact clickable row', () => {
     hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
       data: proAnalytics,
       isLoading: false,
@@ -117,33 +117,63 @@ describe('AiCrawlerIntelligenceCard', () => {
 
     renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
-    expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveClass(
-      'min-h-45'
-    );
-    expect(screen.getByTestId('ai-crawler-entity-card')).toBeInTheDocument();
-    expect(screen.getByText('420 reads')).toBeInTheDocument();
+    const row = screen.getByTestId('ai-crawler-intelligence-card');
+    expect(row).toHaveClass('min-h-12');
+    expect(row.tagName).toBe('BUTTON');
+    expect(screen.getByText('AI Visibility')).toBeInTheDocument();
+    expect(
+      screen.getByText('420 reads · 2 services tracked')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
     expect(
       screen.queryByTestId('ai-crawler-card-teaser')
     ).not.toBeInTheDocument();
   });
 
-  it('shows teaser overlay for free users while keeping card footprint', () => {
+  it('opens the detail panel when the row is clicked', async () => {
+    const { track } = await import('@/lib/analytics');
+    hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
+      data: proAnalytics,
+      isLoading: false,
+      isError: false,
+    });
+    const onOpenDetail = vi.fn();
+
+    renderWithQueryClient(
+      <AiCrawlerIntelligenceCard onOpenDetail={onOpenDetail} />
+    );
+
+    fireEvent.click(screen.getByTestId('ai-crawler-intelligence-card'));
+
+    expect(onOpenDetail).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith('ai_crawler_card_opened', {
+      total_requests: 420,
+      crawler_count: 2,
+    });
+  });
+
+  it('shows upgrade CTA for free users instead of a dead detail row', () => {
     hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
       data: teaserAnalytics,
       isLoading: false,
       isError: false,
     });
+    const onOpenDetail = vi.fn();
 
-    renderWithQueryClient(<AiCrawlerIntelligenceCard />);
-
-    expect(screen.getByTestId('ai-crawler-intelligence-card')).toHaveClass(
-      'min-h-45'
+    renderWithQueryClient(
+      <AiCrawlerIntelligenceCard onOpenDetail={onOpenDetail} />
     );
+
+    const row = screen.getByTestId('ai-crawler-intelligence-card');
+    expect(row).toHaveClass('min-h-12');
+    expect(row.tagName).not.toBe('BUTTON');
     const teaser = screen.getByTestId('ai-crawler-card-teaser');
-    expect(teaser).toBeInTheDocument();
     expect(
-      within(teaser).getByText('42 AI reads in 30 days')
+      within(teaser).getByText('See which AI services read your pages')
     ).toBeInTheDocument();
-    expect(within(teaser).getByText('Upgrade to Pro')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /upgrade to pro/i })
+    ).toBeInTheDocument();
+    expect(onOpenDetail).not.toHaveBeenCalled();
   });
 });

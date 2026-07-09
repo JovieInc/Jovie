@@ -342,21 +342,25 @@ export function aiCrawlerAnalyticsToEntityCard(
   analytics: Pick<
     AiCrawlerAnalyticsResponse,
     'totalRequests' | 'weeklyRequests' | 'crawlers' | 'isTeaser'
-  >
+  >,
+  options: Readonly<{ onOpenDetail?: () => void }> = {}
 ): EntityCardModel {
+  const preset = KIND_PRESETS.ai;
   const topCrawler = analytics.crawlers[0]?.name;
-  const meta =
-    analytics.crawlers.length > 1
-      ? `${analytics.crawlers.length} services tracked`
-      : (topCrawler ?? 'Waiting for first AI crawl');
+  const detail =
+    analytics.totalRequests > 0
+      ? analytics.crawlers.length > 1
+        ? `${analytics.crawlers.length} services tracked`
+        : (topCrawler ?? 'Last 30 days')
+      : 'Waiting for first AI crawl';
 
   return {
     id: 'ai-crawler-intelligence',
-    kind: 'music',
-    accent: 'blue',
-    eyebrow: 'AI Visibility',
+    kind: 'ai',
+    accent: preset.accent,
+    eyebrow: preset.eyebrow,
     title: `${analytics.totalRequests.toLocaleString()} reads`,
-    meta,
+    meta: detail,
     secondaryMeta:
       analytics.weeklyRequests > 0
         ? `${analytics.weeklyRequests.toLocaleString()} this week`
@@ -367,7 +371,13 @@ export function aiCrawlerAnalyticsToEntityCard(
         : { label: 'Collecting', tone: 'neutral' },
     cta: analytics.isTeaser
       ? { label: 'Upgrade to Pro', href: null, disabled: true }
-      : { label: 'View Details', href: null },
+      : {
+          label: preset.ctaLabel,
+          href: null,
+          onClick: options.onOpenDetail
+            ? () => options.onOpenDetail?.()
+            : undefined,
+        },
     interactive: true,
     imageAlt: 'AI crawler analytics',
   };
