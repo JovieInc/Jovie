@@ -2,7 +2,7 @@
 
 import { Plus, UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EmptyState } from '@/components/organisms/EmptyState';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import {
   convertToCommonDropdownItems,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -214,14 +214,14 @@ export const ContactsTable = memo(function ContactsTable({
           {isEmpty ? (
             <EmptyState
               icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
-              heading='No contacts yet'
+              heading='No Contacts Yet'
               description='Add bookings, management, and press contacts so fans and industry know who to reach.'
               action={{
-                label: 'Add bookings contact',
+                label: 'Add Bookings Contact',
                 onClick: () => onAddContact('bookings'),
               }}
               secondaryAction={{
-                label: 'Add management contact',
+                label: 'Add Management Contact',
                 onClick: () => onAddContact('management'),
               }}
             />

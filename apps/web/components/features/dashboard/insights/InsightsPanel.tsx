@@ -1,20 +1,22 @@
 'use client';
 
+import { Sparkles } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
   PageToolbarActionButton,
 } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
-import { InsightEmptyState } from './InsightEmptyState';
 
 interface PrioritySectionProps {
   readonly label: string;
@@ -56,6 +58,8 @@ interface InsightsPanelContentProps {
     medium: InsightResponse[];
     low: InsightResponse[];
   };
+  readonly onGenerate: () => void;
+  readonly isGenerating: boolean;
 }
 
 function InsightsPanelContent({
@@ -63,6 +67,8 @@ function InsightsPanelContent({
   error,
   insights,
   grouped,
+  onGenerate,
+  isGenerating,
 }: InsightsPanelContentProps) {
   if (isLoading) {
     return (
@@ -95,7 +101,25 @@ function InsightsPanelContent({
   }
 
   if (insights.length === 0) {
-    return <InsightEmptyState />;
+    return (
+      <ContentSurfaceCard className='flex flex-col items-center justify-center px-2.5 py-2.5 text-center'>
+        <EmptyState
+          icon={<Sparkles className='h-4 w-4' aria-hidden='true' />}
+          heading='No Insights Yet'
+          description='Generate your first set of AI-powered insights to discover actionable trends in your analytics.'
+          action={{
+            label: isGenerating ? 'Generating...' : 'Generate Insights',
+            onClick: onGenerate,
+            disabled: isGenerating,
+          }}
+          secondaryAction={{
+            label: 'Share Profile',
+            href: APP_ROUTES.CHAT_PROFILE_PANEL,
+          }}
+          className='py-6'
+        />
+      </ContentSurfaceCard>
+    );
   }
 
   return (
@@ -202,6 +226,8 @@ export function InsightsPanelView({
             error={error}
             insights={insights}
             grouped={grouped}
+            onGenerate={onGenerate}
+            isGenerating={isGenerating}
           />
         </div>
       </div>

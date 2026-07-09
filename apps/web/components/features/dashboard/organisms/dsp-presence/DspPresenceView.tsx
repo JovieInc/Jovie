@@ -1,12 +1,14 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { Radio } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type {
   DspPresenceData,
   DspPresenceItem,
 } from '@/app/app/(shell)/dashboard/presence/actions';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useTableMeta } from '@/contexts/TableMetaContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -15,7 +17,6 @@ import { queryKeys } from '@/lib/queries/keys';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
 import { AddPlatformDialog } from './AddPlatformDialog';
 import { CatalogHealthSection } from './CatalogHealthSection';
-import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
 import { DspPresenceTable } from './DspPresenceTable';
@@ -141,10 +142,19 @@ export function DspPresenceView({
     return (
       <PageShell toolbar={toolbar} data-testid='dsp-presence-workspace'>
         <div
-          className='flex h-full min-h-0 flex-1 items-center justify-center'
+          className='flex h-full min-h-0 flex-1 items-center justify-center p-8'
           data-testid='dsp-presence-content-panel'
         >
-          <DspPresenceEmptyState onAddPlatform={openAddPlatformDialog} />
+          <EmptyState
+            testId='presence-empty-state'
+            icon={<Radio className='h-5 w-5' aria-hidden='true' />}
+            heading='No DSP Profiles Found'
+            description='We automatically find your profiles on streaming platforms. You can also add them manually.'
+            action={{
+              label: 'Add Platform',
+              onClick: openAddPlatformDialog,
+            }}
+          />
         </div>
         <AddPlatformDialog
           open={isAddPlatformDialogOpen}

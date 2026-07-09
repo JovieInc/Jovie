@@ -3,15 +3,15 @@ import { BarChart3, Link as LinkIcon, Lock, Search, Users } from 'lucide-react';
 import {
   EmptyState,
   type EmptyStateProps,
-} from '@/components/organisms/EmptyState';
+} from '@/components/molecules/EmptyState';
 
 const meta: Meta<typeof EmptyState> = {
   title: 'UI/EmptyState',
   component: EmptyState,
   args: {
-    heading: 'Nothing here yet',
+    heading: 'Nothing Here Yet',
     description: 'Add your first item to see data and helpful insights.',
-    icon: <LinkIcon className='h-6 w-6' aria-hidden='true' />,
+    icon: <LinkIcon className='h-5 w-5' aria-hidden='true' />,
   },
   parameters: {
     layout: 'centered',
@@ -26,9 +26,9 @@ export const Default: Story = {};
 
 export const WithPrimaryAction: Story = {
   args: {
-    heading: 'No links yet',
+    heading: 'No Links Yet',
     description: 'Add your first link to start sharing your profile.',
-    icon: <LinkIcon className='h-6 w-6' aria-hidden='true' />,
+    icon: <LinkIcon className='h-5 w-5' aria-hidden='true' />,
     action: {
       label: 'Add Link',
       onClick: () => {
@@ -36,7 +36,7 @@ export const WithPrimaryAction: Story = {
       },
     },
     secondaryAction: {
-      label: 'Learn about links',
+      label: 'Learn About Links',
       href: '/support',
     },
   },
@@ -45,11 +45,11 @@ export const WithPrimaryAction: Story = {
 export const SearchVariant: Story = {
   args: {
     variant: 'search',
-    heading: 'No results found',
+    heading: 'No Results Found',
     description: 'Try different keywords or clear the current filters.',
-    icon: <Search className='h-6 w-6' aria-hidden='true' />,
+    icon: <Search className='h-5 w-5' aria-hidden='true' />,
     action: {
-      label: 'Clear search',
+      label: 'Clear Search',
       onClick: () => console.log('Search cleared'),
       variant: 'secondary',
     },
@@ -59,15 +59,15 @@ export const SearchVariant: Story = {
 export const ErrorState: Story = {
   args: {
     variant: 'error',
-    heading: 'Something went wrong',
+    heading: 'Something Went Wrong',
     description: 'Please try again or contact support if the issue persists.',
-    icon: <BarChart3 className='h-6 w-6' aria-hidden='true' />,
+    icon: <BarChart3 className='h-5 w-5' aria-hidden='true' />,
     action: {
       label: 'Retry',
       onClick: () => console.log('Retry clicked'),
     },
     secondaryAction: {
-      label: 'Contact support',
+      label: 'Contact Support',
       href: '/support',
     },
   },
@@ -76,12 +76,12 @@ export const ErrorState: Story = {
 export const PermissionState: Story = {
   args: {
     variant: 'permission',
-    heading: 'You need additional access',
+    heading: 'You Need Additional Access',
     description:
       'Your current plan does not include this dashboard. Ask a workspace admin to grant access.',
-    icon: <Lock className='h-6 w-6' aria-hidden='true' />,
+    icon: <Lock className='h-5 w-5' aria-hidden='true' />,
     action: {
-      label: 'Request access',
+      label: 'Request Access',
       onClick: () => console.log('Request access'),
     },
   },
@@ -92,22 +92,22 @@ export const Gallery: Story = {
     <div className='grid gap-8 md:grid-cols-2'>
       <EmptyState
         {...args}
-        heading='Invite your first audience member'
-        description='Share your profile link to see who&apos;s visiting and subscribing.'
-        icon={<Users className='h-6 w-6' aria-hidden='true' />}
+        heading='Invite Your First Audience Member'
+        description="Share your profile link to see who's visiting and subscribing."
+        icon={<Users className='h-5 w-5' aria-hidden='true' />}
         action={{
-          label: 'Copy profile link',
+          label: 'Copy Profile Link',
           onClick: () => console.log('Profile link copied'),
         }}
       />
       <EmptyState
         {...args}
         variant='search'
-        heading='No analytics yet'
+        heading='No Analytics Yet'
         description='Once fans visit your profile, engagement data will appear here.'
-        icon={<BarChart3 className='h-6 w-6' aria-hidden='true' />}
+        icon={<BarChart3 className='h-5 w-5' aria-hidden='true' />}
         secondaryAction={{
-          label: 'View docs',
+          label: 'View Docs',
           href: 'https://docs.jov.ie',
         }}
       />

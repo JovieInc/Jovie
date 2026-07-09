@@ -101,23 +101,26 @@ vi.mock(
   })
 );
 
-vi.mock(
-  '@/features/dashboard/organisms/dsp-presence/DspPresenceEmptyState',
-  () => ({
-    DspPresenceEmptyState: ({
-      onAddPlatform,
-    }: {
-      onAddPlatform: () => void;
-    }) => (
-      <div data-testid='presence-empty-state'>
-        Empty state
-        <button type='button' onClick={onAddPlatform}>
+vi.mock('@/components/molecules/EmptyState', () => ({
+  EmptyState: ({
+    heading,
+    action,
+    testId,
+  }: {
+    heading: string;
+    action?: { label: string; onClick?: () => void };
+    testId?: string;
+  }) => (
+    <div data-testid={testId ?? 'presence-empty-state'}>
+      {heading}
+      {action?.onClick ? (
+        <button type='button' onClick={action.onClick}>
           Empty State Add Platform
         </button>
-      </div>
-    ),
-  })
-);
+      ) : null}
+    </div>
+  ),
+}));
 
 vi.mock(
   '@/features/dashboard/organisms/dsp-presence/AddPlatformDialog',
