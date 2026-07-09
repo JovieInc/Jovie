@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -89,33 +90,40 @@ export function Banner({
 
       {action ? (
         action.href ? (
-          <Link
-            href={action.href}
-            onClick={action.onClick}
+          <Button
+            asChild
+            variant='secondary'
+            size='sm'
             className={actionClassName}
           >
-            {action.label}
-          </Link>
+            <Link href={action.href} onClick={action.onClick}>
+              {action.label}
+            </Link>
+          </Button>
         ) : (
-          <button
+          <Button
             type='button'
+            variant='secondary'
+            size='sm'
             onClick={action.onClick}
             className={actionClassName}
           >
             {action.label}
-          </button>
+          </Button>
         )
       ) : null}
 
       {onDismiss ? (
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           onClick={onDismiss}
           aria-label='Dismiss'
-          className='shrink-0 rounded-full p-1 text-tertiary-token transition-colors duration-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          className='h-auto w-auto shrink-0 rounded-full p-1 text-tertiary-token transition-colors duration-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
         >
           <X className='h-4 w-4' aria-hidden='true' />
-        </button>
+        </Button>
       ) : null}
     </div>
   );

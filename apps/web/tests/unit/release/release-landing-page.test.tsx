@@ -17,6 +17,13 @@ type ChildrenProps = { readonly children: React.ReactNode };
 // ---------------------------------------------------------------------------
 
 vi.mock('lucide-react', () => ({
+  AlertTriangle: (p: Record<string, unknown>) => (
+    <span data-testid='icon-alerttriangle' {...p} />
+  ),
+  CheckCircle2: (p: Record<string, unknown>) => (
+    <span data-testid='icon-checkcircle2' {...p} />
+  ),
+  Info: (p: Record<string, unknown>) => <span data-testid='icon-info' {...p} />,
   Share2: (p: Record<string, unknown>) => (
     <span data-testid='icon-share2' {...p} />
   ),
@@ -26,6 +33,7 @@ vi.mock('lucide-react', () => ({
   Users: (p: Record<string, unknown>) => (
     <span data-testid='icon-users' {...p} />
   ),
+  X: (p: Record<string, unknown>) => <span data-testid='icon-x' {...p} />,
 }));
 
 vi.mock('next/link', () => ({

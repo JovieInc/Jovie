@@ -184,8 +184,12 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
+          # Screenshot-only product exports live under public/product-screenshots and
+          # must not force public Lighthouse + Neon on main (they are marketing assets,
+          # not route code). Filter that tree out before matching public/* paths.
           PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
-          if echo "$CHANGED_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
+          PUBLIC_LIGHTHOUSE_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^apps/web/public/product-screenshots/' || true)
+          if echo "$PUBLIC_LIGHTHOUSE_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
             echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
@@ -773,41 +777,59 @@ jobs:
       - name: Finalize Neon DB URLs
         id: finalize-urls
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
+        env:
+          CONNECTION_FILE: ${{ steps.create-branch.outputs.connection_file }}
         run: |
-          DB_URL="${{ steps.create-branch.outputs.db_url }}"
-          DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
-
-          if [ -z "$DB_URL" ]; then
-            echo "Neon branch creation did not return db_url."
+          set -euo pipefail
+          CONNECTION_FILE="${CONNECTION_FILE:-${RUNNER_TEMP:-/tmp}/neon-connection/connection.json}"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon connection file missing after branch create: $CONNECTION_FILE"
             echo "This indicates NEON_PROJECT_ID/NEON_API_KEY or the create-branch action is failing."
             exit 1
           fi
-
-          if [ -z "$DB_URL_POOLED" ]; then
-            echo "Neon branch creation did not return db_url_pooled."
-            echo "The pooled URL is required for stable cross-job CI consumers."
+          if ! jq -e '
+            (.db_url // "" | length > 0) and
+            (.db_url_pooled // "" | length > 0)
+          ' "$CONNECTION_FILE" >/dev/null; then
+            echo "Neon connection file is missing db_url/db_url_pooled."
             exit 1
           fi
-
           # Intentionally do NOT expose DB_URL via job outputs.
           # GitHub will drop outputs that look like secrets, which breaks downstream jobs.
-          echo "Neon DB URL resolved for this job."
+          echo "Neon DB URL resolved for this job (file-backed)."
 
       - name: Persist Neon DB connection artifact
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
+        env:
+          BRANCH_NAME: ${{ steps.sanitize-branch.outputs.name }}
+          CONNECTION_FILE: ${{ steps.create-branch.outputs.connection_file }}
         run: |
+          set -euo pipefail
           mkdir -p /tmp/neon-db-artifact
-          jq -n \
-            --arg db_url "${{ steps.create-branch.outputs.db_url }}" \
-            --arg db_url_pooled "${{ steps.create-branch.outputs.db_url_pooled }}" \
-            --arg branch_id "${{ steps.create-branch.outputs.branch_id }}" \
-            --arg branch_name "${{ steps.sanitize-branch.outputs.name }}" \
-            '{
-              db_url: $db_url,
-              db_url_pooled: $db_url_pooled,
-              branch_id: $branch_id,
-              branch_name: $branch_name
-            }' > /tmp/neon-db-artifact/connection.json
+          # Prefer the file written by neon-create-branch-with-retry (avoids
+          # re-interpolating DB passwords through GitHub expression expansion).
+          if [ -n "${CONNECTION_FILE:-}" ] && [ -f "$CONNECTION_FILE" ]; then
+            cp "$CONNECTION_FILE" /tmp/neon-db-artifact/connection.json
+          elif [ -f "${RUNNER_TEMP:-/tmp}/neon-connection/connection.json" ]; then
+            cp "${RUNNER_TEMP:-/tmp}/neon-connection/connection.json" /tmp/neon-db-artifact/connection.json
+          else
+            echo "Neon connection file missing; cannot persist artifact."
+            exit 1
+          fi
+          # Ensure branch_name is present for downstream diagnostics.
+          if [ -n "${BRANCH_NAME:-}" ]; then
+            jq --arg branch_name "$BRANCH_NAME" '.branch_name = $branch_name' \
+              /tmp/neon-db-artifact/connection.json > /tmp/neon-db-artifact/connection.json.tmp
+            mv /tmp/neon-db-artifact/connection.json.tmp /tmp/neon-db-artifact/connection.json
+          fi
+          # Fail closed if password is missing from the artifact URL.
+          if ! jq -e '
+            (.db_url // "" | test("^postgres(ql)?://[^:]+:[^@]+@")) and
+            (.db_url_pooled // "" | test("^postgres(ql)?://[^:]+:[^@]+@"))
+          ' /tmp/neon-db-artifact/connection.json >/dev/null; then
+            echo "Neon connection artifact is missing username/password credentials."
+            exit 1
+          fi
 
       - name: Upload Neon DB connection artifact
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -1301,15 +1323,18 @@ jobs:
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
-        # Use only the ephemeral branch credentials from the neon-db artifact.
-        # Injecting DATABASE_URL_MAIN passwords onto an ephemeral host causes
-        # password-auth retry storms during shard-0 migrate/seed and LHCI.
+        # Prefer ephemeral branch host from neon-db artifact. credential_source
+        # only fills missing username/password components (Neon project roles
+        # share passwords) — it never rewrites the ephemeral host. This recovers
+        # when GITHUB_OUTPUT/artifact handoff strips credentials.
         id: resolve-lighthouse-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL (ephemeral branch)
         run: echo "DATABASE_URL=${{ steps.resolve-lighthouse-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"

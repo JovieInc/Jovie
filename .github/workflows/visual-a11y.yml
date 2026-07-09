@@ -38,7 +38,15 @@ jobs:
               echo "has_visual_changes=false" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
+            # Push to main: only run when the tip commit touches visual surfaces.
+            # Running on every main push made this workflow a permanent red badge
+            # for unrelated merges (tasks, screenshots, infra).
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git show --name-only --pretty=format: HEAD)
+            if echo "$CHANGED_FILES" | grep -qE "$VISUAL_PATTERNS"; then
+              echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_visual_changes=false" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   storybook-a11y:
