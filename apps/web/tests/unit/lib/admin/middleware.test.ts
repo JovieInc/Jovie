@@ -39,6 +39,9 @@ vi.mock('@/lib/admin/roles', () => ({
 vi.mock('@/lib/auth/test-mode', () => ({
   isTestAuthBypassEnabled: mockIsTestAuthBypassEnabled,
   resolveTestBypassUserId: mockResolveTestBypassUserId,
+  TEST_MODE_COOKIE: '__e2e_test_mode',
+  TEST_AUTH_BYPASS_MODE: 'test-auth-bypass',
+  TEST_MODE_HEADER: 'x-test-mode',
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
