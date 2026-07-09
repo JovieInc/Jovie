@@ -10,29 +10,11 @@ interface DesktopNativeExchangeResponse {
   readonly userId?: unknown;
 }
 
-interface DesktopSignInResource {
-  readonly status?: string | null;
-  readonly createdSessionId?: string | null;
-  create: (params: { strategy: 'ticket'; ticket: string }) => Promise<{
-    status?: string;
-    createdSessionId?: string | null;
-    error?: unknown;
-    errors?: Array<{ code?: unknown }>;
-    clerkError?: boolean;
-  }>;
-}
-
-type DesktopSetActive = (params: {
-  session: string;
-  redirectUrl?: string;
-}) => Promise<void>;
-
 type DesktopNativeExchangeFetch = (
   input: RequestInfo | URL,
   init?: RequestInit
 ) => Promise<Pick<Response, 'ok' | 'status' | 'json'>>;
 
-const SET_ACTIVE_SETTLE_TIMEOUT_MS = 5000;
 const RETURN_ROUTE_VERIFY_TIMEOUT_MS = 30_000;
 const RETURN_ROUTE_VERIFY_INTERVAL_MS = 500;
 
@@ -48,16 +30,9 @@ export type DesktopAuthDiagnosticStage =
   | 'native_exchange_started'
   | 'native_exchange_failed'
   | 'native_exchange_succeeded'
-  | 'ticket_sign_in_started'
-  | 'ticket_sign_in_failed'
-  | 'ticket_sign_in_succeeded'
-  | 'ticket_finalize_started'
-  | 'ticket_finalize_failed'
-  | 'ticket_finalize_succeeded'
-  | 'session_id_missing'
-  | 'set_active_started'
-  | 'set_active_timed_out'
-  | 'set_active_succeeded'
+  | 'ott_verify_started'
+  | 'ott_verify_failed'
+  | 'ott_verify_succeeded'
   | 'return_route_verify_started'
   | 'return_route_verify_failed'
   | 'return_route_verified'
@@ -66,11 +41,15 @@ export type DesktopAuthDiagnosticStage =
 export interface CompleteDesktopNativeAuthInput {
   readonly consumeCompletion: () => Promise<DesktopAuthCompletionResult>;
   readonly fetchNativeExchange?: DesktopNativeExchangeFetch;
-  readonly signIn: DesktopSignInResource;
-  readonly setActive: DesktopSetActive;
-  readonly reloadClerk?: () => Promise<void>;
-  readonly getActiveSessionId?: () => string | null;
-  readonly getActiveUserId?: () => string | null;
+  /**
+   * Posts the one-time token to `/api/auth/one-time-token/verify` which sets
+   * the Better Auth session cookie. The default implementation uses `fetch`
+   * with same-origin credentials so the cookie lands on the current origin.
+   * (Clerk → Better Auth migration, plan decision 9.)
+   */
+  readonly verifyOneTimeToken?: (
+    ott: string
+  ) => Promise<{ ok: boolean; status: number }>;
   readonly setActiveTimeoutMs?: number;
   readonly returnRouteVerificationTimeoutMs?: number;
   readonly verifyReturnRoute?: (
@@ -168,77 +147,6 @@ function parseNativeExchangePayload(payload: DesktopNativeExchangeResponse): {
   };
 }
 
-async function waitForActivatedSession(input: {
-  readonly expectedUserId: string | null;
-  readonly reloadClerk?: () => Promise<void>;
-  readonly getActiveSessionId?: () => string | null;
-  readonly getActiveUserId?: () => string | null;
-}): Promise<'active' | 'missing' | 'user_mismatch'> {
-  if (!input.getActiveSessionId) return 'active';
-
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await input.reloadClerk?.();
-
-    const activeSessionId = input.getActiveSessionId();
-    const activeUserId = input.getActiveUserId?.() ?? null;
-    if (activeSessionId) {
-      if (
-        input.expectedUserId &&
-        activeUserId &&
-        activeUserId !== input.expectedUserId
-      ) {
-        return 'user_mismatch';
-      }
-
-      return 'active';
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 250));
-  }
-
-  return 'missing';
-}
-
-function getClerkErrorCode(value: unknown): string | null {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  const record = value as {
-    readonly errors?: ReadonlyArray<{ readonly code?: unknown }>;
-  };
-  const code = record.errors?.[0]?.code;
-  return typeof code === 'string' ? code : null;
-}
-
-async function waitForSetActiveToSettle(input: {
-  readonly setActive: DesktopSetActive;
-  readonly sessionId: string;
-  readonly returnTo: string;
-  readonly timeoutMs: number;
-}): Promise<'settled' | 'timed_out'> {
-  let activationError: unknown;
-  const activation = input
-    .setActive({ session: input.sessionId, redirectUrl: input.returnTo })
-    .then(
-      () => 'settled' as const,
-      error => {
-        activationError = error;
-        return 'rejected' as const;
-      }
-    );
-  const timeout = new Promise<'timed_out'>(resolve => {
-    setTimeout(() => resolve('timed_out'), input.timeoutMs);
-  });
-
-  const result = await Promise.race([activation, timeout]);
-  if (result === 'rejected') {
-    throw createError('desktop-auth-set-active-failed', activationError);
-  }
-
-  return result;
-}
-
 async function waitForReturnRouteVerification(input: {
   readonly returnTo: string;
   readonly timeoutMs: number;
@@ -293,15 +201,29 @@ async function verifyReturnRouteReady(input: {
   input.recordDiagnostic('return_route_verified', input.returnTo);
 }
 
+/**
+ * Default OTT verify: POST the one-time token to the built-in
+ * `/api/auth/one-time-token/verify` endpoint, which sets the Better Auth
+ * session cookie itself (verified from plugin source — no setActive, no
+ * custom cookie code). Plan decision 9.
+ */
+async function defaultVerifyOneTimeToken(
+  ott: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ ok: boolean; status: number }> {
+  const response = await fetchImpl('/api/auth/one-time-token/verify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ token: ott }),
+  });
+  return { ok: response.ok, status: response.status };
+}
+
 export async function completeDesktopNativeAuth({
   consumeCompletion,
   fetchNativeExchange = fetch,
-  signIn,
-  setActive,
-  reloadClerk,
-  getActiveSessionId,
-  getActiveUserId,
-  setActiveTimeoutMs = SET_ACTIVE_SETTLE_TIMEOUT_MS,
+  verifyOneTimeToken,
   returnRouteVerificationTimeoutMs = RETURN_ROUTE_VERIFY_TIMEOUT_MS,
   verifyReturnRoute,
   recordDiagnostic = recordDesktopAuthDiagnostic,
@@ -343,86 +265,24 @@ export async function completeDesktopNativeAuth({
   recordDesktopAuthReturnTo(exchange.returnTo);
   recordDiagnostic('native_exchange_succeeded');
 
-  recordDiagnostic('ticket_sign_in_started');
-  const ticketAttempt = await signIn.create({
-    strategy: 'ticket',
-    ticket: exchange.ticket,
-  });
-  const ticketErrorCode =
-    getClerkErrorCode(ticketAttempt.error) ?? getClerkErrorCode(ticketAttempt);
-  if (ticketAttempt.error && ticketErrorCode !== 'session_exists') {
-    recordDiagnostic('ticket_sign_in_failed');
-    throw createError('desktop-auth-ticket-failed', ticketAttempt.error);
-  }
-  const ticketStatus = ticketAttempt.status ?? signIn.status ?? null;
-  if (ticketStatus && ticketStatus !== 'complete') {
-    recordDiagnostic('ticket_sign_in_failed', `status=${ticketStatus}`);
-    throw new Error('desktop-auth-ticket-incomplete');
-  }
+  // Verify the OTT — this sets the Better Auth session cookie on the current
+  // origin. No setActive, no Clerk ticket flow, no session hydration. The
+  // built-in `/api/auth/one-time-token/verify` endpoint owns the cookie.
+  recordDiagnostic('ott_verify_started');
+  const verify = verifyOneTimeToken
+    ? await verifyOneTimeToken(exchange.ticket)
+    : await defaultVerifyOneTimeToken(exchange.ticket);
 
-  const sessionId =
-    ticketAttempt.createdSessionId ?? signIn.createdSessionId ?? null;
-  if (!sessionId) {
-    recordDiagnostic('ticket_finalize_started', 'hydrate_active_session');
-    const hydrationStatus = getActiveSessionId
-      ? await waitForActivatedSession({
-          expectedUserId: exchange.userId,
-          reloadClerk,
-          getActiveSessionId,
-          getActiveUserId,
-        })
-      : 'missing';
-
-    if (hydrationStatus === 'active') {
-      const activeSessionId = getActiveSessionId?.() ?? 'hydrated_session';
-      recordDiagnostic('ticket_finalize_succeeded', activeSessionId);
-      await verifyReturnRouteReady({
-        returnTo: exchange.returnTo,
-        timeoutMs: returnRouteVerificationTimeoutMs,
-        verifyReturnRoute,
-        recordDiagnostic,
-      });
-      recordDiagnostic('route_ready', exchange.returnTo);
-      return { returnTo: exchange.returnTo };
+  if (!verify.ok) {
+    recordDiagnostic('ott_verify_failed', `status=${verify.status}`);
+    // 401 from OTT verify typically means expired/invalid token.
+    if (verify.status === 401) {
+      throw createError('credential_expired');
     }
-
-    recordDiagnostic(
-      'session_id_missing',
-      hydrationStatus === 'user_mismatch'
-        ? 'active_user_mismatch'
-        : 'missing_created_session'
-    );
-    throw new Error('desktop-auth-missing-session');
+    throw createError('verify_failed');
   }
-  recordDiagnostic('ticket_sign_in_succeeded');
+  recordDiagnostic('ott_verify_succeeded');
 
-  recordDiagnostic('set_active_started', sessionId);
-  const setActiveResult = await waitForSetActiveToSettle({
-    setActive,
-    sessionId,
-    returnTo: exchange.returnTo,
-    timeoutMs: setActiveTimeoutMs,
-  });
-  recordDiagnostic(
-    setActiveResult === 'settled'
-      ? 'set_active_succeeded'
-      : 'set_active_timed_out',
-    sessionId
-  );
-
-  recordDiagnostic('ticket_finalize_started', 'verify_active_session');
-  const activationStatus = await waitForActivatedSession({
-    expectedUserId: exchange.userId,
-    reloadClerk,
-    getActiveSessionId,
-    getActiveUserId,
-  });
-  if (activationStatus !== 'active') {
-    recordDiagnostic('ticket_finalize_failed', activationStatus);
-    throw new Error('desktop-auth-session-not-active');
-  }
-
-  recordDiagnostic('ticket_finalize_succeeded', sessionId);
   await verifyReturnRouteReady({
     returnTo: exchange.returnTo,
     timeoutMs: returnRouteVerificationTimeoutMs,

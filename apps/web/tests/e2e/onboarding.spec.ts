@@ -1,4 +1,3 @@
-import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page, test } from '@playwright/test';
 import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
 
@@ -83,7 +82,6 @@ test.describe('Onboarding', () => {
     test.setTimeout(120_000);
 
     await interceptAnalytics(page);
-    await setupClerkTestingToken({ page });
 
     const clerkLoaded = await ensureClerkReady(page);
     if (!clerkLoaded) {
@@ -193,7 +191,6 @@ test.describe('Onboarding', () => {
     test.setTimeout(120_000);
 
     await interceptAnalytics(page);
-    await setupClerkTestingToken({ page });
 
     const clerkLoaded = await ensureClerkReady(page);
     if (!clerkLoaded) {
@@ -214,26 +211,11 @@ test.describe('Onboarding', () => {
     }
 
     try {
-      if (existingEmail.includes('+clerk_test')) {
-        await clerk.signIn({
-          page,
-          signInParams: { strategy: 'email_code', identifier: existingEmail },
-        });
-      } else {
-        const password = process.env.E2E_CLERK_USER_PASSWORD;
-        if (!password) {
-          test.skip(true, 'No password for non-clerk_test email');
-          return;
-        }
-        await clerk.signIn({
-          page,
-          signInParams: {
-            strategy: 'password',
-            identifier: existingEmail,
-            password,
-          },
-        });
-      }
+      // Clerk → Better Auth migration: `clerk.signIn` removed. Under BA the
+      // dev bypass route handles auth — the email_code/password paths below
+      // are unreachable when E2E_USE_TEST_AUTH_BYPASS=1 (the only path under BA).
+      test.skip(true, 'Clerk signIn API removed — use dev bypass route');
+      return;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (!msg.includes('already signed in')) {
@@ -293,7 +275,6 @@ test.describe('Onboarding', () => {
     test.setTimeout(90_000);
 
     await interceptAnalytics(page);
-    await setupClerkTestingToken({ page });
 
     const clerkLoaded = await ensureClerkReady(page);
     if (!clerkLoaded) {

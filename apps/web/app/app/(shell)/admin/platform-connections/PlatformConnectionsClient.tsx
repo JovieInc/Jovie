@@ -14,10 +14,6 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { APP_ROUTES } from '@/constants/routes';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import {
-  REQUIRED_PLAYLIST_SPOTIFY_SCOPES,
-  SPOTIFY_OAUTH_TOKEN_STRATEGY,
-} from '@/lib/spotify/system-account';
-import {
   generateTestPlaylist,
   setCurrentAdminAsPlaylistSpotifyPublisher,
   updatePlaylistEngineSettings,
@@ -191,12 +187,18 @@ function SpotifyTabContent({
     setResult(null);
     setIsConnecting(true);
     try {
+      // Clerk → Better Auth migration follow-up: `user.createExternalAccount`
+      // was a Clerk-specific API for linking external OAuth accounts (Spotify).
+      // Better Auth does not have an equivalent for non-auth provider
+      // connections. This admin feature needs to be rewired onto a direct
+      // Spotify OAuth flow (separate from the BA auth session). Linear
+      // follow-up filed. For now, surface a clear "not yet migrated" error
+      // so the failure is visible rather than silent.
       const redirectUrl = `${globalThis.location.origin}${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}`;
-      await user.createExternalAccount({
-        strategy: SPOTIFY_OAUTH_TOKEN_STRATEGY,
-        additionalScopes: [...REQUIRED_PLAYLIST_SPOTIFY_SCOPES],
-        redirectUrl,
-      });
+      void redirectUrl;
+      throw new Error(
+        'Spotify connection is being migrated to Better Auth and is temporarily unavailable. See Linear follow-up.'
+      );
     } catch (error) {
       setResult({
         success: false,
@@ -413,7 +415,7 @@ function EngineTabContent({
           <div className='flex min-w-0 flex-wrap items-center gap-2'>
             <StatusBadge ok={enabled} label={enabled ? 'Enabled' : 'Paused'} />
             <Badge variant='secondary' size='sm'>
-              Minimum interval
+              Minimum Interval
             </Badge>
           </div>
           <Button type='button' variant='ghost' size='sm' onClick={refresh}>
@@ -452,7 +454,7 @@ function EngineTabContent({
               onChange={event =>
                 setIntervalUnit(event.target.value as IntervalUnit)
               }
-              aria-label='Playlist generation interval unit'
+              aria-label='Playlist Generation Interval Unit'
               className='h-8 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
             >
               {INTERVAL_UNITS.map(unit => (

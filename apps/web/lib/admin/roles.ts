@@ -13,7 +13,7 @@ async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
   const [user] = await db
     .select({ isAdmin: users.isAdmin })
     .from(users)
-    .where(eq(users.clerkId, userId))
+    .where(eq(users.id, userId))
     .limit(1);
 
   return user?.isAdmin ?? false;

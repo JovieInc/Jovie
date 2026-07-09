@@ -1,24 +1,17 @@
 import { isValidElement, type ReactNode } from 'react';
-import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
-import { isMockPublishableKey } from '@/components/providers/clerkAvailability';
-import { AuthUnavailableCard } from '@/features/auth';
-import { resolvePublishableKeyStaticFirst } from '@/lib/auth/staging-clerk-keys';
-import { publicEnv } from '@/lib/env-public';
 import AuthSlotDefault from './default';
 
 /**
- * Layout for the `@auth` parallel slot.
+ * Layout for the `@auth` parallel slot (Clerk → Better Auth migration,
+ * client-flip commit ⑦).
  *
- * The intercepted signup modal at `(.)signup/page.tsx` needs the same
- * ClerkProvider the `(auth)/layout.tsx` provides for the full-page routes.
- * Without this layout the modal renders outside the Clerk context and
- * `<SignUp />` throws.
- *
- * Design mirrors `(auth)/layout.tsx`: publishable key resolved without calling
- * headers() on production so this layout does NOT opt marketing routes into
- * dynamic rendering. On staging/local resolvePublishableKeyStaticFirst() falls
- * back to the per-request header, which is fine (those envs are dynamic anyway).
+ * Under Clerk this layout resolved the publishable key and rendered an
+ * `AuthUnavailableCard` when Clerk was misconfigured. Under Better Auth
+ * there is no provider to mount and no publishable key to resolve —
+ * `AuthClientProviders` mounts `JovieAuthValuesProvider` (aliased as
+ * `ClerkSafeValuesProvider`) and the intercepted modal renders its own
+ * auth surface.
  *
  * We intentionally do NOT use `export const dynamic = 'force-dynamic'` here —
  * this layout renders on every route including static marketing pages, and
@@ -35,41 +28,19 @@ function isInactiveAuthSlot(children: ReactNode): boolean {
   }
 
   // Next renders `default.tsx` as a component node (truthy), not literal `null`.
-  // Treat that fallback the same as an empty slot so ISR routes never mount
-  // Clerk resolution or call headers() from this layout.
+  // Treat that fallback the same as an empty slot so ISR routes never call
+  // headers() from this layout.
   return isValidElement(children) && children.type === AuthSlotDefault;
 }
 
 export default async function AuthSlotLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Default @auth slot is null on ISR/marketing/profile routes. Skip Clerk
-  // resolution entirely so we never call headers() on statically generated pages.
+  // Default @auth slot is null on ISR/marketing/profile routes. Skip entirely
+  // so we never call headers() on statically generated pages.
   if (isInactiveAuthSlot(children)) {
     return null;
   }
 
-  const publishableKey = await resolvePublishableKeyStaticFirst();
-
-  const isClerkUnavailable =
-    !publishableKey ||
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-    isMockPublishableKey(publishableKey);
-
-  if (isClerkUnavailable) {
-    // Wrap the fallback card in the same modal shell the real flow uses, so
-    // dev (Clerk mock) and prod both show a modal. Without this, the card
-    // rendered in flow below the homepage and looked like a layout bug.
-    return (
-      <AuthModalShell ariaLabel='Authentication unavailable'>
-        <AuthUnavailableCard />
-      </AuthModalShell>
-    );
-  }
-
-  return (
-    <AuthClientProviders forceEnableClerk publishableKey={publishableKey}>
-      {children}
-    </AuthClientProviders>
-  );
+  return <AuthClientProviders>{children}</AuthClientProviders>;
 }

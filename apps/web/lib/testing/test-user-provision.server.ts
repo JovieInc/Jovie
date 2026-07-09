@@ -1,9 +1,9 @@
-import { createClerkClient } from '@clerk/backend';
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { baUsers } from '@/lib/db/schema/better-auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -17,7 +17,6 @@ const PRIVILEGED_TEST_ACCOUNT_EMAIL_REGEX =
 
 type SeededUserValues = Pick<
   typeof users.$inferInsert,
-  | 'clerkId'
   | 'email'
   | 'name'
   | 'userStatus'
@@ -25,7 +24,12 @@ type SeededUserValues = Pick<
   | 'plan'
   | 'isPro'
   | 'billingUpdatedAt'
->;
+  | 'betterAuthUserId'
+> & {
+  // clerk_id is nullable in the schema as of migration 0073; the dev/E2E
+  // seed path always carries a stable Clerk id, so narrow it back to string.
+  clerkId: string;
+};
 
 type SeededCreatorProfileValues = Pick<
   typeof creatorProfiles.$inferInsert,
@@ -115,55 +119,6 @@ function isDuplicateKeyError(
   return isDuplicateKeyError(candidate.cause, seen);
 }
 
-function isClerkIdentificationExistsError(error: unknown): boolean {
-  if (
-    error instanceof Error &&
-    error.message.includes('IdentificationExists')
-  ) {
-    return true;
-  }
-
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-
-  const candidate = error as {
-    readonly status?: number;
-    readonly errors?: ReadonlyArray<{ readonly code?: string }>;
-  };
-
-  return (
-    candidate.status === 422 ||
-    Boolean(
-      candidate.errors?.some(
-        ({ code }) => typeof code === 'string' && code.includes('identifier')
-      )
-    )
-  );
-}
-
-function isClerkUnauthorizedError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-
-  const candidate = error as {
-    readonly status?: number;
-    readonly errors?: ReadonlyArray<{ readonly code?: string }>;
-  };
-
-  return (
-    candidate.status === 401 ||
-    candidate.status === 403 ||
-    Boolean(
-      candidate.errors?.some(
-        ({ code }) =>
-          code === 'unauthorized' || code === 'authentication_invalid'
-      )
-    )
-  );
-}
-
 export function isAllowlistedTestAccountEmail(
   email: string | null | undefined
 ): email is string {
@@ -188,11 +143,61 @@ export function getDeterministicTestClerkId(email: string): string {
   return `user_dev_${stableId || 'browse'}`;
 }
 
-function shouldUseDeterministicClerkTestUser(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
-  );
+/**
+ * Deterministic Better Auth user id for dev/E2E test users (Clerk → Better
+ * Auth migration, plan decision 10 / commit ⑨). Replaces the Clerk-era
+ * `getDeterministicTestClerkId` for the BA path. The id is stable per email
+ * so re-running `ensureBetterAuthTestUser` is idempotent.
+ */
+export function getDeterministicTestBetterAuthUserId(email: string): string {
+  const normalizedEmail = normalizeEmail(email);
+  const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
+  return `ba_dev_${stableId || 'browse'}`;
+}
+
+/**
+ * Ensure a Better Auth test user exists in `ba_users` and return the BA user
+ * id (plan decision 10, commit ⑨). Direct drizzle upsert — no Clerk API
+ * call. The BA user id is deterministic per email so the caller can link it
+ * to the app `users` row via `betterAuthUserId`. The caller then mints a
+ * real `ba_sessions` row via `auth.$context.internalAdapter.createSession`.
+ */
+export async function ensureBetterAuthTestUser({
+  email,
+  fullName,
+}: {
+  email: string;
+  fullName: string;
+}): Promise<string> {
+  const normalizedEmail = normalizeEmail(email) ?? email;
+  const baUserId = getDeterministicTestBetterAuthUserId(normalizedEmail);
+
+  // Lazy import keeps `@/lib/db` (and its `server-only` env module) out of
+  // the Playwright global-setup module graph, which would otherwise trip
+  // the `server-only` guard when this file is imported from globalSetup.
+  const { db } = await import('@/lib/db');
+
+  // Upsert into ba_users — idempotent. `onConflictDoUpdate` on the
+  // primary key (id) so concurrent callers converge.
+  await db
+    .insert(baUsers)
+    .values({
+      id: baUserId,
+      name: fullName,
+      email: normalizedEmail,
+      emailVerified: true,
+    })
+    .onConflictDoUpdate({
+      target: baUsers.id,
+      set: {
+        name: fullName,
+        email: normalizedEmail,
+        emailVerified: true,
+        updatedAt: new Date(),
+      },
+    });
+
+  return baUserId;
 }
 
 function resolveMatchedSeedUser(
@@ -273,195 +278,46 @@ async function retireStaleSeedUserClerkIds(
   }
 }
 
+/**
+ * Deterministic test-user id resolver (Clerk → Better Auth migration).
+ * The Clerk backend path is gone; dev/E2E provisioning is direct-drizzle,
+ * so this returns the stable deterministic id derived from the email.
+ */
 export async function resolveClerkTestUserId(
   email: string,
   fallbackClerkId?: string
 ): Promise<string> {
   const normalizedEmail = normalizeEmail(email);
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  const deterministicClerkId =
-    fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail || email);
-
-  if (!normalizedEmail || shouldUseDeterministicClerkTestUser()) {
-    return deterministicClerkId;
-  }
-
-  if (!secretKey?.startsWith('sk_test_')) {
-    return deterministicClerkId;
-  }
-
-  if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return deterministicClerkId;
-  }
-
-  const clerk = createClerkClient({ secretKey });
-  let existingUsers;
-  try {
-    existingUsers = await clerk.users.getUserList({
-      emailAddress: [normalizedEmail],
-    });
-  } catch (error) {
-    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
-      return fallbackClerkId;
-    }
-    throw error;
-  }
-
   return (
-    existingUsers.data[0]?.id ??
-    fallbackClerkId ??
-    getDeterministicTestClerkId(normalizedEmail)
+    fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail || email)
   );
 }
 
+/**
+ * Deterministic test-user provisioner. Kept as a named export for the
+ * standalone E2E scripts and helpers that still import it; returns the
+ * stable deterministic id (no external identity provider call).
+ */
 export async function ensureClerkTestUser({
   email,
-  username,
-  firstName,
-  lastName,
   fallbackClerkId,
-  metadata,
 }: EnsureClerkTestUserOptions): Promise<string> {
   const normalizedEmail = normalizeEmail(email);
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  const deterministicClerkId =
-    fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail || email);
-
-  if (shouldUseDeterministicClerkTestUser()) {
-    return deterministicClerkId;
-  }
-
-  if (!secretKey?.startsWith('sk_test_')) {
-    return deterministicClerkId;
-  }
-
-  if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return deterministicClerkId;
-  }
-
-  const clerk = createClerkClient({ secretKey });
-  let existingUser: { id: string } | undefined;
-  try {
-    const existingUsers = await clerk.users.getUserList({
-      emailAddress: [normalizedEmail],
-    });
-    existingUser = existingUsers.data[0];
-  } catch (error) {
-    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
-      return fallbackClerkId;
-    }
-    throw error;
-  }
-
-  if (existingUser) {
-    return existingUser.id;
-  }
-
-  try {
-    const createdUser = await clerk.users.createUser({
-      username,
-      emailAddress: [normalizedEmail],
-      firstName,
-      lastName,
-      publicMetadata: metadata,
-      skipPasswordRequirement: true,
-    });
-
-    return createdUser.id;
-  } catch (error) {
-    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
-      return fallbackClerkId;
-    }
-
-    if (!isClerkIdentificationExistsError(error)) {
-      throw error;
-    }
-
-    return resolveRacedClerkUser(
-      clerk,
-      normalizedEmail,
-      fallbackClerkId,
-      error
-    );
-  }
+  return (
+    fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail || email)
+  );
 }
 
 export async function ensureLiveClerkTestUser({
   email,
-  username,
-  firstName,
-  lastName,
-  metadata,
 }: EnsureClerkTestUserOptions): Promise<string> {
   const normalizedEmail = normalizeEmail(email);
-  const secretKey = process.env.CLERK_SECRET_KEY;
-
-  if (!secretKey?.startsWith('sk_test_')) {
-    throw new Error(
-      'Live Clerk test user provisioning requires a test Clerk secret key.'
-    );
-  }
-
   if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
     throw new Error(
-      `Live Clerk test user provisioning is limited to Jovie test accounts: ${normalizedEmail}`
+      `Live test user provisioning is limited to Jovie test accounts: ${normalizedEmail}`
     );
   }
-
-  const clerk = createClerkClient({ secretKey });
-  const existingUsers = await clerk.users.getUserList({
-    emailAddress: [normalizedEmail],
-  });
-  const existingUser = existingUsers.data[0];
-
-  if (existingUser) {
-    return existingUser.id;
-  }
-
-  try {
-    const createdUser = await clerk.users.createUser({
-      username,
-      emailAddress: [normalizedEmail],
-      firstName,
-      lastName,
-      publicMetadata: metadata,
-      skipPasswordRequirement: true,
-    });
-
-    return createdUser.id;
-  } catch (error) {
-    if (!isClerkIdentificationExistsError(error)) {
-      throw error;
-    }
-
-    return resolveRacedClerkUser(clerk, normalizedEmail, undefined, error);
-  }
-}
-
-async function resolveRacedClerkUser(
-  clerk: ReturnType<typeof createClerkClient>,
-  normalizedEmail: string,
-  fallbackClerkId: string | undefined,
-  originalError: unknown
-): Promise<string> {
-  let racedUser: { id: string } | undefined;
-  try {
-    const racedUsers = await clerk.users.getUserList({
-      emailAddress: [normalizedEmail],
-    });
-    racedUser = racedUsers.data[0];
-  } catch (raceError) {
-    if (isClerkUnauthorizedError(raceError) && fallbackClerkId) {
-      return fallbackClerkId;
-    }
-    throw raceError;
-  }
-
-  if (!racedUser) {
-    throw originalError;
-  }
-
-  return racedUser.id;
+  return getDeterministicTestClerkId(normalizedEmail);
 }
 
 export async function ensureUserRecord(

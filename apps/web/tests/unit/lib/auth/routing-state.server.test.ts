@@ -147,6 +147,7 @@ describe('auth routing state store', () => {
       userId: 'user_123',
       returnTo: '/app',
       codeChallenge: 'challenge',
+      ott: null,
       createdAt: 1_000,
       expiresAt: 61_000,
       consumedAt: null,
@@ -166,6 +167,7 @@ describe('auth routing state store', () => {
       ok: true,
       userId: 'user_123',
       returnTo: '/app',
+      ott: null,
     });
 
     expect(hoisted.redisGetdelMock).toHaveBeenCalledWith(
@@ -184,6 +186,7 @@ describe('auth routing state store', () => {
       userId: 'user_123',
       returnTo: '/app',
       codeChallenge: 'challenge',
+      ott: null,
       createdAt: 1_000,
       expiresAt: 61_000,
       consumedAt: null,
@@ -221,6 +224,7 @@ describe('auth routing state store', () => {
       userId: 'user_123',
       returnTo: '/app',
       codeChallenge: 'challenge',
+      ott: null,
       createdAt: 1_000,
       expiresAt: 61_000,
       consumedAt: null,
@@ -247,6 +251,7 @@ describe('auth routing state store', () => {
       ok: true,
       userId: 'user_123',
       returnTo: '/app',
+      ott: null,
     });
     expect(secondResult).toEqual({ ok: false, reason: 'missing' });
     expect(hoisted.redisGetdelMock).toHaveBeenCalledTimes(2);

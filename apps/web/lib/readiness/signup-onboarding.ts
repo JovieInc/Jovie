@@ -2,8 +2,8 @@ export type SignupOnboardingReadinessTarget = 'prd' | 'stg' | 'local';
 export type SignupOnboardingReadinessSource = 'env' | 'vercel-file';
 
 export const REQUIRED_SIGNUP_ONBOARDING_ENV_KEYS = [
-  'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-  'CLERK_SECRET_KEY',
+  'NEXT_PUBLIC_BETTER_AUTH_URL',
+  'BETTER_AUTH_SECRET',
   'DATABASE_URL',
   'SESSION_SECRET',
   'AI_GATEWAY_API_KEY',

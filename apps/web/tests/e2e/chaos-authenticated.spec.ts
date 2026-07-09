@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page, test } from '@playwright/test';
 import {
   ensureSignedInUser,
@@ -388,8 +387,6 @@ async function setupChaosAuth(page: Page, useAdmin = false): Promise<void> {
       'Chaos tests require Clerk credentials. Ensure E2E_CLERK_USER_USERNAME, E2E_CLERK_USER_PASSWORD, and CLERK_TESTING_SETUP_SUCCESS are set. Run with: doppler run -- pnpm exec playwright test'
     );
   }
-
-  await setupClerkTestingToken({ page });
 
   const credentials = useAdmin ? getAdminCredentials() : undefined;
   await ensureSignedInUser(page, credentials);

@@ -61,6 +61,15 @@ export interface NativeExchangeCodeRecord {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge: string | null;
+  /**
+   * One-time token minted at the auth callback from the completing browser
+   * session (Clerk → Better Auth migration, plan decision 9). The native
+   * exchange route verifies this OTT to redeem a fresh native session
+   * (iOS) or hands it to the native-complete page (Electron) which POSTs
+   * it to `/api/auth/one-time-token/verify`. Optional — present only for
+   * native clients, null for web.
+   */
+  readonly ott: string | null;
   readonly createdAt: number;
   readonly expiresAt: number;
   readonly consumedAt?: number | null;
@@ -440,6 +449,7 @@ export function buildNativeExchangeCodeRecord(input: {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge?: string | null;
+  readonly ott?: string | null;
   readonly now: number;
 }): NativeExchangeCodeRecord {
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
@@ -454,6 +464,7 @@ export function buildNativeExchangeCodeRecord(input: {
     userId: input.userId,
     returnTo,
     codeChallenge: input.codeChallenge ?? null,
+    ott: input.ott ?? null,
     createdAt: input.now,
     expiresAt: input.now + NATIVE_EXCHANGE_TTL_MS,
     consumedAt: null,
@@ -474,6 +485,7 @@ export type NativeExchangeValidationResult =
       readonly ok: true;
       readonly userId: string;
       readonly returnTo: string;
+      readonly ott: string | null;
     }
   | {
       readonly ok: false;
@@ -514,6 +526,7 @@ export function validateNativeExchange(input: {
     ok: true,
     userId: input.record.userId,
     returnTo: input.record.returnTo,
+    ott: input.record.ott ?? null,
   };
 }
 

@@ -78,7 +78,8 @@ export async function POST() {
       }
 
       const notificationResult = await notifyVerificationRequest({
-        name: user.name?.trim() || user.email || user.clerkId,
+        name:
+          user.name?.trim() || user.email || user.clerkId || 'Unknown artist',
         email: user.email,
         username: profile.usernameNormalized,
         profileId: profile.id,

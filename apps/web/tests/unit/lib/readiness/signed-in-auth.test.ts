@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOSTNAME } from '@/constants/domains';
 import {
   formatSignedInAuthProbeReport,
   formatSignedInAuthReport,
@@ -13,13 +12,10 @@ const ORIGINAL_ENV = { ...process.env };
 
 describe('signed-in auth readiness', () => {
   beforeEach(() => {
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-      'pk_live_production_example';
-    process.env.CLERK_SECRET_KEY = 'sk_live_production_example';
+    process.env.NEXT_PUBLIC_BETTER_AUTH_URL = 'https://jov.ie';
+    process.env.BETTER_AUTH_SECRET = 'x'.repeat(40);
     process.env.SESSION_SECRET = 'session-secret-example';
     process.env.DATABASE_URL = 'postgres://example';
-    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-    delete process.env.CLERK_SECRET_KEY_STAGING;
   });
 
   afterEach(() => {
@@ -28,13 +24,13 @@ describe('signed-in auth readiness', () => {
     vi.unstubAllGlobals();
   });
 
-  it('resolves hostnames by target', () => {
-    expect(resolveSignedInAuthHostname('local')).toBe('localhost');
-    expect(resolveSignedInAuthHostname('stg')).toBe(`staging.${HOSTNAME}`);
-    expect(resolveSignedInAuthHostname('prd')).toBe(HOSTNAME);
+  it('resolves target passthrough by target', () => {
+    expect(resolveSignedInAuthHostname('local')).toBe('local');
+    expect(resolveSignedInAuthHostname('stg')).toBe('stg');
+    expect(resolveSignedInAuthHostname('prd')).toBe('prd');
   });
 
-  it('passes production config when required keys and routing are healthy', () => {
+  it('passes production config when required keys are present', () => {
     const result = verifySignedInAuthConfig({
       env: process.env,
       target: 'prd',
@@ -42,37 +38,23 @@ describe('signed-in auth readiness', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.checks.some(check => check.id === 'clerk-key-routing')).toBe(
+    expect(result.checks.some(check => check.id === 'better-auth-url')).toBe(
       true
     );
     expect(formatSignedInAuthReport(result)).toContain('status=passed');
   });
 
-  it('fails staging config when production keys would be inherited', () => {
+  it('fails production config when Better Auth URL is missing', () => {
     const result = verifySignedInAuthConfig({
-      env: process.env,
-      target: 'stg',
+      env: { ...process.env, NEXT_PUBLIC_BETTER_AUTH_URL: undefined },
+      target: 'prd',
       source: 'env',
     });
 
     expect(result.ok).toBe(false);
     expect(
-      result.checks.find(check => check.id === 'clerk-key-routing')?.status
+      result.checks.find(check => check.id === 'better-auth-url')?.status
     ).toBe('fail');
-  });
-
-  it('passes staging config when explicit staging Clerk keys are configured', () => {
-    const result = verifySignedInAuthConfig({
-      env: {
-        ...process.env,
-        CLERK_PUBLISHABLE_KEY_STAGING: 'pk_test_staging_example',
-        CLERK_SECRET_KEY_STAGING: 'sk_test_staging_example',
-      },
-      target: 'stg',
-      source: 'env',
-    });
-
-    expect(result.ok).toBe(true);
   });
 
   it('skips required env keys for local target', () => {
@@ -101,7 +83,7 @@ describe('signed-in auth deployment probe', () => {
     vi.unstubAllGlobals();
   });
 
-  it('reports healthy Clerk key routing from deployment headers', async () => {
+  it('reports healthy sign-in when test-auth session bootstraps', async () => {
     vi.stubGlobal(
       'fetch',
       vi
@@ -120,9 +102,6 @@ describe('signed-in auth deployment probe', () => {
           return Promise.resolve(
             new Response('<html>Sign in</html>', {
               status: 200,
-              headers: {
-                'x-clerk-key-status': 'ok',
-              },
             })
           );
         })
@@ -131,7 +110,6 @@ describe('signed-in auth deployment probe', () => {
     const result = await probeSignedInAuthDeployment('http://localhost:3000');
 
     expect(result.ok).toBe(true);
-    expect(result.clerkKeyStatus).toBe('ok');
     expect(result.testAuthSessionOk).toBe(true);
     expect(formatSignedInAuthProbeReport(result)).toContain('status=passed');
   });
@@ -142,9 +120,6 @@ describe('signed-in auth deployment probe', () => {
       vi.fn().mockResolvedValue(
         new Response('<html>Authentication unavailable</html>', {
           status: 200,
-          headers: {
-            'x-clerk-key-status': 'ok',
-          },
         })
       )
     );

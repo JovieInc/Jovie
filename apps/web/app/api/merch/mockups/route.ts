@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { generateProductMockups } from '@/lib/merch/mockups';
 
 const MOCKUP_PRODUCT_TYPES = ['premium tee', 'premium hoodie', 'mug'] as const;
@@ -14,7 +14,7 @@ const postBodySchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

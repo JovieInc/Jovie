@@ -220,9 +220,9 @@ export function isValidationCompleted() {
 export function validateEnvironmentForMiddleware(): boolean {
   try {
     // Basic checks for middleware functionality
-    const hasRequiredForAuth = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const hasRequiredForAuth = !!process.env.BETTER_AUTH_SECRET;
 
-    // Middleware can function with just Clerk, database isn't required for all routes
+    // Middleware can function with just Better Auth, database isn't required for all routes
     return hasRequiredForAuth;
   } catch {
     return false;

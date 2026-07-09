@@ -1,12 +1,8 @@
 import { CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE } from '@/lib/auth/oauth-providers';
 
 /**
- * Apple-level auth copy: terse, declarative, no throat-clearing.
- *
- * Per DESIGN.md "Copywriting": say the thing once, earn every word, cut
- * "welcome", "please", "to continue", and other generic setup copy.
- *
- * Applied via `<ClerkProvider localization={...}>` in AuthClientProviders.
+ * Legacy auth copy map retained for tests and copy reuse after the Better Auth
+ * cutover. The export name is stable while call sites migrate to BA names.
  */
 export const authClerkLocalization = {
   socialButtonsBlockButton: CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE,

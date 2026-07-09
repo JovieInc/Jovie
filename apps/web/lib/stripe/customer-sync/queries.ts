@@ -76,7 +76,11 @@ function isNonRetryableBillingError(error?: string): boolean {
 }
 
 /**
- * Attempts to fetch user data with legacy field fallback
+ * Attempts to fetch user data with legacy field fallback.
+ *
+ * @param clerkUserId - For webhook paths: a real Clerk user id (looked up
+ *   via `users.clerk_id`). For the auth-aware path: this is unused; see
+ *   `fetchUserBillingDataByAppId`.
  */
 async function fetchUserDataWithFallback<
   T extends readonly UserBillingFieldKey[],
@@ -115,6 +119,56 @@ async function fetchUserDataWithFallback<
       .select(legacySelectObj)
       .from(users)
       .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    if (!legacyResult) {
+      return undefined;
+    }
+
+    return mergeWithDefaults(legacyResult as Record<string, unknown>, fields);
+  }
+}
+
+/**
+ * Auth-aware variant of {@link fetchUserDataWithFallback} that looks the
+ * user up by app `users.id` (the value returned by `getCachedAuth().userId`
+ * post-cutover). Webhook paths still use the clerk_id-keyed helper above
+ * because they receive a real Clerk user id from Stripe metadata.
+ */
+async function fetchUserDataByAppIdWithFallback<
+  T extends readonly UserBillingFieldKey[],
+>(
+  appUserId: string,
+  fields: T,
+  selectObj: ReturnType<typeof buildSelectObject<T>>
+): Promise<Record<string, unknown> | undefined> {
+  try {
+    const [result] = await db
+      .select(selectObj)
+      .from(users)
+      .where(eq(users.id, appUserId))
+      .limit(1);
+
+    return result as Record<string, unknown> | undefined;
+  } catch (error) {
+    if (!isMissingColumnError(error)) {
+      throw error;
+    }
+
+    const legacyFieldsToFetch = fields.filter(f => LEGACY_FIELDS.includes(f));
+
+    if (legacyFieldsToFetch.length === 0) {
+      throw error;
+    }
+
+    const legacySelectObj = buildSelectObject(
+      legacyFieldsToFetch as unknown as T
+    );
+
+    const [legacyResult] = await db
+      .select(legacySelectObj)
+      .from(users)
+      .where(eq(users.id, appUserId))
       .limit(1);
 
     if (!legacyResult) {
@@ -190,6 +244,46 @@ export async function fetchUserBillingData<
 }
 
 /**
+ * Same contract as {@link fetchUserBillingData} but keyed on the app
+ * `users.id` UUID (the value returned by `getCachedAuth().userId`
+ * post-cutover) instead of `users.clerk_id`. Used by the auth-aware
+ * wrapper; webhook paths still use the clerk_id-keyed helper.
+ */
+export async function fetchUserBillingDataByAppId<
+  T extends readonly UserBillingFieldKey[] = typeof BILLING_FIELDS_FULL,
+>(options: {
+  appUserId: string;
+  fields?: T;
+}): Promise<FetchUserBillingDataResult<T>> {
+  const { appUserId, fields = BILLING_FIELDS_FULL as unknown as T } = options;
+
+  try {
+    const selectObj = buildSelectObject(fields);
+    const userData = await fetchUserDataByAppIdWithFallback(
+      appUserId,
+      fields,
+      selectObj
+    );
+
+    if (!userData) {
+      return { success: false, error: 'User not found' };
+    }
+
+    return {
+      success: true,
+      data: userData as BillingFieldsResult<T>,
+    };
+  } catch (error) {
+    await captureWarning('Billing data fetch failed (transient)', error, {
+      appUserId,
+      fields: fields.join(','),
+      function: 'fetchUserBillingDataByAppId',
+    });
+    return { success: false, error: 'Failed to retrieve billing data' };
+  }
+}
+
+/**
  * Auth-aware wrapper for fetchUserBillingData.
  * Automatically retrieves the clerkUserId from the current auth context
  * using Clerk's auth() and withDbSession, then delegates to fetchUserBillingData.
@@ -229,8 +323,12 @@ export async function fetchUserBillingDataWithAuth<
       return { success: false, error: 'User not authenticated' };
     }
 
-    const sessionAwareResult = await fetchUserBillingData({
-      clerkUserId: userId,
+    // Post-cutover: getCachedAuth().userId is the app `users.id` UUID.
+    // Look up via the app-id-keyed helper so the auth-aware path doesn't
+    // depend on `clerk_id` (nullable post migration 0073). Webhook paths
+    // keep using the clerk_id-keyed `fetchUserBillingData`.
+    const sessionAwareResult = await fetchUserBillingDataByAppId({
+      appUserId: userId,
       fields,
     });
 
@@ -241,20 +339,20 @@ export async function fetchUserBillingDataWithAuth<
     }
 
     // Do not retry deterministic errors that are expected and non-transient.
-    // For example, newly authenticated users can exist in Clerk before their
+    // For example, newly authenticated users can exist in auth before their
     // local billing row is created. Callers normalize this case to free plan.
     if (isNonRetryableBillingError(sessionAwareResult.error)) {
       return sessionAwareResult;
     }
 
-    const retryResult = await fetchUserBillingData({
-      clerkUserId: userId,
+    const retryResult = await fetchUserBillingDataByAppId({
+      appUserId: userId,
       fields,
     });
 
     if (!retryResult.success) {
       await captureWarning('Billing data auth query failed after retry', null, {
-        clerkUserId: userId,
+        appUserId: userId,
         fields: fields.join(','),
         function: 'fetchUserBillingDataWithAuth',
         initialError: sessionAwareResult.error,

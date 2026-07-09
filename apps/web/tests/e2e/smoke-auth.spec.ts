@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -230,7 +229,6 @@ test.describe('Dashboard Navigation @smoke', () => {
     test.setTimeout(FAST_ITERATION || SMOKE_ONLY ? 180_000 : 300_000);
 
     if (!TEST_AUTH_BYPASS_ENABLED) {
-      await setupClerkTestingToken({ page });
     }
 
     try {

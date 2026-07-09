@@ -124,12 +124,6 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
 
 test.describe('Billing plan selection resiliency', () => {
   test('shows recovery UI when pricing cannot load', async ({ page }) => {
-    // Set up Clerk testing token before sign-in
-    const { setupClerkTestingToken } = await import(
-      '@clerk/testing/playwright'
-    );
-    await setupClerkTestingToken({ page });
-
     try {
       await signInUser(page);
     } catch {

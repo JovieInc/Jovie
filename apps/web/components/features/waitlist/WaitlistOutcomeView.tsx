@@ -1,9 +1,9 @@
 'use client';
 
-import { SignOutButton } from '@clerk/nextjs';
 import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
@@ -81,6 +81,7 @@ export function WaitlistOutcomeView({
   const Icon = copy.icon;
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
+  const { signOut } = useAuthSafe();
 
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
@@ -114,17 +115,18 @@ export function WaitlistOutcomeView({
           </button>
         ) : null}
         {copy.actionHref ? null : (
-          <SignOutButton redirectUrl={APP_ROUTES.HOME}>
-            <button
-              type='button'
-              className={cn(
-                'inline-flex h-10 items-center justify-center rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/74 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed',
-                canRetry && 'sm:ml-auto'
-              )}
-            >
-              Sign Out
-            </button>
-          </SignOutButton>
+          <button
+            type='button'
+            onClick={() => {
+              void signOut({ redirectUrl: APP_ROUTES.HOME });
+            }}
+            className={cn(
+              'inline-flex h-10 items-center justify-center rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/74 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed',
+              canRetry && 'sm:ml-auto'
+            )}
+          >
+            Sign Out
+          </button>
         )}
       </div>
     </section>

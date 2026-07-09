@@ -1,3 +1,4 @@
+import { getCookieCache } from 'better-auth/cookies';
 import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -6,19 +7,14 @@ import {
 } from '@/lib/audience/public-profile-block';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import { isCentralAuthPassThroughRoute } from '@/lib/auth/central-auth-routing';
-import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { buildFinalResponse } from '@/lib/auth/final-response';
-import type { ProxyUserState } from '@/lib/auth/proxy-state';
-import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
-import { resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
-import { captureError, captureWarning } from '@/lib/error-tracking';
+import { captureError } from '@/lib/error-tracking';
 import { resolveLegacyRootPathRedirect } from '@/lib/routing/legacy-root-path-redirects';
 import {
   analyzeHost,
   categorizePath,
   DASHBOARD_URL,
   isDedicatedRootSegment,
-  isProxyRewriteExempt,
 } from '@/lib/routing/proxy-routing';
 import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import {
@@ -42,95 +38,12 @@ function detectMetaBot(userAgent: string): boolean {
   return META_BOT_REGEX.test(userAgent);
 }
 
-function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
-  return (
-    redirectUrl === '/waitlist/invite' ||
-    redirectUrl?.startsWith('/waitlist/invite?') === true
-  );
-}
-
 function shouldAllowProductScreenshotCaptureRoutes(req: NextRequest): boolean {
   return shouldBypassProductionBlockedDebugPath(
     req.nextUrl.pathname,
     req.nextUrl.hostname,
     req.headers
   );
-}
-
-/** Max consecutive state-based rewrites before the circuit breaker fires. */
-const PROXY_REWRITE_CIRCUIT_BREAKER_THRESHOLD = 3;
-const PROXY_REWRITE_COUNT_COOKIE = 'jovie_redirect_count';
-const PROXY_REWRITE_COUNT_TTL_SECONDS = 30;
-
-/**
- * Read the redirect-count cookie defensively. A tampered or malformed cookie
- * value must NOT disable the circuit breaker — fall back to 0 on any
- * non-finite or negative value.
- */
-function readRedirectCount(req: NextRequest): number {
-  const raw = req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value;
-  const parsed = Number.parseInt(raw ?? '0', 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-}
-
-/**
- * Apply a state-based redirect with a shared redirect-loop circuit breaker.
- * Returns the redirect NextResponse, or null when the breaker fires (caller
- * falls through with NextResponse.next() and a Sentry event).
- *
- * Uses redirect (not rewrite) so the URL bar moves to the canonical target.
- * Rewrites left the original pathname in the address bar, which caused
- * repeated middleware hits (RSC prefetches) on non-exempt paths and tripped
- * the breaker even when the user was already viewing onboarding content.
- *
- * The counter is shared across all state-based redirects (waitlist + onboarding)
- * so any loop class trips the same breaker.
- */
-function applyStateRedirect(
-  req: NextRequest,
-  target: string
-): NextResponse | null {
-  const redirectCount = readRedirectCount(req);
-  if (redirectCount >= PROXY_REWRITE_CIRCUIT_BREAKER_THRESHOLD) {
-    return null;
-  }
-  const res = NextResponse.redirect(new URL(target, req.url));
-  res.cookies.set(PROXY_REWRITE_COUNT_COOKIE, String(redirectCount + 1), {
-    maxAge: PROXY_REWRITE_COUNT_TTL_SECONDS,
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-  });
-  return res;
-}
-
-/**
- * Apply a state-based redirect, handling the circuit-breaker fallthrough:
- * when the breaker fires, capture a Sentry warning, pass the request through,
- * and clear the redirect-count cookie so the next navigation starts fresh.
- */
-async function applyStateRedirectOrBreak(
-  req: NextRequest,
-  requestHeaders: Headers,
-  target: string
-): Promise<NextResponse> {
-  const redirect = applyStateRedirect(req, target);
-  if (redirect !== null) {
-    return redirect;
-  }
-  await captureWarning(
-    '[proxy] Redirect loop circuit breaker triggered',
-    new Error('Redirect loop detected'),
-    {
-      pathname: req.nextUrl.pathname,
-      target,
-      redirectCount: readRedirectCount(req),
-      operation: 'proxy_circuit_breaker',
-    }
-  );
-  const res = NextResponse.next({ request: { headers: requestHeaders } });
-  res.cookies.delete(PROXY_REWRITE_COUNT_COOKIE);
-  return res;
 }
 
 /**
@@ -148,9 +61,18 @@ function generateNonce(): string {
 }
 
 /**
- * Core proxy request handler: routing, state-based redirects, CSP nonce,
- * and final response composition. Runs after Clerk middleware (or a bypass)
- * has resolved the userId.
+ * Core proxy request handler: routing, signed-in `/` → `/app` redirect, CSP
+ * nonce, and final response composition. Runs after the proxy.ts entry has
+ * resolved the signed-in marker (Better Auth session cookie presence).
+ *
+ * The handler treats `userId` as a truthy signed-in marker only. Plan
+ * decision 5: the proxy no longer does user-state DB/Redis work — the
+ * shell layout (`resolveUserState`) owns waitlist/onboarding/banned
+ * redirects. Auth-page signed-in redirects are owned by the pages
+ * themselves via `auth.api.getSession` (audit row 16 — avoids a 5-min
+ * stale cookie-cache redirect loop). The signed-cookie validation via
+ * `getCookieCache` is consulted ONLY for the `/` → `/app` convenience
+ * redirect (worst case: one bounce to /signin, no loop).
  */
 export async function handleProxyRequest(
   req: NextRequest,
@@ -170,7 +92,8 @@ export async function handleProxyRequest(
 
     // ========================================================================
     // Generate CSP nonce early and set on request headers
-    // Next.js Server Components read the nonce from request headers via headers().get('x-nonce')
+    // Next.js Server Components read the nonce from request headers via
+    // headers().get('x-nonce')
     // ========================================================================
     const requestHeaders = new Headers(req.headers);
     let nonce: string | null = null;
@@ -181,24 +104,6 @@ export async function handleProxyRequest(
       // Fire-and-forget Sentry initialization (non-blocking)
       ensureSentry().catch(() => {});
     }
-
-    // Inject the resolved Clerk publishable key so server components can read
-    // it from a single pre-resolved header instead of re-parsing the hostname.
-    // Only set when BOTH keys are present — a valid publishable key with a
-    // missing secret key would trick the auth layout into rendering ClerkProvider,
-    // which then throws during SSR because CLERK_SECRET_KEY is unavailable.
-    const resolvedKeys = resolveClerkKeys(hostname);
-    if (resolvedKeys.publishableKey && resolvedKeys.secretKey) {
-      requestHeaders.set(
-        'x-clerk-publishable-key',
-        resolvedKeys.publishableKey
-      );
-    }
-    // Always set the key-resolution status so downstream UI (signin page,
-    // AuthClientProviders) can distinguish "Clerk not configured" from
-    // "Clerk disabled for localhost" and show a specific error instead of
-    // silently falling back to the mock provider.
-    requestHeaders.set('x-clerk-key-status', resolvedKeys.status);
 
     // ========================================================================
     // Early exits that don't need CSP or user state (no DB/Redis calls)
@@ -283,8 +188,7 @@ export async function handleProxyRequest(
     }
 
     // Authenticated legacy earnings deep links should land directly on the
-    // canonical artist profile pay section. Keeping this in proxy preserves
-    // auth-aware handling for anonymous users instead of using static redirects.
+    // canonical artist profile pay section.
     if (
       isNavigationMethod &&
       userId &&
@@ -299,12 +203,13 @@ export async function handleProxyRequest(
     // ========================================================================
     // Audience block check for public profile routes
     //
-    // Runs here — after domain redirects, before any auth/routing logic — so it
-    // applies to both authenticated and unauthenticated visitors.
+    // Runs here — after domain redirects, before any auth/routing logic — so
+    // it applies to both authenticated and unauthenticated visitors.
     //
-    // On Vercel, middleware executes before the CDN cache is consulted, meaning
-    // this gate is enforced even for ISR-cached responses. This lets the profile
-    // page avoid calling headers() (which opts the page into dynamic rendering).
+    // On Vercel, middleware executes before the CDN cache is consulted,
+    // meaning this gate is enforced even for ISR-cached responses. This lets
+    // the profile page avoid calling headers() (which opts the page into
+    // dynamic rendering).
     // ========================================================================
     if (isNavigationMethod) {
       const profileUsername = pathInfo.publicProfileCandidate;
@@ -323,7 +228,7 @@ export async function handleProxyRequest(
     }
 
     // ========================================================================
-    // Unauthenticated user handling (no getUserState call needed)
+    // Unauthenticated user handling (no getCookieCache call needed)
     // ========================================================================
     if (!userId) {
       // Normalize legacy auth paths
@@ -338,8 +243,9 @@ export async function handleProxyRequest(
         return NextResponse.redirect(url);
       }
 
-      // Anonymous waitlist visitors now start in chat onboarding. Keep this in
-      // middleware so local/dev auth outages do not expose a 503 or legacy view.
+      // Anonymous waitlist visitors start in chat onboarding. Keep this in
+      // middleware so local/dev auth outages do not expose a 503 or legacy
+      // view.
       if (isNavigationMethod && pathname === APP_ROUTES.WAITLIST) {
         return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
       }
@@ -363,7 +269,7 @@ export async function handleProxyRequest(
         return NextResponse.redirect(authUrl);
       }
 
-      // Unauthenticated user on public path - build response with CSP if needed
+      // Unauthenticated user on public path — build response with CSP if needed
       return buildFinalResponse(
         req,
         NextResponse.next({ request: { headers: requestHeaders } }),
@@ -374,11 +280,9 @@ export async function handleProxyRequest(
       );
     }
 
-    // Auth callback routes must pass through untouched so Clerk can
-    // complete the handshake and exchange tokens successfully.
-    // Native auth start must also reach its route handler for authenticated
-    // users so it can issue the central callback instead of being redirected
-    // by waitlist/onboarding middleware state.
+    // Auth callback / native handoff pass-through routes must reach their
+    // route handlers untouched so OAuth/PKCE completion can succeed. The
+    // signed-in marker is forwarded but no state-based redirect is applied.
     if (
       pathInfo.isAuthCallbackPath ||
       isCentralAuthPassThroughRoute(pathname)
@@ -394,148 +298,44 @@ export async function handleProxyRequest(
     }
 
     // ========================================================================
-    // Authenticated user handling - SINGLE getUserState call
+    // Signed-in `/` → `/app` convenience redirect (audit row 16).
+    //
+    // `getCookieCache(req)` validates the signed session cookie (zero DB hit
+    // for cache reads ≤5 min old). On a valid signed-in session at `/`, the
+    // proxy bounces to /app. On a stale/revoked cookie (worst case), the
+    // user lands on /, the shell layout re-validates via the full
+    // `auth.api.getSession`, and bounces to /signin if needed — one bounce,
+    // no loop. The shell layout owns the waitlist/onboarding redirect for
+    // authenticated /app/* navigations.
     // ========================================================================
-    const isRSCPrefetch =
-      req.headers.get('Next-Router-Prefetch') === '1' ||
-      req.nextUrl.searchParams.has('_rsc');
-
-    // Fetch user state ONCE for all authenticated routing decisions
-    let userState: ProxyUserState | null = null;
-
-    // Only non-/app page routes need user state for middleware redirects.
-    // /app and /app/* perform auth and onboarding/waitlist gating deeper in
-    // route handlers/layouts, so proxy-level state lookups are unnecessary.
-    const needsUserState =
-      !pathname.startsWith('/api/') &&
-      !pathInfo.isAuthCallbackPath &&
-      pathname !== '/app' &&
-      !pathname.startsWith('/app/');
-
-    // Skip the getUserState call for RSC prefetch requests when the user is
-    // already known-active from the in-memory cache. Active users don't need
-    // routing intervention (no waitlist/onboarding redirect), so the prefetch
-    // can pass through immediately. The subsequent full navigation will still
-    // call getUserState normally.
-    const canSkipForPrefetch = isRSCPrefetch && isKnownActiveUser(userId);
-
-    if (needsUserState && !canSkipForPrefetch) {
-      userState = await getUserState(userId);
-    }
-
-    // Authenticated users on homepage → route based on user state at the edge.
-    // needsOnboarding users go directly to /start so we never bounce through
-    // /app (which immediately redirects back to /start and can loop with
-    // /onboarding/checkout — JOV-2454 / ENG-002).
-    if (pathname === '/' && isNavigationMethod && !isRSCPrefetch) {
-      if (userState?.needsOnboarding) {
-        return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
-      }
-      if (userState?.needsWaitlist) {
-        return NextResponse.redirect(new URL('/waitlist', req.url));
-      }
-      return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-    }
-
-    let res: NextResponse;
-
-    // Handle authenticated user on auth pages (signin/signup)
-    if (
-      pathInfo.isAuthPath &&
-      !pathInfo.isAuthCallbackPath &&
-      !isRSCPrefetch &&
-      isNavigationMethod &&
-      userState
-    ) {
-      const redirectUrl = sanitizeRedirectUrl(
-        req.nextUrl.searchParams.get('redirect_url')
-      );
-
-      if (redirectUrl && isWaitlistInviteRedirect(redirectUrl)) {
-        return NextResponse.redirect(new URL(redirectUrl, req.url));
-      }
-      if (userState.needsWaitlist) {
-        return NextResponse.redirect(new URL('/waitlist', req.url));
-      }
-      if (userState.needsOnboarding) {
-        return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
-      }
-      if (redirectUrl) {
-        return NextResponse.redirect(new URL(redirectUrl, req.url));
-      }
-      return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-    }
-
-    // Route based on user state
-    // Note: /app/* routes are excluded from waitlist/onboarding rewrites because
-    // they have their own auth handling in their layouts. Rewriting /app/* to
-    // /waitlist during RSC navigation causes layout hierarchy mismatches that
-    // manifest as "page not found" errors on the client.
-    if (userState) {
-      const isInviteRedemptionPath = isWaitlistInviteRedirect(
-        req.nextUrl.pathname + req.nextUrl.search
-      );
-
-      // Rewrite banned/deleted users to generic unavailable page.
-      // Uses rewrite (not redirect) so the URL bar stays on whatever page
-      // they were visiting — no dedicated path to discover.
-      // Note: /app/* routes are handled by the shell layout ban check,
-      // not here (proxy skips getUserState for /app/* paths).
-      if (
-        userState.isBanned &&
-        isNavigationMethod &&
-        !isRSCPrefetch &&
-        pathname !== APP_ROUTES.UNAVAILABLE
-      ) {
-        res = NextResponse.rewrite(new URL(APP_ROUTES.UNAVAILABLE, req.url), {
-          request: { headers: requestHeaders },
-        });
-      } else if (
-        userState.needsWaitlist &&
-        pathname !== '/waitlist' &&
-        !isInviteRedemptionPath &&
-        !isProxyRewriteExempt(pathname)
-      ) {
-        res = await applyStateRedirectOrBreak(req, requestHeaders, '/waitlist');
-      } else if (
-        userState.needsOnboarding &&
-        pathname !== APP_ROUTES.START &&
-        !isInviteRedemptionPath &&
-        !isProxyRewriteExempt(pathname)
-      ) {
-        const onboardingJustCompleted =
-          req.cookies.get('jovie_onboarding_complete')?.value === '1';
-
-        if (onboardingJustCompleted) {
-          res = NextResponse.next({ request: { headers: requestHeaders } });
-          res.cookies.delete('jovie_onboarding_complete');
-        } else {
-          res = await applyStateRedirectOrBreak(
-            req,
-            requestHeaders,
-            APP_ROUTES.START
-          );
+    if (pathname === '/' && isNavigationMethod) {
+      try {
+        // `getCookieCache` validates the signed session cookie (zero DB hit
+        // for cache reads ≤5 min old). A non-null return means the user has
+        // a live BA session — bounce to /app. A null/throw means stale or
+        // absent — fall through to render the anonymous homepage; the shell
+        // layout revalidates via auth.api.getSession. Audit row 16.
+        const cachedSession = await getCookieCache(req);
+        if (cachedSession) {
+          return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
         }
-      } else if (
-        !userState.needsWaitlist &&
-        pathname === '/waitlist' &&
-        isNavigationMethod &&
-        !isRSCPrefetch
-      ) {
-        return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {
-        // Redirect authenticated users away from any auth page (/signin, /sign-in,
-        // /signup, /sign-up). Uses isAuthPath to cover all variants consistently.
-        return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else {
-        // Single domain: no rewrites needed, routes are at their canonical paths
-        res = NextResponse.next({ request: { headers: requestHeaders } });
+      } catch {
+        // Tampered/unparseable signed cookie — treat as not signed in.
       }
-    } else {
-      res = NextResponse.next({ request: { headers: requestHeaders } });
     }
 
-    return buildFinalResponse(req, res, pathInfo, startTime, userId, nonce);
+    // Default: pass through with CSP nonce. /app/* and other authenticated
+    // surfaces do their own auth/onboarding/waitlist gating in layouts and
+    // route handlers (plan decision 5: shell layout owns user-state
+    // redirects; proxy no longer does DB/Redis work).
+    return buildFinalResponse(
+      req,
+      NextResponse.next({ request: { headers: requestHeaders } }),
+      pathInfo,
+      startTime,
+      userId,
+      nonce
+    );
   } catch (error) {
     await captureError('Middleware error in proxy', error, {
       pathname: req.nextUrl.pathname,

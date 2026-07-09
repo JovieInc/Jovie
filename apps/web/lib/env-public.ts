@@ -17,8 +17,13 @@ function getRuntimeHtmlDatasetValue(
  * environment variables are fully initialized.
  */
 export const publicEnv = {
-  get NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY() {
-    return process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || undefined;
+  // Better Auth: Google One Tap client id (also gates One Tap rendering)
+  get NEXT_PUBLIC_GOOGLE_CLIENT_ID() {
+    return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || undefined;
+  },
+  // Better Auth: public base URL for the auth server
+  get NEXT_PUBLIC_BETTER_AUTH_URL() {
+    return process.env.NEXT_PUBLIC_BETTER_AUTH_URL || undefined;
   },
   get NEXT_PUBLIC_CLERK_FRONTEND_API() {
     return process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || undefined;

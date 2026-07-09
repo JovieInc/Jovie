@@ -25,7 +25,7 @@ struct MobileAuthFinalizationTests {
     )
   }
 
-  @Test func ticketPlanRequiresClerkStartup() {
+  @Test func ticketOnlyPlanIsNilUnderBetterAuth() {
     let response = NativeAuthExchangeResponse(
       ticket: "ticket_only",
       sessionToken: nil,
@@ -37,7 +37,7 @@ struct MobileAuthFinalizationTests {
 
     let plan = MobileAuthFinalizationPlanner.plan(for: response)
 
-    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_only"))
+    #expect(plan == nil)
   }
 
   @Test func planIsNilWhenNeitherSessionTokenNorTicketPresent() {
@@ -55,7 +55,7 @@ struct MobileAuthFinalizationTests {
     #expect(plan == nil)
   }
 
-  @Test func planFallsBackToTicketWhenSessionTokenIsEmptyString() {
+  @Test func planIsNilWhenSessionTokenIsEmptyString() {
     let response = NativeAuthExchangeResponse(
       ticket: "ticket_fallback",
       sessionToken: "",
@@ -67,10 +67,10 @@ struct MobileAuthFinalizationTests {
 
     let plan = MobileAuthFinalizationPlanner.plan(for: response)
 
-    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_fallback"))
+    #expect(plan == nil)
   }
 
-  @Test func planFallsBackToTicketWhenUserIdIsEmptyString() {
+  @Test func planIsNilWhenUserIdIsEmptyString() {
     let response = NativeAuthExchangeResponse(
       ticket: "ticket_fallback",
       sessionToken: "native-session-token",
@@ -82,7 +82,7 @@ struct MobileAuthFinalizationTests {
 
     let plan = MobileAuthFinalizationPlanner.plan(for: response)
 
-    #expect(plan == .requiresClerkTicketFlow(ticket: "ticket_fallback"))
+    #expect(plan == nil)
   }
 
   @Test func planIsNilWhenSessionTokenValidButTicketIsEmptyStringAndUserIdMissing() {
@@ -104,115 +104,38 @@ struct MobileAuthFinalizationTests {
     let result = LiveLaunchConfigurationResolver.resolve(
       launchMode: .uiTestingSignedOut,
       loadLiveConfiguration: {
-        throw ClerkPublishableKeyValidationError.developmentKeyInDistribution
+        AppConfiguration.mock
       },
       loadUnvalidatedConfiguration: {
-        testConfiguration(clerkPublishableKey: "pk_test_fallback")
+        testConfiguration()
       }
     )
 
-    #expect(result.configuration.clerkPublishableKey == AppConfiguration.mock.clerkPublishableKey)
     #expect(result.shouldConfigureClerk == false)
     #expect(result.authErrorMessage == nil)
   }
 
   @Test func liveLaunchConfigurationEnablesClerkForValidLiveConfig() {
-    let configuration = testConfiguration(clerkPublishableKey: "pk_live_prod")
+    let configuration = testConfiguration()
 
     let result = LiveLaunchConfigurationResolver.resolve(
       launchMode: .live,
       loadLiveConfiguration: { configuration },
-      loadUnvalidatedConfiguration: {
-        testConfiguration(clerkPublishableKey: "pk_test_fallback")
-      }
+      loadUnvalidatedConfiguration: { testConfiguration() }
     )
 
-    #expect(result.configuration.clerkPublishableKey == "pk_live_prod")
     #expect(result.shouldConfigureClerk == true)
     #expect(result.authErrorMessage == nil)
   }
 
-  @Test func liveLaunchConfigurationFailsClosedForInvalidDistributionConfig() {
-    let fallbackConfiguration = testConfiguration(
-      clerkPublishableKey: "pk_test_bW9zdC1rb2FsYS04NC5jbGVyay5hY2NvdW50cy5kZXYk"
-    )
-
-    let result = LiveLaunchConfigurationResolver.resolve(
-      launchMode: .live,
-      loadLiveConfiguration: {
-        throw ClerkPublishableKeyValidationError.developmentKeyInDistribution
-      },
-      loadUnvalidatedConfiguration: { fallbackConfiguration }
-    )
-
-    #expect(result.configuration.clerkPublishableKey == fallbackConfiguration.clerkPublishableKey)
-    #expect(result.shouldConfigureClerk == false)
-    #expect(
-      result.authErrorMessage ==
-        "Sign-in is unavailable in this build. Install the latest TestFlight build or try again later."
-    )
-  }
-
-  @Test func rejectsMissingClerkKeyInAnyBuildConfiguration() {
-    #expect(throws: ClerkPublishableKeyValidationError.missing) {
-      try ClerkPublishableKeyValidator.validateForDistribution("")
-    }
-
-    #expect(throws: ClerkPublishableKeyValidationError.missing) {
-      try ClerkPublishableKeyValidator.validateForDistribution("   ")
-    }
-  }
-
-  @Test func rejectsPlaceholderClerkKeyInAnyBuildConfiguration() {
-    #expect(throws: ClerkPublishableKeyValidationError.placeholder) {
-      try ClerkPublishableKeyValidator.validateForDistribution(
-        ClerkPublishableKeyValidator.placeholderKey
-      )
-    }
-  }
-
-  @Test func rejectsPlaceholderClerkKeyInDistributionBuilds() {
-#if DEBUG
-    // Development builds may use pk_test keys locally.
-#else
-    #expect(throws: ClerkPublishableKeyValidationError.placeholder) {
-      try ClerkPublishableKeyValidator.validateForDistribution(
-        ClerkPublishableKeyValidator.placeholderKey
-      )
-    }
-
-    #expect(throws: ClerkPublishableKeyValidationError.developmentKeyInDistribution) {
-      try ClerkPublishableKeyValidator.validateForDistribution("pk_test_example")
-    }
-
-    #expect(throws: ClerkPublishableKeyValidationError.knownDevelopmentInstance) {
-      try ClerkPublishableKeyValidator.validateForDistribution(
-        "pk_live_most-koala-84.clerk.accounts.dev"
-      )
-    }
-#endif
-  }
-
-  @Test func acceptsProductionStyleKeyInDistributionBuilds() throws {
-#if DEBUG
-    // Validated only for release/TestFlight builds.
-#else
-    try ClerkPublishableKeyValidator.validateForDistribution(
-      "pk_live_production_instance.clerk.accounts.dev"
-    )
-#endif
-  }
-
-  private func testConfiguration(clerkPublishableKey: String) -> AppConfiguration {
+  private func testConfiguration() -> AppConfiguration {
     AppConfiguration(
-      clerkPublishableKey: clerkPublishableKey,
       apiBaseURL: URL(string: "https://jov.ie")!,
       webBaseURL: URL(string: "https://jov.ie")!,
       sentryDSN: nil,
       observabilityIngestURL: nil,
       observabilityIngestSecret: nil,
       observabilityEnvironment: "test",
-      clerkRedirectUrl: "ie.jov.jovie://callback",
       clerkCallbackUrlScheme: "ie.jov.jovie"
     )
   }

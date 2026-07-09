@@ -343,9 +343,9 @@ describe('Environment Validation', () => {
       expect(typeof result).toBe('boolean');
     });
 
-    it('should return true when Clerk key is present', () => {
-      const originalKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_something';
+    it('should return true when Better Auth secret is present', () => {
+      const originalKey = process.env.BETTER_AUTH_SECRET;
+      process.env.BETTER_AUTH_SECRET = 'x'.repeat(40);
 
       try {
         const result = validateEnvironmentForMiddleware();
@@ -353,16 +353,16 @@ describe('Environment Validation', () => {
         expect(result).toBe(true);
       } finally {
         if (originalKey) {
-          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = originalKey;
+          process.env.BETTER_AUTH_SECRET = originalKey;
         } else {
-          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+          delete process.env.BETTER_AUTH_SECRET;
         }
       }
     });
 
-    it('should return false when Clerk key is missing', () => {
-      const originalKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-      delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    it('should return false when Better Auth secret is missing', () => {
+      const originalKey = process.env.BETTER_AUTH_SECRET;
+      delete process.env.BETTER_AUTH_SECRET;
 
       try {
         const result = validateEnvironmentForMiddleware();
@@ -370,7 +370,7 @@ describe('Environment Validation', () => {
         expect(result).toBe(false);
       } finally {
         if (originalKey) {
-          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = originalKey;
+          process.env.BETTER_AUTH_SECRET = originalKey;
         }
       }
     });

@@ -316,7 +316,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const actionCallbacks = useMemo<BuildAdminUserActionsCallbacks>(
     () => ({
       onCopyClerkId: (u: AdminUserRow) => {
-        copyToClipboard(u.clerkId).then(ok => {
+        copyToClipboard(u.clerkId ?? '').then(ok => {
           if (ok) {
             toast.success('Clerk ID copied', { duration: 2000 });
           } else {
@@ -340,11 +340,12 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           if (ok) {
             toast.success('User ID copied', { duration: 2000 });
           } else {
-            toast.error('Failed to copy User ID');
+            toast.error('Failed to copy user ID');
           }
         });
       },
       onOpenInClerk: (u: AdminUserRow) => {
+        if (!u.clerkId) return;
         const clerkConsoleUrl = `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(u.clerkId)}`;
         globalThis.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
       },
@@ -372,7 +373,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
     return [
       {
-        label: 'Copy Clerk IDs',
+        label: 'Copy Clerk Ids',
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: async () => {
           const ids = selectedUsers.map(u => u.clerkId).filter(Boolean);
@@ -402,7 +403,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         },
       },
       {
-        label: 'Copy User IDs',
+        label: 'Copy User Ids',
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: async () => {
           const ids = selectedUsers.map(u => u.id).filter(Boolean);
@@ -412,7 +413,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             toast.success(`Copied ${ids.length} User ID(s)`);
             clearSelection();
           } else {
-            toast.error('Failed to copy User IDs');
+            toast.error('Failed to copy user IDs');
           }
         },
       },
@@ -465,7 +466,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       // Sign up (Created) column
       columnHelper.accessor('createdAt', {
         id: 'created',
-        header: 'Sign up',
+        header: 'Sign Up',
         cell: renderCreatedDateCell,
         size: 160,
       }),
@@ -621,7 +622,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         fetchNextPage().catch(() => {});
                       }}
                     >
-                      Load more users
+                      Load More Users
                     </Button>
                   ) : null}
                 </div>

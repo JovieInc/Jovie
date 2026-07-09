@@ -14,7 +14,7 @@ const nextConfig = {
   allowedDevOrigins: ['localhost', '127.0.0.1', '::1', '[::1]'],
   devIndicators: false,
   // Transpile workspace packages for proper module resolution
-  transpilePackages: ['@jovie/ui', '@clerk/ui'],
+  transpilePackages: ['@jovie/ui'],
   turbopack: {
     // Path aliases are automatically resolved from tsconfig.json paths.
     // Do NOT add resolveAlias entries for @/* — that conflicts with
@@ -424,24 +424,6 @@ const nextConfig = {
       7
     ),
     NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
-    // Clerk JS bundle URL — decoded from the publishable key at build time.
-    // For pk_live_ keys, this points to the FAPI domain (CNAME to Clerk CDN)
-    // so Clerk JS + chunks load directly from Clerk infrastructure instead of
-    // going through the /__clerk middleware proxy which can't serve chunks.
-    ...(() => {
-      const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
-      if (!pk.startsWith('pk_live_')) return {};
-      try {
-        const b64 = pk.replace(/^pk_live_/, '');
-        const host = Buffer.from(b64, 'base64').toString().replace(/\$$/, '');
-        if (!host) return {};
-        return {
-          NEXT_PUBLIC_CLERK_JS_URL: `https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
-        };
-      } catch {
-        return {};
-      }
-    })(),
   },
   // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
   // the NAPI package. When bundled, the hash-prefixed import path that Next.js

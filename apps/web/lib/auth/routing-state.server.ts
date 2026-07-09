@@ -116,6 +116,13 @@ function parseStoredNativeExchange(
   ) {
     return null;
   }
+  if (
+    record.ott !== null &&
+    record.ott !== undefined &&
+    typeof record.ott !== 'string'
+  ) {
+    return null;
+  }
 
   return {
     code: record.code,
@@ -124,6 +131,7 @@ function parseStoredNativeExchange(
     userId: record.userId,
     returnTo: record.returnTo,
     codeChallenge: record.codeChallenge ?? null,
+    ott: typeof record.ott === 'string' ? record.ott : null,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     consumedAt:
@@ -199,6 +207,7 @@ export async function createStoredNativeExchangeCode(input: {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge?: string | null;
+  readonly ott?: string | null;
   readonly now?: number;
 }): Promise<NativeExchangeCodeRecord> {
   const redis = getRequiredRedis();
@@ -209,6 +218,7 @@ export async function createStoredNativeExchangeCode(input: {
     userId: input.userId,
     returnTo: input.returnTo,
     codeChallenge: input.codeChallenge,
+    ott: input.ott,
     now: input.now ?? Date.now(),
   });
 

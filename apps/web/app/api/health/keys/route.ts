@@ -27,14 +27,14 @@ const REQUIRED_KEYS = [
     check: () => Boolean(env.DATABASE_URL),
   },
   {
-    key: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-    label: 'Auth (Clerk Public)',
-    check: () => Boolean(publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY),
+    key: 'BETTER_AUTH_SECRET',
+    label: 'Auth (Better Auth Secret)',
+    check: () => Boolean(env.BETTER_AUTH_SECRET),
   },
   {
-    key: 'CLERK_SECRET_KEY',
-    label: 'Auth (Clerk Secret)',
-    check: () => Boolean(env.CLERK_SECRET_KEY),
+    key: 'NEXT_PUBLIC_BETTER_AUTH_URL',
+    label: 'Auth (Better Auth URL)',
+    check: () => Boolean(publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL),
   },
 ] as const;
 

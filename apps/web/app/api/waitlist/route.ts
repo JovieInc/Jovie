@@ -1,7 +1,6 @@
-import { currentUser } from '@clerk/nextjs/server';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { db, doesTableExist } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
@@ -86,12 +85,10 @@ export async function GET() {
     );
   }
 
-  const user = await currentUser();
-  // Verified emails are the source of truth for identity. Do not fall back to
-  // `primaryEmailAddress` because Clerk can expose an unverified primary.
-  const emailRaw =
-    user?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ?? null;
+  const user = await getCachedCurrentUser();
+  // Better Auth stores exactly one verified email per user — no unverified
+  // primary to guard against (Clerk-era concern, BA always verifies).
+  const emailRaw = user?.primaryEmailAddress?.emailAddress ?? null;
   if (!emailRaw) {
     return NextResponse.json(
       { hasEntry: false, status: null },
@@ -178,13 +175,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await currentUser();
-    // Prefer a verified email — `emailAddresses[0]` may be unverified, which
-    // would let a caller hit the already_accepted path against an email they
-    // have not actually confirmed they own.
-    const emailRaw =
-      user?.emailAddresses?.find(e => e.verification?.status === 'verified')
-        ?.emailAddress ?? null;
+    const user = await getCachedCurrentUser();
+    // Better Auth stores exactly one verified email per user — no unverified
+    // primary to guard against (Clerk-era concern, BA always verifies).
+    const emailRaw = user?.primaryEmailAddress?.emailAddress ?? null;
     if (!emailRaw) {
       return NextResponse.json(
         {

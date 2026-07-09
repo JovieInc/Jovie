@@ -1,8 +1,7 @@
-import { currentUser } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -211,16 +210,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const clerkUser = await currentUser();
-    // Verified emails are the source of truth for identity. Picking
-    // `emailAddresses[0]` (or even `primaryEmailAddress`) can pick an
-    // unverified address that the user has not actually confirmed they
-    // own — which would let them hit the `already_accepted` path against
-    // another claimant's email and silently elevate their status to
-    // `waitlist_approved`. Fail closed on unverified addresses.
-    const emailRaw = clerkUser?.emailAddresses?.find(
-      e => e.verification?.status === 'verified'
-    )?.emailAddress;
+    const clerkUser = await getCachedCurrentUser();
+    // Better Auth stores exactly one verified email per user — no
+    // unverified addresses to guard against (Clerk-era concern, BA
+    // always verifies before sign-in completes).
+    const emailRaw = clerkUser?.primaryEmailAddress?.emailAddress;
     if (!emailRaw) {
       return NextResponse.json(
         { error: 'Email not verified', code: 'email_unverified' },

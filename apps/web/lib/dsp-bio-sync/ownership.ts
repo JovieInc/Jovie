@@ -7,7 +7,7 @@ export interface OwnedProfileResult {
   status: 'ok' | 'not_found' | 'forbidden';
   profile?: {
     id: string;
-    clerkId: string;
+    clerkId: string | null;
     bio: string | null;
   };
 }

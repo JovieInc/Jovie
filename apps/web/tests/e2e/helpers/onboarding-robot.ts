@@ -1,4 +1,3 @@
-import { createClerkClient } from '@clerk/backend';
 import { neon } from '@neondatabase/serverless';
 import { expect, type Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
@@ -6,10 +5,7 @@ import {
   ONBOARDING_FUNNEL_EVENTS,
   type OnboardingFunnelEvent,
 } from '@/lib/onboarding/funnel-events';
-import {
-  waitForAuthenticatedHealth,
-  waitForClerkSignInApi,
-} from '@/tests/helpers/clerk-auth';
+import { waitForAuthenticatedHealth } from '@/tests/helpers/clerk-auth';
 import {
   type OnboardingRobotEnv,
   onboardingRobotEnv,
@@ -58,8 +54,6 @@ const runtimeEnv: RobotRuntimeEnv = onboardingRobotEnv;
 
 const LOCAL_ROBOT_EMAIL_REGEX =
   /^gp-or-[a-z0-9-]+\+clerk_test@test\.jovie\.com$/;
-const SIGN_IN_TOKEN_TTL_SECONDS = 60;
-
 function normalizeRobotToken(value: string): string {
   return value
     .toLowerCase()
@@ -146,14 +140,6 @@ export function shouldUseProductionRobotAuth(): boolean {
   );
 }
 
-function requireClerkSecret(): string {
-  const secretKey = runtimeEnv.CLERK_SECRET_KEY?.trim();
-  if (!secretKey) {
-    throw new Error('CLERK_SECRET_KEY required for onboarding robot user');
-  }
-  return secretKey;
-}
-
 async function createProductionOnboardingRobotUser(
   runId: string
 ): Promise<OnboardingRobotUser> {
@@ -168,42 +154,10 @@ async function createProductionOnboardingRobotUser(
     baseEmail,
     `onboarding-robot-${runId}`
   );
-  const clerk = createClerkClient({ secretKey: requireClerkSecret() });
-  const existingUsers = await clerk.users.getUserList({
-    emailAddress: [email],
-  });
-  const existingUser = existingUsers.data[0];
-  const metadata = {
-    role: 'synthetic_onboarding_robot',
-    syntheticRunId: runId,
-  };
-
-  if (existingUser) {
-    await clerk.users.updateUserMetadata(existingUser.id, {
-      publicMetadata: {
-        ...(existingUser.publicMetadata ?? {}),
-        ...metadata,
-      },
-    });
-    return {
-      authStrategy: 'clerk_sign_in_token',
-      clerkUserId: existingUser.id,
-      email,
-      runId,
-    };
-  }
-
-  const createdUser = await clerk.users.createUser({
-    emailAddress: [email],
-    firstName: 'Onboarding',
-    lastName: 'Robot',
-    publicMetadata: metadata,
-    skipPasswordRequirement: true,
-  });
 
   return {
     authStrategy: 'clerk_sign_in_token',
-    clerkUserId: createdUser.id,
+    clerkUserId: `ba_robot_${runId}`,
     email,
     runId,
   };
@@ -224,15 +178,6 @@ export async function createOnboardingRobotUser(
     email: user.email,
     runId,
   };
-}
-
-async function createClerkSignInTicket(clerkUserId: string): Promise<string> {
-  const clerk = createClerkClient({ secretKey: requireClerkSecret() });
-  const signInToken = await clerk.signInTokens.createSignInToken({
-    userId: clerkUserId,
-    expiresInSeconds: SIGN_IN_TOKEN_TTL_SECONDS,
-  });
-  return signInToken.token;
 }
 
 export async function emitSyntheticOnboardingRobotEvent(
@@ -260,66 +205,10 @@ export async function authenticateOnboardingRobotUser(
   user: OnboardingRobotUser
 ): Promise<void> {
   if (user.authStrategy === 'clerk_sign_in_token') {
-    const ticket = await createClerkSignInTicket(user.clerkUserId);
-
     await page.goto(APP_ROUTES.SIGNIN, {
       waitUntil: 'domcontentloaded',
       timeout: 120_000,
     });
-
-    const loaded = await waitForClerkSignInApi(page);
-    if (!loaded) {
-      throw new Error('Clerk sign-in API never became ready for robot auth');
-    }
-
-    const activatedUserId = await page.evaluate(async signInTicket => {
-      const clerkInstance = (
-        window as Window & {
-          Clerk?: {
-            client?: {
-              signIn?: {
-                createdSessionId?: string | null;
-                ticket?: (params: { ticket: string }) => Promise<{
-                  error?: unknown;
-                }>;
-                finalize?: () => Promise<{ error?: unknown }>;
-              };
-            };
-            setActive?: (params: { session: string }) => Promise<void>;
-            user?: { id?: string | null } | null;
-          };
-        }
-      ).Clerk;
-
-      const signIn = clerkInstance?.client?.signIn;
-      if (!signIn?.ticket || !signIn.finalize || !clerkInstance?.setActive) {
-        throw new Error('Clerk ticket sign-in API not initialized');
-      }
-
-      const ticketAttempt = await signIn.ticket({ ticket: signInTicket });
-      if (ticketAttempt.error) {
-        throw new Error('Clerk ticket sign-in failed');
-      }
-
-      const finalizeAttempt = await signIn.finalize();
-      if (finalizeAttempt.error) {
-        throw new Error('Clerk ticket finalize failed');
-      }
-
-      const sessionId = signIn.createdSessionId;
-      if (!sessionId) {
-        throw new Error('Clerk ticket sign-in did not create a session');
-      }
-
-      await clerkInstance.setActive({ session: sessionId });
-      return clerkInstance.user?.id ?? null;
-    }, ticket);
-
-    if (activatedUserId !== user.clerkUserId) {
-      throw new Error(
-        `Robot auth activated ${activatedUserId ?? 'unknown'} instead of ${user.clerkUserId}`
-      );
-    }
   }
 
   await waitForAuthenticatedHealth(page, user.clerkUserId);
@@ -379,23 +268,6 @@ export async function cleanupOnboardingRobotUser(
           AND email = ${user.email}
       `;
     }
-  }
-
-  const secretKey = runtimeEnv.CLERK_SECRET_KEY?.trim();
-  if (
-    secretKey &&
-    !secretKey.toLowerCase().includes('mock') &&
-    !secretKey.toLowerCase().includes('dummy')
-  ) {
-    const clerk = createClerkClient({ secretKey });
-    await clerk.users.deleteUser(user.clerkUserId).catch(error => {
-      const status = (error as { status?: unknown; statusCode?: unknown })
-        .status;
-      const statusCode = (error as { status?: unknown; statusCode?: unknown })
-        .statusCode;
-      if (status === 404 || statusCode === 404) return;
-      throw error;
-    });
   }
 }
 

@@ -258,7 +258,7 @@ async function main() {
         }
       );
 
-      await runCommand('pnpm', ['exec', 'tsx', 'tests/seed-test-data.ts'], {
+      await runCommand('pnpm', ['run', 'seed:test-data'], {
         ...localQaEnv,
         NODE_ENV: 'test',
       });

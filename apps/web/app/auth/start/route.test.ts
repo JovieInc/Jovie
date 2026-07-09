@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  auth: vi.fn(),
+  getCachedAuth: vi.fn(),
   createStoredAuthState: vi.fn(),
   captureError: vi.fn().mockResolvedValue(undefined),
   generalLimiter: {
@@ -13,8 +13,8 @@ const hoisted = vi.hoisted(() => ({
   trackServerEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: hoisted.auth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: hoisted.getCachedAuth,
 }));
 
 vi.mock('@/lib/auth/routing-state.server', () => ({
@@ -61,7 +61,11 @@ describe('GET /auth/start', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
       '00000000-0000-4000-8000-000000000123'
     );
-    hoisted.auth.mockResolvedValue({ userId: 'user_123' });
+    hoisted.getCachedAuth.mockResolvedValue({
+      userId: 'user_123',
+      sessionId: 'session_123',
+      orgId: null,
+    });
     hoisted.generalLimiter.limit.mockResolvedValue({ success: true });
     hoisted.localLimiter.limit.mockResolvedValue({ success: true });
     hoisted.createStoredAuthState.mockResolvedValue({

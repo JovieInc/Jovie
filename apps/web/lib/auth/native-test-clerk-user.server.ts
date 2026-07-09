@@ -1,65 +1,51 @@
 import 'server-only';
 
-import { clerkClient } from '@clerk/nextjs/server';
-
-type ClerkClient = Awaited<ReturnType<typeof clerkClient>>;
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+import { baUsers } from '@/lib/db/schema/better-auth';
 
 function readTrimmedEnv(name: string): string | null {
   const value = process.env[name]?.trim();
   return value ? value : null;
 }
 
-async function getExistingUserId(
-  clerk: ClerkClient,
-  userId: string
-): Promise<string | null> {
-  try {
-    const user = await clerk.users.getUser(userId);
-    return user.id.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-async function getUserIdByEmail(
-  clerk: ClerkClient,
-  email: string
-): Promise<string | null> {
-  try {
-    const users = await clerk.users.getUserList({
-      emailAddress: [email],
-    });
-    return users.data[0]?.id?.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-export async function resolveConfiguredNativeTestClerkUserId(): Promise<
+export async function resolveConfiguredNativeTestBetterAuthUserId(): Promise<
   string | null
 > {
-  const explicitUserId = readTrimmedEnv('JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID');
+  const explicitBaUserId = readTrimmedEnv(
+    'JOVIE_IOS_LIVE_AUTH_BETTER_AUTH_USER_ID'
+  );
+  const legacyClerkId = readTrimmedEnv('JOVIE_IOS_LIVE_AUTH_CLERK_USER_ID');
   const e2eEmail = readTrimmedEnv('E2E_CLERK_USER_USERNAME');
   const e2eUserId = readTrimmedEnv('E2E_CLERK_USER_ID');
-  if (!explicitUserId && !e2eEmail && !e2eUserId) {
-    return null;
+
+  if (explicitBaUserId) {
+    const [baUser] = await db
+      .select({ id: baUsers.id })
+      .from(baUsers)
+      .where(eq(baUsers.id, explicitBaUserId))
+      .limit(1);
+    return baUser?.id ?? null;
   }
 
-  const clerk = await clerkClient();
-
-  if (explicitUserId) {
-    return getExistingUserId(clerk, explicitUserId);
+  const legacyId = legacyClerkId ?? e2eUserId;
+  if (legacyId) {
+    const [appUser] = await db
+      .select({ betterAuthUserId: users.betterAuthUserId })
+      .from(users)
+      .where(eq(users.clerkId, legacyId))
+      .limit(1);
+    return appUser?.betterAuthUserId ?? null;
   }
 
   if (e2eEmail) {
-    const emailUserId = await getUserIdByEmail(clerk, e2eEmail);
-    if (emailUserId) {
-      return emailUserId;
-    }
-  }
-
-  if (e2eUserId) {
-    return getExistingUserId(clerk, e2eUserId);
+    const [baUser] = await db
+      .select({ id: baUsers.id })
+      .from(baUsers)
+      .where(eq(baUsers.email, e2eEmail))
+      .limit(1);
+    return baUser?.id ?? null;
   }
 
   return null;

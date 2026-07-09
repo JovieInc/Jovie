@@ -1,6 +1,5 @@
 import { ProfileWebVitalsReporter } from '@/components/features/profile/ProfileWebVitalsReporter';
 import { ClientProviders } from '@/components/providers/ClientProviders';
-import { publicEnv } from '@/lib/env-public';
 
 // ISR: profiles are statically generated and revalidated every hour.
 // On-demand invalidation via revalidateTag(createProfileTag(username))
@@ -32,11 +31,7 @@ export default function ProfileLayout({
   // `user: null` when Clerk is bypassed. Authenticated flows (sign-in, claim,
   // dashboard) run under their own route groups which mount ClerkProvider.
   return (
-    <ClientProviders
-      forceBypassClerk
-      publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      skipCoreProviders
-    >
+    <ClientProviders forceBypassClerk skipCoreProviders>
       {children}
       <ProfileWebVitalsReporter />
     </ClientProviders>

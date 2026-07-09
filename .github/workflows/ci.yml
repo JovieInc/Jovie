@@ -1148,7 +1148,7 @@ jobs:
 
       - name: Seed mobile overflow fixtures
         if: matrix.width == 320
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -1330,7 +1330,7 @@ jobs:
 
       - name: Seed public QA fixtures
         if: matrix.shard == 0
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -2656,7 +2656,7 @@ jobs:
 
       - name: Seed public QA fixtures
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -2806,7 +2806,7 @@ jobs:
 
       - name: Seed public QA fixtures
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -3303,7 +3303,7 @@ jobs:
 
       - name: Seed E2E DB
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        run: pnpm --filter=@jovie/web run seed:test-data
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -4773,14 +4773,42 @@ jobs:
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
 
+      - name: Hard probe — Better Auth handler reachable (GET /api/auth/ok)
+        id: ba-health
+        run: |
+          # Plan Phase 11 (Clerk → Better Auth migration): a deterministic 200
+          # from `/api/auth/ok` proves the BA handler mounted on prod before
+          # the OAuth provider redirect_uri probe runs. A 404 means the
+          # catch-all `/api/auth/[...all]` shadowed the static route, or the
+          # deploy broke auth stitching. Separate axis from the OAuth provider
+          # probe: catches handler-wired-wrong without depending on
+          # Google/Apple console state.
+          ok_url="https://jov.ie/api/auth/ok"
+          attempt=1
+          max_attempts=3
+          until curl --fail --silent --show-error -o /dev/null -w "%{http_code}\n" "$ok_url" | grep -q '^200$'; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "ba_health=failed" >> "$GITHUB_OUTPUT"
+              echo "❌ $ok_url did not return 200 after ${max_attempts} attempts."
+              exit 1
+            fi
+            sleep_seconds=$((attempt * 15))
+            echo "⚠️ $ok_url not 200 on attempt ${attempt}/${max_attempts}; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
+          echo "ba_health=passed" >> "$GITHUB_OUTPUT"
+          echo "✅ $ok_url returned 200 (Better Auth handler healthy)"
+
       - name: Probe production Google + Apple OAuth redirect URIs
         id: oauth-probe
         run: |
           # Hits the Google + Apple authorize endpoints with the EXACT redirect_uri
-          # Clerk hands them and fails ONLY on a real provider rejection
+          # Better Auth hands them (https://jov.ie/api/auth/callback/<provider>)
+          # and fails ONLY on a real provider rejection
           # (redirect_uri_mismatch / invalid_request). This is the gap the
-          # staging canary cannot cover: production runs a different Clerk
-          # instance + different OAuth clients than staging.
+          # staging canary cannot cover: production runs a different app host
+          # + different OAuth clients than staging.
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
@@ -4798,12 +4826,12 @@ jobs:
             attempt=$((attempt + 1))
           done
           echo "oauth_status=passed" >> "$GITHUB_OUTPUT"
-          echo "✅ Production Google + Apple accept Clerk's redirect_uri"
-      - name: Auto-rollback on confirmed OAuth break
-        # Roll back ONLY on a confirmed provider rejection (oauth_status=failed),
-        # never on an infra/setup failure — a spurious rollback of a healthy
-        # deploy is worse than a one-cycle delay.
-        if: ${{ failure() && steps.oauth-probe.outputs.oauth_status == 'failed' }}
+          echo "✅ Production Google + Apple accept Better Auth's redirect_uri"
+      - name: Auto-rollback on confirmed auth break
+        # Roll back ONLY on a confirmed auth regression (oauth_status=failed OR
+        # ba_health=failed), never on an infra/setup failure — a spurious
+        # rollback of a healthy deploy is worse than a one-cycle delay.
+        if: ${{ failure() && (steps.oauth-probe.outputs.oauth_status == 'failed' || steps.ba-health.outputs.ba_health == 'failed') }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -4825,11 +4853,11 @@ jobs:
             -d "$(jq -n \
               --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
               '{
-                text: "🚨 Production OAuth Gate FAILED — Google/Apple reject Clerk redirect_uri. Auto-rollback triggered.",
+                text: "🚨 Production Auth Gate FAILED — Better Auth handler unreachable OR Google/Apple reject redirect_uri. Auto-rollback triggered.",
                 attachments: [{
                   color: "danger",
                   fields: [
-                    {title: "Fix", value: "Re-sync consoles via the /auth-console-sync skill (FAPI host likely changed).", short: false},
+                    {title: "Fix", value: "If BA handler 404s: catch-all /api/auth/[...all] shadowed /api/auth/ok or auth stitching broke. If OAuth probe failed: re-sync Google/Apple consoles via the /auth-console-sync skill (app host likely changed).", short: false},
                     {title: "Run", value: $run_url, short: false}
                   ]
                 }]
