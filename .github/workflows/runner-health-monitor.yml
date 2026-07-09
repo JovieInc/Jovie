@@ -13,9 +13,7 @@ name: Runner Health Monitor
 # GitHub-hosted runners onto an incomplete toolchain.
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'   # every 5 minutes
-  workflow_dispatch:         # manual trigger for testing
+  workflow_dispatch:         # manual trigger (cron moved to agent-tick.yml)
 
 permissions:
   contents: read

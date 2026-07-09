@@ -6,8 +6,6 @@
 name: GitHub AI Dispatcher
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       ready_label:

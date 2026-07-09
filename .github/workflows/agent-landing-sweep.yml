@@ -29,9 +29,6 @@
 name: Agent Landing Sweep
 
 on:
-  schedule:
-    # Every 15 minutes — matches the github-ai-dispatcher cadence
-    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:

@@ -36,11 +36,6 @@
 name: Cost Anomaly Gate
 
 on:
-  schedule:
-    # Every 15 minutes. GH Actions cron has up to several minutes of drift
-    # under load; that's acceptable for cost monitoring.
-    - cron: '*/15 * * * *'
-      timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
       dry_run:

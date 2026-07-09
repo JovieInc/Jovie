@@ -4,13 +4,7 @@ permissions:
   contents: read
 
 on:
-  schedule:
-    # Run every 15 minutes during business hours (8 AM - 8 PM PST = 16:00-04:00 UTC)
-    - cron: '*/15 16-23 * * *'
-    - cron: '*/15 0-4 * * *'
-    # Run every 30 minutes during off-hours (4 AM - 4 PM PST = 05:00-15:00 UTC)
-    - cron: '0,30 5-15 * * *'
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch: # Manual trigger (cron moved to agent-tick.yml)
 
 jobs:
   synthetic-test:
