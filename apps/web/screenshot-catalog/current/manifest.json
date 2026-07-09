@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-09T08:30:54.479Z",
-    "gitSha": "e8684429e0e0c6cae3d56a7a0c2f4e8ccf36f7b8",
+    "capturedAt": "2026-07-09T09:06:59.872Z",
+    "gitSha": "d343b2328c7f0c7fd6871083a466baff3672c1de",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-09T08:32:43.927Z",
-    "gitSha": "e8684429e0e0c6cae3d56a7a0c2f4e8ccf36f7b8",
+    "capturedAt": "2026-07-09T09:08:49.352Z",
+    "gitSha": "d343b2328c7f0c7fd6871083a466baff3672c1de",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-09T08:33:09.224Z",
-    "gitSha": "e8684429e0e0c6cae3d56a7a0c2f4e8ccf36f7b8",
+    "capturedAt": "2026-07-09T09:09:14.692Z",
+    "gitSha": "d343b2328c7f0c7fd6871083a466baff3672c1de",
     "imagePath": "artist-profile-built-for-artists-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-09T05:05:02.364Z",
-    "gitSha": "e3d6ba5a3b6a6af92d63b802a381a4d1951ea599",
+    "capturedAt": "2026-07-09T09:10:52.600Z",
+    "gitSha": "d343b2328c7f0c7fd6871083a466baff3672c1de",
     "imagePath": "artist-profile-power-features-section-desktop.png"
   },
   {
@@ -608,8 +608,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-07-09T08:44:06.416Z",
-    "gitSha": "e8684429e0e0c6cae3d56a7a0c2f4e8ccf36f7b8",
+    "capturedAt": "2026-07-09T09:20:12.456Z",
+    "gitSha": "d343b2328c7f0c7fd6871083a466baff3672c1de",
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"
   },
