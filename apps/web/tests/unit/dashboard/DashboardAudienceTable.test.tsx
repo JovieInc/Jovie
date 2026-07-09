@@ -92,8 +92,8 @@ vi.mock('@/features/dashboard/organisms/AnalyticsSidebar', () => ({
 }));
 
 vi.mock('@/components/organisms/EmptyState', () => ({
-  EmptyState: ({ heading }: { heading?: string }) => (
-    <div data-testid='empty-state'>{heading}</div>
+  EmptyState: ({ heading, testId }: { heading?: string; testId?: string }) => (
+    <div data-testid={testId ?? 'empty-state'}>{heading}</div>
   ),
 }));
 
@@ -292,15 +292,21 @@ describe('DashboardAudienceTable', () => {
     expect(screen.getByTestId('dashboard-audience-table')).toBeInTheDocument();
   });
 
-  it('shows empty state when no rows provided', () => {
+  it('shows empty state with correct testId when no rows provided', () => {
     renderWithProviders(<DashboardAudienceTable {...defaultProps} rows={[]} />);
+    expect(
+      screen.getByTestId('dashboard-audience-empty-state')
+    ).toBeInTheDocument();
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
-  it('shows unified empty state in subscribers mode', () => {
+  it('shows unified empty state with correct testId in subscribers mode', () => {
     renderWithProviders(
       <DashboardAudienceTable {...defaultProps} mode='subscribers' rows={[]} />
     );
+    expect(
+      screen.getByTestId('dashboard-audience-empty-state')
+    ).toBeInTheDocument();
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
