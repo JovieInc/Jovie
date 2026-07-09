@@ -6,10 +6,12 @@ import {
   buildGbrainCaptureText,
   buildGbrainQuery,
   buildRecoveryStashMessage,
+  buildRetryEscalationReason,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   classifyCheckout,
+  countRetryReleases,
   describeCheckout,
   dirtyPathsAreRecoverableDetritus,
   EPIC_LABEL,
@@ -27,14 +29,17 @@ import {
   isSpawnEagain,
   isUiUxDesignIssue,
   loadShipperConfig,
+  MAX_RETRY_RELEASES,
   NO_AUTO_LABEL,
   parseAgentChain,
   parseDirtyPaths,
   planCheckoutGate,
+  RETRY_RELEASE_COMMENT_HEADER,
   routeForAgent,
   SpawnEagainError,
   selectTaskRoute,
   shellQuote,
+  shouldEscalateRetry,
   worktreeHasWork,
 } from '../../hermes/lib/codex-issue-shipper.ts';
 
@@ -368,13 +373,16 @@ describe('codex issue shipper prompt', () => {
       })
     ).toBeNull();
 
+    // Capture failure alone no longer blocks dispatch (#13116): only a
+    // `gbrain query failed:` line is the coordination gate, so a
+    // `(capture failed)` slug with a clean query result must not block.
     expect(
       gbrainContextBlocker({
         captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
         queryText: 'Jovie implementation context',
         queryResult: 'No results.',
       })
-    ).toContain('system-blocker');
+    ).toBeNull();
   });
 
   it('adds Ovie-specific make-interfaces-better guardrails to Ovie UX prompts', () => {
@@ -872,6 +880,89 @@ describe('agent fallback chain', () => {
       'opus',
       'opus',
     ]);
+  });
+});
+
+describe('retry escalation (#13126)', () => {
+  // The real comment strings the shipper posts — the header is the exported
+  // constant the emitter (releaseClaimForRetry) also uses, so these stay in
+  // sync with the comments the counter must (and must not) count. Only the
+  // shipper's own comments (viewerDidAuthor: true) are trusted markers.
+  const releaseComment = {
+    body: `${RETRY_RELEASE_COMMENT_HEADER}\n\nAgent exited 0 but no open PR exists - releasing claim for retry.`,
+    viewerDidAuthor: true,
+  };
+  const restartRecoveryComment = {
+    body: 'Jovie agent (codex issue shipper) restarted mid-dispatch (owner pid 4242 gone). Claim released for retry.',
+    viewerDidAuthor: true,
+  };
+  const claimComment = {
+    body: 'Jovie agent (codex issue shipper) claimed this issue.\n\nBranch: `codex/gh-1-x`',
+    viewerDidAuthor: true,
+  };
+  const blockedComment = {
+    body: 'Jovie agent (codex issue shipper) stopped on a real blocker.\n\nSome reason.',
+    viewerDidAuthor: true,
+  };
+  // Public repo: an attacker can copy the header verbatim, but did not author
+  // it (viewerDidAuthor: false), so it must not inflate the counter.
+  const forgedComment = {
+    body: `${RETRY_RELEASE_COMMENT_HEADER}\n\nnice try`,
+    viewerDidAuthor: false,
+  };
+
+  it('counts only the shipper-authored release-for-retry comments', () => {
+    expect(countRetryReleases([])).toBe(0);
+    expect(
+      countRetryReleases([
+        claimComment,
+        releaseComment,
+        restartRecoveryComment, // "Claim released for retry" — infra restart, not a task failure
+        releaseComment,
+        blockedComment,
+        forgedComment, // header present but not shipper-authored
+      ])
+    ).toBe(2);
+  });
+
+  it('does not count comments forged by other authors (public repo)', () => {
+    expect(countRetryReleases([forgedComment, forgedComment])).toBe(0);
+  });
+
+  it('release comment matches the header; restart-recovery comment does not', () => {
+    expect(releaseComment.body).toContain(RETRY_RELEASE_COMMENT_HEADER);
+    expect(restartRecoveryComment.body).not.toContain(
+      RETRY_RELEASE_COMMENT_HEADER
+    );
+    expect(claimComment.body).not.toContain(RETRY_RELEASE_COMMENT_HEADER);
+  });
+
+  it('escalates on the MAX_RETRY_RELEASES-th failure, not before', () => {
+    expect(MAX_RETRY_RELEASES).toBe(3);
+    // 0 prior releases → 1st failure: release
+    expect(shouldEscalateRetry(0)).toBe(false);
+    // 1 prior release → 2nd failure: release
+    expect(shouldEscalateRetry(1)).toBe(false);
+    // 2 prior releases → 3rd failure: escalate
+    expect(shouldEscalateRetry(2)).toBe(true);
+    expect(shouldEscalateRetry(5)).toBe(true);
+  });
+
+  it('respects a custom max threshold', () => {
+    expect(shouldEscalateRetry(0, 1)).toBe(true);
+    expect(shouldEscalateRetry(0, 2)).toBe(false);
+    expect(shouldEscalateRetry(1, 2)).toBe(true);
+  });
+
+  it('escalation reason names the attempt count and the latest failure', () => {
+    const reason = buildRetryEscalationReason(
+      2,
+      'Agent timeout after 7200000ms'
+    );
+    expect(reason).toContain('after 3 automated retry attempts');
+    expect(reason).toContain('possible systemic issue');
+    expect(reason).toContain('Agent timeout after 7200000ms');
+    expect(reason).toContain('#13126');
   });
 });
 
