@@ -3,7 +3,6 @@
 import { SimpleTooltip } from '@jovie/ui';
 import * as Sentry from '@sentry/nextjs';
 import { useMemo } from 'react';
-import { toast } from 'sonner';
 import type {
   PreviewPanelData,
   PreviewPanelLink,
@@ -11,6 +10,7 @@ import type {
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
+import { toast } from '@/components/feedback';
 import {
   DrawerLinkSection,
   SidebarLinkRow,

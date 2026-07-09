@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {

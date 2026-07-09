@@ -2,8 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
+import { toast } from '@/components/feedback';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { ChatArtifactErrorCard } from './ChatArtifactErrorCard';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';

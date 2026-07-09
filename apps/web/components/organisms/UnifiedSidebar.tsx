@@ -10,9 +10,9 @@ import { ArrowLeft, Copy, RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import {
   Sidebar,

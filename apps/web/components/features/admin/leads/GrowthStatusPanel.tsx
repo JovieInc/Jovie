@@ -4,7 +4,7 @@ import { Switch } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { type ReactNode, startTransition } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';

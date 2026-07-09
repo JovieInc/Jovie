@@ -9,8 +9,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { toast } from '@/components/feedback';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { useAutoSave } from '@/lib/pacer/hooks/useAutoSave';
 import { useAvatarMutation, useProfileSaveMutation } from '@/lib/queries';

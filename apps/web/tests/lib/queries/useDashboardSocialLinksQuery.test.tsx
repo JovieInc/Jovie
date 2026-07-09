@@ -42,7 +42,7 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { track } from '@/lib/analytics';
 
 // Sample social link data for tests

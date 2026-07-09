@@ -12,7 +12,7 @@ import {
 import { Mail, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { memo, useCallback } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';

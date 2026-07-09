@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { AlertTriangle, Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {

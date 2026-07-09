@@ -1,5 +1,5 @@
-import { toast } from 'sonner';
 import { connectAppleMusicArtist } from '@/app/app/(shell)/dashboard/releases/actions';
+import { toast } from '@/components/feedback';
 
 export interface AppleMusicArtistSelection {
   readonly id: string;

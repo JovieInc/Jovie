@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { captureException } from '@/lib/sentry/client-lite';
 import { fetchBuildInfo } from './useVersionMonitor';
 

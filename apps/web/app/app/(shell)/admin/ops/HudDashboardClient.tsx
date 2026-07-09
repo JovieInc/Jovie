@@ -19,7 +19,6 @@ import {
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
@@ -28,6 +27,7 @@ import type { DailyBucket } from '@/components/features/admin/ShippingVelocityCh
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
 import { WhatShipped } from '@/components/features/admin/WhatShipped';
+import { toast } from '@/components/feedback';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';

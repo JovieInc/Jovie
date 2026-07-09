@@ -3,8 +3,8 @@
 import { Button, Input } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { Label } from '@/components/atoms/Label';
+import { toast } from '@/components/feedback';
 import {
   Dialog,
   DialogActions,

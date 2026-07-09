@@ -2,11 +2,11 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import {
   deleteContact,
   saveContact,
 } from '@/app/app/(shell)/dashboard/contacts/actions';
+import { toast } from '@/components/feedback';
 import { track } from '@/lib/analytics';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
 import { queryKeys } from '@/lib/queries';

@@ -33,7 +33,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { track } from '@/lib/analytics';
 import {
   buildUTMUrl,

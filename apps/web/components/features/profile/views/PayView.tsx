@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { PaySelector } from '@/components/molecules/PaySelector';
 import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';

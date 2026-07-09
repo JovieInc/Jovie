@@ -12,7 +12,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { toast } from 'sonner';
 import {
   connectAppleMusicArtist,
   deleteRelease,
@@ -21,6 +20,7 @@ import {
 import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { Icon } from '@/components/atoms/Icon';
+import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   DrawerButton,

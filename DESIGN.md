@@ -648,8 +648,8 @@ Destructive actions use `destructive` on any variant. Examples: primary destruct
 |---|---|---|
 | Irreversible single-item delete (account, investor link, payment method) | `<ConfirmDialog>` modal, `variant='destructive'` | Default for hard delete and any action with no recovery path |
 | Bulk destructive action ≥ 10 items | `<ConfirmDialog>` modal with count-prefixed title | Below the count threshold, prefer one-click + undo-toast |
-| Async error / failure feedback | `toast.error("...")` from `sonner` | Non-blocking; auto-dismisses |
-| Async success feedback | `toast.success("...")` from `sonner` | Show on every successful confirm — silence reads as "did it work?" |
+| Async error / failure feedback | `toast.error("...")` from `@/components/feedback` | Non-blocking; auto-dismisses |
+| Async success feedback | `toast.success("...")` from `@/components/feedback` | Show on every successful confirm — silence reads as "did it work?" |
 | Reversible single-item action (soft-delete, hide/show, status change) | Optimistic update + undo-toast | Pattern not yet codified — for now use `<ConfirmDialog>` and file a follow-up |
 | Native `alert()` / `confirm()` / `prompt()` | **NEVER** | Banned by `biome.json` `noRestrictedGlobals` and CI grep gate |
 

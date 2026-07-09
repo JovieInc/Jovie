@@ -2,11 +2,11 @@ import { Badge } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { Copy, ExternalLink } from 'lucide-react';
 import type { RefObject } from 'react';
-import { toast } from 'sonner';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { toast } from '@/components/feedback';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,

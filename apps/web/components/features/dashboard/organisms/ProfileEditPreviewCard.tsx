@@ -9,8 +9,8 @@
 
 import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { stripUntrustedSourceFence } from '@/lib/ai/tools/untrusted-source-fence';

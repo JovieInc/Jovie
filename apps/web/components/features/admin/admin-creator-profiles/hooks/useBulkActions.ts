@@ -8,7 +8,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { useAdminBulkRefreshMutation } from '@/lib/queries';
 import type { AdminCreatorProfileRow } from '../types';
 

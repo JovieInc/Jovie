@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useMarkLeadDmSentMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';

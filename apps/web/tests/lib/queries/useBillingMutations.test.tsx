@@ -38,7 +38,7 @@ vi.mock('@sentry/nextjs', async importOriginal => {
 });
 
 // Import the mocked modules for assertions
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 
 describe('useBillingMutations', () => {
   let queryClient: QueryClient;

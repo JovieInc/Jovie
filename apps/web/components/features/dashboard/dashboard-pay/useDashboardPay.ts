@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { toast } from '@/components/feedback';
 import { useUpdateVenmoMutation } from '@/lib/queries';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { UseDashboardPayReturn } from './types';

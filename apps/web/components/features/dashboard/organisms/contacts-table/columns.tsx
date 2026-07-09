@@ -4,11 +4,11 @@ import { Badge } from '@jovie/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Mail, Phone } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   TableActionMenu,
   type TableActionMenuItem,
 } from '@/components/atoms/table-action-menu';
+import { toast } from '@/components/feedback';
 import { convertContextMenuItems } from '@/components/organisms/table';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {

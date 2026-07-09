@@ -52,7 +52,7 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 import { usePathname, useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';

@@ -13,7 +13,7 @@ import {
 } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState, useTransition } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 
 interface CreateProfileResult {
   success: boolean;

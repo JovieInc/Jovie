@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DmQueueCard } from './DmQueueCard';

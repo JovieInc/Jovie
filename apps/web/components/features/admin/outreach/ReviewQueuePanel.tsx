@@ -8,8 +8,8 @@ import {
 } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';

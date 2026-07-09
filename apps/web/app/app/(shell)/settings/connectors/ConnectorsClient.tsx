@@ -3,11 +3,11 @@
 import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
-import { toast } from 'sonner';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import { ConnectorCard } from '@/components/features/connectors/ConnectorCard';
 import { SuggestedActionCard } from '@/components/features/connectors/SuggestedActionCard';
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
+import { toast } from '@/components/feedback';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
 

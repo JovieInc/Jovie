@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import type { SaveStatus } from '@/types';
 
 export interface UseProfileSaveToastsOptions {

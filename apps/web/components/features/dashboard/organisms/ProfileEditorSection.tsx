@@ -9,7 +9,7 @@
 
 import { Input } from '@jovie/ui';
 import type { ReactNode } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {

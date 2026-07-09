@@ -4,7 +4,7 @@ import { Switch } from '@jovie/ui';
 import { BellOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';

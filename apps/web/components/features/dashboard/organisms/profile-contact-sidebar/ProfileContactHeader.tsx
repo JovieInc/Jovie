@@ -1,6 +1,6 @@
 'use client';
 
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { DrawerEditableTextField } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {

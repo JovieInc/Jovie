@@ -2,7 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import type { OpportunityInboxFeedbackRating } from '@/lib/connectors/opportunity-inbox-feedback';
 import { buildOpportunityInboxFeedbackMessage } from '@/lib/connectors/opportunity-inbox-feedback';
 import { fetchWithTimeout } from './fetch';

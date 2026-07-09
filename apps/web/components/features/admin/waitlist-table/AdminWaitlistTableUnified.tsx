@@ -3,7 +3,7 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import {
   type ContextMenuItemType,
   useRowSelection,

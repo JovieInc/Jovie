@@ -4,7 +4,7 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Badge } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import { useCallback } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import {
   DrawerCardActionBar,
   DrawerSection,

@@ -4,9 +4,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { toast } from '@/components/feedback';
 import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {

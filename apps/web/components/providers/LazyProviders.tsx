@@ -2,9 +2,9 @@
 
 import dynamic from 'next/dynamic';
 import React from 'react';
+import { FeedbackProvider } from '@/components/feedback';
 import { env } from '@/lib/env-client';
 import { JovieAnalytics } from './JovieAnalytics';
-import { ToastProvider } from './ToastProvider';
 
 const Analytics = dynamic(
   () => import('./Analytics').then(mod => ({ default: mod.Analytics })),
@@ -36,10 +36,10 @@ export function LazyProviders({
   const showAnalytics = enableAnalytics && !isPassiveRuntime;
 
   return (
-    <ToastProvider>
+    <FeedbackProvider>
       {children}
       {isPassiveRuntime ? null : <JovieAnalytics />}
       {showAnalytics ? <Analytics /> : null}
-    </ToastProvider>
+    </FeedbackProvider>
   );
 }

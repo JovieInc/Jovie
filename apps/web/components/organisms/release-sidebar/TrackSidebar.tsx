@@ -2,8 +2,8 @@
 
 import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { SeekBar } from '@/components/atoms/SeekBar';
+import { toast } from '@/components/feedback';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerBackButton,

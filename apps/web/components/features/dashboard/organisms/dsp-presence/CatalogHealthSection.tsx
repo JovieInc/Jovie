@@ -11,7 +11,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { MismatchCard } from './MismatchCard';
 import type { CatalogMismatch, CatalogScan } from './types';

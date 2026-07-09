@@ -13,9 +13,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {

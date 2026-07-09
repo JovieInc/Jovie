@@ -4,7 +4,7 @@ import * as Switch from '@radix-ui/react-switch';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { RotateCcw } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { PageToolbar, TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';

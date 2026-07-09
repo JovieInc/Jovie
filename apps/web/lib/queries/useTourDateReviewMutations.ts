@@ -2,13 +2,13 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
 import {
   confirmEvent,
   type EventActionResult,
   rejectEvent,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
+import { toast } from '@/components/feedback';
 
 function assertOk(result: EventActionResult, failureMessage: string): void {
   if (!result.ok) {

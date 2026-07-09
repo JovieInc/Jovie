@@ -16,7 +16,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';

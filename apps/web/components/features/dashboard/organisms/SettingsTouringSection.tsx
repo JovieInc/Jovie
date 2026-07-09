@@ -20,7 +20,6 @@ import {
   Unlink,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import {
   connectBandsintownArtist,
   disconnectBandsintown,
@@ -30,6 +29,7 @@ import {
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import {
