@@ -13,13 +13,13 @@ type CurrentUserEntitlements = Awaited<
 >;
 
 /**
- * Closed-beta retouch execution is gated separately from entitlement checks.
- * Flip to true when JOV-8834 wires the image provider + job queue.
+ * Retouch execution is gated separately from entitlement checks.
+ * `provisioned` reflects whether the retouch provider is configured — server
+ * callsites pass `isRetouchConfigured()` from
+ * lib/services/retouching/provider-gemini. This module stays env-free so it
+ * can be imported by pure code and tests; the conservative default when the
+ * caller omits `provisioned` is unprovisioned.
  */
-export function isRetouchProvisioned(): boolean {
-  return false;
-}
-
 export function resolveRetouchCapability(input: {
   readonly entitlements: CurrentUserEntitlements | null;
   readonly provisioned?: boolean;
@@ -32,7 +32,7 @@ export function resolveRetouchCapability(input: {
     };
   }
 
-  const provisioned = input.provisioned ?? isRetouchProvisioned();
+  const provisioned = input.provisioned ?? false;
   if (!provisioned) {
     return {
       availability: 'unavailable',

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRetouchUnavailableAssistantMessage,
   detectRetouchIntent,
-  isRetouchProvisioned,
   resolveRetouchCapability,
 } from '@/lib/chat/retouch-capability';
 
@@ -26,8 +25,6 @@ describe('retouch capability resolution', () => {
   });
 
   it('marks retouch unavailable when execution is not provisioned', () => {
-    expect(isRetouchProvisioned()).toBe(false);
-
     const capability = resolveRetouchCapability({
       entitlements: {
         canAccessAiRetouching: true,
@@ -42,6 +39,25 @@ describe('retouch capability resolution', () => {
       availability: 'unavailable',
       reason: 'Retouch is not provisioned for this account.',
       reasonCode: 'TOOL_UNPROVISIONED',
+    });
+  });
+
+  it('marks retouch available when entitled and provisioned', () => {
+    const capability = resolveRetouchCapability({
+      entitlements: {
+        canAccessAiRetouching: true,
+      } as Awaited<
+        ReturnType<
+          typeof import('@/lib/entitlements/server').getCurrentUserEntitlements
+        >
+      >,
+      provisioned: true,
+    });
+
+    expect(capability).toEqual({
+      availability: 'available',
+      reason: null,
+      reasonCode: null,
     });
   });
 

@@ -5,6 +5,7 @@ import { resolveRetouchCapability } from '@/lib/chat/retouch-capability';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { isXaiConfigured } from '@/lib/services/album-art/provider-xai';
+import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../session-error-response';
 
@@ -37,7 +38,10 @@ export async function GET(req: Request) {
       providerConfigured: isXaiConfigured(),
       entitlements,
     });
-    const retouch = resolveRetouchCapability({ entitlements });
+    const retouch = resolveRetouchCapability({
+      entitlements,
+      provisioned: isRetouchConfigured(),
+    });
 
     return NextResponse.json(
       {

@@ -46,6 +46,8 @@ pnpm --filter @jovie/web run test:bug-to-test
 ### Branch Hygiene
 
 - Always rebase on main before pushing (not merge).
+- **History Sanity Check:** Before starting work or rebasing, verify the branch shares a recent ancestor with `main`. Use `git merge-base main <branch>`. If the result is empty or the branch is >5,000 commits behind, it is a zombie; re-plant it onto a fresh `main` base instead of rebasing.
+
 - **Agent routine work:** `tim/jov-*` → `integration/loop-{domain}` → train PR → `main` (see [`.claude/rules/ci-branching.md`](ci-branching.md)). Do not open routine agent PRs directly to `main`.
 - **Human / hotfix:** `hotfix/*` or `needs-human` labeled PRs may target `main` with full CI.
 - If a PR has been open >24h without progress, close it and re-create from fresh integration base or `main`.
