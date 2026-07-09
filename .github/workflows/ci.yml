@@ -282,7 +282,7 @@ jobs:
           fi
 
   ci-risk-classifier:
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: CI Risk Classifier
     needs: [ci-path-changes]
     runs-on: ubuntu-latest
@@ -373,7 +373,7 @@ jobs:
 
   ci-env-example-guard:
     needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
     runs-on: ubuntu-latest
@@ -406,7 +406,7 @@ jobs:
 
   ci-secret-scan:
     needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
     runs-on: ubuntu-latest
@@ -442,7 +442,7 @@ jobs:
     needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { fetch-depth: 0 }
@@ -470,7 +470,7 @@ jobs:
 
   ci-structural-contract:
     # Path-gated: only runs when CI harness/.github files change or on push/dispatch.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Structural Contract
     needs: [ci-path-changes]
     runs-on: ubuntu-latest
@@ -598,7 +598,7 @@ jobs:
     # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_promptfoo_evals == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.run_promptfoo_evals == 'true')) }}
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
       JOVIE_RUN_LIVE_HTTP_EVALS: '0'
@@ -622,7 +622,7 @@ jobs:
     # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || needs.ci-path-changes.outputs.run_golden_eval_set == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.run_golden_eval_set == 'true')) }}
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
       JOVIE_RUN_LIVE_HTTP_EVALS: '0'
