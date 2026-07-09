@@ -914,7 +914,7 @@ describe('TasksPageClient', () => {
 
     expect(screen.getAllByText('In Progress').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Medium').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('You').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Me').length).toBeGreaterThan(0);
   });
 
   it('renders separate list and document scroll regions on desktop', () => {
