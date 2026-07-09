@@ -44,4 +44,21 @@ struct AuthScreenStyleGuardTests {
     #expect(!source.contains("0xFF0080"))
     #expect(!source.contains("0x1F2430"))
   }
+
+  /// Staged entrance guard: the auth screen's first-appearance animation
+  /// must drop translateY under Reduce Motion (opacity-only) and must never
+  /// animate from a hard scale(0)/hidden state that would jank on appear.
+  @Test func authEntranceRespectsReduceMotionAndNeverStartsFromZeroScale() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Auth/AuthScreen.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    let modifierStart = try #require(source.range(of: "private struct AuthEntranceModifier: ViewModifier"))
+    let modifierSource = source[modifierStart.lowerBound...]
+
+    #expect(modifierSource.contains("reduceMotion ? 0 : (hasAppeared ? 0 : offset)"))
+    #expect(!modifierSource.contains("scaleEffect"))
+  }
 }
