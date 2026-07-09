@@ -164,7 +164,7 @@ const TASK_PRIORITY_OPTIONS = [
 ] as const satisfies ReadonlyArray<readonly [TaskPriority, string]>;
 
 const TASK_ASSIGNEE_OPTIONS = [
-  ['human', 'You'],
+  ['human', 'Me'],
   ['jovie', 'Jovie'],
 ] as const satisfies ReadonlyArray<readonly [TaskAssigneeKind, string]>;
 
@@ -1314,7 +1314,7 @@ function useTaskActions({
           items: [
             {
               id: 'assignee-human',
-              label: 'You',
+              label: 'Me',
               icon: (
                 <span aria-hidden='true'>
                   <TaskAssigneeLeadingVisual
