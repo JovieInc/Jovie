@@ -419,7 +419,7 @@ function ToggleRow({
       <input
         type='checkbox'
         defaultChecked={defaultChecked}
-        className='mt-0.5 size-4 shrink-0 rounded-sm accent-[var(--color-accent)]'
+        className='mt-0.5 size-4 shrink-0 rounded-sm accent-(--color-accent)'
         onChange={() =>
           runDemoAction({ successMessage: 'Setting updated (demo).' })
         }

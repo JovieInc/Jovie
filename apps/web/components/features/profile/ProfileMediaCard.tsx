@@ -470,7 +470,7 @@ export function ProfileMediaCard({
               <p
                 className={cn(
                   'line-clamp-2 min-w-0 text-white/78 [overflow-wrap:anywhere]',
-                  compact ? 'text-3xs leading-[1.25]' : 'text-app'
+                  compact ? 'text-3xs leading-tight' : 'text-app'
                 )}
               >
                 {subtitle}

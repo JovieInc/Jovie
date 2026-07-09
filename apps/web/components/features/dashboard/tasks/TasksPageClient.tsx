@@ -1014,7 +1014,7 @@ function TaskErrorState({
       <TableEmptyState
         title="Couldn't Load Tasks"
         description='Try reloading the task list.'
-        className='min-h-60 max-w-[28rem]'
+        className='min-h-60 max-w-md'
         action={
           <Button type='button' variant='secondary' size='sm' onClick={onRetry}>
             Retry
@@ -1151,7 +1151,7 @@ function MobileTaskListItem({
       </span>
 
       <span className='min-w-0 flex-1'>
-        <span className='block truncate text-sm font-semibold leading-[1.25] text-primary-token'>
+        <span className='block truncate text-sm font-semibold leading-tight text-primary-token'>
           {task.title}
         </span>
         <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-secondary-token'>
@@ -2252,7 +2252,7 @@ export function TasksPageClient() {
                   'min-h-0 min-w-0',
                   TASK_WORKSPACE_PANE_CLASSNAME,
                   viewMode !== 'board'
-                    ? 'lg:flex-none lg:basis-[32rem] lg:min-w-[28rem] lg:max-w-[36rem] lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    ? 'lg:flex-none lg:basis-[32rem] lg:min-w-[28rem] lg:max-w-xl lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
                     : 'flex-1',
                   showTaskListPane ? 'block' : 'hidden',
                   !selectedTask && 'lg:max-w-none'

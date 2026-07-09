@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 
 export interface DictationWaveformProps {
   /** When false, the strip fades to a static row at 40% opacity. */

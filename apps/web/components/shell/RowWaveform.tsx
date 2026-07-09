@@ -250,7 +250,7 @@ export function RowWaveform({
               />
               <span
                 className={cn(
-                  'absolute -top-px h-1 w-1 rounded-full -translate-x-[1px] transition-opacity duration-subtle ease-subtle opacity-80 group-hover/wf:opacity-100',
+                  'absolute -top-px h-1 w-1 rounded-full -translate-x-px transition-opacity duration-subtle ease-subtle opacity-80 group-hover/wf:opacity-100',
                   CUE_TONE_DOT[c.kind]
                 )}
               />

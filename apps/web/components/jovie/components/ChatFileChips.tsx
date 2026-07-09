@@ -67,7 +67,7 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
                 fileKindIcon(f.kind, 'h-3 w-3')
               )}
             </span>
-            <span className='max-w-[120px] truncate text-xs text-secondary-token'>
+            <span className='max-w-30 truncate text-xs text-secondary-token'>
               {f.name}
             </span>
             <Check

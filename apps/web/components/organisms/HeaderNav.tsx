@@ -126,9 +126,12 @@ function GlassAuthActions({
       >
         Sign in
       </Link>
-      <Button variant='primary' size='md' asChild>
-        <Link href={publicCtaHref}>{publicCtaLabel}</Link>
-      </Button>
+      <Link
+        href={publicCtaHref}
+        className='marketing-glass-header__cta focus-ring-themed'
+      >
+        {publicCtaLabel}
+      </Link>
     </div>
   );
 }
@@ -482,8 +485,8 @@ export function HeaderNav({
   ) : null;
   const containerClass =
     _containerSize === 'homepage'
-      ? 'flex h-[var(--linear-header-height)] w-full items-center gap-3 sm:gap-4 md:gap-6'
-      : 'flex h-[var(--linear-header-height)] w-full items-center gap-6';
+      ? 'flex h-(--linear-header-height) w-full items-center gap-3 sm:gap-4 md:gap-6'
+      : 'flex h-(--linear-header-height) w-full items-center gap-6';
   return (
     <header
       ref={headerRef}

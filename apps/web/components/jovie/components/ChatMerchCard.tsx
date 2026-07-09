@@ -236,10 +236,10 @@ export function ChatMerchOptionsCard({
             <article
               key={option.id}
               data-testid='chat-merch-option-card'
-              className='flex min-w-0 flex-col gap-2.5 rounded-[16px] border border-subtle bg-surface-1 p-2.5 shadow-card'
+              className='flex min-w-0 flex-col gap-2.5 rounded-xl border border-subtle bg-surface-1 p-2.5 shadow-card'
             >
               <div
-                className='relative aspect-square overflow-hidden rounded-[12px] border border-subtle'
+                className='relative aspect-square overflow-hidden rounded-lg border border-subtle'
                 style={{
                   background: `radial-gradient(120% 120% at 32% 22%, color-mix(in oklab, ${accentVar(accent)} 22%, transparent), transparent 62%), linear-gradient(155deg, var(--color-bg-surface-2), var(--color-bg-surface-1))`,
                 }}

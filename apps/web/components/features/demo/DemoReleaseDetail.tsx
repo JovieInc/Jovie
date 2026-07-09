@@ -162,7 +162,7 @@ export function DemoReleaseDetail({
                 </div>
                 <div className='min-w-0 flex-1 leading-snug text-secondary-token'>
                   <div className='text-xs tracking-[-0.005em]'>
-                    <span className='font-[500] text-secondary-token'>
+                    <span className='font-medium text-secondary-token'>
                       {activity.action}
                     </span>
                     {activity.detail ? (

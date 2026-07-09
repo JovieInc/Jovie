@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 
 export interface SuggestionCardProps {
   /** Card heading. Renders as an h2 with the cinematic title weight + tracking. */

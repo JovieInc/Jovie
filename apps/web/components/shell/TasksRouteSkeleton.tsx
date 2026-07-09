@@ -15,7 +15,7 @@ const BOARD_COLUMNS = ['backlog', 'todo', 'progress'] as const;
 export function TasksRouteSkeleton() {
   return (
     <PageShell
-      aria-label='Loading tasks'
+      aria-label='Loading Tasks'
       aria-busy='true'
       aria-live='polite'
       className='absolute inset-0 overflow-hidden'
@@ -34,7 +34,7 @@ export function TasksRouteSkeleton() {
               <Skeleton className='h-7 w-7' rounded='full' />
             </div>
           }
-          className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
+          className='h-(--linear-app-header-height-compact) min-h-(--linear-app-header-height-compact)'
         />
       }
     >

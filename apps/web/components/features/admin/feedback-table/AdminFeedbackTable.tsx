@@ -247,7 +247,7 @@ export function AdminFeedbackTable({
     (item: FeedbackRow): ContextMenuItemType[] => [
       {
         id: 'copy-markdown',
-        label: 'Copy as Markdown',
+        label: 'Copy As Markdown',
         icon: <ClipboardCopy className='h-4 w-4' />,
         onClick: () => copyRowAsMarkdown(item),
       },
@@ -310,7 +310,7 @@ export function AdminFeedbackTable({
           }
           end={
             <PageToolbarActionButton
-              label='Copy all as Markdown'
+              label='Copy All As Markdown'
               ariaLabel='Copy all feedback as Markdown'
               tooltipLabel='Copy all as Markdown'
               iconOnly
@@ -369,7 +369,7 @@ export function AdminFeedbackTable({
                 title={getFeedbackUserLabel(selected.user)}
                 subtitle={selected.user.email ?? 'No email available'}
                 meta={
-                  <div className='space-y-1 text-xs leading-[16px] text-secondary-token'>
+                  <div className='space-y-1 text-xs leading-4 text-secondary-token'>
                     <p>
                       Source: {selected.source} ·{' '}
                       {new Date(selected.createdAtIso).toLocaleString()}
@@ -400,7 +400,7 @@ export function AdminFeedbackTable({
                             ]),
                         {
                           id: 'copy-feedback-markdown',
-                          label: 'Copy as Markdown',
+                          label: 'Copy As Markdown',
                           icon: ClipboardCopy,
                           onClick: () => {
                             copyRowAsMarkdown(selected);
@@ -460,7 +460,7 @@ export function AdminFeedbackTable({
               surface='card'
             >
               <div className='overflow-auto rounded-md bg-surface-0 p-0'>
-                <pre className='p-2.5 text-3xs leading-[16px] text-secondary-token'>
+                <pre className='p-2.5 text-3xs leading-4 text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
                 </pre>
               </div>

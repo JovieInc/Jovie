@@ -266,7 +266,7 @@ export function NativeSmsSubscribeButton({
       </button>
 
       {phase !== 'confirmed' && (
-        <p className='text-center text-xs text-[var(--text-tertiary)] leading-snug'>
+        <p className='text-center text-xs text-(--text-tertiary) leading-snug'>
           {SMS_CONSENT_TEXT}
         </p>
       )}
@@ -275,7 +275,7 @@ export function NativeSmsSubscribeButton({
         <div
           role='status'
           aria-live='polite'
-          className='text-center text-sm text-[var(--text-secondary)]'
+          className='text-center text-sm text-(--text-secondary)'
         >
           {phase === 'sms_handed_off' || phase === 'awaiting_inbound'
             ? 'Send the text to subscribe.'
@@ -297,7 +297,7 @@ export function NativeSmsSubscribeButton({
           {intent.smsTo && (
             <a
               href={`sms:${intent.smsTo}?body=${encodeURIComponent('JOIN ' + intent.code)}`}
-              className='text-sm text-[var(--accent)] underline-offset-2 hover:underline'
+              className='text-sm text-(--accent) underline-offset-2 hover:underline'
             >
               Text {intent.smsTo}
             </a>
@@ -306,10 +306,10 @@ export function NativeSmsSubscribeButton({
       )}
 
       {phase === 'confirmed' && (
-        <div className='flex items-center justify-center gap-2 text-sm text-[var(--text-secondary)]'>
+        <div className='flex items-center justify-center gap-2 text-sm text-(--text-secondary)'>
           <span>You&apos;re subscribed.</span>
           {ctx.subscriptionDetails?.sms && (
-            <span className='text-[var(--text-tertiary)]'>
+            <span className='text-(--text-tertiary)'>
               ({ctx.subscriptionDetails.sms})
             </span>
           )}

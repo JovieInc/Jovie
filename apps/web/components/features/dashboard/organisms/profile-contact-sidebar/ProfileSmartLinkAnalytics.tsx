@@ -40,7 +40,7 @@ function ProfileSmartLinkControl({
         aria-hidden='true'
       />
       <span
-        className='min-w-0 flex-1 truncate font-mono text-3xs leading-none tracking-[-0.01em] text-secondary-token'
+        className='min-w-0 flex-1 truncate font-mono text-3xs leading-none tracking-tight text-secondary-token'
         title={profileUrl}
       >
         {smartLinkLabel}
@@ -179,7 +179,7 @@ function AnalyticsMetric({
       <p className='text-3xs font-medium leading-[14px] text-tertiary-token'>
         {label}
       </p>
-      <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+      <p className='tabular-nums text-lg font-semibold leading-none tracking-tighter text-primary-token'>
         {value}
       </p>
       {hint ? (

@@ -344,7 +344,7 @@ function ToolActivityRow({
       <ToolEventFeedback
         event={event}
         feedback={feedback}
-        className='shrink-0 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100'
+        className='shrink-0 opacity-0 transition-opacity duration-subtle focus-within:opacity-100 group-hover/message:opacity-100'
       />
     </div>
   );
@@ -790,7 +790,7 @@ function renderToolActivityGroups({
         <ToolEventFeedback
           event={event}
           feedback={feedback}
-          className='mt-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100'
+          className='mt-1 opacity-0 transition-opacity duration-subtle focus-within:opacity-100 group-hover/message:opacity-100'
         />
       </div>
     );

@@ -49,15 +49,15 @@ export function SkillDocCard({
             <span className='text-sm font-medium text-primary-token'>
               {name}
             </span>
-            <span className='rounded-sm bg-surface-0 px-1.5 py-0.5 font-mono text-[10px] text-secondary-token'>
+            <span className='rounded-sm bg-surface-0 px-1.5 py-0.5 font-mono text-3xs text-secondary-token'>
               {kind}
             </span>
-            <span className='rounded-sm bg-surface-0 px-1.5 py-0.5 font-mono text-[10px] text-tertiary-token'>
+            <span className='rounded-sm bg-surface-0 px-1.5 py-0.5 font-mono text-3xs text-tertiary-token'>
               v{version}
             </span>
           </div>
           <p className='mt-1 text-xs text-secondary-token'>{description}</p>
-          <p className='mt-0.5 font-mono text-[11px] text-tertiary-token'>
+          <p className='mt-0.5 font-mono text-2xs text-tertiary-token'>
             {model}
           </p>
         </div>

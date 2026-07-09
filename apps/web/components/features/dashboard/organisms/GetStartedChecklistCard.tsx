@@ -171,7 +171,7 @@ export function GetStartedChecklistCard({
     <ContentSurfaceCard className='overflow-hidden p-0'>
       <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <div className='flex items-center gap-1.5'>
-          <h3 className='text-xs font-caption tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-xs font-caption tracking-tight text-primary-token'>
             Get Started
           </h3>
           <span className='text-2xs text-tertiary-token'>
@@ -202,7 +202,7 @@ export function GetStartedChecklistCard({
       {/* Progress bar */}
       <div className='mx-3 mt-2 h-1 rounded-full bg-surface-0'>
         <div
-          className='h-1 rounded-full bg-[var(--linear-accent)] transition-[width] duration-subtle'
+          className='h-1 rounded-full bg-(--linear-accent) transition-[width] duration-subtle'
           style={{
             width: `${(completedCount / CHECKLIST_ITEMS.length) * 100}%`,
           }}
@@ -222,7 +222,7 @@ export function GetStartedChecklistCard({
               }}
               className={`flex h-4.5 w-4.5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                 isDone
-                  ? 'border-[var(--linear-accent)] bg-[var(--linear-accent)]'
+                  ? 'border-(--linear-accent) bg-(--linear-accent)'
                   : 'border-subtle bg-(--linear-app-content-surface) hover:border-secondary-token'
               }`}
               aria-label={

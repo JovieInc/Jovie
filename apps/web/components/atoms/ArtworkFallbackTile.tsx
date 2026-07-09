@@ -54,7 +54,7 @@ export function ArtworkFallbackTile({
       />
       <span
         aria-hidden='true'
-        className='absolute inset-[1px] rounded-xs border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
+        className='absolute inset-px rounded-xs border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
       />
       {label ? <span className='sr-only'>{label}</span> : null}
     </div>

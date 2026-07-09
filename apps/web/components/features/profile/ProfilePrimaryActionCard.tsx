@@ -111,7 +111,7 @@ function buildCardStyles(
   return {
     isShowcase,
     shellClassName: cn(
-      'group w-full rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-subtle hover:bg-white/[0.08] active:opacity-[0.9]',
+      'group w-full rounded-(--profile-action-radius) border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-subtle hover:bg-white/[0.08] active:opacity-90',
       isShowcase
         ? 'relative block min-h-50 overflow-hidden shadow-[0_18px_46px_rgba(0,0,0,0.34)] [@media(max-height:880px)]:min-h-43 [@media(max-height:760px)]:min-h-39'
         : 'flex min-h-16 items-center gap-3 px-3 py-2.5',
@@ -161,7 +161,7 @@ function ReleaseCard({
             alt={`${state.release.title} artwork`}
             fill
             sizes='(max-width: 430px) 100vw, 340px'
-            className='object-cover opacity-[0.9] transition-opacity duration-subtle group-hover:opacity-100'
+            className='object-cover opacity-90 transition-opacity duration-subtle group-hover:opacity-100'
             fallbackVariant='release'
           />
         ) : (

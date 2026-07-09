@@ -273,7 +273,7 @@ function TaskBoardColumn({
       >
         <div className='min-h-0 flex-1 space-y-2 overflow-y-auto px-2.5 py-2.5'>
           {column.tasks.length === 0 ? (
-            <div className='flex min-h-[7rem] items-center justify-center rounded-md border border-dashed border-subtle px-4 text-center text-2xs leading-relaxed text-tertiary-token'>
+            <div className='flex min-h-28 items-center justify-center rounded-md border border-dashed border-subtle px-4 text-center text-2xs leading-relaxed text-tertiary-token'>
               Drop tasks here
             </div>
           ) : (

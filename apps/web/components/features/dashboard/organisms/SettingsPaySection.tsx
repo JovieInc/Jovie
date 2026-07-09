@@ -13,7 +13,7 @@ function LoadingState() {
   return (
     <div className='space-y-3 px-4 py-4 sm:px-5'>
       <div className='h-6 w-28 rounded-full skeleton' />
-      <div className='h-4 w-full max-w-[28rem] rounded skeleton' />
+      <div className='h-4 w-full max-w-md rounded skeleton' />
       <div className='h-4 w-3/4 rounded skeleton' />
       <div className='flex gap-2'>
         <div className='h-8 w-28 rounded-md skeleton' />

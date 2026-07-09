@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 // Cinematic ease — same curve used across the shell for layout-revealing
 // transitions. Imported here as a literal so this leaf has no cross-file
 // dependency.
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 
 export type ShellLoaderPhase = 'bloom' | 'reveal' | 'done';
 

@@ -85,7 +85,7 @@ export const ProfileCompletionCard = memo(
       <ContentSurfaceCard className='mb-2 border-(--linear-app-frame-seam) p-3.5 sm:mb-3 sm:p-4'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 flex-1 space-y-2'>
-            <div className='flex items-center gap-1.5 text-2xs font-caption tracking-[-0.01em] text-tertiary-token'>
+            <div className='flex items-center gap-1.5 text-2xs font-caption tracking-tight text-tertiary-token'>
               {profileIsLive ? (
                 <Sparkles className='h-3 w-3' aria-hidden='true' />
               ) : (
@@ -106,7 +106,7 @@ export const ProfileCompletionCard = memo(
               aria-valuenow={completionPercentage}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label='Profile completion'
+              aria-label='Profile Completion'
             >
               <motion.div
                 className='h-full rounded-full bg-accent'
@@ -145,7 +145,7 @@ export const ProfileCompletionCard = memo(
             <button
               type='button'
               onClick={handleDismiss}
-              aria-label='Dismiss profile completion card'
+              aria-label='Dismiss Profile Completion Card'
               className='shrink-0 rounded-lg border border-(--linear-app-frame-seam) p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
               <X className='h-4 w-4' aria-hidden='true' />

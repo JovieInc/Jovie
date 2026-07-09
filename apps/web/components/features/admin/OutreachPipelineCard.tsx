@@ -42,7 +42,7 @@ function ConversionMetric({
       icon={Icon}
       iconClassName={iconClassName}
       className='rounded-md px-2.5 py-2'
-      labelClassName='text-xs font-[500] text-secondary-token'
+      labelClassName='text-xs font-medium text-secondary-token'
       valueClassName='text-xs font-semibold text-primary-token tabular-nums'
     />
   );
@@ -72,7 +72,7 @@ function PipelineStep({
       icon={Icon}
       iconClassName={iconClassName}
       valueClassName='text-2xl font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'
-      subtitleClassName='text-2xs leading-[16px] text-secondary-token'
+      subtitleClassName='text-2xs leading-4 text-secondary-token'
     />
   );
 }

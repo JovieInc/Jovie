@@ -280,7 +280,7 @@ export function TourDateSidebar({
                 }
                 meta={
                   tourDate.provider === 'bandsintown' ? (
-                    <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-xs text-[var(--color-success)]'>
+                    <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-xs text-(--color-success)'>
                       <Icon name='Link' className='h-3.5 w-3.5' />
                       <span>Synced from Bandsintown</span>
                     </div>
@@ -308,11 +308,11 @@ export function TourDateSidebar({
             <DrawerSurfaceCard variant='card' className='space-y-3.5 p-3.5'>
               {/* Title */}
               <div className='space-y-1.5'>
-                <Label htmlFor='title'>Event Title (optional)</Label>
+                <Label htmlFor='title'>Event Title (Optional)</Label>
                 <Input
                   id='title'
                   type='text'
-                  placeholder='e.g., Summer Tour 2025'
+                  placeholder='e.g., Summer Tour 2025' // ui-casing-allow: literal example placeholder
                   value={formData.title}
                   onChange={e =>
                     setFormData(prev => ({ ...prev, title: e.target.value }))
@@ -379,11 +379,11 @@ export function TourDateSidebar({
 
               {/* Timezone */}
               <div className='space-y-1.5'>
-                <Label htmlFor='timezone'>Timezone (optional)</Label>
+                <Label htmlFor='timezone'>Timezone (Optional)</Label>
                 <Input
                   id='timezone'
                   type='text'
-                  placeholder='e.g., America/New_York'
+                  placeholder='e.g., America/New_York' // ui-casing-allow: literal example placeholder
                   value={formData.timezone}
                   onChange={e =>
                     setFormData(prev => ({ ...prev, timezone: e.target.value }))
@@ -428,7 +428,8 @@ export function TourDateSidebar({
                   />
                 </div>
                 <div className='space-y-1.5'>
-                  <Label htmlFor='region'>State/Region</Label>
+                  {/* ui-casing-allow: slash-compound label */}
+                  <Label htmlFor='region'>State/region</Label>
                   <Input
                     id='region'
                     type='text'

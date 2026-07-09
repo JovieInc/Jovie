@@ -317,7 +317,7 @@ export function AddReleaseSidebar({
     >
       <DrawerSurfaceCard variant='card' className='overflow-hidden'>
         <div className='space-y-3.5 p-3' data-testid='add-release-details-card'>
-          <p className='text-2xs font-semibold leading-none tracking-[-0.01em] text-tertiary-token'>
+          <p className='text-2xs font-semibold leading-none tracking-tight text-tertiary-token'>
             Details
           </p>
 

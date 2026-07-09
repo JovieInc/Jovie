@@ -54,10 +54,10 @@ const CountryOptionButton = memo(function CountryOptionButton({
     <button
       type='button'
       onClick={handleClick}
-      className={`flex w-full items-center gap-3 rounded-[var(--radius-2xl)] px-3 py-2 text-app font-semibold leading-[20px] tracking-[-0.01em] transition-colors duration-normal ease-out ${
+      className={`flex w-full items-center gap-3 rounded-(--radius-2xl) px-3 py-2 text-app font-semibold leading-[20px] tracking-[-0.01em] transition-colors duration-normal ease-out ${
         isSelected
-          ? 'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-primary-token'
-          : 'text-primary-token hover:bg-[var(--profile-pearl-bg)]'
+          ? 'border border-[color:var(--profile-pearl-border)] bg-(--profile-pearl-bg-active) text-primary-token'
+          : 'text-primary-token hover:bg-(--profile-pearl-bg)'
       }`}
       style={FONT_SYNTHESIS_STYLE}
     >
@@ -107,7 +107,7 @@ export function CountrySelector({
       <PopoverContent
         align='start'
         sideOffset={6}
-        className='w-64 rounded-[var(--radius-3xl)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-drawer-bg)] p-2 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl'
+        className='w-64 rounded-(--radius-3xl) border border-[color:var(--profile-panel-border)] bg-(--profile-drawer-bg) p-2 shadow-(--profile-panel-shadow) backdrop-blur-2xl'
       >
         <div className='max-h-64 overflow-y-auto'>
           {COUNTRY_OPTIONS.map(option => (

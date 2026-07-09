@@ -90,7 +90,7 @@ export function TaskWorkspaceHeaderBar({
           placeholder='Draft press release, update bio, pitch sync supervisor...'
           aria-label='New Task Name'
           autoFocus
-          className='h-8 max-w-[32rem] min-w-0'
+          className='h-8 max-w-lg min-w-0'
         />
       </form>
     ) : (
@@ -191,7 +191,7 @@ export function TaskWorkspaceHeaderBar({
       <PageToolbar
         start={toolbarStart}
         end={toolbarEnd}
-        className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
+        className='h-(--linear-app-header-height-compact) min-h-(--linear-app-header-height-compact)'
         startClassName='overflow-visible'
         endClassName='gap-0.5'
       />

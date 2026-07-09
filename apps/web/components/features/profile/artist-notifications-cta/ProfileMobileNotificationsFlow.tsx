@@ -155,9 +155,7 @@ function ScreenShell({
               {title}
             </h2>
             {body ? (
-              <p className='max-w-[24rem] text-sm leading-5 text-white/58'>
-                {body}
-              </p>
+              <p className='max-w-96 text-sm leading-5 text-white/58'>{body}</p>
             ) : null}
           </div>
           <div>{children}</div>
@@ -174,9 +172,7 @@ function ScreenShell({
           {title}
         </h2>
         {body ? (
-          <p className='max-w-[24rem] text-sm leading-5 text-white/58'>
-            {body}
-          </p>
+          <p className='max-w-96 text-sm leading-5 text-white/58'>{body}</p>
         ) : null}
       </div>
       <div className='flex-1'>{children}</div>
@@ -315,7 +311,7 @@ function InlineCaptureField({
   onSubmit: () => void;
 }>) {
   return (
-    <div className='rounded-[var(--profile-action-radius)] border border-white/10 bg-white/[0.035] p-1.5'>
+    <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1.5'>
       <div className='flex min-h-13 items-center gap-1'>
         {channel === 'sms' ? (
           <CountrySelector
@@ -756,7 +752,7 @@ export function ProfileMobileNotificationsFlow({
                         checked={enabled}
                         onCheckedChange={() => onTogglePref(key)}
                         aria-label={meta.label}
-                        className='data-[state=checked]:bg-[var(--mobile-flow-accent)] data-[state=unchecked]:bg-white/14'
+                        className='data-[state=checked]:bg-(--mobile-flow-accent) data-[state=unchecked]:bg-white/14'
                       />
                     </div>
                   );
@@ -789,7 +785,7 @@ export function ProfileMobileNotificationsFlow({
                         onArtistEmailToggle?.(checked)
                       }
                       aria-label='Artist Emails'
-                      className='data-[state=checked]:bg-[var(--mobile-flow-accent)] data-[state=unchecked]:bg-white/14'
+                      className='data-[state=checked]:bg-(--mobile-flow-accent) data-[state=unchecked]:bg-white/14'
                     />
                   </div>
                 </div>
@@ -924,13 +920,13 @@ export function ProfileMobileNotificationsFlow({
         aria-modal='true'
         style={contentStyle}
       >
-        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)] min-[1180px]:max-w-160'>
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)] min-[1180px]:max-w-160'>
           {contentBody}
         </div>
       </div>
     ) : (
       <div
-        className='relative min-h-150 rounded-[var(--profile-card-radius)] bg-[color:var(--profile-stage-bg)] dark:text-white'
+        className='relative min-h-150 rounded-(--profile-card-radius) bg-[color:var(--profile-stage-bg)] dark:text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

@@ -54,7 +54,7 @@ export function DemoReleaseLandingSurface() {
                 <div className='mt-5 flex justify-center'>
                   <a
                     href={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}
-                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-mid font-[600] tracking-[-0.02em] text-black dark:text-white'
+                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-mid font-semibold tracking-[-0.02em] text-black dark:text-white'
                   >
                     Use this sound
                   </a>

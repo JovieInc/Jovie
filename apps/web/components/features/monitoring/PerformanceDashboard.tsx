@@ -111,13 +111,13 @@ export function PerformanceDashboard({
 
   return (
     <div className='fixed bottom-4 right-4 z-50'>
-      <div className='overflow-hidden rounded-[var(--app-shell-radius)] border border-subtle bg-surface-0 shadow-lg'>
+      <div className='overflow-hidden rounded-(--app-shell-radius) border border-subtle bg-surface-0 shadow-lg'>
         <button
           type='button'
           className='flex w-full cursor-pointer items-center justify-between bg-accent px-4 py-2 text-on-accent'
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
-          aria-label='Toggle performance metrics'
+          aria-label='Toggle Performance Metrics'
         >
           <h3 className='text-sm font-medium'>Performance Metrics</h3>
           {expanded ? (

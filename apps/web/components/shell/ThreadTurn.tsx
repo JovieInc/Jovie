@@ -27,7 +27,7 @@ export function ThreadTurn({ speaker, subtle, children }: ThreadTurnProps) {
   if (speaker === 'me' && !subtle) {
     return (
       <div className='flex justify-end'>
-        <div className='max-w-[70%] rounded-xl rounded-br-[10px] px-3 py-1.5 text-app leading-relaxed bg-(--surface-1)/80 text-primary-token'>
+        <div className='max-w-[70%] rounded-xl rounded-br-md px-3 py-1.5 text-app leading-relaxed bg-(--surface-1)/80 text-primary-token'>
           {children}
         </div>
       </div>

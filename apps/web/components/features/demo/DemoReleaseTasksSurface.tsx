@@ -132,7 +132,7 @@ export function DemoReleaseTasksSurface() {
     <div className='mx-auto w-full max-w-215 px-6 py-8'>
       <section
         data-testid='demo-showcase-release-tasks'
-        className='overflow-hidden rounded-[1.5rem] border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
+        className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
       >
         <div className='border-b border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))] px-6 py-5'>
           <div className='flex items-start justify-between gap-4'>
@@ -155,19 +155,19 @@ export function DemoReleaseTasksSurface() {
           </div>
 
           <div className='mt-5 grid gap-3 sm:grid-cols-3'>
-            <div className='rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
+            <div className='rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3'>
               <p className='text-2xs text-tertiary-token'>Tasks Ready</p>
               <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token'>
                 {TASKS.length}
               </p>
             </div>
-            <div className='rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
+            <div className='rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3'>
               <p className='text-2xs text-tertiary-token'>Done</p>
               <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token'>
                 {doneCount}
               </p>
             </div>
-            <div className='rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
+            <div className='rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3'>
               <p className='text-2xs text-tertiary-token'>Next Review</p>
               <p className='mt-2 flex items-center gap-2 text-sm font-semibold text-primary-token'>
                 <CalendarDays className='h-4 w-4 text-tertiary-token' />
@@ -194,7 +194,7 @@ export function DemoReleaseTasksSurface() {
               return (
                 <div
                   key={group.category}
-                  className='rounded-[1rem] border border-subtle bg-surface-0'
+                  className='rounded-xl border border-subtle bg-surface-0'
                 >
                   <div className='px-4 pt-3'>
                     <div className='mb-2 inline-flex items-center gap-2 text-2xs text-tertiary-token'>

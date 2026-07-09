@@ -57,7 +57,7 @@ export async function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
                 <p className='mt-0.5 text-xs text-secondary-token'>
                   {t.description}
                 </p>
-                <p className='mt-1 font-mono text-[11px] text-tertiary-token'>
+                <p className='mt-1 font-mono text-2xs text-tertiary-token'>
                   {t.model}
                 </p>
               </div>
