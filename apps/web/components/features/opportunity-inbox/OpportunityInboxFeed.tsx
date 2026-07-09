@@ -1,8 +1,9 @@
 'use client';
 
+import { OpportunityRow } from '@/components/organisms/opportunity-card/OpportunityRow';
+import type { OpportunityRowState } from '@/components/organisms/opportunity-card/types';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
-import { OpportunityInboxCard } from './OpportunityInboxCard';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
 
 export interface OpportunityInboxFeedProps {
@@ -21,14 +22,24 @@ export interface OpportunityInboxFeedProps {
   readonly className?: string;
 }
 
+/**
+ * Map the existing OpportunityInboxCardViewModel status to the new
+ * OpportunityRowState. The current data model only exposes 'pending',
+ * but the new row component supports all 5 states for progressive design.
+ */
+function mapCardState(_status: string): OpportunityRowState {
+  // Cards visible in the feed are always actionable — map to 'new'
+  return 'new';
+}
+
 export function OpportunityInboxFeed({
   cards,
   onApprove,
   onDismiss,
-  onFeedback,
+  onFeedback: _onFeedback,
   onNextStep,
   pendingActionId = null,
-  pendingFeedbackId = null,
+  pendingFeedbackId: _pendingFeedbackId = null,
   pendingNextStepId = null,
   className,
 }: OpportunityInboxFeedProps) {
@@ -51,15 +62,16 @@ export function OpportunityInboxFeed({
               isDismissing={pendingActionId === card.id}
             />
           ) : (
-            <OpportunityInboxCard
+            <OpportunityRow
               key={card.id}
-              card={card}
-              onApprove={onApprove}
-              onDismiss={onDismiss}
-              onFeedback={onFeedback}
-              isApproving={pendingActionId === card.id}
-              isDismissing={pendingActionId === card.id}
-              isSubmittingFeedback={pendingFeedbackId === card.id}
+              id={card.id}
+              state={mapCardState(card.status)}
+              title={card.title}
+              metadata={card.why}
+              hideDot={false}
+              onPrimaryAction={id => onApprove(id)}
+              onDismiss={id => onDismiss(id)}
+              isBusy={pendingActionId === card.id}
             />
           )
         )}

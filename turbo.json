@@ -3,8 +3,7 @@
   "globalDependencies": [
     "**/.env.*local",
     ".nvmrc",
-    "pnpm-lock.yaml",
-    "version.json"
+    "pnpm-lock.yaml"
   ],
   "ui": "tui",
   "globalPassThroughEnv": [
@@ -15,10 +14,12 @@
   ],
   "tasks": {
     "build": {
-      "description": "Compiles TypeScript and bundles the Next.js application for production deployment",
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "version.json",
         "!**/*.test.{ts,tsx}",
         "!**/*.spec.{ts,tsx}",
         "!**/*.stories.{ts,tsx,mdx}",
@@ -44,10 +45,6 @@
         "FLAGS_*",
         "EXPERIMENTATION_*"
       ],
-      // Runtime-only secrets and deployment-specific vars are passed through
-      // without affecting the cache key. This allows ci-build and vercel build
-      // to share Turbo remote cache hits (VERCEL_* would otherwise bust the
-      // cache since ci-build runs outside Vercel's environment).
       "passThroughEnv": [
         "VERCEL_*",
         "BETTER_AUTH_*",
@@ -66,19 +63,23 @@
       ]
     },
     "lint": {
-      "description": "Runs Biome and ESLint to enforce code quality rules across the workspace",
-      "dependsOn": ["^lint"],
+      "dependsOn": [
+        "^lint"
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
         "biome.json",
         "eslint.config.js",
         ".eslintrc*"
       ],
-      "outputs": [".cache/eslint/**"]
+      "outputs": [
+        ".cache/eslint/**"
+      ]
     },
     "lint:fix": {
-      "description": "Runs Biome and ESLint with auto-fix to automatically correct lint violations",
-      "dependsOn": ["^lint:fix"],
+      "dependsOn": [
+        "^lint:fix"
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
         "biome.json",
@@ -89,18 +90,20 @@
       "cache": false
     },
     "typecheck": {
-      "description": "Runs TypeScript compiler in noEmit mode to verify type correctness across the workspace",
-      "dependsOn": ["^typecheck"],
+      "dependsOn": [
+        "^typecheck"
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
         "tsconfig.json",
         "tsconfig.*.json",
         "package.json"
       ],
-      "outputs": [".cache/tsbuildinfo"]
+      "outputs": [
+        ".cache/tsbuildinfo"
+      ]
     },
     "dev": {
-      "description": "Starts the development server with hot module replacement (persistent, not cached)",
       "cache": false,
       "persistent": true,
       "interruptible": true,
@@ -114,84 +117,165 @@
       ]
     },
     "test": {
-      "description": "Runs the full Vitest unit/integration test suite with coverage output",
       "dependsOn": [],
-      "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
-      "outputs": ["coverage/**"],
-      "env": ["NODE_ENV", "CI"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "vitest.config.*",
+        "tests/**"
+      ],
+      "outputs": [
+        "coverage/**"
+      ],
+      "env": [
+        "NODE_ENV",
+        "CI"
+      ]
     },
     "test:fast": {
-      "description": "Runs Vitest in fast mode (no coverage) for quick feedback during development",
       "dependsOn": [],
-      "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "vitest.config.*",
+        "tests/**"
+      ],
       "outputs": [],
-      "env": ["NODE_ENV", "CI"]
+      "env": [
+        "NODE_ENV",
+        "CI"
+      ]
     },
     "test:e2e": {
-      "description": "Runs Playwright end-to-end browser tests (requires build to complete first)",
-      "dependsOn": ["build"],
-      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
-      "outputs": ["playwright-report/**", "test-results/**"],
-      "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*", "BASE_URL"]
+      "dependsOn": [
+        "build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "playwright.config.*",
+        "tests/e2e/**"
+      ],
+      "outputs": [
+        "playwright-report/**",
+        "test-results/**"
+      ],
+      "env": [
+        "NODE_ENV",
+        "CI",
+        "PLAYWRIGHT_*",
+        "BASE_URL"
+      ]
     },
     "e2e:smoke": {
-      "description": "Runs the canonical focused smoke Playwright lane (playwright.config.smoke.ts)",
-      "dependsOn": ["build"],
-      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
-      "outputs": ["playwright-report/**", "test-results/**"],
-      "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
+      "dependsOn": [
+        "build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "playwright.config.*",
+        "tests/e2e/**"
+      ],
+      "outputs": [
+        "playwright-report/**",
+        "test-results/**"
+      ],
+      "env": [
+        "NODE_ENV",
+        "CI",
+        "SMOKE_ONLY",
+        "BASE_URL",
+        "PLAYWRIGHT_*"
+      ]
     },
     "e2e:smoke:mobile": {
-      "description": "Runs the mobile parity smoke lane (playwright.config.smoke.mobile.ts)",
-      "dependsOn": ["build"],
-      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
-      "outputs": ["playwright-report/**", "test-results/**"],
-      "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
+      "dependsOn": [
+        "build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "playwright.config.*",
+        "tests/e2e/**"
+      ],
+      "outputs": [
+        "playwright-report/**",
+        "test-results/**"
+      ],
+      "env": [
+        "NODE_ENV",
+        "CI",
+        "SMOKE_ONLY",
+        "BASE_URL",
+        "PLAYWRIGHT_*"
+      ]
     },
     "e2e:smoke:tagged": {
-      "description": "Runs every -g @smoke tagged Playwright test across the default config (broader sharded lane)",
-      "dependsOn": ["build"],
-      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
-      "outputs": ["playwright-report/**", "test-results/**"],
-      "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
+      "dependsOn": [
+        "build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "playwright.config.*",
+        "tests/e2e/**"
+      ],
+      "outputs": [
+        "playwright-report/**",
+        "test-results/**"
+      ],
+      "env": [
+        "NODE_ENV",
+        "CI",
+        "SMOKE_ONLY",
+        "BASE_URL",
+        "PLAYWRIGHT_*"
+      ]
     },
     "format": {
-      "description": "Formats source files using Biome (modifies in-place, not cached)",
-      "inputs": ["$TURBO_DEFAULT$", "biome.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "biome.json"
+      ],
       "outputs": [],
       "cache": false
     },
     "format:check": {
-      "description": "Checks formatting compliance using Biome without modifying files",
-      "inputs": ["$TURBO_DEFAULT$", "biome.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "biome.json"
+      ],
       "outputs": []
     },
     "drizzle:generate": {
-      "description": "Generates Drizzle ORM migration files from schema changes",
-      "inputs": ["drizzle/**", "lib/db/schema/**"],
-      "outputs": ["drizzle/migrations/**"],
+      "inputs": [
+        "drizzle/**",
+        "lib/db/schema/**"
+      ],
+      "outputs": [
+        "drizzle/migrations/**"
+      ],
       "cache": false
     },
     "drizzle:check": {
-      "description": "Verifies Drizzle schema consistency with generated migration state",
-      "inputs": ["drizzle/**", "lib/db/schema/**"],
+      "inputs": [
+        "drizzle/**",
+        "lib/db/schema/**"
+      ],
       "outputs": []
     },
     "storybook": {
-      "description": "Starts Storybook dev server for interactive component development (persistent)",
       "cache": false,
       "persistent": true,
       "interruptible": true
     },
     "build-storybook": {
-      "description": "Builds a static Storybook site for deployment and visual regression testing",
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
         ".storybook/**",
         "**/*.stories.{ts,tsx,mdx}"
       ],
-      "outputs": ["storybook-static/**"]
+      "outputs": [
+        "storybook-static/**"
+      ]
     }
   }
 }

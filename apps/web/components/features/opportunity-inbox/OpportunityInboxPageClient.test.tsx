@@ -220,7 +220,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Review pitch/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Plan opportunity/ }));
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
