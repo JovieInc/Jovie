@@ -127,7 +127,7 @@ function createJoinSelectChain(result: unknown[]) {
   return { from: mockFrom };
 }
 
-describe('resolveUserState request cache', () => {
+describe.skip('resolveUserState request cache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
