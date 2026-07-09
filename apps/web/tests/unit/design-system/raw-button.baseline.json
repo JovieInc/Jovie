@@ -1,4 +1,4 @@
 {
   "count": 722,
-  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down \u2014 lower this when a PR converts raw buttons to the canonical Button. 719\u2192721 on 2026-06-30 (codex/t_e84f3d5f): TeleprompterShowcaseInterstitial adds 2 raw buttons for showcase CTA controls."
+  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down — lower this when a PR converts raw buttons to the canonical Button. 725→722 on 2026-07-09 (fix/main-green-neon-visual): convert Banner action/dismiss + CookieSettingsFooterButton raw <button>s to @jovie/ui Button."
 }

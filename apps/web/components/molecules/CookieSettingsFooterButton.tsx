@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
@@ -28,10 +29,11 @@ export function CookieSettingsFooterButton({
   if (!visible) return null;
 
   return (
-    <button
+    <Button
       type='button'
+      variant='link'
       className={cn(
-        'appearance-none bg-transparent text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+        'h-auto appearance-none bg-transparent p-0 text-left no-underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
         className
       )}
       style={style}
@@ -39,7 +41,7 @@ export function CookieSettingsFooterButton({
         window.dispatchEvent(new CustomEvent('jv:cookie:open'));
       }}
     >
-      Cookie settings
-    </button>
+      Cookie Settings
+    </Button>
   );
 }
