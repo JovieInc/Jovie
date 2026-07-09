@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
+import { BRAND_PATHS, JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 describe('BrandLogo', () => {
@@ -123,6 +123,30 @@ describe('BrandLogo', () => {
     const { container } = render(<BrandLogo />);
     const wrapper = container.querySelector('span');
     expect(wrapper).toHaveClass('inline-flex', 'shrink-0');
+  });
+
+  it('defaults to the jovie variant with data-brand-variant on wrapper', () => {
+    const { container } = render(<BrandLogo />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveAttribute('data-brand-variant', 'jovie');
+  });
+
+  it('renders the ov variant with the OV mark path and data attribute', () => {
+    const { container } = render(<BrandLogo variant='ov' />);
+    const wrapper = container.querySelector('span');
+    const path = container.querySelector('path');
+    expect(wrapper).toHaveAttribute('data-brand-variant', 'ov');
+    expect(path?.getAttribute('d')).toBe(BRAND_PATHS.ov);
+  });
+
+  it('defaults aria-label to "OV" for the ov variant', () => {
+    render(<BrandLogo variant='ov' />);
+    expect(screen.getByLabelText('OV')).toBeInTheDocument();
+  });
+
+  it('explicit alt overrides the variant default', () => {
+    render(<BrandLogo variant='ov' alt='Custom' />);
+    expect(screen.getByLabelText('Custom')).toBeInTheDocument();
   });
 
   it('passes a11y checks', async () => {

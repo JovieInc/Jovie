@@ -40,6 +40,7 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
@@ -54,6 +55,8 @@ import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
+  /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
+  readonly variant?: BrandVariant;
 }
 
 const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
@@ -195,6 +198,7 @@ function SidebarHeaderNav({
   isAdmin,
   hasMultipleProfiles,
   isDemoRoute,
+  variant = 'jovie',
   routeBackHref = APP_ROUTES.DASHBOARD,
   routeBackLabel = 'Back to App',
 }: Readonly<{
@@ -202,6 +206,7 @@ function SidebarHeaderNav({
   isAdmin: boolean;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
+  variant?: BrandVariant;
   routeBackHref?: string;
   routeBackLabel?: string;
 }>) {
@@ -255,8 +260,9 @@ function SidebarHeaderNav({
         if (hasMultipleProfiles && !isAdmin) {
           return <ProfileSwitcher />;
         }
-        // Clean header: Jovie logo + wordmark for identity (matches Linear's
+        // Clean header: brand logo + wordmark for identity (matches Linear's
         // workspace pill pattern). User menu lives in the bottom Settings button.
+        // Wordmark and logo variant are driven by the active brand skin.
         return (
           <div
             className={cn(
@@ -267,11 +273,12 @@ function SidebarHeaderNav({
             <BrandLogo
               size={14}
               tone='auto'
+              variant={variant}
               rounded={false}
               className='rounded-sm shrink-0'
             />
             <span className='truncate text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
-              Jovie
+              {BRAND_WORDMARKS[variant]}
             </span>
           </div>
         );
@@ -372,7 +379,10 @@ function ShellSidebarInstallBanner() {
  * The version string (vX.Y.Z + optional sha) is now rendered inside the user
  * menu (visible to everyone) instead of the previous admin-only footer.
  */
-export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
+export function UnifiedSidebar({
+  section,
+  variant = 'jovie',
+}: UnifiedSidebarProps) {
   const { creatorProfiles } = useDashboardData();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const sidebarOverride = useShellSidebarOverride();
@@ -394,7 +404,10 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       className={cn(
         'bg-base',
         '[--sidebar-width:var(--linear-app-sidebar-width)]',
-        'transition-[width,transform] duration-cinematic ease-cinematic'
+        'transition-[width,transform] duration-cinematic ease-cinematic',
+        // OV brand skin: class-based token override, same mechanism as `.dark`
+        // (see design-system.css → OV MODE). Zero layout impact.
+        variant === 'ov' && 'ov-mode'
       )}
     >
       <SidebarHeader
@@ -409,6 +422,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
           isAdmin={isAdmin}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
+          variant={variant}
           routeBackHref={sidebarOverride?.backHref}
           routeBackLabel={sidebarOverride?.backLabel}
         />
