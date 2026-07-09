@@ -156,7 +156,9 @@ const baseInput = {
   } as never,
 };
 
-describe('submitWaitlistAccessRequest', () => {
+// Cold import of access-request pulls email-jobs / notifications graph (~5–7s
+// on CI shards). Raise describe timeout so the first case can pay that cost.
+describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     userRow = null;

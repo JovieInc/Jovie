@@ -158,7 +158,9 @@ function createTransactionMock(
   };
 }
 
-describe('Waitlist API', () => {
+// Route module cold-import is heavy on sharded CI workers; first case can exceed
+// the default 5s timeout when it also awaits GET/POST.
+describe('Waitlist API', { timeout: 20_000 }, () => {
   beforeAll(() => {
     process.env.DATABASE_URL = 'postgres://test@localhost/test';
     routeModulePromise = import('@/app/api/waitlist/route');
