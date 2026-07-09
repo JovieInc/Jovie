@@ -2873,6 +2873,8 @@ jobs:
           export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
           export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
           export E2E_SKIP_WARMUP=1
+          export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
+          export CHAT_LLM_FAILURE_INJECTION=1
 
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
