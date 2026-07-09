@@ -1,3 +1,7 @@
+import {
+  MAX_ACTIONABLE_OVERDUE_DAYS,
+  parseTaskDate,
+} from '@/lib/tasks/task-due-date';
 import { cn } from '@/lib/utils';
 import {
   ShellMetadataChip,
@@ -32,26 +36,27 @@ function resolveDueTone(days: number, muted: boolean): ShellMetadataChipTone {
   return 'neutral';
 }
 
-function formatDueLabel(days: number): string {
+function formatDueLabel(days: number, due: Date): string {
   if (days === 0) return 'Due today';
   if (days === 1) return 'Due tomorrow';
   if (days === -1) return 'Due yesterday';
+
+  // Multi-year relative chips ("12y ago") are never sane for planning —
+  // fall back to a short absolute date instead of year-scale relative text.
+  if (Math.abs(days) >= 365) {
+    return due.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
   if (days > 0) {
-    const text =
-      days >= 365
-        ? `${Math.round(days / 365)}y`
-        : days < 7
-          ? `${days}d`
-          : `${Math.round(days / 7)}w`;
+    const text = days < 7 ? `${days}d` : `${Math.round(days / 7)}w`;
     return `Due in ${text}`;
   }
   const abs = Math.abs(days);
-  const text =
-    abs >= 365
-      ? `${Math.round(abs / 365)}y`
-      : abs < 7
-        ? `${abs}d`
-        : `${Math.round(abs / 7)}w`;
+  const text = abs < 7 ? `${abs}d` : `${Math.round(abs / 7)}w`;
   return `Due ${text} ago`;
 }
 
@@ -69,19 +74,28 @@ function formatDueLabel(days: number): string {
  * ```
  */
 export function DueChip({ dueIso, now, muted, className }: DueChipProps) {
-  const due = new Date(dueIso).getTime();
-  if (!Number.isFinite(due)) {
+  const dueDate = parseTaskDate(dueIso);
+  if (!dueDate) {
     return null;
   }
-  const reference = (now ?? new Date()).getTime();
+  const due = dueDate.getTime();
+  const referenceDate = now ?? new Date();
+  const reference = referenceDate.getTime();
   const days = Math.round((due - reference) / MS_PER_DAY);
-  const label = formatDueLabel(days);
+
+  // Hide absurd historical overdues entirely (defense in depth for rows
+  // that bypassed sanitizeTaskDueAt at the data layer).
+  if (days < -MAX_ACTIONABLE_OVERDUE_DAYS) {
+    return null;
+  }
+
+  const label = formatDueLabel(days, dueDate);
   return (
     <ShellMetadataChip
       tone={resolveDueTone(days, Boolean(muted))}
       className={cn('tabular-nums', className)}
       contentClassName='uppercase tracking-[0.04em]'
-      title={new Date(due).toLocaleDateString()}
+      title={dueDate.toLocaleDateString()}
     >
       {label}
     </ShellMetadataChip>
