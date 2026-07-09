@@ -177,19 +177,35 @@ describe('Tooltip', () => {
   });
 
   describe('Styling', () => {
-    it('applies base styling classes', () => {
+    it('applies base styling classes (System B tokens)', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('z-[150]');
-      expect(content.className).toContain('rounded-md');
-      expect(content.className).toContain('text-[12px]');
+      // Radius on the System B scale (--radius-default = 4px), 12px type.
+      expect(content.className).toContain('rounded-(--radius-default)');
+      expect(content.className).toContain('text-xs');
     });
 
     it('applies theme-aware surface classes', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('bg-(--linear-bg-surface-0)');
-      expect(content.className).toContain('text-(--linear-text-primary)');
+      expect(content.className).toContain('bg-surface-0');
+      expect(content.className).toContain('text-primary-token');
+      expect(content.className).toContain('border-subtle');
+      expect(content.className).toContain('shadow-popover');
+    });
+
+    it('never hard-clips content mid-glyph (no overflow-hidden; wraps within max width)', () => {
+      render(
+        <TestTooltip open={true}>
+          Ask Jovie about my audience trends and engagement over the last
+          quarter
+        </TestTooltip>
+      );
+      const content = screen.getByTestId('tooltip-content');
+      expect(content.className).not.toContain('overflow-hidden');
+      expect(content.className).toContain('max-w-56');
+      expect(content.className).toContain('break-words');
     });
 
     it('applies animation classes', () => {

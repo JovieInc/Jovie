@@ -92,11 +92,14 @@ const TooltipContent = React.forwardRef<
         collisionPadding={collisionPadding}
         data-testid={testId}
         className={cn(
-          // Base layout + spacing
-          'z-[150] overflow-hidden rounded-md border border-(--linear-border-subtle)',
-          'bg-(--linear-bg-surface-0) px-2 py-1 text-[12px] font-[400] tracking-[-0.011em]',
-          'text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)',
-          'max-w-[220px]',
+          // Base layout + spacing. Radius is --radius-default (4px, System B
+          // scale) — compact Linear-style tooltip, not a pill. No
+          // overflow-hidden: long labels wrap/ellipsize (consumers control
+          // clamping); they must never hard-clip mid-glyph.
+          'z-[150] rounded-(--radius-default) border border-subtle',
+          'bg-surface-0 px-2 py-1 text-xs font-normal tracking-tight',
+          'text-primary-token shadow-popover',
+          'max-w-56 break-words',
           // Pure opacity reveal (fade only) — subtract decorative zoom + slide-ins.
           // Matches parallel support work on shell Tooltip / Dsp for visual parity.
           // No layout shift; cursor-near friendly.
@@ -118,7 +121,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-(--linear-bg-surface-0)'
+            className='fill-surface-0'
             data-testid='tooltip-arrow'
           />
         )}

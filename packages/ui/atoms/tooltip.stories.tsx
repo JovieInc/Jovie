@@ -228,6 +228,27 @@ export const LongContent: Story = {
 };
 
 /**
+ * Sidebar-style long thread title: a `side='right'` tooltip whose label is
+ * longer than the max width. It must wrap (or ellipsize) within the surface —
+ * never hard-clip mid-glyph (regression: "Ask Jovie about my audience trends a").
+ */
+export const SidebarLongTitle: Story = {
+  render: () => (
+    <Tooltip defaultOpen>
+      <TooltipTrigger>
+        <Button variant='outline'>Sidebar thread row</Button>
+      </TooltipTrigger>
+      <TooltipContent side='right' sideOffset={8}>
+        <span>
+          Ask Jovie about my audience trends and engagement over the last
+          quarter
+        </span>
+      </TooltipContent>
+    </Tooltip>
+  ),
+};
+
+/**
  * Always-dark tooltip appearance (same in both light and dark themes)
  */
 export const AlwaysDark: Story = {
