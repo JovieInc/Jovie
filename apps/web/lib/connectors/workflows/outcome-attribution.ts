@@ -11,6 +11,7 @@ import { and, sql as drizzleSql, eq, gte, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { workflowRunOutcomes, workflowRuns } from '@/lib/db/schema/connectors';
+import { ensureJovieActiveCohort } from '@/lib/metrics/artist-revenue-cohorts';
 import { buildReleaseGmvRowForRun } from '@/lib/release-to-revenue/gmv-attribution';
 import type { ReleaseToRevenueRunStepOutputs } from '@/lib/release-to-revenue/types';
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '@/lib/release-to-revenue/types';
@@ -251,6 +252,14 @@ export async function recordWorkflowRunOutcome(
     clickDelta: deltas.clickDelta,
     dspClickDelta: deltas.dspClickDelta,
     newFansDelta: deltas.newFansDelta,
+  });
+
+  // First recorded automation outcome tags the artist jovie_active and
+  // snapshots their pre-Jovie baseline (IRPAA cohort foundation, gh-12141).
+  // Best-effort: never blocks the automation path.
+  await ensureJovieActiveCohort({
+    userId: run.userId,
+    activatedAt: run.updatedAt,
   });
 
   return inserted ? toAutomationAttributedRevenue(inserted) : null;

@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockBuildReleaseGmvRowForRun = vi.hoisted(() => vi.fn());
+const mockEnsureJovieActiveCohort = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/release-to-revenue/gmv-attribution', () => ({
   buildReleaseGmvRowForRun: mockBuildReleaseGmvRowForRun,
+}));
+
+vi.mock('@/lib/metrics/artist-revenue-cohorts', () => ({
+  ensureJovieActiveCohort: mockEnsureJovieActiveCohort,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -186,6 +191,10 @@ describe('recordWorkflowRunOutcome', () => {
       newFansDelta: 1,
     });
     expect(mockDbInsert).toHaveBeenCalledTimes(1);
+    expect(mockEnsureJovieActiveCohort).toHaveBeenCalledWith({
+      userId: 'user-1',
+      activatedAt: new Date('2026-06-21T00:00:00.000Z'),
+    });
   });
 
   it('is idempotent when an outcome row already exists', async () => {
@@ -226,6 +235,7 @@ describe('recordWorkflowRunOutcome', () => {
       gmvDeltaCents: 900,
     });
     expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockEnsureJovieActiveCohort).not.toHaveBeenCalled();
   });
 });
 
