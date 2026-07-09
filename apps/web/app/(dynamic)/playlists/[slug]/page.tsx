@@ -255,10 +255,10 @@ export default async function PlaylistPage({
           )}
 
           {/* Title & Attribution */}
-          <h1 className='mt-6 text-center text-[24px] font-[510] leading-[1.2] tracking-[-0.48px] text-white dark:text-white'>
+          <h1 className='mt-6 text-center text-2xl font-[510] leading-[1.2] tracking-[-0.48px] text-white dark:text-white'>
             {playlist.title}
           </h1>
-          <p className='mt-1 text-[13px] font-[450] text-white/40'>
+          <p className='mt-1 text-app font-[450] text-white/40'>
             Curated by{' '}
             <Link href='/' className='text-white/60 hover:text-white'>
               Jovie
@@ -272,7 +272,7 @@ export default async function PlaylistPage({
               trigger={
                 <button
                   type='button'
-                  className='text-[13px] font-[450] text-white/50 transition-colors hover:text-white/80'
+                  className='text-app font-[450] text-white/50 transition-colors hover:text-white/80'
                 >
                   Share
                 </button>
@@ -282,7 +282,7 @@ export default async function PlaylistPage({
 
           {/* Description */}
           {playlist.description && (
-            <p className='mt-4 text-center text-[15px] font-[400] leading-[1.6] text-white/60'>
+            <p className='mt-4 text-center text-mid font-[400] leading-[1.6] text-white/60'>
               {playlist.description}
             </p>
           )}
@@ -293,7 +293,7 @@ export default async function PlaylistPage({
               href={spotifyUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-[15px] font-[510] text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
+              className='mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-mid font-[510] text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
             >
               <SocialIcon
                 platform='spotify'
@@ -312,24 +312,24 @@ export default async function PlaylistPage({
               {tracks.map(track => (
                 <li key={track.id} className='flex items-center gap-3 py-3'>
                   {/* Track number (hidden on mobile per design review) */}
-                  <span className='hidden w-6 text-right text-[13px] font-[450] text-white/20 md:block'>
+                  <span className='hidden w-6 text-right text-app font-[450] text-white/20 md:block'>
                     {track.position}
                   </span>
 
                   {/* Track info */}
                   <div className='min-w-0 flex-1'>
-                    <p className='truncate text-[15px] font-[450] text-white dark:text-white'>
+                    <p className='truncate text-mid font-[450] text-white dark:text-white'>
                       {track.trackName}
                     </p>
                     {track.username ? (
                       <Link
                         href={`/${track.username}`}
-                        className='truncate text-[13px] font-[450] text-white/50 hover:text-white/80'
+                        className='truncate text-app font-[450] text-white/50 hover:text-white/80'
                       >
                         {track.artistName}
                       </Link>
                     ) : (
-                      <p className='truncate text-[13px] font-[450] text-white/50'>
+                      <p className='truncate text-app font-[450] text-white/50'>
                         {track.artistName}
                       </p>
                     )}
@@ -360,7 +360,7 @@ export default async function PlaylistPage({
           <div className='mt-12 text-center'>
             <Link
               href='/playlists'
-              className='text-[13px] font-[450] text-white/40 hover:text-white/60'
+              className='text-app font-[450] text-white/40 hover:text-white/60'
             >
               Discover More Playlists
             </Link>

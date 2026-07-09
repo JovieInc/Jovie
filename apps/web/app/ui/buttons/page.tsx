@@ -14,7 +14,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-3'>{children}</div>
@@ -23,7 +23,7 @@ function Section({
 }
 
 function Label({ children }: { readonly children: React.ReactNode }) {
-  return <span className='text-[11px] text-tertiary-token'>{children}</span>;
+  return <span className='text-2xs text-tertiary-token'>{children}</span>;
 }
 
 function Row({ children }: { readonly children: React.ReactNode }) {
@@ -49,7 +49,7 @@ export default function ButtonsPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Button</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Canonical variants: primary, secondary, tertiary, ghost, and link.
         Destructive is a tone prop, not a standalone variant.
       </p>

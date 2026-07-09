@@ -106,7 +106,7 @@ export function AuthModalShell({
             <ArrowLeft className='h-4 w-4' strokeWidth={2} aria-hidden='true' />
           </button>
           {statusRow ? (
-            <div className='min-w-0 flex-1 text-[12px] leading-[1.45] tracking-[-0.01em] text-white/54'>
+            <div className='min-w-0 flex-1 text-xs leading-[1.45] tracking-[-0.01em] text-white/54'>
               {statusRow}
             </div>
           ) : null}
