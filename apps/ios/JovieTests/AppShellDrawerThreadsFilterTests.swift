@@ -71,3 +71,31 @@ struct AppShellDrawerSurfaceLayoutTests {
     #expect(AppShellDrawerSurfaceLayout.maxSingleLineSurfaceButtonHeight == 56)
   }
 }
+
+// GH-12949: recessed drawer base plane must be fully occluded when closed so
+// translucent composer/toolbar chrome cannot reveal thread rows underneath.
+struct AppShellDrawerBasePlaneOcclusionTests {
+  @Test func closedIdleStateHidesBasePlane() {
+    #expect(
+      appShellDrawerBasePlaneOpacity(isShowingDrawer: false, drawerDragOffset: 0) == 0
+    )
+  }
+
+  @Test func openStateShowsBasePlane() {
+    #expect(
+      appShellDrawerBasePlaneOpacity(isShowingDrawer: true, drawerDragOffset: 0) == 1
+    )
+  }
+
+  @Test func edgeDragRevealShowsBasePlaneWhileStillClosed() {
+    #expect(
+      appShellDrawerBasePlaneOpacity(isShowingDrawer: false, drawerDragOffset: 48) == 1
+    )
+  }
+
+  @Test func closingDragKeepsBasePlaneVisibleUntilSettled() {
+    #expect(
+      appShellDrawerBasePlaneOpacity(isShowingDrawer: true, drawerDragOffset: -32) == 1
+    )
+  }
+}

@@ -165,6 +165,39 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  // GH-12949: with the drawer closed, the recessed base plane must be fully
+  // occluded — no drawer chrome hittable under the composer/content card.
+  func testDrawerBasePlaneOccludedWhenClosed() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let composer = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      waitForHittable(composer, timeout: 3),
+      "Chat composer did not become hittable with drawer closed.\n\(app.debugDescription)"
+    )
+
+    let drawer = app.descendants(matching: .any)["shell-drawer"]
+    XCTAssertFalse(
+      drawer.isHittable,
+      "Drawer base plane stayed hittable with drawer closed — content card must fully occlude it.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["shell-drawer-new-chat"].isHittable,
+      "Drawer New chat control is hittable with drawer closed.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["shell-drawer-surface-shell-tab-profile"].isHittable,
+      "Drawer surface switcher is hittable with drawer closed.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.staticTexts["Start a conversation to see recent conversations here."].isHittable,
+      "Drawer empty-threads copy is hittable under content with drawer closed.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "drawer-base-plane-occluded-closed", app: app)
+  }
+
   // JOV-3670 evidence (a): the drawer is the SOLE surface switcher. The former
   // bottom QR/sparkle pill (shell-tab-* buttons, no drawer prefix) must not
   // exist anywhere in the shell, whether the drawer is closed or open.
