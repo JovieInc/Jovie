@@ -8,6 +8,11 @@
  * Default: --dry-run
  */
 
+import { execSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 const args = process.argv.slice(2);
 const PR_ARG = args.find(a => a.startsWith('--pr='));
 const DRY_RUN = !args.includes('--apply');
@@ -21,7 +26,6 @@ if (!PR_ARG) {
 const PR_NUMBER = PR_ARG.split('=')[1];
 
 function gh(args) {
-  const { execSync } = require('node:child_process');
   const result = execSync('gh ' + args.map(a => JSON.stringify(a)).join(' '), {
     encoding: 'utf-8',
     maxBuffer: 16 * 1024 * 1024,
@@ -77,11 +81,6 @@ function main() {
   }
 
   // Step 3: Try to auto-resolve by merging base into head
-  const { execSync } = require('node:child_process');
-  const { mkdtempSync, rmSync } = require('node:fs');
-  const { tmpdir } = require('node:os');
-  const { join } = require('node:path');
-
   const tmpDir = mkdtempSync(join(tmpdir(), 'pr-conflict-'));
   let resolved = false;
 
