@@ -5,8 +5,10 @@ const mockAuth = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockGetUserByClerkId = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
 }));
 
 vi.mock('@/lib/admin', () => ({

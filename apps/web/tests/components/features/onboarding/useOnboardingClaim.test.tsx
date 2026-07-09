@@ -1,8 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOnboardingClaim } from '@/components/features/onboarding/useOnboardingClaim';
-import { ClerkSafeBootstrapProvider } from '@/hooks/useClerkSafe';
-import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
 
 const { replaceMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
@@ -14,15 +12,13 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-const bootstrap: ClientAuthBootstrap = {
-  isAuthenticated: true,
-  userId: 'user_dev_creator',
-  email: 'creator@example.com',
-  username: 'creator',
-  fullName: 'Creator Example',
-  isAdmin: false,
-  persona: 'creator',
-};
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    userId: 'user_dev_creator',
+  }),
+}));
 
 function ClaimHarness({ trigger }: { readonly trigger: number }) {
   const status = useOnboardingClaim(trigger);
@@ -30,11 +26,7 @@ function ClaimHarness({ trigger }: { readonly trigger: number }) {
 }
 
 function renderClaimHarness(trigger: number) {
-  return (
-    <ClerkSafeBootstrapProvider bootstrap={bootstrap}>
-      <ClaimHarness trigger={trigger} />
-    </ClerkSafeBootstrapProvider>
-  );
+  return <ClaimHarness trigger={trigger} />;
 }
 
 function jsonResponse(body: unknown, init?: ResponseInit) {

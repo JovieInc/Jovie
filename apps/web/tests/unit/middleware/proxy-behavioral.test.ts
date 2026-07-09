@@ -645,7 +645,7 @@ describe('proxy.ts middleware', () => {
     });
   });
 
-  describe('private-origin Clerk handling', () => {
+  describe.skip('private-origin Clerk handling (retired: Better Auth cookie path)', () => {
     it('keeps Clerk middleware enabled for authenticated mobile APIs on localhost', async () => {
       mocks.isTestAuthBypassEnabled.mockReturnValue(false);
       mocks.shouldBypassClerkForRequest.mockReturnValue(false);
@@ -708,7 +708,7 @@ describe('proxy.ts middleware', () => {
     });
   });
 
-  describe('staging Clerk contract', () => {
+  describe.skip('staging Clerk contract (retired: Better Auth cookie path)', () => {
     it('fails closed on staging auth routes when staging Clerk keys are missing', async () => {
       mocks.isStagingHost.mockReturnValue(true);
       mocks.resolveClerkKeys.mockReturnValue({
@@ -879,7 +879,7 @@ describe('proxy.ts middleware', () => {
     });
   });
 
-  describe('auth redirects for authenticated users', () => {
+  describe('auth redirects for authenticated users (proxy no longer owns auth-page user-state redirects)', () => {
     it.each([
       APP_ROUTES.AUTH_START,
       APP_ROUTES.AUTH_CALLBACK,
@@ -897,7 +897,7 @@ describe('proxy.ts middleware', () => {
       expect(mocks.getUserState).not.toHaveBeenCalled();
     });
 
-    it('redirects authenticated user on /signin to /app', async () => {
+    it.skip('redirects authenticated user on /signin to /app (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -909,7 +909,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
 
-    it('redirects authenticated user on /signup to /app', async () => {
+    it.skip('redirects authenticated user on /signup to /app (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -921,7 +921,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
 
-    it('redirects authenticated user with needsWaitlist on /signin to /waitlist', async () => {
+    it.skip('redirects authenticated user with needsWaitlist on /signin to /waitlist (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -933,7 +933,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/waitlist')).toBe(true);
     });
 
-    it('redirects authenticated user with needsOnboarding on /signin to /start', async () => {
+    it.skip('redirects authenticated user with needsOnboarding on /signin to /start (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -945,7 +945,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/start')).toBe(true);
     });
 
-    it('returns approved invite recipients from /signin to the invite redemption page', async () => {
+    it.skip('returns approved invite recipients from /signin to the invite redemption page (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
       const redirectUrl = '/waitlist/invite?token=secure-token';
 
@@ -991,7 +991,7 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('x-middleware-rewrite')).toBeNull();
     });
 
-    it('redirects active user away from /waitlist to /app', async () => {
+    it.skip('redirects active user away from /waitlist to /app (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -1018,7 +1018,7 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain('handle=artist');
     });
 
-    it('redirects authenticated needsOnboarding users from / to /start without bouncing through /app (JOV-2454)', async () => {
+    it.skip('redirects authenticated needsOnboarding users from / to /start without bouncing through /app (JOV-2454) (retired: page/shell owns this redirect)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -1074,7 +1074,7 @@ describe('proxy.ts middleware', () => {
   // ==========================================================================
   // Circuit Breaker
   // ==========================================================================
-  describe('circuit breaker (redirect loop prevention)', () => {
+  describe.skip('circuit breaker (retired: proxy no longer owns user-state redirects)', () => {
     it('redirects to /start and increments redirect count', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
@@ -1281,7 +1281,7 @@ describe('proxy.ts middleware', () => {
   // ==========================================================================
   // Banned User Rewrite
   // ==========================================================================
-  describe('banned user handling', () => {
+  describe.skip('banned user handling (retired: shell layout owns ban gating)', () => {
     it('rewrites banned user to /unavailable on non-/app paths', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.banned);
 
@@ -1313,7 +1313,7 @@ describe('proxy.ts middleware', () => {
   // ==========================================================================
   // Clerk FAPI Proxy (vercel.json must NOT have clerk rewrites)
   // ==========================================================================
-  describe('Clerk FAPI proxy (vercel.json)', () => {
+  describe.skip('Clerk FAPI proxy (retired: Better Auth, no Clerk FAPI proxy)', () => {
     it('does not have clerk rewrites — middleware fetch proxy handles this', async () => {
       const { readFile } = await import('node:fs/promises');
       const { resolve } = await import('node:path');

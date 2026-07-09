@@ -26,8 +26,10 @@ const { db } = vi.hoisted(() => {
 });
 
 // Module mocks use the same hoisted instances the tests manipulate
-vi.mock('@clerk/nextjs/server', () => ({
-  auth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: auth,
+  getOptionalAuth: auth,
+  getCachedSessionTokenAuth: auth,
 }));
 
 vi.mock('@/lib/db', () => ({

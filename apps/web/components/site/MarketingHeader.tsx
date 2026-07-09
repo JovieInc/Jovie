@@ -49,7 +49,7 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
       },
       {
         href: APP_ROUTES.LAUNCH,
-        label: 'Pre-saves & Countdowns',
+        label: 'Pre Saves & Countdowns',
         description: 'Before and after release day.',
       },
       {
@@ -168,7 +168,11 @@ export function MarketingHeader({
     (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
-  const presentation = isMinimal ? 'default' : isHomepage ? 'homepage-embedded' : 'marketing-glass';
+  const presentation = isMinimal
+    ? 'default'
+    : isHomepage
+      ? 'homepage-embedded'
+      : 'marketing-glass';
   const centerNavEnabled =
     FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
     (!isHomepage || showHomepageCenterNav);

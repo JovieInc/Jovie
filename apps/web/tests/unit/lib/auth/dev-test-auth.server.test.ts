@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockEnsureClerkTestUser,
+  mockEnsureBetterAuthTestUser,
   mockEnsureCreatorProfileRecord,
   mockEnsureSocialLinkRecord,
   mockEnsureUserProfileClaim,
@@ -11,6 +12,7 @@ const {
   mockSetActiveProfileForUser,
 } = vi.hoisted(() => ({
   mockEnsureClerkTestUser: vi.fn(),
+  mockEnsureBetterAuthTestUser: vi.fn(),
   mockEnsureCreatorProfileRecord: vi.fn(),
   mockEnsureSocialLinkRecord: vi.fn(),
   mockEnsureUserProfileClaim: vi.fn(),
@@ -20,13 +22,52 @@ const {
   mockSetActiveProfileForUser: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {},
+vi.mock('@/lib/db', () => {
+  const limit = vi
+    .fn()
+    .mockResolvedValue([{ id: 'db_user', betterAuthUserId: 'ba_user_clerk' }]);
+  const where = vi.fn(() => ({
+    limit,
+    where: vi.fn().mockResolvedValue(undefined),
+  }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+  const set = vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) }));
+  const update = vi.fn(() => ({ set }));
+  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const values = vi.fn(() => ({ onConflictDoUpdate }));
+  const insert = vi.fn(() => ({ values }));
+  return {
+    db: { select, update, insert },
+  };
+});
+
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: {
+    $context: Promise.resolve({
+      internalAdapter: {
+        createSession: vi.fn().mockResolvedValue({ id: 'sess_test' }),
+      },
+    }),
+  },
+}));
+
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((...args: unknown[]) => args),
+}));
+
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: { id: 'id', betterAuthUserId: 'betterAuthUserId' },
+}));
+
+vi.mock('@/lib/db/schema/better-auth', () => ({
+  baUsers: { id: 'id' },
 }));
 
 vi.mock('@/lib/testing/test-user-provision.server', () => ({
   DEFAULT_TEST_AVATAR_URL: '/avatars/default-user.png',
   ensureClerkTestUser: mockEnsureClerkTestUser,
+  ensureBetterAuthTestUser: mockEnsureBetterAuthTestUser,
   ensureCreatorProfileRecord: mockEnsureCreatorProfileRecord,
   ensureSocialLinkRecord: mockEnsureSocialLinkRecord,
   ensureUserProfileClaim: mockEnsureUserProfileClaim,
@@ -48,6 +89,7 @@ describe('dev-test-auth.server', () => {
     vi.resetModules();
 
     mockEnsureClerkTestUser.mockResolvedValue('user_clerk');
+    mockEnsureBetterAuthTestUser.mockResolvedValue('ba_user_clerk');
     mockEnsureUserRecord.mockResolvedValue({
       id: 'db_user',
       previousClerkId: null,
@@ -174,10 +216,10 @@ describe('dev-test-auth.server', () => {
     );
     const actor = await ensureDevTestAuthActor('creator');
 
-    expect(mockEnsureClerkTestUser).toHaveBeenCalledWith(
+    expect(mockEnsureBetterAuthTestUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'browse+clerk_test@jov.ie',
-        username: 'browse-test-user',
+        fullName: 'Browse Test User',
       })
     );
     expect(mockEnsureUserRecord).toHaveBeenCalledWith(
@@ -214,7 +256,7 @@ describe('dev-test-auth.server', () => {
     );
     expect(actor).toEqual({
       persona: 'creator',
-      clerkUserId: 'user_clerk',
+      clerkUserId: 'ba_user_clerk',
       email: 'browse+clerk_test@jov.ie',
       username: 'browse-test-user',
       fullName: 'Browse Test User',
@@ -229,10 +271,10 @@ describe('dev-test-auth.server', () => {
     );
     const actor = await ensureDevTestAuthActor('creator-ready');
 
-    expect(mockEnsureClerkTestUser).toHaveBeenCalledWith(
+    expect(mockEnsureBetterAuthTestUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'browse-ready+clerk_test@jov.ie',
-        username: 'browse-ready-user',
+        fullName: 'Browse Ready User',
       })
     );
     expect(mockEnsureUserRecord).toHaveBeenCalledWith(
@@ -261,7 +303,7 @@ describe('dev-test-auth.server', () => {
     );
     expect(actor).toEqual({
       persona: 'creator-ready',
-      clerkUserId: 'user_clerk',
+      clerkUserId: 'ba_user_clerk',
       email: 'browse-ready+clerk_test@jov.ie',
       username: 'browse-ready-user',
       fullName: 'Browse Ready User',
@@ -277,10 +319,10 @@ describe('dev-test-auth.server', () => {
     );
     const actor = await ensureDevTestAuthActor('admin');
 
-    expect(mockEnsureClerkTestUser).toHaveBeenCalledWith(
+    expect(mockEnsureBetterAuthTestUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'admin+clerk_test@jov.ie',
-        username: 'browse-admin-user',
+        fullName: 'Browse Admin',
       })
     );
     expect(mockEnsureUserRecord).toHaveBeenCalledWith(
@@ -316,7 +358,7 @@ describe('dev-test-auth.server', () => {
     expect(mockEnsureSocialLinkRecord).not.toHaveBeenCalled();
     expect(actor).toEqual({
       persona: 'admin',
-      clerkUserId: 'user_clerk',
+      clerkUserId: 'ba_user_clerk',
       email: 'admin+clerk_test@jov.ie',
       username: 'browse-admin-user',
       fullName: 'Browse Admin',
@@ -334,10 +376,9 @@ describe('dev-test-auth.server', () => {
 
     await ensureDevTestAuthActor('admin');
 
-    expect(mockEnsureClerkTestUser).toHaveBeenCalledWith(
+    expect(mockEnsureBetterAuthTestUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'browse-admin+clerk_test@jov.ie',
-        fallbackClerkId: 'user_admin_seed',
       })
     );
   });
@@ -372,7 +413,7 @@ describe('dev-test-auth.server', () => {
 
     await expect(ensureDevTestAuthActor('creator')).resolves.toEqual({
       persona: 'creator',
-      clerkUserId: 'user_clerk',
+      clerkUserId: 'ba_user_clerk',
       email: 'browse+clerk_test@jov.ie',
       username: 'browse-test-user',
       fullName: 'Browse Test User',
@@ -382,7 +423,7 @@ describe('dev-test-auth.server', () => {
     expect(mockLoggerWarn).toHaveBeenCalledWith(
       'Failed to invalidate dev test auth caches',
       expect.objectContaining({
-        clerkUserId: 'user_clerk',
+        betterAuthUserId: 'ba_user_clerk',
       }),
       'dev-test-auth'
     );

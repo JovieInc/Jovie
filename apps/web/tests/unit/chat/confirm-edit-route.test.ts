@@ -28,8 +28,12 @@ const hoisted = vi.hoisted(() => {
 // --- Module mocks ---
 let mockUserId: string | null = 'user_abc';
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: vi.fn(() => Promise.resolve({ userId: mockUserId })),
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: vi.fn(() => Promise.resolve({ userId: mockUserId })),
+  getOptionalAuth: vi.fn(() => Promise.resolve({ userId: mockUserId })),
+  getCachedSessionTokenAuth: vi.fn(() =>
+    Promise.resolve({ userId: mockUserId })
+  ),
 }));
 
 vi.mock('@/lib/db', () => ({
