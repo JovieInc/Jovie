@@ -80,7 +80,7 @@ export function DesktopAuthRouteHandoff() {
       data-desktop-auth-state={openState}
       data-testid='desktop-auth-route-handoff'
     >
-      <section className='relative z-10 flex w-full max-w-[360px] flex-col items-center px-6 py-16 text-center'>
+      <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
         <BrandLogo aria-hidden size={60} tone='white' />
         <h1 className='sr-only'>Sign In To Jovie</h1>
         {isWaitingInBrowser ? null : (

@@ -29,7 +29,7 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
     <span className='inline-flex max-w-full items-center gap-1.5'>
       <code
         className={cn(
-          'min-w-0 max-w-[10rem] font-mono text-2xs text-tertiary-token',
+          'min-w-0 max-w-40 font-mono text-2xs text-tertiary-token',
           isRevealed
             ? 'break-all whitespace-normal'
             : 'truncate overflow-hidden'
@@ -56,7 +56,7 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
         type='button'
         onClick={copyToken}
         className='inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-[color,opacity] hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        aria-label='Copy full investor token'
+        aria-label='Copy Full Investor Token'
       >
         {copied ? (
           <Check

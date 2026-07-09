@@ -87,7 +87,7 @@ export default function PitchPage() {
           <p className='font-mono text-3xs uppercase tracking-[0.18em] text-white/35'>
             Pitch Deck
           </p>
-          <p className='max-w-[18rem] text-balance text-base leading-snug text-white/70'>
+          <p className='max-w-72 text-balance text-base leading-snug text-white/70'>
             Designed for desktop. Open on a larger screen or download the PDF.
           </p>
         </div>
