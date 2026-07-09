@@ -19,7 +19,7 @@ import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutat
 import { cn } from '@/lib/utils';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
-import { OpportunityInboxTourDateCard } from './OpportunityInboxTourDateCard';
+import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
 import {
   OpportunityInboxConfirmedTourDates,
   OpportunityInboxRejectedTourDates,
@@ -273,7 +273,7 @@ export function OpportunityInboxPageClient({
           </div>
           <div className='system-b-opportunity-inbox-feed-list'>
             {pendingTourDates.map(item => (
-              <OpportunityInboxTourDateCard
+              <OpportunityInboxTourDateRow
                 key={item.id}
                 item={item}
                 onConfirm={handleConfirmTourDate}
