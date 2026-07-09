@@ -2,7 +2,6 @@
 
 import { Button, TooltipShortcut } from '@jovie/ui';
 import type { ComponentProps, ReactNode } from 'react';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
@@ -21,13 +20,11 @@ export const PAGE_TOOLBAR_END_GROUP_CLASS =
 export const PAGE_TOOLBAR_META_TEXT_CLASS =
   'text-xs text-tertiary-token tabular-nums';
 
-export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
-  APP_CONTROL_BUTTON_CLASS,
-  'h-7.5 rounded-pill px-2.5 text-2xs font-[540] text-secondary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
-);
+export const PAGE_TOOLBAR_TAB_BUTTON_CLASS =
+  'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-secondary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
-  'border-default bg-surface-0 text-primary-token shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_68%,transparent)]';
+  'ring-2 ring-(--color-accent) text-primary-token';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
