@@ -5,6 +5,7 @@ import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
 
 const REPORT_CARD: OpportunityInboxCardViewModel = {
   id: 'report-1',
+  signalType: 'other',
   typeLabel: 'Report',
   createdAt: '2026-07-04T10:00:00.000Z',
   title: 'Thumbnail experiment finished',

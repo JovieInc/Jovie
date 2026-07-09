@@ -87,7 +87,12 @@ export function mapSuggestedActionToInboxCard(
   return {
     id: row.id,
     signalType,
-    typeLabel: OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
+    // Report cards keep a fixed type label; all other cards use the typed
+    // signal-category label (song / event / profile match / suggestion).
+    typeLabel:
+      category === 'report'
+        ? 'Report'
+        : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
     createdAt: row.createdAt.toISOString(),
     title: titleFromPayload(row.payload, category),
     why: whyFromRow(row, category),
