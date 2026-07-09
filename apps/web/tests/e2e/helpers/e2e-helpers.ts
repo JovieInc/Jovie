@@ -495,7 +495,7 @@ export async function completeOnboardingV2(
   await waitForHydration(page, { timeout: 90_000 });
 
   if (!(await spotifyHeading.isVisible().catch(() => false))) {
-    const handleInput = page.getByLabel('Claim your handle');
+    const handleInput = page.getByLabel('Claim Your Handle');
     await expect(onboardingWrapper).toHaveAttribute('data-hydrated', 'true', {
       timeout: 90_000,
     });

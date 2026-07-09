@@ -119,7 +119,7 @@ test.describe('Dashboard Access Control', () => {
     await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/onboarding', { timeout: 10_000 });
 
-    const handleInputA = page.getByLabel('Claim your handle');
+    const handleInputA = page.getByLabel('Claim Your Handle');
     await expect(handleInputA).toBeVisible({ timeout: 5_000 });
     await handleInputA.fill(userAHandle);
 
@@ -193,7 +193,7 @@ test.describe('Dashboard Access Control', () => {
     await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/onboarding', { timeout: 10_000 });
 
-    const handleInputB = page.getByLabel('Claim your handle');
+    const handleInputB = page.getByLabel('Claim Your Handle');
     await handleInputB.fill(userBHandle);
 
     await expect(

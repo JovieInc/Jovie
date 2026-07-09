@@ -485,7 +485,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
       ).toBeVisible({ timeout: 10_000 });
 
       // Handle input should be pre-filled
-      const handleEl = page.getByLabel('Claim your handle');
+      const handleEl = page.getByLabel('Claim Your Handle');
       const handleVisible = await handleEl
         .isVisible({ timeout: 3_000 })
         .catch(() => false);
