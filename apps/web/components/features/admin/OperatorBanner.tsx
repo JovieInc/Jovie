@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { QueryClient, QueryClientContext } from '@tanstack/react-query';
 import { AlertTriangle, X } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
@@ -101,14 +102,15 @@ export function OperatorBanner({
             )}
           </span>
         </div>
-        <button
+        <Button
           type='button'
+          variant='ghost'
           onClick={handleDismiss}
-          className='rounded p-1 transition-colors hover:bg-amber-600/20'
-          aria-label='Dismiss environment warning'
+          className='h-auto w-auto rounded p-1 text-amber-950 transition-colors hover:bg-amber-600/20'
+          aria-label='Dismiss Environment Warning'
         >
           <X className='size-3.5' />
-        </button>
+        </Button>
       </div>
     </div>
   );

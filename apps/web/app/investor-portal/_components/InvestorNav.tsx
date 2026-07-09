@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -86,23 +87,22 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
 
       {/* Mobile header bar */}
       <header className='fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-subtle bg-base px-4 py-3 lg:hidden'>
-        <span className='text-[length:var(--text-base)] font-bold text-primary-token'>
-          Jovie
-        </span>
+        <span className='text-base font-bold text-primary-token'>Jovie</span>
         <div className='flex items-center gap-3'>
           {investorName && (
             <span className='text-[length:var(--text-xs)] text-tertiary-token'>
               For {investorName}
             </span>
           )}
-          <button
-            type='button'
+          <Button
+            variant='ghost'
+            size='icon'
             onClick={toggleSheet}
             aria-expanded={isOpen}
             aria-controls='mobile-nav'
             aria-label={isOpen ? 'Close Navigation' : 'Open Navigation'}
             className={cn(
-              'flex h-8 w-8 items-center justify-center rounded',
+              'h-8 w-8 rounded',
               'text-secondary-token hover:bg-interactive-hover',
               'focus-ring-themed transition-colors'
             )}
@@ -112,7 +112,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
             ) : (
               <Menu className='h-4 w-4' aria-hidden='true' />
             )}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -147,18 +147,19 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
                   </p>
                 )}
               </div>
-              <button
-                type='button'
+              <Button
+                variant='ghost'
+                size='icon'
                 onClick={() => setIsOpen(false)}
                 aria-label='Close Navigation'
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded',
+                  'h-8 w-8 rounded',
                   'text-secondary-token hover:bg-interactive-hover',
                   'focus-ring-themed transition-colors'
                 )}
               >
                 <X className='h-4 w-4' aria-hidden='true' />
-              </button>
+              </Button>
             </div>
 
             {navLinks}
@@ -183,7 +184,7 @@ function NavItem({
       <Link
         href={href}
         aria-current={isActive ? 'page' : undefined}
-        className={`block rounded-(--radius-sm) px-2 py-1.5 text-[length:var(--text-app)] font-medium transition-colors ${
+        className={`block rounded-(--radius-sm) px-2 py-1.5 text-app font-medium transition-colors ${
           isActive
             ? 'bg-interactive-hover text-primary-token'
             : 'text-tertiary-token hover:bg-interactive-hover hover:text-secondary-token'

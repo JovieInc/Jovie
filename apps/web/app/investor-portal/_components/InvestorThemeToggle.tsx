@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { MoonStar, SunMedium } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -24,16 +25,17 @@ export function InvestorThemeToggle({
   const Icon = isLight ? MoonStar : SunMedium;
 
   return (
-    <button
-      type='button'
+    <Button
+      variant='ghost'
+      size='icon'
       onClick={handleToggle}
       aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
       className={cn(
-        'focus-ring-themed flex h-8 w-8 items-center justify-center rounded-full border border-subtle text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token',
+        'focus-ring-themed h-8 w-8 rounded-full border border-subtle text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token',
         isLight && 'bg-surface-1 text-primary-token'
       )}
     >
       <Icon className='h-4 w-4' aria-hidden='true' />
-    </button>
+    </Button>
   );
 }

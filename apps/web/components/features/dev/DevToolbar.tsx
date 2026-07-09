@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import * as Switch from '@radix-ui/react-switch';
 import {
   type QueryClient,
@@ -723,17 +724,18 @@ export function DevToolbar({
 
   if (hidden) {
     return (
-      <button
+      <Button
         type='button'
+        variant='ghost'
         onClick={show}
         data-testid='dev-toolbar'
-        className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-default bg-surface-1 text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:border-default shadow-md font-mono text-3xs transition-colors'
+        className='fixed bottom-3 right-3 z-[9999] h-auto gap-1.5 px-2.5 py-1.5 rounded-lg border border-default bg-surface-1 text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:border-default shadow-md font-mono text-3xs transition-colors'
         aria-label='Show Dev Toolbar'
         title='Show Dev Toolbar (⌘⇧D)'
       >
         <Wrench size={11} />
         Dev
-      </button>
+      </Button>
     );
   }
 
@@ -768,14 +770,15 @@ export function DevToolbar({
               aria-label='Search Flags'
             />
             {search && (
-              <button
+              <Button
                 type='button'
+                variant='ghost'
                 onClick={() => setSearch('')}
-                className='shrink-0 text-quaternary-token hover:text-(--color-text-primary) transition-colors'
+                className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-primary) transition-colors'
                 aria-label='Clear Search'
               >
                 <X size={11} />
-              </button>
+              </Button>
             )}
             <span className='shrink-0 text-3xs text-quaternary-token'>
               {matchCount} of {filteredFlags.total}
@@ -791,13 +794,14 @@ export function DevToolbar({
                   <span className='text-3xs font-semibold uppercase tracking-wide text-accent'>
                     Overrides ({filteredFlags.overridden.length})
                   </span>
-                  <button
+                  <Button
                     type='button'
+                    variant='link'
                     onClick={overridesCtx.clearOverrides}
                     className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
                   >
-                    clear all
-                  </button>
+                    Clear All
+                  </Button>
                 </div>
                 <div className='flex flex-col gap-0.5'>
                   {filteredFlags.overridden.map(flag => (
@@ -882,28 +886,30 @@ export function DevToolbar({
 
         {/* Override badge */}
         {overrideCount > 0 && (
-          <button
+          <Button
             type='button'
+            variant='ghost'
             onClick={() => {
               if (!open) toggleOpen();
             }}
-            className='px-2 py-0.5 rounded-full text-3xs font-medium bg-accent/10 text-accent border border-accent/30 shrink-0 hover:bg-accent/20 transition-colors cursor-pointer'
+            className='h-auto px-2 py-0.5 rounded-full text-3xs font-medium bg-accent/10 text-accent border border-accent/30 shrink-0 hover:bg-accent/20 transition-colors cursor-pointer'
             title='View overrides'
           >
             {overrideCount} {overrideCount === 1 ? 'override' : 'overrides'}
-          </button>
+          </Button>
         )}
 
         <span className='max-md:hidden md:inline px-1.5 py-0.5 rounded text-3xs text-quaternary-token bg-surface-2 shrink-0'>
           {breakpoint}
         </span>
 
-        <button
+        <Button
           type='button'
+          variant='ghost'
           aria-pressed={designV1Enabled}
           title='Toggle New Design (DESIGN_V1)'
           onClick={toggleDesignV1}
-          className={`inline-flex shrink-0 items-center gap-1 px-1.5 py-1 rounded text-3xs transition-colors ${
+          className={`h-auto shrink-0 gap-1 px-1.5 py-1 rounded text-3xs transition-colors ${
             designV1Enabled
               ? 'text-accent bg-accent/10 hover:bg-accent/15'
               : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
@@ -913,18 +919,19 @@ export function DevToolbar({
           {designV1Overridden && (
             <span className='text-3xs opacity-70'>(override)</span>
           )}
-        </button>
+        </Button>
 
         <div className='flex-1' />
 
         {/* Quick actions */}
         <div className='flex items-center gap-0.5'>
           {/* Flag badges toggle */}
-          <button
+          <Button
             type='button'
+            variant='ghost'
             onClick={() => flagBadgeCtx?.toggleBadges()}
             title={`${flagBadgeCtx?.showBadges ? 'Hide' : 'Show'} flag badges (⌘⇧F)`}
-            className={`p-1.5 rounded transition-colors ${
+            className={`h-auto w-auto p-1.5 rounded transition-colors ${
               flagBadgeCtx?.showBadges
                 ? 'text-accent bg-accent/10'
                 : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
@@ -932,7 +939,7 @@ export function DevToolbar({
             aria-label='Toggle Flag Badges'
           >
             <Flag size={12} />
-          </button>
+          </Button>
 
           <div className='w-px h-4 mx-1 bg-subtle' />
 
@@ -961,30 +968,32 @@ export function DevToolbar({
           <div className='w-px h-4 mx-1 bg-subtle' />
 
           {sha && (
-            <button
+            <Button
               type='button'
+              variant='ghost'
               onClick={() => copyToClipboard(sha, 'sha')}
               title={`Copy SHA: ${sha}`}
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+              className='h-auto gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
               aria-label='Copy SHA'
             >
               <CopyFieldIcon copied={copiedField === 'sha'} icon={Copy} />
               <span className='max-sm:hidden sm:inline text-3xs'>SHA</span>
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
             type='button'
+            variant='ghost'
             onClick={() =>
               copyToClipboard(globalThis.location.pathname, 'route')
             }
             title={`Copy Route: ${globalThis.window === undefined ? '' : globalThis.location.pathname}`}
-            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+            className='h-auto gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label='Copy Route'
           >
             <CopyFieldIcon copied={copiedField === 'route'} icon={Route} />
             <span className='max-sm:hidden sm:inline text-3xs'>Route</span>
-          </button>
+          </Button>
 
           {designV1Enabled && (
             <Link

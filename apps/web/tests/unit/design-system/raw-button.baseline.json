@@ -1,4 +1,4 @@
 {
-  "count": 722,
-  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down — lower this when a PR converts raw buttons to the canonical Button. 725→722 on 2026-07-09 (fix/main-green-neon-visual): convert Banner action/dismiss + CookieSettingsFooterButton raw <button>s to @jovie/ui Button."
+  "count": 713,
+  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down \u2014 lower this when a PR converts raw buttons to the canonical Button. 722\u2192713 on 2026-07-09 (JOV-4157/JOV-3479): NOTE main actually counted 726 (the 722 stamp from #13814 predated 4 racing merges); this wave converted 13 (DevToolbar\u00d78, OperatorBanner, TimActionRequiredSection, InvestorNav\u00d72, InvestorThemeToggle) landing at 713."
 }

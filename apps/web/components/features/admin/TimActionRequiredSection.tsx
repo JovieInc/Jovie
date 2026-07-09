@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -34,7 +35,7 @@ const PRIORITY_CONFIG: Record<number, { label: string; className: string }> = {
 };
 
 const DEFAULT_PRIORITY_CONFIG = {
-  label: 'No priority',
+  label: 'No Priority',
   className: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20',
 };
 
@@ -101,15 +102,16 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
       <DaysOldBadge daysOld={issue.daysOld} />
 
       {/* Quick-mark-done */}
-      <button
+      <Button
         type='button'
+        variant='secondary'
         onClick={() => void onClose(issue.id)}
         disabled={isClosing}
         aria-label={`Mark "${issue.title}" as done`}
-        className='shrink-0 rounded-lg border border-subtle bg-surface-1 p-1.5 text-tertiary-token transition-colors hover:border-warning/30 hover:bg-warning/10 hover:text-warning disabled:cursor-not-allowed disabled:opacity-40'
+        className='h-auto w-auto shrink-0 rounded-lg border border-subtle bg-surface-1 p-1.5 text-tertiary-token transition-colors hover:border-warning/30 hover:bg-warning/10 hover:text-warning disabled:cursor-not-allowed disabled:opacity-40'
       >
         <Check className='h-3.5 w-3.5' aria-hidden='true' />
-      </button>
+      </Button>
     </ShellListRowFrame>
   );
 }

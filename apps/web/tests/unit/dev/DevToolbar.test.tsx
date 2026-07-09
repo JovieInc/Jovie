@@ -517,7 +517,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      expect(screen.getByText('clear all')).toBeInTheDocument();
+      expect(screen.getByText('Clear All')).toBeInTheDocument();
     });
 
     it('clears all overrides when clear all is clicked', () => {
@@ -525,7 +525,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      fireEvent.click(screen.getByText('clear all'));
+      fireEvent.click(screen.getByText('Clear All'));
       expect(localStorage.getItem(FF_OVERRIDES_KEY)).toBeNull();
     });
 
