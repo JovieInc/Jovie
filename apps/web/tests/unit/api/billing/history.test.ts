@@ -4,8 +4,10 @@ const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
 const mockGetBillingAuditLog = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
 }));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({

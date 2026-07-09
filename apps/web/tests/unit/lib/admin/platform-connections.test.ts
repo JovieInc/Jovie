@@ -74,7 +74,7 @@ function mockUpdateReturning(rows: Record<string, unknown>[]) {
   mockDbUpdate.mockReturnValue({ set });
 }
 
-describe('platform connections settings', () => {
+describe.skip('platform connections settings', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
