@@ -98,7 +98,7 @@ export default function AboutPage() {
 
       <MarketingHeroLayout variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>About</p>
-        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
           Release More Music. Do Less Release Work.
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>

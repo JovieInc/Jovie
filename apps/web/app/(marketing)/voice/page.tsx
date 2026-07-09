@@ -183,7 +183,7 @@ export default function VoiceLandingPage() {
       </section>
 
       {/* Final CTA band */}
-      <section className='border-t border-subtle bg-surface-1 py-14 text-primary-token'>
+      <section className='border-t border-subtle bg-surface-0 py-14 text-primary-token'>
         <div className={sectionWrapClassName}>
           <div className='mx-auto flex max-w-2xl flex-col items-center gap-4 text-center'>
             <h2 className='text-3xl font-semibold tracking-tight'>

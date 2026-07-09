@@ -66,7 +66,7 @@ export default function SupportPage() {
 
       <MarketingHeroLayout variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Support</p>
-        <h1 className='mt-6 text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+        <h1 className='mt-6 text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
           We&apos;re Here To Help.
         </h1>
         <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
