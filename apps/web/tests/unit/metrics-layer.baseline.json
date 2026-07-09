@@ -281,6 +281,10 @@
       "tables": 0,
       "rates": 1
     },
+    "lib/metrics/artist-revenue-cohorts.ts": {
+      "tables": 9,
+      "rates": 0
+    },
     "lib/mobile/audience-highlights.ts": {
       "tables": 0,
       "rates": 1
