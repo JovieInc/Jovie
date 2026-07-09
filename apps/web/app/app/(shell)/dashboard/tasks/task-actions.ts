@@ -27,7 +27,9 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
+import { dedupeReleaseTasks } from '@/lib/tasks/dedupe-release-tasks';
 import { isTaskStatus, TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
+import { sanitizeTaskDueAt } from '@/lib/tasks/task-due-date';
 import { buildTaskUpdateFieldPatch } from '@/lib/tasks/task-update';
 import type {
   CreateTaskInput,
@@ -162,7 +164,8 @@ function mapTaskRow(
     releaseTitle: row.releaseTitle ?? null,
     parentTaskId: row.parentTaskId ?? null,
     category: row.category ?? null,
-    dueAt: row.dueAt ?? null,
+    // Drop epoch / multi-year historical dues so the list never paints "12Y ago".
+    dueAt: sanitizeTaskDueAt(row.dueAt ?? null),
     scheduledFor: row.scheduledFor ?? null,
     startedAt: row.startedAt ?? null,
     completedAt: row.completedAt ?? null,
@@ -172,6 +175,14 @@ function mapTaskRow(
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function mapAndDedupeTaskRows(
+  rows: ReadonlyArray<
+    Omit<TaskView, 'releaseTitle'> & { releaseTitle?: string | null }
+  >
+): TaskView[] {
+  return dedupeReleaseTasks(rows.map(mapTaskRow));
 }
 
 async function assertReleaseAccess(
@@ -485,7 +496,7 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
   const pageRows = getPageRows(rows, limit);
 
   return {
-    tasks: pageRows.map(mapTaskRow),
+    tasks: mapAndDedupeTaskRows(pageRows),
     nextCursor: getNextCursor(rows, limit),
   };
 }
@@ -547,7 +558,7 @@ export async function getTaskBoard(
 
       return {
         status,
-        tasks: getPageRows(rows, limit).map(mapTaskRow),
+        tasks: mapAndDedupeTaskRows(getPageRows(rows, limit)),
         totalCount: Number(totalRow?.totalCount ?? 0),
         nextCursor: getNextCursor(rows, limit),
       };
