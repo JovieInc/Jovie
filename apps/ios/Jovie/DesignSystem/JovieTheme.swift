@@ -6,17 +6,19 @@ enum JovieColor {
   static let surface0 = Color(hex: 0x0A0B0E)
   static let surface1 = Color(hex: 0x101216)
   static let surface2 = Color(hex: 0x161A20)
-  static let surface3 = Color(hex: 0x1F2430)
+  static let surface3 = Color(hex: 0x2A2C32)
   static let textPrimary = Color(hex: 0xFFFFFF)
   static let textSecondary = Color(hex: 0xE3E4E6)
   static let textTertiary = Color(hex: 0x969799)
   static let borderSubtle = Color.white.opacity(0.05)
   static let borderDefault = Color.white.opacity(0.08)
   static let borderStrong = Color.white.opacity(0.10)
-  static let accentBlue = Color(hex: 0x0070F3)
-  static let accentPurple = Color(hex: 0x8B5CF6)
-  static let accentPink = Color(hex: 0xFF0080)
-  static let accent = accentBlue
+  static let accentBlue = Color(hex: 0x4D7DFF)
+  static let accentPurple = Color(hex: 0x9B4DFF)
+  static let accentPink = Color(hex: 0xEA4A9C)
+  static let accentOrange = Color(hex: 0xFFAB2E)
+  /// System B focus/active accent (`--color-accent`), not a CTA color.
+  static let accent = Color(hex: 0x7170FF)
   static let progressTrack = accentBlue.opacity(0.08)
   static let errorText = Color(hex: 0xFF7A73)
   static let qrSurface = Color.white
@@ -88,6 +90,35 @@ enum JovieRadius {
   static let large: CGFloat = 12
   static let xLarge: CGFloat = 16
   static let pill: CGFloat = 999
+}
+
+/// System B motion tokens, ported from apps/web/styles/design-system.css.
+/// SUBTLE for micro-interactions (press, color, toast); CINEMATIC for
+/// high-impact reveals (drawer, modal, surface morph). Movement (offset/scale)
+/// must be dropped under Reduce Motion; opacity transitions may remain.
+enum JovieMotion {
+  static let instantDuration: Double = 0.05
+  static let fastDuration: Double = 0.10
+  static let normalDuration: Double = 0.16
+  static let subtleDuration: Double = 0.15
+  static let slowDuration: Double = 0.25
+  static let cinematicDuration: Double = 0.42
+
+  /// --ease-subtle @ 150ms — hover/press/color micro-changes.
+  static let subtle = Animation.timingCurve(0.4, 0, 0.2, 1, duration: subtleDuration)
+  /// --ease-cinematic @ 420ms — drawers, modals, surface morphs.
+  static let cinematic = Animation.timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)
+  /// --ease-out — enter/exit; starts fast so it feels responsive.
+  static func easeOut(duration: Double = normalDuration) -> Animation {
+    .timingCurve(0.16, 1, 0.3, 1, duration: duration)
+  }
+  /// --ease-spring — rare playful overshoot, opt-in only.
+  static func spring(duration: Double = slowDuration) -> Animation {
+    .timingCurve(0.34, 1.56, 0.64, 1, duration: duration)
+  }
+
+  /// --scale-press — canonical press-down scale for pressable elements.
+  static let pressScale: CGFloat = 0.96
 }
 
 enum JovieQRCodePlate {
@@ -169,7 +200,8 @@ struct JoviePillButtonStyle: ButtonStyle {
           )
       }
       .opacity(configuration.isPressed ? 0.8 : 1)
-      .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
+      .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }
 
@@ -184,7 +216,8 @@ struct JovieIconButtonStyle: ButtonStyle {
         Circle().stroke(JovieColor.borderDefault, lineWidth: 1)
       }
       .opacity(configuration.isPressed ? 0.72 : 1)
-      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
+      .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }
 

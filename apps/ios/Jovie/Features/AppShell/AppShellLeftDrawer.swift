@@ -1,10 +1,5 @@
 import SwiftUI
 
-enum JovieMotion {
-  static let cinematicDuration: Double = 0.42
-  static let cinematic = Animation.timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)
-}
-
 enum AppShellDrawerSurfaceLayout {
   static let labelMinimumScaleFactor: CGFloat = 0.85
   static let maxSingleLineSurfaceButtonHeight: CGFloat = 56
