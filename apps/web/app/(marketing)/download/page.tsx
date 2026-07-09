@@ -1,4 +1,4 @@
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import {
   ArrowDownToLine,
   Check,
@@ -176,12 +176,15 @@ export default function DownloadPage() {
                         Download for Mac
                       </a>
                     </Button>
-                    <Link
-                      href='#ios-alpha'
-                      className='system-b-download-secondary-link'
-                    >
-                      iPhone status
-                    </Link>
+                    <div className='flex items-center gap-2'>
+                      <Badge variant='outline'>iPhone Alpha</Badge>
+                      <Link
+                        href='#ios-alpha'
+                        className='text-sm font-medium text-secondary-token underline underline-offset-4 transition-colors duration-subtle hover:text-primary-token'
+                      >
+                        See status
+                      </Link>
+                    </div>
                   </div>
                   <div className='system-b-download-meta'>
                     <span>Developer ID signed</span>
