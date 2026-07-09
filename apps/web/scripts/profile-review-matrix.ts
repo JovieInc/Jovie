@@ -148,9 +148,7 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
       await page.getByTestId('mobile-name-input').fill('Alex');
       await clickStepButton(page, 'name', /^continue$/i);
       await waitForStep(page, 'birthday');
-      await pickBirthdayOption(page, 'mobile-birthday-month', 'April');
-      await pickBirthdayOption(page, 'mobile-birthday-day', '5');
-      await pickBirthdayOption(page, 'mobile-birthday-year', '1992');
+      await fillBirthdayDigits(page, '04051992');
     },
   },
   {
@@ -177,9 +175,7 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
       await page.getByTestId('mobile-name-input').fill('Alex');
       await clickStepButton(page, 'name', /^continue$/i);
       await waitForStep(page, 'birthday');
-      await pickBirthdayOption(page, 'mobile-birthday-month', 'April');
-      await pickBirthdayOption(page, 'mobile-birthday-day', '24');
-      await pickBirthdayOption(page, 'mobile-birthday-year', '1994');
+      await fillBirthdayDigits(page, '04241994');
       await clickStepButton(page, 'birthday', /^continue$/i);
       await waitForStep(page, 'preferences');
       await clickStepButton(page, 'preferences', /save & finish/i);
@@ -468,17 +464,14 @@ async function clickStepButton(
   await button.click({ timeout: 20_000, force: true });
 }
 
-async function pickBirthdayOption(
-  page: Page,
-  testId: string,
-  optionName: string
-) {
-  // Birthday selects are Radix Selects (portal to document.body), not native
-  // <select> elements — open each trigger, then click the option by name.
-  await page.getByTestId(testId).click({ timeout: 20_000 });
-  await page
-    .getByRole('option', { name: optionName, exact: true })
-    .click({ timeout: 20_000 });
+/** Fill segmented BirthdayInput via MMDDYYYY digits (GH-13389). */
+async function fillBirthdayDigits(page: Page, digits: string) {
+  const firstDigit = page
+    .getByTestId('mobile-birthday-month')
+    .locator('input')
+    .first();
+  await firstDigit.click({ timeout: 20_000 });
+  await firstDigit.pressSequentially(digits, { delay: 20 });
 }
 
 async function continueFromAlertsEntry(page: Page) {

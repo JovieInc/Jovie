@@ -857,6 +857,8 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           .getByRole('button', { name: /^continue$/i })
           .click();
 
+        // Birthday uses segmented digit groups (GH-13389); focus the first
+        // numeric input inside each group rather than a select trigger.
         for (const [id, label] of [
           ['mobile-birthday-month', 'birthday month'],
           ['mobile-birthday-day', 'birthday day'],
@@ -864,7 +866,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
         ] as const) {
           await focusAndAssertNoShift(
             flowPage,
-            activeFlow.getByTestId(id),
+            activeFlow.getByTestId(id).locator('input').first(),
             rootSelector,
             `${viewport.label} ${label}`
           );
