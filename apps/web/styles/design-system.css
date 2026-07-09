@@ -1586,7 +1586,7 @@ html[data-profile-initial-mode]
 
 /* OV mark carries the identity accent; treatment is CSS-driven so the
    taste-gated mark decision can land without touching components. */
-.ov-mode [data-brand-variant='ov'] {
+.ov-mode [data-brand-variant="ov"] {
   color: var(--ov-brand-accent);
 }
 
