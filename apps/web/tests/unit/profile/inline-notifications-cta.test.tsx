@@ -281,6 +281,67 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   });
 
+  it('reports overlay open state through onFlowOpenChange', async () => {
+    const onFlowOpenChange = vi.fn();
+
+    render(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist()}
+        onFlowOpenChange={onFlowOpenChange}
+      />
+    );
+
+    expect(onFlowOpenChange).toHaveBeenLastCalledWith(false);
+
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
+    expect(onFlowOpenChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => {
+      expect(onFlowOpenChange).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  it('keeps action labels visible without a dark ancestor and uses themed birthday selects', async () => {
+    const handleSubscribe = vi.fn().mockResolvedValue('pending_confirmation');
+    const handleVerifyOtp = vi.fn().mockResolvedValue('subscribed');
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        handleSubscribe,
+        handleVerifyOtp,
+        otpCode: '123456',
+      })
+    );
+
+    render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+
+    // Regression #13391: the primary action label color must not be
+    // dark:-gated — it renders on the always-dark profile stage regardless of
+    // any `.dark` ancestor class.
+    const verify = await screen.findByRole('button', { name: /^verify$/i });
+    expect(verify.className).toContain('text-white');
+    expect(verify.className).not.toContain('dark:text-white');
+
+    fireEvent.click(verify);
+    expect(await screen.findByTestId('mobile-name-input')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+
+    // Regression #13391: birthday inputs are themed Radix Select triggers, not
+    // native <select> elements that pop an unstyled OS listbox.
+    for (const testId of [
+      'mobile-birthday-month',
+      'mobile-birthday-day',
+      'mobile-birthday-year',
+    ]) {
+      const trigger = await screen.findByTestId(testId);
+      expect(trigger.tagName).toBe('BUTTON');
+    }
+  });
+
   it('renders nothing while notification hydration is checking', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({

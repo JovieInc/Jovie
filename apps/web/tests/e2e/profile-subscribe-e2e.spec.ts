@@ -1,4 +1,4 @@
-import { type Page, type Route } from '@playwright/test';
+import { type Locator, type Page, type Route } from '@playwright/test';
 import { expect, test } from './setup';
 import {
   SMOKE_TIMEOUTS,
@@ -181,6 +181,18 @@ async function completeNameStep(page: Page, name: string) {
   await continueButton.click();
 }
 
+async function pickBirthdayOption(
+  page: Page,
+  flow: Locator,
+  testId: string,
+  optionName: string
+) {
+  await flow.locator(`[data-testid="${testId}"]`).click();
+  await page
+    .getByRole('option', { name: optionName, exact: true })
+    .click({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+}
+
 async function completeBirthdayStep(page: Page) {
   const flow = await getActiveNotificationsFlow(page);
   const birthdayStep = flow
@@ -190,13 +202,11 @@ async function completeBirthdayStep(page: Page) {
     state: 'visible',
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
-  await flow
-    .locator('[data-testid="mobile-birthday-month"]')
-    .selectOption('04');
-  await flow.locator('[data-testid="mobile-birthday-day"]').selectOption('24');
-  await flow
-    .locator('[data-testid="mobile-birthday-year"]')
-    .selectOption('1994');
+  // Birthday selects are Radix Selects (portal to document.body), not native
+  // <select> elements — open each trigger, then click the option by name.
+  await pickBirthdayOption(page, flow, 'mobile-birthday-month', 'April');
+  await pickBirthdayOption(page, flow, 'mobile-birthday-day', '24');
+  await pickBirthdayOption(page, flow, 'mobile-birthday-year', '1994');
   const continueButton = birthdayStep.getByRole('button', {
     name: /^continue$/i,
   });

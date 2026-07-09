@@ -290,6 +290,9 @@ export function ProfileCompactSurface({
 }: Readonly<ProfileCompactSurfaceProps>) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
+  // While the notifications overlay/modal is open the flow owns navigation —
+  // hide the surface's own back chrome so only one back affordance renders.
+  const [isNotificationsFlowOpen, setIsNotificationsFlowOpen] = useState(false);
   const [showRecentActivationRow, setShowRecentActivationRow] = useState(false);
   const [notificationSourceContext, setNotificationSourceContext] =
     useState<NotificationSourceContext | null>(null);
@@ -571,7 +574,7 @@ export function ProfileCompactSurface({
               className='flex w-full items-start justify-between'
               data-testid='profile-top-chrome'
             >
-              {hideBackButton ? (
+              {hideBackButton || isNotificationsFlowOpen ? (
                 <div className='h-11 w-11 shrink-0' aria-hidden='true' />
               ) : (
                 <CircleIconButton
@@ -718,6 +721,7 @@ export function ProfileCompactSurface({
               source={activeNotificationSourceContext.ctaLocation}
               sourceContext={activeNotificationSourceContext}
               onFlowClosed={returnToProfileAfterNotifications}
+              onFlowOpenChange={setIsNotificationsFlowOpen}
               onSubscriptionActivated={handleSubscriptionActivated}
             />
           ) : null}
