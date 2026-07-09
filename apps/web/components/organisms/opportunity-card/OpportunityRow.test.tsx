@@ -30,7 +30,7 @@ describe('OpportunityRow', () => {
 
   it('hides action chrome by default (resting state) via invisible wrapper', () => {
     render(<OpportunityRow {...baseProps} />);
-    const btn = screen.getByLabelText('Plan opportunity');
+    const btn = screen.getByLabelText('Plan Opportunity');
     const wrapper = btn.parentElement;
     expect(wrapper).toHaveClass('opacity-0');
     expect(wrapper).toHaveClass('pointer-events-none');
@@ -39,7 +39,7 @@ describe('OpportunityRow', () => {
   it('fires primary action on plan button click', () => {
     const onPrimaryAction = vi.fn();
     render(<OpportunityRow {...{ ...baseProps, onPrimaryAction }} />);
-    const btn = screen.getByLabelText('Plan opportunity');
+    const btn = screen.getByLabelText('Plan Opportunity');
     fireEvent.click(btn);
     expect(onPrimaryAction).toHaveBeenCalledWith('row-1');
   });
@@ -66,7 +66,7 @@ describe('OpportunityRow', () => {
 
   it('renders no action chrome for rejected state', () => {
     render(<OpportunityRow {...{ ...baseProps, state: 'rejected' }} />);
-    expect(screen.queryByLabelText('Plan opportunity')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Plan Opportunity')).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText('Dismiss Opportunity')
     ).not.toBeInTheDocument();
@@ -74,7 +74,7 @@ describe('OpportunityRow', () => {
 
   it('renders no action chrome for reported state', () => {
     render(<OpportunityRow {...{ ...baseProps, state: 'reported' }} />);
-    expect(screen.queryByLabelText('Plan opportunity')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Plan Opportunity')).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText('Dismiss Opportunity')
     ).not.toBeInTheDocument();
