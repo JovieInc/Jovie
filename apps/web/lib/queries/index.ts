@@ -479,6 +479,7 @@ export {
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
   useSaveReleaseMetadataMutation,
+  useSaveReleaseStatusMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations
