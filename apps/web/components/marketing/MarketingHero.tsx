@@ -68,8 +68,8 @@ function MarketingHeroCtaLink({
   return (
     <Button
       asChild
-      size='lg'
-      variant={intent === 'primary' ? 'primary' : 'ghost'}
+      size='md'
+      variant={intent === 'primary' ? 'primary' : 'secondary'}
       className='marketing-hero-cta'
     >
       <LinkComponent
