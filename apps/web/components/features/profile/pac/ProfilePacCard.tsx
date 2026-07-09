@@ -196,7 +196,7 @@ function SubjectZone({
         )}
       </div>
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-semibold leading-tight text-white'>
+        <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
           {title}
         </p>
         <p className='mt-0.5 truncate text-xs text-white/60'>{meta}</p>
@@ -253,8 +253,12 @@ export function ProfilePacCard({
   const [state, setState] = useState<PacState>(() =>
     resolveInitialPacState({ ...ctx, tier: 'cold', captureSuppressed: false })
   );
+  // Keep latest visitor context for reducer transitions without rebinding
+  // every callback; write in an effect so we never mutate refs during render.
   const ctxRef = useRef(ctx);
-  ctxRef.current = ctx;
+  useEffect(() => {
+    ctxRef.current = ctx;
+  }, [ctx]);
 
   const dispatch = useCallback((event: Parameters<typeof pacReducer>[1]) => {
     setState(prev => pacReducer(prev, event, ctxRef.current));
@@ -543,7 +547,7 @@ export function ProfilePacCard({
       );
       subject = (
         <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white'>
+          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
             {copy.title}
           </p>
           <p className='mt-0.5 truncate text-xs text-white/60'>{copy.body}</p>
@@ -560,7 +564,7 @@ export function ProfilePacCard({
             inputMode='email'
             autoComplete='email'
             required
-            placeholder='you@email.com'
+            placeholder='Email address'
             value={emailInput}
             onChange={event => {
               setEmailInput(event.target.value);
@@ -569,7 +573,7 @@ export function ProfilePacCard({
             disabled={state.kind === 'submitting'}
             aria-label={`Email address for ${artist.name} updates`}
             aria-invalid={Boolean(fieldError) || state.kind === 'error'}
-            className='h-9 min-w-0 flex-1 rounded-full border border-white/15 bg-white/10 px-4 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
+            className='h-9 min-w-0 flex-1 rounded-full border border-white/15 bg-white/10 px-4 text-sm text-white dark:text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
           />
           <PrimaryPill type='submit' disabled={state.kind === 'submitting'}>
             {state.kind === 'submitting'
@@ -594,7 +598,7 @@ export function ProfilePacCard({
       contextLabel = 'Stay In The Loop';
       subject = (
         <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white'>
+          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
             {"You're in"}
           </p>
           <p className='mt-0.5 truncate text-xs text-white/60'>
@@ -626,7 +630,7 @@ export function ProfilePacCard({
       contextLabel = 'Support';
       subject = (
         <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white'>
+          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
             Support {artist.name}
           </p>
           <p className='mt-0.5 truncate text-xs text-white/60'>
@@ -646,7 +650,7 @@ export function ProfilePacCard({
         .join(' · ');
       subject = (
         <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white'>
+          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
             {nextShow?.title ?? `${artist.name} live`}
           </p>
           <p className='mt-0.5 truncate text-xs text-white/60'>
@@ -669,7 +673,7 @@ export function ProfilePacCard({
       contextLabel = 'Following';
       subject = (
         <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white'>
+          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
             You follow {artist.name}
           </p>
           <p className='mt-0.5 truncate text-xs text-white/60'>
