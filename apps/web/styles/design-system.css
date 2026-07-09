@@ -2103,29 +2103,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   text-wrap: balance;
 }
 
-:where(.system-b-download-secondary-link) {
-  display: inline-flex;
-  height: calc(var(--space-10) + var(--space-1));
-  align-items: center;
-  border-radius: var(--system-b-radius-pill);
-  color: color-mix(in oklab, var(--system-b-text-primary) 72%, transparent);
-  font-size: var(--text-mid);
-  font-weight: var(--font-weight-semibold);
-  padding-inline: var(--space-4);
-  transition: color var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-:where(.system-b-download-secondary-link:hover) {
-  color: var(--system-b-text-primary);
-}
-
-:where(.system-b-download-secondary-link:focus-visible) {
-  box-shadow:
-    0 0 0 2px var(--system-b-cinematic-black),
-    0 0 0 4px color-mix(in oklab, var(--system-b-text-primary) 35%, transparent);
-  outline: none;
-}
-
 :where(.system-b-download-meta) {
   display: flex;
   flex-wrap: wrap;
