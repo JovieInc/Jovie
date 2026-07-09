@@ -52,23 +52,12 @@ describe('Integration Health Diagnostics', () => {
     });
   });
 
-  describe('Clerk Integration Health', () => {
-    it('should have the necessary Clerk configuration', async () => {
-      const clerkKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-      if (!clerkKey) {
-        console.log('⏭ Skipping Clerk integration test - no publishable key');
-        return;
-      }
-
-      // Test that Clerk key has expected format
-      expect(clerkKey).toMatch(/pk_(test|live)_/);
-      console.log('✓ Clerk publishable key format is valid');
-
-      // Test that we can import Clerk modules without errors
-      const { auth } = await import('@clerk/nextjs/server');
+  describe('Auth Integration Health', () => {
+    it('should expose Better Auth configuration', async () => {
+      // Better Auth uses BETTER_AUTH_SECRET / app URL — no Clerk publishable key.
+      const { auth } = await import('@/lib/auth/better-auth');
       expect(auth).toBeDefined();
-      console.log('✓ Clerk auth module imports successfully');
+      expect(auth.api?.getSession).toBeTypeOf('function');
     });
   });
 

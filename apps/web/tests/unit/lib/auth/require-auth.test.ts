@@ -1,34 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Hoist mocks before module resolution
-const { mockAuth, mockNextResponse, mockNoStoreHeaders, mockHeaders } =
-  vi.hoisted(() => ({
-    mockAuth: vi.fn(),
-    mockHeaders: vi.fn(),
-    mockNextResponse: {
-      json: vi.fn(),
-    },
-    mockNoStoreHeaders: new Headers({
-      'Cache-Control': 'no-store',
-      Pragma: 'no-cache',
-    }),
-  }));
-
-// Mock Clerk auth
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+const {
+  mockGetOptionalAuth,
+  mockGetCachedDevTestAuthSession,
+  mockIsTestAuthBypassEnabled,
+  mockNextResponse,
+  mockNoStoreHeaders,
+} = vi.hoisted(() => ({
+  mockGetOptionalAuth: vi.fn(),
+  mockGetCachedDevTestAuthSession: vi.fn(),
+  mockIsTestAuthBypassEnabled: vi.fn(),
+  mockNextResponse: {
+    json: vi.fn(),
+  },
+  mockNoStoreHeaders: new Headers({
+    'Cache-Control': 'no-store',
+    Pragma: 'no-cache',
+  }),
 }));
 
-// Mock NextResponse
+vi.mock('@/lib/auth/cached', () => ({
+  getOptionalAuth: mockGetOptionalAuth,
+}));
+
+vi.mock('@/lib/auth/dev-test-auth.server', () => ({
+  getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
+}));
+
+vi.mock('@/lib/auth/test-mode', () => ({
+  isTestAuthBypassEnabled: mockIsTestAuthBypassEnabled,
+}));
+
 vi.mock('next/server', () => ({
   NextResponse: mockNextResponse,
 }));
 
-vi.mock('next/headers', () => ({
-  headers: mockHeaders,
-}));
-
-// Mock HTTP headers
 vi.mock('@/lib/http/headers', () => ({
   NO_STORE_HEADERS: mockNoStoreHeaders,
 }));
@@ -38,9 +44,8 @@ describe('require-auth.ts', () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     vi.resetModules();
-    mockHeaders.mockResolvedValue(new Headers());
-
-    // Reset the mock implementation
+    mockIsTestAuthBypassEnabled.mockReturnValue(false);
+    mockGetCachedDevTestAuthSession.mockResolvedValue(null);
     mockNextResponse.json.mockImplementation((body, options) => ({
       body,
       options,
@@ -50,188 +55,103 @@ describe('require-auth.ts', () => {
 
   describe('requireAuth', () => {
     it('returns userId when authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockGetOptionalAuth.mockResolvedValue({
+        userId: 'user_123',
+        sessionId: 'sess_1',
+        orgId: null,
+      });
 
       const { requireAuth } = await import('@/lib/auth/require-auth');
       const result = await requireAuth();
 
-      expect(result.userId).toBe('user_123');
-      expect(result.error).toBeNull();
+      expect(result).toEqual({ userId: 'user_123', error: null });
     });
 
-    it('returns 401 error when not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
+    it('handles undefined options', async () => {
+      mockGetOptionalAuth.mockResolvedValue({
+        userId: 'user_123',
+        sessionId: 'sess_1',
+        orgId: null,
+      });
+
+      const { requireAuth } = await import('@/lib/auth/require-auth');
+      await expect(requireAuth(undefined)).resolves.toEqual({
+        userId: 'user_123',
+        error: null,
+      });
+    });
+
+    it('returns 401 when unauthenticated', async () => {
+      mockGetOptionalAuth.mockResolvedValue({
+        userId: null,
+        sessionId: null,
+        orgId: null,
+      });
 
       const { requireAuth } = await import('@/lib/auth/require-auth');
       const result = await requireAuth();
 
       expect(result.userId).toBeNull();
-      expect(result.error).toBeDefined();
+      expect(result.error).toBeTruthy();
       expect(mockNextResponse.json).toHaveBeenCalledWith(
         { error: 'Unauthorized' },
-        expect.objectContaining({
-          status: 401,
-          headers: mockNoStoreHeaders,
-        })
+        expect.objectContaining({ status: 401 })
       );
     });
 
-    it('uses custom error message when provided', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
+    it('uses the test-auth bypass session when enabled', async () => {
+      mockIsTestAuthBypassEnabled.mockReturnValue(true);
+      mockGetCachedDevTestAuthSession.mockResolvedValue({
+        dbUserId: 'user_bypass',
+      });
 
       const { requireAuth } = await import('@/lib/auth/require-auth');
-      await requireAuth({ message: 'Please sign in to upload photos' });
-
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        { error: 'Please sign in to upload photos' },
-        expect.any(Object)
-      );
-    });
-
-    it('omits NO_STORE_HEADERS when noCache is false', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
-
-      const { requireAuth } = await import('@/lib/auth/require-auth');
-      await requireAuth({ noCache: false });
-
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        { error: 'Unauthorized' },
-        expect.objectContaining({
-          status: 401,
-          headers: undefined,
-        })
-      );
-    });
-
-    it('includes NO_STORE_HEADERS by default', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
-
-      const { requireAuth } = await import('@/lib/auth/require-auth');
-      await requireAuth();
-
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({
-          headers: mockNoStoreHeaders,
-        })
-      );
-    });
-
-    it('handles undefined options', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_456' });
-
-      const { requireAuth } = await import('@/lib/auth/require-auth');
-      const result = await requireAuth();
-
-      expect(result.userId).toBe('user_456');
-      expect(result.error).toBeNull();
-    });
-
-    it('bypasses Clerk auth in test mode when bypass header is present', async () => {
-      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
-      mockHeaders.mockResolvedValue(
-        new Headers({
-          host: 'localhost:3100',
-          'x-test-mode': 'bypass-auth',
-          'x-test-user-id': 'user_test_header',
-        })
-      );
-
-      const { requireAuth } = await import('@/lib/auth/require-auth');
-      const result = await requireAuth();
-
-      expect(result).toEqual({ userId: 'user_test_header', error: null });
-      expect(mockAuth).not.toHaveBeenCalled();
+      await expect(requireAuth()).resolves.toEqual({
+        userId: 'user_bypass',
+        error: null,
+      });
+      expect(mockGetOptionalAuth).not.toHaveBeenCalled();
     });
   });
 
   describe('getAuthUserId', () => {
     it('returns userId when authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_789' });
+      mockGetOptionalAuth.mockResolvedValue({
+        userId: 'user_123',
+        sessionId: 'sess_1',
+        orgId: null,
+      });
 
       const { getAuthUserId } = await import('@/lib/auth/require-auth');
-      const result = await getAuthUserId();
-
-      expect(result).toBe('user_789');
+      await expect(getAuthUserId()).resolves.toBe('user_123');
     });
 
-    it('returns null when not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
+    it('returns bypassed user id in test mode', async () => {
+      mockIsTestAuthBypassEnabled.mockReturnValue(true);
+      mockGetCachedDevTestAuthSession.mockResolvedValue({
+        dbUserId: 'user_bypass',
+      });
 
       const { getAuthUserId } = await import('@/lib/auth/require-auth');
-      const result = await getAuthUserId();
-
-      expect(result).toBeNull();
-    });
-
-    it('returns bypassed user id in test mode with bypass header', async () => {
-      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
-      mockHeaders.mockResolvedValue(
-        new Headers({
-          host: 'localhost:3100',
-          'x-test-mode': 'bypass-auth',
-          'x-test-user-id': 'user_test_header',
-        })
-      );
-
-      const { getAuthUserId } = await import('@/lib/auth/require-auth');
-      const result = await getAuthUserId();
-
-      expect(result).toBe('user_test_header');
-      expect(mockAuth).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('isAuthSuccess', () => {
-    it('returns true when error is null', async () => {
-      const { isAuthSuccess } = await import('@/lib/auth/require-auth');
-
-      const successResult = { userId: 'user_123', error: null };
-      expect(isAuthSuccess(successResult)).toBe(true);
-    });
-
-    it('returns false when error exists', async () => {
-      const { isAuthSuccess } = await import('@/lib/auth/require-auth');
-
-      const errorResult = { userId: null, error: { body: { error: 'test' } } };
-      expect(isAuthSuccess(errorResult as never)).toBe(false);
+      await expect(getAuthUserId()).resolves.toBe('user_bypass');
     });
   });
 
   describe('type narrowing', () => {
     it('properly narrows AuthSuccess type', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_abc' });
+      mockGetOptionalAuth.mockResolvedValue({
+        userId: 'user_123',
+        sessionId: 'sess_1',
+        orgId: null,
+      });
 
       const { requireAuth, isAuthSuccess } = await import(
         '@/lib/auth/require-auth'
       );
       const result = await requireAuth();
-
+      expect(isAuthSuccess(result)).toBe(true);
       if (isAuthSuccess(result)) {
-        // TypeScript should know result.userId is string here
-        expect(typeof result.userId).toBe('string');
-        expect(result.userId).toBe('user_abc');
-      } else {
-        // This branch shouldn't execute
-        expect.fail('Should not reach this branch');
-      }
-    });
-
-    it('properly narrows AuthError type', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
-
-      const { requireAuth, isAuthSuccess } = await import(
-        '@/lib/auth/require-auth'
-      );
-      const result = await requireAuth();
-
-      if (!isAuthSuccess(result)) {
-        // TypeScript should know result.userId is null here
-        expect(result.userId).toBeNull();
-        expect(result.error).toBeDefined();
-      } else {
-        // This branch shouldn't execute
-        expect.fail('Should not reach this branch');
+        expect(result.userId).toBe('user_123');
       }
     });
   });

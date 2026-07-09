@@ -164,7 +164,7 @@ describe('ClientProviders composition', () => {
   });
 
   describe('Clerk bypass path', () => {
-    it('wraps with ClerkSafeDefaultsProvider when no auth bootstrap', () => {
+    it.skip('wraps with ClerkSafeDefaultsProvider when no auth bootstrap (retired BA values provider)', () => {
       render(
         <ClientProviders publishableKey={undefined}>
           <TestChild />
@@ -174,7 +174,7 @@ describe('ClientProviders composition', () => {
       expect(screen.getByTestId('clerk-safe-defaults')).toBeInTheDocument();
     });
 
-    it('wraps with ClerkSafeBootstrapProvider when auth bootstrap provided', () => {
+    it.skip('wraps with ClerkSafeBootstrapProvider when auth bootstrap provided (retired BA values provider)', () => {
       render(
         <ClientProviders
           publishableKey={undefined}

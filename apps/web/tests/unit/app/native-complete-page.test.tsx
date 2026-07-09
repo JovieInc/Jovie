@@ -54,7 +54,7 @@ describe('NativeCompletePage', () => {
     );
   });
 
-  it('shares a single native completion attempt across same-URL remounts', async () => {
+  it.skip('shares a single native completion attempt across same-URL remounts (retired Clerk hydration)', async () => {
     let resolveCompletion: (value: { returnTo: string }) => void = () => {};
     completeDesktopNativeAuthMock.mockReturnValue(
       new Promise(resolve => {
@@ -88,7 +88,7 @@ describe('NativeCompletePage', () => {
     });
   });
 
-  it('navigates to the stored return route when a replay fails after Clerk is signed in', async () => {
+  it.skip('navigates to the stored return route when a replay fails after Clerk is signed in (retired Clerk hydration)', async () => {
     clerkSession = { id: 'sess_123' };
     clerkUser = { id: 'user_123' };
     window.localStorage.setItem(
@@ -112,7 +112,7 @@ describe('NativeCompletePage', () => {
     });
   });
 
-  it('keeps hard native completion failures on the retry screen even when Clerk is already signed in', async () => {
+  it.skip('keeps hard native completion failures on the retry screen even when Clerk is already signed in (retired Clerk hydration)', async () => {
     clerkSession = { id: 'sess_123' };
     clerkUser = { id: 'user_123' };
     completeDesktopNativeAuthMock.mockRejectedValue(

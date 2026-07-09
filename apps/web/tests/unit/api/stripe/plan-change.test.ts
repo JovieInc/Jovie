@@ -12,7 +12,11 @@ const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({ auth: mockAuth }));
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
+}));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   ensureStripeCustomer: mockEnsureStripeCustomer,
