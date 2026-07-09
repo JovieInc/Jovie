@@ -25,7 +25,7 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 
 const PANEL_CLASS_NAME =
-  'rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
+  'rounded-(--profile-card-radius) border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] p-5 shadow-(--profile-panel-shadow) backdrop-blur-2xl';
 const OTP_SLOT_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
 const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
 

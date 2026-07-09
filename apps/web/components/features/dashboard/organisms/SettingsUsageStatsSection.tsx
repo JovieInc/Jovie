@@ -178,7 +178,7 @@ function UsageMessageState({
 }>) {
   return (
     <UsagePanelShell className='justify-center'>
-      <div className='mx-auto flex max-w-[28rem] flex-col items-center px-4 text-center'>
+      <div className='mx-auto flex max-w-md flex-col items-center px-4 text-center'>
         <div className='flex h-8 w-8 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
           <AlertCircle className='h-4 w-4' aria-hidden />
         </div>
@@ -249,7 +249,7 @@ export function SettingsUsageStatsSection() {
               {copy.statusLabel}
             </span>
           </div>
-          <p className='max-w-[42rem] text-xs leading-[17px] text-secondary-token'>
+          <p className='max-w-2xl text-xs leading-[17px] text-secondary-token'>
             {copy.summaryDescription}
           </p>
         </div>

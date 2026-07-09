@@ -105,7 +105,7 @@ export function SidebarCollapsibleGroup({
             ) : null}
             <ChevronRight
               className={cn(
-                'size-3 shrink-0 opacity-50 transition-transform duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
+                'size-3 shrink-0 opacity-50 transition-transform duration-normal ease-interactive',
                 open ? 'rotate-90' : 'rotate-0'
               )}
               aria-hidden='true'
@@ -117,7 +117,7 @@ export function SidebarCollapsibleGroup({
       <div
         inert={open ? undefined : true}
         className={cn(
-          'grid transition-[grid-template-rows,opacity] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
+          'grid transition-[grid-template-rows,opacity] duration-normal ease-interactive',
           open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
         )}
       >

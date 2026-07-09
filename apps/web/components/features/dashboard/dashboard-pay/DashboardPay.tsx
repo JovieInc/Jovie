@@ -441,7 +441,7 @@ export function DashboardPay() {
                     <Wallet className='h-5 w-5 text-accent-token' />
                   </div>
                   <h2 className='text-base font-semibold tracking-[-0.011em] text-primary-token sm:text-lg'>
-                    Connect Venmo to unlock earnings
+                    Connect Venmo To Unlock Earnings
                   </h2>
                   <p className='mt-2 text-app leading-5 text-secondary-token sm:text-sm'>
                     Link your Venmo once to start receiving payments and reveal
@@ -451,7 +451,7 @@ export function DashboardPay() {
                     onClick={() => setIsConnectOpen(true)}
                     variant='primary'
                     size='sm'
-                    className='mt-5 rounded-lg text-2xs font-caption tracking-[-0.01em]'
+                    className='mt-5 rounded-lg text-2xs font-caption tracking-tight'
                   >
                     Connect Venmo
                   </Button>
@@ -475,7 +475,7 @@ export function DashboardPay() {
                 <div className='grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,1fr)_320px]'>
                   <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
                     <StatCard
-                      label='QR scans'
+                      label='QR Scans'
                       value={qrTipClicks}
                       description='Fans who scanned your QR'
                       icon={ScanLine}
@@ -484,7 +484,7 @@ export function DashboardPay() {
                       bordered={false}
                     />
                     <StatCard
-                      label='Link clicks'
+                      label='Link Clicks'
                       value={linkTipClicks}
                       description='Fans who clicked your link'
                       icon={MousePointerClick}
@@ -493,7 +493,7 @@ export function DashboardPay() {
                       bordered={false}
                     />
                     <StatCard
-                      label='Total visits'
+                      label='Total Visits'
                       value={tipClicks}
                       description='QR + link combined'
                       icon={BarChart3}

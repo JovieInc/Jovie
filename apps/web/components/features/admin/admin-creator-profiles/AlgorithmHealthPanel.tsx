@@ -200,17 +200,17 @@ function PrimarySummaryCard({
 
       <div className='grid gap-2 sm:grid-cols-3'>
         <MetricTile
-          label='Last checked'
+          label='Last Checked'
           value={formatCheckedAt(report.checkedAt)}
           icon={<Clock3 className='size-3.5' aria-hidden='true' />}
         />
         <MetricTile
-          label='Resolved artists'
+          label='Resolved Artists'
           value={`${report.resolvedNeighbourCount}/${report.attemptedNeighbourCount}`}
           icon={<Sparkles className='size-3.5' aria-hidden='true' />}
         />
         <MetricTile
-          label='Health score'
+          label='Health Score'
           value={report.status === 'ready' ? `${report.healthScore}%` : 'N/A'}
           icon={<Waves className='size-3.5' aria-hidden='true' />}
         />
@@ -321,7 +321,7 @@ function NeighbourRow({ neighbour }: Readonly<{ neighbour: ScoredNeighbour }>) {
             {capitalizeWord(neighbour.size)}
           </Badge>
         </div>
-        <p className='mt-1 text-2xs leading-[16px] text-secondary-token'>
+        <p className='mt-1 text-2xs leading-4 text-secondary-token'>
           Pop {neighbour.artist.popularity} (
           {formatDelta(neighbour.popularityDelta)}) ·{' '}
           {neighbour.artist.followerCount.toLocaleString()} followers ·{' '}

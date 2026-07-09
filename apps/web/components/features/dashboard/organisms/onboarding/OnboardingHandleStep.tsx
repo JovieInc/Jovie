@@ -113,7 +113,7 @@ export function OnboardingHandleStep({
               id='handle-input'
               ref={inputRef}
               name='username'
-              aria-label='Claim your handle'
+              aria-label='Claim Your Handle'
               type='text'
               value={handleInput}
               onChange={e =>
@@ -124,13 +124,13 @@ export function OnboardingHandleStep({
                     .replace(/^@+/, '')
                 )
               }
-              placeholder='yourname'
+              placeholder='yourname' // ui-casing-allow: literal example placeholder
               autoComplete='username'
               autoCapitalize='none'
               autoCorrect='off'
               spellCheck={false}
               aria-invalid={hasError ? 'true' : undefined}
-              className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-visible:outline-none'
+              className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-tighter text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-visible:outline-none'
             />
             <button
               data-testid='onboarding-handle-submit'

@@ -382,7 +382,7 @@ function DemoShowcaseShell({
         <div className='min-h-screen bg-surface-0 px-5 py-8 text-white dark:text-white sm:px-6 lg:px-8'>
           <div className='mx-auto max-w-300'>
             <div className='max-w-[42rem]'>
-              <p className='text-2xs font-[600] tracking-[0.14em] text-white/42 dark:text-white/42'>
+              <p className='text-2xs font-semibold tracking-[0.14em] text-white/42 dark:text-white/42'>
                 Tim White Showcase
               </p>
               <h1 className='mt-3 text-[clamp(2rem,4vw,3.2rem)] font-[630] tracking-[-0.06em] text-white dark:text-white'>
@@ -603,7 +603,7 @@ function SubscribeShowcaseBoard() {
                 compact
                 hideJovieBranding
                 hideMoreMenu
-                className='scale-[0.9] origin-top'
+                className='scale-90 origin-top'
               />
             </div>
           </ShowcaseBoardCard>
@@ -754,7 +754,7 @@ export function DemoTimWhiteProfileSurface() {
                     <p className='text-xs font-semibold text-white/50 dark:text-white/50'>
                       About
                     </p>
-                    <h2 className='mt-1 text-xl font-[600] tracking-[-0.03em] text-white dark:text-white'>
+                    <h2 className='mt-1 text-xl font-semibold tracking-[-0.03em] text-white dark:text-white'>
                       Share Press Photos
                     </h2>
                   </div>

@@ -64,7 +64,7 @@ export function ChatMerchDesignCarousel({
       <div className='flex flex-col gap-3'>
         <div className='relative'>
           {/* Fixed-aspect media so generating -> ready never shifts layout. */}
-          <div className='overflow-hidden rounded-[16px]'>
+          <div className='overflow-hidden rounded-xl'>
             {current.status === 'ready' && current.preview_url ? (
               <ThreadImageCard
                 status='ready'

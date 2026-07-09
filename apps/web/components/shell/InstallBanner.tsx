@@ -5,7 +5,7 @@ import { ArrowDown, Sparkles, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 const DURATION_CINEMATIC = 420;
 
 /**

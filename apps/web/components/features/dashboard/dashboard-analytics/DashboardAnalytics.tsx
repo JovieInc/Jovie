@@ -90,7 +90,7 @@ function StatCard({
                 <HelpCircle className='h-3 w-3' />
               </button>
             </TooltipTrigger>
-            <TooltipContent side='top' className='max-w-[200px]'>
+            <TooltipContent side='top' className='max-w-50'>
               <p className='text-app'>{definition}</p>
             </TooltipContent>
           </Tooltip>

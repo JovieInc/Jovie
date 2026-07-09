@@ -27,7 +27,7 @@ export function ProfileSkeleton() {
               (#11899: fixed 16/7 crop + 240px floor) so skeleton → loaded
               causes zero layout shift. */}
           <div
-            className={`relative overflow-hidden md:rounded-t-[var(--profile-shell-card-radius)] ${PROFILE_HERO_COMPOSITION_CLASSNAME} ${pulse}`}
+            className={`relative overflow-hidden md:rounded-t-(--profile-shell-card-radius) ${PROFILE_HERO_COMPOSITION_CLASSNAME} ${pulse}`}
           >
             {/* Gradient overlay: artistic dark hero fade — intentional profile-stage values */}
             <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(18,20,26,0.6)_50%,rgba(10,11,14,0.95)_100%)]' />
@@ -52,7 +52,7 @@ export function ProfileSkeleton() {
               </div>
 
               {/* Artist name + Play button + primary CTA */}
-              <div className='mt-auto max-w-[32rem] space-y-4'>
+              <div className='mt-auto max-w-lg space-y-4'>
                 <div className='flex items-end justify-between gap-4'>
                   <div className='space-y-2'>
                     <div

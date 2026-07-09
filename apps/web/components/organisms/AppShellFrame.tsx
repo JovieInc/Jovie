@@ -83,7 +83,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         className={cn(
           'flex min-h-0 min-w-0 flex-1 overflow-hidden',
           isShellChatV1 &&
-            'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
+            'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
         )}
       >
         <div
@@ -127,7 +127,7 @@ export const AppShellFrame = memo(function AppShellFrame({
           <div
             className={cn(
               'flex flex-1 min-h-0 min-w-0 overflow-hidden',
-              isShellChatV1 && 'lg:gap-[var(--linear-app-shell-gap)]'
+              isShellChatV1 && 'lg:gap-(--linear-app-shell-gap)'
             )}
           >
             <div

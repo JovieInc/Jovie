@@ -416,7 +416,7 @@ export function ProfileCompactSurface({
   // hero to ≤190px so the bento release card stays above the fold
   // (profile-mobile-viewport-stability). Taller phones keep flex growth.
   const heroHeightClassName = isHomeMode
-    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:820px)]:flex-none [@media(max-height:820px)]:min-h-0 [@media(max-height:820px)]:max-h-[190px]'
+    ? 'min-h-(--cover-height) flex-1 [@media(max-height:820px)]:flex-none [@media(max-height:820px)]:min-h-0 [@media(max-height:820px)]:max-h-[190px]'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';
@@ -626,7 +626,7 @@ export function ProfileCompactSurface({
           </div>
 
           {isHomeMode ? (
-            <div className='absolute inset-x-0 bottom-0 z-10 px-[var(--page-pad)] pb-5 [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'>
+            <div className='absolute inset-x-0 bottom-0 z-10 px-(--page-pad) pb-5 [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'>
               <div
                 className='min-w-0 rounded-2xl bg-black/18 px-3 py-2.5 shadow-[0_16px_38px_-24px_rgba(0,0,0,0.72)] backdrop-blur-[2px] [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
                 data-testid='profile-hero-identity-block'
@@ -706,7 +706,7 @@ export function ProfileCompactSurface({
 
         <div
           className={cn(
-            'relative z-10 flex flex-col px-[var(--page-pad)]',
+            'relative z-10 flex flex-col px-(--page-pad)',
             homeContentColumnClassName,
             isHomeMode ? 'pt-0' : 'pt-2'
           )}

@@ -47,7 +47,7 @@ export function DesktopTitlebar() {
           >
             <div
               data-testid='electron-traffic-light-safe-area'
-              className='w-[var(--electron-traffic-light-safe-width)] shrink-0'
+              className='w-(--electron-traffic-light-safe-width) shrink-0'
               aria-hidden='true'
             />
             {/* Single canonical sidebar toggle for Electron. */}
@@ -77,7 +77,7 @@ export function DesktopTitlebar() {
                 type='button'
                 onClick={goBack}
                 disabled={!canGoBack}
-                aria-label='Go back'
+                aria-label='Go Back'
                 data-testid='electron-nav-back'
                 className={cn(
                   'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
@@ -93,7 +93,7 @@ export function DesktopTitlebar() {
                 type='button'
                 onClick={goForward}
                 disabled={!canGoForward}
-                aria-label='Go forward'
+                aria-label='Go Forward'
                 data-testid='electron-nav-forward'
                 className={cn(
                   'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',

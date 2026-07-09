@@ -258,7 +258,7 @@ export function ProfilePaySurface({
           {summary.narrative}
         </p>
 
-        <div className={cn('space-y-2.5', isDrawer ? 'max-w-[13rem]' : null)}>
+        <div className={cn('space-y-2.5', isDrawer ? 'max-w-52' : null)}>
           <div
             className={cn(
               'flex gap-2',

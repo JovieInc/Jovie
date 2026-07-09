@@ -1124,7 +1124,7 @@ function InputRow({
               'min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent placeholder:text-quaternary-token',
               isHero
                 ? 'min-h-7 px-2 py-0.5 text-mid font-book leading-6 text-primary-token sm:text-base'
-                : 'min-h-6 px-1.5 py-[1px] text-mid leading-6 text-primary-token',
+                : 'min-h-6 px-1.5 py-px text-mid leading-6 text-primary-token',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
               // isFocused→isExpanded). Using focus-visible:outline-none keeps

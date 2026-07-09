@@ -61,7 +61,7 @@ export function ProfileContactHeader({
 
       <div className='min-w-0 flex-1 space-y-px'>
         <DrawerEditableTextField
-          label='Display name'
+          label='Display Name'
           value={displayName}
           editable={editable && Boolean(onDisplayNameChange)}
           emptyLabel='Add display name'
@@ -70,7 +70,7 @@ export function ProfileContactHeader({
               onDisplayNameChange(nextValue ?? '');
             }
           }}
-          displayClassName='text-app font-semibold leading-[15px] tracking-[-0.01em] text-primary-token'
+          displayClassName='text-app font-semibold leading-[15px] tracking-tight text-primary-token'
           emptyClassName='text-tertiary-token'
           inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-sm font-semibold'
         />
@@ -80,7 +80,7 @@ export function ProfileContactHeader({
         </div>
 
         {metaParts.length > 0 && (
-          <p className='text-3xs leading-[14px] tracking-[0.01em] text-tertiary-token'>
+          <p className='text-3xs leading-[14px] tracking-wide text-tertiary-token'>
             {metaParts.join(' · ')}
           </p>
         )}

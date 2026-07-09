@@ -42,7 +42,7 @@ export function AppShellRightRail({
         // Mirror the left sidebar mount language so inner drawer width changes
         // reclaim canvas space with the same cinematic timing.
         'transition-[width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',
-        isShellChatV1 && 'lg:rounded-[var(--linear-app-shell-radius)]',
+        isShellChatV1 && 'lg:rounded-(--linear-app-shell-radius)',
         className
       )}
     >

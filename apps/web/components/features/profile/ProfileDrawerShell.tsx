@@ -50,7 +50,7 @@ export function ProfileDrawerShell({
     ['--profile-drawer-height-max' as string]: 'min(472px, 62dvh)',
     ['--profile-drawer-header' as string]: '72px',
   } as React.CSSProperties;
-  const contentClasses = `relative flex max-h-[var(--profile-drawer-height-max)] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
+  const contentClasses = `relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop) before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
   // Fixed height (not min-h) so overflow-y-auto activates on overflow; min-h
   // lets the body grow past the parent's max-h and get clipped by overflow-hidden.
   const bodyClasses = `relative z-10 h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
@@ -117,7 +117,7 @@ export function ProfileDrawerShell({
         ) : (
           <div className='pt-5' data-testid='profile-drawer-root-header'>
             <div
-              className='min-h-[2rem] min-w-0'
+              className='min-h-8 min-w-0'
               data-testid='profile-drawer-title-slot'
             >
               <h2
@@ -156,7 +156,7 @@ export function ProfileDrawerShell({
       <>
         <button
           type='button'
-          aria-label='Close drawer overlay'
+          aria-label='Close Drawer Overlay'
           className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/48 backdrop-blur-sm`}
           onClick={() => onOpenChange(false)}
         />
@@ -169,7 +169,7 @@ export function ProfileDrawerShell({
           open
         >
           <div
-            className={`relative flex max-h-[var(--profile-drawer-height-max)] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-desktop)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`}
+            className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-desktop) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`}
           >
             <span id={accessibleDescriptionId} className='sr-only'>
               {accessibleDescription}
@@ -193,12 +193,12 @@ export function ProfileDrawerShell({
       >
         <button
           type='button'
-          aria-label='Close modal overlay'
+          aria-label='Close Modal Overlay'
           className='absolute inset-0'
           onClick={() => onOpenChange(false)}
         />
         <div
-          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-[var(--profile-card-radius)] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
+          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
           data-testid={dataTestId}
           role='dialog'
           aria-describedby={accessibleDescriptionId}

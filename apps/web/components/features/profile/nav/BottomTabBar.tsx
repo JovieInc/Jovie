@@ -105,7 +105,7 @@ export function BottomTabBar({
   return (
     <div
       className={cn(
-        '-mx-[var(--page-pad)] shrink-0 border-t border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] px-1.5 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 backdrop-blur-2xl',
+        '-mx-(--page-pad) shrink-0 border-t border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] px-1.5 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 backdrop-blur-2xl',
         className
       )}
       data-testid='profile-tab-bar'
@@ -129,7 +129,7 @@ export function BottomTabBar({
                 onClick={() => onTabSelect(tab.mode)}
                 // 44×44pt minimum touch target (spec §2 a11y requirement).
                 className={cn(
-                  'relative flex min-h-13 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--profile-action-radius)] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
+                  'relative flex min-h-13 min-w-0 flex-col items-center justify-center gap-0.5 rounded-(--profile-action-radius) px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive
                     ? 'text-white dark:text-white'

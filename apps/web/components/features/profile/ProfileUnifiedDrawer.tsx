@@ -503,7 +503,7 @@ export function ProfileUnifiedDrawer({
                   showOtherPaymentOptions={false}
                 />
               ) : (
-                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
+                <div className='rounded-(--profile-drawer-radius-mobile) border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
                   <p className='text-sm font-semibold text-primary-token'>
                     Payments not available yet
                   </p>

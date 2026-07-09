@@ -90,7 +90,7 @@ export function SmartLinkAudioPreview({
           {isPlaying ? (
             <Pause className='h-3 w-3' />
           ) : (
-            <Play className='h-3 w-3 translate-x-[1px]' />
+            <Play className='h-3 w-3 translate-x-px' />
           )}
         </button>
 
