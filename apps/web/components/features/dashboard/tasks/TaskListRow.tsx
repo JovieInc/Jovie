@@ -5,6 +5,7 @@ import { Disc3, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import { DueChip } from '@/components/shell/DueChip';
+import { toDueIso } from '@/lib/tasks/task-due-date';
 import type { TaskView } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -160,6 +161,7 @@ export const TaskListRow = memo(function TaskListRow({
   const isCancelled = task.status === 'cancelled';
   const isMuted = isDone || isCancelled;
   const categoryLabel = getTaskCategoryLabel(task.category);
+  const dueIso = hideDue ? null : toDueIso(task.dueAt);
   const agentWorking = isTaskAgentWorking(
     task.assigneeKind,
     task.status,
@@ -204,9 +206,7 @@ export const TaskListRow = memo(function TaskListRow({
             !hideTitle && 'mt-0.5'
           )}
         >
-          {task.dueAt && !hideDue ? (
-            <DueChip dueIso={task.dueAt.toISOString()} muted={isMuted} />
-          ) : null}
+          {dueIso ? <DueChip dueIso={dueIso} muted={isMuted} /> : null}
           <span className='shrink-0 truncate text-tertiary-token'>
             {stage.label}
           </span>
