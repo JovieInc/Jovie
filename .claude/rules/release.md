@@ -320,7 +320,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Job | Tier | Local remediation command |
 | --- | --- | --- |
 | `ci-fast` | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
-| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors` |
+| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors` |
 | `CI Risk Classifier` | structural-contract | `pnpm ci:harness:check` |
 | `Unit Tests` | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build (public routes)` | preview-evidence | `pnpm run build:web` |

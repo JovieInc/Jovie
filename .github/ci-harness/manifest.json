@@ -60,8 +60,8 @@
       "name": "Structural Contract",
       "tier": "structural-contract",
       "mergeGate": true,
-      "nextLocalCommand": "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors",
-      "remediation": "The CI harness, Graphite merge-queue config, docs, workflow syntax, proxy, Tailwind, UI guardrails, SEO ratchet, contrast ratchet, doc-freshness registry, or reliability detector registry drifted. Run the local command and update the source rule or manifest, not only the generated output."
+      "nextLocalCommand": "pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors",
+      "remediation": "The CI harness, control-plane characterization suite, Graphite merge-queue config, docs, workflow syntax, proxy, Tailwind, UI guardrails, SEO ratchet, contrast ratchet, doc-freshness registry, or reliability detector registry drifted. Run the local command and update the source rule or manifest, not only the generated output."
     },
     {
       "id": "ci-risk-classifier",

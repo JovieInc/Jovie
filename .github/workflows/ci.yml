@@ -488,6 +488,10 @@ jobs:
           python-version: '3.12'
       - name: Validate CI harness manifest and generated docs
         run: pnpm ci:harness:check
+      - name: CI control-plane characterization suite
+        # Locks merge-gate set, risk smoke/preview flags, and merge-queue aggregate
+        # required-check contracts before any YAML refactor can silently change them.
+        run: pnpm ci:control:test
       - name: Validate CI branching policy
         run: pnpm ci:branching-guard:validate
       - name: Validate Graphite merge queue config
@@ -524,7 +528,7 @@ jobs:
             echo "Next local command:"
             echo
             echo '```bash'
-            echo "pnpm ci:harness:check && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors"
+            echo "pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

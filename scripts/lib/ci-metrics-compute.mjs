@@ -257,11 +257,16 @@ export function summarizeCiMetrics({ ts, runs, prs, timelineResults }) {
       queueWait: queueWaits.length,
       readyToMerge: readyToMerge.length,
     },
-    throughputVerdict: evaluateMergeQueueThroughput({
-      latency: {
-        readyToMergeSeconds: percentilesOf(readyToMerge),
+    throughputVerdict: evaluateMergeQueueThroughput(
+      {
+        latency: {
+          readyToMergeSeconds: percentilesOf(readyToMerge),
+        },
+        sampleSizes: { readyToMerge: readyToMerge.length },
       },
-      sampleSizes: { readyToMerge: readyToMerge.length },
-    }),
+      // Keep verdict deterministic: callers pass `ts` so wall-clock Date.now
+      // cannot flip evaluation-window status between test and job runs.
+      { now: ts ? new Date(ts) : new Date() }
+    ),
   };
 }
