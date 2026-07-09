@@ -231,14 +231,6 @@ function ProfileBentoView({
       icon: <SlidersHorizontal className='h-3.5 w-3.5' />,
       onClick: () => setUtmOpen(true),
     },
-    { type: 'separator', id: 'profile-actions-separator' },
-    {
-      type: 'action',
-      id: 'close-preview',
-      label: 'Close',
-      icon: <X className='h-3.5 w-3.5' />,
-      onClick: onClose,
-    },
   ];
 
   return (
@@ -256,22 +248,34 @@ function ProfileBentoView({
         heroClassName='aspect-4/5 max-h-115 w-full pt-3'
         phoneFrameClassName='h-120 w-57'
         topRight={
-          <CommonDropdown
-            items={menuItems}
-            align='end'
-            aria-label='Profile Actions'
-            trigger={
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon'
-                aria-label='Profile Actions'
-                className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
-              >
-                <MoreVertical className='h-3.5 w-3.5' />
-              </Button>
-            }
-          />
+          <div className='flex items-center gap-1.5'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              aria-label='Close'
+              onClick={onClose}
+              className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
+            >
+              <X className='h-3.5 w-3.5' />
+            </Button>
+            <CommonDropdown
+              items={menuItems}
+              align='end'
+              aria-label='Profile Actions'
+              trigger={
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  aria-label='Profile Actions'
+                  className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
+                >
+                  <MoreVertical className='h-3.5 w-3.5' />
+                </Button>
+              }
+            />
+          </div>
         }
         footer={
           <div className='space-y-2 px-1.5 pb-1.5 pt-1.5 lg:px-0 lg:pb-0'>
