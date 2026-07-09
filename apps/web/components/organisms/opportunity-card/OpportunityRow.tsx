@@ -1,13 +1,8 @@
 'use client';
 
-import {
-  type TouchEvent as ReactTouchEvent,
-  useCallback,
-  useRef,
-  useState,
-} from 'react';
+import { type TouchEvent as ReactTouchEvent, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { type OpportunityRowProps, type OpportunityRowState } from './types';
+import type { OpportunityRowProps, OpportunityRowState } from './types';
 
 /* ─── State-dependent token maps ─────────────────────────────────────── */
 
@@ -77,8 +72,6 @@ export function OpportunityRow({
   className,
   dataTestId,
 }: OpportunityRowProps) {
-  const [hovered, setHovered] = useState(false);
-  const [_swiping, setSwiping] = useState<'left' | 'right' | null>(null);
   const swipeRef = useRef<SwipeState | null>(null);
 
   const dotColor = DOT_COLOR[state];
@@ -86,9 +79,6 @@ export function OpportunityRow({
   const persistentAction = hasPersistentAction(state);
   const showCheckmark = isCheckmarkState(state);
   const rowHasAction = hasActionChrome(state);
-
-  /* ── Hover reveal logic (desktop) ──────────────────────────────────── */
-  const showActionChrome = persistentAction || (rowHasAction && hovered);
 
   /* ── Primary action handler ─────────────────────────────────────────── */
   const handlePrimaryAction = useCallback(() => {
@@ -105,28 +95,14 @@ export function OpportunityRow({
   }, [id, isBusy, onDismiss]);
 
   /* ── Mobile touch swipe handlers ───────────────────────────────────── */
-  const handleTouchStart = useCallback((e: ReactTouchEvent<HTMLElement>) => {
+  const handleTouchStart = useCallback((e: ReactTouchEvent<HTMLDivElement>) => {
     const touch = e.touches[0];
     if (!touch) return;
     swipeRef.current = { startX: touch.clientX };
   }, []);
 
-  const handleTouchMove = useCallback(
-    (e: ReactTouchEvent<HTMLElement>) => {
-      const s = swipeRef.current;
-      if (!s || !rowHasAction) return;
-      const touch = e.touches[0];
-      if (!touch) return;
-      const dx = touch.clientX - s.startX;
-      if (dx < -20) setSwiping('left');
-      else if (dx > 20) setSwiping('right');
-      else setSwiping(null);
-    },
-    [rowHasAction]
-  );
-
   const handleTouchEnd = useCallback(
-    (e: ReactTouchEvent<HTMLElement>) => {
+    (e: ReactTouchEvent<HTMLDivElement>) => {
       const s = swipeRef.current;
       if (!s) return;
       const touch = e.changedTouches[0];
@@ -135,49 +111,38 @@ export function OpportunityRow({
       // Left swipe = dismiss, right swipe = plan
       if (dx < -60) handleDismiss();
       else if (dx > 60 && rowHasAction) handlePrimaryAction();
-      setSwiping(null);
       swipeRef.current = null;
     },
     [rowHasAction, handleDismiss, handlePrimaryAction]
   );
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: interactive list row for hover/swipe actions
     <li
       className={cn('group/row list-none overflow-hidden', className)}
       data-testid={dataTestId ?? `opportunity-row-${id}`}
       data-state={state}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-      }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
       <div
         className={cn(
-          'min-h-[48px] flex items-center gap-3 px-5 py-2.5',
+          'min-h-12 flex items-center gap-3 px-5 py-2.5',
           'rounded-none',
           'transition-[background-color] duration-subtle',
-          hovered && 'bg-surface-0/40'
+          'group-hover/row:bg-surface-0'
         )}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Status dot — 5px circle */}
         {!hideDot ? (
           <span
-            className='block shrink-0 rounded-full'
+            className='block size-1.5 shrink-0 rounded-full'
             aria-hidden='true'
             style={{
-              width: 5,
-              height: 5,
               backgroundColor: dotColor,
-              minWidth: 5,
-              minHeight: 5,
             }}
           />
         ) : (
-          <span className='block w-[5px] shrink-0' aria-hidden='true' />
+          <span className='block size-1.5 shrink-0' aria-hidden='true' />
         )}
 
         {/* Type column — two lines */}
@@ -185,20 +150,16 @@ export function OpportunityRow({
           {/* Line 1: Title — 13px semi-bold (--text-app) */}
           <span
             className={cn(
-              'truncate font-[590] leading-tight tracking-[-0.01em]',
-              'text-primary-token'
+              'truncate font-medium leading-tight tracking-tight',
+              'text-primary-token text-app'
             )}
-            style={{ fontSize: 'var(--text-app)' }}
           >
             {title}
           </span>
 
           {/* Line 2: Metadata — muted 10px (--text-2xs) */}
           {metadata ? (
-            <span
-              className='truncate text-tertiary-token'
-              style={{ fontSize: 'var(--text-2xs)' }}
-            >
+            <span className='truncate text-tertiary-token text-2xs'>
               {metadata}
             </span>
           ) : null}
@@ -212,7 +173,9 @@ export function OpportunityRow({
             className={cn(
               'flex items-center gap-2 shrink-0 min-w-0',
               'transition-opacity duration-subtle',
-              showActionChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              persistentAction
+                ? 'opacity-100'
+                : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto'
             )}
           >
             {/* Ghost accent ring pill — 2px border, no fill */}
@@ -220,25 +183,21 @@ export function OpportunityRow({
               type='button'
               className={cn(
                 'inline-flex items-center justify-center',
-                'rounded-full',
-                'bg-transparent',
+                'rounded-full min-w-7 min-h-7 px-2',
+                'bg-transparent border-2',
                 'transition-colors duration-subtle',
-                'cursor-pointer',
-                'select-none',
+                'cursor-pointer select-none',
                 isBusy && 'cursor-not-allowed opacity-50',
                 showCheckmark || persistentAction
                   ? 'text-primary-token'
                   : 'text-accent-token'
               )}
               style={{
-                border: `2px solid ${actionAccent}`,
-                padding: '2px 8px',
-                minWidth: 28,
-                minHeight: 28,
+                borderColor: actionAccent,
               }}
               onClick={handlePrimaryAction}
               disabled={isBusy || !rowHasAction}
-              aria-label={showCheckmark ? 'Planned' : 'Plan opportunity'}
+              aria-label={showCheckmark ? 'Planned' : 'Plan Opportunity'}
             >
               {showCheckmark ? '✓' : '→'}
             </button>
@@ -250,19 +209,17 @@ export function OpportunityRow({
                 type='button'
                 className={cn(
                   'inline-flex items-center justify-center',
-                  'rounded-full w-7 h-7',
+                  'rounded-full size-7',
                   'bg-transparent',
-                  'text-quaternary-token',
+                  'text-quaternary-token text-app',
                   'transition-colors duration-subtle',
                   'hover:text-secondary-token',
-                  'cursor-pointer',
-                  'select-none',
+                  'cursor-pointer select-none',
                   isBusy && 'cursor-not-allowed opacity-30'
                 )}
                 onClick={handleDismiss}
                 disabled={isBusy}
                 aria-label='Dismiss Opportunity'
-                style={{ fontSize: 'var(--text-app)' }}
               >
                 &times;
               </button>

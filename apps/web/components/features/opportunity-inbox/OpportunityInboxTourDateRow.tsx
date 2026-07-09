@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  type TouchEvent as ReactTouchEvent,
-  useCallback,
-  useRef,
-  useState,
-} from 'react';
+import { type TouchEvent as ReactTouchEvent, useCallback, useRef } from 'react';
 import { formatTourDateDisplay } from '@/lib/connectors/opportunity-inbox-tour-dates';
 import type { OpportunityInboxTourDateItem } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
@@ -57,15 +52,12 @@ export function OpportunityInboxTourDateRow({
   isBusy = false,
   className,
 }: OpportunityInboxTourDateRowProps) {
-  const [hovered, setHovered] = useState(false);
-  const [_swiping, setSwiping] = useState<'left' | 'right' | null>(null);
   const swipeRef = useRef<SwipeState | null>(null);
 
   const dotColor = DOT_COLOR[item.status];
   const actionAccent = ACTION_ACCENT[item.status];
   const isActionable = item.status === 'pending';
   const isPersistent = item.status === 'confirmed';
-  const showActions = isPersistent || (isActionable && hovered);
 
   /* ── Handlers ──────────────────────────────────────────────────────── */
   const handleConfirm = useCallback(() => {
@@ -77,28 +69,14 @@ export function OpportunityInboxTourDateRow({
   }, [item.id, isBusy, isActionable, onReject]);
 
   /* ── Mobile touch swipe ───────────────────────────────────────────── */
-  const handleTouchStart = useCallback((e: ReactTouchEvent<HTMLElement>) => {
+  const handleTouchStart = useCallback((e: ReactTouchEvent<HTMLDivElement>) => {
     const touch = e.touches[0];
     if (!touch) return;
     swipeRef.current = { startX: touch.clientX };
   }, []);
 
-  const handleTouchMove = useCallback(
-    (e: ReactTouchEvent<HTMLElement>) => {
-      const s = swipeRef.current;
-      if (!s || !isActionable) return;
-      const touch = e.touches[0];
-      if (!touch) return;
-      const dx = touch.clientX - s.startX;
-      if (dx < -20) setSwiping('left');
-      else if (dx > 20) setSwiping('right');
-      else setSwiping(null);
-    },
-    [isActionable]
-  );
-
   const handleTouchEnd = useCallback(
-    (e: ReactTouchEvent<HTMLElement>) => {
+    (e: ReactTouchEvent<HTMLDivElement>) => {
       const s = swipeRef.current;
       if (!s) return;
       const touch = e.changedTouches[0];
@@ -106,7 +84,6 @@ export function OpportunityInboxTourDateRow({
       const dx = touch.clientX - s.startX;
       if (dx < -60) handleReject();
       else if (dx > 60 && isActionable) handleConfirm();
-      setSwiping(null);
       swipeRef.current = null;
     },
     [isActionable, handleReject, handleConfirm]
@@ -118,35 +95,27 @@ export function OpportunityInboxTourDateRow({
   })();
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: interactive list row for hover/swipe actions
     <li
       className={cn('group/row list-none overflow-hidden', className)}
       data-testid={`tour-date-row-${item.id}`}
       data-status={item.status}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
       <div
         className={cn(
-          'min-h-[48px] flex items-center gap-3 px-5 py-2.5',
+          'min-h-12 flex items-center gap-3 px-5 py-2.5',
           'rounded-none',
           'transition-[background-color] duration-subtle',
-          hovered && 'bg-surface-0/40'
+          'group-hover/row:bg-surface-0'
         )}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Status dot — 5px circle */}
         <span
-          className='block shrink-0 rounded-full'
+          className='block size-1.5 shrink-0 rounded-full'
           aria-hidden='true'
           style={{
-            width: 5,
-            height: 5,
             backgroundColor: dotColor,
-            minWidth: 5,
-            minHeight: 5,
           }}
         />
 
@@ -155,19 +124,15 @@ export function OpportunityInboxTourDateRow({
           {/* Line 1: Title — 13px semi-bold (--text-app) */}
           <span
             className={cn(
-              'truncate font-[590] leading-tight tracking-[-0.01em]',
-              'text-primary-token'
+              'truncate font-medium leading-tight tracking-tight',
+              'text-primary-token text-app'
             )}
-            style={{ fontSize: 'var(--text-app)' }}
           >
             {item.title}
           </span>
 
           {/* Line 2: Metadata — muted 10px (--text-2xs) */}
-          <span
-            className='truncate text-tertiary-token'
-            style={{ fontSize: 'var(--text-2xs)' }}
-          >
+          <span className='truncate text-tertiary-token text-2xs'>
             {metadataLine}
           </span>
         </div>
@@ -178,7 +143,9 @@ export function OpportunityInboxTourDateRow({
             className={cn(
               'flex items-center gap-2 shrink-0 min-w-0',
               'transition-opacity duration-subtle',
-              showActions ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              isPersistent
+                ? 'opacity-100'
+                : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto'
             )}
           >
             {/* Ghost accent ring pill — 2px border, no fill */}
@@ -186,27 +153,21 @@ export function OpportunityInboxTourDateRow({
               type='button'
               className={cn(
                 'inline-flex items-center justify-center',
-                'rounded-full',
-                'bg-transparent',
+                'rounded-full min-w-7 min-h-7 px-2',
+                'bg-transparent border-2',
                 'transition-colors duration-subtle',
-                'cursor-pointer',
-                'select-none',
+                'cursor-pointer select-none',
                 isBusy && 'cursor-not-allowed opacity-50',
-                isPersistent
-                  ? 'text-primary-token'
-                  : 'text-accent-token'
+                isPersistent ? 'text-primary-token' : 'text-accent-token'
               )}
               style={{
-                border: `2px solid ${actionAccent}`,
-                padding: '2px 8px',
-                minWidth: 28,
-                minHeight: 28,
+                borderColor: actionAccent,
               }}
               onClick={handleConfirm}
               disabled={isBusy || !isActionable}
-              aria-label={isPersistent ? 'Confirmed' : 'Confirm tour date'}
+              aria-label={isPersistent ? 'Confirmed' : 'Confirm Tour Date'}
             >
-              {isPersistent ? '✓' : '✓'}
+              ✓
             </button>
 
             {/* Dismiss (reject) button — only visible on hover for pending */}
@@ -215,19 +176,17 @@ export function OpportunityInboxTourDateRow({
                 type='button'
                 className={cn(
                   'inline-flex items-center justify-center',
-                  'rounded-full w-7 h-7',
+                  'rounded-full size-7',
                   'bg-transparent',
-                  'text-quaternary-token',
+                  'text-quaternary-token text-app',
                   'transition-colors duration-subtle',
                   'hover:text-secondary-token',
-                  'cursor-pointer',
-                  'select-none',
+                  'cursor-pointer select-none',
                   isBusy && 'cursor-not-allowed opacity-30'
                 )}
                 onClick={handleReject}
                 disabled={isBusy}
-                aria-label='Reject tour date'
-                style={{ fontSize: 'var(--text-app)' }}
+                aria-label='Reject Tour Date'
               >
                 &times;
               </button>
