@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import { computeTaskDueDate } from '@/lib/tasks/task-due-date';
 
 // Test the pure logic that the server actions use — date computation,
 // task row building, idempotency checks. These don't need DB mocking.
 
-function computeDueDate(releaseDate: Date, offsetDays: number): Date {
-  const date = new Date(releaseDate);
-  date.setDate(date.getDate() + offsetDays);
-  return date;
-}
+const NOW = new Date('2026-04-25T12:00:00.000Z');
 
 function buildTaskRows(
   releaseId: string,
@@ -38,41 +35,45 @@ function buildTaskRows(
     assigneeType: item.assigneeType,
     aiWorkflowId: item.aiWorkflowId ?? null,
     dueDaysOffset: item.dueDaysOffset,
-    dueDate: releaseDate
-      ? computeDueDate(releaseDate, item.dueDaysOffset)
-      : null,
+    dueDate: computeTaskDueDate(releaseDate, item.dueDaysOffset, { now: NOW }),
   }));
 }
 
-describe('computeDueDate', () => {
+describe('computeTaskDueDate', () => {
   it('computes correct date with negative offset', () => {
     const releaseDate = new Date('2026-04-15T00:00:00Z');
-    const result = computeDueDate(releaseDate, -28);
-    expect(result.toISOString().split('T')[0]).toBe('2026-03-18');
+    const result = computeTaskDueDate(releaseDate, -28, { now: NOW });
+    expect(result?.toISOString().split('T')[0]).toBe('2026-03-18');
   });
 
   it('computes correct date with positive offset', () => {
     const releaseDate = new Date('2026-04-15T00:00:00Z');
-    const result = computeDueDate(releaseDate, 7);
-    expect(result.toISOString().split('T')[0]).toBe('2026-04-22');
+    const result = computeTaskDueDate(releaseDate, 7, { now: NOW });
+    expect(result?.toISOString().split('T')[0]).toBe('2026-04-22');
   });
 
   it('computes correct date with zero offset (release day)', () => {
     const releaseDate = new Date('2026-04-15T00:00:00Z');
-    const result = computeDueDate(releaseDate, 0);
-    expect(result.toISOString().split('T')[0]).toBe('2026-04-15');
+    const result = computeTaskDueDate(releaseDate, 0, { now: NOW });
+    expect(result?.toISOString().split('T')[0]).toBe('2026-04-15');
   });
 
   it('handles month boundary crossing', () => {
     const releaseDate = new Date('2026-03-05T00:00:00Z');
-    const result = computeDueDate(releaseDate, -10);
-    expect(result.toISOString().split('T')[0]).toBe('2026-02-23');
+    const result = computeTaskDueDate(releaseDate, -10, { now: NOW });
+    expect(result?.toISOString().split('T')[0]).toBe('2026-02-23');
   });
 
   it('handles year boundary crossing', () => {
     const releaseDate = new Date('2026-01-10T00:00:00Z');
-    const result = computeDueDate(releaseDate, -30);
-    expect(result.toISOString().split('T')[0]).toBe('2025-12-11');
+    const result = computeTaskDueDate(releaseDate, -30, { now: NOW });
+    expect(result?.toISOString().split('T')[0]).toBe('2025-12-11');
+  });
+
+  it('returns null for historical multi-year baselines (no 12Y-ago dues)', () => {
+    expect(
+      computeTaskDueDate(new Date('2014-06-01T00:00:00Z'), -30, { now: NOW })
+    ).toBeNull();
   });
 });
 
