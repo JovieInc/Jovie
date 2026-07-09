@@ -6,6 +6,12 @@ set -euo pipefail
 : "${BRANCH_NAME:?BRANCH_NAME is required}"
 : "${ROLE_NAME:=neondb_owner}"
 
+# Persist connection strings to the runner filesystem so callers can load them
+# without re-interpolating secrets through ${{ }} expressions (which can strip
+# or corrupt passwords that overlap registered GitHub secrets).
+CONNECTION_DIR="${RUNNER_TEMP:-/tmp}/neon-connection"
+mkdir -p "$CONNECTION_DIR"
+
 args=(
   branches create
   --project-id "$NEON_PROJECT_ID"
@@ -92,8 +98,32 @@ if [ -z "$DB_URL" ] || [ -z "$DB_URL_POOLED" ]; then
   exit 1
 fi
 
+# File-based handoff (authoritative for artifact consumers)
+printf '%s' "$BRANCH_ID" > "$CONNECTION_DIR/branch_id"
+printf '%s' "$RESOLVED_BRANCH_NAME" > "$CONNECTION_DIR/branch_name"
+printf '%s' "$DB_URL" > "$CONNECTION_DIR/db_url"
+printf '%s' "$DB_URL_POOLED" > "$CONNECTION_DIR/db_url_pooled"
+jq -n \
+  --arg db_url "$DB_URL" \
+  --arg db_url_pooled "$DB_URL_POOLED" \
+  --arg branch_id "$BRANCH_ID" \
+  --arg branch_name "$RESOLVED_BRANCH_NAME" \
+  '{
+    db_url: $db_url,
+    db_url_pooled: $db_url_pooled,
+    branch_id: $branch_id,
+    branch_name: $branch_name
+  }' > "$CONNECTION_DIR/connection.json"
+
+# Multiline GITHUB_OUTPUT avoids corruption when passwords contain special chars.
 {
-  echo "branch_id=$BRANCH_ID"
-  echo "db_url=$DB_URL"
-  echo "db_url_pooled=$DB_URL_POOLED"
+  echo "branch_id<<NEON_EOF"
+  echo "$BRANCH_ID"
+  echo "NEON_EOF"
+  echo "db_url<<NEON_EOF"
+  echo "$DB_URL"
+  echo "NEON_EOF"
+  echo "db_url_pooled<<NEON_EOF"
+  echo "$DB_URL_POOLED"
+  echo "NEON_EOF"
 } >> "$GITHUB_OUTPUT"

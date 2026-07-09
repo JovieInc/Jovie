@@ -411,7 +411,10 @@ describe('CI public lighthouse workflow', () => {
     expect(resolveDbStep).toContain(
       'connection_file: /tmp/neon-db-connection/connection.json'
     );
-    expect(resolveDbStep).not.toContain('credential_source_url');
+    // credential_source only fills missing username/password; ephemeral host
+    // still comes from the neon-db artifact (see resolve-neon-database-url).
+    expect(resolveDbStep).toContain('credential_source_url:');
+    expect(resolveDbStep).toContain('secrets.DATABASE_URL_MAIN');
     expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
     expect(failClosedStep).toContain(
       'Refusing to run public Lighthouse against staging/production DBs'

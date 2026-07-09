@@ -106,15 +106,18 @@ runs:
           Boolean
         );
 
-        const usernameSource = !candidate.username
-          ? credentialSources.find((url) => url.username)
+        const isMissingCred = (value) =>
+          !value || value === "***" || value === "%2A%2A%2A";
+
+        const usernameSource = isMissingCred(candidate.username)
+          ? credentialSources.find((url) => url.username && !isMissingCred(url.username))
           : null;
         if (usernameSource) {
           candidate.username = usernameSource.username;
         }
 
-        const passwordSource = !candidate.password
-          ? credentialSources.find((url) => url.password)
+        const passwordSource = isMissingCred(candidate.password)
+          ? credentialSources.find((url) => url.password && !isMissingCred(url.password))
           : null;
         if (passwordSource) {
           candidate.password = passwordSource.password;
