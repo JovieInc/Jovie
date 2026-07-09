@@ -156,7 +156,7 @@ describe('HomePageNarrative', () => {
       'Stay in the studio.'
     );
     expect(screen.getByTestId('final-cta-action')).toHaveTextContent(
-      'Request Access'
+      'Get started'
     );
     expect(screen.queryByTestId('final-cta-secondary')).not.toBeInTheDocument();
   });

@@ -1054,7 +1054,7 @@ body {
     gap: clamp(0.85rem, 1.4vw, 1.1rem);
   }
   .marketing-pricing-plans--compact {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .marketing-pricing-plans--expanded {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1162,8 +1162,15 @@ body {
     color: rgba(255, 255, 255, 0.58);
   }
   @media (max-width: 1180px) {
-    .marketing-pricing-plans--compact,
+    .marketing-pricing-plans--compact {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
     .marketing-pricing-plans--expanded {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 860px) {
+    .marketing-pricing-plans--compact {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }

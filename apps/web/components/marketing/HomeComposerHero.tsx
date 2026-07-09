@@ -33,9 +33,10 @@ import { cn } from '@/lib/utils';
 // ─── Design constants (match in-app composer exactly) ─────────────────────
 
 const SURFACE_BG =
-  'linear-gradient(180deg, rgba(255,255,255,0.018) 0%, transparent 40%), #16161a';
+  'linear-gradient(180deg, rgba(255,255,255,0.018) 0%, transparent 40%), var(--color-bg-surface-2)';
 
-const SEND_BTN_BG = 'linear-gradient(180deg, #fff 0%, #e8e8eb 100%)';
+const SEND_BTN_BG =
+  'linear-gradient(180deg, var(--color-bg-primary) 0%, var(--color-bg-base) 100%)';
 
 // ─── State machine ────────────────────────────────────────────────────────
 
@@ -456,7 +457,7 @@ export function HomeComposerHero() {
   return (
     <section
       ref={containerRef}
-      aria-label='Jovie AI composer demo'
+      aria-label='Jovie AI Composer Demo'
       className='relative w-full'
     >
       <button

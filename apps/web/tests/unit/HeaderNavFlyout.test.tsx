@@ -40,9 +40,10 @@ describe('HeaderNav flyout interactions', () => {
       'href',
       '/signin'
     );
-    expect(
-      screen.getByRole('link', { name: 'Request Access' })
-    ).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/signup'
+    );
   });
 
   it('closes marketing flyouts with Escape', () => {

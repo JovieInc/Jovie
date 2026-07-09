@@ -126,12 +126,9 @@ function GlassAuthActions({
       >
         Sign in
       </Link>
-      <Link
-        href={publicCtaHref}
-        className='marketing-glass-header__cta focus-ring-themed'
-      >
-        {publicCtaLabel}
-      </Link>
+      <Button variant='primary' size='md' asChild>
+        <Link href={publicCtaHref}>{publicCtaLabel}</Link>
+      </Button>
     </div>
   );
 }

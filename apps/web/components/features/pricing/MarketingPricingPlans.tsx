@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -49,18 +50,15 @@ function MarketingPricingPlanCard({
         {plan.cadence ? <span>{plan.cadence}</span> : null}
       </p>
 
-      <Link
-        href={getMarketingPlanHref(plan.id)}
-        prefetch={false}
-        className={cn(
-          'marketing-pricing-plan-card__cta focus-ring-themed',
-          ctaVariant === 'primary'
-            ? 'public-action-primary'
-            : 'public-action-secondary'
-        )}
+      <Button
+        variant={ctaVariant === 'primary' ? 'primary' : 'ghost'}
+        size='md'
+        asChild
       >
-        {getMarketingPlanCtaLabel(plan)}
-      </Link>
+        <Link href={getMarketingPlanHref(plan.id)} prefetch={false}>
+          {getMarketingPlanCtaLabel(plan)}
+        </Link>
+      </Button>
 
       <ul className='marketing-pricing-plan-card__features'>
         {plan.features.map(feature => (
