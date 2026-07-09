@@ -11,11 +11,14 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
+import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
-import { usePlanGate } from '@/lib/queries';
+import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
+import { ChatEmptyStateOpportunityCards } from './components/ChatEmptyStateOpportunityCards';
+import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
@@ -67,6 +70,9 @@ export function JovieChat({
   const initialSkillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
+  /** Pinned opportunity card for empty-thread → card-open mode (GH #13177 / #13174). */
+  const [pinnedOpportunity, setPinnedOpportunity] =
+    useState<OpportunityInboxCardViewModel | null>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const initialConversationScrollRef = useRef<string | null>(null);
@@ -390,7 +396,39 @@ export function JovieChat({
   const lastAssistantIndex = findLastAssistantIndex(messages);
 
   const isStreaming = status === 'streaming';
-  const showThreadView = hasMessages;
+  // Empty-thread opportunity cards (GH #13177): only when there is no active
+  // conversation content yet. Zero pending → leave empty state as-is (no pills).
+  const shouldLoadOpportunityCards =
+    !hasMessages && !conversationId && !isLoadingConversation;
+  const { data: pendingOpportunityCards = [] } =
+    usePendingOpportunityCardsQuery({
+      enabled: shouldLoadOpportunityCards && !pinnedOpportunity,
+    });
+  const showEmptyOpportunityCards =
+    shouldLoadOpportunityCards &&
+    !pinnedOpportunity &&
+    pendingOpportunityCards.length > 0;
+
+  const handleSelectOpportunityCard = useCallback(
+    (card: OpportunityInboxCardViewModel) => {
+      setPinnedOpportunity(card);
+    },
+    []
+  );
+  const handleUnpinOpportunity = useCallback(() => {
+    setPinnedOpportunity(null);
+  }, []);
+
+  // Clear pin when navigating to a different conversation.
+  useEffect(() => {
+    if (conversationId) {
+      setPinnedOpportunity(null);
+    }
+  }, [conversationId]);
+
+  // Pin mode uses the thread chrome (docked composer + header) so the card
+  // stays above the transcript, matching inbox → pinned-card behavior.
+  const showThreadView = hasMessages || pinnedOpportunity !== null;
   const showBottomComposer = showThreadView;
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
@@ -616,6 +654,14 @@ export function JovieChat({
               >
                 <ChatEmptyStateComposerRegion
                   greetingName={displayName ?? username ?? null}
+                  above={
+                    showEmptyOpportunityCards ? (
+                      <ChatEmptyStateOpportunityCards
+                        cards={pendingOpportunityCards}
+                        onSelect={handleSelectOpportunityCard}
+                      />
+                    ) : undefined
+                  }
                 >
                   {composerSurface}
                   {inlineChatError ? (
@@ -624,27 +670,35 @@ export function JovieChat({
                 </ChatEmptyStateComposerRegion>
               </div>
             ) : (
-              <ChatThreadMessages
-                messages={messages}
-                shouldVirtualizeMessages={shouldVirtualizeMessages}
-                virtualizer={virtualizer}
-                virtualizedMessageViewportHeight={
-                  virtualizedMessageViewportHeight
-                }
-                virtualizedMinHeight={virtualizedMinHeight}
-                messageViewportPaddingBottom={messageViewportPaddingBottom}
-                totalSizeRef={totalSizeRef}
-                bottomSentinelRef={bottomSentinelRef}
-                isStreaming={isStreaming}
-                lastAssistantIndex={lastAssistantIndex}
-                avatarUrl={avatarUrl}
-                profileId={profileId}
-                knownMessageIds={knownMessageIdsRef.current}
-                inlineChatError={inlineChatError}
-                isStuckToBottom={isStuckToBottom}
-                onScrollToBottom={() => scrollToBottom()}
-                conversationId={activeConversationId ?? conversationId}
-              />
+              <>
+                {pinnedOpportunity ? (
+                  <ChatPinnedOpportunityHeader
+                    card={pinnedOpportunity}
+                    onUnpin={handleUnpinOpportunity}
+                  />
+                ) : null}
+                <ChatThreadMessages
+                  messages={messages}
+                  shouldVirtualizeMessages={shouldVirtualizeMessages}
+                  virtualizer={virtualizer}
+                  virtualizedMessageViewportHeight={
+                    virtualizedMessageViewportHeight
+                  }
+                  virtualizedMinHeight={virtualizedMinHeight}
+                  messageViewportPaddingBottom={messageViewportPaddingBottom}
+                  totalSizeRef={totalSizeRef}
+                  bottomSentinelRef={bottomSentinelRef}
+                  isStreaming={isStreaming}
+                  lastAssistantIndex={lastAssistantIndex}
+                  avatarUrl={avatarUrl}
+                  profileId={profileId}
+                  knownMessageIds={knownMessageIdsRef.current}
+                  inlineChatError={inlineChatError}
+                  isStuckToBottom={isStuckToBottom}
+                  onScrollToBottom={() => scrollToBottom()}
+                  conversationId={activeConversationId ?? conversationId}
+                />
+              </>
             )}
           </div>
 
