@@ -6,6 +6,7 @@ export type DesktopSecurityEvent =
   | 'auth-deep-link-replay-rejected'
   | 'csp-header-missing'
   | 'csp-header-weakened'
+  | 'remote-debugging-blocked'
   | 'window-state-clamped';
 
 export interface DesktopSecurityEventDetail {
