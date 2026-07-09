@@ -8,6 +8,8 @@ import {
 } from '@/lib/chat/retouch-capability';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import type { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { executeRetouch } from '@/lib/services/retouching/executor';
+import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 
 type CurrentUserEntitlements = Awaited<
   ReturnType<typeof getCurrentUserEntitlements>
@@ -28,6 +30,14 @@ function buildUnavailablePayload(capability: RetouchCapability) {
 export function createRetouchImageTool(input: {
   readonly profileId: string | null;
   readonly entitlements: CurrentUserEntitlements | null;
+  readonly clerkUserId: string;
+  /**
+   * Public URL of the most recent image the user attached in this turn's
+   * message history (extracted server-side from UIMessage file parts).
+   * Null when no image attachment is present.
+   */
+  readonly sourceImageUrl: string | null;
+  readonly conversationId: string | null;
 }) {
   return tool({
     description:
@@ -43,7 +53,7 @@ export function createRetouchImageTool(input: {
         .optional()
         .describe('Optional retouch direction from the artist.'),
     }),
-    execute: async () => {
+    execute: async ({ instructions }) => {
       if (!input.profileId) {
         return {
           success: false as const,
@@ -55,16 +65,46 @@ export function createRetouchImageTool(input: {
 
       const capability = resolveRetouchCapability({
         entitlements: input.entitlements,
+        provisioned: isRetouchConfigured(),
       });
       if (capability.availability !== 'available') {
         return buildUnavailablePayload(capability);
       }
 
+      if (!input.sourceImageUrl) {
+        return {
+          success: false as const,
+          retryable: true,
+          errorCode: 'NO_IMAGE_ATTACHED' as const,
+          error:
+            'No photo found to retouch. Attach the image you want retouched and ask again.',
+        };
+      }
+
+      const result = await executeRetouch({
+        clerkUserId: input.clerkUserId,
+        sourceImageUrl: input.sourceImageUrl,
+        instructions: instructions?.trim() || null,
+        conversationId: input.conversationId,
+        dailyLimit: input.entitlements?.aiRetouchDailyLimit ?? null,
+      });
+
+      if (!result.success) {
+        return {
+          success: false as const,
+          retryable: result.retryable,
+          errorCode: result.errorCode,
+          error: result.error,
+        };
+      }
+
       return {
-        success: false as const,
-        retryable: true,
-        errorCode: 'TOOL_UNAVAILABLE' as const,
-        error: 'Image retouching is temporarily unavailable.',
+        success: true as const,
+        state: 'retouched' as const,
+        jobId: result.jobId,
+        styleId: result.styleId,
+        resultUrl: result.resultUrl,
+        sourceImageUrl: result.sourceImageUrl,
       };
     },
   });
