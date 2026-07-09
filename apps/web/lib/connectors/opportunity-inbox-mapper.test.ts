@@ -70,7 +70,7 @@ describe('buildOpportunityInboxData', () => {
 });
 
 describe('tour-date classification in the mapper', () => {
-  it('labels tour-date-looking calendar signals as tour date cards', () => {
+  it('classifies tour-date-looking calendar signals with tour category + event type', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'action-3',
       kind: 'calendar.create_event',
@@ -83,12 +83,14 @@ describe('tour-date classification in the mapper', () => {
       createdAt: new Date('2026-06-28T10:00:00.000Z'),
     });
 
+    // category drives tour-date action labels; signalType drives the typed chip.
     expect(card.category).toBe('tour_date');
-    expect(card.typeLabel).toBe('Tour date');
+    expect(card.signalType).toBe('new_event');
+    expect(card.typeLabel).toBe('New Event');
     expect(card.primaryActionLabel).toBe('Confirm date');
   });
 
-  it('keeps non-tour calendar signals as suggestions', () => {
+  it('keeps non-tour calendar signals as suggestions with event type', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'action-4',
       kind: 'calendar.create_event',
@@ -98,7 +100,8 @@ describe('tour-date classification in the mapper', () => {
     });
 
     expect(card.category).toBe('suggestion');
-    expect(card.typeLabel).toBe('Suggestion');
+    expect(card.signalType).toBe('new_event');
+    expect(card.typeLabel).toBe('New Event');
     expect(card.primaryActionLabel).toBe('Add to calendar');
   });
 });

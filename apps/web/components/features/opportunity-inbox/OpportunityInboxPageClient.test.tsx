@@ -151,6 +151,7 @@ describe('OpportunityInboxPageClient', () => {
               why: 'Fresh release found on your catalog.',
               primaryActionLabel: 'Set up release',
               status: 'pending' as const,
+              category: 'suggestion' as const,
             },
             {
               id: 'event-1',
@@ -161,6 +162,7 @@ describe('OpportunityInboxPageClient', () => {
               why: 'Promoter email matched your Detroit growth spike.',
               primaryActionLabel: 'Add to calendar',
               status: 'pending' as const,
+              category: 'suggestion' as const,
             },
           ],
           emptyActionCards: [],
