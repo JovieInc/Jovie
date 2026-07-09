@@ -66,19 +66,19 @@ const SECTION_LABELS: Record<
 > = {
   added: {
     label: 'New',
-    color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    color: 'bg-accent-green-subtle text-accent-green',
   },
   changed: {
     label: 'Improved',
-    color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    color: 'bg-accent-blue-subtle text-accent-blue',
   },
   fixed: {
     label: 'Fixed',
-    color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    color: 'bg-accent-orange-subtle text-accent-orange',
   },
   removed: {
     label: 'Removed',
-    color: 'bg-red-500/10 text-red-600 dark:text-red-400',
+    color: 'bg-accent-red-subtle text-accent-red',
   },
 };
 
@@ -113,18 +113,18 @@ export default async function ChangelogPage() {
     <section className='min-h-screen bg-page text-primary-token'>
       {/* Header */}
       <MarketingHeroLayout variant='left'>
-        <p className='marketing-kicker'>Changelog</p>
-        <h1 className='marketing-h1-linear mb-4 mt-6 max-w-[10ch]'>
-          What&apos;s new
+        <p className='text-sm font-medium text-tertiary-token'>Changelog</p>
+        <h1 className='mb-4 mt-6 max-w-xs text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+          What&apos;s New
         </h1>
-        <p className='marketing-lead-linear mb-4 max-w-[34rem] text-secondary-token'>
+        <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>
           Follow our journey building the future of music.
         </p>
         <div className='flex flex-wrap items-center gap-3'>
           {thisMonthCount > 0 && (
             <Badge variant='outline' className='text-xs'>
-              {thisMonthCount} update{thisMonthCount === 1 ? '' : 's'} this
-              month
+              {thisMonthCount} Update{thisMonthCount === 1 ? '' : 's'} This
+              Month
             </Badge>
           )}
           <Link
@@ -149,25 +149,16 @@ export default async function ChangelogPage() {
               {releases.map(release => (
                 <article
                   key={`${release.version}-${release.date ?? 'unreleased'}`}
-                  className='relative pl-6 border-l-2'
-                  style={{
-                    borderColor:
-                      'color-mix(in srgb, var(--linear-text-primary) 10%, transparent)',
-                  }}
+                  className='relative border-l-2 border-subtle pl-6'
                 >
                   {/* Timeline dot */}
-                  <div
-                    className='absolute -left-[7px] top-1 w-3 h-3 rounded-full'
-                    style={{
-                      backgroundColor: 'var(--linear-text-primary)',
-                      opacity: 0.3,
-                    }}
-                  />
+                  <div className='absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-tertiary-token opacity-30' />
 
                   {/* Version + date header */}
                   <div className='flex flex-wrap items-center gap-2 mb-4'>
                     <Badge variant='outline' className='font-mono text-xs'>
-                      v{release.version}
+                      {/* ui-casing-allow: semantic version string */}v
+                      {release.version}
                     </Badge>
                     {release.date && (
                       <span className='text-xs text-tertiary-token'>

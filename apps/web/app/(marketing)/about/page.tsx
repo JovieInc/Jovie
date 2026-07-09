@@ -49,6 +49,7 @@ const FAQ_ITEMS = [
 export const metadata: Metadata = {
   title: 'About — The Release Platform for Independent Musicians',
   description:
+    // ui-casing-allow: metadata sentence with brand names + acronym
     'Jovie is a release platform for independent musicians, combining smart links, artist profiles, audience intelligence, and AI. Founded by Tim White. Not affiliated with Jovie childcare.',
   keywords: [
     'Jovie',
@@ -67,6 +68,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: `About ${APP_NAME} — The Release Platform for Independent Musicians`,
     description:
+      // ui-casing-allow: metadata sentence with brand names + acronym
       'Jovie is a release platform for independent musicians, combining smart links, artist profiles, audience intelligence, and AI. Founded by Tim White.',
     url: `${BASE_URL}/about`,
     type: 'website',
@@ -95,11 +97,11 @@ export default function AboutPage() {
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
       <MarketingHeroLayout variant='left'>
-        <p className='marketing-kicker'>About</p>
-        <h1 className='marketing-h1-linear mt-6 max-w-[20ch] text-primary-token'>
-          Release more music. Do less release work.
+        <p className='text-sm font-medium text-tertiary-token'>About</p>
+        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
+          Release More Music. Do Less Release Work.
         </h1>
-        <p className='mt-6 max-w-[60ch] text-lg leading-relaxed text-secondary-token'>
+        <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
           Jovie is the release platform for independent musicians. Smart links,
           artist profiles, audience intelligence, release automation, and AI —
           all in one place.
@@ -110,7 +112,7 @@ export default function AboutPage() {
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <h2 className='text-2xl font-semibold text-primary-token'>
-            Why Jovie exists
+            Why Jovie Exists
           </h2>
           <div className='mt-6 space-y-5 text-base leading-relaxed text-secondary-token'>
             <p>
@@ -144,13 +146,14 @@ export default function AboutPage() {
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <h2 className='text-2xl font-semibold text-primary-token'>
-            What Jovie does
+            What Jovie Does
           </h2>
           <div className='mt-6 grid gap-8 sm:grid-cols-2'>
             {[
               {
                 title: 'Smart Links',
                 description:
+                  // ui-casing-allow: feature list copy with brand names
                   'Every release gets a smart link that routes fans to Spotify, Apple Music, YouTube, or wherever they listen.',
               },
               {
@@ -176,6 +179,7 @@ export default function AboutPage() {
               {
                 title: 'Tipping & Payments',
                 description:
+                  // ui-casing-allow: feature list copy with brand name
                   'Let fans support you directly with tips via Stripe — at shows, on your profile, or through QR codes.',
               },
             ].map(feature => (
@@ -193,7 +197,10 @@ export default function AboutPage() {
       </MarketingContainer>
 
       {/* FAQ Section */}
-      <FaqSection items={FAQ_ITEMS} />
+      <FaqSection
+        items={FAQ_ITEMS}
+        headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
+      />
     </>
   );
 }

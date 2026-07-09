@@ -73,9 +73,9 @@ export default function VoiceLandingPage() {
         primaryCtaTestId='voice-hero-primary-cta'
         secondaryCtaLabel='See pricing'
         secondaryCtaHref={APP_ROUTES.PRICING}
-        subcopy='Free tier available • 2 min to first clone'
+        subcopy='Free tier available. 2 min to first clone.'
         proofPoints={[
-          'YouTube → trained model',
+          'YouTube to trained model',
           'ElevenLabs powered',
           'Consent logged',
           'Works in replies & promos',
@@ -87,7 +87,7 @@ export default function VoiceLandingPage() {
         <div className={sectionWrapClassName}>
           <div className='mx-auto max-w-3xl text-center'>
             <p className='homepage-section-eyebrow'>Four steps</p>
-            <h2 className='marketing-h2-linear mt-3 text-primary-token'>
+            <h2 className='mt-3 text-2xl font-semibold tracking-tight text-primary-token'>
               Your Voice. Trained. Ready.
             </h2>
             <p className='mt-3 text-mid leading-7 text-secondary-token'>
@@ -123,7 +123,7 @@ export default function VoiceLandingPage() {
                 key={step.n}
                 className='rounded-3xl border border-subtle bg-base p-6'
               >
-                <div className='text-xs font-mono tracking-[3px] text-tertiary-token'>
+                <div className='text-xs font-mono tracking-widest text-tertiary-token'>
                   {step.n}
                 </div>
                 <h3 className='mt-3 text-lg font-semibold text-primary-token'>
@@ -146,15 +146,15 @@ export default function VoiceLandingPage() {
               <h3 className='text-xl font-semibold'>
                 Built For Creators Who Care About Consent.
               </h3>
-              <ul className='mt-6 space-y-3 text-mid leading-7 text-secondary-token'>
-                <li>• Explicit opt-in recorded before any training run.</li>
+              <ul className='mt-6 list-disc space-y-3 pl-5 text-mid leading-7 text-secondary-token'>
+                <li>Explicit opt-in recorded before any training run.</li>
                 <li>
-                  • Models stay private to your account until you publish a
-                  voice drop.
+                  Models stay private to your account until you publish a voice
+                  drop.
                 </li>
-                <li>• Delete or re-train anytime. No lock-in.</li>
+                <li>Delete or re-train anytime. No lock-in.</li>
                 <li>
-                  • Same async job + webhook pattern used for video and other
+                  Same async job + webhook pattern used for video and other
                   heavy skills.
                 </li>
               </ul>
@@ -174,8 +174,8 @@ export default function VoiceLandingPage() {
                 </Link>
               </div>
               <p className='mt-4 text-xs text-tertiary-token'>
-                Voice infrastructure shipped in PR#9882 (YouTube→ElevenLabs) +
-                webhook/cron layer PR#9881.
+                Voice infrastructure shipped in PR 9882 (YouTube to ElevenLabs)
+                + webhook/cron layer PR 9881.
               </p>
             </div>
           </div>
@@ -183,13 +183,13 @@ export default function VoiceLandingPage() {
       </section>
 
       {/* Final CTA band */}
-      <section className='border-t border-subtle bg-black dark:bg-black py-14 text-white dark:text-white'>
+      <section className='border-t border-subtle bg-surface-0 py-14 text-primary-token'>
         <div className={sectionWrapClassName}>
           <div className='mx-auto flex max-w-2xl flex-col items-center gap-4 text-center'>
             <h2 className='text-3xl font-semibold tracking-tight'>
               Ready To Sound Like You — Everywhere?
             </h2>
-            <p className='text-white/70'>
+            <p className='text-secondary-token'>
               The same voice that fans already know, now available on demand.
             </p>
             <Link
@@ -199,8 +199,8 @@ export default function VoiceLandingPage() {
             >
               Clone my voice now
             </Link>
-            <span className='text-xs text-white/50'>
-              Free tier • Cancel anytime • No card required
+            <span className='text-xs text-tertiary-token'>
+              Free tier. Cancel anytime. No card required.
             </span>
           </div>
         </div>

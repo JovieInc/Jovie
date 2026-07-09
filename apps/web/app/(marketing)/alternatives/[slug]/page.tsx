@@ -63,11 +63,11 @@ export default async function AlternativesPage({
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
       <MarketingHeroLayout variant='left'>
-        <p className='marketing-kicker'>Alternative</p>
-        <h1 className='marketing-h1-linear mt-6 max-w-[20ch] text-primary-token'>
+        <p className='text-sm font-medium text-tertiary-token'>Alternative</p>
+        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
           {data.heroHeadline}
         </h1>
-        <p className='mt-6 max-w-[60ch] text-lg leading-relaxed text-secondary-token'>
+        <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
           {data.heroSubheadline}
         </p>
       </MarketingHeroLayout>
@@ -125,7 +125,7 @@ export default async function AlternativesPage({
             </p>
             <Link
               href={APP_ROUTES.SIGNUP}
-              className='mt-6 inline-flex items-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)'
+              className='mt-6 inline-flex items-center rounded-lg bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:bg-btn-primary-hover'
             >
               Request Access
             </Link>
@@ -134,7 +134,10 @@ export default async function AlternativesPage({
       </MarketingContainer>
 
       {/* FAQ */}
-      <FaqSection items={data.faq} />
+      <FaqSection
+        items={data.faq}
+        headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
+      />
     </>
   );
 }

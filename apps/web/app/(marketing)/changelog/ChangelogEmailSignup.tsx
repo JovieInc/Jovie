@@ -4,7 +4,6 @@ import { Button } from '@jovie/ui/atoms/button';
 import { Input } from '@jovie/ui/atoms/input';
 import { ArrowRight, Mail } from 'lucide-react';
 import {
-  type CSSProperties,
   type FocusEvent,
   type FormEvent,
   useEffect,
@@ -142,13 +141,7 @@ export function ChangelogEmailSignup() {
   return (
     <div
       id='changelog-subscribe'
-      className='rounded-2xl p-8 md:p-10'
-      style={{
-        backgroundColor:
-          'color-mix(in srgb, var(--linear-text-primary) 3%, transparent)',
-        border:
-          '1px solid color-mix(in srgb, var(--linear-text-primary) 8%, transparent)',
-      }}
+      className='rounded-2xl border border-subtle bg-surface-1 p-8 md:p-10'
     >
       <div className='mb-3 flex items-center gap-3'>
         <Mail className='h-5 w-5 opacity-50' />
@@ -172,11 +165,6 @@ export function ChangelogEmailSignup() {
         data-ui='cta-reveal'
         data-visual-state={visualState}
         onBlurCapture={handleShellBlurCapture}
-        style={
-          {
-            '--cta-reveal-min-height': '56px',
-          } as CSSProperties
-        }
       >
         <div className='cta-reveal-shell'>
           <div className='cta-reveal-panel cta-reveal-panel--cta'>
@@ -256,7 +244,7 @@ export function ChangelogEmailSignup() {
         </div>
 
         <p
-          className='cta-reveal-support mt-3 text-sm text-red-500'
+          className='cta-reveal-support mt-3 text-sm text-accent-red'
           role={status === 'error' ? 'alert' : undefined}
         >
           {status === 'error' ? errorMessage : ''}
