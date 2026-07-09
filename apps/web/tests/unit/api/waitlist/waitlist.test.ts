@@ -162,7 +162,7 @@ function createTransactionMock(
 
 // Route module cold-import is heavy on sharded CI workers; first case can exceed
 // the default 5s timeout when it also awaits GET/POST.
-describe.skip('Waitlist API', { timeout: 20_000 }, () => {
+describe('Waitlist API', { timeout: 20_000 }, () => {
   beforeAll(() => {
     process.env.DATABASE_URL = 'postgres://test@localhost/test';
     routeModulePromise = import('@/app/api/waitlist/route');
@@ -248,18 +248,11 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
       expect(data.hasEntry).toBe(false);
     });
 
-    it('does not fall back to an unverified primary email', async () => {
+    it('does not fall back when Better Auth user has no primary email', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'unverified@example.com',
-            verification: { status: 'unverified' },
-          },
-        ],
-        primaryEmailAddress: {
-          emailAddress: 'unverified@example.com',
-        },
+        emailAddresses: [],
+        primaryEmailAddress: null,
       });
 
       const { GET } = await routeModulePromise;
@@ -274,12 +267,8 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
     it('returns waitlist entry status for authenticated user', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'test@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'test@example.com' }],
+        primaryEmailAddress: { id: 'e1', emailAddress: 'test@example.com' },
       });
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
@@ -330,12 +319,8 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
     it('returns 400 for invalid request body', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'test@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'test@example.com' }],
+        primaryEmailAddress: { id: 'e1', emailAddress: 'test@example.com' },
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -395,18 +380,11 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
       expect(mockDbTransaction).not.toHaveBeenCalled();
     });
 
-    it('rejects submissions when only the primary email is unverified', async () => {
+    it('rejects submissions when Better Auth user has no primary email', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'unverified@example.com',
-            verification: { status: 'unverified' },
-          },
-        ],
-        primaryEmailAddress: {
-          emailAddress: 'unverified@example.com',
-        },
+        emailAddresses: [],
+        primaryEmailAddress: null,
         fullName: 'Unverified User',
       });
       mockDoesTableExist.mockResolvedValue(true);
@@ -433,12 +411,8 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
     it.skip('creates waitlist entry successfully', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'test@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'test@example.com' }],
+        primaryEmailAddress: { id: 'e1', emailAddress: 'test@example.com' },
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -481,12 +455,8 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
     it('does not downgrade user status when re-submitting with a claimed entry', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_claimed' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'claimed@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'claimed@example.com' }],
+        primaryEmailAddress: { id: 'e1', emailAddress: 'claimed@example.com' },
         fullName: 'Claimed User',
       });
       mockDbExecute.mockResolvedValue({ rows: [] });
@@ -555,12 +525,8 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
     it('does not send invite email when open signup approval succeeds', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_auto' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'auto@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'auto@example.com' }],
+        primaryEmailAddress: { id: 'e1', emailAddress: 'auto@example.com' },
         fullName: 'Auto User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -653,12 +619,8 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
     it('does not approve fresh submissions when delayed auto-accept has capacity', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_no_slot' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'noslot@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'noslot@example.com' }],
+        primaryEmailAddress: { id: 'e1', emailAddress: 'noslot@example.com' },
         fullName: 'No Slot User',
       });
       mockDbExecute.mockResolvedValue({ rows: [] });
@@ -722,12 +684,11 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
     it('returns waitlisted status and no email when delayed auto-accept is disabled', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_noapproval' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'noapproval@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'noapproval@example.com' }],
+        primaryEmailAddress: {
+          id: 'e1',
+          emailAddress: 'noapproval@example.com',
+        },
         fullName: 'No Approval User',
       });
       mockDbExecute.mockResolvedValue({ rows: [] });
@@ -823,12 +784,8 @@ describe.skip('Waitlist API', { timeout: 20_000 }, () => {
 
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [
-          {
-            emailAddress: 'test@example.com',
-            verification: { status: 'verified' },
-          },
-        ],
+        emailAddresses: [{ id: 'e1', emailAddress: 'test@example.com' }],
+        primaryEmailAddress: { id: 'e1', emailAddress: 'test@example.com' },
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
