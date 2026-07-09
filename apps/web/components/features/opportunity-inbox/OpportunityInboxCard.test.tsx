@@ -4,6 +4,7 @@ import { OpportunityInboxCard } from './OpportunityInboxCard';
 
 const CARD = {
   id: 'card-1',
+  signalType: 'other' as const,
   typeLabel: 'Suggestion',
   createdAt: '2026-06-28T10:00:00.000Z',
   title: 'Detroit listeners up 340% — book a show',

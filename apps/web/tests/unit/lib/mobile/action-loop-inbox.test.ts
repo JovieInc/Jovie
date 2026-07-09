@@ -26,12 +26,14 @@ describe('buildMobileInbox', () => {
       cards: [
         {
           id: 'action-1',
+          signalType: 'other' as const,
           typeLabel: 'Suggestion',
           createdAt: '2026-06-28T10:00:00.000Z',
           title: 'Detroit listeners up 340% — book a show',
           why: 'Promoter email matched your Detroit growth spike.',
           primaryActionLabel: 'Add to calendar',
           status: 'pending',
+          category: 'suggestion' as const,
         },
       ],
       emptyActionCards: [

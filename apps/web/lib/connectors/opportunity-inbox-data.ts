@@ -1,7 +1,10 @@
 import 'server-only';
 
-import { and, desc, eq, gte } from 'drizzle-orm';
-import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
+import { and, desc, eq, gte, type SQL } from 'drizzle-orm';
+import {
+  isMissingConnectorSchemaError,
+  isMissingSignalTypeColumnError,
+} from '@/lib/connectors/schema-errors';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { suggestedActions } from '@/lib/db/schema/connectors';
@@ -32,6 +35,21 @@ const TOUR_DATE_SELECTION = {
   provider: tourDates.provider,
   confirmationStatus: tourDates.confirmationStatus,
 };
+
+const BASE_SELECTION = {
+  id: suggestedActions.id,
+  kind: suggestedActions.kind,
+  payload: suggestedActions.payload,
+  rationale: suggestedActions.rationale,
+  createdAt: suggestedActions.createdAt,
+} as const;
+
+function pendingForUser(userId: string): SQL | undefined {
+  return and(
+    eq(suggestedActions.userId, userId),
+    eq(suggestedActions.status, 'pending')
+  );
+}
 
 /**
  * Detected tour-date signals awaiting the creator's confirm/reject call, plus
@@ -115,19 +133,11 @@ export async function loadOpportunityInboxData(
   try {
     const rows = await db
       .select({
-        id: suggestedActions.id,
-        kind: suggestedActions.kind,
-        payload: suggestedActions.payload,
-        rationale: suggestedActions.rationale,
-        createdAt: suggestedActions.createdAt,
+        ...BASE_SELECTION,
+        signalType: suggestedActions.signalType,
       })
       .from(suggestedActions)
-      .where(
-        and(
-          eq(suggestedActions.userId, dbUser.id),
-          eq(suggestedActions.status, 'pending')
-        )
-      )
+      .where(pendingForUser(dbUser.id))
       .orderBy(desc(suggestedActions.createdAt))
       .limit(50);
 
@@ -137,6 +147,17 @@ export async function loadOpportunityInboxData(
       return tourDateSections
         ? buildOpportunityInboxData([], tourDateSections)
         : EMPTY_INBOX_DATA;
+    }
+    if (isMissingSignalTypeColumnError(error)) {
+      // Migration drift: prod DB predates the signal_type column. Degrade to
+      // the legacy selection; the mapper classifies at read time instead.
+      const rows = await db
+        .select(BASE_SELECTION)
+        .from(suggestedActions)
+        .where(pendingForUser(dbUser.id))
+        .orderBy(desc(suggestedActions.createdAt))
+        .limit(50);
+      return buildOpportunityInboxData(rows, tourDateSections);
     }
     throw error;
   }
