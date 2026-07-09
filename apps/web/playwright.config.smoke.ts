@@ -63,6 +63,7 @@ export default defineConfig({
   workers: getWorkers(8),
   reporter: [
     ['line'],
+    ['github'],
     ['html', { open: 'never' }],
     ['json', { outputFile: 'test-results/results.json' }],
   ],
