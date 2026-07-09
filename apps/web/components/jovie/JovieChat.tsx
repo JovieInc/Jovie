@@ -614,7 +614,9 @@ export function JovieChat({
                 className='flex flex-1 flex-col items-center justify-center'
                 data-testid='chat-empty-state-viewport'
               >
-                <ChatEmptyStateComposerRegion>
+                <ChatEmptyStateComposerRegion
+                  greetingName={displayName ?? username ?? null}
+                >
                   {composerSurface}
                   {inlineChatError ? (
                     <div className='mt-3 w-full'>{inlineChatError}</div>

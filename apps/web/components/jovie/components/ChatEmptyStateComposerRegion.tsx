@@ -1,41 +1,56 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '../chat-layout';
+
+const AMBIENT_LOGO_OPACITY = 0.18;
 
 export function ChatEmptyStateComposerRegion({
   above,
   children,
+  greetingName,
 }: {
   readonly above?: ReactNode;
   readonly children: ReactNode;
+  readonly greetingName?: string | null;
 }) {
+  const trimmedName = greetingName?.trim();
+  const greeting = trimmedName ? `Hi, ${trimmedName}` : 'Hi there';
+  const showWelcomeHeader = !above;
+
   return (
     <div
-      className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-full flex-col items-center justify-center px-1 py-8`}
+      className={`${CHAT_CONTENT_SHELL_CLASSNAME} chat-stagger relative flex min-h-full flex-col items-center justify-center px-1 py-8`}
       data-testid='chat-empty-state-composer-region'
     >
-      <div
-        className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-70 drop-shadow-[0_0_34px_rgba(68,188,255,0.14)] max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
-        style={{
-          maskImage:
-            'radial-gradient(ellipse at center, black 38%, rgba(0,0,0,0.55) 56%, rgba(0,0,0,0.2) 72%, transparent 86%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse at center, black 38%, rgba(0,0,0,0.55) 56%, rgba(0,0,0,0.2) 72%, transparent 86%)',
-        }}
-        data-testid='chat-empty-state-logo'
-      >
-        <JovieMarkElectric
-          className='h-full w-full'
-          idSeed='chat-empty-state-logo'
-        />
-      </div>
       {above ? (
         <div className='absolute inset-x-0 bottom-1/2 z-10 mb-12 max-h-[min(46vh,24rem)] overflow-y-auto overscroll-contain px-1 pb-1'>
           {above}
         </div>
+      ) : null}
+      {showWelcomeHeader ? (
+        <div
+          aria-hidden='true'
+          className='relative z-10 mb-4'
+          style={{ opacity: AMBIENT_LOGO_OPACITY }}
+          data-testid='chat-empty-state-logo'
+        >
+          <BrandLogo
+            size={56}
+            className='text-primary-token'
+            aria-hidden={true}
+          />
+        </div>
+      ) : null}
+      {showWelcomeHeader ? (
+        <h2
+          className='relative z-10 mb-6 text-2xl font-semibold text-primary-token'
+          data-testid='chat-empty-state-greeting'
+        >
+          {greeting}
+        </h2>
       ) : null}
       <div
         className='relative z-10 w-full'

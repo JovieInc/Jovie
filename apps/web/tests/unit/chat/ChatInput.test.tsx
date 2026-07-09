@@ -354,7 +354,7 @@ describe('ChatInput', () => {
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.getAttribute('data-variant')).toBe('hero');
     expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 45rem)');
-    expect(surface.style.borderRadius).toBe('999px');
+    expect(surface.style.borderRadius).toBe('9999px');
 
     expect(screen.getByTestId('chat-composer-input-row').className).toContain(
       'min-h-13'
@@ -419,7 +419,7 @@ describe('ChatInput', () => {
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.style.borderRadius).toBe('999px');
+    expect(surface.style.borderRadius).toBe('9999px');
     expect(surface).not.toHaveAttribute('data-expanded');
 
     const inputRow = screen.getByTestId('chat-composer-input-row');

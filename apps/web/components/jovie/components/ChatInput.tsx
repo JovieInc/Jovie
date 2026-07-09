@@ -112,7 +112,7 @@ function geometryFor(
   if (stacked) return { width, maxWidth, borderRadius: 28 };
   if (mode === 'entity') return { width, maxWidth, borderRadius: 24 };
   if (variant === 'hero' && usePillLayout) {
-    return { width, maxWidth, borderRadius: 999 };
+    return { width, maxWidth, borderRadius: 9999 };
   }
   if (variant === 'hero') return { width, maxWidth, borderRadius: 24 };
   return { width, maxWidth, borderRadius: 28 };
