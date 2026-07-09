@@ -195,7 +195,8 @@
     "hermes:pipeline-scoreboard": "tsx scripts/hermes/jobs/pipeline-scoreboard.ts",
     "ds:offscale": "node scripts/ds-offscale-report.mjs",
     "ds:llms-manifest": "node scripts/generate-llms-design-manifest.mjs",
-    "ds:llms-manifest:check": "node scripts/generate-llms-design-manifest.mjs --check"
+    "ds:llms-manifest:check": "node scripts/generate-llms-design-manifest.mjs --check",
+    "ci:control:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-harness.test.mjs lib/__tests__/ci-duration-ratchet.test.mjs lib/__tests__/ci-branching-guard.test.mjs lib/__tests__/merge-queue-guard.test.mjs lib/__tests__/ci-metrics-compute.test.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

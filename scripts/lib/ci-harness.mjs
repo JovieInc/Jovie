@@ -43,6 +43,40 @@ export function loadCiHarnessManifest(manifestPath = DEFAULT_MANIFEST_PATH) {
   return readJson(manifestPath);
 }
 
+/**
+ * Pure contract views over the harness manifest.
+ * Characterization tests and docs generation share these so merge-gate /
+ * risk policy cannot drift between surfaces.
+ */
+export function listMergeGateJobs(manifest) {
+  return (manifest.jobs ?? [])
+    .filter(job => job.mergeGate === true)
+    .map(job => ({
+      id: job.id,
+      name: job.name,
+      tier: job.tier,
+      nextLocalCommand: job.nextLocalCommand,
+      remediation: job.remediation,
+    }));
+}
+
+export function listRiskRuleContracts(manifest) {
+  return (manifest.riskRules ?? []).map(rule => ({
+    id: rule.id,
+    title: rule.title,
+    level: rule.level,
+    requiresSmoke: rule.requiresSmoke,
+    requiresPreview: rule.requiresPreview,
+    blocksUnattendedAutoMerge: rule.blocksUnattendedAutoMerge,
+    patterns: [...(rule.patterns ?? [])],
+  }));
+}
+
+/** Local remediation commands the harness emits for a classification result. */
+export function riskLocalCommands(classification) {
+  return buildRiskLocalCommands(classification);
+}
+
 export function validateCiHarnessManifest(manifest) {
   const errors = [];
 
@@ -352,20 +386,22 @@ function formatBool(value) {
 }
 
 function tierRows(manifest) {
+  const gatesByTier = new Map();
+  for (const job of listMergeGateJobs(manifest)) {
+    const list = gatesByTier.get(job.tier) ?? [];
+    list.push(`\`${job.name}\``);
+    gatesByTier.set(job.tier, list);
+  }
   return (manifest.tiers ?? [])
     .map(tier => {
-      const jobs = (manifest.jobs ?? []).filter(job => job.tier === tier.id);
-      const mergeGateJobs = jobs
-        .filter(job => job.mergeGate)
-        .map(job => `\`${job.name}\``)
-        .join(', ');
+      const mergeGateJobs = (gatesByTier.get(tier.id) ?? []).join(', ');
       return `| ${tier.name} | ${tier.purpose} | ${mergeGateJobs || 'none'} |`;
     })
     .join('\n');
 }
 
 function riskRows(manifest) {
-  return (manifest.riskRules ?? [])
+  return listRiskRuleContracts(manifest)
     .map(
       rule =>
         `| ${rule.title} | ${rule.level} | ${formatBool(
@@ -378,8 +414,7 @@ function riskRows(manifest) {
 }
 
 function mergeGateRows(manifest) {
-  return (manifest.jobs ?? [])
-    .filter(job => job.mergeGate)
+  return listMergeGateJobs(manifest)
     .map(
       job => `| \`${job.name}\` | ${job.tier} | \`${job.nextLocalCommand}\` |`
     )

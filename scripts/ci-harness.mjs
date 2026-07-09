@@ -5,6 +5,8 @@ import {
   buildCiHarnessArtifact,
   classifyCiRisk,
   generateDocsFiles,
+  listMergeGateJobs,
+  listRiskRuleContracts,
   loadCiHarnessManifest,
   parseJobResultsFromEnv,
   validateCiHarnessManifest,
@@ -120,6 +122,15 @@ function runEmitArtifact(manifest, args) {
   }
 }
 
+function runPrintContract(manifest) {
+  const contract = {
+    schemaVersion: manifest.schemaVersion,
+    mergeGates: listMergeGateJobs(manifest),
+    riskRules: listRiskRuleContracts(manifest),
+  };
+  console.log(JSON.stringify(contract, null, 2));
+}
+
 function main() {
   const [, , command, ...args] = process.argv;
   const manifest = loadCiHarnessManifest(
@@ -139,9 +150,12 @@ function main() {
     case 'emit-artifact':
       runEmitArtifact(manifest, args);
       break;
+    case 'print-contract':
+      runPrintContract(manifest);
+      break;
     default:
       console.error(
-        'Usage: node scripts/ci-harness.mjs <validate|generate-docs|classify-risk|emit-artifact>'
+        'Usage: node scripts/ci-harness.mjs <validate|generate-docs|classify-risk|emit-artifact|print-contract>'
       );
       process.exitCode = 1;
   }

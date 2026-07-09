@@ -15,6 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **CI control-plane characterization (montevideo-v2)**: Locks merge-gate set, risk smoke/preview contracts, and required-check aggregates via `pnpm ci:control:test` (Structural Contract). Adds `scripts/lib/ci-control-plane.mjs`, `print-contract` CLI, deterministic metrics evaluation window, and forbidden pins for all harness merge-gate job names.
+
 - [internal] **IRPAA cohort baseline + lift tracking (GH-12141)**: adds `artist_revenue_cohorts` (cohort tag `jovie_active`/`control` + immutable 30-day pre-Jovie revenue baseline, auto-assigned on first automation outcome), versioned dollarization weights (`lib/metrics/revenue-lift-weights.ts`), per-artist rolling revenue signal + lift rows (`lib/metrics/artist-revenue-cohorts.ts`), and the canonical `getIRPAA(window)` North Star rollup (`lib/metrics/irpaa.ts`). All proxy terms labeled with weights version + validation date.
 - [internal] **Motion doctrine + easing gap tokens (GH-13636)**: `.claude/rules/motion.md` adapts Emil Kowalski's motion-craft rules (MIT, attribution in-file) onto System B tokens — duration table, easing decision tree, press/enter/popover/perf/a11y rules, review checklist. `design-system.css` gains `--ease-drawer` (iOS-like drawer settle curve) and `--scale-press` (0.96 canonical press feedback). Doctrine + additive tokens only; no component changes.
 

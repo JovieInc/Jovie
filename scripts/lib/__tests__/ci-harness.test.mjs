@@ -2,19 +2,116 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCiHarnessArtifact,
   classifyCiRisk,
+  FORBIDDEN_PINNED_JOB_CONTEXTS,
   generateCiHarnessDocs,
+  listMergeGateJobs,
+  listRiskRuleContracts,
   loadCiHarnessManifest,
-  replaceGeneratedBlock,
+  REQUIRED_MERGE_STATUSES,
+  riskLocalCommands,
   validateCiHarnessManifest,
-} from '../ci-harness.mjs';
+} from '../ci-control-plane.mjs';
+import { replaceGeneratedBlock } from '../ci-harness.mjs';
 
 const manifest = loadCiHarnessManifest();
+
+/** Locked PR merge-gate set (manifest is source of truth for harness docs + artifact). */
+const EXPECTED_MERGE_GATE_NAMES = [
+  'ci-fast',
+  'Structural Contract',
+  'CI Risk Classifier',
+  'Unit Tests',
+  'Build (public routes)',
+  'Lighthouse (public routes PR)',
+  'Lighthouse (dashboard PR)',
+  'Lighthouse (onboarding PR)',
+  'Lighthouse (admin PR)',
+  'E2E Smoke (PR Fast Feedback)',
+  'Golden Path (PR)',
+  'Preview Deploy (PR)',
+];
 
 describe('ci-harness manifest', () => {
   it('validates the checked-in manifest', () => {
     const validation = validateCiHarnessManifest(manifest);
     expect(validation.errors).toEqual([]);
     expect(validation.ok).toBe(true);
+  });
+
+  it('locks the merge-gate job set and remediation commands (characterization)', () => {
+    const gates = listMergeGateJobs(manifest);
+    expect(gates.map(job => job.name)).toEqual(EXPECTED_MERGE_GATE_NAMES);
+    // Every merge gate must tell agents how to remediate locally.
+    for (const gate of gates) {
+      expect(gate.nextLocalCommand, gate.id).toMatch(/\S/);
+      expect(gate.remediation, gate.id).toMatch(/\S/);
+      expect(gate.tier, gate.id).toMatch(/\S/);
+    }
+    // Non-gate deploy/cleanup jobs must not pollute PR Ready documentation.
+    const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
+    expect(nonGates.map(job => job.name)).toEqual([
+      'Deploy staging',
+      'Test Flakiness Report',
+    ]);
+  });
+
+  it('locks risk-rule smoke/preview/auto-merge contracts (characterization)', () => {
+    const rules = listRiskRuleContracts(manifest);
+    expect(rules.map(rule => rule.id)).toEqual([
+      'ci-workflows',
+      'agent-control-plane',
+      'auth-identity',
+      'billing-money',
+      'db-migrations',
+      'proxy-middleware',
+      'env-config',
+      'public-ui',
+    ]);
+    const byId = Object.fromEntries(rules.map(rule => [rule.id, rule]));
+    expect(byId['auth-identity']).toMatchObject({
+      level: 'high',
+      requiresSmoke: true,
+      requiresPreview: true,
+      blocksUnattendedAutoMerge: false,
+    });
+    expect(byId['billing-money']).toMatchObject({
+      level: 'high',
+      requiresSmoke: true,
+      requiresPreview: true,
+      blocksUnattendedAutoMerge: false,
+    });
+    expect(byId['public-ui']).toMatchObject({
+      level: 'medium',
+      requiresSmoke: false,
+      requiresPreview: true,
+      blocksUnattendedAutoMerge: false,
+    });
+    expect(byId['ci-workflows']).toMatchObject({
+      level: 'high',
+      requiresSmoke: true,
+      requiresPreview: false,
+      blocksUnattendedAutoMerge: false,
+    });
+  });
+
+  it('keeps merge-queue branch protection on aggregates, not harness merge gates', () => {
+    // Branch protection pins PR Ready / Migration Guard / Fork PR Gate only.
+    expect(REQUIRED_MERGE_STATUSES).toEqual([
+      'PR Ready',
+      'Migration Guard',
+      'Fork PR Gate',
+    ]);
+    // Individual harness merge-gate job names must stay in the forbidden pin list
+    // so a batch failure bisects instead of evicting siblings.
+    for (const name of EXPECTED_MERGE_GATE_NAMES) {
+      // ci-fast appears in the manifest for docs/remediation; the aggregator was
+      // removed from the workflow but the name remains a forbidden pin.
+      expect(
+        FORBIDDEN_PINNED_JOB_CONTEXTS.includes(name) ||
+          FORBIDDEN_PINNED_JOB_CONTEXTS.includes(`CI / ${name}`),
+        `expected forbidden pin for merge-gate job "${name}"`
+      ).toBe(true);
+    }
   });
 
   it('generates stable docs from tiers, merge gates, and risk rules', () => {
@@ -25,6 +122,12 @@ describe('ci-harness manifest', () => {
       '`PR Ready` may require only jobs declared as merge gates'
     );
     expect(docs).toContain('| Auth and identity | high | yes | yes | no |');
+    // Docs must list every locked merge gate + remediation command.
+    for (const name of EXPECTED_MERGE_GATE_NAMES) {
+      expect(docs).toContain(`\`${name}\``);
+    }
+    expect(docs).toContain('`pnpm run typecheck && pnpm run biome:check`');
+    expect(docs).toContain('`pnpm run test:web:smoke`');
   });
 
   it('replaces an existing generated docs block', () => {
@@ -44,6 +147,45 @@ describe('ci-harness manifest', () => {
 });
 
 describe('ci-harness risk classifier', () => {
+  it('classifies high / medium / low path sets with stable smoke+preview flags', () => {
+    const high = classifyCiRisk(
+      ['apps/web/lib/billing/entitlements.ts'],
+      manifest
+    );
+    expect(high.riskLevel).toBe('high');
+    expect(high.requiresSmoke).toBe(true);
+    expect(high.requiresPreview).toBe(true);
+    expect(high.blocksUnattendedAutoMerge).toBe(false);
+    expect(high.matchedRules.map(rule => rule.id)).toContain('billing-money');
+    expect(high.recommendedLabels).toEqual(['testing']);
+    expect(riskLocalCommands(high)).toEqual([
+      'pnpm ci:harness:check',
+      'pnpm run test:web:smoke',
+      'pnpm run build:web',
+    ]);
+
+    const medium = classifyCiRisk(
+      ['apps/web/components/features/profile/ProfileCompactSurface.tsx'],
+      manifest
+    );
+    expect(medium.riskLevel).toBe('medium');
+    expect(medium.requiresSmoke).toBe(false);
+    expect(medium.requiresPreview).toBe(true);
+    expect(medium.blocksUnattendedAutoMerge).toBe(false);
+    expect(riskLocalCommands(medium)).toEqual([
+      'pnpm ci:harness:check',
+      'pnpm run build:web',
+    ]);
+
+    const low = classifyCiRisk(['README.md', 'docs/PR_FLOW.md'], manifest);
+    expect(low.riskLevel).toBe('low');
+    expect(low.requiresSmoke).toBe(false);
+    expect(low.requiresPreview).toBe(false);
+    expect(low.blocksUnattendedAutoMerge).toBe(false);
+    expect(low.matchedRules).toEqual([]);
+    expect(riskLocalCommands(low)).toEqual(['pnpm ci:harness:check']);
+  });
+
   it('requires smoke and preview for auth changes (autonomous merge)', () => {
     const risk = classifyCiRisk(['apps/web/lib/auth/gate.ts'], manifest);
     expect(risk.riskLevel).toBe('high');
