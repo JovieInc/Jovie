@@ -146,7 +146,8 @@ export function checkOutputs(generated = generate()) {
 }
 
 const isMain =
-  process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 
 if (isMain) {
   const generated = generate();
