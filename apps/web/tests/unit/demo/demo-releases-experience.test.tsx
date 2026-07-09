@@ -111,6 +111,7 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   savePrimaryIsrc: vi.fn(),
   saveReleaseLyrics: vi.fn(),
   saveReleaseMetadata: vi.fn(),
+  saveReleaseStatus: vi.fn(),
   saveReleaseTargetPlaylists: vi.fn(),
   formatReleaseLyrics: vi.fn(),
   updateAllowArtworkDownloads: vi.fn(),

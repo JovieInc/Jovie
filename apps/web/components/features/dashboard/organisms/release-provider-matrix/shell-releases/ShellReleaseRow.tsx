@@ -241,7 +241,7 @@ const SmartLinkCell = memo(function SmartLinkCell({
 
 /**
  * Weekly performance metric for the release row — smart-link click-throughs
- * from the trailing 7 days (the click_events analytics pipeline). Renders an
+ * from the trailing 7 days (canonical analytics metrics layer). Renders an
  * em dash when the release has no recorded weekly data, so rows without
  * analytics stay quiet instead of showing a noisy zero.
  */

@@ -311,9 +311,8 @@ function isMotionComponentAttribute(attrNode) {
   if (openingElement?.type !== 'JSXOpeningElement') return false;
   const name = openingElement.name;
   if (name?.type !== 'JSXMemberExpression') return false;
-  const objectName = name.object?.type === 'JSXIdentifier'
-    ? name.object.name
-    : null;
+  const objectName =
+    name.object?.type === 'JSXIdentifier' ? name.object.name : null;
   return objectName === 'motion' || objectName === 'm';
 }
 

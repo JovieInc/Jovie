@@ -4,6 +4,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import type {
   ExperimentRecord,
   ExperimentStatus,
@@ -195,7 +196,7 @@ interface QuotaBarProps {
 function QuotaBar({ quota }: QuotaBarProps) {
   const pct = Math.min(
     100,
-    quota.dailyCap > 0 ? (quota.usedToday / quota.dailyCap) * 100 : 0
+    computeRatePercent(quota.usedToday, quota.dailyCap, 0)
   );
   const isNearCap = pct >= 80;
 

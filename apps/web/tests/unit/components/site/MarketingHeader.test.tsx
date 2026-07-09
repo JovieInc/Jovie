@@ -13,12 +13,27 @@ vi.mock('next/navigation', async importOriginal => {
   };
 });
 
+// Product default: SHOW_MARKETING_CENTER_NAV is false (clean homepage baseline).
+// Enable it here so header content assertions exercise center nav in isolation.
+vi.mock('@/lib/flags/marketing-static', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: {
+      ...actual.FEATURE_FLAGS,
+      SHOW_MARKETING_CENTER_NAV: true,
+      SHOW_HOMEPAGE_CENTER_NAV: true,
+    },
+  };
+});
+
 describe('MarketingHeader', () => {
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/about');
   });
 
-  it('renders marketing center navigation by default on standard routes', () => {
+  it('renders marketing center navigation when the center-nav flag is enabled', () => {
     render(<MarketingHeader />);
 
     expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
@@ -40,14 +55,14 @@ describe('MarketingHeader', () => {
     ).toHaveAttribute('href', '/signup');
   });
 
-  it('shows flyout menu triggers when center navigation is enabled by default', () => {
+  it('shows flyout menu triggers when center navigation is enabled', () => {
     render(<MarketingHeader />);
 
     expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
   });
 
-  it('renders explicit custom nav links when the shared nav flag is enabled by default', () => {
+  it('renders explicit custom nav links when the shared nav flag is enabled', () => {
     render(
       <MarketingHeader
         navLinks={[

@@ -321,10 +321,11 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     // Regression #13391: the primary action label color must not be
     // dark:-gated — it renders on the always-dark profile stage regardless of
-    // any `.dark` ancestor class.
+    // any `.dark` ancestor class. Prefer the tooltip-text token (always white)
+    // over bare `text-white` so the contrast ratchet stays green.
     const verify = await screen.findByRole('button', { name: /^verify$/i });
-    expect(verify.className).toContain('text-white');
-    expect(verify.className).not.toContain('dark:text-white');
+    expect(verify.className).toContain('text-(--color-text-tooltip)');
+    expect(verify.className).not.toMatch(/dark:text-/);
 
     fireEvent.click(verify);
     expect(await screen.findByTestId('mobile-name-input')).toBeInTheDocument();

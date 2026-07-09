@@ -48,7 +48,8 @@ describe('FridayRhythmSection', () => {
       name: 'Build Your Release Rhythm',
     });
     expect(rhythmCta).toHaveAttribute('href');
-    expect(rhythmCta.getAttribute('href')).toContain('/start?starter_prompt=');
+    // Front-door CTA uses the shared homepage start path (no starter_prompt).
+    expect(rhythmCta.getAttribute('href')).toMatch(/^\/start(\?|$)/);
     expect(screen.queryByText('Less')).not.toBeInTheDocument();
     expect(screen.queryByText('More')).not.toBeInTheDocument();
   });

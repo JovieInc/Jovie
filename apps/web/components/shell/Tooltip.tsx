@@ -16,6 +16,7 @@ import {
   type PointerEvent,
   type ReactElement,
   type ReactNode,
+  type Ref,
   useCallback,
   useState,
 } from 'react';
@@ -72,14 +73,13 @@ interface TriggerHandlerProps {
   readonly className?: string;
   readonly onPointerEnter?: (event: PointerEvent<HTMLElement>) => void;
   readonly onFocus?: (event: FocusEvent<HTMLElement>) => void;
+  readonly ref?: Ref<HTMLElement | null>;
 }
 
 function isElementWithClassName(
   child: ReactNode
 ): child is ReactElement<TriggerHandlerProps> {
-  return (
-    isValidElement<TriggerHandlerProps>(child) && child.type !== Fragment
-  );
+  return isValidElement<TriggerHandlerProps>(child) && child.type !== Fragment;
 }
 
 function getTriggerChild({
@@ -87,14 +87,26 @@ function getTriggerChild({
   className,
   block,
   onTriggerIntent,
+  triggerRef,
 }: Pick<TooltipProps, 'children' | 'className' | 'block'> & {
   readonly onTriggerIntent?: (target: HTMLElement) => void;
+  readonly triggerRef?: (node: HTMLElement | null) => void;
 }) {
   if (Children.count(children) === 1) {
     const onlyChild = Children.only(children);
     if (isElementWithClassName(onlyChild)) {
       return cloneElement(onlyChild, {
         className: cn(onlyChild.props.className, className),
+        ref: (node: HTMLElement | null) => {
+          triggerRef?.(node);
+          const existingRef = onlyChild.props.ref;
+          if (typeof existingRef === 'function') {
+            existingRef(node);
+          } else if (existingRef && typeof existingRef === 'object') {
+            (existingRef as { current: HTMLElement | null }).current = node;
+          }
+        },
+        // Measure on the interactive child (button/link) — not a static wrapper.
         onPointerEnter: (event: PointerEvent<HTMLElement>) => {
           onlyChild.props.onPointerEnter?.(event);
           onTriggerIntent?.(event.currentTarget);
@@ -107,11 +119,12 @@ function getTriggerChild({
     }
   }
 
+  // Non-element / multi-child fallback: layout wrapper only. Seam offset is
+  // measured via ref callback (no pointer/focus handlers on a static span).
   return (
     <span
+      ref={triggerRef}
       className={cn(block ? 'flex w-full' : 'inline-flex', className)}
-      onPointerEnter={event => onTriggerIntent?.(event.currentTarget)}
-      onFocus={event => onTriggerIntent?.(event.currentTarget)}
     >
       {children}
     </span>
@@ -130,12 +143,22 @@ export function Tooltip({
 }: TooltipProps) {
   const [seamOffset, setSeamOffset] = useState<number | null>(null);
 
-  // Measured on hover/focus (just before Radix opens the tooltip) so the
-  // offset tracks the live layout without observers.
+  // Measured on hover/focus of the interactive trigger (just before Radix
+  // opens) so the offset tracks the live layout without observers.
   const handleTriggerIntent = useCallback(
     (target: HTMLElement) => {
       if (side !== 'right') return;
       setSeamOffset(getSeamSideOffset(target));
+    },
+    [side]
+  );
+
+  // Fallback path (non-single-element children): measure when the wrapper
+  // mounts/updates. Prefer the single-child path above for interactive rows.
+  const triggerRef = useCallback(
+    (node: HTMLElement | null) => {
+      if (!node || side !== 'right') return;
+      setSeamOffset(getSeamSideOffset(node));
     },
     [side]
   );
@@ -145,6 +168,7 @@ export function Tooltip({
     className,
     block,
     onTriggerIntent: side === 'right' ? handleTriggerIntent : undefined,
+    triggerRef: side === 'right' ? triggerRef : undefined,
   });
 
   const sideOffset =

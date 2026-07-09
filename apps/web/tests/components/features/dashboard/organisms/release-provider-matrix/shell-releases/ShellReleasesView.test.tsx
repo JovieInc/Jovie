@@ -200,6 +200,7 @@ vi.mock('@/lib/queries', () => {
     useSaveProviderOverrideMutation: () => mutation,
     useSaveReleaseLyricsMutation: () => mutation,
     useSaveReleaseMetadataMutation: () => mutation,
+    useSaveReleaseStatusMutation: () => mutation,
     useSaveReleaseTargetPlaylistsMutation: () => mutation,
     useSyncReleasesFromSpotifyMutation: () => mutation,
     usePlanGate: () => mockUsePlanGate(),
@@ -434,13 +435,17 @@ describe('ShellReleasesView', () => {
         name: 'Release actions for Lost in the Light',
       })
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Edit release links' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Edit release links' })[0]
+    );
 
     expect(await screen.findByTestId('release-sidebar')).toHaveTextContent(
       'Lost in the Light'
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy smart link' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Copy smart link' })[0]
+    );
 
     await waitFor(() => {
       expect(copyToClipboard).toHaveBeenCalledWith(
@@ -598,7 +603,7 @@ describe('ShellReleasesView', () => {
 
       // Row menu should expose the scheduled-lock label, not "Copy smart link".
       expect(
-        screen.getByRole('button', { name: 'Scheduled smart link (Pro)' })
+        screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: 'Copy smart link' })
@@ -745,7 +750,7 @@ describe('ShellReleasesView', () => {
 
       // Row menu should expose the scheduled-lock label, not "Copy smart link".
       expect(
-        screen.getByRole('button', { name: 'Scheduled smart link (Pro)' })
+        screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: 'Copy smart link' })

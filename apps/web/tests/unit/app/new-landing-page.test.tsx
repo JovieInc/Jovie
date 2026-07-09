@@ -4,6 +4,21 @@ import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 
+// Product default: center nav is off. Enable it here so this test can assert
+// the staged YC-tightened nav structure in isolation.
+vi.mock('@/lib/flags/marketing-static', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: {
+      ...actual.FEATURE_FLAGS,
+      SHOW_MARKETING_CENTER_NAV: true,
+      SHOW_HOMEPAGE_CENTER_NAV: true,
+    },
+  };
+});
+
 vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
   HomepageV2Route: () => (
     <main data-testid='homepage-v2-route'>
