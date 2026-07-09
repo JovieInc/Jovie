@@ -30,10 +30,13 @@ describe('DueChip', () => {
     expect(screen.getByText('Due in 2w')).toBeInTheDocument();
   });
 
-  it('renders year counts instead of raw multi-year day counts', () => {
-    render(<DueChip dueIso='2020-04-25T12:00:00Z' now={NOW} />);
-    expect(screen.getByText('Due 6y ago')).toBeInTheDocument();
-    expect(screen.queryByText(/2192d/i)).not.toBeInTheDocument();
+  it('hides multi-year historical overdues instead of "12y ago" chips', () => {
+    const { container } = render(
+      <DueChip dueIso='2020-04-25T12:00:00Z' now={NOW} />
+    );
+    // Outside the actionable overdue window — no absurd relative chip.
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByText(/y ago/i)).not.toBeInTheDocument();
   });
 
   it('tints amber for soon-due (<= 2 days)', () => {
