@@ -73,9 +73,21 @@ describe('task-presentation', () => {
     });
 
     expect(getTaskAssigneeVisual('human', 'Tim White')).toMatchObject({
-      label: 'You',
-      avatarName: 'Tim White',
+      label: 'Me',
+      avatarName: 'Me',
       accent: 'blue',
+    });
+
+    // Release/song titles must never surface as the assignee chip (GH-12331).
+    expect(getTaskAssigneeVisual('human', 'Take Me Over')).toMatchObject({
+      label: 'Me',
+      avatarName: 'Me',
+    });
+    expect(
+      getTaskAssigneeVisual('jovie', "Love Don't Let Me Down")
+    ).toMatchObject({
+      label: 'Jovie',
+      avatarName: 'Jovie',
     });
   });
 
