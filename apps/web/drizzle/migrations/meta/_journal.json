@@ -512,6 +512,13 @@
       "when": 1783000150000,
       "tag": "0071_model_experiments",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1783369251000,
+      "tag": "0072_artist_revenue_cohorts",
+      "breakpoints": true
     }
   ]
 }
