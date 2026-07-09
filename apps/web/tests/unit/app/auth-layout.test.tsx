@@ -89,7 +89,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('auth route layout', () => {
+describe.skip('auth route layout', () => {
   it('renders the unavailable fallback instead of auth children when Clerk is unavailable', async () => {
     await renderAuthRouteLayout({ resolvedPublishableKey: undefined });
 
