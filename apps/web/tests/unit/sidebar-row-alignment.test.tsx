@@ -181,6 +181,23 @@ describe('Sidebar row alignment', () => {
     expect(settingsRow).not.toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
   });
 
+  it('keeps nav-row chrome borderless in resting, hover, and active states', () => {
+    // #13217: sidebar nav rows are borderless — active state is a filled
+    // background only. No resting border, no hover border, no active border
+    // or border-by-inset-ring shadow may reappear on the canonical row chrome.
+    for (const row of [
+      getSidebarNavRowClassName({}),
+      getSidebarNavRowClassName({ active: true }),
+      getSidebarNavRowClassName({ tone: 'primary' }),
+    ]) {
+      expect(row).not.toContain('border-transparent');
+      expect(row).not.toContain('border-sidebar-border');
+      expect(row).not.toContain('hover:border');
+      expect(row).not.toContain('inset_0_0_0_1px');
+      expect(row).not.toMatch(/(?:^|\s)border(?:\s|$)/);
+    }
+  });
+
   it('shares the shell nav row and icon chrome helpers', () => {
     const rowClassName = getSidebarNavRowClassName({});
     const activeRowClassName = getSidebarNavRowClassName({ active: true });
