@@ -950,6 +950,17 @@ export {
   selectReleaseTaskTemplateItemSchema,
   selectReleaseTaskTemplateSchema,
 } from './release-tasks';
+// Revenue Cohorts (IRPAA cohort tags + pre-Jovie baselines) — gh-12141
+export {
+  ARTIST_REVENUE_COHORTS,
+  type ArtistCohortMatchCriteria,
+  type ArtistRevenueCohort,
+  type ArtistRevenueCohortRow,
+  artistRevenueCohorts,
+  insertArtistRevenueCohortSchema,
+  type NewArtistRevenueCohortRow,
+  selectArtistRevenueCohortSchema,
+} from './revenue-cohorts';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,
