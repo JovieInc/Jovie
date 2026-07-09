@@ -4228,7 +4228,7 @@ jobs:
     # saturate the production-deploy concurrency slot.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() && needs.deploy-gate.outputs.is_head == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     # Deploy concurrency: serialize main deploys instead of cancelling them.
     # Cancelling in-progress main deploys during merge bursts can starve
     # production promotion and leave main without a completed deploy run.
@@ -4290,6 +4290,7 @@ jobs:
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Sync required production env to Vercel project
+        timeout-minutes: 8
         run: |
           set -euo pipefail
           set +x
@@ -4357,6 +4358,7 @@ jobs:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       - name: Pull env (production)
+        timeout-minutes: 5
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
@@ -4378,6 +4380,7 @@ jobs:
       - name: Check signup readiness (production deploy env)
         run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
       - name: Build (preview target for staging verification)
+        timeout-minutes: 10
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
@@ -4401,6 +4404,7 @@ jobs:
           # runner + signed provenance). L3 requires hermetic build — upgrade when
           # Vercel builds become reproducible/isolated.
       - name: Deploy (staging preview, prebuilt)
+        timeout-minutes: 8
         id: deploy
         run: |
           required_runtime_env=(
@@ -4456,6 +4460,7 @@ jobs:
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
       - name: Alias preview to staging.jov.ie
+        timeout-minutes: 3
         run: |
           ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
         env:
