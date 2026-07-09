@@ -5,7 +5,7 @@ import { BarChart3, HelpCircle, Users } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { EmptyState } from '@/components/organisms/EmptyState';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { APP_ROUTES } from '@/constants/routes';
 import { getTimeRangeLabel } from '@/lib/analytics/time-range';
 import { captureError } from '@/lib/error-tracking';
@@ -82,12 +82,12 @@ function getEmptyStateAction(
 ) {
   if (profileUrl) {
     return {
-      label: copied ? 'Copied!' : 'Copy profile link',
+      label: copied ? 'Copied!' : 'Copy Profile Link',
       onClick: onCopy,
     };
   }
   return {
-    label: 'Open profile settings',
+    label: 'Open Profile Settings',
     href: APP_ROUTES.CHAT,
   };
 }
@@ -242,7 +242,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             copied,
             () => void handleCopy()
           )}
-          secondaryAction={{ label: 'See sharing tips', href: '/support' }}
+          secondaryAction={{ label: 'See Sharing Tips', href: '/support' }}
         />
       );
     }
@@ -262,7 +262,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                   <button
                     type='button'
                     className='text-tertiary-token transition-colors hover:text-secondary-token'
-                    aria-label='Learn more about profile views'
+                    aria-label='Learn More About Profile Views'
                   >
                     <HelpCircle className='h-3.5 w-3.5' />
                   </button>
@@ -289,7 +289,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                   <button
                     type='button'
                     className='text-tertiary-token transition-colors hover:text-secondary-token'
-                    aria-label='Learn more about unique visitors'
+                    aria-label='Learn More About Unique Visitors'
                   >
                     <HelpCircle className='h-3.5 w-3.5' />
                   </button>
@@ -344,7 +344,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
           }}
           disabled={refreshing}
           className='h-8 gap-2 px-3'
-          aria-label='Refresh analytics overview'
+          aria-label='Refresh Analytics Overview'
         >
           <Icon
             name={refreshing ? 'Loader2' : 'RefreshCw'}

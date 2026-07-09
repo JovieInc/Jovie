@@ -4,6 +4,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import { APP_ROUTES } from '@/constants/routes';
 import { DspMatchCard } from '@/features/dashboard/molecules/DspMatchCard';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import {
@@ -13,8 +15,6 @@ import {
   useRejectDspMatchMutation,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-
-import { DspMatchEmptyState } from './DspMatchEmptyState';
 
 export interface DspMatchListProps {
   readonly profileId: string;
@@ -27,9 +27,42 @@ const STATUS_FILTERS: Array<{ value: FilterStatus; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'suggested', label: 'Pending' },
   { value: 'confirmed', label: 'Confirmed' },
-  { value: 'auto_confirmed', label: 'Auto-confirmed' },
+  { value: 'auto_confirmed', label: 'Auto Confirmed' },
   { value: 'rejected', label: 'Rejected' },
 ];
+
+const DSP_MATCH_EMPTY: Record<
+  FilterStatus,
+  { title: string; description: string; icon: string }
+> = {
+  all: {
+    title: 'No Platform Matches Found',
+    description:
+      "We haven't found any streaming platform matches for your profile yet. Check presence while we keep looking.",
+    icon: 'Music',
+  },
+  suggested: {
+    title: 'No Pending Matches',
+    description:
+      'All suggested matches have been reviewed. New matches will appear here automatically.',
+    icon: 'CheckCircle',
+  },
+  confirmed: {
+    title: 'No Confirmed Matches',
+    description: 'Matches you confirm will appear here.',
+    icon: 'CheckCircle',
+  },
+  auto_confirmed: {
+    title: 'No Auto-Confirmed Matches',
+    description: 'Automatically confirmed matches will appear here.',
+    icon: 'Sparkles',
+  },
+  rejected: {
+    title: 'No Rejected Matches',
+    description: 'Matches you reject will appear here.',
+    icon: 'XCircle',
+  },
+};
 
 /**
  * DspMatchList - Displays and manages DSP artist match suggestions.
@@ -131,7 +164,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
               ),
             };
           })}
-          aria-label='Filter DSP matches by status'
+          aria-label='Filter DSP Matches By Status'
           className='min-w-max'
           triggerClassName='flex-none'
         />
@@ -160,7 +193,38 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
 
       {/* Empty State */}
       {!isLoading && displayMatches.length === 0 && (
-        <DspMatchEmptyState status={statusFilter} />
+        <ContentSurfaceCard className='flex flex-col items-center justify-center px-3 py-2 text-center'>
+          <EmptyState
+            icon={
+              <Icon
+                name={DSP_MATCH_EMPTY[statusFilter].icon}
+                className='h-5 w-5'
+              />
+            }
+            heading={DSP_MATCH_EMPTY[statusFilter].title}
+            description={DSP_MATCH_EMPTY[statusFilter].description}
+            action={
+              statusFilter === 'all'
+                ? {
+                    label: 'View Presence',
+                    href: APP_ROUTES.PRESENCE,
+                  }
+                : {
+                    label: 'Show All Matches',
+                    onClick: () => setStatusFilter('all'),
+                  }
+            }
+            secondaryAction={
+              statusFilter === 'all'
+                ? undefined
+                : {
+                    label: 'View Presence',
+                    href: APP_ROUTES.PRESENCE,
+                  }
+            }
+            className='py-6'
+          />
+        </ContentSurfaceCard>
       )}
 
       {/* Match List */}

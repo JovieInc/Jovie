@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **One EmptyState primitive (GH-12638)**: Canonical molecule at `components/molecules/EmptyState` (greyscale icon + Title Case heading + one sentence + primary CTA + optional text-link secondary). Migrated DSP presence/matches, insights, release tasks, and table empty surfaces onto it; deleted 5 bespoke `*EmptyState` components; component-family ratchet emptyState 14→9.
 - Toasts and banners now share one canonical feedback system: confirmations and errors appear bottom-right and dismiss on their own, while system status stays pinned at the top until you dismiss it. (GH-12885)
 - [internal] **Canonical feedback system (GH-12885)**: new `@/components/feedback` module (arity-preserving toast wrapper over sonner + `Banner`/`BannerViewport`/`FeedbackProvider`); all 124 direct `sonner` imports migrated to the canonical module; explicit 4s auto-dismiss default, max 3 stacked toasts, safe-area-aware bottom-right offset; unhandled TanStack mutation errors now surface a canonical error toast via a `MutationCache` fallback.
 - [internal] **CI control-plane characterization (montevideo-v2)**: Locks merge-gate set, risk smoke/preview contracts, and required-check aggregates via `pnpm ci:control:test` (Structural Contract). Adds `scripts/lib/ci-control-plane.mjs`, `print-contract` CLI, deterministic metrics evaluation window, and forbidden pins for all harness merge-gate job names.
