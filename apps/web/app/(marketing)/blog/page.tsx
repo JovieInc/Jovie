@@ -41,11 +41,11 @@ export default async function BlogIndexPage() {
     return (
       <div className='min-h-screen'>
         <MarketingHeroLayout variant='left'>
-          <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
-          <h1 className='marketing-h1-linear mb-6 mt-6 max-w-[8ch] text-primary-token'>
+          <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
+          <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
             Blog
           </h1>
-          <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
+          <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
             Posts coming soon.
           </p>
         </MarketingHeroLayout>
@@ -64,11 +64,11 @@ export default async function BlogIndexPage() {
     <div className='min-h-screen'>
       {/* Hero Section */}
       <MarketingHeroLayout variant='left'>
-        <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
-        <h1 className='marketing-h1-linear mb-6 mt-6 max-w-[8ch] text-primary-token'>
+        <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
+        <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
           Blog
         </h1>
-        <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
+        <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
           Thoughts on product, strategy, and the craft of building tools for
           artists.
         </p>

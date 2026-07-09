@@ -65,17 +65,20 @@ export default function SupportPage() {
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
       <MarketingHeroLayout variant='left'>
-        <p className='marketing-kicker'>Support</p>
-        <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
-          We&apos;re here to help.
+        <p className='text-sm font-medium text-tertiary-token'>Support</p>
+        <h1 className='mt-6 text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+          We&apos;re Here To Help.
         </h1>
-        <p className='mt-6 max-w-[60ch] text-lg leading-relaxed text-secondary-token'>
+        <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
           Browse our docs or reach out to our team.
         </p>
       </MarketingHeroLayout>
 
       <SupportChannels />
-      <FaqSection items={SUPPORT_FAQ_ITEMS} />
+      <FaqSection
+        items={SUPPORT_FAQ_ITEMS}
+        headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
+      />
       <SupportCta />
     </>
   );

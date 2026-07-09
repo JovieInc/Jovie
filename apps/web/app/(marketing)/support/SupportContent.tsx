@@ -56,8 +56,8 @@ export function SupportChannels() {
   return (
     <MarketingContainer width='prose' className='pb-16'>
       <section>
-        <h2 className='marketing-h2-linear text-primary-token'>
-          How can we help?
+        <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
+          How Can We Help?
         </h2>
         <div className='mt-6 grid gap-6 sm:grid-cols-3'>
           {CHANNELS.map(channel => {
@@ -107,8 +107,8 @@ export function SupportCta() {
   return (
     <MarketingContainer width='prose' className='pb-24'>
       <section>
-        <h2 className='marketing-h2-linear text-primary-token'>
-          Still need help?
+        <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
+          Still Need Help?
         </h2>
         <p className='mt-4 text-base leading-relaxed text-secondary-token'>
           Our team is happy to help with anything not covered in the docs.
