@@ -19,7 +19,9 @@
       "!!storybook-static",
       "!**/*.html",
       "!**/.next",
-      "!apps/web/public/pitch/**"
+      "!apps/web/public/pitch/**",
+      "!apps/web/styles/generated/**",
+      "!apps/web/lib/design/generated/**"
     ]
   },
   "formatter": {

@@ -1,0 +1,397 @@
+{
+  "$generated": "GENERATED FILE — do not edit. Source: apps/web/design/tokens.json. Rebuild: pnpm --filter @jovie/web run tokens:build",
+  "source": "apps/web/design/tokens.json",
+  "divergences": {
+    "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice.",
+    "accent-blue": {
+      "canonical-dark": "#4d7dff",
+      "linear-marketing": "#2563ff",
+      "note": "--color-accent-blue (dark carbon palette) vs --linear-accent-blue (System A marketing). Unification tracked under the namespace-collapse wave of #12009."
+    }
+  },
+  "tokens": [
+    {
+      "cssVar": "--gray1",
+      "value": "hsl(0, 0%, 99%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray2",
+      "value": "hsl(0, 0%, 97.3%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray3",
+      "value": "hsl(0, 0%, 95.1%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray4",
+      "value": "hsl(0, 0%, 93%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray5",
+      "value": "hsl(0, 0%, 90.9%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray6",
+      "value": "hsl(0, 0%, 88.7%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray7",
+      "value": "hsl(0, 0%, 85.8%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray8",
+      "value": "hsl(0, 0%, 78%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray9",
+      "value": "hsl(0, 0%, 56.1%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray10",
+      "value": "hsl(0, 0%, 52.3%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray11",
+      "value": "hsl(0, 0%, 43.5%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--gray12",
+      "value": "hsl(0, 0%, 9%)",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--color-accent-gray",
+      "mode": "light",
+      "value": "#7f7f85",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-gray-subtle",
+      "mode": "light",
+      "value": "#efeff2",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-blue",
+      "mode": "light",
+      "value": "#2563ff",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-blue-subtle",
+      "mode": "light",
+      "value": "#edf3ff",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-purple",
+      "mode": "light",
+      "value": "#8b1eff",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-purple-subtle",
+      "mode": "light",
+      "value": "#f3ebff",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-pink",
+      "mode": "light",
+      "value": "#d61a7f",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-pink-subtle",
+      "mode": "light",
+      "value": "#fde9f4",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-red",
+      "mode": "light",
+      "value": "#f3122d",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-red-subtle",
+      "mode": "light",
+      "value": "#ffeaee",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-orange",
+      "mode": "light",
+      "value": "#ff9800",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-orange-subtle",
+      "mode": "light",
+      "value": "#fff3e6",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-green",
+      "mode": "light",
+      "value": "#2f9e44",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-green-subtle",
+      "mode": "light",
+      "value": "#ecf8ee",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-teal",
+      "mode": "light",
+      "value": "#0f9b8e",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-teal-subtle",
+      "mode": "light",
+      "value": "#e8f7f5",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-gray",
+      "mode": "dark",
+      "value": "#8d8d93",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-gray-subtle",
+      "mode": "dark",
+      "value": "rgb(127 127 133 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-blue",
+      "mode": "dark",
+      "value": "#4d7dff",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-blue-subtle",
+      "mode": "dark",
+      "value": "rgb(37 99 255 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-purple",
+      "mode": "dark",
+      "value": "#9b4dff",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-purple-subtle",
+      "mode": "dark",
+      "value": "rgb(139 30 255 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-pink",
+      "mode": "dark",
+      "value": "#ea4a9c",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-pink-subtle",
+      "mode": "dark",
+      "value": "rgb(214 26 127 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-red",
+      "mode": "dark",
+      "value": "#ff4d5f",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-red-subtle",
+      "mode": "dark",
+      "value": "rgb(243 18 45 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-orange",
+      "mode": "dark",
+      "value": "#ffab2e",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-orange-subtle",
+      "mode": "dark",
+      "value": "rgb(255 152 0 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-green",
+      "mode": "dark",
+      "value": "#43b85c",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-green-subtle",
+      "mode": "dark",
+      "value": "rgb(47 158 68 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-teal",
+      "mode": "dark",
+      "value": "#22b8a7",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--color-accent-teal-subtle",
+      "mode": "dark",
+      "value": "rgb(15 155 142 / 0.18)",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-none",
+      "value": "0",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-xs",
+      "value": "2px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-default",
+      "value": "4px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-sm",
+      "value": "8px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-md",
+      "value": "10px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-lg",
+      "value": "12px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-xl",
+      "value": "16px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-2xl",
+      "value": "20px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-3xl",
+      "value": "24px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-pill",
+      "value": "9999px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--radius-full",
+      "value": "9999px",
+      "status": "canonical",
+      "emittedBy": "styles/design-system.css"
+    },
+    {
+      "cssVar": "--linear-duration-fast",
+      "value": "100ms",
+      "status": "deprecated-alias",
+      "emittedBy": "styles/linear-tokens.css",
+      "note": "--linear-* namespace is shrink-only ratcheted (linear-namespace-ratchet.test.ts)"
+    },
+    {
+      "cssVar": "--linear-duration-normal",
+      "value": "160ms",
+      "status": "deprecated-alias",
+      "emittedBy": "styles/linear-tokens.css",
+      "note": "--linear-* namespace is shrink-only ratcheted (linear-namespace-ratchet.test.ts)"
+    },
+    {
+      "cssVar": "--linear-duration-slow",
+      "value": "300ms",
+      "status": "deprecated-alias",
+      "emittedBy": "styles/linear-tokens.css",
+      "note": "--linear-* namespace is shrink-only ratcheted (linear-namespace-ratchet.test.ts)"
+    }
+  ]
+}
