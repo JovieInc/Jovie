@@ -40,10 +40,11 @@ describe('HeaderNav flyout interactions', () => {
       'href',
       '/signin'
     );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    // Default public CTA (no publicCtaLabel override) remains Request Access.
+    // Homepage MarketingHeader passes its own "Get started" label separately.
+    expect(
+      screen.getByRole('link', { name: 'Request Access' })
+    ).toHaveAttribute('href', '/signup');
   });
 
   it('closes marketing flyouts with Escape', () => {

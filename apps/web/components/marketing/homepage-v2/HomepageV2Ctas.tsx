@@ -92,7 +92,12 @@ export function HomepageV2FinalCta() {
           >
             {HOMEPAGE_V2_COPY.finalCta.headline}
           </h2>
-          <Button variant='primary' size='md' asChild>
+          <Button
+            variant='primary'
+            size='md'
+            asChild
+            className='homepage-final-cta-action system-b-mounted-home-footer-cta-action'
+          >
             <Link
               href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
               data-testid='homepage-v2-final-cta-primary'

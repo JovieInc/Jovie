@@ -4951,7 +4951,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: calc(var(--text-xs) - 1px);
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-tight);
-  letter-spacing: 0.01em;
+  /* Keep 0 tracking for System B contract (mounted-home-trust-strip style guard). */
+  letter-spacing: 0;
 }
 
 .system-b-mounted-home-trust-strip
