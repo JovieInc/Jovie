@@ -24,12 +24,11 @@ export const HOMEPAGE_LAUNCH_COPY = {
   seo: {
     title: 'Jovie | Your AI artist manager',
     description:
-      'Jovie is the AI artist workspace that surfaces opportunities in your catalog — fan paths, presaves, pitches — and helps you ship the next one.',
+      'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Your AI artist manager.',
-    subhead:
-      'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or pitch draft.',
+    headline: 'The release system for independent artists.',
+    subhead: 'Jovie runs the business of your career. You make the music.',
     primaryCta: HOMEPAGE_FRONT_DOOR_CTA.primary,
     secondaryCta: {
       label: 'See a live profile',
@@ -56,19 +55,19 @@ export const HOMEPAGE_LAUNCH_COPY = {
         key: 'publish',
         number: '02',
         title: 'Opportunities surfaced',
-        body: 'Jovie scans the whole catalog for underexposed releases, missing fan paths, and presave gaps.',
+        body: 'Jovie scans the whole catalog for underexposed releases, uncaptured listeners, and presave gaps.',
       },
       {
         key: 'review',
         number: '03',
         title: 'Launch the next one',
-        body: 'Generate the presave page, fan path, or pitch and send it live to your audience.',
+        body: 'Generate the presave page, capture page, or pitch and send it live to your audience.',
       },
     ],
   },
   productStatement: {
     eyebrow: '',
-    lead: 'Meet Jovie',
+    lead: '',
     body: 'Your always-on AI artist manager.',
     cards: [
       {
@@ -78,7 +77,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
       },
       {
         number: '',
-        title: 'Missing fan paths.',
+        title: 'Uncaptured moments.',
         body: 'Streams that arrive without a way for listeners to follow, subscribe, or save the next drop.',
       },
       {
@@ -90,12 +89,12 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   aiComposer: {
     headline: 'Ask once. Surface the next opportunity.',
-    body: 'Jovie turns a release into the fan path, presave, or pitch your team can ship.',
+    body: 'Jovie turns a release into the capture, presave, or pitch your team can ship.',
   },
   intentBand: {
     eyebrow: 'Ask Jovie',
     headline: 'Turn the next release into a working plan.',
-    body: 'Use the prompt when you want Jovie to draft the release plan, profile updates, and fan touchpoints after you have seen the product surface.',
+    body: 'Use the prompt when you want Jovie to draft the release plan, profile updates, and fan captures after you have seen the product surface.',
   },
   profileProof: {
     headline: 'Artist profiles built to convert.',
@@ -197,7 +196,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
     {
       question: 'Where does my catalog data come from?',
       answer:
-        'Spotify, Apple Music, and your DSPs. Connect once. Jovie keeps every release, asset, and fan path in one place.',
+        'Spotify, Apple Music, and your DSPs. Connect once. Jovie keeps every release, asset, and capture in one place.',
     },
     {
       question: 'Does Jovie post or pitch on my behalf?',

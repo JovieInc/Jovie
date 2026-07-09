@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { useRef } from 'react';
@@ -55,23 +56,25 @@ export function HomepageArtistProfilesCarousel({
           <div className='homepage-artist-profiles-section__meta'>
             <span>{copy.subhead}</span>
             <div className='homepage-artist-profiles-section__actions'>
-              <HomepageTrackedLink
-                href={copy.primaryCta.href}
-                className='homepage-artist-profiles-section__primary focus-ring-themed'
-                eventName='homepage_profile_cta_clicked'
-                eventProperties={{ cta: 'claim_profile' }}
-                data-cta-sign-up='true'
-              >
-                {copy.primaryCta.label}
-              </HomepageTrackedLink>
-              <HomepageTrackedLink
-                href={copy.secondaryCta.href}
-                className='homepage-artist-profiles-section__secondary focus-ring-themed'
-                eventName='homepage_profile_cta_clicked'
-                eventProperties={{ cta: 'view_example' }}
-              >
-                {copy.secondaryCta.label}
-              </HomepageTrackedLink>
+              <Button variant='primary' size='md' asChild>
+                <HomepageTrackedLink
+                  href={copy.primaryCta.href}
+                  eventName='homepage_profile_cta_clicked'
+                  eventProperties={{ cta: 'claim_profile' }}
+                  data-cta-sign-up='true'
+                >
+                  {copy.primaryCta.label}
+                </HomepageTrackedLink>
+              </Button>
+              <Button variant='secondary' size='md' asChild>
+                <HomepageTrackedLink
+                  href={copy.secondaryCta.href}
+                  eventName='homepage_profile_cta_clicked'
+                  eventProperties={{ cta: 'view_example' }}
+                >
+                  {copy.secondaryCta.label}
+                </HomepageTrackedLink>
+              </Button>
             </div>
           </div>
         </div>
@@ -80,14 +83,14 @@ export function HomepageArtistProfilesCarousel({
           <div className='homepage-artist-profiles-carousel__controls'>
             <button
               type='button'
-              aria-label='Previous artist profile preview'
+              aria-label='Previous Artist Profile Preview'
               onClick={() => scrollRail('previous')}
             >
               <ChevronLeft aria-hidden='true' size={18} strokeWidth={1.9} />
             </button>
             <button
               type='button'
-              aria-label='Next artist profile preview'
+              aria-label='Next Artist Profile Preview'
               onClick={() => scrollRail('next')}
             >
               <ChevronRight aria-hidden='true' size={18} strokeWidth={1.9} />
@@ -101,14 +104,14 @@ export function HomepageArtistProfilesCarousel({
             <div className='homepage-artist-profiles-carousel__keyboard-controls'>
               <button
                 type='button'
-                aria-label='Scroll artist profile previews left'
+                aria-label='Scroll Artist Profile Previews Left'
                 onClick={() => scrollRail('previous')}
               >
                 <ChevronLeft aria-hidden='true' size={16} strokeWidth={1.9} />
               </button>
               <button
                 type='button'
-                aria-label='Scroll artist profile previews right'
+                aria-label='Scroll Artist Profile Previews Right'
                 onClick={() => scrollRail('next')}
               >
                 <ChevronRight aria-hidden='true' size={16} strokeWidth={1.9} />
@@ -116,7 +119,7 @@ export function HomepageArtistProfilesCarousel({
             </div>
             <ol
               className='homepage-artist-profiles-carousel__list'
-              aria-label='Artist profile outcomes'
+              aria-label='Artist Profile Outcomes'
             >
               {cards.map(card => (
                 <li

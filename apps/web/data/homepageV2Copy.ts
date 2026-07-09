@@ -11,7 +11,7 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 // front-door pattern: "Request access" while we're waitlisting, then
 // "Start free trial" once the doors open.
 const FOOTER_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
-  ? 'Request access'
+  ? 'Get started'
   : 'Start free trial';
 
 function requireTile<T extends { readonly id: string }>(

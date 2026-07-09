@@ -720,13 +720,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-outcome-section {
   overflow: hidden;
   padding-block: clamp(5rem, 8.5vw, 7.5rem) clamp(5rem, 8.5vw, 7.5rem);
-  background:
-    radial-gradient(
-      62% 34% at 50% 0%,
-      rgba(0, 112, 243, 0.055) 0%,
-      rgba(245, 245, 247, 0) 72%
-    ),
-    #f5f5f7;
+  background: var(--color-bg-surface-0);
+  color: var(--color-text-primary-token);
 }
 
 .homepage-outcome-inner {
@@ -746,6 +741,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   line-height: 1.05;
   letter-spacing: -0.025em;
   text-wrap: balance;
+  color: var(--color-text-primary-token);
 }
 
 .homepage-outcome-rail-bleed {
@@ -3514,14 +3510,20 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: hidden;
   scroll-margin-top: calc(var(--linear-header-height, 72px) + 1rem);
   padding-block: clamp(5.8rem, 8vw, 7.5rem) clamp(5.6rem, 7.4vw, 7rem);
-  background:
-    radial-gradient(
-      72% 90% at 48% 0%,
-      rgba(0, 112, 243, 0.055),
-      rgba(245, 245, 247, 0) 34rem
-    ),
-    #f5f5f7;
-  color: rgb(5 6 8 / 0.95);
+  background: var(--color-bg-surface-0);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-artist-profiles-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    72% 90% at 48% 0%,
+    color-mix(in srgb, var(--color-accent) 8%, transparent),
+    transparent 34rem
+  );
 }
 
 .homepage-artist-profiles-section__inner {
@@ -3540,7 +3542,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-artist-profiles-section__header p {
   margin: 0;
-  color: rgb(5 6 8 / 0.54);
+  color: var(--color-text-tertiary-token);
   font-size: 0.94rem;
   font-weight: 620;
   line-height: 1.2;
@@ -3550,7 +3552,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: grid;
   max-width: 13.5ch;
   margin: 0;
-  color: rgb(5 6 8 / 0.96);
+  color: var(--color-text-primary-token);
   font-size: clamp(2.7rem, 4vw, 3.85rem);
   font-weight: 680;
   line-height: 1.06;
@@ -3570,7 +3572,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-section__meta > span {
-  color: rgb(5 6 8 / 0.58);
+  color: var(--color-text-tertiary-token);
   font-size: clamp(1.05rem, 1.65vw, 1.45rem);
   font-weight: 420;
   line-height: 1.35;
@@ -3599,14 +3601,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-section__primary {
-  background: #050609;
-  color: #fff;
+  background: var(--color-bg-surface-2);
+  color: var(--color-text-primary-token);
 }
 
 .homepage-artist-profiles-section__secondary {
-  border: 1px solid rgb(5 6 8 / 0.12);
-  background: #fff;
-  color: rgb(5 6 8 / 0.86);
+  border: 1px solid var(--border-default);
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-secondary-token);
 }
 
 .homepage-artist-profiles-carousel {
@@ -4944,11 +4946,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .system-b-mounted-home-trust-strip .system-b-mounted-home-trust-strip-label {
-  margin: 0 0 clamp(var(--space-6), 3vw, var(--space-10));
-  color: var(--color-text-tertiary-token);
-  font-size: var(--text-xs);
+  margin: 0 0 clamp(var(--space-5), 2.5vw, var(--space-8));
+  color: var(--color-text-quaternary-token);
+  font-size: calc(var(--text-xs) - 1px);
   font-weight: var(--font-weight-medium);
-  line-height: var(--leading-normal);
+  line-height: var(--leading-tight);
+  /* Keep 0 tracking for System B contract (mounted-home-trust-strip style guard). */
   letter-spacing: 0;
 }
 

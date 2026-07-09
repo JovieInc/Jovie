@@ -25,11 +25,25 @@ describe('Release task action System B source contract', () => {
       for (const pattern of forbiddenActionPatterns) {
         expect(source, `${sourcePath} leaked ${pattern}`).not.toMatch(pattern);
       }
-
-      expect(source).toContain('bg-btn-primary');
-      expect(source).toContain('text-btn-primary-foreground');
-      expect(source).toContain('hover:bg-btn-primary-hover');
     }
+
+    // EmptyState wave migrated the playbook CTA onto the canonical EmptyState
+    // + Button primary variant (no raw bg-btn-primary classes in this file).
+    const emptyStateSource = readFileSync(
+      resolve(appRoot, actionSourcePaths[0]),
+      'utf8'
+    );
+    expect(emptyStateSource).toContain('EmptyState');
+    expect(emptyStateSource).toContain('onSetUp');
+
+    // Metadata agent still uses explicit neutral primary button tokens.
+    const metadataSource = readFileSync(
+      resolve(appRoot, actionSourcePaths[1]),
+      'utf8'
+    );
+    expect(metadataSource).toContain('bg-btn-primary');
+    expect(metadataSource).toContain('text-btn-primary-foreground');
+    expect(metadataSource).toContain('hover:bg-btn-primary-hover');
   });
 
   it('keeps release task progress as the semantic accent exception', () => {

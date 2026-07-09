@@ -12,7 +12,7 @@ describe('HomepageV2FinalCta', () => {
     ).toHaveTextContent('Keep your music moving.');
     expect(
       screen.getByTestId('homepage-v2-final-cta-primary')
-    ).toHaveTextContent('Start free trial');
+    ).toHaveTextContent('Get started');
     expect(
       screen.queryByTestId('homepage-v2-final-cta-secondary')
     ).not.toBeInTheDocument();

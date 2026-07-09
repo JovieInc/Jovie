@@ -49,12 +49,12 @@ describe('HomepageIntent', () => {
     render(<HomepageIntent />);
     expect(
       screen.getByRole('heading', {
-        name: 'Your AI artist manager.',
+        name: 'The release system for independent artists.',
       })
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or pitch draft.'
+        'Jovie runs the business of your career. You make the music.'
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();

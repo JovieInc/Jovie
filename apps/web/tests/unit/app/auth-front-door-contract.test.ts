@@ -8,7 +8,7 @@ describe('auth front-door contract', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
     expect(contract.primary).toEqual({
-      label: 'Request access',
+      label: 'Get started',
       href: `${APP_ROUTES.START}?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.`,
     });
     expect(contract.secondary).toBeNull();
