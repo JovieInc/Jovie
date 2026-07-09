@@ -13,17 +13,17 @@ import { type OpportunityRowProps, type OpportunityRowState } from './types';
 
 const DOT_COLOR: Record<OpportunityRowState, string> = {
   new: 'var(--color-accent)',
-  accepted: '#2b8a3e',
+  accepted: 'var(--color-accent-green)',
   rejected: 'var(--color-text-quaternary-token)',
-  'in-progress': '#d97a00',
+  'in-progress': 'var(--color-accent-orange)',
   reported: 'var(--color-text-quaternary-token)',
 };
 
 const ACTION_ACCENT: Record<OpportunityRowState, string> = {
   new: 'var(--color-accent)',
-  accepted: '#2b8a3e',
+  accepted: 'var(--color-accent-green)',
   rejected: 'transparent',
-  'in-progress': '#d97a00',
+  'in-progress': 'var(--color-accent-orange)',
   reported: 'transparent',
 };
 
