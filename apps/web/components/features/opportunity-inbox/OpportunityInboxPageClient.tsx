@@ -69,8 +69,12 @@ export function OpportunityInboxPageClient({
   const [rejectedTourDates, setRejectedTourDates] = useState(
     initialTourDates.rejected
   );
-  const { approveMutation, dismissMutation, feedbackMutation } =
-    useOpportunityInboxMutations();
+  const {
+    approveMutation,
+    dismissMutation,
+    feedbackMutation,
+    nextStepMutation,
+  } = useOpportunityInboxMutations();
   const { confirmMutation, rejectMutation, undoRejectMutation } =
     useTourDateReviewMutations();
 
@@ -91,6 +95,10 @@ export function OpportunityInboxPageClient({
 
   const pendingFeedbackId = feedbackMutation.isPending
     ? (feedbackMutation.variables?.suggestedActionId ?? null)
+    : null;
+
+  const pendingNextStepId = nextStepMutation.isPending
+    ? (nextStepMutation.variables ?? null)
     : null;
 
   const pendingTourDateActionId = useMemo(() => {
@@ -138,6 +146,14 @@ export function OpportunityInboxPageClient({
       rating,
       comment,
       pathname,
+    });
+  };
+
+  const handleNextStep = (id: string) => {
+    nextStepMutation.mutate(id, {
+      onSuccess: () => {
+        setCards(current => current.filter(card => card.id !== id));
+      },
     });
   };
 
@@ -239,8 +255,10 @@ export function OpportunityInboxPageClient({
           onApprove={handleApprove}
           onDismiss={handleDismiss}
           onFeedback={handleFeedback}
+          onNextStep={handleNextStep}
           pendingActionId={pendingActionId}
           pendingFeedbackId={pendingFeedbackId}
+          pendingNextStepId={pendingNextStepId}
         />
       ) : null}
 
