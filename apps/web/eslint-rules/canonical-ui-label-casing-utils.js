@@ -40,6 +40,7 @@ const BRAND_WORDS = new Set([
   'Instagram',
   'iOS',
   'Jovie',
+  'Linear',
   'LinkedIn',
   'SoundCloud',
   'Spotify',

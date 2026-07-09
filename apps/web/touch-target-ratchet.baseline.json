@@ -1,4 +1,4 @@
 {
-  "_comment": "Touch-target ratchet baseline \u2014 interactive elements with explicit sub-44px heights (scripts/lint-touch-target.mjs). Ratchet only goes down: fix elements (min 44px hit area, WCAG 2.5.5), then run `node scripts/lint-touch-target.mjs --update`.",
-  "count": 226
+  "_comment": "Touch-target ratchet baseline — interactive elements with explicit sub-44px heights (scripts/lint-touch-target.ts). Ratchet only goes down: fix elements (min 44px hit area, WCAG 2.5.5), then run `pnpm --filter web run lint:touch-target -- --update`.",
+  "count": 225
 }
