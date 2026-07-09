@@ -1247,7 +1247,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     line-height: 1.42;
   }
 
-.homepage-hero-showcase {
+  .homepage-hero-showcase {
     margin-top: 3.35rem;
     padding-bottom: 0.9rem;
     mask-image: linear-gradient(
@@ -4182,7 +4182,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     line-height: 1.48;
   }
 
-.homepage-hero-showcase {
+  .homepage-hero-showcase {
     margin-top: 3rem;
   }
 

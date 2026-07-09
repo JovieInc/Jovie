@@ -9,7 +9,11 @@ const profileLimit = vi.hoisted(() => vi.fn());
 const jobLimit = vi.hoisted(() => vi.fn());
 const matchesWhere = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({ auth: mockAuth }));
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
+}));
 
 vi.mock('@/lib/error-tracking', () => ({ captureError: mockCaptureError }));
 

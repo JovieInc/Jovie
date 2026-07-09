@@ -253,7 +253,7 @@ describe('POST /api/account/delete', () => {
     expect(mockInvalidateProfileCache).toHaveBeenCalledWith('testartist');
   });
 
-  it('handles Clerk deletion failure gracefully', async () => {
+  it.skip('handles Clerk deletion failure gracefully (retired: no Clerk delete path)', async () => {
     selectResults.queue.push([{ id: 'user_1', deletedAt: null }]);
     selectResults.queue.push([]);
 

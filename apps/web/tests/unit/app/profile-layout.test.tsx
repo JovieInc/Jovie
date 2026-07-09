@@ -81,7 +81,7 @@ afterEach(() => {
 describe('ProfileLayout', () => {
   // JOV-2268: public profile routes always bypass Clerk on the client so
   // anonymous visitors don't download clerk.browser.js (~400KB gzip).
-  it('bypasses Clerk for production public profile routes', async () => {
+  it.skip('bypasses Clerk for production public profile routes (retired: Better Auth cookie path)', async () => {
     await renderProfileLayout();
 
     expect(screen.getByTestId('child')).toBeInTheDocument();
@@ -92,7 +92,7 @@ describe('ProfileLayout', () => {
     });
   });
 
-  it('bypasses Clerk for preview public profile routes', async () => {
+  it.skip('bypasses Clerk for preview public profile routes (retired: Better Auth cookie path)', async () => {
     await renderProfileLayout({ vercelEnv: 'preview' });
 
     expect(screen.getByTestId('child')).toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('ProfileLayout', () => {
     });
   });
 
-  it('bypasses Clerk in E2E mode', async () => {
+  it.skip('bypasses Clerk in E2E mode (retired: Better Auth cookie path)', async () => {
     await renderProfileLayout({ e2eMode: '1' });
 
     expect(screen.getByTestId('child')).toBeInTheDocument();

@@ -7,7 +7,11 @@ const mockOnConflictDoUpdate = vi.hoisted(() => vi.fn());
 const mockRevalidate = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/admin/middleware', () => ({ requireAdmin: mockRequireAdmin }));
-vi.mock('@clerk/nextjs/server', () => ({ auth: mockAuth }));
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
+}));
 vi.mock('@/lib/db', () => ({
   db: {
     insert: () => ({

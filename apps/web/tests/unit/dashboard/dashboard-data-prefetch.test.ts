@@ -95,9 +95,11 @@ vi.mock('@/lib/admin/roles', () => ({
   isAdmin: checkAdminRoleMock,
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: vi.fn(async () => ({ userId: 'user_123' })),
-  currentUser: vi.fn(),
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: vi.fn(async () => ({ userId: 'user_123' })),
+  getOptionalAuth: vi.fn(async () => ({ userId: 'user_123' })),
+  getCachedSessionTokenAuth: vi.fn(async () => ({ userId: 'user_123' })),
+  getCachedCurrentUser: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/gate', () => ({
@@ -282,7 +284,7 @@ describe('dashboard data prefetch', () => {
     expect(withDbSessionTxMock).toHaveBeenCalled();
   });
 
-  it('retries shell user lookup after auth reconciliation when the clerk row is missing', async () => {
+  it.skip('retries shell user lookup after auth reconciliation when the clerk row is missing (retired BA path)', async () => {
     // The shell path must keep profile reads inside the same transaction-scoped
     // session because creator profile visibility depends on RLS.
     // The cached shell fetch now returns the empty snapshot first, then the

@@ -256,7 +256,7 @@ describe('proxy composition (critical)', () => {
   // ==========================================================================
   // Clerk publishable key header injection
   // ==========================================================================
-  describe('x-clerk-publishable-key header', () => {
+  describe.skip('x-clerk-publishable-key header (retired: Better Auth)', () => {
     const nextSpy = vi.spyOn(NextResponse, 'next');
     beforeEach(() => {
       nextSpy.mockClear();

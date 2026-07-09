@@ -44,15 +44,7 @@ describe('test-user-provision.server', () => {
     vi.stubEnv('CLERK_SECRET_KEY', 'sk_test_123');
   });
 
-  it('reuses the Clerk user when createUser races with an existing identifier', async () => {
-    mockGetUserList
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({ data: [{ id: 'user_existing' }] });
-    mockCreateUser.mockRejectedValue({
-      status: 422,
-      errors: [{ code: 'form_identifier_exists' }],
-    });
-
+  it('returns a deterministic id for allowlisted browse emails (no Clerk API)', async () => {
     const { ensureClerkTestUser } = await import(
       '@/lib/testing/test-user-provision.server'
     );
@@ -64,9 +56,10 @@ describe('test-user-provision.server', () => {
         firstName: 'Browse',
         lastName: 'Test',
       })
-    ).resolves.toBe('user_existing');
+    ).resolves.toBe('user_dev_browse_clerk_test_jov_ie');
 
-    expect(mockGetUserList).toHaveBeenCalledTimes(2);
+    expect(mockGetUserList).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
   it('does not call Clerk for non-allowlisted emails', async () => {
@@ -125,13 +118,7 @@ describe('test-user-provision.server', () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
-  it('does not treat non-auth Clerk errors with trace ids as fallback cases', async () => {
-    mockGetUserList.mockRejectedValue({
-      status: 429,
-      clerkTraceId: 'trace_123',
-      errors: [{ code: 'rate_limit_exceeded' }],
-    });
-
+  it('prefers an explicit fallback id over the deterministic email-derived id', async () => {
     const { ensureClerkTestUser } = await import(
       '@/lib/testing/test-user-provision.server'
     );
@@ -144,10 +131,10 @@ describe('test-user-provision.server', () => {
         lastName: 'Test',
         fallbackClerkId: 'user_fallback_admin',
       })
-    ).rejects.toMatchObject({
-      status: 429,
-      clerkTraceId: 'trace_123',
-    });
+    ).resolves.toBe('user_fallback_admin');
+
+    expect(mockGetUserList).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
   it('uses an explicit fallback id for unauthorized Clerk lookups', async () => {

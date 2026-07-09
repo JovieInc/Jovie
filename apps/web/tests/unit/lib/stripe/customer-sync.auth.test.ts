@@ -120,7 +120,7 @@ describe('fetchUserBillingDataWithAuth', () => {
       'Billing data auth query failed after retry',
       null,
       expect.objectContaining({
-        clerkUserId: 'user_456',
+        appUserId: 'user_456',
         initialError: 'Failed to retrieve billing data',
         retryError: 'Failed to retrieve billing data',
       })

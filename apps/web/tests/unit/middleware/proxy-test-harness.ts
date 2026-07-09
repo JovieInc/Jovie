@@ -9,7 +9,14 @@
  */
 
 import { NextRequest } from 'next/server';
-import type { ProxyUserState } from '@/lib/auth/proxy-state';
+// Local fixture shape — proxy no longer exports ProxyUserState after the
+// Better Auth cookie-only cutover (user-state lives in gate/shell).
+export type ProxyUserState = {
+  needsWaitlist: boolean;
+  needsOnboarding: boolean;
+  isActive: boolean;
+  isBanned: boolean;
+};
 
 // ============================================================================
 // Request factory

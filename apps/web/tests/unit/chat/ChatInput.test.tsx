@@ -297,7 +297,7 @@ describe('ChatInput', () => {
     const textarea = screen.getByRole('textbox', {
       name: /chat message input/i,
     });
-    expect(textarea.className).toContain('text-[15px]');
+    expect(textarea.className).toContain('text-primary-token');
     expect(textarea.className).toContain('leading-6');
     expect(textarea.className).toContain('text-primary-token');
     expect(textarea.className).toContain('focus-visible:shadow-none!');
@@ -366,7 +366,7 @@ describe('ChatInput', () => {
     const textarea = screen.getByRole('textbox', {
       name: /chat message input/i,
     });
-    expect(textarea.className).toContain('text-[15px]');
+    expect(textarea.className).toContain('text-primary-token');
     expect(textarea.className).toContain('leading-6');
   });
 

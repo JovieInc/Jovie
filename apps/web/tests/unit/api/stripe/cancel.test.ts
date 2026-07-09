@@ -7,8 +7,10 @@ const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({

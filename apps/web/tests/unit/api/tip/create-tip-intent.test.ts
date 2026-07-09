@@ -18,8 +18,10 @@ vi.mock('stripe', () => {
   return { __esModule: true, default: Stripe };
 });
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
