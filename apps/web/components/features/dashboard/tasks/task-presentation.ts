@@ -148,9 +148,15 @@ export function getTaskPriorityVisual(
   return TASK_PRIORITY_META[priority];
 }
 
+/**
+ * Assignee chips always resolve from `assigneeKind` only.
+ * Never bind release/song titles (or display names) into the chip label —
+ * GH-12331: wrong field binding showed "Take Me Over" etc. as the assignee.
+ * The optional `artistName` arg is retained for call-site compatibility and ignored.
+ */
 export function getTaskAssigneeVisual(
   assigneeKind: TaskAssigneeKind,
-  artistName?: string | null
+  _artistName?: string | null
 ): TaskAssigneeMeta {
   if (assigneeKind === 'jovie') {
     return {
@@ -161,8 +167,8 @@ export function getTaskAssigneeVisual(
   }
 
   return {
-    label: 'You',
-    avatarName: artistName?.trim() || 'You',
+    label: 'Me',
+    avatarName: 'Me',
     accent: 'blue',
   };
 }
