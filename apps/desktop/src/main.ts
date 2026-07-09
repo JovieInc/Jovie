@@ -44,6 +44,7 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import { decideRendererRecovery } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
@@ -177,6 +178,28 @@ function getDesktopAppDisplayName(): string {
 }
 
 app.setName(getDesktopAppDisplayName());
+
+// Refuse to run a packaged shell that was launched with a Chrome DevTools
+// Protocol switch. A packaged .app can be started by ANY local process, so an
+// exposed CDP port lets any process running as the same user read the renderer's
+// cookies (incl. the Clerk session) and inject JS — a full session hijack. Source
+// runs may still opt in via JOVIE_DEV=1 (see scripts/launch-electron.mjs).
+const remoteDebuggingGuard = evaluateRemoteDebuggingGuard({
+  isPackaged: app.isPackaged,
+  hasRemoteDebuggingPort: app.commandLine.hasSwitch('remote-debugging-port'),
+  hasRemoteDebuggingPipe: app.commandLine.hasSwitch('remote-debugging-pipe'),
+  jovieDev: process.env.JOVIE_DEV,
+});
+
+if (remoteDebuggingGuard.blocked) {
+  reportDesktopSecurityEvent(
+    'remote-debugging-blocked',
+    remoteDebuggingGuard.reason ?? undefined
+  );
+  // Exit immediately to tear down the exposed CDP listener before any window
+  // (and its authenticated session) is created.
+  app.exit(1);
+}
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
