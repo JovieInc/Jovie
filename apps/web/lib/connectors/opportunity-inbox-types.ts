@@ -1,6 +1,34 @@
 export type OpportunityInboxCardStatus = 'pending';
 
-export type OpportunityInboxCardCategory = 'suggestion' | 'tour_date';
+export type OpportunityInboxCardCategory =
+  | 'suggestion'
+  | 'tour_date'
+  | 'report';
+
+export interface OpportunityInboxReportBreakdownItem {
+  readonly label: string;
+  readonly deltaPercent?: number;
+  readonly detail?: string;
+}
+
+export interface OpportunityInboxReportNextStep {
+  readonly label: string;
+  readonly kind: string;
+  readonly payload?: Readonly<Record<string, unknown>>;
+  readonly rationale?: string;
+}
+
+/** Measurement result rendered by the report card variant (GH #13178). */
+export interface OpportunityInboxReportData {
+  readonly metricLabel: string;
+  readonly deltaPercent: number;
+  readonly deltaDisplay: string;
+  readonly direction: 'up' | 'down' | 'flat';
+  readonly series: readonly number[];
+  readonly items: readonly OpportunityInboxReportBreakdownItem[];
+  readonly experimentId: string | null;
+  readonly nextStep: OpportunityInboxReportNextStep | null;
+}
 
 export interface OpportunityInboxCardViewModel {
   readonly id: string;
@@ -11,6 +39,8 @@ export interface OpportunityInboxCardViewModel {
   readonly primaryActionLabel: string;
   readonly status: OpportunityInboxCardStatus;
   readonly category: OpportunityInboxCardCategory;
+  /** Present only when category === 'report'. */
+  readonly report?: OpportunityInboxReportData;
 }
 
 export interface OpportunityInboxTourDateItem {
