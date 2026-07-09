@@ -7,7 +7,11 @@ const mockCreateRateLimitHeaders = vi.hoisted(() => vi.fn());
 const mockSearchArtist = vi.hoisted(() => vi.fn());
 const mockIsAppleMusicAvailable = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({ auth: mockAuth }));
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
+  getOptionalAuth: mockAuth,
+  getCachedSessionTokenAuth: mockAuth,
+}));
 
 vi.mock('@/lib/rate-limit', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/rate-limit')>();
