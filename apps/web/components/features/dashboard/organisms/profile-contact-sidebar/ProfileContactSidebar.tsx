@@ -245,8 +245,8 @@ function ProfileBentoView({
         phoneAlign='top'
         showBottomFade
         className='shrink-0'
-        heroClassName='aspect-4/5 max-h-115 w-full pt-3'
-        phoneFrameClassName='h-120 w-57'
+        heroClassName='aspect-4/5 max-h-110 w-full pt-2'
+        phoneFrameClassName='h-110 w-57'
         topRight={
           <div className='flex items-center gap-1.5'>
             <Button
