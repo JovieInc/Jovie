@@ -264,7 +264,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] text-(--color-text-tooltip) transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>

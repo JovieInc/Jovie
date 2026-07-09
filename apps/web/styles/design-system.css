@@ -269,11 +269,12 @@
 }
 
 /* Compact mobile home hero: reserve room for the showcase release card below.
-   Composition floor (#11899): hero media never shrinks below 240px — it crops
-   (object-cover), never squashes. Content below the hero scrolls instead. */
+   On short viewports (≤820px tall) cap the cover at 190px so the bento card
+   stays above the fold (profile-mobile-viewport-stability). Media crops via
+   object-cover; content below the hero scrolls. */
 [data-testid="profile-compact-surface"][data-mode="profile"] {
   @media (max-height: 820px) {
-    --cover-height: 240px;
+    --cover-height: 190px;
   }
 }
 

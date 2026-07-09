@@ -49,7 +49,11 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
     await importOriginal<typeof import('@/lib/flags/marketing-static')>();
   return {
     ...actual,
-    FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, SHOW_HOMEPAGE_SECTIONS: true },
+    FEATURE_FLAGS: {
+      ...actual.FEATURE_FLAGS,
+      SHOW_HOMEPAGE_SECTIONS: true,
+      SHOW_LOGO_BAR: true,
+    },
   };
 });
 

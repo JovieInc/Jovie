@@ -116,4 +116,4 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 | `CODEX.md` | Codex bootstrap wrapper |
 
 Indexes (`docs/API_ROUTE_MAP.md`, `docs/CRON_REGISTRY.md`, `docs/WEBHOOK_MAP.md`, …) are system-of-record — navigate via this map.
-<!-- doc-freshness:scoped-rules-count:16 -->
+<!-- doc-freshness:scoped-rules-count:17 -->

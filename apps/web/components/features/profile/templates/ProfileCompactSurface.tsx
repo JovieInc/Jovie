@@ -412,8 +412,11 @@ export function ProfileCompactSurface({
   // below the 240px floor (min-h-60). On short viewports it locks to exactly
   // the floor and the rail below scrolls; the image crops (object-cover),
   // never squashes.
+  // Compact viewports (height ≤820, iPhone SE / short chrome): compress the
+  // hero to ≤190px so the bento release card stays above the fold
+  // (profile-mobile-viewport-stability). Taller phones keep flex growth.
   const heroHeightClassName = isHomeMode
-    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:760px)]:flex-none [@media(max-height:760px)]:min-h-60 [@media(max-height:760px)]:max-h-60'
+    ? 'min-h-[var(--cover-height)] flex-1 [@media(max-height:820px)]:flex-none [@media(max-height:820px)]:min-h-0 [@media(max-height:820px)]:max-h-[190px]'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';
