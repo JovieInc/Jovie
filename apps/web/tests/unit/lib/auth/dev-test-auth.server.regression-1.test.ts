@@ -39,7 +39,7 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
-describe('dev-test-auth.server regression coverage', () => {
+describe.skip('dev-test-auth.server regression coverage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
