@@ -342,6 +342,13 @@ export const queryKeys = {
       [...queryKeys.chat.all, 'capabilities', profileId ?? 'active'] as const,
   },
 
+  // Opportunity inbox (suggested_actions)
+  opportunityInbox: {
+    all: ['opportunity-inbox'] as const,
+    pendingCards: () =>
+      [...queryKeys.opportunityInbox.all, 'pending-cards'] as const,
+  },
+
   // Audience infinite scroll
   audience: {
     all: ['audience'] as const,

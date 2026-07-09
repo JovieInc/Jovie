@@ -413,6 +413,8 @@ export {
   useUpdateSubscriberNameMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
+// Pending opportunity cards (empty chat)
+export { usePendingOpportunityCardsQuery } from './usePendingOpportunityCardsQuery';
 // Pixel health query
 export {
   type PixelHealthData,

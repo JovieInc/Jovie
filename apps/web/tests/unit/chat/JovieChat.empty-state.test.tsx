@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -100,6 +100,17 @@ vi.mock('@/components/jovie/hooks', () => ({
   }),
 }));
 
+const mockPendingOpportunityCards: Array<{
+  readonly id: string;
+  readonly typeLabel: string;
+  readonly createdAt: string;
+  readonly title: string;
+  readonly why: string;
+  readonly primaryActionLabel: string;
+  readonly status: 'pending';
+  readonly category: 'suggestion';
+}> = [];
+
 vi.mock('@/lib/queries', () => ({
   queryKeys: {
     releases: {
@@ -112,6 +123,11 @@ vi.mock('@/lib/queries', () => ({
   usePlanGate: () => ({
     isPro: true,
     chatFileUploadLimit: null,
+    isLoading: false,
+    isError: false,
+  }),
+  usePendingOpportunityCardsQuery: () => ({
+    data: mockPendingOpportunityCards,
     isLoading: false,
     isError: false,
   }),
@@ -154,6 +170,7 @@ vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
 describe('JovieChat empty state', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPendingOpportunityCards.length = 0;
     mockChatState.input = '';
     mockChatState.messages = [];
     mockChatState.hasMessages = false;
@@ -339,5 +356,61 @@ describe('JovieChat empty state', () => {
     expect(
       screen.getByTestId('chat-input').getAttribute('data-quick-actions')
     ).toBeNull();
+  });
+
+  it('renders compact opportunity cards instead of suggestion pills when pending', () => {
+    mockPendingOpportunityCards.push({
+      id: 'opp-1',
+      typeLabel: 'Suggestion',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      title: 'Detroit listeners up 340%',
+      why: 'Promoter at Magic Stick reached out.',
+      primaryActionLabel: 'Review pitch',
+      status: 'pending',
+      category: 'suggestion',
+    });
+
+    const { getByTestId, queryByTestId, getByText } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(getByTestId('chat-empty-state-opportunity-cards')).toBeTruthy();
+    expect(getByText('Detroit listeners up 340%')).toBeTruthy();
+    // Pills stay hidden when opportunities are present.
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
+  });
+
+  it('enters pinned-card mode when an opportunity card is tapped', () => {
+    mockPendingOpportunityCards.push({
+      id: 'opp-pin',
+      typeLabel: 'Suggestion',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      title: 'Playlist window this week',
+      why: 'Your latest single is peaking.',
+      primaryActionLabel: 'Draft pitch',
+      status: 'pending',
+      category: 'suggestion',
+    });
+
+    const { getByTestId, queryByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    fireEvent.click(getByTestId('chat-empty-opportunity-card-opp-pin'));
+
+    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
+    expect(getByTestId('chat-composer-dock')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
+    expect(queryByTestId('chat-empty-state-viewport')).toBeNull();
+  });
+
+  it('does not render opportunity cards when there are none pending', () => {
+    const { queryByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
   });
 });
