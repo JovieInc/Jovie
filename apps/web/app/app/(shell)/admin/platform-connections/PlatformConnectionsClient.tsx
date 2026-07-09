@@ -88,7 +88,7 @@ function StatusSummaryItem({
   ok,
 }: Readonly<{ label: string; value: string; ok: boolean }>) {
   return (
-    <div className='min-w-[11rem] flex-1 rounded-md bg-surface-0 px-3 py-2'>
+    <div className='min-w-44 flex-1 rounded-md bg-surface-0 px-3 py-2'>
       <div className='flex items-center gap-2 text-xs font-medium text-primary-token'>
         {ok ? (
           <CheckCircle2 className='size-3.5 text-success' aria-hidden />

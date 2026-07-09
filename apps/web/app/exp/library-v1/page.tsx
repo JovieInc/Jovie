@@ -41,7 +41,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 const DURATION_CINEMATIC = 420;
 export const LIBRARY_DEMO_NOW_MS = new Date(
   '2026-04-25T12:00:00.000Z'

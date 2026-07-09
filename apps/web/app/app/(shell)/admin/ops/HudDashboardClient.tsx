@@ -765,7 +765,7 @@ export function HudDashboardClient({
   // TV-readable 44/56/72 ramp.
   const mrrValueClass = isShell
     ? 'text-3xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
-    : 'text-5xl font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
+    : 'text-5xl font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-7xl';
 
   // Operations / Reliability / Runway KPIs likewise scale down in shell.
   const secondaryValueClass = isShell

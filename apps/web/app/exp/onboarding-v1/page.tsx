@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 
 const PALETTE = {
   page: '#06070a',

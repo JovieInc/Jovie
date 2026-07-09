@@ -10,7 +10,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-3'>{children}</div>
@@ -19,7 +19,7 @@ function Section({
 }
 
 function Label({ children }: { readonly children: React.ReactNode }) {
-  return <span className='text-[11px] text-tertiary-token'>{children}</span>;
+  return <span className='text-2xs text-tertiary-token'>{children}</span>;
 }
 
 function Stack({
@@ -41,7 +41,7 @@ export default function BadgesPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Badge</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — 11px text, weight 510, pill shape, semantic color
         variants
       </p>
@@ -116,7 +116,7 @@ export default function BadgesPage() {
         >
           <div className='flex items-center justify-between'>
             <span
-              className='text-[13px]'
+              className='text-app'
               style={{ color: 'var(--linear-text-primary)' }}
             >
               Midnight Rain — Single
@@ -132,13 +132,15 @@ export default function BadgesPage() {
           </div>
           <div className='mt-1 flex items-center gap-2'>
             <Badge variant='secondary' size='sm'>
+              {/* ui-casing-allow: genre name keeps established capitalization */}
               Hip-Hop
             </Badge>
             <Badge variant='secondary' size='sm'>
+              {/* ui-casing-allow: genre name keeps established capitalization */}
               R&amp;B
             </Badge>
             <span
-              className='text-[11px]'
+              className='text-2xs'
               style={{ color: 'var(--linear-text-tertiary)' }}
             >
               2 days ago

@@ -13,7 +13,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-3'>{children}</div>
@@ -22,7 +22,7 @@ function Section({
 }
 
 function Label({ children }: { readonly children: React.ReactNode }) {
-  return <span className='text-[11px] text-tertiary-token'>{children}</span>;
+  return <span className='text-2xs text-tertiary-token'>{children}</span>;
 }
 
 function Stack({
@@ -46,7 +46,7 @@ export default function InputsPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Input</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — 32px height, 6px radius, surface-1 bg, border-focus
         on focus
       </p>
@@ -88,7 +88,7 @@ export default function InputsPage() {
                 type='button'
                 className='absolute right-3 top-1/2 z-10 -translate-y-1/2 text-tertiary-token hover:text-primary-token transition-colors'
                 onClick={() => setClearableValue('')}
-                aria-label='Clear input'
+                aria-label='Clear Input'
               >
                 <X className='size-3.5' />
               </button>
@@ -120,14 +120,22 @@ export default function InputsPage() {
       {/* Widths */}
       <Section title='Widths'>
         <Stack title='w-48'>
-          <Input placeholder='w-48' className='w-48' />
+          <Input
+            placeholder='w-48' // ui-casing-allow: literal example placeholder
+            className='w-48'
+          />
         </Stack>
         <Stack title='w-64'>
-          <Input placeholder='w-64' className='w-64' />
+          <Input
+            placeholder='w-64' // ui-casing-allow: literal example placeholder
+            className='w-64'
+          />
         </Stack>
         <Stack title='w-full (container)'>
           <div className='w-80'>
-            <Input placeholder='w-full inside w-80 container' />
+            <Input
+              placeholder='w-full inside w-80 container' // ui-casing-allow: literal example placeholder
+            />
           </div>
         </Stack>
       </Section>
@@ -136,7 +144,7 @@ export default function InputsPage() {
       <Section title='With Label / Error / Help'>
         <Stack title='label + help'>
           <Input
-            label='Release title'
+            label='Release Title'
             helpText='This appears on the release page'
             placeholder='Enter title...'
             className='w-64'
