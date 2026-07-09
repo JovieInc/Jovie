@@ -1,12 +1,6 @@
 name: 'Setup Playwright (Chromium)'
 description: 'Restores the Playwright browser cache and installs Chromium for @jovie/web'
 
-inputs:
-  project:
-    description: 'Playwright project name (e.g., chromium, mobile, smoke) to shard the cache'
-    required: false
-    default: 'chromium'
-
 # Chromium only, no apt-based `--with-deps`: slow font package mirrors can
 # consume tight job budgets before tests run (see ci-layout-guard).
 runs:
@@ -16,10 +10,9 @@ runs:
       uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ inputs.project }}-${{ hashFiles('pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
-          ${{ runner.os }}-playwright-${{ inputs.project }}-
-
+          ${{ runner.os }}-playwright-chromium-
 
     - name: Install Playwright (Chromium)
       shell: bash

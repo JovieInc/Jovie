@@ -36,7 +36,6 @@ runs:
         cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
         cache-dependency-path: '**/pnpm-lock.yaml'
 
-
     - name: Warm pnpm store
       shell: bash
       run: pnpm fetch --frozen-lockfile
