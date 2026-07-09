@@ -226,6 +226,15 @@ export interface CommonDropdownProps {
   readonly onOpenChange?: (open: boolean) => void;
 
   /**
+   * Modality of the dropdown menu (Radix `modal`, default true).
+   * Pass false when the menu launches other modal layers (e.g. a Dialog)
+   * so the menu never takes the body pointer-events lock — stacked
+   * modal layers can race on teardown and leave the page inert.
+   * Only applies to `variant='dropdown'`.
+   */
+  readonly modal?: boolean;
+
+  /**
    * Disable portal rendering (render in DOM position)
    */
   readonly disablePortal?: boolean;

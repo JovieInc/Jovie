@@ -191,6 +191,28 @@ function ProfileBentoView({
 }>) {
   const [utmOpen, setUtmOpen] = useState(false);
 
+  // Open the UTM dialog only after the profile-actions menu has fully torn
+  // down. Mounting a modal Dialog synchronously from a DropdownMenu item's
+  // onSelect stacks two Radix modal layers whose unmount/restore can race and
+  // leave `pointer-events: none` stuck on <body>, deadening the chat composer
+  // (gh-13221).
+  const openUtmDialog = useCallback(() => {
+    globalThis.setTimeout(() => setUtmOpen(true), 0);
+  }, []);
+
+  // Defensive guard (gh-13221): after the dialog (or menu) teardown settles,
+  // clear any body pointer-events lock a stacked-layer race left behind so
+  // the rest of the app — the chat composer in particular — stays clickable.
+  useEffect(() => {
+    if (utmOpen) return;
+    const frame = globalThis.requestAnimationFrame(() => {
+      if (document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+    });
+    return () => globalThis.cancelAnimationFrame(frame);
+  }, [utmOpen]);
+
   const artist = buildPreviewArtistFromProfile({
     username: previewData.username,
     displayName: previewData.displayName,
@@ -229,7 +251,7 @@ function ProfileBentoView({
       id: 'utm-builder',
       label: 'UTM Builder',
       icon: <SlidersHorizontal className='h-3.5 w-3.5' />,
-      onClick: () => setUtmOpen(true),
+      onClick: openUtmDialog,
     },
     { type: 'separator', id: 'profile-actions-separator' },
     {
@@ -259,6 +281,10 @@ function ProfileBentoView({
           <CommonDropdown
             items={menuItems}
             align='end'
+            // Non-modal: this menu launches the UTM Builder dialog, and a
+            // modal menu + modal dialog stack can leave the body
+            // pointer-events lock behind on teardown (gh-13221).
+            modal={false}
             aria-label='Profile Actions'
             trigger={
               <Button

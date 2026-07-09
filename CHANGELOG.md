@@ -15,6 +15,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Chat stays responsive with the Live Profile rail open (GH-13220)**: Opening your profile rail — or its actions menu and UTM Builder — no longer leaves the chat box unable to accept clicks or typing.
+- [internal] **Profile rail composer hardening (GH-13221/GH-13225)**: Profile-actions kebab is now a non-modal `CommonDropdown` (new `modal` prop passed through to Radix), the UTM Builder dialog open is deferred past the menu teardown, and a defensive guard clears any stuck `body[style*="pointer-events: none"]` after dialog close. New Playwright matrix `chat-composer-right-rail.spec.ts` asserts composer focus/typing, body pointer-events, and elementFromPoint invariants across rail/menu/dialog/edit-mode open-close cycles.
+
 - **Plan-locked chat tools now explain and offer an upgrade instead of erroring (GH-13304)**: Asking Jovie for album art, photo retouching, or merch on the Free plan no longer dead-ends the conversation. Jovie describes what it would create, and a single upgrade prompt appears inline — with copy sourced from the plan registry so it always names the right plan.
 
 - [internal] **AEO citation monitoring + brand integrity (GH-11037)**: Pure-function modules `lib/aeo/citation-monitor.ts` and `lib/aeo/brand-integrity.ts` implement share-of-citation measurement (tracks whether Jovie profile URLs are cited by answer engines for canonical artist queries) and same-name entity disambiguation (scores KB-anchor coverage, flags missing MusicBrainz/Wikidata/ISNI identifiers, and produces a disambiguating checklist mapping to schema.org fields). 47 unit tests. No migrations.
