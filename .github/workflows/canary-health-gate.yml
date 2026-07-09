@@ -629,13 +629,36 @@ jobs:
           DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
+      - name: Hard probe — Better Auth handler reachable (GET /api/auth/ok)
+        run: |
+          # Plan Phase 11 (Clerk → Better Auth migration): a 200 from
+          # `/api/auth/ok` proves the BA handler mounted and the runtime wired
+          # up — a separate axis from the OAuth provider redirect_uri probe
+          # below. A 404 here means the static route was shadowed (catch-all
+          # `/api/auth/[...all]` won the route race) or the deploy broke.
+          ok_url="https://staging.jov.ie/api/auth/ok"
+          attempt=1
+          max_attempts=3
+          until curl --fail --silent --show-error -o /dev/null -w "%{http_code}\n" "$ok_url" | grep -q '^200$'; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "❌ $ok_url did not return 200 after ${max_attempts} attempts."
+              echo "canary_status=failed_better_auth_handler" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep_seconds=$((attempt * 15))
+            echo "⚠️ $ok_url not 200 on attempt ${attempt}/${max_attempts}; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
+          echo "✅ $ok_url returned 200 (Better Auth handler healthy)"
+
       - name: Verify staging OAuth redirect URIs are accepted by Google/Apple
         run: |
           # Probe the Google/Apple authorize endpoints with the EXACT redirect_uri
-          # Clerk's STAGING instance hands them (clerk.staging.jov.ie). Catches
-          # code regressions in how the redirect_uri is built and staging Google
-          # client drift before promote. Production's own clients are covered by
-          # the post-promote production-oauth-gate (different Clerk instance).
+          # Better Auth hands them (https://staging.jov.ie/api/auth/callback/<provider>).
+          # Catches code regressions in how the redirect_uri is built and staging
+          # Google/Apple console drift before promote. Production's own clients
+          # are covered by the post-promote production-oauth-gate in ci.yml.
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json

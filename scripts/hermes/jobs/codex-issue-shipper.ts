@@ -36,10 +36,12 @@ import {
   buildGbrainCaptureText,
   buildGbrainQuery,
   buildRecoveryStashMessage,
+  buildRetryEscalationReason,
   type CheckoutState,
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  countRetryReleases,
   type DispatchPlan,
   EPIC_LABEL,
   type FinisherRunner,
@@ -49,15 +51,18 @@ import {
   type GithubIssue,
   gbrainContextBlocker,
   HUMAN_REVIEW_LABEL,
+  type IssueComment,
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
   parseAgentChain,
   parseDirtyPaths,
   planCheckoutGate,
+  RETRY_RELEASE_COMMENT_HEADER,
   routeForAgent,
   type ShipperConfig,
   SpawnEagainError,
+  shouldEscalateRetry,
   worktreeHasWork,
 } from '../lib/codex-issue-shipper';
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
@@ -780,11 +785,9 @@ function releaseClaimForRetry(
     commentIssue(
       config,
       plan.issue.number,
-      [
-        `Jovie agent (codex issue shipper) released this issue for retry.`,
-        '',
-        reason,
-      ].join('\n')
+      // Header is the exported constant the retry counter matches on — keep
+      // this the ONLY place it is emitted so emitter and counter can't drift.
+      [RETRY_RELEASE_COMMENT_HEADER, '', reason].join('\n')
     );
   } catch (err) {
     logJobEvent({
@@ -794,6 +797,78 @@ function releaseClaimForRetry(
       error: shortError(err),
     });
   }
+}
+
+function fetchIssueComments(
+  config: ShipperConfig,
+  issueNumber: number
+): IssueComment[] {
+  try {
+    const raw = run(
+      [
+        'gh',
+        'issue',
+        'view',
+        String(issueNumber),
+        '--repo',
+        config.repo,
+        '--json',
+        'comments',
+      ],
+      config
+    );
+    const parsed = JSON.parse(raw) as {
+      comments?: ReadonlyArray<{
+        body?: string | null;
+        viewerDidAuthor?: boolean | null;
+      }>;
+    };
+    return (parsed.comments ?? []).map(comment => ({
+      body: comment.body ?? '',
+      viewerDidAuthor: comment.viewerDidAuthor === true,
+    }));
+  } catch (err) {
+    // Fail open: a gh hiccup must not escalate a task that isn't actually
+    // stuck. An empty list means priorReleases=0, so we release as before.
+    logJobEvent({
+      job: JOB,
+      event: 'retry_comments_fetch_failed',
+      issue: issueNumber,
+      error: shortError(err),
+    });
+    return [];
+  }
+}
+
+/**
+ * Retry-escalation gate (#13126). Count how many times this issue was already
+ * released for retry; after MAX_RETRY_RELEASES failures, mark it blocked with a
+ * diagnostic (which drops it from the dispatchable pool) instead of releasing
+ * into another agent run.
+ */
+function releaseOrEscalate(
+  config: ShipperConfig,
+  plan: DispatchPlan,
+  reason: string
+): void {
+  const priorReleases = countRetryReleases(
+    fetchIssueComments(config, plan.issue.number)
+  );
+  if (shouldEscalateRetry(priorReleases)) {
+    markBlocked(
+      config,
+      plan,
+      buildRetryEscalationReason(priorReleases, reason)
+    );
+    logJobEvent({
+      job: JOB,
+      event: 'retry_escalated_blocked',
+      issue: plan.issue.number,
+      priorReleases,
+    });
+    return;
+  }
+  releaseClaimForRetry(config, plan, reason);
 }
 
 function gbrainCaptureSlug(raw: string, fallback: string): string {
@@ -1136,7 +1211,7 @@ async function dispatchPlan(
     }
 
     if (isSystemKilled) {
-      releaseClaimForRetry(
+      releaseOrEscalate(
         config,
         dispatch,
         [
@@ -1219,7 +1294,7 @@ async function dispatchPlan(
     }
 
     if (!pr) {
-      releaseClaimForRetry(
+      releaseOrEscalate(
         config,
         dispatch,
         [

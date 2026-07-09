@@ -6,11 +6,11 @@
  * Used by the AdminPlanToggle dev bar component.
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

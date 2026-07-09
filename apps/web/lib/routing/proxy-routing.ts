@@ -179,7 +179,15 @@ export function categorizePath(pathname: string): PathCategory {
     pathname === APP_ROUTES.SIGNUP_SSO_CALLBACK ||
     pathname === APP_ROUTES.SIGNIN_SSO_CALLBACK ||
     pathname === APP_ROUTES.SIGNUP_HYPHEN_SSO_CALLBACK ||
-    pathname === APP_ROUTES.SIGNIN_HYPHEN_SSO_CALLBACK;
+    pathname === APP_ROUTES.SIGNIN_HYPHEN_SSO_CALLBACK ||
+    // Better Auth catch-all (sign-in/social, OAuth callbacks, email OTP,
+    // one-time-token verify, session endpoints) is owned by the BA handler
+    // at app/api/auth/[...all]/route.ts. Treat any /api/auth/* path as a
+    // pass-through so categorizePath consumers (handleProxyRequest,
+    // route-policy tests) classify them with the other callback routes.
+    // Plan decision 5. (proxy.ts also short-circuits /api/auth/* before
+    // handleProxyRequest is reached, so this is a defensive contract pin.)
+    pathname.startsWith('/api/auth/');
 
   const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
   const isAccountPath = matchesRoute(pathname, '/account');

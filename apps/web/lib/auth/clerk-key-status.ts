@@ -1,10 +1,3 @@
-/**
- * Why Clerk publishable key resolution succeeded or failed for a request.
- *
- * Threaded through the `x-clerk-key-status` middleware header so downstream
- * SSR code and client providers can surface a specific error UI instead of
- * silently falling back to the mock provider.
- */
 export type ClerkKeyStatus =
   | 'ok'
   | 'no_publishable_key'

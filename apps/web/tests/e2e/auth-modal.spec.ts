@@ -6,7 +6,6 @@
  *
  * Run: pnpm run test:web:e2e -- tests/e2e/auth-modal.spec.ts
  */
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -42,14 +41,8 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
 async function prepareHomepage(page: import('@playwright/test').Page) {
   await blockAnalytics(page);
 
-  if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
-    await setupClerkTestingToken({ page }).catch((err: unknown) => {
-      console.warn(
-        '[auth-modal.spec] setupClerkTestingToken skipped:',
-        err instanceof Error ? err.message : String(err)
-      );
-    });
-  }
+  // Clerk → Better Auth migration: setupClerkTestingToken removed — the
+  // dev bypass route mints a real BA session, no testing token needed.
 
   await page.goto('/', {
     waitUntil: 'domcontentloaded',

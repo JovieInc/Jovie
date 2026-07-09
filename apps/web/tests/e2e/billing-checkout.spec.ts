@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser } from '../helpers/clerk-auth';
@@ -57,16 +56,8 @@ interface CheckoutAttempt {
 }
 
 async function refreshClerkSessionForApi(page: Page): Promise<boolean> {
-  // Re-arm the Clerk testing token for this retry path (a fresh call is
-  // required after a 401 — this is deliberate, not leftover duplication
-  // from the initial setupClerkTestingToken call in the test body). Log on
-  // failure so a broken setup surfaces here rather than as a later 401.
-  await setupClerkTestingToken({ page }).catch(err => {
-    console.warn(
-      '[billing-checkout] setupClerkTestingToken failed during session refresh:',
-      err instanceof Error ? err.message : String(err)
-    );
-  });
+  // Clerk → Better Auth migration: setupClerkTestingToken removed.
+  // The dev bypass session cookie persists, so no re-arm is needed.
   await page.goto(APP_ROUTES.CHAT, {
     waitUntil: 'domcontentloaded',
     timeout: 120_000,
@@ -171,7 +162,6 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
   }) => {
     test.setTimeout(180_000);
 
-    await setupClerkTestingToken({ page });
     await ensureSignedInUser(page);
 
     // Get available pricing. Local Next can restart under memory pressure,

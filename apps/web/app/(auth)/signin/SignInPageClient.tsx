@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
-import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
@@ -26,19 +25,35 @@ import {
 } from '../DesktopAuthRouteHandoff';
 
 /**
- * Shows a banner when the OAuth provider returned an error code.
- * Covers the case where the user clicks "Deny" on the provider consent screen,
- * which returns `?oauth_error=access_denied` on redirect back to /signin. #86
+ * OAuth error banner (Clerk → Better Auth migration, client-flip commit ⑦).
+ *
+ * Plan design row 19: rewritten to parse Better Auth's `?error=` param with
+ * an explicit code→copy table. Better Auth redirects to `errorCallbackURL`
+ * with `?error=<code>` when OAuth fails (user denies, state mismatch,
+ * provider error, account linking conflict). The banner classifies the code
+ * and surfaces a specific message, then strips the param from the URL so a
+ * refresh doesn't re-show it.
  */
+const OAUTH_ERROR_COPY: Record<string, string> = {
+  access_denied:
+    'Sign-in was cancelled. Try again, or pick a different method.',
+  oauth_callback_error:
+    'Something went wrong with the sign-in. Please try again.',
+  account_exists:
+    'An account with this email already exists. Try signing in with your email instead.',
+  state_mismatch: 'Sign-in failed for security reasons. Please try again.',
+  invalid_state: 'Sign-in failed for security reasons. Please try again.',
+};
+
 function SignInOauthErrorBanner() {
   const searchParams = useSearchParams();
-  const oauthError = searchParams.get('oauth_error');
+  const oauthError = searchParams.get('error');
 
   useEffect(() => {
     if (!oauthError) return;
 
     const url = new URL(globalThis.location.href);
-    url.searchParams.delete('oauth_error');
+    url.searchParams.delete('error');
     globalThis.history.replaceState(
       globalThis.history.state,
       '',
@@ -48,13 +63,9 @@ function SignInOauthErrorBanner() {
 
   if (!oauthError) return null;
 
-  let message = 'Something went wrong with sign-in. Please try again.';
-  if (oauthError === 'access_denied') {
-    message = 'Sign-in was cancelled. Try again, or pick a different method.';
-  } else if (oauthError === 'account_exists') {
-    message =
-      'An account with this email already exists. Try signing in with your email instead.';
-  }
+  const message =
+    OAUTH_ERROR_COPY[oauthError] ??
+    'Something went wrong with sign-in. Please try again.';
 
   return (
     <div
@@ -202,7 +213,6 @@ export function SignInPageClient() {
           fallbackRedirectUrl={fallbackRedirectUrl}
           initialValues={initialValues}
         />
-        <SignInTimeoutEscape />
       </AuthLayout>
     </AuthenticatedAuthEntryGuard>
   );

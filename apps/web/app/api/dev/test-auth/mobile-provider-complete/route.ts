@@ -7,7 +7,7 @@ import {
   parseDevTestAuthPersona,
 } from '@/lib/auth/dev-test-auth.server';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
-import { resolveConfiguredNativeTestClerkUserId } from '@/lib/auth/native-test-clerk-user.server';
+import { resolveConfiguredNativeTestBetterAuthUserId } from '@/lib/auth/native-test-clerk-user.server';
 import { createStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { isVercelProductionDeployment } from '@/lib/security/development-only';
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let userId = await resolveConfiguredNativeTestClerkUserId();
+  let userId = await resolveConfiguredNativeTestBetterAuthUserId();
   if (!userId) {
     const actor = await ensureLiveDevTestAuthActor(persona);
     userId = actor.clerkUserId;

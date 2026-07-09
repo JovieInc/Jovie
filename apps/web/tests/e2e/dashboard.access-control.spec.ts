@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -62,7 +61,6 @@ test.describe('Dashboard Access Control', () => {
     test.setTimeout(120_000);
 
     // Setup Clerk testing token for programmatic authentication
-    await setupClerkTestingToken({ page });
 
     // === Step 1: Create User A and complete onboarding ===
     await page.goto('/', { waitUntil: 'domcontentloaded' });

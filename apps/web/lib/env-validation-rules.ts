@@ -47,29 +47,33 @@ function isLikelyVercelColdStart(): boolean {
 }
 
 /**
- * Validation rule: Check Clerk publishable key exists
+ * Validation rule: Better Auth secret must exist in production/preview.
+ * Local/dev falls back to a non-production secret (see better-auth.ts).
  */
-const checkClerkPublishableKey: ValidationRule = () => {
-  // Skip validation if in mock mode
-  if (publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1') {
+const checkBetterAuthSecret: ValidationRule = ({ server, vercelEnv }) => {
+  if (vercelEnv !== 'production' && vercelEnv !== 'preview') {
     return null;
   }
 
-  if (!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    // During cold start, downgrade to warning instead of critical
+  const secret = server.BETTER_AUTH_SECRET;
+  if (!secret) {
     if (isLikelyVercelColdStart()) {
       return {
         type: 'warning',
         message:
-          'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing (may be cold start timing issue)',
+          'BETTER_AUTH_SECRET is missing (may be cold start timing issue)',
       };
     }
-
-    // After cold start window, this is a real config error
     return {
       type: 'critical',
-      message:
-        'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required for authentication',
+      message: 'BETTER_AUTH_SECRET is required for authentication',
+    };
+  }
+
+  if (secret.length < 32) {
+    return {
+      type: 'critical',
+      message: 'BETTER_AUTH_SECRET must be at least 32 characters',
     };
   }
   return null;
@@ -83,22 +87,6 @@ const checkDatabaseUrl: ValidationRule = ({ server }) => {
     return {
       type: 'critical',
       message: 'DATABASE_URL is required for database operations',
-    };
-  }
-  return null;
-};
-
-/**
- * Validation rule: Check Clerk key format
- */
-const checkClerkKeyFormat: ValidationRule = () => {
-  if (
-    publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-    !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_')
-  ) {
-    return {
-      type: 'error',
-      message: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY should start with pk_',
     };
   }
   return null;
@@ -225,9 +213,8 @@ const checkXaiApiKey: ValidationRule = ({ server, vercelEnv }) => {
  * Runtime validation rules (checked in runtime context)
  */
 export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
-  checkClerkPublishableKey,
+  checkBetterAuthSecret,
   checkDatabaseUrl,
-  checkClerkKeyFormat,
   checkStripeSecretFormat,
   checkStripePublishableFormat,
   checkStripePairConsistency,

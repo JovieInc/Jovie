@@ -10,7 +10,6 @@
  *
  * Run: pnpm run test:web:e2e -- tests/e2e/auth-oauth-deny.spec.ts
  */
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { Browser, expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -66,14 +65,7 @@ async function createAnonPage(browser: Browser) {
   const context = await browser.newContext({ storageState: EMPTY_STATE });
   const page = await context.newPage();
 
-  if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
-    await setupClerkTestingToken({ page }).catch((err: unknown) => {
-      console.warn(
-        '[auth-oauth-deny.spec] setupClerkTestingToken skipped:',
-        err instanceof Error ? err.message : String(err)
-      );
-    });
-  }
+  // Clerk → Better Auth migration: setupClerkTestingToken removed.
 
   return { page, context };
 }

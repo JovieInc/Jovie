@@ -154,6 +154,7 @@ describe('auth routing boundary', () => {
       ok: true,
       userId: 'user_123',
       returnTo: '/app',
+      ott: null,
     });
 
     expect(

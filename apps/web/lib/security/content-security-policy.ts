@@ -32,13 +32,6 @@ type BuildCspOptions = {
  */
 const INLINE_SCRIPT_HASHES = {
   /**
-   * Clerk inline script hash (@clerk/nextjs)
-   * This script handles Clerk initialization before hydration.
-   * Hash may need updating when @clerk/nextjs version changes.
-   */
-  clerk: "'sha256-U8qHNAYVONMkNDz+dKowqI4OkI0neY4A/sKEI0weOO8='",
-
-  /**
    * next-themes inline script hash (v0.4.6)
    * This script prevents flash of unstyled content (FOUC) by applying
    * the theme class before React hydration.
@@ -86,20 +79,11 @@ const STATIC_CSP_PARTS = {
   scriptSrcPrefix: "script-src 'self'",
   // Pre-computed script-src suffix (after nonce, excludes dev-only 'unsafe-eval')
   scriptSrcSuffix: [
-    INLINE_SCRIPT_HASHES.clerk,
     INLINE_SCRIPT_HASHES.nextThemes,
     INLINE_SCRIPT_HASHES.vercelAnalytics,
     'https://va.vercel-scripts.com',
     'https://vitals.vercel-insights.com',
     'https://vercel.live',
-    'https://distinct-giraffe-5.clerk.accounts.dev',
-    'https://clerk.com',
-    'https://cdn.clerk.com',
-    'https://*.clerk.com',
-    'https://*.clerk.services',
-    'https://*.clerk.accounts.dev',
-    'https://clerk.jov.ie',
-    'https://clerk.staging.jov.ie',
     'https://challenges.cloudflare.com',
     'https://r2.leadsy.ai',
     'https://tag.trovo-tag.com',
@@ -116,24 +100,12 @@ const STATIC_CSP_PARTS = {
   connectSrcBase: [
     "connect-src 'self'",
     ...getCspConnectSrcDomains(),
-    'https://distinct-giraffe-5.clerk.accounts.dev',
-    'https://clerk.com',
-    'https://cdn.clerk.com',
-    'https://*.clerk.com',
-    'https://*.clerk.services',
-    'https://*.clerk.accounts.dev',
-    'https://clerk.jov.ie',
-    'https://clerk.staging.jov.ie',
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
     'https://*.ingest.us.sentry.io',
     'https://*.sentry.io',
-    'wss://*.clerk.com',
-    'wss://distinct-giraffe-5.clerk.accounts.dev',
-    'wss://clerk.staging.jov.ie',
     'https://jov.ie',
     'https://challenges.cloudflare.com',
-    'https://clerk-telemetry.com',
     'https://vercel.live',
     'wss://ws-us3.pusher.com',
     'https://r2.leadsy.ai',
@@ -155,10 +127,6 @@ const STATIC_CSP_PARTS = {
     "frame-src 'self'",
     'https://js.stripe.com',
     'https://checkout.stripe.com',
-    'https://*.clerk.com',
-    'https://*.clerk.accounts.dev',
-    'https://distinct-giraffe-5.clerk.accounts.dev',
-    'https://clerk.staging.jov.ie',
     'https://challenges.cloudflare.com',
   ].join(' '),
 } as const;

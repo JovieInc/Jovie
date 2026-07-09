@@ -23,6 +23,3 @@ export {
   AuthTextInput,
 } from './atoms';
 export { ButtonSpinner } from './ButtonSpinner';
-
-// SSO Callback Handler
-export { SsoCallbackHandler } from './SsoCallbackHandler';

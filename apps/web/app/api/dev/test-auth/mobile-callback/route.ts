@@ -7,7 +7,7 @@ import {
   parseDevTestAuthPersona,
 } from '@/lib/auth/dev-test-auth.server';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
-import { resolveConfiguredNativeTestClerkUserId } from '@/lib/auth/native-test-clerk-user.server';
+import { resolveConfiguredNativeTestBetterAuthUserId } from '@/lib/auth/native-test-clerk-user.server';
 import { createStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
 import { isTrustedTestBypassRequest } from '@/lib/auth/test-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let userId = await resolveConfiguredNativeTestClerkUserId();
+  let userId = await resolveConfiguredNativeTestBetterAuthUserId();
   let responsePersona = persona;
   if (!userId) {
     const actor = await ensureLiveDevTestAuthActor(persona);

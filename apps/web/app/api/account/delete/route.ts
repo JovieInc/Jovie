@@ -1,4 +1,3 @@
-import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -88,7 +87,7 @@ export async function POST(request: Request) {
         const [row] = await db
           .select({ id: users.id, deletedAt: users.deletedAt })
           .from(users)
-          .where(eq(users.clerkId, sessionClerkUserId))
+          .where(eq(users.id, sessionClerkUserId))
           .limit(1);
 
         return row;
@@ -151,19 +150,6 @@ export async function POST(request: Request) {
         await invalidateHandleCache(profile.usernameNormalized);
         await invalidateProfileCache(profile.usernameNormalized);
       }
-    }
-
-    // Delete the Clerk user (signs out all sessions)
-    try {
-      const clerk = await clerkClient();
-      await clerk.users.deleteUser(clerkUserId);
-    } catch (error_) {
-      // Log but don't fail - the DB deletion is the critical part
-      await captureError(
-        'Failed to delete Clerk user during account deletion',
-        error_,
-        { route: '/api/account/delete', clerkUserId }
-      );
     }
 
     return NextResponse.json(

@@ -171,7 +171,7 @@ export async function getProfileSocialLinks(
  */
 export interface UserRecord {
   id: string;
-  clerkId: string;
+  clerkId: string | null;
   email: string | null;
   isAdmin: boolean;
   isPro: boolean | null;

@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import {
   assertNoCriticalErrors,
@@ -43,8 +42,6 @@ test.describe('Full onboarding flow @nightly', () => {
     }
 
     try {
-      await setupClerkTestingToken({ page });
-
       await smokeNavigate(page, '/');
 
       await withRetry(

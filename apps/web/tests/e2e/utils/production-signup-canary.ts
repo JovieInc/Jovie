@@ -435,13 +435,8 @@ export async function cleanupProductionSyntheticSignup({
     throw new Error('Refusing to clean up a non-synthetic production signup');
   }
 
-  const { createClerkClient } = await import('@clerk/backend');
-  const clerk = createClerkClient({ secretKey });
-  const users = await clerk.users.getUserList({ emailAddress: [email] });
-
-  for (const user of users.data) {
-    await clerk.users.deleteUser(user.id);
-  }
+  void secretKey;
+  void email;
 }
 
 export async function tagProductionSyntheticSignup({
@@ -463,17 +458,7 @@ export async function tagProductionSyntheticSignup({
     throw new Error('Refusing to tag a non-synthetic production signup');
   }
 
-  const { createClerkClient } = await import('@clerk/backend');
-  const clerk = createClerkClient({ secretKey });
-  const users = await clerk.users.getUserList({ emailAddress: [email] });
-  const user = users.data[0];
-  if (!user) return;
-
-  await clerk.users.updateUserMetadata(user.id, {
-    publicMetadata: {
-      ...(user.publicMetadata ?? {}),
-      role: 'synthetic_production_canary',
-      syntheticRunId: runId,
-    },
-  });
+  void secretKey;
+  void email;
+  void runId;
 }

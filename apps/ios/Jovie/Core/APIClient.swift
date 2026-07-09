@@ -159,6 +159,47 @@ struct APIClient: APIClientProtocol, Sendable {
     self.requestTimeout = requestTimeout
   }
 
+  /**
+   * Refresh the stored native session token + expiry from the bearer
+   * plugin's `set-auth-token` response header (Clerk → Better Auth
+   * migration, eng row 31). The server emits this header when the session
+   * cookie rolls (per `updateAge`); the iOS client never needs to force a
+   * refresh — every API call that returns the header updates Keychain
+   * in-place. Returns silently when the header is absent (no roll this
+   * call) or malformed (kept token stays authoritative).
+   */
+  private func refreshStoredSessionFromResponse(
+    _ response: URLResponse,
+    expectedUserID: String? = nil
+  ) {
+    guard let httpResponse = response as? HTTPURLResponse else { return }
+    guard let newToken = httpResponse.value(forHTTPHeaderField: "set-auth-token"),
+          newToken.isEmpty == false
+    else { return }
+
+    let stored = NativeSessionTokenStore.load()
+    let userID = expectedUserID ?? stored?.userID ?? ""
+    guard userID.isEmpty == false else { return }
+
+    // Preserve the existing expiry if the server doesn't send a new one;
+    // BA's session.expiresIn (7 days) is the source of truth, and the
+    // header doesn't currently carry a new expiry — we extend the existing
+    // expiry by 7 days from now to match the server's roll cadence.
+    let newExpiry = Date().addingTimeInterval(60 * 60 * 24 * 7)
+    NativeSessionTokenStore.save(token: newToken, userID: userID, expiresAt: newExpiry)
+  }
+
+  /**
+   * Terminal 401 path (eng row 31): a 401 even after `forceRefresh` means
+   * the session is revoked or expired beyond client-side refresh. Clear
+   * Keychain so the next launch shows the signed-out state. The caller is
+   * responsible for surfacing the sign-in screen.
+   */
+  private func handleTerminalUnauthorized() {
+    NativeSessionTokenStore.clear()
+    MobileAuthDiagnostics.record("native_session_cleared_terminal_401")
+  }
+
   func fetchMe() async throws -> MobileMeResponse {
     try await sendMeRequest(forceRefresh: false)
   }
@@ -207,6 +248,9 @@ struct APIClient: APIClientProtocol, Sendable {
       MobileAuthDiagnostics.record("mobile_me_retrying", detail: "status=401")
       return try await sendMeRequest(forceRefresh: true)
     }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       MobileAuthDiagnostics.record(
@@ -215,6 +259,8 @@ struct APIClient: APIClientProtocol, Sendable {
       )
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
+
+    refreshStoredSessionFromResponse(response)
 
     do {
       MobileAuthDiagnostics.record(
@@ -254,10 +300,15 @@ struct APIClient: APIClientProtocol, Sendable {
     if httpResponse.statusCode == 401, !forceRefresh {
       return try await sendAppleWalletProfilePassRequest(forceRefresh: true)
     }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
+
+    refreshStoredSessionFromResponse(response)
 
     return data
   }
@@ -292,10 +343,15 @@ struct APIClient: APIClientProtocol, Sendable {
     if httpResponse.statusCode == 401, !forceRefresh {
       return try await sendAudienceHighlightsRequest(forceRefresh: true)
     }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
+
+    refreshStoredSessionFromResponse(response)
 
     do {
       return try decoder.decode(MobileAudienceHighlightsResponse.self, from: data)
@@ -332,10 +388,15 @@ struct APIClient: APIClientProtocol, Sendable {
     if httpResponse.statusCode == 401, !forceRefresh {
       return try await sendActionLoopInboxRequest(forceRefresh: true)
     }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
+
+    refreshStoredSessionFromResponse(response)
 
     do {
       return try decoder.decode(MobileActionLoopInboxResponse.self, from: data)
@@ -372,10 +433,15 @@ struct APIClient: APIClientProtocol, Sendable {
     if httpResponse.statusCode == 401, !forceRefresh {
       return try await sendActionLoopCalendarRequest(forceRefresh: true)
     }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
+
+    refreshStoredSessionFromResponse(response)
 
     do {
       return try decoder.decode(MobileActionLoopCalendarResponse.self, from: data)

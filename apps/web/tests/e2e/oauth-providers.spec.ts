@@ -4,23 +4,30 @@ import expected from '@/lib/auth/oauth-redirect-uris.expected.json';
 /**
  * OAuth provider redirect-URI probe (@production-smoke).
  *
- * Catches the 2026-06-26 incident: production Google/Apple sign-in died with
- * `Error 400: redirect_uri_mismatch` because the Clerk FAPI host moved to
- * clerk.jov.ie (staging unification) but the Google OAuth client + Apple
- * Service ID consoles still only had the old proxy-path / meetjovie callbacks.
- * No existing test caught it: auth-public-ready.spec.ts only asserts the SSO
- * buttons RENDER — it never follows the redirect to Google/Apple.
+ * Catches the 2026-06-26 incident class: production Google/Apple sign-in
+ * died with `Error 400: redirect_uri_mismatch` because the console
+ * registrations drifted from the OAuth redirect_uri the app hands them.
+ * No existing test caught it: auth-public-ready.spec.ts only asserts the
+ * SSO buttons RENDER — it never follows the redirect to Google/Apple.
  *
- * This probe does NOT click the in-app button (that couples to Clerk readiness
- * and the invisible bot-protection / Turnstile gate). Instead it hits the
- * Google + Apple authorize endpoints directly with the EXACT redirect_uri Clerk
- * hands them — `https://<fapi-host>/v1/oauth_callback` — and asserts the
- * provider ACCEPTS it (shows its sign-in / consent screen) rather than the
- * redirect_uri_mismatch error page. Deterministic, needs no credentials, and
- * tests the precise contract the consoles must satisfy.
+ * This probe does NOT click the in-app button (that couples to Better
+ * Auth handler readiness and invisible bot-protection). Instead it hits
+ * the Google + Apple authorize endpoints directly with the EXACT
+ * redirect_uri Better Auth hands them —
+ * `https://<appHost>/api/auth/callback/<provider>` — and asserts the
+ * provider ACCEPTS it (shows its sign-in / consent screen) rather than
+ * the redirect_uri_mismatch error page. Deterministic, needs no
+ * credentials, and tests the precise contract the consoles must satisfy.
  *
  * Source of truth for the URIs: apps/web/lib/auth/oauth-redirect-uris.expected.json
- * (kept honest by scripts/auth-redirect-uris.ts + fapi-host-snapshot.test.ts).
+ * (kept honest by scripts/auth-redirect-uris.ts +
+ * redirect-uri-snapshot.test.ts + /auth-console-sync skill).
+ *
+ * Plan Phase 11 (Clerk → Better Auth migration): the callback changed from
+ * Clerk's `https://<fapi-host>/v1/oauth_callback` to Better Auth's
+ * `https://<appHost>/api/auth/callback/<provider>`. Plus a new hard probe
+ * `GET /api/auth/ok` (ci.yml production-oauth-gate +
+ * canary-health-gate.yml) covers the handler-reachable case.
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -32,23 +39,25 @@ const APPLE_REJECT =
   /invalid_request|invalid_redirect_uri|invalid web redirect|your request could not be completed/i;
 
 /**
- * Pick the FAPI callback that matches the deployment under test. Probing
- * jov.ie must test clerk.jov.ie; staging.jov.ie must test clerk.staging.jov.ie,
- * because the two run different Clerk instances with different OAuth clients.
+ * Pick the OAuth callback URI that matches the deployment under test.
+ * Probing jov.ie must test jov.ie's callback; staging.jov.ie must test
+ * staging.jov.ie's callback, because the two run different app hosts
+ * registered against the same Google OAuth client + Apple Service ID.
  */
-function callbackForBaseUrl(): string {
+function callbackForBaseUrl(provider: 'google' | 'apple'): string {
   const base = process.env.BASE_URL ?? 'https://jov.ie';
   const instance = /staging\./i.test(base) ? 'staging' : 'prod';
-  return `https://${expected.instances[instance].fapiHost}/v1/oauth_callback`;
+  const appHost = expected.instances[instance].appHost;
+  return `https://${appHost}/api/auth/callback/${provider}`;
 }
 
 test.describe('OAuth provider redirect URIs @production-smoke', () => {
   test.setTimeout(60_000);
 
-  test('Google accepts the Clerk redirect_uri (no redirect_uri_mismatch)', async ({
+  test('Google accepts the Better Auth redirect_uri (no redirect_uri_mismatch)', async ({
     page,
   }) => {
-    const redirectUri = callbackForBaseUrl();
+    const redirectUri = callbackForBaseUrl('google');
     // Only probe Google if this redirect_uri is in the required set for the env.
     test.skip(
       !expected.google.requiredRedirectUris.includes(redirectUri),
@@ -85,11 +94,11 @@ test.describe('OAuth provider redirect URIs @production-smoke', () => {
     }
   });
 
-  test('Apple accepts the Clerk return URL (no invalid_request)', async ({
+  test('Apple accepts the Better Auth return URL (no invalid_request)', async ({
     page,
   }) => {
-    const redirectUri = callbackForBaseUrl();
-    // Apple Sign In is only enabled on the prod instance (staging Apple is off).
+    const redirectUri = callbackForBaseUrl('apple');
+    // Apple Sign In is only enabled on prod (staging Apple is off).
     test.skip(
       !expected.apple.requiredReturnUrls.includes(redirectUri),
       `Apple not expected to allow ${redirectUri}`

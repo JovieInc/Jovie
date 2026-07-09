@@ -1,9 +1,7 @@
-import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -55,36 +53,12 @@ export async function POST(request: Request) {
 
     const { email } = result.data;
 
-    return await withDbSession(async clerkUserId => {
-      const clerk = await clerkClient();
-      const clerkUser = await clerk.users.getUser(clerkUserId);
-      const normalizedEmail = email.toLowerCase();
-
-      const matchingEmail = clerkUser.emailAddresses.find(address => {
-        return address.emailAddress.toLowerCase() === normalizedEmail;
-      });
-
-      if (!matchingEmail) {
-        return NextResponse.json(
-          {
-            error:
-              'Email must match one of your verified Clerk email addresses.',
-          },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      if (matchingEmail.verification?.status !== 'verified') {
-        return NextResponse.json(
-          {
-            error: 'Email address must be verified before syncing.',
-          },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      // Get user to verify they exist and get internal ID
-      const user = await getUserByClerkId(db, clerkUserId);
+    return await withDbSession(async userId => {
+      const [user] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
       if (!user) {
         return NextResponse.json(
           { error: 'User not found' },
@@ -92,7 +66,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Update user's email
       await db
         .update(users)
         .set({ email, updatedAt: new Date() })

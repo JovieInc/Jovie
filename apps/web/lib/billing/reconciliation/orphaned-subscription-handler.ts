@@ -14,7 +14,7 @@ import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
  */
 export interface OrphanedSubscriptionResult {
   success: boolean;
-  action: 'downgraded' | 'cleared_id';
+  action: 'downgraded' | 'cleared_id' | 'skipped';
   error?: string;
 }
 
@@ -30,11 +30,19 @@ export async function handleOrphanedSubscription(
   db: DbOrTransaction,
   user: {
     id: string;
-    clerkId: string;
+    clerkId: string | null;
     isPro: boolean;
     stripeSubscriptionId: string;
   }
 ): Promise<OrphanedSubscriptionResult> {
+  if (!user.clerkId) {
+    return {
+      success: false,
+      action: 'skipped',
+      error:
+        'user has no clerk_id (post-cutover row; reconciler skips until better-auth identity swap)',
+    };
+  }
   if (user.isPro) {
     // User is marked as Pro but subscription is gone - downgrade
     const result = await updateUserBillingStatus({

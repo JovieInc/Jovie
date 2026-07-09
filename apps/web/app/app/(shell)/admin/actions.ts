@@ -551,26 +551,31 @@ export async function banUserAction(formData: FormData): Promise<void> {
     return { clerkId: current.clerkId };
   });
 
-  // Post-commit side effects (best-effort)
-  try {
-    await syncAllClerkMetadata(result.clerkId);
-  } catch (error) {
-    captureError('Failed to sync Clerk metadata after ban', error, {
-      userId,
-      clerkId: result.clerkId,
-    });
-  }
+  // Post-commit side effects (best-effort). clerk_id may be null for users
+  // provisioned post-cutover (migration 0073); Clerk-keyed side effects are
+  // skipped in that case — the live auth path resolves them via
+  // better_auth_user_id, so there is no Clerk metadata to sync.
+  if (result.clerkId) {
+    try {
+      await syncAllClerkMetadata(result.clerkId);
+    } catch (error) {
+      captureError('Failed to sync Clerk metadata after ban', error, {
+        userId,
+        clerkId: result.clerkId,
+      });
+    }
 
-  try {
-    await Promise.all([
-      invalidateProxyUserStateCache(result.clerkId),
-      invalidateBanStatusCache(result.clerkId),
-    ]);
-  } catch (error) {
-    captureError('Failed to invalidate auth caches after ban', error, {
-      userId,
-      clerkId: result.clerkId,
-    });
+    try {
+      await Promise.all([
+        invalidateProxyUserStateCache(result.clerkId),
+        invalidateBanStatusCache(result.clerkId),
+      ]);
+    } catch (error) {
+      captureError('Failed to invalidate auth caches after ban', error, {
+        userId,
+        clerkId: result.clerkId,
+      });
+    }
   }
 
   revalidatePath(APP_ROUTES.ADMIN);
@@ -684,26 +689,29 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
     return { clerkId: user.clerkId };
   });
 
-  // Post-commit side effects (best-effort)
-  try {
-    await syncAllClerkMetadata(result.clerkId);
-  } catch (error) {
-    captureError('Failed to sync Clerk metadata after unban', error, {
-      userId,
-      clerkId: result.clerkId,
-    });
-  }
+  // Post-commit side effects (best-effort). See note in banUser: clerk_id may
+  // be null for users provisioned post-cutover (migration 0073).
+  if (result.clerkId) {
+    try {
+      await syncAllClerkMetadata(result.clerkId);
+    } catch (error) {
+      captureError('Failed to sync Clerk metadata after unban', error, {
+        userId,
+        clerkId: result.clerkId,
+      });
+    }
 
-  try {
-    await Promise.all([
-      invalidateProxyUserStateCache(result.clerkId),
-      invalidateBanStatusCache(result.clerkId),
-    ]);
-  } catch (error) {
-    captureError('Failed to invalidate auth caches after unban', error, {
-      userId,
-      clerkId: result.clerkId,
-    });
+    try {
+      await Promise.all([
+        invalidateProxyUserStateCache(result.clerkId),
+        invalidateBanStatusCache(result.clerkId),
+      ]);
+    } catch (error) {
+      captureError('Failed to invalidate auth caches after unban', error, {
+        userId,
+        clerkId: result.clerkId,
+      });
+    }
   }
 
   revalidatePath(APP_ROUTES.ADMIN);

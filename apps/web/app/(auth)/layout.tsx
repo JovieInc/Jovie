@@ -1,19 +1,5 @@
-import * as Sentry from '@sentry/nextjs';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
-import {
-  getRequestLocationFromHeaders,
-  isMockPublishableKey,
-  isPublicAuthHost,
-} from '@/components/providers/clerkAvailability';
-import {
-  AuthLayout as AuthShellLayout,
-  AuthUnavailableCard,
-} from '@/features/auth';
-import { CLERK_KEY_STATUS_HEADER } from '@/lib/auth/clerk-key-status';
-import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
-import { publicEnv } from '@/lib/env-public';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { resolveAuthRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
@@ -26,6 +12,22 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * Auth layout (Clerk → Better Auth migration, client-flip commit ⑦).
+ *
+ * Under Clerk this layout resolved the publishable key, gated on
+ * `isMockPublishableKey`, and rendered an `AuthUnavailableCard` when Clerk
+ * was misconfigured. Under Better Auth there is no provider to mount and
+ * no publishable key to resolve — `AuthClientProviders` mounts the
+ * `JovieAuthValuesProvider` (aliased as `ClerkSafeValuesProvider`) and
+ * the auth pages render their own `auth.api.getSession` check directly
+ * (audit row 16 — auth-page signed-in redirects live in the pages, not
+ * the proxy).
+ *
+ * The `AuthUnavailableCard` trigger is retired (plan design row 21): there
+ * is no Clerk config to be missing. A generic auth error boundary stays
+ * in the `error.tsx` sibling.
+ */
 export default async function AuthLayout({
   children,
 }: Readonly<{
@@ -34,46 +36,9 @@ export default async function AuthLayout({
   const initialFlags = await getAppFlagsSnapshot({
     flagNames: resolveAuthRouteFlagNames(),
   });
-  const publishableKey = await resolvePublishableKeyFromHeaders();
-  const hdrs = await headers();
-  const isClerkUnavailable =
-    !publishableKey ||
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-    isMockPublishableKey(publishableKey);
-
-  if (isClerkUnavailable) {
-    const location = getRequestLocationFromHeaders(hdrs);
-    const onPublicHost = isPublicAuthHost(location);
-    if (onPublicHost) {
-      const keyStatus = hdrs.get(CLERK_KEY_STATUS_HEADER);
-      Sentry.captureMessage('clerk_bypass_on_public_host', {
-        level: 'error',
-        tags: {
-          hostname: location?.hostname ?? 'unknown',
-          key_status: keyStatus ?? 'unknown',
-        },
-      });
-    }
-    return (
-      <AppFlagProvider initialFlags={initialFlags}>
-        <main id='main-content'>
-          <AuthShellLayout
-            formTitle='Auth unavailable'
-            showFormTitle={false}
-            showFooterPrompt={false}
-            layoutVariant='stack'
-            contentPlacement='center'
-            showLogo={false}
-          >
-            <AuthUnavailableCard showResetAction={onPublicHost} />
-          </AuthShellLayout>
-        </main>
-      </AppFlagProvider>
-    );
-  }
 
   return (
-    <AuthClientProviders forceEnableClerk publishableKey={publishableKey}>
+    <AuthClientProviders>
       <AppFlagProvider initialFlags={initialFlags}>
         <main id='main-content'>{children}</main>
       </AppFlagProvider>

@@ -59,11 +59,29 @@ export const ServerEnvSchema = z.object({
    */
   CHAT_LLM_FAILURE_INJECTION: z.string().optional(),
 
+  /**
+   * E2E-only: '1' switches the Better Auth email-OTP flow to the deterministic
+   * test code for test-pattern addresses. Hard-ignored on production deploys
+   * (better-auth.ts guards on VERCEL_ENV).
+   */
+  E2E_TEST_MODE: z.string().optional(),
+
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
   CLERK_WEBHOOK_SECRET: z.string().optional(),
   CLERK_PUBLISHABLE_KEY_STAGING: z.string().optional(),
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
+
+  // Better Auth (self-hosted auth — Clerk cutover in flight; optional until
+  // the flip commit adds preview/prod fail-fast validation rules)
+  BETTER_AUTH_SECRET: z.string().optional(),
+  BETTER_AUTH_URL: z.string().url().optional(),
+  AUTH_GOOGLE_CLIENT_ID: z.string().optional(),
+  AUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
+  AUTH_APPLE_CLIENT_ID: z.string().optional(),
+  AUTH_APPLE_TEAM_ID: z.string().optional(),
+  AUTH_APPLE_KEY_ID: z.string().optional(),
+  AUTH_APPLE_PRIVATE_KEY: z.string().optional(),
 
   // Email / notifications
   RESEND_API_KEY: z.string().optional(),
@@ -84,6 +102,7 @@ export const ServerEnvSchema = z.object({
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
   JOVIE_SYSTEM_CLERK_USER_ID: z.string().optional(),
+  JOVIE_SPOTIFY_ACCESS_TOKEN: z.string().optional(),
   APPLE_MUSIC_DEVELOPER_TOKEN: z.string().optional(),
   IOS_TESTFLIGHT_PUBLIC_LINK: z.string().url().optional(),
 
@@ -391,10 +410,19 @@ export const ENV_KEYS = [
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'PUBLIC_NOAUTH_SMOKE',
   'CHAT_LLM_FAILURE_INJECTION',
+  'E2E_TEST_MODE',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
   'CLERK_PUBLISHABLE_KEY_STAGING',
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+  'BETTER_AUTH_SECRET',
+  'BETTER_AUTH_URL',
+  'AUTH_GOOGLE_CLIENT_ID',
+  'AUTH_GOOGLE_CLIENT_SECRET',
+  'AUTH_APPLE_CLIENT_ID',
+  'AUTH_APPLE_TEAM_ID',
+  'AUTH_APPLE_KEY_ID',
+  'AUTH_APPLE_PRIVATE_KEY',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',
@@ -406,6 +434,7 @@ export const ENV_KEYS = [
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
   'JOVIE_SYSTEM_CLERK_USER_ID',
+  'JOVIE_SPOTIFY_ACCESS_TOKEN',
   'APPLE_MUSIC_DEVELOPER_TOKEN',
   'IOS_TESTFLIGHT_PUBLIC_LINK',
   'APPLE_WALLET_PASS_TYPE_IDENTIFIER',

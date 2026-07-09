@@ -57,14 +57,12 @@ private final class MockBrightnessController: BrightnessControlling, @unchecked 
 @MainActor
 struct AppStateTests {
   private let configuration = AppConfiguration(
-    clerkPublishableKey: "pk_test_123",
     apiBaseURL: URL(string: "http://localhost:3100")!,
     webBaseURL: URL(string: "https://jov.ie")!,
     sentryDSN: nil,
     observabilityIngestURL: nil,
     observabilityIngestSecret: nil,
     observabilityEnvironment: "test",
-    clerkRedirectUrl: "ie.jov.jovie://callback",
     clerkCallbackUrlScheme: "ie.jov.jovie"
   )
 

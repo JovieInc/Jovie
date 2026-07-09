@@ -1,4 +1,3 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
@@ -301,8 +300,6 @@ async function interceptTrackingCalls(page: Page) {
  * with the magic code 424242 before a session is created.
  */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
-  await setupClerkTestingToken({ page });
-
   await page.goto('/signin', {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
@@ -634,7 +631,6 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
       const adminPage = await adminContext.newPage();
 
       try {
-        await setupClerkTestingToken({ page: adminPage });
         await ensureSignedInUser(adminPage, getAdminCredentials());
 
         await adminPage.goto(APP_ROUTES.ADMIN, {

@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import { normalizeEmail } from '@/lib/utils/email';
 
@@ -6,10 +8,6 @@ export interface ClerkEmailAddress {
   verification?: { status?: string | null } | null;
 }
 
-/**
- * Prefer a verified Clerk email over `emailAddresses[0]` or primary.
- * Unverified addresses must not drive identity-sensitive DB rebinding.
- */
 export function selectVerifiedClerkEmail(
   emailAddresses: ReadonlyArray<ClerkEmailAddress> | null | undefined
 ): string | null {
@@ -23,9 +21,14 @@ export interface ClerkPrivateMetadata {
   fullName?: string | null;
 }
 
+export interface ClerkExternalAccount {
+  provider?: string | null;
+  username?: string | null;
+}
+
 export interface ClerkUserIdentityInput {
   primaryEmailAddress?: ClerkEmailAddress | null;
-  emailAddresses?: ClerkEmailAddress[] | null;
+  emailAddresses?: ReadonlyArray<ClerkEmailAddress> | null;
   fullName?: string | null;
   firstName?: string | null;
   lastName?: string | null;
@@ -33,11 +36,6 @@ export interface ClerkUserIdentityInput {
   imageUrl?: string | null;
   externalAccounts?: ClerkExternalAccount[] | null;
   privateMetadata?: ClerkPrivateMetadata | null;
-}
-
-export interface ClerkExternalAccount {
-  provider?: string | null;
-  username?: string | null;
 }
 
 export type ClerkDisplayNameSource =
@@ -61,47 +59,15 @@ function resolveSpotifyUsername(
   externalAccounts: ClerkExternalAccount[] | null | undefined
 ): string | null {
   if (!externalAccounts?.length) return null;
-
-  const spotifyAccount = externalAccounts.find(account => {
-    const provider = (account.provider ?? '').toLowerCase();
-    return provider.includes('spotify');
-  });
-
-  const username = spotifyAccount?.username?.trim() ?? '';
-  return username || null;
+  const spotifyAccount = externalAccounts.find(account =>
+    (account.provider ?? '').toLowerCase().includes('spotify')
+  );
+  return spotifyAccount?.username?.trim() || null;
 }
 
 function deriveDisplayNameFromEmail(email: string): string {
-  if (!email.includes('@')) {
-    return '';
-  }
-
   const localPart = email.split('@').at(0) ?? '';
   return localPart.trim().replaceAll(/[._-]+/g, ' ');
-}
-
-/**
- * Display name candidate with its source identifier.
- */
-type DisplayNameCandidate = {
-  value: string | null;
-  source: ClerkDisplayNameSource;
-};
-
-/**
- * Resolve display name from candidates using priority order.
- * Returns the first non-empty candidate.
- */
-function resolveDisplayName(candidates: DisplayNameCandidate[]): {
-  displayName: string | null;
-  source: ClerkDisplayNameSource;
-} {
-  for (const candidate of candidates) {
-    if (candidate.value) {
-      return { displayName: candidate.value, source: candidate.source };
-    }
-  }
-  return { displayName: null, source: null };
 }
 
 export function resolveClerkIdentity(
@@ -111,46 +77,31 @@ export function resolveClerkIdentity(
     user?.primaryEmailAddress?.emailAddress ??
     user?.emailAddresses?.[0]?.emailAddress ??
     null;
-
   const email = emailRaw ? normalizeEmail(emailRaw) : null;
-
   const privateMetadataFullName = (
     user?.privateMetadata?.fullName ?? ''
   ).trim();
   const fullName = (user?.fullName ?? '').trim();
   const firstName = (user?.firstName ?? '').trim();
   const lastName = (user?.lastName ?? '').trim();
-
   const nameFromParts = [firstName, lastName].filter(Boolean).join(' ').trim();
   const username = (user?.username ?? '').trim();
   const derivedFromEmail = email ? deriveDisplayNameFromEmail(email) : null;
-
-  // Priority-ordered candidates for display name resolution
-  const candidates: DisplayNameCandidate[] = [
-    {
-      value: privateMetadataFullName || null,
-      source: 'private_metadata_full_name',
-    },
-    { value: fullName || null, source: 'clerk_full_name' },
-    { value: nameFromParts || null, source: 'clerk_name_parts' },
-    { value: firstName || null, source: 'clerk_first_name' },
-    { value: username || null, source: 'clerk_username' },
-    { value: derivedFromEmail, source: 'email_local_part' },
+  const candidates: readonly [string | null, ClerkDisplayNameSource][] = [
+    [privateMetadataFullName || null, 'private_metadata_full_name'],
+    [fullName || null, 'clerk_full_name'],
+    [nameFromParts || null, 'clerk_name_parts'],
+    [firstName || null, 'clerk_first_name'],
+    [username || null, 'clerk_username'],
+    [derivedFromEmail, 'email_local_part'],
   ];
-
-  const { displayName, source: displayNameSource } =
-    resolveDisplayName(candidates);
-
-  // Upgrade OAuth provider avatar URLs to high resolution
-  // Google OAuth returns 96x96 by default, we upgrade to 512x512
-  const avatarUrl = upgradeOAuthAvatarUrl(user?.imageUrl);
-  const spotifyUsername = resolveSpotifyUsername(user?.externalAccounts);
+  const match = candidates.find(([value]) => value);
 
   return {
     email,
-    displayName,
-    avatarUrl,
-    spotifyUsername,
-    displayNameSource,
+    displayName: match?.[0] ?? null,
+    avatarUrl: upgradeOAuthAvatarUrl(user?.imageUrl),
+    spotifyUsername: resolveSpotifyUsername(user?.externalAccounts),
+    displayNameSource: match?.[1] ?? null,
   };
 }

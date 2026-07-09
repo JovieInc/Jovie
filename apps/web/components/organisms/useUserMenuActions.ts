@@ -1,8 +1,8 @@
 'use client';
 
-import type { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import type { JovieSignOutOptions } from '@/hooks/useJovieAuth';
 import { track } from '@/lib/analytics';
 import {
   formatVerifiedPriceLabel,
@@ -16,8 +16,6 @@ import {
   usePricingOptionsQuery,
 } from '@/lib/queries';
 import type { BillingStatus } from './user-button/useUserButton';
-
-type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];
 
 const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
@@ -36,7 +34,7 @@ interface UseUserMenuActionsParams {
   settingsUrl?: string;
   usageStatsUrl?: string;
   redirectToUrl: (url: string) => void;
-  signOut: ClerkSignOut;
+  signOut: (options?: JovieSignOutOptions) => Promise<void>;
 }
 
 export function useUserMenuActions({

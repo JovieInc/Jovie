@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { clerkClient } from '@clerk/nextjs/server';
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { adminSystemSettings } from '@/lib/db/schema/admin';
@@ -14,7 +13,6 @@ import {
 import {
   REQUIRED_PLAYLIST_SPOTIFY_SCOPES,
   SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS,
-  SPOTIFY_OAUTH_TOKEN_STRATEGY,
 } from '@/lib/spotify/system-account';
 
 export const PLAYLIST_INTERVAL_UNITS = ['hours', 'days', 'weeks'] as const;
@@ -232,22 +230,15 @@ export function isSpotifyAccount(
 }
 
 async function getSpotifyExternalAccount(
-  clerkUserId: string
+  _clerkUserId: string
 ): Promise<SpotifyExternalAccount | null> {
-  const clerk = await clerkClient();
-  const user = await clerk.users.getUser(clerkUserId);
-  return user.externalAccounts.find(isSpotifyAccount) ?? null;
+  return null;
 }
 
-async function getSpotifyToken(clerkUserId: string): Promise<string> {
-  const clerk = await clerkClient();
-  const tokens = await clerk.users.getUserOauthAccessToken(
-    clerkUserId,
-    SPOTIFY_OAUTH_TOKEN_STRATEGY
+async function getSpotifyToken(_clerkUserId: string): Promise<string> {
+  throw new Error(
+    'Spotify OAuth token is unavailable after Better Auth cutover. Reconnect Spotify with the new provider path.'
   );
-  const token = tokens.data[0]?.token;
-  if (!token) throw new Error('Spotify OAuth token is unavailable.');
-  return token;
 }
 
 export async function validatePlaylistSpotifyAccount(

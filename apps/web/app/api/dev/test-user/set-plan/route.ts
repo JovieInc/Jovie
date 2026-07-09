@@ -8,7 +8,6 @@
  * through the full Stripe checkout flow.
  */
 
-import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -35,20 +34,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Verify this is a Clerk test user (+clerk_test email)
-  const clerk = await clerkClient();
-  const clerkUser = await clerk.users.getUser(userId);
-  const primaryEmail = clerkUser.emailAddresses.find(
-    e => e.id === clerkUser.primaryEmailAddressId
-  )?.emailAddress;
-
-  if (!primaryEmail?.includes('+clerk_test')) {
-    return NextResponse.json(
-      { error: 'Only available for test users (+clerk_test)' },
-      { status: 403 }
-    );
-  }
-
   const body = await req.json().catch(() => null);
   const parsed = RequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -68,7 +53,7 @@ export async function POST(req: Request) {
       isPro,
       billingUpdatedAt: new Date(),
     })
-    .where(eq(users.clerkId, userId));
+    .where(eq(users.id, userId));
 
   return NextResponse.json({ success: true, plan, isPro });
 }

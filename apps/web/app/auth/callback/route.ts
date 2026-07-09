@@ -1,4 +1,3 @@
-import { auth } from '@clerk/nextjs/server';
 import {
   AUTH_STATE_PARAM,
   createAuthAnalyticsEvent,
@@ -7,6 +6,7 @@ import {
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { auth } from '@/lib/auth/better-auth';
 import {
   consumeStoredAuthState,
   createStoredNativeExchangeCode,
@@ -30,6 +30,32 @@ async function trackAuthEvent(
   );
 }
 
+/**
+ * Mint a one-time token from the completing browser's Better Auth session
+ * (plan decision 9). The native exchange route verifies this OTT to redeem
+ * a fresh native session (iOS) or hands it to the native-complete page
+ * (Electron) which POSTs it to `/api/auth/one-time-token/verify`.
+ *
+ * `auth.api.generateOneTimeToken` requires a session (it reads the user
+ * from the request headers); the OTT is bound to the completing user.
+ * `expiresIn: 5` (minutes) ≥ the native exchange TTL (5 min).
+ */
+async function mintNativeOneTimeToken(
+  headers: Headers
+): Promise<string | null> {
+  try {
+    const result = await auth.api.generateOneTimeToken({ headers });
+    if (!result?.token) return null;
+    return result.token;
+  } catch (error) {
+    await captureError('Native OTT mint failed at auth callback', error, {
+      route: '/auth/callback',
+      operation: 'generateOneTimeToken',
+    });
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const state = url.searchParams.get('state');
@@ -41,7 +67,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { userId } = await auth();
+    // Better Auth session (Clerk → Better Auth migration, plan decision 9).
+    // `auth.api.getSession` validates the signed session cookie and returns
+    // the user. A missing session redirects to /signin with the auth state
+    // preserved so the OAuth flow restarts cleanly.
+    const session = await auth.api.getSession({ headers: request.headers });
+    const userId = session?.user?.id ?? null;
     if (!userId) {
       const signInUrl = new URL(APP_ROUTES.SIGNIN, request.url);
       signInUrl.searchParams.set(AUTH_STATE_PARAM, state);
@@ -66,8 +97,27 @@ export async function GET(request: Request) {
     let exchangeCode: string | undefined;
     const nativeClient: NativeAuthClient | null =
       stateRecord.client === 'web' ? null : stateRecord.client;
+
+    // Native clients: mint an OTT from the completing browser session and
+    // store it in the exchange record. The native exchange route reads it
+    // back to verify (iOS) or hands it to native-complete (Electron).
+    let ott: string | null = null;
     if (nativeClient) {
       exchangeCode = createExchangeCode();
+      ott = await mintNativeOneTimeToken(request.headers);
+      if (!ott) {
+        // OTT mint failed (captured above). Still create the exchange record
+        // so the native client can surface a specific failure class
+        // (`ott_missing`) rather than a generic missing-code error.
+        await captureError(
+          'Native exchange created without OTT — exchange will fail at verify',
+          new Error('OTT mint returned null'),
+          {
+            route: '/auth/callback',
+            client: nativeClient,
+          }
+        );
+      }
       await createStoredNativeExchangeCode({
         code: exchangeCode,
         client: nativeClient,
@@ -75,6 +125,7 @@ export async function GET(request: Request) {
         userId,
         returnTo: stateRecord.returnTo,
         codeChallenge: stateRecord.codeChallenge,
+        ott,
       });
     }
 

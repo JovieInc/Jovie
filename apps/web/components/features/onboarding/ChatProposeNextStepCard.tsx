@@ -1,8 +1,8 @@
 'use client';
 
-import { SignUp } from '@clerk/nextjs';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthShell } from '@/features/auth';
 import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
@@ -13,10 +13,12 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  *
  * Three render paths driven by the deterministic decision:
  *
- *  - `instant_access` → inline Clerk `<SignUp />` with `fallbackRedirectUrl`
- *    back to /start. The OnboardingShell's auto-claim hook then attaches the
+ *  - `instant_access` → inline `AuthShell mode="sign-up"` (Better Auth-backed
+ *    signup surface). The OnboardingShell's auto-claim hook then attaches the
  *    fresh user's account to the anonymous transcript and bounces them
- *    forward to /onboarding/checkout.
+ *    forward to /onboarding/checkout. (Clerk → Better Auth migration,
+ *    client-flip commit ⑦: replaced Clerk `<SignUp />` prebuilt with the
+ *    BA-backed `AuthShell`.)
  *
  *  - `waitlist` → confirmation message. Visitor's transcript is already
  *    saved; we'll email them when they're up.
@@ -62,38 +64,9 @@ export function ChatProposeNextStepCard({
     }
   }, [kind, payload.decision.score]);
 
-  // Memoise the Clerk appearance so the inline form looks at home on the
-  // dark onboarding canvas without re-creating the object on every render.
-  const appearance = useMemo(
-    () => ({
-      elements: {
-        rootBox: 'w-full',
-        card: 'bg-transparent shadow-none border-0 p-0',
-        headerTitle: 'text-primary-token text-lg font-semibold',
-        headerSubtitle: 'text-secondary-token text-app',
-        formButtonPrimary:
-          'bg-white text-black dark:text-white hover:bg-white/90 font-semibold',
-        socialButtonsBlockButton:
-          'bg-surface-1 border-subtle text-primary-token hover:bg-surface-2',
-        formFieldInput:
-          'bg-surface-0 border-subtle text-primary-token focus:border-primary-token/30',
-        formFieldLabel: 'text-secondary-token',
-        footer: 'hidden',
-        dividerLine: 'bg-(--linear-border-subtle)',
-        dividerText: 'text-tertiary-token',
-      },
-      variables: {
-        colorBackground: 'transparent',
-        colorPrimary: '#ffffff',
-        colorText: '#ffffff',
-        colorTextSecondary: 'rgba(255,255,255,0.6)',
-        colorInputBackground: 'rgba(255,255,255,0.04)',
-        colorInputText: '#ffffff',
-        borderRadius: '12px',
-      },
-    }),
-    []
-  );
+  // Memoise the auth surface so the inline form looks at home on the
+  // dark onboarding canvas. AuthShell's `compact` mode renders the
+  // provider grid + email OTP form without the full-page chrome.
 
   if (kind === 'needs_more_info') {
     // No visible card — the LLM keeps the conversation going.
@@ -139,12 +112,10 @@ export function ChatProposeNextStepCard({
       <p className='mb-3 text-mid leading-7 text-primary-token'>
         {`You're in. Add an email to keep going. I'll save this conversation to your account so we don't lose it.`}
       </p>
-      <SignUp
-        routing='hash'
-        oauthFlow='redirect'
-        signInUrl={APP_ROUTES.SIGNIN}
+      <AuthShell
+        mode='sign-up'
+        compact
         fallbackRedirectUrl={APP_ROUTES.START}
-        appearance={appearance}
       />
     </div>
   );

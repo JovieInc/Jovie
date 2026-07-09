@@ -28,12 +28,19 @@ export interface StatusMismatchFixResult {
 export async function fixStatusMismatch(
   user: {
     id: string;
-    clerkId: string;
+    clerkId: string | null;
     isPro: boolean;
   },
   subscription: Stripe.Subscription,
   expectedIsPro: boolean
 ): Promise<StatusMismatchFixResult> {
+  if (!user.clerkId) {
+    return {
+      success: false,
+      error:
+        'user has no clerk_id (post-cutover row; reconciler skips until better-auth identity swap)',
+    };
+  }
   const customerId = extractCustomerId(subscription.customer);
 
   const result = await updateUserBillingStatus({

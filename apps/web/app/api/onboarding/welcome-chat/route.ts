@@ -265,7 +265,7 @@ export async function POST(request: Request) {
           reused: false,
         };
       },
-      { clerkUserId: user.clerkId }
+      { clerkUserId: user.clerkId ?? undefined }
     );
 
     return NextResponse.json(

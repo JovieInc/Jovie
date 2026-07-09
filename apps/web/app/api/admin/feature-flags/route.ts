@@ -8,10 +8,10 @@
  * "publish to env" action.
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { featureFlagOverrides } from '@/lib/db/schema/feature-flags';
 import { captureError } from '@/lib/error-tracking';
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
