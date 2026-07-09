@@ -2,8 +2,8 @@
 
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
-import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { toast } from '@/components/feedback';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';

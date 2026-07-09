@@ -6,8 +6,8 @@ import {
   useCallback,
   useState,
 } from 'react';
-import { toast } from 'sonner';
 import { deleteRelease } from '@/app/app/(shell)/dashboard/releases/actions';
+import { toast } from '@/components/feedback';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 export function isDistributedRelease(release: ReleaseViewModel): boolean {

@@ -1,8 +1,8 @@
 'use client';
 
 import { memo, useCallback } from 'react';
-import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
+import { toast } from '@/components/feedback';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';

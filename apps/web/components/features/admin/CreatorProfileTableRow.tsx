@@ -18,7 +18,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { rowState } from '@/components/organisms/table';
 import { CreatorAvatarCell } from '@/features/admin/CreatorAvatarCell';
 import { CreatorProfileSocialLinks } from '@/features/admin/CreatorProfileSocialLinks';

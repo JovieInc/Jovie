@@ -3,9 +3,9 @@
 import { Button } from '@jovie/ui';
 import { Calendar, Copy } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { toast } from '@/components/feedback';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';

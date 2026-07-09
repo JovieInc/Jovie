@@ -2,8 +2,8 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
+import { toast } from '@/components/feedback';
 import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';

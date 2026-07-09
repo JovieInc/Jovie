@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelData,
@@ -22,6 +21,7 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { toast } from '@/components/feedback';
 import {
   DrawerMediaThumb,
   DrawerSurfaceCard,
@@ -231,6 +231,14 @@ function ProfileBentoView({
       icon: <SlidersHorizontal className='h-3.5 w-3.5' />,
       onClick: () => setUtmOpen(true),
     },
+    { type: 'separator', id: 'profile-actions-separator' },
+    {
+      type: 'action',
+      id: 'close-preview',
+      label: 'Close',
+      icon: <X className='h-3.5 w-3.5' />,
+      onClick: onClose,
+    },
   ];
 
   return (
@@ -245,40 +253,27 @@ function ProfileBentoView({
         phoneAlign='top'
         showBottomFade
         className='shrink-0'
-        heroClassName='aspect-4/5 max-h-110 w-full pt-2'
-        phoneFrameClassName='h-110 w-57'
+        heroClassName='h-115'
         topRight={
-          <div className='flex items-center gap-1.5'>
-            <Button
-              type='button'
-              variant='ghost'
-              size='icon'
-              aria-label='Close'
-              onClick={onClose}
-              className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
-            >
-              <X className='h-3.5 w-3.5' />
-            </Button>
-            <CommonDropdown
-              items={menuItems}
-              align='end'
-              aria-label='Profile Actions'
-              trigger={
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  aria-label='Profile Actions'
-                  className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
-                >
-                  <MoreVertical className='h-3.5 w-3.5' />
-                </Button>
-              }
-            />
-          </div>
+          <CommonDropdown
+            items={menuItems}
+            align='end'
+            aria-label='Profile Actions'
+            trigger={
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                aria-label='Profile Actions'
+                className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
+              >
+                <MoreVertical className='h-3.5 w-3.5' />
+              </Button>
+            }
+          />
         }
         footer={
-          <div className='space-y-2 px-1.5 pb-1.5 pt-1.5 lg:px-0 lg:pb-0'>
+          <div className='space-y-2 pt-1.5'>
             <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
             <Button
               type='button'
@@ -850,10 +845,9 @@ export function ProfileContactSidebar() {
         ariaLabel='Profile Contact'
         headerMode='minimal'
         hideMinimalHeaderBar
-        contentBleed
       >
         {emailSignatureModal}
-        <div className='space-y-2.5 px-1.5 pb-1.5 pt-2 lg:px-0 lg:pb-0 lg:pt-0.5'>
+        <div className='space-y-2.5 pt-0.5'>
           <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
@@ -915,7 +909,6 @@ export function ProfileContactSidebar() {
         ariaLabel='Profile Preview'
         headerMode='minimal'
         hideMinimalHeaderBar
-        contentBleed
       >
         {emailSignatureModal}
         <ProfileBentoView

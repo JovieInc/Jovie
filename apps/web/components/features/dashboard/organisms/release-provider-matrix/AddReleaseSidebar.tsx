@@ -17,11 +17,11 @@ import {
 import { format, isValid, parse, startOfToday } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Calendar } from '@/components/atoms/Calendar';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { toast } from '@/components/feedback';
 import {
   DrawerButton,
   DrawerCardActionBar,

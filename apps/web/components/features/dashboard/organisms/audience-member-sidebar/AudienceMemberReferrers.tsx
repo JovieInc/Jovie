@@ -15,7 +15,7 @@ import {
   Search,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';

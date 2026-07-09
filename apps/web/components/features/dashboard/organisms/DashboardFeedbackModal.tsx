@@ -3,7 +3,7 @@
 import { Button, Textarea } from '@jovie/ui';
 import { CheckCircle2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { FormField } from '@/components/molecules/FormField';
 import {
   Dialog,

@@ -2,9 +2,9 @@
 
 import { AlertTriangle, CheckCircle, Copy, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { toast } from '@/components/feedback';
 import {
   DisplayMenuDropdown,
   ExportCSVButton,

@@ -11,7 +11,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { type ChangeEvent, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {

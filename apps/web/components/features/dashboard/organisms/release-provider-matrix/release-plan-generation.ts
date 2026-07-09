@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
+import { toast } from '@/components/feedback';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';

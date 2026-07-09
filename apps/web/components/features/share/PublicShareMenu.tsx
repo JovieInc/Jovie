@@ -13,8 +13,8 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { toast } from 'sonner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { toast } from '@/components/feedback';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {

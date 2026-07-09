@@ -2,12 +2,12 @@
 
 import { Button } from '@jovie/ui';
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 import {
   type BandsintownConnectionStatus,
   loadTourDates,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   useDeleteTourDateMutation,

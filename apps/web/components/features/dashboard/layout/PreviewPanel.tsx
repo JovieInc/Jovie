@@ -12,11 +12,11 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { toast } from '@/components/feedback';
 import {
   DrawerButton,
   DrawerEmptyState,

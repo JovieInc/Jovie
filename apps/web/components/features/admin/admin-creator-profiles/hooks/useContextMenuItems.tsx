@@ -20,7 +20,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCallback } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';

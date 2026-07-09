@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
@@ -15,7 +15,6 @@ import {
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
   useSaveReleaseMetadataMutation,
-  useSaveReleaseStatusMutation,
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -81,7 +80,6 @@ export function useReleaseProviderMatrix({
   const saveCanvasStatusMutation = useSaveCanvasStatusMutation(profileId);
   const savePrimaryIsrcMutation = useSavePrimaryIsrcMutation(profileId);
   const saveReleaseMetadataMutation = useSaveReleaseMetadataMutation(profileId);
-  const saveReleaseStatusMutation = useSaveReleaseStatusMutation(profileId);
   const saveLyricsMutation = useSaveReleaseLyricsMutation(profileId);
   const formatLyricsMutation = useFormatReleaseLyricsMutation(profileId);
 
@@ -467,32 +465,6 @@ export function useReleaseProviderMatrix({
     [saveLyricsMutation]
   );
 
-  const handleSaveStatus = useCallback(
-    (release: ReleaseViewModel, status: ReleaseViewModel['status']) => {
-      saveReleaseStatusMutation.mutate(
-        {
-          profileId: release.profileId,
-          releaseId: release.id,
-          status,
-        },
-        {
-          onSuccess: updated => {
-            updateRow(updated);
-            toast.success(`Status changed to ${status}`);
-          },
-          onError: error => {
-            captureError('Failed to update release status', error, {
-              releaseId: release.id,
-              status,
-            });
-            toast.error('Unable to update status');
-          },
-        }
-      );
-    },
-    [saveReleaseStatusMutation, updateRow]
-  );
-
   const handleSaveMetadata = useCallback(
     async (
       releaseId: string,
@@ -589,7 +561,6 @@ export function useReleaseProviderMatrix({
     handleAddUrl,
     handleSaveMetadata,
     handleSavePrimaryIsrc,
-    handleSaveStatus,
     handleSaveLyrics,
     handleFormatLyrics,
     isLyricsSaving,

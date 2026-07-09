@@ -4,7 +4,7 @@ import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ConfidenceBadge } from '@/features/dashboard/atoms/ConfidenceBadge';
 import {
   DspProviderIcon,

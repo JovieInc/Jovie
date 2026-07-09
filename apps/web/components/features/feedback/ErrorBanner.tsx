@@ -3,7 +3,7 @@
 import { AlertTriangle, Copy, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { cn } from '@/lib/utils';
 
 export interface ErrorBannerAction {
