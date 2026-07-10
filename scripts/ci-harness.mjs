@@ -100,6 +100,14 @@ function runClassifyRisk(manifest, args) {
 function runEmitArtifact(manifest, args) {
   const riskPath = argValue(args, '--risk');
   const risk = riskPath ? JSON.parse(readFileSync(riskPath, 'utf8')) : null;
+  // Optional intra-job lane results (JOV-3464 ci-fast collapse).
+  // Accepts either a flat lanes array file or `{ lanes: [...] }` from ci-fast-lanes.mjs.
+  const lanesPath = argValue(args, '--lanes');
+  let laneResults;
+  if (lanesPath) {
+    const raw = JSON.parse(readFileSync(lanesPath, 'utf8'));
+    laneResults = Array.isArray(raw) ? raw : (raw.lanes ?? raw);
+  }
   const artifact = buildCiHarnessArtifact({
     runId: process.env.GITHUB_RUN_ID,
     runAttempt: process.env.GITHUB_RUN_ATTEMPT,
@@ -110,6 +118,7 @@ function runEmitArtifact(manifest, args) {
     jobResults: parseJobResultsFromEnv(process.env, manifest),
     risk,
     manifest,
+    laneResults,
   });
 
   const outputPath = argValue(args, '--out');

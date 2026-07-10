@@ -17,59 +17,95 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const WORKFLOW_PATH = resolve('.github/workflows/ci.yml');
-const JOB_MARKER = 'ci-typecheck:';
+const LANES_PATH = resolve('scripts/ci-fast-lanes.mjs');
+// JOV-3464: typecheck lives in the collapsed `ci-fast` job (lanes runner).
+// Accept either the legacy `ci-typecheck:` job or the `ci-fast` + lanes script.
+const JOB_MARKERS = ['ci-fast:', 'ci-typecheck:'];
 const REQUIRED_FLAG = '--force';
-const TURBO_CMD_PATTERN = /pnpm\s+turbo\s+typecheck/;
+const TURBO_CMD_PATTERN = /(?:pnpm\s+)?turbo\s+typecheck/;
 
-function main() {
-  let workflow;
+function scanFile(filePath, label) {
+  let content;
   try {
-    workflow = readFileSync(WORKFLOW_PATH, 'utf8');
+    content = readFileSync(filePath, 'utf8');
   } catch {
-    console.error(`[ci-typecheck-gate-guard] Cannot read ${WORKFLOW_PATH}`);
-    process.exit(1);
+    return { missingFile: true, findings: [], hasForce: false, label };
   }
 
-  const lines = workflow.split('\n');
-
-  // Locate the ci-typecheck job block and find the turbo typecheck run line.
-  let inJob = false;
+  const lines = content.split('\n');
+  // Non-workflow files (lanes script) are scanned in full; workflow files are
+  // restricted to the ci-fast / ci-typecheck job blocks below.
+  let inJob = !filePath.endsWith('ci.yml');
   let inNextJob = false;
   const findings = [];
+  let sawTurbo = false;
+  let hasForce = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Detect job boundaries (top-level job keys end with a colon at column 2 in GH Actions YAML).
-    if (/^\s{2}\w[\w-]+:\s*$/.test(line)) {
-      if (line.trim() === JOB_MARKER) {
+    if (filePath.endsWith('ci.yml') && /^\s{2}\w[\w-]+:\s*$/.test(line)) {
+      if (JOB_MARKERS.includes(line.trim())) {
         inJob = true;
         inNextJob = false;
       } else if (inJob) {
-        // Entered the next job — stop scanning.
         inNextJob = true;
       }
     }
 
     if (!inJob || inNextJob) continue;
 
-    // Found a turbo typecheck invocation inside the ci-typecheck job.
     if (TURBO_CMD_PATTERN.test(line)) {
-      if (!line.includes(REQUIRED_FLAG)) {
-        findings.push({ lineNumber: i + 1, content: line.trim() });
+      sawTurbo = true;
+      if (line.includes(REQUIRED_FLAG)) {
+        hasForce = true;
+      } else {
+        findings.push({ lineNumber: i + 1, content: line.trim(), label });
       }
     }
   }
 
-  if (findings.length === 0) {
+  return { missingFile: false, findings, hasForce, sawTurbo, label };
+}
+
+function main() {
+  // Prefer the lanes script (source of truth after JOV-3464 collapse); also
+  // scan ci.yml for any inline turbo typecheck that might bypass the lanes.
+  const scans = [
+    scanFile(LANES_PATH, 'ci-fast-lanes'),
+    scanFile(WORKFLOW_PATH, 'ci.yml'),
+  ];
+
+  if (scans[0].missingFile && scans[1].missingFile) {
+    console.error(
+      '[ci-typecheck-gate-guard] Cannot read workflow or lanes script'
+    );
+    process.exit(1);
+  }
+
+  const findings = scans.flatMap(s => s.findings);
+  const hasForce = scans.some(s => s.hasForce);
+  const sawTurbo = scans.some(s => s.sawTurbo);
+
+  if (sawTurbo && hasForce && findings.length === 0) {
     console.log(
-      `[ci-typecheck-gate-guard] PASS — ci-typecheck gate invokes turbo with ${REQUIRED_FLAG}.`
+      `[ci-typecheck-gate-guard] PASS — ci-fast typecheck gate invokes turbo with ${REQUIRED_FLAG}.`
     );
     process.exit(0);
   }
 
+  if (!sawTurbo) {
+    console.error(
+      '[ci-typecheck-gate-guard] FAIL — no turbo typecheck invocation found in ci-fast.'
+    );
+    console.error(
+      `Remediation: ensure ${LANES_PATH} (or the ci-fast job) runs \`pnpm turbo typecheck --affected --force\`.`
+    );
+    process.exit(1);
+  }
+
   console.error(
-    '[ci-typecheck-gate-guard] FAIL — ci-typecheck gate is missing --force.'
+    '[ci-typecheck-gate-guard] FAIL — typecheck gate is missing --force.'
   );
   console.error('');
   console.error(
@@ -79,12 +115,12 @@ function main() {
     'producing a false-green merge gate (JOV-3499). The gate MUST use --force.'
   );
   console.error('');
-  for (const { lineNumber, content } of findings) {
-    console.error(`  Line ${lineNumber}: ${content}`);
+  for (const { lineNumber, content, label } of findings) {
+    console.error(`  ${label}:${lineNumber}: ${content}`);
   }
   console.error('');
   console.error(
-    `Remediation: add ${REQUIRED_FLAG} to the turbo typecheck command in ${WORKFLOW_PATH}`
+    `Remediation: add ${REQUIRED_FLAG} to the turbo typecheck command in ${LANES_PATH}`
   );
   process.exit(1);
 }
