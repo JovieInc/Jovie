@@ -1,3 +1,13 @@
+/**
+ * Electron native-auth smoke (Better Auth).
+ *
+ * Exercises: desktop PKCE start → browser email OTP → /auth/callback deep link
+ * → one-time-token exchange → cookie/session restoration → Settings.
+ *
+ * Requires a running Electron shell with CDP (ELECTRON_CDP_URL) and a web
+ * origin with E2E_TEST_MODE=1 so +clerk_test / +e2e emails receive the
+ * deterministic OTP 424242.
+ */
 import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
 
@@ -7,7 +17,6 @@ const ELECTRON_CDP_URL =
 const MACOS_PROTOCOL_OPEN_BUNDLE_ID =
   process.env.JOVIE_PROTOCOL_OPEN_BUNDLE_ID?.trim() || null;
 const MAGIC_CODE = '424242';
-const TESTING_TOKEN_PARAM = '__clerk_testing_token';
 const SMOKE_CLIENT_IP =
   process.env.SMOKE_CLIENT_IP ??
   `127.77.${Math.floor(Math.random() * 200) + 1}.${Math.floor(Math.random() * 200) + 1}`;
@@ -21,6 +30,7 @@ const REQUEST_TIMEOUT_MS = parsePositiveInteger(
 );
 const SMOKE_AUTH_EVIDENCE_KEY = 'jovie.desktopAuth.smokeAuthEvidence';
 const NATIVE_AUTH_CALLBACK_PREFIX = `${NATIVE_AUTH_CALLBACK_SCHEME}://auth/complete?`;
+const SETTINGS_ACCOUNT_PATH = '/app/settings/account';
 
 let playwrightChromium;
 
@@ -55,608 +65,131 @@ async function getChromium() {
   return playwrightChromium;
 }
 
-function parseFrontendApi(pk) {
-  const match = pk.match(/^pk_(test|live)_(.+)$/);
-  if (!match) throw new Error('Invalid Clerk publishable key format');
-  return Buffer.from(match[2], 'base64').toString('utf8').replace(/\$$/, '');
-}
-
-async function getTestingToken(secretKey) {
-  const errors = [];
-  for (let attempt = 1; attempt <= 4; attempt += 1) {
-    try {
-      return await requestTestingToken(secretKey);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-      if (attempt < 4) {
-        await sleep(1000 * attempt);
-      }
-    }
-  }
-
-  throw new Error(
-    `Testing token request failed after retries: ${errors.join(' | ')}`
-  );
-}
-
-async function requestTestingToken(secretKey) {
-  let data;
-  try {
-    const response = await fetch('https://api.clerk.com/v1/testing_tokens', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${secretKey}` },
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!response.ok) {
-      throw new Error(`Testing token request failed: ${response.status}`);
-    }
-    data = await response.json();
-  } catch {
-    const output = execFileSync(
-      'curl',
-      [
-        '-fsS',
-        '--connect-timeout',
-        '10',
-        '--max-time',
-        '30',
-        '-X',
-        'POST',
-        '-K',
-        '-',
-        'https://api.clerk.com/v1/testing_tokens',
-      ],
-      {
-        encoding: 'utf8',
-        input: `header = "Authorization: Bearer ${secretKey}"\n`,
-      }
-    );
-    data = JSON.parse(output);
-  }
-  if (!data.token) throw new Error('Testing token response missing token');
-  return data.token;
-}
-
-async function clerkBackendRequest(
-  secretKey,
-  path,
-  { method = 'GET', body } = {}
-) {
-  const response = await fetch(`https://api.clerk.com/v1${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${secretKey}`,
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!response.ok) {
-    const responseBody = await response.text().catch(() => '');
-    throw new Error(
-      `Clerk Backend API request failed: ${method} ${path} ${response.status} ${responseBody}`
-    );
-  }
-
-  return await response.json();
-}
-
-function firstUserFromList(response) {
-  const users = Array.isArray(response) ? response : response?.data;
-  return Array.isArray(users) ? users[0] : null;
-}
-
 function getStableSmokeEmail() {
   const hostname = new URL(BASE_URL).hostname
     .replace(/[^a-z0-9]+/gi, '-')
     .replace(/^-+|-+$/g, '')
     .toLowerCase();
-  return `native-auth-smoke-${hostname || 'local'}+clerk_test@test.jovie.com`;
+  const stamp = Date.now().toString(36);
+  // Deterministic OTP gate accepts +clerk_test / +e2e under E2E_TEST_MODE=1.
+  return `native-auth-smoke-${hostname || 'local'}-${stamp}+clerk_test@test.jovie.com`;
 }
 
-async function ensureSmokeUser(secretKey, email) {
-  const searchPath = `/users?email_address=${encodeURIComponent(email)}&limit=1`;
-  const existing = firstUserFromList(
-    await clerkBackendRequest(secretKey, searchPath)
+function isBetterAuthSessionCookie(name) {
+  return (
+    name.startsWith('better-auth.') ||
+    name.startsWith('__Secure-better-auth.') ||
+    name.startsWith('__Host-better-auth.')
   );
-  if (existing?.id) {
-    return { userId: existing.id, reused: true };
-  }
-
-  const metadata = {
-    role: 'native_auth_smoke',
-    app: 'desktop',
-  };
-  let created;
-  try {
-    created = await clerkBackendRequest(secretKey, '/users', {
-      method: 'POST',
-      body: {
-        email_address: [email],
-        first_name: 'Native',
-        last_name: 'Auth QA',
-        public_metadata: metadata,
-        skip_password_requirement: true,
-      },
-    });
-  } catch (error) {
-    const raced = firstUserFromList(
-      await clerkBackendRequest(secretKey, searchPath).catch(() => null)
-    );
-    if (raced?.id) {
-      return { userId: raced.id, reused: true };
-    }
-    throw error;
-  }
-  if (!created?.id) {
-    const raced = firstUserFromList(
-      await clerkBackendRequest(secretKey, searchPath)
-    );
-    if (raced?.id) {
-      return { userId: raced.id, reused: true };
-    }
-    throw new Error('Clerk user create response missing id');
-  }
-
-  return { userId: created.id, reused: false };
 }
 
-async function createSignInTicket(secretKey, userId) {
-  const token = await clerkBackendRequest(secretKey, '/sign_in_tokens', {
-    method: 'POST',
-    body: {
-      user_id: userId,
-      expires_in_seconds: 300,
+async function newAuthContext(browser) {
+  const context = await browser.newContext({
+    extraHTTPHeaders: {
+      'x-forwarded-for': SMOKE_CLIENT_IP,
     },
   });
-  if (!token?.token) {
-    throw new Error('Clerk sign-in token response missing token');
-  }
-  return token.token;
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-async function setupClerkTestingToken(context, fapiHost, testingToken) {
-  async function appendTestingToken(route) {
-    const url = new URL(route.request().url());
-    url.searchParams.set(TESTING_TOKEN_PARAM, testingToken);
-
-    try {
-      const response = await route.fetch({ url: url.toString() });
-      const json = await response.json();
-      if (json?.response?.captcha_bypass === false) {
-        json.response.captcha_bypass = true;
-      }
-      if (json?.client?.captcha_bypass === false) {
-        json.client.captcha_bypass = true;
-      }
-      await route.fulfill({ response, json });
-    } catch {
-      await route.continue({ url: url.toString() });
-    }
-  }
-
-  const fapiPattern = new RegExp(
-    `^https://${escapeRegExp(fapiHost)}/v1/.*?(\\?.*)?$`
-  );
-  const baseOrigin = new URL(BASE_URL).origin;
-  const proxyPattern = new RegExp(
-    `^${escapeRegExp(baseOrigin)}/__clerk/v1/.*?(\\?.*)?$`
-  );
-
-  await context.route(fapiPattern, appendTestingToken);
-  await context.route(proxyPattern, appendTestingToken);
-}
-
-async function newAuthContext(browser, fapiHost, testingToken) {
-  const context = await browser.newContext();
-  if (testingToken) {
-    await setupClerkTestingToken(context, fapiHost, testingToken);
-  }
   const page = await context.newPage();
-  await page.goto(`${BASE_URL}/signin`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-  await page.waitForFunction(() => Boolean(window.Clerk?.loaded), undefined, {
-    timeout: 90_000,
-  });
   return { context, page };
 }
 
-async function signUpFresh(page, email, redirectUrl = null) {
-  try {
-    return await page.evaluate(
-      async ({ email: targetEmail, code, redirectUrl: targetRedirectUrl }) => {
-        async function waitForActiveIdentity(
-          fallbackSessionId,
-          fallbackUserId
-        ) {
-          for (let attempt = 0; attempt < 30; attempt += 1) {
-            if (clerk.user?.id || clerk.session?.id) {
-              return {
-                userId: clerk.user?.id ?? fallbackUserId ?? null,
-                sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
-              };
-            }
-            await new Promise(resolve => setTimeout(resolve, 250));
-          }
-
-          return {
-            userId: clerk.user?.id ?? fallbackUserId ?? null,
-            sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
-          };
-        }
-
-        const clerk = window.Clerk;
-        if (!clerk?.client?.signUp) {
-          throw new Error('Clerk signUp API unavailable');
-        }
-
-        const signUp = await clerk.client.signUp.create({
-          emailAddress: targetEmail,
-        });
-        await signUp.prepareEmailAddressVerification({
-          strategy: 'email_code',
-        });
-        const result = await signUp.attemptEmailAddressVerification({ code });
-
-        if (result.status !== 'complete' || !result.createdSessionId) {
-          throw new Error(
-            `Fresh signup did not create a complete session: ${result.status}`
-          );
-        }
-
-        const activate = clerk.setActive({
-          session: result.createdSessionId,
-          ...(targetRedirectUrl ? { redirectUrl: targetRedirectUrl } : {}),
-        });
-        await Promise.race([
-          activate.catch(() => undefined),
-          new Promise(resolve => setTimeout(resolve, 5000)),
-        ]);
-
-        const identity = await waitForActiveIdentity(
-          result.createdSessionId,
-          result.createdUserId
-        );
-        if (!identity.userId) {
-          throw new Error('Fresh signup did not expose Clerk user id');
-        }
-
-        return identity;
-      },
-      { email, code: MAGIC_CODE, redirectUrl }
-    );
-  } catch (error) {
-    if (!isNavigationInterruption(error)) throw error;
-    return await getClerkPageIdentity(page, 'fresh-signup').catch(async () => {
-      await waitForAppSessionCookie(page.context(), 'fresh-signup');
-      return getClerkSessionIdentity(page.context(), 'fresh-signup');
-    });
-  }
-}
-
-async function signInExisting(page, email, redirectUrl = null) {
-  try {
-    return await page.evaluate(
-      async ({ email: targetEmail, code, redirectUrl: targetRedirectUrl }) => {
-        async function waitForActiveIdentity(fallbackSessionId) {
-          for (let attempt = 0; attempt < 30; attempt += 1) {
-            if (clerk.user?.id || clerk.session?.id) {
-              return {
-                userId: clerk.user?.id ?? null,
-                sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
-              };
-            }
-            await new Promise(resolve => setTimeout(resolve, 250));
-          }
-
-          return {
-            userId: clerk.user?.id ?? null,
-            sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
-          };
-        }
-
-        const clerk = window.Clerk;
-        if (!clerk?.client?.signIn) {
-          throw new Error('Clerk signIn API unavailable');
-        }
-
-        const signIn = await clerk.client.signIn.create({
-          identifier: targetEmail,
-        });
-        const emailFactor = signIn.supportedFirstFactors?.find(
-          factor =>
-            factor.strategy === 'email_code' &&
-            typeof factor.emailAddressId === 'string'
-        );
-        if (!emailFactor?.emailAddressId) {
-          throw new Error('email_code factor unavailable');
-        }
-
-        await signIn.prepareFirstFactor({
-          strategy: 'email_code',
-          emailAddressId: emailFactor.emailAddressId,
-        });
-        const result = await signIn.attemptFirstFactor({
-          strategy: 'email_code',
-          code,
-        });
-
-        if (result.status !== 'complete' || !result.createdSessionId) {
-          throw new Error(
-            `Existing sign-in did not create a complete session: ${result.status}`
-          );
-        }
-
-        const activate = clerk.setActive({
-          session: result.createdSessionId,
-          ...(targetRedirectUrl ? { redirectUrl: targetRedirectUrl } : {}),
-        });
-        await Promise.race([
-          activate.catch(() => undefined),
-          new Promise(resolve => setTimeout(resolve, 5000)),
-        ]);
-
-        const identity = await waitForActiveIdentity(result.createdSessionId);
-        if (!identity.userId) {
-          throw new Error('Existing sign-in did not expose Clerk user id');
-        }
-
-        return identity;
-      },
-      { email, code: MAGIC_CODE, redirectUrl }
-    );
-  } catch (error) {
-    if (!isNavigationInterruption(error)) throw error;
-    return await getClerkPageIdentity(page, 'existing-signin').catch(
-      async () => {
-        await waitForAppSessionCookie(page.context(), 'existing-signin');
-        return getClerkSessionIdentity(page.context(), 'existing-signin');
-      }
-    );
-  }
-}
-
-async function signInWithTicket(
-  page,
-  ticket,
-  expectedUserId,
-  redirectUrl = null
-) {
-  try {
-    return await page.evaluate(
-      async ({
-        signInTicket,
-        expectedUserId: targetUserId,
-        redirectUrl: targetRedirectUrl,
-      }) => {
-        function describeError(error) {
-          try {
-            return JSON.stringify({
-              message: error?.message,
-              status: error?.status,
-              clerkError: error?.clerkError,
-              errors: error?.errors,
-              longMessage: error?.longMessage,
-            });
-          } catch {
-            return String(error);
-          }
-        }
-
-        async function waitForActiveIdentity(fallbackSessionId) {
-          for (let attempt = 0; attempt < 30; attempt += 1) {
-            if (clerk.user?.id || clerk.session?.id) {
-              return {
-                userId: clerk.user?.id ?? clerk.session?.user?.id ?? null,
-                sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
-              };
-            }
-            await new Promise(resolve => setTimeout(resolve, 250));
-          }
-
-          return {
-            userId: clerk.user?.id ?? clerk.session?.user?.id ?? null,
-            sessionId: clerk.session?.id ?? fallbackSessionId ?? null,
-          };
-        }
-
-        const clerk = window.Clerk;
-        const signIn = clerk?.client?.signIn;
-        const futureSignIn = signIn?.__internal_future;
-        if (
-          !clerk?.setActive ||
-          (!signIn?.ticket && !futureSignIn?.ticket && !signIn?.create)
-        ) {
-          throw new Error('Clerk ticket API unavailable');
-        }
-
-        let ticketAttempt;
-        let finalizeAttempt = null;
-        if (signIn?.create) {
-          ticketAttempt = await signIn
-            .create({ strategy: 'ticket', ticket: signInTicket })
-            .catch(error => {
-              throw new Error(
-                `Clerk ticket sign-in threw: ${describeError(error)}`
-              );
-            });
-        } else if (signIn?.ticket && signIn?.finalize) {
-          ticketAttempt = await signIn
-            .ticket({ ticket: signInTicket })
-            .catch(error => {
-              throw new Error(
-                `Clerk ticket sign-in threw: ${describeError(error)}`
-              );
-            });
-          if (ticketAttempt.error) {
-            throw new Error(
-              `Clerk ticket sign-in failed: ${describeError(ticketAttempt.error)}`
-            );
-          }
-          finalizeAttempt = await signIn.finalize().catch(error => {
-            throw new Error(
-              `Clerk ticket finalize threw: ${describeError(error)}`
-            );
-          });
-        } else {
-          ticketAttempt = await futureSignIn
-            .ticket({ ticket: signInTicket })
-            .catch(error => {
-              throw new Error(
-                `Clerk future ticket sign-in threw: ${describeError(error)}`
-              );
-            });
-        }
-
-        if (ticketAttempt.error) {
-          throw new Error(
-            `Clerk ticket sign-in failed: ${describeError(ticketAttempt.error)}`
-          );
-        }
-        let sessionId =
-          ticketAttempt.createdSessionId ||
-          signIn.createdSessionId ||
-          futureSignIn?.createdSessionId;
-        finalizeAttempt =
-          !sessionId && futureSignIn?.finalize
-            ? await futureSignIn.finalize().catch(error => {
-                throw new Error(
-                  `Clerk future ticket finalize threw: ${describeError(error)}`
-                );
-              })
-            : finalizeAttempt;
-        if (finalizeAttempt?.error) {
-          throw new Error('Clerk ticket finalize failed');
-        }
-        sessionId = sessionId || finalizeAttempt?.createdSessionId;
-        if (!sessionId) {
-          throw new Error('Clerk ticket did not create a session');
-        }
-
-        await clerk.setActive({
-          session: sessionId,
-          ...(targetRedirectUrl ? { redirectUrl: targetRedirectUrl } : {}),
-        });
-        const identity = await waitForActiveIdentity(sessionId);
-        if (identity.userId !== targetUserId) {
-          throw new Error(
-            `Activated user mismatch: expected ${targetUserId}, got ${
-              identity.userId || 'null'
-            }`
-          );
-        }
-        return identity;
-      },
-      { signInTicket: ticket, expectedUserId, redirectUrl }
-    );
-  } catch (error) {
-    if (!isNavigationInterruption(error)) throw error;
-    return await getClerkPageIdentity(page, 'ticket-signin').catch(async () => {
-      await waitForAppSessionCookie(page.context(), 'ticket-signin');
-      return getClerkSessionIdentity(page.context(), 'ticket-signin');
-    });
-  }
-}
-
-async function signInWithFreshTicket(
-  page,
-  secretKey,
-  expectedUserId,
-  redirectUrl = null
-) {
-  const errors = [];
-  for (let attempt = 1; attempt <= 4; attempt += 1) {
-    try {
-      const ticket = await createSignInTicket(secretKey, expectedUserId);
-      return await signInWithTicket(page, ticket, expectedUserId, redirectUrl);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-      if (attempt < 4) {
-        await sleep(1000 * attempt);
-      }
+async function waitForAppSessionCookie(context, label) {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const cookies = await context.cookies(BASE_URL);
+    if (cookies.some(cookie => isBetterAuthSessionCookie(cookie.name))) {
+      return;
     }
+    await sleep(500);
   }
-
-  throw new Error(
-    `Clerk ticket sign-in failed after retries: ${errors.join(' | ')}`
-  );
+  throw new Error(`${label} did not persist a Better Auth session cookie`);
 }
 
-function isNavigationInterruption(error) {
-  return (
-    error instanceof Error &&
-    /Execution context was destroyed|Target page, context or browser has been closed|Inspected target navigated or closed/i.test(
-      error.message
-    )
-  );
-}
+async function getSessionIdentity(page, label) {
+  const identity = await page.evaluate(async () => {
+    const response = await fetch('/api/auth/get-session', {
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+    });
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        userId: null,
+        sessionId: null,
+        email: null,
+      };
+    }
+    const payload = await response.json().catch(() => null);
+    const user = payload?.user ?? payload?.data?.user ?? null;
+    const session = payload?.session ?? payload?.data?.session ?? null;
+    return {
+      ok: Boolean(user?.id),
+      status: response.status,
+      userId: user?.id ?? null,
+      sessionId: session?.id ?? null,
+      email: user?.email ?? null,
+    };
+  });
 
-function decodeJwtPayload(token) {
-  const payload = token.split('.')[1];
-  if (!payload) return null;
-
-  try {
-    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-  } catch {
-    return null;
+  if (!identity?.ok || !identity.userId) {
+    throw new Error(
+      `${label} Better Auth session identity unavailable (status=${identity?.status ?? 'n/a'})`
+    );
   }
-}
-
-async function getClerkSessionIdentity(context, label) {
-  const cookies = await context.cookies(BASE_URL);
-  const sessionCookie = cookies.find(cookie =>
-    cookie.name.startsWith('__session')
-  );
-  const payload = sessionCookie ? decodeJwtPayload(sessionCookie.value) : null;
-  if (!payload || typeof payload.sub !== 'string') {
-    throw new Error(`${label} session cookie is missing Clerk user id`);
-  }
-
-  return {
-    userId: payload.sub,
-    sessionId: typeof payload.sid === 'string' ? payload.sid : null,
-  };
-}
-
-async function getClerkPageIdentity(page, label) {
-  await page.waitForFunction(
-    () => Boolean(window.Clerk?.loaded && window.Clerk?.user?.id),
-    undefined,
-    { timeout: 30_000 }
-  );
-
-  const identity = await page.evaluate(() => ({
-    userId: window.Clerk?.user?.id ?? null,
-    sessionId: window.Clerk?.session?.id ?? null,
-  }));
-
-  if (!identity.userId) {
-    throw new Error(`${label} Clerk user id is unavailable`);
-  }
-
   return identity;
 }
 
-async function waitForAppSessionCookie(context, label) {
-  const deadline = Date.now() + 30_000;
+/**
+ * Drive the Better Auth email OTP form on /signin or /signup.
+ * Fills email → send → code step → verify with MAGIC_CODE.
+ */
+async function signInWithEmailOtp(page, email, redirectUrl = null) {
+  const target = redirectUrl
+    ? new URL(
+        `/signin?redirect_url=${encodeURIComponent(redirectUrl)}`,
+        BASE_URL
+      ).toString()
+    : new URL('/signin', BASE_URL).toString();
 
-  while (Date.now() < deadline) {
-    const cookies = await context.cookies(BASE_URL);
-    if (cookies.some(cookie => cookie.name.startsWith('__session'))) {
-      return;
-    }
+  await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+  const emailInput = page.getByLabel(/email address/i).first();
+  await emailInput.waitFor({ state: 'visible', timeout: 60_000 });
+  await emailInput.fill(email);
+
+  const sendButton = page.getByRole('button', {
+    name: /email me a code|continue with email|sending code/i,
+  });
+  await sendButton.click();
+
+  await page
+    .locator('[data-auth-email-code-step="code"]')
+    .waitFor({ state: 'visible', timeout: 60_000 });
+
+  const otpAutofill = page.getByTestId('otp-autofill-input');
+  if (await otpAutofill.count()) {
+    await otpAutofill.fill(MAGIC_CODE);
+  } else {
+    await page.getByLabel(/digit 1 of 6/i).pressSequentially(MAGIC_CODE);
   }
 
-  throw new Error(`${label} did not persist a Clerk app session cookie`);
+  await page
+    .waitForFunction(
+      () =>
+        !document.querySelector('[data-auth-email-code-step="code"]') ||
+        Boolean(
+          document.cookie
+            .split(';')
+            .some(part => /better-auth\.|__Secure-better-auth\./.test(part))
+        ),
+      undefined,
+      { timeout: 90_000 }
+    )
+    .catch(() => undefined);
+
+  await waitForAppSessionCookie(page.context(), 'email-otp');
+  return await getSessionIdentity(page, 'email-otp');
 }
 
 async function requestRedirect(page, targetUrl, label) {
@@ -764,18 +297,24 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     `/auth/callback?state=${encodeURIComponent(authState)}`,
     callbackOrigin
   ).toString();
-  await page.goto(authPageUrl, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-  await page.waitForFunction(() => Boolean(window.Clerk?.loaded), undefined, {
-    timeout: 90_000,
-  });
 
-  const activeSessionId = await page.evaluate(
-    () => window.Clerk?.session?.id ?? null
-  );
-  if (activeSessionId) {
+  // Already signed in → callback should mint OTT + deep link.
+  const sessionProbe = await page
+    .evaluate(async () => {
+      try {
+        const response = await fetch('/api/auth/get-session', {
+          credentials: 'include',
+        });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        return payload?.user?.id ?? payload?.data?.user?.id ?? null;
+      } catch {
+        return null;
+      }
+    })
+    .catch(() => null);
+
+  if (sessionProbe) {
     return await requestNativeCallbackRedirect(
       page,
       callbackPath,
@@ -787,11 +326,8 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     waitForNativeProtocolRequest(page, parsed.pathname),
     waitForNativeRedirectResponse(page, parsed.pathname),
   ]);
-  const authAction =
-    parsed.pathname === '/signup' || parsed.pathname === '/sign-up'
-      ? signUpFresh(page, email, callbackPath)
-      : signInExisting(page, email, callbackPath);
-  await authAction.catch(error => {
+
+  await signInWithEmailOtp(page, email, callbackPath).catch(error => {
     if (
       error instanceof Error &&
       /Execution context was destroyed|Target page, context or browser has been closed/i.test(
@@ -803,7 +339,18 @@ async function completeBrowserAuthState(page, authPageUrl, email) {
     throw error;
   });
 
-  return await callbackPromise;
+  // Prefer the protocol/redirect race; fall back to explicit callback GET.
+  const raced = await Promise.race([
+    callbackPromise,
+    sleep(2_000).then(() => null),
+  ]);
+  if (raced) return raced;
+
+  return await requestNativeCallbackRedirect(
+    page,
+    callbackPath,
+    'auth callback after otp'
+  );
 }
 
 async function requestNativeCallback(page, authUrl, email) {
@@ -853,8 +400,10 @@ function openNativeCallback(callbackUrl) {
 function redactTicketFromUrl(urlString) {
   try {
     const url = new URL(urlString);
-    if (url.searchParams.has('ticket')) {
-      url.searchParams.set('ticket', '[redacted]');
+    for (const key of ['ticket', 'token', 'code', 'ott']) {
+      if (url.searchParams.has(key)) {
+        url.searchParams.set(key, '[redacted]');
+      }
     }
     return url.toString();
   } catch {
@@ -930,7 +479,7 @@ async function waitForElectronTarget(predicate, label, timeout = 30_000) {
   while (Date.now() < deadline) {
     const target = (await getElectronTargets()).find(predicate);
     if (target) return target;
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await sleep(250);
   }
 
   throw new Error(`Timed out waiting for Electron target: ${label}`);
@@ -1032,7 +581,7 @@ class CdpPage {
     });
     const result = await Promise.race([
       navigation.catch(error => {
-        if (isNavigationInterruption(error)) return null;
+        if (/Execution context was destroyed/i.test(String(error))) return null;
         throw error;
       }),
       sleep(2000).then(() => null),
@@ -1077,7 +626,7 @@ async function waitForDesktopAuthHandoff(page, label, timeout = 30_000) {
       })()`)
       .catch(() => false);
     if (isReady) return;
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await sleep(250);
   }
 
   throw new Error(`Desktop auth handoff missing: ${label}`);
@@ -1160,6 +709,18 @@ async function startElectronBrowserAuth() {
     throw new Error('Desktop auth handoff URL is missing auth_url');
   }
 
+  // PKCE contract: central /auth/start must carry code_challenge + method.
+  const resolvedAuthUrl = new URL(rawAuthUrl, BASE_URL);
+  if (
+    resolvedAuthUrl.pathname === '/auth/start' &&
+    (!resolvedAuthUrl.searchParams.get('code_challenge') ||
+      resolvedAuthUrl.searchParams.get('code_challenge_method') !== 'S256')
+  ) {
+    throw new Error(
+      `Desktop auth start missing PKCE params: ${resolvedAuthUrl.pathname}${resolvedAuthUrl.search}`
+    );
+  }
+
   const authPage = await connectCdpPage(authTarget);
   try {
     await waitForDesktopAuthHandoff(authPage, 'desktop auth handoff');
@@ -1167,7 +728,7 @@ async function startElectronBrowserAuth() {
     authPage.close();
   }
 
-  return new URL(rawAuthUrl, BASE_URL).toString();
+  return resolvedAuthUrl.toString();
 }
 
 function parseStoredSmokeAuthEvidence(value, expectedUserId, minCapturedAt) {
@@ -1212,27 +773,34 @@ async function readStoredSmokeAuthEvidence(
 
 async function captureElectronAuthEvidence(page, expectedUserId) {
   return await page.evaluate(`(async () => {
-    if (
-      !window.Clerk?.loaded ||
-      window.Clerk?.user?.id !== ${JSON.stringify(expectedUserId)} ||
-      !window.Clerk?.session
-    ) {
+    const sessionResponse = await fetch('/api/auth/get-session', {
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+    });
+    const sessionPayload = sessionResponse.ok
+      ? await sessionResponse.json().catch(() => null)
+      : null;
+    const user = sessionPayload?.user ?? sessionPayload?.data?.user ?? null;
+    const session =
+      sessionPayload?.session ?? sessionPayload?.data?.session ?? null;
+    const userId = user?.id ?? null;
+    if (!userId || userId !== ${JSON.stringify(expectedUserId)}) {
       return null;
     }
 
-    const token = await window.Clerk.session.getToken();
     const api = await fetch('/api/mobile/v1/me', {
-      headers: { Authorization: 'Bearer ' + token },
+      credentials: 'include',
     });
     const state = {
       url: window.location.href,
-      userId: window.Clerk.user.id,
-      hasSession: Boolean(window.Clerk.session),
-      hasToken: Boolean(token),
+      userId,
+      sessionId: session?.id ?? null,
+      hasSession: Boolean(session?.id || userId),
+      hasToken: false,
       apiStatus: api.status,
       apiOk: api.ok,
       capturedAt: Date.now(),
-      evidenceSource: 'clerk-token',
+      evidenceSource: 'better-auth-session',
     };
 
     if (state.apiOk) {
@@ -1254,8 +822,17 @@ async function findSignedInElectronPage() {
     const page = await connectCdpPage(target).catch(() => null);
     if (!page) continue;
     try {
-      const signedIn = await page.evaluate(`(() => {
-        return Boolean(window.Clerk?.loaded && window.Clerk?.session);
+      const signedIn = await page.evaluate(`(async () => {
+        try {
+          const response = await fetch('/api/auth/get-session', {
+            credentials: 'include',
+          });
+          if (!response.ok) return false;
+          const payload = await response.json();
+          return Boolean(payload?.user?.id ?? payload?.data?.user?.id);
+        } catch {
+          return false;
+        }
       })()`);
       if (signedIn) return page;
       page.close();
@@ -1264,7 +841,7 @@ async function findSignedInElectronPage() {
     }
   }
 
-  throw new Error('Electron has no signed-in Clerk page');
+  throw new Error('Electron has no signed-in Better Auth page');
 }
 
 async function waitForSignedInElectronPage() {
@@ -1276,11 +853,11 @@ async function waitForSignedInElectronPage() {
       return await findSignedInElectronPage();
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await sleep(500);
     }
   }
 
-  throw new Error(lastError ?? 'Electron has no signed-in Clerk page');
+  throw new Error(lastError ?? 'Electron has no signed-in Better Auth page');
 }
 
 async function getElectronSessionState() {
@@ -1295,12 +872,32 @@ async function getElectronSessionState() {
     const page = await connectCdpPage(target).catch(() => null);
     if (!page) continue;
     try {
-      const state = await page.evaluate(`(() => {
-        return {
-          url: window.location.href,
-          userId: window.Clerk?.user?.id ?? null,
-          hasSession: Boolean(window.Clerk?.session),
-        };
+      const state = await page.evaluate(`(async () => {
+        try {
+          const response = await fetch('/api/auth/get-session', {
+            credentials: 'include',
+          });
+          if (!response.ok) {
+            return {
+              url: window.location.href,
+              userId: null,
+              hasSession: false,
+            };
+          }
+          const payload = await response.json();
+          const userId = payload?.user?.id ?? payload?.data?.user?.id ?? null;
+          return {
+            url: window.location.href,
+            userId,
+            hasSession: Boolean(userId),
+          };
+        } catch {
+          return {
+            url: window.location.href,
+            userId: null,
+            hasSession: false,
+          };
+        }
       })()`);
       fallback = state ?? fallback;
       if (state?.hasSession) return state;
@@ -1333,7 +930,7 @@ async function waitForElectronSignedOut() {
   while (Date.now() < deadline) {
     lastState = await getElectronSessionState();
     if (!lastState.hasSession) return lastState;
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await sleep(500);
   }
 
   throw new Error(
@@ -1399,7 +996,7 @@ async function waitForElectronAuth(expectedUserId, label) {
       }
     }
 
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await sleep(250);
   }
 
   throw new Error(
@@ -1409,13 +1006,74 @@ async function waitForElectronAuth(expectedUserId, label) {
   );
 }
 
+async function openSettingsAndAssert(page, expectedEmail) {
+  await page.navigate(`${BASE_URL}${SETTINGS_ACCOUNT_PATH}`);
+  const settings = await page.evaluate(`(async () => {
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const section = document.querySelector(
+        '[data-testid="account-settings-section"]'
+      );
+      const emailEl = document.querySelector(
+        '[data-testid="account-identity-email"]'
+      );
+      if (section && emailEl) {
+        return {
+          ok: true,
+          email: emailEl.textContent?.trim() ?? null,
+          hasUnavailable: /account settings unavailable/i.test(
+            document.body?.innerText ?? ''
+          ),
+        };
+      }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return {
+      ok: false,
+      email: null,
+      hasUnavailable: /account settings unavailable/i.test(
+        document.body?.innerText ?? ''
+      ),
+    };
+  })()`);
+
+  if (!settings?.ok) {
+    throw new Error('Settings account section did not render');
+  }
+  if (settings.hasUnavailable) {
+    throw new Error('Settings still shows unavailable gate');
+  }
+  if (
+    expectedEmail &&
+    settings.email &&
+    settings.email.toLowerCase() !== expectedEmail.toLowerCase()
+  ) {
+    throw new Error(
+      `Settings email mismatch: got ${settings.email}, expected ${expectedEmail}`
+    );
+  }
+  return settings;
+}
+
 async function signOutElectron() {
   const page = await waitForSignedInElectronPage();
 
   try {
     await page.evaluate(`(async () => {
       const redirectUrl = '/signin?redirect_url=%2Fapp%2Fchat%3Fruntime%3Delectron';
-      await window.Clerk?.signOut?.({ redirectUrl })?.catch?.(() => undefined);
+      try {
+        await fetch('/api/auth/sign-out', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch {}
+      try {
+        await fetch('/api/auth/reset', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch {}
+      window.location.assign(redirectUrl);
       return true;
     })()`);
   } finally {
@@ -1482,20 +1140,13 @@ async function clearElectronAuthStorage() {
 }
 
 async function main() {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  if (!secretKey || !publishableKey) {
-    throw new Error(
-      'Missing Clerk dev env. Run with Doppler dev Clerk keys loaded.'
-    );
-  }
+  // Better Auth smoke does not need Clerk keys. Keep a no-op Buffer import
+  // path-free reference for environments that polyfill global crypto only.
+  void Buffer;
 
-  const fapiHost = parseFrontendApi(publishableKey);
-  const testingToken = await getTestingToken(secretKey);
   const chromium = await getChromium();
   const browser = await chromium.launch({ headless: true });
   const email = getStableSmokeEmail();
-  const provisionedUser = await ensureSmokeUser(secretKey, email);
 
   try {
     if (!SKIP_START_SIGN_OUT) {
@@ -1505,12 +1156,9 @@ async function main() {
       }
     }
 
-    const fresh = await newAuthContext(browser, fapiHost, null);
-    const provisionedSignin = await signInWithFreshTicket(
-      fresh.page,
-      secretKey,
-      provisionedUser.userId
-    );
+    // Pass 1: signup (auto-create via email OTP) → deep link → Settings
+    const fresh = await newAuthContext(browser);
+    const provisionedSignin = await signInWithEmailOtp(fresh.page, email);
     await waitForAppSessionCookie(fresh.context, 'fresh-signup');
     const freshAuthUrl = await startElectronBrowserAuth();
     const freshCallback = await requestNativeCallback(
@@ -1523,6 +1171,13 @@ async function main() {
       provisionedSignin.userId,
       'fresh-signup'
     );
+    const settingsPage = await waitForSignedInElectronPage();
+    let settings;
+    try {
+      settings = await openSettingsAndAssert(settingsPage, email);
+    } finally {
+      settingsPage.close();
+    }
     await fresh.context.close();
 
     const signedOut = await signOutOrClearElectronAuth();
@@ -1530,12 +1185,9 @@ async function main() {
       await clearElectronAuthStorage();
     }
 
-    const existing = await newAuthContext(browser, fapiHost, testingToken);
-    const existingSignin = await signInWithFreshTicket(
-      existing.page,
-      secretKey,
-      provisionedUser.userId
-    );
+    // Pass 2: same-account login → deep link → Settings reload
+    const existing = await newAuthContext(browser);
+    const existingSignin = await signInWithEmailOtp(existing.page, email);
     await waitForAppSessionCookie(existing.context, 'existing-signin');
     const existingAuthUrl = await startElectronBrowserAuth();
     const existingCallback = await requestNativeCallback(
@@ -1548,23 +1200,34 @@ async function main() {
       existingSignin.userId,
       'existing-signin'
     );
+    const settingsPage2 = await waitForSignedInElectronPage();
+    let settingsReload;
+    try {
+      settingsReload = await openSettingsAndAssert(settingsPage2, email);
+    } finally {
+      settingsPage2.close();
+    }
     await existing.context.close();
 
     console.log(
       JSON.stringify(
         {
           email,
+          scheme: NATIVE_AUTH_CALLBACK_SCHEME,
           provisionedSignin: {
             userId: provisionedSignin.userId,
-            reused: provisionedUser.reused,
             electronUrl: redactTicketFromUrl(freshElectron.url),
             apiStatus: freshElectron.apiStatus,
+            evidenceSource: freshElectron.evidenceSource,
+            settingsEmail: settings?.email ?? null,
           },
           signedOut,
           existingSignin: {
             userId: existingSignin.userId,
             electronUrl: redactTicketFromUrl(existingElectron.url),
             apiStatus: existingElectron.apiStatus,
+            evidenceSource: existingElectron.evidenceSource,
+            settingsEmail: settingsReload?.email ?? null,
           },
         },
         null,
