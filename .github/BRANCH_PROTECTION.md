@@ -16,7 +16,7 @@ gh api repos/JovieInc/Jovie/rulesets/10512119 \
   --jq '.rules[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'
 ```
 
-1. **PR Ready** - Aggregate fast lane (`ci-fast`: typecheck + biome lint + server boundaries + guardrails)
+1. **PR Ready** - The single aggregate merge gate (`ci-pr-ready` job in `ci.yml`): fans in typecheck, biome, guardrails, structural contract, unit tests, risk classifier + risk-triggered preview evidence (build is advisory)
 2. **Migration Guard** - Database migration validation (path-gated to DB/schema changes)
 3. **Fork PR Gate** - Blocks unreviewed external fork PRs; auto-passes for agents + team
 4. **PR Size Guard** - Caps PR size (800 lines / 40 files) to force small, reviewable PRs; `big-pr` label opts out

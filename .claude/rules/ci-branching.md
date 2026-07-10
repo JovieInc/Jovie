@@ -43,7 +43,9 @@ After a train merges to `main`, reset the integration branch from `main` before 
 
 ## Hard rules for agents
 
-1. **Never open a routine Linear PR to `main`** — target `integration/loop-{domain}` first.
+1. **Default is a small sibling PR straight to `main`** (see header note +
+   `docs/PR_FLOW.md`). Target `integration/loop-{domain}` only inside a
+   coordinated multi-agent wave (>3 agents, one domain, same window).
 2. **One PR = one Linear issue** — no drive-by refactors.
 3. **No `testing` label** unless touching: auth, billing, DB/migrations, proxy, env, agent control plane.
 4. **Local verify before integration merge:** `typecheck`, `biome`, focused `vitest`.
@@ -86,4 +88,8 @@ After a train merges to `main`, reset the integration branch from `main` before 
 - **Local:** `pnpm ci:branching-guard --head <branch> --base main` before opening agent PRs.
 - **Harness:** `pnpm ci:branching-guard:validate` in Structural Contract lane.
 
-**Ship now:** warn mode for agent PRs → `main`. **Re-evaluate when:** 2026-06-17. **Then:** escalate to error mode unless false-positive rate >10% (hotfix path blocked).
+**Ship now:** warn mode for agent PRs → `main` — kept past the original
+2026-06-17 trigger because direct-to-`main` sibling PRs became the documented
+default (`docs/PR_FLOW.md`, 2026-06-22 post-mortem); error mode would fight the
+canonical flow. **Re-evaluate when:** integration-branch waves become the
+default again. **Then:** escalate to error mode.

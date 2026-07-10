@@ -6,9 +6,11 @@ PR discipline, ship validation, branch strategy, deploy flow, bot-review blockin
 
 ### Size Limits
 
-- Max 10 files changed per PR (excluding lockfiles and generated files)
-- Max 400 lines of diff (additions + deletions)
-- If a task requires more, split into sequential PRs with clear dependencies
+- Max 40 files changed per PR (excluding lockfiles, generated files, snapshots, svg)
+- Max 800 lines of diff (additions + deletions) — enforced by `pr-size-guard.yml`
+  (repo vars `PR_MAX_LINES`/`PR_MAX_FILES`); approved mechanical codemods use `big-pr`
+- If a task requires more, split into a `gt` stack with clear dependencies
+  (see [`.claude/rules/pr-stacking.md`](pr-stacking.md))
 
 ### Pre-Push Gate
 
