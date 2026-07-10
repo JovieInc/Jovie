@@ -26,7 +26,7 @@ describe('AppShellFrame', () => {
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
     expect(mainContent.querySelector('div.flex.flex-1')).toHaveClass(
-      'lg:gap-[var(--linear-app-shell-gap)]'
+      'lg:gap-(--linear-app-shell-gap)'
     );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('Main Content')).toBeInTheDocument();
@@ -68,10 +68,10 @@ describe('AppShellFrame', () => {
     );
     expect(mainContent).toHaveClass('lg:border-l');
     expect(mainContent).not.toHaveClass(
-      'lg:shadow-[var(--linear-app-shell-shadow)]'
+      'lg:shadow-(--linear-app-shell-shadow)'
     );
     expect(mainContent.querySelector('div.flex.flex-1')).not.toHaveClass(
-      'lg:gap-[var(--linear-app-shell-gap)]'
+      'lg:gap-(--linear-app-shell-gap)'
     );
   });
 

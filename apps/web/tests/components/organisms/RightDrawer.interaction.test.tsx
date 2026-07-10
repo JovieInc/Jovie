@@ -50,7 +50,7 @@ describe('RightDrawer', () => {
     expect(aside).not.toHaveClass('border-l');
     expect(aside).not.toHaveClass('bg-surface-0');
     expect(aside).not.toHaveClass('lg:border');
-    expect(aside).not.toHaveClass('shadow-[var(--linear-app-drawer-shadow)]');
+    expect(aside).not.toHaveClass('shadow-(--linear-app-drawer-shadow)');
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 
@@ -173,7 +173,7 @@ describe('RightDrawer', () => {
     );
     expect(desktopAside).not.toHaveClass('lg:border');
     expect(desktopAside).not.toHaveClass(
-      'lg:rounded-[var(--linear-app-shell-radius)]'
+      'lg:rounded-(--linear-app-shell-radius)'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');
