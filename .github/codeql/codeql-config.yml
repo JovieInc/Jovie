@@ -1,0 +1,21 @@
+name: jovie-codeql-config
+
+# Use the security-extended suite for broader SAST coverage
+# This satisfies the OpenSSF Scorecard SAST recommendation
+query-filters:
+  - include:
+      tags: security-extended
+
+paths-ignore:
+  # Workflow YAML is not application source; ignoring it prevents the
+  # dynamic PR analyzer from treating changed CI shell blocks as JavaScript.
+  - .github/workflows/**
+  - storybook-static/**
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - '**/__tests__/**'
+  - '**/__mocks__/**'
+  - '**/fixtures/**'
+  - docs/**
