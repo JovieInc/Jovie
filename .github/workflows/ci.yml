@@ -4323,10 +4323,25 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
       # Main deploys to staging with the isolated Doppler `stg` service token.
-      # Do not substitute production GitHub secrets in this job.
+      # Doppler owns runtime config; GitHub owns the existing Vercel control-plane
+      # credentials used only to pull, deploy, and alias the staging build.
       - uses: ./.github/actions/setup-doppler
         with:
           doppler-token: ${{ secrets.DOPPLER_TOKEN_STG }}
+      - name: Configure staging deployment credentials
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          # Write after setup-doppler so a runtime config cannot override the
+          # repository-scoped deployment identity for later Vercel CLI steps.
+          {
+            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
+            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
+            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
+          } >> "$GITHUB_ENV"
       - name: Verify staging deploy control-plane credentials
         shell: bash
         run: |
@@ -4337,7 +4352,7 @@ jobs:
             fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Doppler stg is missing required deploy credentials: ${missing[*]}"
+            echo "::error::Missing required staging deployment credentials: ${missing[*]}"
             exit 1
           fi
       - name: DB safety check (staging preflight)
