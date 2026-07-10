@@ -110,15 +110,14 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     const runtimeKeys = [
       'VERCEL_AUTOMATION_BYPASS_SECRET',
-      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-      'CLERK_SECRET_KEY',
+      'NEXT_PUBLIC_BETTER_AUTH_URL',
+      'BETTER_AUTH_SECRET',
+      'BETTER_AUTH_URL',
       'DATABASE_URL',
       'SESSION_SECRET',
       'AI_GATEWAY_API_KEY',
       'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
       'TURNSTILE_SECRET_KEY',
-      'CLERK_PUBLISHABLE_KEY_STAGING',
-      'CLERK_SECRET_KEY_STAGING',
     ];
 
     expect(deployStep).toContain('required_runtime_env=(');
@@ -127,7 +126,6 @@ describe('deploy workflow Vercel env resolution', () => {
     for (const key of runtimeKeys) {
       expect(deployStep).toContain(key);
       expect(deployStep).toContain(`--env ${key}="\${${key}}"`);
-      expect(deployStep).toContain(`${key}: \${{ secrets.${key} }}`);
     }
   });
 
