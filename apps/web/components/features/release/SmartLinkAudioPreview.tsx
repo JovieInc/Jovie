@@ -22,7 +22,6 @@ interface SmartLinkAudioPreviewProps {
   readonly previewSource?: PreviewSource;
 }
 
-/** Fan-facing preview — thin UI over the global engine; height-stable. */
 export function SmartLinkAudioPreview({
   contentId,
   title,

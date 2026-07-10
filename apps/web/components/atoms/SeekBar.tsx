@@ -17,7 +17,6 @@ interface SeekBarProps {
   readonly className?: string;
 }
 
-/** Scrubber with local drag state so engine ticks cannot snap the thumb. */
 export function SeekBar({
   currentTime,
   duration,
