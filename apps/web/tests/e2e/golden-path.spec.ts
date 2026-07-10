@@ -235,23 +235,43 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
-  await page.getByLabel('Email Address').fill(email);
-  await page.getByRole('button', { name: 'Continue with Email' }).click();
+  const emailInput = page.getByLabel('Email Address');
+  const continueButton = page.getByRole('button', {
+    name: 'Continue with Email',
+  });
+  await emailInput.fill(email);
+  // The standalone app can finish client hydration immediately after its
+  // server-rendered form becomes visible. Wait for React state to enable the
+  // submit control before clicking so the typed address is not lost.
+  await expect(continueButton).toBeEnabled({ timeout: 30_000 });
+  await Promise.all([
+    page.waitForURL(/\/(start|onboarding)/, { timeout: 30_000 }),
+    continueButton.click(),
+  ]);
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout: 30_000,
   });
   await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
   await page.waitForURL(/\/(start|onboarding)/, { timeout: 30_000 });
+  await page.waitForLoadState('domcontentloaded');
 
-  const session = await page.evaluate(async () => {
-    const response = await fetch('/api/auth/get-session');
-    if (!response.ok) return null;
-    return (await response.json()) as { user?: { id?: string } };
-  });
-  const betterAuthUserId = session?.user?.id;
-  if (!betterAuthUserId) {
-    throw new Error('Better Auth session not established after signup');
-  }
+  const sessionHandle = await page.waitForFunction(
+    async () => {
+      try {
+        const response = await fetch('/api/auth/get-session');
+        if (!response.ok) return false;
+        const session = (await response.json()) as {
+          user?: { id?: string };
+        };
+        return session.user?.id || false;
+      } catch {
+        return false;
+      }
+    },
+    undefined,
+    { timeout: 30_000 }
+  );
+  const betterAuthUserId = await sessionHandle.jsonValue<string>();
 
   await ensureDbUser(betterAuthUserId);
   return { email, betterAuthUserId };

@@ -1267,7 +1267,9 @@ jobs:
             exit 1
           fi
 
-          pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line
+          # The lane uses the deterministic test-auth bypass, so use the
+          # no-auth config and avoid its unrelated legacy Clerk setup project.
+          pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           BASE_URL: http://localhost:3100
           DATABASE_URL: ${{ env.DATABASE_URL }}

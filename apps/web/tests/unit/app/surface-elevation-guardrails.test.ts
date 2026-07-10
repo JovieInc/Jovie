@@ -423,7 +423,7 @@ describe('surface elevation guardrails', () => {
 
     expect(shellFrame).toContain('lg:shadow-(--linear-app-shell-shadow)');
     expect(shellFrame).toContain(
-      'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
+      'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
     );
     expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
     expect(sidebar).not.toContain(
@@ -434,9 +434,7 @@ describe('surface elevation guardrails', () => {
     // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.
     expect(rightDrawer).toContain('shadow-(--linear-app-drawer-shadow)');
     // Desktop-only classes: no border, no radius — flat inline sidebar
-    expect(rightDrawer).not.toContain(
-      'lg:rounded-[var(--linear-app-shell-radius)]'
-    );
+    expect(rightDrawer).not.toContain('lg:rounded-(--linear-app-shell-radius)');
     expect(rightDrawer).not.toContain('lg:border');
     expect(adminTableShell).toContain('bg-(--linear-app-content-surface)/96');
   });
