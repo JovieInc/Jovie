@@ -54,7 +54,7 @@ jobs:
   # runs first (fail-open), then path detection.
   ci-path-changes:
     name: Path Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
@@ -296,7 +296,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     name: CI Risk Classifier
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     outputs:
       risk_level: ${{ steps.classify.outputs.risk_level }}
@@ -387,7 +387,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -420,7 +420,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -451,7 +451,7 @@ jobs:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     steps:
@@ -484,7 +484,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Structural Contract
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 8
     env:
       SHELLCHECK_OPTS: >-
@@ -549,7 +549,7 @@ jobs:
     # Merge gate: keep on always-available GitHub runners. The self-hosted
     # jovie-runner pool is not highly-available (personal OrbStack host) and
     # took down this gate when it shut down mid-run.
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
@@ -858,7 +858,7 @@ jobs:
     needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -3683,7 +3683,7 @@ jobs:
         ci-pr-vercel-preview,
       ]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
       - name: Evaluate required PR checks
