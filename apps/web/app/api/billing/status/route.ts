@@ -38,7 +38,7 @@ interface BillingStatusPayload {
   trialNotificationsSent: number;
 }
 
-async function readTrialFields(clerkId: string): Promise<{
+async function readTrialFields(appUserId: string): Promise<{
   trialStartedAt: string | null;
   trialEndsAt: string | null;
   trialNotificationsSent: number;
@@ -51,7 +51,7 @@ async function readTrialFields(clerkId: string): Promise<{
         trialNotificationsSent: users.trialNotificationsSent,
       })
       .from(users)
-      .where(eq(users.clerkId, clerkId))
+      .where(eq(users.id, appUserId))
       .limit(1);
 
     const record = row[0];
@@ -70,7 +70,7 @@ async function readTrialFields(clerkId: string): Promise<{
     };
   } catch (error) {
     logger.warn('Trial field read failed; defaulting to nulls', {
-      clerkId,
+      appUserId,
       error,
     });
     return {

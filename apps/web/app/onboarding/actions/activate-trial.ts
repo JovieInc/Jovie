@@ -11,7 +11,7 @@
 
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -23,10 +23,10 @@ const TRIAL_DURATION_DAYS = 14;
  * Activate a 14-day Pro trial for a user.
  * Only activates if the user is currently on the free plan with no prior trial.
  *
- * @param clerkId - The Clerk user ID
+ * @param appUserId - The authenticated app `users.id`
  * @returns true if trial was activated, false if skipped (already on trial/paid/had trial before)
  */
-export async function activateTrial(clerkId: string): Promise<boolean> {
+export async function activateTrial(appUserId: string): Promise<boolean> {
   try {
     const now = new Date();
     const trialEndsAt = new Date(
@@ -43,22 +43,31 @@ export async function activateTrial(clerkId: string): Promise<boolean> {
         trialEndsAt,
         trialNotificationsSent: 0,
       })
-      .where(eq(users.clerkId, clerkId))
+      .where(
+        and(
+          eq(users.id, appUserId),
+          eq(users.plan, 'free'),
+          isNull(users.trialStartedAt),
+          isNull(users.trialEndsAt)
+        )
+      )
       .returning({ id: users.id, plan: users.plan });
 
     if (result.length === 0) {
-      logger.warn('Trial activation: user not found', { clerkId });
+      logger.warn('Trial activation skipped: user ineligible or not found', {
+        appUserId,
+      });
       return false;
     }
 
     logger.info('Trial activated', {
-      clerkId,
+      appUserId,
       trialEndsAt: trialEndsAt.toISOString(),
     });
 
     return true;
   } catch (error) {
-    logger.error('Trial activation failed', { clerkId, error });
+    logger.error('Trial activation failed', { appUserId, error });
     return false;
   }
 }

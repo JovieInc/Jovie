@@ -210,6 +210,22 @@
       "reason": "Identity regressions can lock out users or invalidate auth handoff paths."
     },
     {
+      "id": "activation-automation-data",
+      "title": "Activation, AI, and background data flows",
+      "level": "high",
+      "patterns": [
+        "^apps/web/app/(onboarding|start)/",
+        "^apps/web/app/api/(onboarding|ingestion|cron|chat|memory|dsp/enrichment|dashboard/ai-crawlers|admin/agent-os/workflows|hud/ai-ops)/",
+        "^apps/web/lib/(onboarding|ingestion|memory|ai|workflows)/",
+        "^apps/web/lib/connectors/enrichment/",
+        "^apps/web/tests/.*/(onboarding|ingestion|memory|enrichment|workflow)"
+      ],
+      "requiresSmoke": true,
+      "requiresPreview": true,
+      "blocksUnattendedAutoMerge": false,
+      "reason": "Activation and automated data-flow regressions can strand new users, cross tenant boundaries, or silently stop background work."
+    },
+    {
       "id": "billing-money",
       "title": "Billing and money movement",
       "level": "high",

@@ -4,7 +4,8 @@
  * Common query patterns used across API routes to eliminate duplication.
  * These helpers ensure consistent security checks and field selection.
  *
- * All authenticated queries verify ownership using the clerkUserId.
+ * All authenticated queries verify ownership using the app user id returned by
+ * the Better Auth session boundary.
  */
 
 import 'server-only';
@@ -38,7 +39,7 @@ export interface AuthenticatedProfile {
  *
  * @param tx - Database transaction or connection
  * @param profileId - Profile ID to fetch
- * @param clerkUserId - Authenticated user's Clerk ID
+ * @param appUserId - Authenticated app `users.id`
  * @returns Profile if found and owned by user, null otherwise
  *
  * @example
@@ -52,7 +53,7 @@ export interface AuthenticatedProfile {
 export async function getAuthenticatedProfile(
   tx: DbOrTransaction,
   profileId: string,
-  clerkUserId: string
+  appUserId: string
 ): Promise<AuthenticatedProfile | null> {
   const [profile] = await tx
     .select({
@@ -64,7 +65,7 @@ export async function getAuthenticatedProfile(
       displayNameLocked: creatorProfiles.displayNameLocked,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.clerkId, clerkUserId))
+    .innerJoin(users, eq(users.id, appUserId))
     .leftJoin(
       userProfileClaims,
       and(
@@ -201,6 +202,18 @@ export async function getUserByClerkId(
   tx: DbOrTransaction,
   clerkUserId: string
 ): Promise<UserRecord | null> {
+  return getUserByIdentity(tx, clerkUserId);
+}
+
+/**
+ * Resolve a user across the legacy Clerk-ID and Better Auth app-ID
+ * generations. Authenticated request callers receive `users.id`, while
+ * admin and legacy webhook callers may still provide `users.clerkId`.
+ */
+export async function getUserByIdentity(
+  tx: DbOrTransaction,
+  userIdentity: string
+): Promise<UserRecord | null> {
   const [user] = await tx
     .select({
       id: users.id,
@@ -212,10 +225,28 @@ export async function getUserByClerkId(
       deletedAt: users.deletedAt,
     })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.clerkId, userIdentity))
     .limit(1);
 
-  return user ?? null;
+  if (user) {
+    return user;
+  }
+
+  const [appUser] = await tx
+    .select({
+      id: users.id,
+      clerkId: users.clerkId,
+      email: users.email,
+      isAdmin: users.isAdmin,
+      isPro: users.isPro,
+      userStatus: users.userStatus,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(eq(users.id, userIdentity))
+    .limit(1);
+
+  return appUser ?? null;
 }
 
 /**
@@ -229,7 +260,7 @@ export async function getUserByClerkId(
  *
  * @param tx - Database transaction or connection
  * @param profileId - Profile ID to verify
- * @param clerkUserId - Authenticated user's Clerk ID
+ * @param appUserId - Authenticated app `users.id`
  * @returns Object with profile ID if owned by user, null otherwise
  *
  * @example
@@ -244,12 +275,12 @@ export async function getUserByClerkId(
 export async function verifyProfileOwnership(
   tx: DbOrTransaction,
   profileId: string,
-  clerkUserId: string
+  appUserId: string
 ): Promise<{ id: string } | null> {
   const [profile] = await tx
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.clerkId, clerkUserId))
+    .innerJoin(users, eq(users.id, appUserId))
     .leftJoin(
       userProfileClaims,
       and(

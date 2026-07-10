@@ -51,6 +51,7 @@ export {
   type FetchUserBillingDataWithAuthResult,
   // Query functions
   fetchUserBillingData,
+  fetchUserBillingDataByIdentity,
   fetchUserBillingDataWithAuth,
   // Billing info functions
   getBillingAuditLog,

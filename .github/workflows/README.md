@@ -171,6 +171,7 @@ Sensitive changes are classified deterministically before auto-merge. High-risk 
 | CI and workflow control plane | high | yes | no | no |
 | Agent control plane | high | yes | no | no |
 | Auth and identity | high | yes | yes | no |
+| Activation, AI, and background data flows | high | yes | yes | no |
 | Billing and money movement | high | yes | yes | no |
 | Database and migrations | high | yes | no | no |
 | Proxy and middleware | high | yes | yes | no |
