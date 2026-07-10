@@ -36,12 +36,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
  * with restrained light, calmer chrome, and an embedded header.
  */
 .home-viewport {
-  --linear-header-height: calc(var(--space-12) + var(--space-1));
+  --homepage-header-height: calc(var(--space-12) + var(--space-1));
   --homepage-page-gutter: clamp(1.25rem, 2.2vw, 2rem);
   --homepage-header-gutter: clamp(1.25rem, 2.2vw, 2rem);
   --homepage-radius: 1rem;
   --homepage-hero-top: calc(
-    var(--linear-header-height) +
+    var(--homepage-header-height) +
     clamp(4.5rem, 8.5vh, 6.5rem)
   );
   --homepage-hero-copy-max: min(
@@ -72,7 +72,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   [data-testid="header-nav"]:not([data-presentation="marketing-glass"]) {
   --linear-text-primary: var(--color-text-primary-token);
   top: 0 !important;
-  min-height: var(--linear-header-height);
+  min-height: var(--homepage-header-height);
   border-bottom: 1px solid transparent !important;
   background: transparent !important;
   color: var(--color-text-primary-token);
@@ -105,7 +105,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   [data-testid="header-nav"]:not([data-presentation="marketing-glass"])
   nav
   > div {
-  height: var(--linear-header-height);
+  height: var(--homepage-header-height);
 }
 
 /*
@@ -1180,10 +1180,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .home-viewport {
-    --linear-header-height: 52px;
+    --homepage-header-height: 52px;
     --homepage-page-gutter: 1.5rem;
     --homepage-header-gutter: 1.5rem;
-    --homepage-hero-top: calc(var(--linear-header-height) + 8.15rem);
+    --homepage-hero-top: calc(var(--homepage-header-height) + 8.15rem);
     --homepage-hero-copy-max: calc(100vw - 3rem);
     --homepage-hero-subhead-max: 22rem;
     --homepage-carousel-stage-height: clamp(14rem, 58vw, 18rem);
@@ -1446,7 +1446,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* Launch homepage overrides — active / route, after legacy section styles. */
 .home-viewport {
   --homepage-hero-top: calc(
-    var(--linear-header-height) +
+    var(--homepage-header-height) +
     clamp(2.4rem, 5.4vh, 4rem)
   );
   --homepage-carousel-stage-height: clamp(28rem, 42vw, 41rem);
@@ -1877,7 +1877,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .home-viewport {
-    --homepage-hero-top: calc(var(--linear-header-height) + 3.25rem);
+    --homepage-hero-top: calc(var(--homepage-header-height) + 3.25rem);
     --homepage-carousel-stage-height: clamp(25rem, 116vw, 31rem);
   }
 
@@ -1967,9 +1967,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Frame.io-rhythm homepage cleanup: sparse hero, wide media, slower sections. */
 .home-viewport {
-  --linear-header-height: 56px;
+  --homepage-header-height: 56px;
   --homepage-hero-top: calc(
-    var(--linear-header-height) +
+    var(--homepage-header-height) +
     clamp(4.9rem, 11.5vh, 7.8rem)
   );
   --homepage-carousel-stage-height: clamp(34rem, 42vw, 38rem);
@@ -2254,7 +2254,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   align-items: center;
   overflow: clip;
   padding-top: calc(
-    var(--linear-header-height) +
+    var(--homepage-header-height) +
     clamp(var(--space-12), 5.5vw, var(--space-20))
   );
   background: var(--system-b-bg-page);
@@ -3523,7 +3523,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-artist-profiles-section {
   position: relative;
   overflow: hidden;
-  scroll-margin-top: calc(var(--linear-header-height, 72px) + 1rem);
+  scroll-margin-top: calc(var(--homepage-header-height, 72px) + 1rem);
   padding-block: clamp(5.8rem, 8vw, 7.5rem) clamp(5.6rem, 7.4vw, 7rem);
   background: var(--system-b-bg-page);
   color: var(--color-text-primary-token);
@@ -3855,7 +3855,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .homepage-artist-profiles-section {
-    scroll-margin-top: calc(var(--linear-header-height, 60px) + 1rem);
+    scroll-margin-top: calc(var(--homepage-header-height, 60px) + 1rem);
     padding-block: clamp(5.4rem, 16vw, 6.3rem) clamp(4.4rem, 13vw, 5.6rem);
   }
 
@@ -4155,8 +4155,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .home-viewport {
-    --linear-header-height: 52px;
-    --homepage-hero-top: calc(var(--linear-header-height) + 3.9rem);
+    --homepage-header-height: 52px;
+    --homepage-hero-top: calc(var(--homepage-header-height) + 3.9rem);
     --homepage-carousel-stage-height: clamp(22rem, 92vw, 28rem);
     --homepage-section-space: clamp(4.8rem, 15vw, 6.2rem);
   }
@@ -4523,7 +4523,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .homepage-hero-inner {
-    padding-top: calc(var(--linear-header-height) + 2.45rem);
+    padding-top: calc(var(--homepage-header-height) + 2.45rem);
     padding-bottom: clamp(3.25rem, 9vw, 4.25rem);
   }
 
@@ -4555,7 +4555,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-poster-hero {
-    padding-top: calc(var(--linear-header-height) + var(--space-8));
+    padding-top: calc(var(--homepage-header-height) + var(--space-8));
   }
 
   .homepage-poster-hero__headline {
@@ -4719,102 +4719,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* SYSTEM B MOUNTED HOME COMMAND CENTER PRIMITIVES END */
-
-/* ============================================
-   SYSTEM B MOUNTED HOME PRODUCT STATEMENT PRIMITIVES
-   ============================================ */
-
-.system-b-mounted-home-product-statement {
-  padding-block: clamp(
-      var(--space-24),
-      8vw,
-      calc(var(--space-24) + var(--space-8))
-    )
-    clamp(calc(var(--space-16) + var(--space-3)), 6.4vw, var(--space-24));
-  background: var(--system-b-bg-page);
-  color: var(--color-text-primary-token);
-}
-
-.homepage-story-stack--proof-transition
-  .system-b-mounted-home-product-statement {
-  padding-top: clamp(
-    calc(var(--space-24) + var(--space-3)),
-    9.4vw,
-    calc(var(--space-24) + var(--space-12))
-  );
-}
-
-.system-b-mounted-home-product-statement::before {
-  display: none;
-}
-
-.system-b-mounted-home-product-statement-inner {
-  gap: clamp(var(--space-8), 4.2vw, var(--space-16));
-}
-
-.system-b-mounted-home-product-statement
-  .system-b-mounted-home-product-statement-eyebrow {
-  color: var(--color-text-tertiary-token);
-}
-
-.system-b-mounted-home-product-statement
-  .system-b-mounted-home-product-statement-headline {
-  color: var(--color-text-tertiary-token);
-  font-size: var(--text-5xl);
-  letter-spacing: 0;
-}
-
-.system-b-mounted-home-product-statement-lead {
-  color: var(--color-text-primary-token);
-}
-
-.system-b-mounted-home-product-statement-body {
-  color: var(--color-text-tertiary-token);
-}
-
-.system-b-mounted-home-product-statement-ai {
-  color: var(--color-text-secondary-token);
-}
-
-.system-b-mounted-home-product-statement
-  .system-b-mounted-home-product-statement-ai-copy
-  h3 {
-  color: var(--color-text-primary-token);
-  letter-spacing: 0;
-}
-
-.system-b-mounted-home-product-statement
-  .system-b-mounted-home-product-statement-ai-copy
-  p {
-  color: var(--color-text-tertiary-token);
-}
-
-@media (max-width: 767px) {
-  .system-b-mounted-home-product-statement {
-    padding-block: clamp(
-        var(--space-20),
-        14vw,
-        calc(var(--space-24) + var(--space-1))
-      )
-      clamp(calc(var(--space-16) + var(--space-1)), 11vw, var(--space-20));
-  }
-
-  .homepage-story-stack--proof-transition
-    .system-b-mounted-home-product-statement {
-    padding-top: clamp(
-      calc(var(--space-20) + var(--space-0-5)),
-      14vw,
-      calc(var(--space-24) + var(--space-2))
-    );
-  }
-
-  .system-b-mounted-home-product-statement
-    .system-b-mounted-home-product-statement-headline {
-    font-size: var(--text-4xl);
-  }
-}
-
-/* SYSTEM B MOUNTED HOME PRODUCT STATEMENT PRIMITIVES END */
 
 /* ============================================
    SYSTEM B MOUNTED HOME WORKSPACE SHELL PRIMITIVES
