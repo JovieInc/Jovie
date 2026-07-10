@@ -4,7 +4,50 @@
  * Shared utilities for rate limiting including IP extraction and header generation.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import type { RateLimitResult, RateLimitStatus } from './types';
+
+/**
+ * Treat a denied rate-limit result as allowed when the durable backend was
+ * degraded or unavailable (Redis down / circuit open → per-instance memory).
+ *
+ * User-critical paths (auth, chat) must not hard-block on an advisory
+ * in-memory bucket during an Upstash outage (JOV-3929 / JOV-3956). Healthy
+ * Redis denials still enforce the limit.
+ */
+export function allowIfRateLimitBackendDegraded(
+  result: RateLimitResult,
+  context?: Readonly<Record<string, string | null | undefined>>
+): RateLimitResult {
+  if (result.success) {
+    return result;
+  }
+
+  const backendDegraded =
+    result.unavailable === true || result.degraded === true;
+  if (!backendDegraded) {
+    return result;
+  }
+
+  Sentry.addBreadcrumb({
+    category: 'rate-limit',
+    message: 'Rate-limit backend degraded — treating limit as advisory',
+    level: 'warning',
+    data: {
+      ...context,
+      limit: result.limit,
+      remaining: result.remaining,
+      unavailable: result.unavailable === true,
+      degraded: result.degraded === true,
+    },
+  });
+
+  return {
+    ...result,
+    success: true,
+    reason: undefined,
+  };
+}
 
 /**
  * Extract client IP address from request headers
