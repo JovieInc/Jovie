@@ -88,10 +88,7 @@ function describeRejectedType(file: Pick<File, 'name' | 'type'>): string {
   return match?.[1] ? `.${match[1].toLowerCase()}` : 'unknown type';
 }
 
-/**
- * Structured audio upload validation with a named failing rule + CTA.
- * Prefer this over `validateAudioFile` for UI surfaces (JOV-3688).
- */
+/** Structured upload validation with named failing rule + CTA (JOV-3688). */
 export function validateAudioUpload(
   file: Pick<File, 'name' | 'type' | 'size'>,
   maxSizeBytes = AUDIO_MAX_FILE_SIZE_BYTES
@@ -129,10 +126,7 @@ export function validateAudioUpload(
   return { ok: true };
 }
 
-/**
- * Legacy string validator. Returns the structured message or null when valid.
- * Prefer `validateAudioUpload` for new call sites.
- */
+/** Legacy string validator; prefer `validateAudioUpload` for UI. */
 export function validateAudioFile(
   file: Pick<File, 'name' | 'type' | 'size'>,
   maxSizeBytes = AUDIO_MAX_FILE_SIZE_BYTES

@@ -191,7 +191,6 @@ export function AudioWaveformEditor({
     };
   }, [audioUrl, snippet]);
 
-  // Global engine wins: if dock/right-rail starts, stop local snippet preview.
   useEffect(() => {
     if (!globalPlayback.isPlaying) return;
     const audio = audioRef.current;
@@ -237,8 +236,6 @@ export function AudioWaveformEditor({
       }
     }
 
-    // Snippet editor keeps a local element for trim loops, but claims global
-    // audio focus so dock/right-rail cannot dual-play (JOV-3683).
     if (!holdsGlobalFocusRef.current) {
       pausePlaybackForInterruption();
       holdsGlobalFocusRef.current = true;

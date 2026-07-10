@@ -115,7 +115,6 @@ export function ReleaseAudioAssetPanel({
         handleRequestType(rejection);
         return;
       }
-      // pick_another + compress both re-open the picker (no silent dead-end).
       openFilePicker();
     },
     [handleRequestType, openFilePicker]
@@ -290,7 +289,6 @@ export function ReleaseAudioAssetPanel({
           className='sr-only'
           aria-label={`Upload audio for ${releaseTitle}`}
         />
-        {/* Fixed min-height so rejection UI never collapses the dropzone layout */}
         <output
           className='min-h-12 space-y-1.5 pt-1.5 text-2xs'
           data-testid='release-audio-upload-feedback'

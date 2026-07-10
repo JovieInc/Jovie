@@ -22,11 +22,7 @@ interface SmartLinkAudioPreviewProps {
   readonly previewSource?: PreviewSource;
 }
 
-/**
- * Fan-facing smart-link audio preview. Thin UI over the single global
- * playback engine — never instantiates its own audio element (JOV-3683).
- * Layout is height-stable across idle/loading/playing to avoid CLS (JOV-3681).
- */
+/** Fan-facing preview — thin UI over the global engine; height-stable. */
 export function SmartLinkAudioPreview({
   contentId,
   title,
@@ -123,7 +119,6 @@ export function SmartLinkAudioPreview({
         </button>
 
         <div className='min-w-0 flex-1 space-y-1'>
-          {/* Fixed scrub row height so play/pause/load never shifts layout */}
           <div className='flex h-4 items-center'>
             <SeekBar
               currentTime={currentTime}
@@ -142,7 +137,6 @@ export function SmartLinkAudioPreview({
           </div>
         </div>
       </div>
-      {/* Reserve one line so fallback label never pushes DSP buttons */}
       <p className='min-h-3.5 text-3xs text-white/45'>
         {fallbackSourceLabel ?? '\u00a0'}
       </p>

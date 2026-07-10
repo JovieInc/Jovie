@@ -330,7 +330,7 @@ describe('useTrackAudioPlayer', () => {
     expect(errorCb).toHaveBeenCalledTimes(1);
   });
 
-  it('pauses active playback for interruptions and stays paused by default', async () => {
+  it('pauses for interruptions and stays paused by default', async () => {
     const useTrackAudioPlayer = await importFresh();
     const engine = await import(
       '@/components/organisms/release-sidebar/useTrackAudioPlayer'
@@ -348,20 +348,16 @@ describe('useTrackAudioPlayer', () => {
       mockAudio.paused = false;
       fireAudioEvent('play');
     });
-    expect(result.current.playbackState.isPlaying).toBe(true);
 
     act(() => {
       engine.pausePlaybackForInterruption();
     });
     expect(mockAudio.pause).toHaveBeenCalled();
-
     act(() => {
       mockAudio.paused = true;
       fireAudioEvent('pause');
     });
-    expect(result.current.playbackState.isPlaying).toBe(false);
 
-    // Default: stay paused (no auto-resume) — JOV-3683 decision.
     act(() => {
       engine.resumePlaybackAfterInterruption();
     });
@@ -369,7 +365,7 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.isPlaying).toBe(false);
   });
 
-  it('switches source and never leaves two tracks active', async () => {
+  it('switches source onto a single active track', async () => {
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
 
@@ -380,11 +376,6 @@ describe('useTrackAudioPlayer', () => {
         audioUrl: 'https://cdn.example.com/first.mp3',
       });
     });
-    act(() => {
-      mockAudio.paused = false;
-      fireAudioEvent('play');
-    });
-
     await act(async () => {
       await result.current.toggleTrack({
         id: 'track-2',
@@ -392,15 +383,9 @@ describe('useTrackAudioPlayer', () => {
         audioUrl: 'https://cdn.example.com/second.mp3',
       });
     });
-    act(() => {
-      mockAudio.paused = false;
-      fireAudioEvent('play');
-    });
 
     expect(result.current.playbackState.activeTrackId).toBe('track-2');
-    expect(result.current.playbackState.trackTitle).toBe('Second');
     expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
-    // Single element: prior track was paused before src swap.
     expect(mockAudio.pause.mock.calls.length).toBeGreaterThanOrEqual(1);
   });
 

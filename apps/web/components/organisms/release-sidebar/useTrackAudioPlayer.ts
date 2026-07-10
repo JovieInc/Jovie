@@ -51,15 +51,11 @@ let _activeTrackIsrc: string | null = null;
 let _hasRetriedRefresh = false;
 let _queue: readonly AudioTrackSource[] = [];
 let _queueIndex = -1;
-/**
- * Interruption focus (dictation / local preview / video). While held, the engine
- * stays paused so a secondary surface cannot dual-play with the global source.
- * Resume is opt-in — default UX is stay paused after capture ends (JOV-3683).
- */
+/** Nested audio-focus holds (dictation / local preview). Resume is opt-in. */
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
 let _mediaSessionBound = false;
-/** Progress notify floor — ~4 Hz keeps scrub UIs smooth without full rAF thrash. */
+/** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
 const PROGRESS_NOTIFY_MS = 250;
 
 /** Lazily create the Audio element — safe to call during SSR (returns null server-side). */
@@ -147,16 +143,15 @@ function setState(partial: Partial<PlaybackState>): void {
   state = { ...state, ...partial };
   notify();
 
-  // Skip Media Session work on pure progress ticks (timeupdate ~4 Hz).
-  const identityChanged =
+  if (
     prev.activeTrackId !== state.activeTrackId ||
     prev.trackTitle !== state.trackTitle ||
     prev.artistName !== state.artistName ||
     prev.releaseTitle !== state.releaseTitle ||
     prev.artworkUrl !== state.artworkUrl ||
     prev.isPlaying !== state.isPlaying ||
-    prev.duration !== state.duration;
-  if (identityChanged) {
+    prev.duration !== state.duration
+  ) {
     syncMediaSession();
   }
 }
@@ -444,11 +439,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   });
 }
 
-/**
- * Imperative pause for short interruptions (chat dictation, local waveform
- * preview, embedded video). Nested-safe; only the outermost release clears the
- * focus hold. Default after release: stay paused (do not auto-resume).
- */
+/** Nested-safe pause for dictation / local preview. Default: no auto-resume. */
 export function pausePlaybackForInterruption(): void {
   const audio = getAudio();
   if (_interruptionDepth === 0) {
@@ -462,10 +453,7 @@ export function pausePlaybackForInterruption(): void {
   }
 }
 
-/**
- * Release an interruption hold. Pass `{ resume: true }` only when product UX
- * wants auto-resume; JOV-3683 default is stay paused after dictation.
- */
+/** Release interruption hold. Pass `{ resume: true }` to resume prior track. */
 export function resumePlaybackAfterInterruption(
   options: { readonly resume?: boolean } = {}
 ): void {
@@ -484,12 +472,10 @@ export function resumePlaybackAfterInterruption(
   });
 }
 
-/** Snapshot for non-React callers (tests, focus arbitration). */
 export function getPlaybackEngineSnapshot(): PlaybackState {
   return state;
 }
 
-/** True while an interruption hold is active (dictation / local preview). */
 export function isPlaybackInterrupted(): boolean {
   return _interruptionDepth > 0;
 }
@@ -500,7 +486,6 @@ export function useTrackAudioPlayer() {
   useEffect(() => {
     const listener = () => setPlaybackState(state);
     listeners.add(listener);
-    // Sync late subscribers with current engine state (e.g. route remounts).
     setPlaybackState(state);
     return () => {
       listeners.delete(listener);
@@ -512,8 +497,7 @@ export function useTrackAudioPlayer() {
       const audio = getAudio();
       if (!audio) return;
 
-      // New intentional play clears interruption holds so dock/right-rail
-      // transport is never stuck muted after dictation.
+      // Intentional play clears dictation/local-preview holds.
       if (_interruptionDepth > 0) {
         _interruptionDepth = 0;
         _wasPlayingBeforeInterruption = false;

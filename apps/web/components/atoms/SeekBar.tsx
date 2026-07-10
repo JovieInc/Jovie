@@ -17,10 +17,7 @@ interface SeekBarProps {
   readonly className?: string;
 }
 
-/**
- * Range scrubber with local drag state so the thumb never snaps back to the
- * last throttled engine tick mid-gesture (JOV-3681 smart-link jank fix).
- */
+/** Scrubber with local drag state so engine ticks cannot snap the thumb. */
 export function SeekBar({
   currentTime,
   duration,
