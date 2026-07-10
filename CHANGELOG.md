@@ -28,7 +28,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Chat release right-rail System B polish (JOV-3493)**: Section cards use Library elevation, DSP rows show provider icons, and typography drops oversized/all-caps chrome.
 - **Chat file attachments render as rich chips (JOV-3492)**: Uploaded audio/docs show a filetype icon + clean filename instead of raw Vercel blob URLs.
 - **Provider-ingested released music can only be archived (JOV-3885)**: Soft-hide via `deleted_at` for ingested published releases; Jovie-created releases still hard-delete.
-
+- **Search fills the whole screen (JOV-2982)**: Cmd+K opens a full-viewport search surface with the same clean input; results scroll the remaining height instead of a cramped centered card.
 
 
 - [internal] **Single machine-readable design-token source, wave 1 (GH-12009, GH-10158)**: New `apps/web/design/tokens.json` compiled by `scripts/build-design-tokens.mjs` (`pnpm tokens:build` / `tokens:check`) into generated CSS (`--gray1..12` now resolve app-wide), a typed TS export, and an agent manifest. `--linear-*` namespace is now shrink-only ratcheted (`linear-namespace-ratchet.test.ts`, baseline 2242), and a source-vs-emitter divergence guard locks tokens.json to the live accent palette. No visual changes.

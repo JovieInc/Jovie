@@ -31,6 +31,7 @@ import {
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import { cn } from '@/lib/utils';
 import {
   artistResultToEntityRef,
   type ReleaseLikeRow,
@@ -251,8 +252,21 @@ export function CmdKPalette({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-140'
+        // JOV-2982: full-viewport search takeover (not a centered card).
+        // Overrides DialogContent centered defaults via tailwind-merge.
+        className={cn(
+          'left-0 top-0 h-dvh w-screen max-w-none [translate:0_0]',
+          'grid gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none',
+          'bg-(--linear-app-content-surface)',
+          'sm:max-w-none',
+          // Full-page: fade only (no zoom — zoom reads as a modal card)
+          'data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100'
+        )}
         hideClose
+        overlayProps={{
+          className: 'bg-(--linear-app-content-surface)',
+        }}
+        testId='cmdk-full-page'
       >
         <DialogPrimitive.Title className='sr-only'>
           Command palette
@@ -261,11 +275,11 @@ export function CmdKPalette({
           Search routes, skills, releases, artists, and recent conversations.
         </DialogPrimitive.Description>
         <div
-          className='flex flex-col'
+          className='mx-auto flex h-full w-full max-w-3xl flex-col'
           data-testid='shared-command-palette'
           data-surface='cmdk'
         >
-          <div className='flex items-center gap-2 border-b border-(--linear-app-frame-seam) px-3.5 py-2.5'>
+          <div className='flex shrink-0 items-center gap-2 border-b border-(--linear-app-frame-seam) px-3.5 py-2.5'>
             <Search
               className='size-4 shrink-0 text-tertiary-token'
               aria-hidden='true'
@@ -287,7 +301,7 @@ export function CmdKPalette({
             </span>
           </div>
           <div
-            className='max-h-105 overflow-y-auto px-2 pb-2 pt-1.5'
+            className='min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1.5'
             role='listbox'
             aria-label='Command Palette Results'
           >
