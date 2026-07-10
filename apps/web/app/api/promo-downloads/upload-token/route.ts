@@ -10,6 +10,7 @@ import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
+import { hasActiveProAccess } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -45,7 +46,13 @@ export async function POST(request: NextRequest) {
           throw new Error('Creator profile not found');
         }
 
-        if (!user.isPro) {
+        if (
+          !hasActiveProAccess({
+            isPro: user.isPro,
+            plan: user.plan,
+            trialEndsAt: user.trialEndsAt,
+          })
+        ) {
           throw new Error('Pro plan required for promo downloads');
         }
 

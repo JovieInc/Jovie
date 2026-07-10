@@ -242,6 +242,8 @@ export interface DbUserContext {
   email: string | null;
   isAdmin: boolean;
   isPro: boolean | null;
+  plan?: string | null;
+  trialEndsAt?: Date | null;
   userStatus:
     | 'waitlist_pending'
     | 'waitlist_approved'
@@ -298,6 +300,8 @@ export async function getDbUser(
       email: users.email,
       isAdmin: users.isAdmin,
       isPro: users.isPro,
+      plan: users.plan,
+      trialEndsAt: users.trialEndsAt,
       userStatus: users.userStatus,
     })
     .from(users)

@@ -4,6 +4,7 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { hasActiveProAccess } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import {
   checkVerificationRequestRateLimit,
@@ -37,6 +38,8 @@ export async function POST() {
           name: users.name,
           email: users.email,
           isPro: users.isPro,
+          plan: users.plan,
+          trialEndsAt: users.trialEndsAt,
         })
         .from(users)
         .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
@@ -46,7 +49,13 @@ export async function POST() {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
-      if (!user.isPro) {
+      if (
+        !hasActiveProAccess({
+          isPro: user.isPro,
+          plan: user.plan,
+          trialEndsAt: user.trialEndsAt,
+        })
+      ) {
         return NextResponse.json(
           { error: 'Verification requests are available to Pro members.' },
           { status: 403 }
