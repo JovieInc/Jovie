@@ -401,46 +401,51 @@ async function handleMissingDbUser(
     };
   }
 
-  // Check waitlist status before creating user. Gate OFF opens daily intake
-  // capacity; it does not skip the access request flow for brand-new accounts.
+  // Check waitlist status before creating user. When the waitlist gate is
+  // OFF, skip the waitlist check entirely — brand-new users are allowed
+  // straight through without a waitlist entry. This fixes the blank app
+  // shell bug where new signups were redirected to /waitlist even with
+  // the gate disabled.
   let waitlistEntryId: string | undefined;
 
-  const waitlistResult = await checkWaitlistAccessInternal(email);
+  if (waitlistGateEnabled) {
+    const waitlistResult = await checkWaitlistAccessInternal(email);
 
-  if (isWaitlistPendingStatus(waitlistResult.status)) {
-    return {
-      state: CanonicalUserState.WAITLIST_PENDING,
-      clerkUserId: betterAuthUserId,
-      dbUserId: null,
-      profileId: null,
-      redirectTo: '/waitlist',
-      context: { ...baseContext, email },
-    };
+    if (isWaitlistPendingStatus(waitlistResult.status)) {
+      return {
+        state: CanonicalUserState.WAITLIST_PENDING,
+        clerkUserId: betterAuthUserId,
+        dbUserId: null,
+        profileId: null,
+        redirectTo: '/waitlist',
+        context: { ...baseContext, email },
+      };
+    }
+
+    if (!waitlistResult.status) {
+      return {
+        state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
+        clerkUserId: betterAuthUserId,
+        dbUserId: null,
+        profileId: null,
+        redirectTo: '/waitlist',
+        context: { ...baseContext, email },
+      };
+    }
+
+    if (!isWaitlistApprovedStatus(waitlistResult.status)) {
+      return {
+        state: CanonicalUserState.WAITLIST_PENDING,
+        clerkUserId: betterAuthUserId,
+        dbUserId: null,
+        profileId: null,
+        redirectTo: '/waitlist',
+        context: { ...baseContext, email },
+      };
+    }
+
+    waitlistEntryId = waitlistResult.entryId ?? undefined;
   }
-
-  if (!waitlistResult.status) {
-    return {
-      state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
-      clerkUserId: betterAuthUserId,
-      dbUserId: null,
-      profileId: null,
-      redirectTo: '/waitlist',
-      context: { ...baseContext, email },
-    };
-  }
-
-  if (!isWaitlistApprovedStatus(waitlistResult.status)) {
-    return {
-      state: CanonicalUserState.WAITLIST_PENDING,
-      clerkUserId: betterAuthUserId,
-      dbUserId: null,
-      profileId: null,
-      redirectTo: '/waitlist',
-      context: { ...baseContext, email },
-    };
-  }
-
-  waitlistEntryId = waitlistResult.entryId ?? undefined;
 
   // Create the user (without waitlist entry when waitlist is disabled)
   const newUserId = await createUserWithRetry(
