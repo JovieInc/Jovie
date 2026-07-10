@@ -21,9 +21,16 @@ runs:
             || git config --global --add safe.directory "$GITHUB_WORKSPACE"
         fi
 
+    # Version-scoped install dir: the default ~/setup-pnpm persists on
+    # self-hosted runners, and a pnpm v11 layout left there crashes the pinned
+    # pnpm 9.15.4 with "Worker pnpm exited with code 1" during `pnpm fetch`
+    # (JOV-4175, run 29070623310 on gem-linux). A pnpm-9-only dest can never be
+    # polluted by another major. No-op on hosted runners (fresh VM each job).
     - name: Setup pnpm
       uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      
+      with:
+        dest: ~/setup-pnpm-v9
+
     # Actions-cache-backed pnpm caching is GitHub-hosted only. Self-hosted
     # runners (jovie-runner) keep a persistent pnpm store on disk, so the
     # restore is pointless and the post-run save uploads ~1.2 GB — observed
