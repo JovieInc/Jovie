@@ -59,7 +59,7 @@ describe('DashboardPay empty state behavior', () => {
     render(<DashboardPay />);
 
     expect(
-      screen.getByRole('heading', { name: 'Connect Venmo to unlock earnings' })
+      screen.getByRole('heading', { name: 'Connect Venmo To Unlock Earnings' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Connect Venmo' })

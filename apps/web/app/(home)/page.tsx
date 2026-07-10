@@ -270,7 +270,7 @@ function HomepageFaq() {
         items={HOMEPAGE_LAUNCH_COPY.faq}
         heading='Questions'
         headingClassName='homepage-story-heading'
-        className='mx-auto w-full max-w-[760px] px-[var(--homepage-page-gutter)] py-[var(--homepage-section-space)]'
+        className='mx-auto w-full max-w-190 px-(--homepage-page-gutter) py-(--homepage-section-space)'
         analyticsEventName='homepage_faq_opened'
         analyticsProperties={{ source: 'homepage' }}
       />

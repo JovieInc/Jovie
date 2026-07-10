@@ -173,7 +173,7 @@ describe('RightDrawer', () => {
     );
     expect(desktopAside).not.toHaveClass('lg:border');
     expect(desktopAside).not.toHaveClass(
-      'lg:rounded-[var(--linear-app-shell-radius)]'
+      'lg:rounded-(--linear-app-shell-radius)'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');

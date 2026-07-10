@@ -29,7 +29,7 @@ describe('OnboardingHandleStep', () => {
     render(<OnboardingHandleStep {...baseProps} />);
 
     expect(screen.getByText('jov.ie/')).toBeInTheDocument();
-    expect(screen.getByLabelText('Claim your handle')).toBeInTheDocument();
+    expect(screen.getByLabelText('Claim Your Handle')).toBeInTheDocument();
   });
 
   it('keeps the standard layout for non-reserved handles', () => {
@@ -43,6 +43,6 @@ describe('OnboardingHandleStep', () => {
   it('keeps the form non-interactive until hydration completes', () => {
     render(<OnboardingHandleStep {...baseProps} isHydrated={false} />);
 
-    expect(screen.getByLabelText('Claim your handle')).toBeDisabled();
+    expect(screen.getByLabelText('Claim Your Handle')).toBeDisabled();
   });
 });

@@ -283,7 +283,7 @@ const CARBON_PALETTE = {
 // Most transitions snap (150ms ease-out). Layout transformations get
 // a cinematic curve — the kind of thing you only get on macOS / Apple
 // surfaces, where the system invests motion budget in revealing structure.
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 const DURATION_CINEMATIC = 420;
 
 // Selected/focused row treatment — electric cyan accent. Calibrated to
@@ -2301,7 +2301,7 @@ function ShellV1ExperimentContent() {
         .shell-v1 [tabindex='0'] {
           transition-property: box-shadow, border-color, background-color, color;
           transition-duration: 150ms;
-          transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+          transition-timing-function: var(--ease-drawer);
         }
         .shell-v1 :focus-visible {
           outline: none;

@@ -119,7 +119,7 @@ export default async function MerchProductPage({
   return (
     <PublicPageShell
       headerVariant='minimal'
-      mainClassName='bg-[color:var(--profile-stage-bg)] text-white dark:text-white'
+      mainClassName='bg-(--profile-stage-bg) text-white dark:text-white'
     >
       <script type='application/ld+json'>
         {safeJsonLdStringify(productJsonLd)}

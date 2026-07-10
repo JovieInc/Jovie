@@ -34,7 +34,7 @@ function ChatListSkeleton() {
           className='flex h-7 items-center gap-2 rounded-full px-2.5'
         >
           <div className='h-1.5 w-1.5 shrink-0 rounded-full skeleton motion-reduce:animate-none' />
-          <div className='h-3.5 w-full max-w-[18rem] rounded-sm skeleton motion-reduce:animate-none' />
+          <div className='h-3.5 w-full max-w-72 rounded-sm skeleton motion-reduce:animate-none' />
         </div>
       ))}
     </div>
@@ -183,7 +183,7 @@ export function ChatsPageClient() {
               }}
             />
           ) : filteredThreads.length === 0 ? (
-            <div className='grid min-h-[18rem] place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'>
+            <div className='grid min-h-72 place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'>
               <div className='max-w-sm space-y-3'>
                 <p className='text-sm font-semibold text-primary-token'>
                   {normalizedQuery

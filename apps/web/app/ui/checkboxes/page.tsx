@@ -12,7 +12,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-6'>{children}</div>
@@ -29,7 +29,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-tertiary-token'>{title}</span>
+      <span className='text-2xs text-tertiary-token'>{title}</span>
       <div className='flex items-center gap-3'>{children}</div>
     </div>
   );
@@ -43,7 +43,7 @@ export default function CheckboxesPage() {
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>
         Checkbox
       </h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — 16px, 4px radius, primary-bg when checked, 2.5
         stroke check
       </p>
@@ -51,26 +51,26 @@ export default function CheckboxesPage() {
       {/* States */}
       <Section title='States'>
         <Stack title='unchecked'>
-          <Checkbox aria-label='Unchecked example' />
+          <Checkbox aria-label='Unchecked Example' />
         </Stack>
         <Stack title='checked'>
-          <Checkbox defaultChecked aria-label='Checked example' />
+          <Checkbox defaultChecked aria-label='Checked Example' />
         </Stack>
         <Stack title='indeterminate'>
           <Checkbox
             checked={indeterminate ? 'indeterminate' : false}
             onCheckedChange={() => setIndeterminate(prev => !prev)}
-            aria-label='Indeterminate example'
+            aria-label='Indeterminate Example'
           />
         </Stack>
         <Stack title='disabled unchecked'>
-          <Checkbox disabled aria-label='Disabled unchecked example' />
+          <Checkbox disabled aria-label='Disabled Unchecked Example' />
         </Stack>
         <Stack title='disabled checked'>
           <Checkbox
             disabled
             defaultChecked
-            aria-label='Disabled checked example'
+            aria-label='Disabled Checked Example'
           />
         </Stack>
       </Section>
@@ -79,10 +79,7 @@ export default function CheckboxesPage() {
       <Section title='With Label'>
         <div className='flex items-center gap-2'>
           <Checkbox id='label-demo' />
-          <label
-            htmlFor='label-demo'
-            className='text-[13px] text-primary-token'
-          >
+          <label htmlFor='label-demo' className='text-app text-primary-token'>
             Label text
           </label>
         </div>
@@ -96,7 +93,7 @@ export default function CheckboxesPage() {
               <Checkbox id={`filter-${item}`} />
               <label
                 htmlFor={`filter-${item}`}
-                className='text-[13px] text-primary-token'
+                className='text-app text-primary-token'
               >
                 {item}
               </label>

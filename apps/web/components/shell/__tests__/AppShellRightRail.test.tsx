@@ -33,7 +33,7 @@ describe('AppShellRightRail', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
 
     expect(rail).toHaveAttribute('data-shell-design', 'shellChatV1');
-    expect(rail).toHaveClass('lg:rounded-[var(--linear-app-shell-radius)]');
+    expect(rail).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
   });
 
   it('defaults to legacy variant without shell radius chrome', () => {
@@ -46,7 +46,7 @@ describe('AppShellRightRail', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
 
     expect(rail).toHaveAttribute('data-shell-design', 'legacy');
-    expect(rail).not.toHaveClass('lg:rounded-[var(--linear-app-shell-radius)]');
+    expect(rail).not.toHaveClass('lg:rounded-(--linear-app-shell-radius)');
   });
 
   it('merges custom className without replacing base sticky layout', () => {

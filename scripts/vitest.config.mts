@@ -10,6 +10,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'lib/__tests__/**/*.test.mjs',
+      'gate-ladder/**/*.test.mjs',
       'hermes/lib/__tests__/**/*.test.ts',
     ],
     name: 'workspace-scripts',
