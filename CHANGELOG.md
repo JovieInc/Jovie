@@ -21,7 +21,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Tagging knows your world (JOV-3717)**: Artist picker cold-starts with your claimed Spotify artist and catalog collaborators (with ids) above Spotify search.
 
 - **Public artist profiles now feel native at every size (JOV-2018)**: Square artwork stays square, portraits keep a face-safe crop, profile rails use one consistent card size, scrollbars stay out of sight, and sparse or subscription states no longer leave awkward gaps.
-- **Unclaimed artist profiles now include a concise claim card (JOV-2018)**: Desktop AEO pages end with an editorial Jovie prompt and a single Spotify-verified claim action.
+- **Unclaimed artist profiles now close with a cleaner claim poster (JOV-2018)**: Desktop AEO content uses a tighter editorial rhythm, then ends on oversized `jov.ie/you` type, one Spotify-verified proof line, and one claim action.
 - **Library status badges no longer call released items "Draft" (JOV-3333)**: Grid cards and the release rail hero show Release Status only; Approval Status stays as a single editable control in Details.
 - **Chat release right-rail System B polish (JOV-3493)**: Section cards use Library elevation, DSP rows show provider icons, and typography drops oversized/all-caps chrome.
 - **Chat file attachments render as rich chips (JOV-3492)**: Uploaded audio/docs show a filetype icon + clean filename instead of raw Vercel blob URLs.
