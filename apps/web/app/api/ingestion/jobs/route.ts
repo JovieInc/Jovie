@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
   const now = new Date();
   let processed = 0;
   let attempted = 0;
+  let failed = 0;
 
   try {
     const claimed = await withSystemIngestionSession(tx =>
@@ -121,11 +122,15 @@ export async function POST(request: NextRequest) {
       const batch = claimed.slice(i, i + MAX_CONCURRENT_JOBS);
       const results = await Promise.all(batch.map(processJobTransaction));
       processed += results.filter(Boolean).length;
+      failed += results.filter(result => !result).length;
     }
 
     return NextResponse.json(
-      { ok: true, attempted, processed },
-      { status: 200, headers: NO_STORE_HEADERS }
+      { ok: failed === 0, attempted, processed, failed },
+      {
+        status: failed === 0 ? 200 : 500,
+        headers: NO_STORE_HEADERS,
+      }
     );
   } catch (error) {
     logger.error('Ingestion job runner error', {

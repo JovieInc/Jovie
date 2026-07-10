@@ -100,7 +100,12 @@ describe('POST /api/ingestion/jobs', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload).toEqual({ ok: true, attempted: 1, processed: 1 });
+    expect(payload).toEqual({
+      ok: true,
+      attempted: 1,
+      processed: 1,
+      failed: 0,
+    });
     expect(mockSucceedJob).toHaveBeenCalledWith(
       {},
       expect.objectContaining({ id: 'job_1' })
@@ -134,8 +139,13 @@ describe('POST /api/ingestion/jobs', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload).toEqual({ ok: true, attempted: 2, processed: 1 });
+    expect(response.status).toBe(500);
+    expect(payload).toEqual({
+      ok: false,
+      attempted: 2,
+      processed: 1,
+      failed: 1,
+    });
     expect(mockHandleIngestionJobFailure).toHaveBeenCalledWith(
       {},
       expect.objectContaining({ id: 'job_2' }),

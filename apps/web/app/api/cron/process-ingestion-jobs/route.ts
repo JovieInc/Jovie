@@ -90,8 +90,11 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(
-      { ok: true, attempted, processed, errors },
-      { status: 200, headers: NO_STORE_HEADERS }
+      { ok: errors.length === 0, attempted, processed, errors },
+      {
+        status: errors.length === 0 ? 200 : 500,
+        headers: NO_STORE_HEADERS,
+      }
     );
   } catch (error) {
     logger.error('Ingestion cron runner error', {

@@ -111,9 +111,9 @@ describe('GET /api/cron/process-ingestion-jobs', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(500);
     expect(payload).toEqual({
-      ok: true,
+      ok: false,
       attempted: 2,
       processed: 1,
       errors: ['Job job_2: timed out'],

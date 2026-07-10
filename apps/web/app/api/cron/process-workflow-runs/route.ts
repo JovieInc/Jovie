@@ -176,18 +176,29 @@ export async function GET(request: Request): Promise<Response> {
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      claimed: claimed.length,
-      processed,
-      failed,
-    });
+    return NextResponse.json(
+      {
+        ok: failed === 0,
+        claimed: claimed.length,
+        processed,
+        failed,
+      },
+      { status: failed === 0 ? 200 : 500 }
+    );
   } catch (err) {
     if (isMissingConnectorWorkflowTablesError(err)) {
       logger.info(
         '[process-workflow-runs] connector workflow tables not migrated; skipping tick'
       );
-      return NextResponse.json({ ok: true, processed: 0, skipped: true });
+      return NextResponse.json(
+        {
+          ok: false,
+          processed: 0,
+          skipped: true,
+          error: 'Workflow tables are not migrated',
+        },
+        { status: 503 }
+      );
     }
 
     // JOV-2326: a failed cron tick is self-healing — the next tick (6 min) will retry

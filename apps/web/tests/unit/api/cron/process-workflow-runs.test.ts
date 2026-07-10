@@ -202,8 +202,13 @@ describe('GET /api/cron/process-workflow-runs', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload).toEqual({ ok: true, processed: 0, skipped: true });
+    expect(response.status).toBe(503);
+    expect(payload).toEqual({
+      ok: false,
+      processed: 0,
+      skipped: true,
+      error: 'Workflow tables are not migrated',
+    });
     expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
