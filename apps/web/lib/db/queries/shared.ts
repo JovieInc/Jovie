@@ -10,11 +10,36 @@
 
 import 'server-only';
 
-import { and, eq, isNotNull, or } from 'drizzle-orm';
+import { and, eq, isNotNull, or, type SQL } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Match a users row by any live identity shape (Clerk → Better Auth
+ * migration): legacy Clerk id (`user_…` in `clerk_id`), bridge value
+ * (`ba:<baId>` in `clerk_id`), raw Better Auth id, or the app `users.id`
+ * UUID that `getCachedAuth()` returns. Matching only `clerk_id` sent every
+ * BA-session dashboard request into the /app ↔ /signin redirect loop
+ * (OpportunityInboxRoute streamed redirect).
+ *
+ * The `users.id` clause is only added for UUID-shaped input — comparing a
+ * uuid column against a non-UUID string throws a Postgres cast error.
+ */
+export function userIdentityFilter(authUserId: string): SQL {
+  const clauses: SQL[] = [
+    eq(users.clerkId, authUserId) as SQL,
+    eq(users.betterAuthUserId, authUserId) as SQL,
+  ];
+  if (UUID_PATTERN.test(authUserId)) {
+    clauses.push(eq(users.id, authUserId) as SQL);
+  }
+  return or(...clauses) as SQL;
+}
 
 /**
  * Result type for authenticated profile queries.
@@ -65,7 +90,7 @@ export async function getAuthenticatedProfile(
       displayNameLocked: creatorProfiles.displayNameLocked,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, appUserId))
+    .innerJoin(users, userIdentityFilter(appUserId))
     .leftJoin(
       userProfileClaims,
       and(
@@ -225,28 +250,14 @@ export async function getUserByIdentity(
       deletedAt: users.deletedAt,
     })
     .from(users)
-    .where(eq(users.clerkId, userIdentity))
+    // Single OR query replaces the prior clerkId-then-uuid two-step: it also
+    // matches raw better_auth_user_id, and the uuid clause is shape-guarded —
+    // the two-step fallback threw a Postgres cast error whenever a non-UUID
+    // identity (stale legacy clerk id) missed on clerk_id.
+    .where(userIdentityFilter(userIdentity))
     .limit(1);
 
-  if (user) {
-    return user;
-  }
-
-  const [appUser] = await tx
-    .select({
-      id: users.id,
-      clerkId: users.clerkId,
-      email: users.email,
-      isAdmin: users.isAdmin,
-      isPro: users.isPro,
-      userStatus: users.userStatus,
-      deletedAt: users.deletedAt,
-    })
-    .from(users)
-    .where(eq(users.id, userIdentity))
-    .limit(1);
-
-  return appUser ?? null;
+  return user ?? null;
 }
 
 /**
@@ -280,7 +291,7 @@ export async function verifyProfileOwnership(
   const [profile] = await tx
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, appUserId))
+    .innerJoin(users, userIdentityFilter(appUserId))
     .leftJoin(
       userProfileClaims,
       and(

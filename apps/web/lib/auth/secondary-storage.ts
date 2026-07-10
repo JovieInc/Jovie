@@ -25,25 +25,37 @@ import { logger } from '@/lib/utils/logger';
  *   controls in production).
  */
 
-const OP_TIMEOUT_MS = 500;
+const DEFAULT_OP_TIMEOUT_MS = 500;
 const MEMORY_FALLBACK_MAX_ENTRIES = 1000;
 
+/**
+ * Env-tunable so local dev (where Upstash REST RTT can sit at ~500ms and race
+ * the default) can raise headroom without touching deployed behavior. Read at
+ * call time to stay test-mutable, mirroring env-server's dynamic proxy.
+ */
+function getOpTimeoutMs(): number {
+  const raw = env.AUTH_SECONDARY_STORAGE_TIMEOUT_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_OP_TIMEOUT_MS;
+}
+
 class SecondaryStorageTimeoutError extends Error {
-  constructor() {
-    super(`Secondary storage operation timed out after ${OP_TIMEOUT_MS}ms`);
+  constructor(timeoutMs: number) {
+    super(`Secondary storage operation timed out after ${timeoutMs}ms`);
     this.name = 'SecondaryStorageTimeoutError';
   }
 }
 
 async function withTimeout<T>(operation: Promise<T>): Promise<T> {
+  const timeoutMs = getOpTimeoutMs();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       operation,
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(
-          () => reject(new SecondaryStorageTimeoutError()),
-          OP_TIMEOUT_MS
+          () => reject(new SecondaryStorageTimeoutError(timeoutMs)),
+          timeoutMs
         );
       }),
     ]);
@@ -186,8 +198,11 @@ export const secondaryStorage: SecondaryStorage = {
     }
     try {
       const count = await withTimeout(redis.incr(key));
-      if (count === 1 && ttl > 0) {
-        await withTimeout(redis.expire(key, ttl));
+      if (ttl > 0) {
+        // NX: set expiry only when the key has none. Covers both the fresh
+        // key (count===1) and self-heals keys whose first expire call failed
+        // — a TTL-less counter never resets and 429s that bucket forever.
+        await withTimeout(redis.expire(key, ttl, 'NX'));
       }
       return count;
     } catch (error) {
