@@ -44,16 +44,20 @@ function commentBody(result) {
     result.reason,
     '',
     `Removed: ${result.offendingLabels.map(label => `\`${label}\``).join(', ')}.`,
-    `If this PR makes a material, subjective UX change only a human can judge, add the \`${MATERIAL_UX_MARKER}\` label and re-apply the taste label.`,
+    `If this PR makes a material, subjective UX change only a human can judge: attach a screenshot to the PR body, add the \`${MATERIAL_UX_MARKER}\` label, and re-apply the taste label.`,
   ].join('\n');
 }
 
 /**
- * @param {{ number: number, title: string, labels: string[] }} pr
+ * @param {{ number: number, title: string, labels: string[], body?: string }} pr
  * @param {boolean} apply
  */
 function processPr(pr, apply) {
-  const result = evaluateTasteLabel({ title: pr.title, labels: pr.labels });
+  const result = evaluateTasteLabel({
+    title: pr.title,
+    labels: pr.labels,
+    body: pr.body ?? '',
+  });
   if (result.ok) {
     console.log(`#${pr.number}: OK — ${result.reason}`);
     return result;
@@ -92,11 +96,18 @@ function processPr(pr, apply) {
 
 function loadPr(prNumber) {
   const pr = JSON.parse(
-    gh(['pr', 'view', String(prNumber), '--json', 'number,title,labels'])
+    gh([
+      'pr',
+      'view',
+      String(prNumber),
+      '--json',
+      'number,title,labels,body',
+    ])
   );
   return {
     number: pr.number,
     title: pr.title ?? '',
+    body: pr.body ?? '',
     labels: (pr.labels ?? []).map(label => label.name),
   };
 }
@@ -111,13 +122,14 @@ function listOpenTastePrs(limit) {
       '--limit',
       String(limit),
       '--json',
-      'number,title,labels',
+      'number,title,labels,body',
     ])
   );
   return prs
     .map(pr => ({
       number: pr.number,
       title: pr.title ?? '',
+      body: pr.body ?? '',
       labels: (pr.labels ?? []).map(label => label.name),
     }))
     .filter(pr => tasteLabelsOn(pr.labels).length > 0);
@@ -130,11 +142,12 @@ function main() {
   switch (command) {
     case 'check': {
       const title = argValue(args, '--title', '');
+      const body = argValue(args, '--body', '');
       const labels = (argValue(args, '--labels', '') || '')
         .split(',')
         .map(label => label.trim())
         .filter(Boolean);
-      const result = evaluateTasteLabel({ title, labels });
+      const result = evaluateTasteLabel({ title, labels, body });
       console.log(`${result.ok ? 'OK' : 'VIOLATION'} — ${result.reason}`);
       if (!result.ok) process.exitCode = 1;
       break;

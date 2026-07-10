@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   conventionalCommitType,
   evaluateTasteLabel,
+  hasScreenshotInBody,
   MATERIAL_UX_MARKER,
   NON_TASTE_COMMIT_TYPES,
   tasteLabelsOn,
 } from '../taste-label-guard.mjs';
+
+const SCREENSHOT_BODY =
+  '## Screenshots\n\n![hero](https://user-images.githubusercontent.com/1/hero.png)\n';
 
 describe('conventionalCommitType', () => {
   it.each([
@@ -85,47 +89,91 @@ describe('evaluateTasteLabel — mis-applied (acceptance: guard red-fails)', () 
   });
 });
 
+describe('hasScreenshotInBody (JOV-3674)', () => {
+  it.each([
+    ['markdown image', '![ui](https://example.com/a.png)'],
+    ['html img', '<img src="https://example.com/a.png" alt="ui" />'],
+    [
+      'user-images host',
+      'https://user-images.githubusercontent.com/1/abc.png',
+    ],
+    ['user-attachments', 'https://github.com/user-attachments/assets/abc'],
+  ])('detects %s', (_label, body) => {
+    expect(hasScreenshotInBody(body)).toBe(true);
+  });
+
+  it('rejects empty / text-only bodies', () => {
+    expect(hasScreenshotInBody('')).toBe(false);
+    expect(hasScreenshotInBody('no visual here')).toBe(false);
+  });
+});
+
 describe('evaluateTasteLabel — correctly retained (acceptance: legit taste KEPT)', () => {
-  it('keeps taste on a material UX feat (#11988 collapse homepage to hero)', () => {
+  it('keeps taste on a material UX feat with screenshot (#11988)', () => {
     const result = evaluateTasteLabel({
       title: 'feat(home): collapse homepage to hero + minimal footer',
       labels: ['needs-human-taste'],
+      body: SCREENSHOT_BODY,
     });
     expect(result.ok).toBe(true);
   });
 
-  it('keeps taste on an untyped design-pass title (#11984 library right rail)', () => {
+  it('keeps taste on an untyped design-pass title with screenshot (#11984)', () => {
     const result = evaluateTasteLabel({
       title: 'JOV-3120: Library right rail definitive design pass',
       labels: ['needs:taste'],
+      body: SCREENSHOT_BODY,
     });
     expect(result.ok).toBe(true);
   });
 
-  it(`keeps taste on a chore when ${MATERIAL_UX_MARKER} is present (explicit override)`, () => {
+  it(`keeps taste on a chore when screenshot + ${MATERIAL_UX_MARKER} present`, () => {
     const result = evaluateTasteLabel({
       title: 'chore: refresh marketing screenshots',
       labels: ['needs-human-taste', MATERIAL_UX_MARKER],
+      body: SCREENSHOT_BODY,
     });
     expect(result.ok).toBe(true);
     expect(result.offendingLabels).toEqual([]);
   });
 
-  it('honors the ux:material override case-insensitively', () => {
+  it('honors the ux:material override case-insensitively when screenshot present', () => {
     const result = evaluateTasteLabel({
       title: 'refactor!: rebuild the nav',
       labels: ['needs:taste', 'UX:Material'],
+      body: SCREENSHOT_BODY,
     });
     expect(result.ok).toBe(true);
     expect(result.offendingLabels).toEqual([]);
   });
 
-  it('keeps taste on a title with no conventional-commit type (conservative)', () => {
+  it('keeps taste on a title with no conventional-commit type when screenshot present', () => {
     const result = evaluateTasteLabel({
       title: 'fix:no-space-so-not-a-conventional-prefix',
       labels: ['needs:taste'],
+      body: SCREENSHOT_BODY,
     });
     expect(result.ok).toBe(true);
+  });
+
+  it('strips taste on a feat when no screenshot is attached (JOV-3674)', () => {
+    const result = evaluateTasteLabel({
+      title: 'feat(home): collapse homepage to hero + minimal footer',
+      labels: ['needs-human-taste'],
+      body: 'Looks good — please review the UX.',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/screenshot/i);
+  });
+
+  it('strips taste even with ux:material when no screenshot (JOV-3674)', () => {
+    const result = evaluateTasteLabel({
+      title: 'chore: refresh marketing screenshots',
+      labels: ['needs-human-taste', MATERIAL_UX_MARKER],
+      body: '',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/screenshot/i);
   });
 
   it('passes when no taste label is present', () => {

@@ -1071,15 +1071,12 @@ jobs:
           if-no-files-found: warn
 
   ci-layout-guard:
-    name: Layout Guard (informational)
+    name: Layout Guard
     needs: [ci-path-changes, ci-build-public]
-    # Fully informational — never blocks PRs or merge queue.
-    # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
-    # Moved to post-merge (push to main) — evidence-timing change only, since this job
-    # cuts redundant runs while preserving the same coverage. ci-build-public also runs
-    # on push:main, so the shared artifact this job downloads is still available.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-build-public.outputs.has_artifact == 'true') }}
-    continue-on-error: true
+    # Blocking on PRs via ci-pr-ready (flipped from informational — Tim directive,
+    # a11y/visual gating mission 2026-07-06 / JOV-4060). Runs on PRs to main when the
+    # shared build artifact exists, plus push:main for post-merge coverage.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 8
     steps:
@@ -2525,9 +2522,11 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    # Runs on push to main, workflow_dispatch, or PRs with 'testing' label to limit Neon compute.
+    # Runs on push to main, workflow_dispatch, and PRs touching public UI paths
+    # (run_public_lighthouse gate — same paths that provision the shared Neon branch).
+    # Blocking on PRs via ci-pr-ready (JOV-4060).
     needs: [ci-build-public, ci-path-changes, neon-db]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing'))) && needs.ci-build-public.outputs.has_artifact == 'true') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true')) && needs.ci-build-public.outputs.has_artifact == 'true') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -2677,6 +2676,136 @@ jobs:
           name: a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
           retention-days: 3
+
+  # Authenticated a11y (JOV-4061): dashboard + chat axe suites that previously
+  # lived only as dead local coverage. Path/event-gated and informational until
+  # violations are burned down — does NOT fan into PR Ready.
+  ci-a11y-authed:
+    name: A11y (authenticated, informational)
+    needs: [ci-build-public, ci-path-changes, neon-db]
+    # Main + workflow_dispatch always (when artifact present). PRs only with
+    # 'testing' label or dashboard/chat path changes — avoids Neon tax on every UI PR.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && needs.ci-build-public.outputs.has_artifact == 'true' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_dashboard_lighthouse == 'true' || needs.ci-path-changes.outputs.run_chat_lighthouse == 'true'))) }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download Neon DB connection artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
+        continue-on-error: true
+
+      - name: Resolve DATABASE_URL from Neon artifact
+        id: resolve-a11y-authed-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+        continue-on-error: true
+
+      - name: Export DATABASE_URL
+        if: steps.resolve-a11y-authed-neon-db-url.outputs.database_url != ''
+        run: echo "DATABASE_URL=${{ steps.resolve-a11y-authed-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Skip when Neon URL missing
+        if: env.DATABASE_URL == ''
+        run: |
+          echo "No Neon DATABASE_URL — skipping authenticated a11y (informational)."
+          exit 0
+
+      - name: Setup Playwright (Chromium)
+        if: env.DATABASE_URL != ''
+        uses: ./.github/actions/setup-playwright
+
+      - name: Download build artifact
+        id: download
+        if: env.DATABASE_URL != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+        continue-on-error: true
+
+      - name: Extract or rebuild
+        if: env.DATABASE_URL != ''
+        run: |
+          if [ -f /tmp/nextjs-build-download/nextjs-build.tar ]; then
+            tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+          else
+            pnpm turbo build --filter=@jovie/web
+          fi
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Run migrations + seed
+        if: env.DATABASE_URL != ''
+        run: |
+          pnpm --filter=@jovie/web run drizzle:migrate:ci
+          pnpm --filter=@jovie/web run seed:test-data
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: a11y-authed-${{ github.run_id }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Run authenticated a11y specs
+        id: a11y-authed
+        if: env.DATABASE_URL != ''
+        run: |
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+
+          cleanup() { kill "$SERVER_PID" 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found for authenticated a11y."
+            exit 1
+          fi
+
+          PORT=3100 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+          pnpm exec playwright test \
+            tests/e2e/a11y.spec.ts \
+            tests/e2e/chat-axe.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line
+        env:
+          BASE_URL: http://localhost:3100
+          CI: true
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          URL_ENCRYPTION_KEY: a11y-authed-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: a11y-authed-ci
+
+      - name: Upload Playwright Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/playwright-report/
+          retention-days: 7
 
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)
@@ -3658,6 +3787,8 @@ jobs:
         ci-unit-tests,
         ci-build-public,
         ci-pr-vercel-preview,
+        ci-a11y,
+        ci-layout-guard,
       ]
     # always() so we still evaluate when a leaf fails. !cancelled() avoids a
     # second red PR Ready when the whole run is concurrency-cancelled mid-DAG
@@ -3672,6 +3803,8 @@ jobs:
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
+          A11Y_RESULT="${{ needs.ci-a11y.result }}"
+          LAYOUT_GUARD_RESULT="${{ needs.ci-layout-guard.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_REQUIRES_PREVIEW="${{ needs.ci-risk-classifier.outputs.requires_preview }}"
@@ -3684,6 +3817,8 @@ jobs:
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
+          echo "ci-a11y: $A11Y_RESULT"
+          echo "ci-layout-guard: $LAYOUT_GUARD_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
           echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
 
@@ -3696,6 +3831,8 @@ jobs:
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
             echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
+            echo "| A11y (axe) | $A11Y_RESULT | \`pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium\` |"
+            echo "| Layout Guard | $LAYOUT_GUARD_RESULT | \`pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts --project=chromium\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
             echo
@@ -3712,7 +3849,9 @@ jobs:
             exit 1
           fi
 
-          if [[ "$RISK_RESULT" != "success" ]]; then
+          # Risk classifier is path/event-gated; on some events it is legitimately
+          # skipped with empty outputs. Treat skipped like other path-gated leaves.
+          if [[ "$RISK_RESULT" != "success" && "$RISK_RESULT" != "skipped" ]]; then
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
             echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
             exit 1
@@ -3739,6 +3878,20 @@ jobs:
             exit 1
           fi
 
+          # A11y (axe) must succeed when it runs (skipped when no public UI paths changed).
+          if [[ "$A11Y_RESULT" != "success" && "$A11Y_RESULT" != "skipped" ]]; then
+            echo "❌ A11y (axe) audit did not pass (result: $A11Y_RESULT)"
+            echo "Likely fix: download the a11y-axe-report artifact from this run and fix the WCAG violations it lists."
+            exit 1
+          fi
+
+          # Layout Guard must succeed when it runs (skipped when the shared build artifact is absent).
+          if [[ "$LAYOUT_GUARD_RESULT" != "success" && "$LAYOUT_GUARD_RESULT" != "skipped" ]]; then
+            echo "❌ Layout Guard did not pass (result: $LAYOUT_GUARD_RESULT)"
+            echo "Likely fix: run pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts locally and fix overlapping/touching elements."
+            exit 1
+          fi
+
           # Build is non-blocking (throughput philosophy): corrections are cheap, waiting is expensive.
           # Build correctness is also validated by Vercel preview deploy + post-merge push CI.
           if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
@@ -3759,7 +3912,7 @@ jobs:
             echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
           fi
 
-          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build"
+          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y, layout guard, build"
 
   ci-summary:
     name: PR Summary
@@ -4015,7 +4168,7 @@ jobs:
                 runFullCi: process.env.BUILD_RUN_FULL_CI
               },
               { label: 'Build (public routes)', jobName: 'Build (public routes)' },
-              { label: 'Layout Guard', jobName: 'Layout Guard (informational)' },
+              { label: 'Layout Guard', jobName: 'Layout Guard' },
               { label: 'Lighthouse (public routes PR)', jobName: 'Lighthouse (public routes PR)' },
               { label: 'Lighthouse (dashboard PR)', jobName: 'Lighthouse (dashboard PR)' },
               { label: 'Lighthouse (onboarding PR)', jobName: 'Lighthouse (onboarding PR)' },
