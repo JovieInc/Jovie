@@ -1100,8 +1100,8 @@ function InputRow({
         transition={reducedMotion ? undefined : TRANSITION_SURFACE}
         className={cn(
           'relative',
-          // Symmetric token padding: px-4 / py-2 so placeholder + text are evenly inset
-          // (kills ad-hoc px-3 + mixed py-[1px] / px-1.5 from JOV-3531).
+          // Symmetric token padding (px-4 / py-2) so placeholder + text are evenly
+          // inset — replaces ad-hoc compact padding from JOV-3531.
           useHeroPill
             ? 'flex min-h-13 items-center gap-2 px-4 py-2 sm:min-h-14'
             : 'grid content-start gap-2 grid-rows-[auto_36px] px-4 py-2'
