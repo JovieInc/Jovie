@@ -595,29 +595,30 @@ export function ProfilePacCard({
     case 'error': {
       contextLabel = 'Stay In The Loop';
       // JOV-3908: text "Not now" (control) vs borderless icon-X (candidate).
-      contextAside =
-        assignment.dismissAffordance === 'icon' ? (
-          <button
-            type='button'
-            onClick={handleDismiss}
-            aria-label='Dismiss'
-            data-testid='pac-capture-dismiss'
-            data-affordance='icon'
-            className='-mr-1.5 -mt-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/50 transition-colors duration-subtle hover:bg-white/10 hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
-          >
+      // One control element keeps the raw-button ratchet flat; min-h/w-11 keeps
+      // the icon arm at the 44px WCAG touch-target floor.
+      const isIconDismiss = assignment.dismissAffordance === 'icon';
+      contextAside = (
+        <button
+          type='button'
+          onClick={handleDismiss}
+          aria-label={isIconDismiss ? 'Dismiss' : undefined}
+          data-testid='pac-capture-dismiss'
+          data-affordance={isIconDismiss ? 'icon' : 'text'}
+          className={cn(
+            'shrink-0 text-white/50 transition-colors duration-subtle hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70',
+            isIconDismiss
+              ? '-mr-1.5 -mt-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-white/10'
+              : 'text-xs font-medium'
+          )}
+        >
+          {isIconDismiss ? (
             <X className='h-4 w-4' aria-hidden='true' />
-          </button>
-        ) : (
-          <button
-            type='button'
-            onClick={handleDismiss}
-            data-testid='pac-capture-dismiss'
-            data-affordance='text'
-            className='shrink-0 text-xs font-medium text-white/50 transition-colors duration-subtle hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
-          >
-            Not now
-          </button>
-        );
+          ) : (
+            'Not now'
+          )}
+        </button>
+      );
       subject = (
         <div className='min-w-0 flex-1'>
           <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
