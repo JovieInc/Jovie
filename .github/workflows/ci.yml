@@ -3581,6 +3581,130 @@ jobs:
   # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
   # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
 
+  ci-pr-ready:
+    name: PR Ready
+    # THE single aggregate merge gate (docs/PR_FLOW.md, merge-queue-guard.mjs
+    # REQUIRED_MERGE_STATUSES). Branch protection and every enqueue automation
+    # (drain-pr-queue.sh, agent-pipeline, agent-landing-sweep, agent-tick,
+    # pr-conflict-handler) key on this one check-run name. Individual leaves
+    # still report separately for at-a-glance failure visibility; this job only
+    # fans them in so the required-check set stays one stable context instead
+    # of N shard-named contexts that drift (removing it in #13610 left main
+    # requiring only Migration Guard + Fork PR Gate + PR Size Guard and let
+    # red-unit-test PRs merge — do not remove without updating the ruleset AND
+    # all five automation consumers in the same PR).
+    needs:
+      [
+        ci-path-changes,
+        ci-risk-classifier,
+        ci-typecheck,
+        ci-biome,
+        ci-guardrails,
+        ci-structural-contract,
+        ci-unit-tests,
+        ci-build-public,
+        ci-pr-vercel-preview,
+      ]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Evaluate required PR checks
+        run: |
+          TYPECHECK_RESULT="${{ needs.ci-typecheck.result }}"
+          BIOME_RESULT="${{ needs.ci-biome.result }}"
+          GUARDRAILS_RESULT="${{ needs.ci-guardrails.result }}"
+          STRUCTURAL_RESULT="${{ needs.ci-structural-contract.result }}"
+          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          BUILD_RESULT="${{ needs.ci-build-public.result }}"
+          RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
+          RISK_REQUIRES_PREVIEW="${{ needs.ci-risk-classifier.outputs.requires_preview }}"
+          RISK_BLOCKS_UNATTENDED="${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}"
+          RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
+          PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
+          IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
+          echo "ci-typecheck: $TYPECHECK_RESULT"
+          echo "ci-biome: $BIOME_RESULT"
+          echo "ci-guardrails: $GUARDRAILS_RESULT"
+          echo "ci-structural-contract: $STRUCTURAL_RESULT"
+          echo "ci-unit-tests: $UNIT_RESULT"
+          echo "ci-build-public: $BUILD_RESULT"
+          echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
+          echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
+
+          {
+            echo "### PR Ready"
+            echo
+            echo "| Gate | Result | Next local command |"
+            echo "| --- | --- | --- |"
+            echo "| Typecheck | $TYPECHECK_RESULT | \`pnpm run typecheck\` |"
+            echo "| Biome | $BIOME_RESULT | \`pnpm run biome:check\` |"
+            echo "| Guardrails | $GUARDRAILS_RESULT | \`pnpm next:proxy-guard\` |"
+            echo "| Structural Contract | $STRUCTURAL_RESULT | \`pnpm ci:harness:check\` |"
+            echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
+            echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
+            echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
+            echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
+            echo
+            echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$RISK_RESULT" != "success" ]]; then
+            echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
+            echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
+            exit 1
+          fi
+
+          # Fast leaves must each succeed (or be skipped when path-gated with
+          # no relevant files changed).
+          FAST_LEAF_NAMES=(ci-typecheck ci-biome ci-guardrails ci-structural-contract)
+          FAST_LEAF_RESULTS=("$TYPECHECK_RESULT" "$BIOME_RESULT" "$GUARDRAILS_RESULT" "$STRUCTURAL_RESULT")
+          FAST_LEAF_FAILED=false
+          for i in "${!FAST_LEAF_NAMES[@]}"; do
+            leaf_result="${FAST_LEAF_RESULTS[$i]}"
+            if [[ "$leaf_result" != "success" && "$leaf_result" != "skipped" ]]; then
+              FAST_LEAF_FAILED=true
+            fi
+          done
+          if [[ "$FAST_LEAF_FAILED" == "true" ]]; then
+            echo "❌ One or more fast checks did not pass:"
+            for i in "${!FAST_LEAF_NAMES[@]}"; do
+              echo "   - ${FAST_LEAF_NAMES[$i]}: ${FAST_LEAF_RESULTS[$i]}"
+            done
+            echo "Likely fix: run pnpm run typecheck && pnpm run biome:check, then inspect the failing fast-check job."
+            exit 1
+          fi
+
+          # Unit tests must succeed (or be skipped when path-gated with no test files changed)
+          if [[ "$UNIT_RESULT" != "success" && "$UNIT_RESULT" != "skipped" ]]; then
+            echo "❌ Unit tests did not pass (result: $UNIT_RESULT)"
+            echo "Likely fix: run the failing Vitest file locally or pnpm --filter=@jovie/web run test:fast."
+            exit 1
+          fi
+
+          # Build is non-blocking (throughput philosophy): corrections are cheap, waiting is expensive.
+          # Build correctness is also validated by Vercel preview deploy + post-merge push CI.
+          if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
+            echo "::warning::ci-build-public did not pass (result: $BUILD_RESULT) — non-blocking per throughput policy"
+            echo "Build failure will be corrected post-merge or in a follow-up PR."
+          fi
+
+          if [[ "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
+            echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
+            echo "Likely fix: inspect the Preview Deploy logs, then run pnpm run build:web locally."
+            exit 1
+          fi
+          if [[ "$IS_DEPENDABOT" == "true" && "$PREVIEW_RESULT" == "skipped" ]]; then
+            echo "Dependabot PR: preview deploy intentionally skipped — treating as waived."
+          fi
+
+          if [[ "$RISK_BLOCKS_UNATTENDED" == "true" ]]; then
+            echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
+          fi
+
+          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build"
+
   ci-summary:
     name: PR Summary
     # Informational only (posts a PR comment).

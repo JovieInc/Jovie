@@ -166,8 +166,12 @@ echo "$SNAP" | jq -c '.[]
 # `concurrency: cancel-in-progress` (the ruleset evaluates required checks by
 # name and a non-success duplicate pins it BLOCKED). Stripping merge-queue on
 # that transient state un-enrolled green PRs every 20 min and starved the queue
-# for 6h on 2026-06-22. Dequeue only on: needs-conflict-resolution, a real
-# merge conflict (m != MERGEABLE), or actually-failing checks (.fail).
+# for 6h on 2026-06-22. The raw `mergeable` field has the same flicker:
+# GitHub recomputes it asynchronously every time main advances, reporting
+# UNKNOWN for the recompute window — on 2026-07-09 that churned three clean
+# PRs (13741/13746/13779) through synchronized dequeue/re-enroll cycles.
+# Dequeue only on: needs-conflict-resolution, a CONFIRMED merge conflict
+# (m == CONFLICTING, never UNKNOWN), or actually-failing checks (.fail).
 echo "=== DEQUEUE (conflict / failing → -merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
   | select([.L[]] | index("merge-queue"))
@@ -175,7 +179,7 @@ echo "$SNAP" | jq -c '.[]
   | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated")) | not)
   | select(
       ([.L[]] | any(.=="needs-conflict-resolution"))
-      or (.m != "MERGEABLE")
+      or (.m == "CONFLICTING")
       or (.fail|length>0)
     )' \
 | while read -r pr; do
@@ -183,7 +187,7 @@ echo "$SNAP" | jq -c '.[]
     reason=$(jq -r '
       [
         (if ([.L[]] | any(.=="needs-conflict-resolution")) then "needs-conflict-resolution" else empty end),
-        (if .m != "MERGEABLE" then "mergeable=" + (.m // "UNKNOWN") else empty end),
+        (if .m == "CONFLICTING" then "mergeable=CONFLICTING" else empty end),
         (if (.fail|length)>0 then "checks=" + (.fail|join(",")) else empty end)
       ] | join("; ")
     ' <<<"$pr")
@@ -199,6 +203,17 @@ echo "$SNAP" | jq -c '.[]
 # safe — Graphite re-validates and the dequeue step above removes any that truly
 # fail. `.fail` only counts terminal failing checks, not pending/queued ones.
 echo "=== ENROLL (mergeable + not failing → +merge-queue + auto-merge) ==="
+# Honor GRAPHITE_QUEUE_POLICY.maxQueueDepth: this is the primary enrollment
+# path, and until 2026-07-09 it was the only one that ignored the cap the
+# agent-pipeline/landing-sweep/tick paths all enforce — a mass-green event
+# (CI outage recovery, post-rebase wave) could enqueue an unbounded batch and
+# saturate Graphite + the runner pool in one pass.
+MAX_QUEUE_DEPTH=$(node scripts/ci-merge-queue-check.mjs max-queue-depth 2>/dev/null || echo 16)
+QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select([.L[]] | index("merge-queue"))] | length')
+ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
+[[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
+echo "  queue depth: $QUEUED_NOW/$MAX_QUEUE_DEPTH ($ENROLL_SLOTS slots)"
+ENROLLED_THIS_RUN=0
 echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
@@ -207,6 +222,11 @@ echo "$SNAP" | jq -c '.[]
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    if [[ "$ENROLLED_THIS_RUN" -ge "$ENROLL_SLOTS" ]]; then
+      echo "  #$n  $t  ⏸ deferred (queue at depth cap; next drain pass enrolls)"
+      continue
+    fi
+    ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
     echo "  #$n  $t"
     label "$n" merge-queue
     # Enable GitHub native auto-merge (squash) so the PR merges as soon as
