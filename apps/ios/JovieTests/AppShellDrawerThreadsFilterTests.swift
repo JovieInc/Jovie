@@ -58,6 +58,37 @@ struct AppShellDrawerThreadsFilterTests {
   }
 }
 
+struct AppShellDrawerThreadsSkeletonTests {
+  private let conversations = [
+    MobileConversationSummary(
+      id: "conv-1",
+      title: "Launch follow-up",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+      latestMessageRole: "assistant",
+      latestTurnStatus: "completed"
+    ),
+  ]
+
+  @Test func showsSkeletonWhileLoadingWithNoCachedConversations() {
+    #expect(
+      AppShellDrawerThreadsFilter.shouldShowLoadingSkeleton(isLoading: true, conversations: []) == true
+    )
+  }
+
+  @Test func prefersCachedConversationsOverSkeletonWhileRevalidating() {
+    #expect(
+      AppShellDrawerThreadsFilter.shouldShowLoadingSkeleton(isLoading: true, conversations: conversations) == false
+    )
+  }
+
+  @Test func hidesSkeletonWhenNotLoading() {
+    #expect(
+      AppShellDrawerThreadsFilter.shouldShowLoadingSkeleton(isLoading: false, conversations: []) == false
+    )
+  }
+}
+
 struct AppShellDrawerSurfaceLayoutTests {
   @Test func longestSurfaceTitleIsAudience() {
     #expect(AppShellDrawerSurfaceLayout.longestSurfaceTitle == "Audience")

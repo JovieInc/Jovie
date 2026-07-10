@@ -1,10 +1,5 @@
 import SwiftUI
 
-enum JovieMotion {
-  static let cinematicDuration: Double = 0.42
-  static let cinematic = Animation.timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)
-}
-
 enum AppShellDrawerSurfaceLayout {
   static let labelMinimumScaleFactor: CGFloat = 0.85
   static let maxSingleLineSurfaceButtonHeight: CGFloat = 56
@@ -27,6 +22,17 @@ enum AppShellDrawerThreadsFilter {
       return title.localizedCaseInsensitiveContains(trimmed)
     }
   }
+
+  // Loading skeleton only makes sense while there is nothing cached to show
+  // yet — once any conversation is cached, prefer showing stale data over a
+  // skeleton flash (stale-while-revalidate, matches the dashboard/audience
+  // cache-first canon).
+  static func shouldShowLoadingSkeleton(
+    isLoading: Bool,
+    conversations: [MobileConversationSummary]
+  ) -> Bool {
+    isLoading && conversations.isEmpty
+  }
 }
 
 // The drawer is mounted as the recessed BASE plane behind the elevated content
@@ -42,6 +48,7 @@ struct AppShellLeftDrawer: View {
   let audienceEnabled: Bool
   let selectedTab: AppShellTab
   let recentConversations: [MobileConversationSummary]
+  let isLoadingConversations: Bool
   let activeConversationID: String?
   let drawerWidth: CGFloat
   let onSelectTab: (AppShellTab) -> Void
@@ -50,6 +57,10 @@ struct AppShellLeftDrawer: View {
   let onOpenSettings: () -> Void
 
   @State private var threadSearch = ""
+  // Decorative open-stagger only; the drawer is fully interactive regardless
+  // of this flag (rows never block on it — see DrawerRowRevealModifier).
+  @State private var contentRevealed = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private var filteredConversations: [MobileConversationSummary] {
     AppShellDrawerThreadsFilter.filtered(
@@ -78,22 +89,28 @@ struct AppShellLeftDrawer: View {
             selectedTab: selectedTab,
             onSelectTab: onSelectTab
           )
+          .drawerRowReveal(isRevealed: contentRevealed, delay: 0, reduceMotion: reduceMotion)
 
           DrawerAccountHeader(profile: profile)
+            .drawerRowReveal(isRevealed: contentRevealed, delay: 0.04, reduceMotion: reduceMotion)
 
           if chatEnabled {
             DrawerNewChatButton(action: onStartNewChat)
+              .drawerRowReveal(isRevealed: contentRevealed, delay: 0.08, reduceMotion: reduceMotion)
 
             DrawerThreadsSection(
               searchText: $threadSearch,
               conversations: filteredConversations,
               totalCount: recentConversations.count,
+              isLoading: isLoadingConversations,
               activeConversationID: activeConversationID,
               onSelectConversation: onSelectConversation
             )
+            .drawerRowReveal(isRevealed: contentRevealed, delay: 0.08, reduceMotion: reduceMotion)
           }
 
           DrawerSettingsRow(action: onOpenSettings)
+            .drawerRowReveal(isRevealed: contentRevealed, delay: 0.12, reduceMotion: reduceMotion)
         }
         .padding(.horizontal, JovieSpacing.large)
         .padding(.bottom, JovieSpacing.xxLarge)
@@ -109,6 +126,50 @@ struct AppShellLeftDrawer: View {
       guard !isPresented else { return }
       threadSearch = ""
     }
+    // Reveal is purely decorative (opacity/offset only, see the modifier
+    // below) — it never gates hit-testing or accessibility, both of which
+    // stay driven by `isPresented` above.
+    .task(id: isPresented) {
+      guard isPresented else {
+        contentRevealed = false
+        return
+      }
+
+      guard !reduceMotion else {
+        contentRevealed = true
+        return
+      }
+
+      contentRevealed = false
+      try? await Task.sleep(nanoseconds: 20_000_000)
+      contentRevealed = true
+    }
+  }
+}
+
+// Decorative stagger for the drawer's open animation: rows fade + slide in a
+// short distance, `delay` apart. Opacity-only (no offset) and undelayed under
+// Reduce Motion per motion.md §6. Never affects interactivity — hit-testing
+// is controlled solely by `isPresented` on the drawer root.
+private struct DrawerRowRevealModifier: ViewModifier {
+  let isRevealed: Bool
+  let delay: Double
+  let reduceMotion: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .opacity(isRevealed ? 1 : 0)
+      .offset(x: (reduceMotion || isRevealed) ? 0 : -8)
+      .animation(
+        reduceMotion ? nil : JovieMotion.easeOut().delay(delay),
+        value: isRevealed
+      )
+  }
+}
+
+private extension View {
+  func drawerRowReveal(isRevealed: Bool, delay: Double, reduceMotion: Bool) -> some View {
+    modifier(DrawerRowRevealModifier(isRevealed: isRevealed, delay: delay, reduceMotion: reduceMotion))
   }
 }
 
@@ -210,7 +271,7 @@ private struct DrawerSurfaceButton: View {
           .stroke(isSelected ? JovieColor.borderDefault : Color.clear, lineWidth: 1)
       }
     }
-    .buttonStyle(.plain)
+    .buttonStyle(DrawerRowButtonStyle())
     .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
     .accessibilityLabel(tab.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -238,7 +299,7 @@ private struct DrawerNewChatButton: View {
       .padding(.horizontal, JovieSpacing.medium)
       .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
-    .buttonStyle(.plain)
+    .buttonStyle(DrawerRowButtonStyle())
     .accessibilityLabel("New chat")
     .accessibilityIdentifier("shell-drawer-new-chat")
   }
@@ -248,8 +309,11 @@ private struct DrawerThreadsSection: View {
   @Binding var searchText: String
   let conversations: [MobileConversationSummary]
   let totalCount: Int
+  let isLoading: Bool
   let activeConversationID: String?
   let onSelectConversation: (String) -> Void
+
+  private static let skeletonRowCount = 5
 
   var body: some View {
     VStack(alignment: .leading, spacing: JovieSpacing.medium) {
@@ -273,7 +337,19 @@ private struct DrawerThreadsSection: View {
       .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
       .accessibilityIdentifier("shell-drawer-search")
 
-      if totalCount == 0 {
+      // Skeleton mirrors DrawerThreadRow's exact paddings/height so the
+      // skeleton -> loaded swap causes zero layout shift. Only shown while
+      // there is nothing cached yet (AppShellDrawerThreadsFilter.shouldShowLoadingSkeleton) --
+      // once a conversation is cached, stale rows are preferred over a flash.
+      if AppShellDrawerThreadsFilter.shouldShowLoadingSkeleton(isLoading: isLoading, conversations: conversations) {
+        VStack(spacing: JovieSpacing.xSmall) {
+          ForEach(0 ..< Self.skeletonRowCount, id: \.self) { _ in
+            DrawerThreadRowSkeleton()
+          }
+        }
+        .redacted(reason: .placeholder)
+        .accessibilityHidden(true)
+      } else if totalCount == 0 {
         Text("Start a conversation to see recent conversations here.")
           .font(JovieFont.body(size: 15))
           .foregroundStyle(JovieColor.textTertiary)
@@ -321,8 +397,31 @@ private struct DrawerThreadRow: View {
         in: RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
       )
     }
-    .buttonStyle(.plain)
+    .buttonStyle(DrawerRowButtonStyle())
     .accessibilityIdentifier("shell-drawer-thread-\(conversation.id)")
+  }
+}
+
+// Exactly mirrors DrawerThreadRow's paddings, font, and single-line height so
+// the loading -> loaded swap in DrawerThreadsSection causes zero layout
+// shift. Non-interactive (no Button, no action) -- it is purely a visual
+// placeholder gated on `.redacted(reason: .placeholder)` by its parent.
+private struct DrawerThreadRowSkeleton: View {
+  var body: some View {
+    HStack(spacing: JovieSpacing.medium) {
+      Text("Loading conversation")
+        .font(JovieFont.body(size: 15, weight: .regular))
+        .foregroundStyle(JovieColor.textSecondary)
+        .lineLimit(1)
+
+      Spacer(minLength: 0)
+    }
+    .padding(.vertical, JovieSpacing.small)
+    .padding(.horizontal, JovieSpacing.small)
+    .background(
+      Color.clear,
+      in: RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
+    )
   }
 }
 
@@ -345,8 +444,22 @@ private struct DrawerSettingsRow: View {
       .padding(.vertical, 13)
       .padding(.horizontal, JovieSpacing.medium)
     }
-    .buttonStyle(.plain)
+    .buttonStyle(DrawerRowButtonStyle())
     .accessibilityLabel("Settings")
     .accessibilityIdentifier("shell-drawer-settings")
+  }
+}
+
+// Canonical drawer-row press feedback (background dim + JovieMotion.pressScale),
+// shared by every plain-content Button row in the drawer (new chat, threads,
+// settings). Mirrors JoviePillButtonStyle/JovieIconButtonStyle in
+// DesignSystem/JovieTheme.swift but without their filled backgrounds, since
+// drawer rows are flush against the drawer canvas.
+private struct DrawerRowButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .opacity(configuration.isPressed ? 0.72 : 1)
+      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
+      .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }

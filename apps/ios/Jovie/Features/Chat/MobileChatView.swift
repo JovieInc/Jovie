@@ -60,8 +60,13 @@ struct MobileChatView: View {
                 Task { await repository.send(text: prompt) }
               }
             )
+            .transition(.opacity.combined(with: .offset(y: 6)))
           }
         }
+        // Keyed on `count` only, so this fires when a message is appended --
+        // never on in-place streaming text/status mutations of an existing
+        // row, which must render without animation.
+        .animation(JovieMotion.easeOut(), value: repository.timeline.count)
         .padding(.horizontal, JovieSpacing.large)
         .padding(.top, JovieSpacing.xLarge)
         .padding(.bottom, JovieSpacing.medium)
@@ -299,9 +304,11 @@ private struct MobileChatMessageRow: View {
     let showsThinking = displayText.isEmpty && !hasRenderableSegments && isStreamingAssistant
 
     if showsThinking {
-      Text("Thinking…")
-        .font(JovieFont.body(size: 16))
-        .foregroundStyle(JovieColor.textPrimary)
+      // Same padding/background/corner-radius/frame as the assistant prose
+      // bubble below -- only the inner content (dots vs. text) differs, so
+      // swapping this bubble out for real content is a normal content-size
+      // change, not a layout-shift bug.
+      MobileChatThinkingDotsView()
         .padding(.horizontal, JovieSpacing.large)
         .padding(.vertical, JovieSpacing.medium)
         .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -348,6 +355,54 @@ private struct MobileChatMessageRow: View {
       runs.append(contentsOf: segmentRuns)
     }
     return runs
+  }
+}
+
+/// Three-dot streaming indicator that replaces the old "Thinking…" text.
+/// Dots pulse in sequence (staggered `.delay`) via `repeatForever`; under
+/// Reduce Motion they render static (no movement/opacity animation) per
+/// `.claude/rules/motion.md` §6. The row height is pinned to match a 16pt
+/// body line so it reserves the same footprint the text bubble used.
+private struct MobileChatThinkingDotsView: View {
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var isPulsing = false
+
+  private static let dotSize: CGFloat = 6
+  private static let dotSpacing: CGFloat = 4
+  private static let rowHeight: CGFloat = 20
+
+  var body: some View {
+    HStack(spacing: Self.dotSpacing) {
+      ForEach(0..<3, id: \.self) { index in
+        Circle()
+          .fill(JovieColor.textTertiary)
+          .frame(width: Self.dotSize, height: Self.dotSize)
+          .opacity(dotOpacity)
+          .animation(dotAnimation(delayIndex: index), value: isPulsing)
+      }
+    }
+    .frame(height: Self.rowHeight, alignment: .center)
+    .onAppear {
+      guard !reduceMotion else { return }
+      isPulsing = true
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Thinking")
+  }
+
+  private var dotOpacity: Double {
+    guard !reduceMotion else { return 0.6 }
+    return isPulsing ? 1 : 0.3
+  }
+
+  private func dotAnimation(delayIndex: Int) -> Animation? {
+    guard !reduceMotion else { return nil }
+    // Constant/ambient motion uses `linear` per motion.md §3, not an
+    // eased token -- durations still come from JovieMotion so nothing here
+    // is a raw hardcoded ms value.
+    return Animation.linear(duration: JovieMotion.slowDuration)
+      .repeatForever(autoreverses: true)
+      .delay(JovieMotion.subtleDuration * Double(delayIndex))
   }
 }
 
@@ -521,31 +576,28 @@ private struct MobileChatEntityChipView: View {
     }
   }
 
+  // Converged onto the web "input variant" chip recipe
+  // (apps/web/styles/design-system.css .system-b-entity-chip): border at
+  // accent-30%, background at accent-13% for both tones. Text stays
+  // accent-tinted on the dark assistant bubble (legible at full accent
+  // brightness against `surface1`); the light user bubble keeps a
+  // near-black text color since these saturated accents read too low-
+  // contrast on white to serve as body text there.
   private var chipTextColor: Color {
     switch tone {
     case .onDark:
-      return JovieColor.textPrimary
+      return accentColor
     case .onLight:
       return JovieColor.backgroundBase
     }
   }
 
   private var chipBackground: Color {
-    switch tone {
-    case .onDark:
-      return accentColor.opacity(0.12)
-    case .onLight:
-      return accentColor.opacity(0.08)
-    }
+    accentColor.opacity(0.13)
   }
 
   private var chipBorderColor: Color {
-    switch tone {
-    case .onDark:
-      return accentColor.opacity(0.22)
-    case .onLight:
-      return accentColor.opacity(0.30)
-    }
+    accentColor.opacity(0.30)
   }
 }
 

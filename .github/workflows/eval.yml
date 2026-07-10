@@ -106,7 +106,7 @@ jobs:
 
       - name: Post Promptfoo viewer comment (deterministic)
         if: github.event_name == 'pull_request' && steps.deterministic.outcome == 'success'
-        uses: promptfoo/promptfoo-action@v1
+        uses: promptfoo/promptfoo-action@04839e664f52212b877170219dab0d7ad2bf6440 # v1
         continue-on-error: true
         with:
           github-token: ${{ github.token }}

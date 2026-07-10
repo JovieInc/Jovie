@@ -84,7 +84,7 @@ struct CachedRemoteImageView<Fallback: View>: View {
     }
     .frame(width: size, height: size)
     .clipShape(Circle())
-    .animation(.easeOut(duration: 0.2), value: image == nil)
+    .animation(JovieMotion.easeOut(duration: JovieMotion.subtleDuration), value: image == nil)
     .task(id: imageURL) { await load() }
   }
 
@@ -473,7 +473,7 @@ struct QRCodeCardView: View {
     }
     .aspectRatio(1, contentMode: .fit)
     .frame(maxWidth: .infinity)
-    .animation(.easeOut(duration: 0.2), value: image == nil)
+    .animation(JovieMotion.easeOut(duration: JovieMotion.subtleDuration), value: image == nil)
     .task(id: payload) { await render() }
   }
 
