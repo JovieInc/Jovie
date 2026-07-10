@@ -14,7 +14,7 @@ concurrency:
 jobs:
   delete-neon-branch:
     name: Delete Neon branch for closed PR
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 5
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}

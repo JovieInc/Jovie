@@ -15,7 +15,7 @@ permissions: {}
 jobs:
   auto-merge:
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     permissions:
       contents: write
       pull-requests: write

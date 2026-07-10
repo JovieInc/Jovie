@@ -231,16 +231,34 @@ function run(args: ReadonlyArray<string>, config: ShipperConfig): string {
   }
 }
 
-function systemCapacity(config: ShipperConfig): CapacitySnapshot {
+function systemCapacity(
+  config: ShipperConfig,
+  openCodexPrCount: number
+): CapacitySnapshot {
   const cpuCount = Math.max(1, availableParallelism());
   const freeMemoryMb = Math.round(freemem() / 1024 / 1024);
   const loadAverage1m = loadavg()[0] ?? 0;
   const loadPerCpu = loadAverage1m / cpuCount;
   const reasons: string[] = [];
+
+  // Cap simultaneous codex dispatches to keep CI predictable (JOV-4201).
+  const MAX_CONCURRENT_DISPATCH_CAP = 5;
+  const remainingPrCapacity = Math.max(
+    0,
+    MAX_CONCURRENT_DISPATCH_CAP - openCodexPrCount
+  );
+
   let allowedAgents = Math.min(
     config.maxIssuesPerRun,
-    config.maxParallelAgents
+    config.maxParallelAgents,
+    remainingPrCapacity
   );
+
+  if (remainingPrCapacity === 0) {
+    reasons.push(
+      `reached max concurrent codex PR cap (${MAX_CONCURRENT_DISPATCH_CAP})`
+    );
+  }
 
   if (freeMemoryMb < config.minFreeMemoryMb) {
     allowedAgents = Math.min(allowedAgents, 1);
@@ -517,6 +535,38 @@ function detectGithubRepo(repoRoot: string): string | null {
 interface ListCodexIssuesResult {
   readonly issues: ReadonlyArray<GithubIssue>;
   readonly resourceUnavailable: boolean;
+}
+
+function countOpenCodexPrs(config: ShipperConfig): number {
+  try {
+    const raw = run(
+      [
+        'gh',
+        'pr',
+        'list',
+        '--repo',
+        config.repo,
+        '--state',
+        'open',
+        '--limit',
+        '100',
+        '--json',
+        'headRefName',
+        '--jq',
+        '[.[] | select(.headRefName | startswith("codex/"))] | length',
+      ],
+      config
+    );
+    return Number.parseInt(raw.trim(), 10) || 0;
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'count_open_prs_failed',
+      error: shortError(err),
+    });
+    // Fail closed: if we can't count PRs, assume we're at capacity.
+    return 100;
+  }
 }
 
 function listCodexIssues(config: ShipperConfig): ListCodexIssuesResult {
@@ -1492,6 +1542,7 @@ async function runShipper(): Promise<void> {
         let controlLabelsEnsured = false;
 
         for (;;) {
+          const openCodexPrCount = countOpenCodexPrs(config);
           const listed = listCodexIssues(config);
           if (listed.resourceUnavailable) {
             await handleSpawnResourcePressure('list_codex_issues');
@@ -1508,7 +1559,7 @@ async function runShipper(): Promise<void> {
           const skippedEpic = issues.filter(issue =>
             labelNames(issue).includes(EPIC_LABEL)
           ).length;
-          const capacity = systemCapacity(config);
+          const capacity = systemCapacity(config, openCodexPrCount);
           const batch = plans.slice(0, capacity.allowedAgents);
 
           logJobEvent({
@@ -1520,6 +1571,7 @@ async function runShipper(): Promise<void> {
             skippedNoAuto,
             skippedEpic,
             batchCount: batch.length,
+            openCodexPrCount,
             maxIssuesPerRun: config.maxIssuesPerRun,
             maxParallelAgents: config.maxParallelAgents,
             capacity,

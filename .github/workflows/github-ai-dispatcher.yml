@@ -30,7 +30,7 @@ concurrency:
 jobs:
   dispatch:
     name: Dispatch Ready GitHub Issues
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
       contents: read
