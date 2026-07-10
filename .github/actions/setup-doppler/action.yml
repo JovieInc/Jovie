@@ -41,7 +41,7 @@ runs:
         while IFS= read -r entry; do
           decoded="$(printf '%s' "$entry" | base64 -d)"
           key="$(printf '%s' "$decoded" | jq -r '.key')"
-          value="$(printf '%s' "$decoded" | jq -r '.value // \"\"')"
+          value="$(printf '%s' "$decoded" | jq -r '.value // ""')"
           marker="EOF_${RANDOM}_$(date +%s%N)"
           {
             echo "${key}<<${marker}"
