@@ -201,6 +201,7 @@ export async function POST(request: NextRequest) {
             sessionId: subscriptionCheck.portalSession.id,
             url: subscriptionCheck.portalSession.url,
             alreadySubscribed: true,
+            planChangeRequired: subscriptionCheck.planChangeRequired,
           },
           { headers: NO_STORE_HEADERS }
         );
