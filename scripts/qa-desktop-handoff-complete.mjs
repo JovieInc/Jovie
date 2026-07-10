@@ -27,6 +27,8 @@ const cdpUrl = arg('cdp', 'http://127.0.0.1:9223');
 const baseUrl = arg('base-url', 'http://localhost:3112');
 const email = arg('email');
 const otp = arg('otp', '424242');
+const otpFile = arg('otp-file'); // staging/prod: operator writes the mailed code
+const scheme = arg('scheme', 'jovie-local'); // jovie-staging / jovie for deployed shells
 const electronApp = arg(
   'electron-app',
   `${process.cwd()}/node_modules/.pnpm/electron@42.4.0/node_modules/electron/dist/Electron.app`
@@ -158,7 +160,26 @@ if (!codeStep) {
 const navigated = page.waitForURL(/\/app|\/waitlist|\/start/, {
   timeout: 90_000,
 });
-await page.locator("[data-testid='otp-autofill-input']").fill(otp);
+let otpCode = otp;
+if (otpFile) {
+  // Deployed targets: poll for the mailed code an operator/agent writes.
+  const { readFileSync } = await import('node:fs');
+  const deadline = Date.now() + 240_000;
+  otpCode = null;
+  while (Date.now() < deadline && !otpCode) {
+    try {
+      otpCode = readFileSync(otpFile, 'utf8').match(/\b(\d{6})\b/)?.[1] ?? null;
+    } catch {
+      // not written yet
+    }
+    if (!otpCode) await sleep(2000);
+  }
+  if (!otpCode) {
+    console.error('no OTP in otp-file within timeout');
+    process.exit(1);
+  }
+}
+await page.locator("[data-testid='otp-autofill-input']").fill(otpCode);
 await page
   .locator("form button[type='submit']:not([disabled])")
   .first()
@@ -186,7 +207,7 @@ if (!code || !state) {
   );
   process.exit(1);
 }
-const deepLink = new URL('jovie-local://auth/complete');
+const deepLink = new URL(`${scheme}://auth/complete`);
 deepLink.searchParams.set('code', code);
 deepLink.searchParams.set('state', state);
 if (desktopFlow) deepLink.searchParams.set('desktop_flow', desktopFlow);
