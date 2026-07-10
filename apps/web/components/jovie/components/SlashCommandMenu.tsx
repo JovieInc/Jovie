@@ -40,9 +40,11 @@ import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { useEventsQuery } from '@/lib/queries/useEventsQuery';
+import { useOwnGraphArtistsQuery } from '@/lib/queries/useOwnGraphArtistsQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   artistResultToEntityRef,
+  ownGraphArtistToEntityRef,
   type ReleaseLikeRow,
   rankRecentsFirst,
   releaseRowMatches,
@@ -171,6 +173,13 @@ export function useSlashItems(
   // opens populated with the creator's world even before Spotify responds.
   const { recents } = useEntityRecents(profileId);
 
+  // Claimed-self + catalog collaborators with Spotify ids (JOV-3717).
+  // Cold-start: empty artist menu still shows "You" + credits before recents.
+  const { data: ownGraphArtists } = useOwnGraphArtistsQuery(profileId, {
+    enabled:
+      Boolean(profileId) && (isRoot || (isEntity && state.kind === 'artist')),
+  });
+
   return useMemo<UseSlashItemsResult>(() => {
     if (state.status === 'closed') {
       return { items: [], sections: [], isLoading: false };
@@ -201,7 +210,15 @@ export function useSlashItems(
       limit
     );
 
-    const artistRecents = recents.filter(r => r.kind === 'artist');
+    // Own-graph artists (self first, then collaborators) seed the recents
+    // tier so they win over Spotify fallback and de-dupe by id.
+    const ownGraphRefs = (ownGraphArtists ?? []).map(ownGraphArtistToEntityRef);
+    const artistRecents = [
+      ...ownGraphRefs,
+      ...recents.filter(
+        r => r.kind === 'artist' && !ownGraphRefs.some(own => own.id === r.id)
+      ),
+    ];
     const artistEntities: EntityRef[] = rankRecentsFirst(
       artistRecents,
       artistSearch.results
@@ -296,6 +313,7 @@ export function useSlashItems(
     query,
     isEntity,
     recents,
+    ownGraphArtists,
     releaseData,
     releaseLoading,
     eventData,

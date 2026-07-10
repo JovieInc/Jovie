@@ -187,6 +187,35 @@ these, not redefine them.
 - **Canonical button sizes** — `sm` = 28px, `md` = 36px, `lg` = 44px; `icon`
   uses the `md` control height with equal width.
 
+## Source guards (composer + header radius/padding)
+
+Composer and app-shell header surfaces must not reintroduce off-token corner
+radius or padding magic numbers. Enforced by:
+
+- `apps/web/tests/unit/chat/composer-header-radius-padding-source-guard.test.ts` (JOV-3532)
+- Numeric px map: `apps/web/lib/design/system-b-radius.ts` (`SYSTEM_B_RADIUS_PX`)
+
+**Forbidden in scoped files** (`ChatInput.tsx`, `ChatComposerToolbar.tsx`,
+`chat-motion.ts`, `HomeComposerHero.tsx`, `components/shell/*`):
+
+- `borderRadius: 28` (or any bare number) — use `SYSTEM_B_RADIUS_PX['3xl']` etc.
+- `rounded-[…]` arbitrary Tailwind radius
+- `p-[…]` / `px-[…]` / `py-[…]` (and `pt|pb|pl|pr-[…]`) arbitrary padding
+
+**Escape hatch** (previous line or same line, with reason + Linear ID):
+
+```ts
+// system-b-allow: safe-area inset requires calc(); no spacing token covers env() (JOV-3532)
+className='… pb-[calc(1rem+env(safe-area-inset-bottom))]'
+```
+
+To widen the guard: clean the new surface of un-allowlisted violations first,
+then add its path to the test's scoped file list.
+
+Admin page titles are owned by the shell breadcrumb — `AdminPage` must not
+re-render the route title (JOV-3527;
+`apps/web/tests/unit/app/admin-page-header-dedupe.test.ts`).
+
 ## Common Failure Modes
 
 - Defining the same token in multiple CSS files
@@ -195,3 +224,5 @@ these, not redefine them.
   `components/marketing/*`
 - Treating `/artist-profiles` as the public profile canonical surface
 - Treating `/ai` or `/investors` as design surfaces instead of redirects
+- Adding bare `borderRadius: N` or `rounded-[Npx]` on composer/header surfaces
+  (use `SYSTEM_B_RADIUS_PX` / named utilities; see source guards above)

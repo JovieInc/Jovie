@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { EntityRef } from '@/lib/commands/entities';
 import {
   formatLongDate,
+  ownGraphArtistToEntityRef,
   rankRecentsFirst,
   shortMonthDay,
 } from './entity-mappers';
@@ -85,6 +86,49 @@ describe('rankRecentsFirst', () => {
   it('returns only source when there are no recents (Spotify fallback)', () => {
     const source = [artist('a1', 'One')];
     expect(rankRecentsFirst([], source, 'whatever', 8)).toEqual(source);
+  });
+
+  it('seeds claimed-self ahead of Spotify on cold start (JOV-3717)', () => {
+    const self = ownGraphArtistToEntityRef({
+      id: 'me-spotify',
+      name: 'Tim White',
+      imageUrl: 'https://example.com/a.jpg',
+      isClaimedSelf: true,
+    });
+    const collab = ownGraphArtistToEntityRef({
+      id: 'collab-1',
+      name: 'Feature Artist',
+      isClaimedSelf: false,
+    });
+    const spotify = [artist('spotify-hit', 'Random Spotify')];
+    const result = rankRecentsFirst([self, collab], spotify, '', 8);
+    expect(result.map(r => r.id)).toEqual([
+      'me-spotify',
+      'collab-1',
+      'spotify-hit',
+    ]);
+    expect(result[0]?.meta?.subtitle).toBe('You');
+    // Narrow the EntityRefMeta discriminated union before reading isYou.
+    expect(result[0]?.meta).toMatchObject({ kind: 'artist', isYou: true });
+  });
+});
+
+describe('ownGraphArtistToEntityRef', () => {
+  it('marks claimed self as You and collaborators as Catalog', () => {
+    expect(
+      ownGraphArtistToEntityRef({
+        id: '1',
+        name: 'Me',
+        isClaimedSelf: true,
+      }).meta
+    ).toMatchObject({ subtitle: 'You', isYou: true });
+    expect(
+      ownGraphArtistToEntityRef({
+        id: '2',
+        name: 'Collab',
+        isClaimedSelf: false,
+      }).meta
+    ).toMatchObject({ subtitle: 'Catalog', isYou: false });
   });
 });
 

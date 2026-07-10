@@ -149,6 +149,7 @@ export type {
 } from './types';
 // Utilities
 export {
+  allowIfRateLimitBackendDegraded,
   createRateLimitHeaders,
   createRateLimitHeadersFromStatus,
   createRateLimitKey,

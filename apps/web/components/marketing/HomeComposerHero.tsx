@@ -28,6 +28,7 @@ import {
   TYPEWRITER_CHAR_INTERVAL,
   TYPEWRITER_QUERY,
 } from '@/data/homeComposerHeroData';
+import { SYSTEM_B_RADIUS_PX } from '@/lib/design/system-b-radius';
 import { cn } from '@/lib/utils';
 
 // ─── Design constants (match in-app composer exactly) ─────────────────────
@@ -85,9 +86,10 @@ function demoReducer(state: DemoState, action: DemoAction): DemoState {
 type SurfaceMode = 'empty' | 'typing' | 'entity';
 
 function geometryFor(mode: SurfaceMode) {
-  if (mode === 'empty') return { borderRadius: 999 };
-  if (mode === 'typing') return { borderRadius: 24 };
-  return { borderRadius: 20 };
+  // Mirror ChatInput geometryFor — System B radius tokens only (JOV-3532).
+  if (mode === 'empty') return { borderRadius: SYSTEM_B_RADIUS_PX.pill };
+  if (mode === 'typing') return { borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
+  return { borderRadius: SYSTEM_B_RADIUS_PX['2xl'] };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────

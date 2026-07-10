@@ -10,6 +10,7 @@ import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
 import type { PlanAwareRateLimiter, RateLimitResult } from './types';
+import { allowIfRateLimitBackendDegraded } from './utils';
 
 // ============================================================================
 // Authentication & User Operations
@@ -594,24 +595,50 @@ export async function checkAiChatRateLimit(
  * Check AI chat rate limits for a specific plan.
  * Applies both the hourly burst limiter (all plans) and the daily plan quota.
  * Returns the first failure or success if all pass.
+ *
+ * Fail-open when the durable rate-limit backend is degraded/unavailable
+ * (archived Upstash, circuit open → per-instance memory). A healthy Redis
+ * denial still blocks. Never throws — chat must not die with CHAT_STREAM_FAILED
+ * because the limiter path blew up (JOV-3956 / JOV-3929).
  */
 export async function checkAiChatRateLimitForPlan(
   userId: string,
   plan: string | null
 ): Promise<RateLimitResult> {
-  // 1. Check hourly burst limiter (applies to all plans)
-  const burstResult = await checkRateLimit(
-    aiChatLimiter,
-    userId,
-    'Too many messages in a short time. Please wait a moment.'
-  );
-  if (!burstResult.success) {
-    return burstResult;
-  }
+  try {
+    // 1. Check hourly burst limiter (applies to all plans)
+    const burstResult = await checkRateLimit(
+      aiChatLimiter,
+      userId,
+      'Too many messages in a short time. Please wait a moment.'
+    );
+    const burstAllowed = allowIfRateLimitBackendDegraded(burstResult, {
+      limiter: 'ai-chat-burst',
+      userId,
+      plan,
+    });
+    if (!burstAllowed.success) {
+      return burstAllowed;
+    }
 
-  // 2. Check daily plan-specific quota using the plan-aware limiter
-  const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
-  return dailyResult;
+    // 2. Check daily plan-specific quota using the plan-aware limiter
+    const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
+    return allowIfRateLimitBackendDegraded(dailyResult, {
+      limiter: 'ai-chat-daily',
+      userId,
+      plan,
+    });
+  } catch {
+    // Unexpected limiter failure (should be rare — RateLimiter already
+    // catches Redis errors). Fail open so chat stays available.
+    return {
+      success: true,
+      limit: 0,
+      remaining: 0,
+      reset: new Date(),
+      degraded: true,
+    };
+  }
 }
 
 // ============================================================================

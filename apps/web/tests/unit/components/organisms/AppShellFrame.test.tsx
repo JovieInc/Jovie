@@ -68,7 +68,7 @@ describe('AppShellFrame', () => {
     );
     expect(mainContent).toHaveClass('lg:border-l');
     expect(mainContent).not.toHaveClass(
-      'lg:shadow-[var(--linear-app-shell-shadow)]'
+      'lg:shadow-(--linear-app-shell-shadow)'
     );
     expect(mainContent.querySelector('div.flex.flex-1')).not.toHaveClass(
       'lg:gap-(--linear-app-shell-gap)'

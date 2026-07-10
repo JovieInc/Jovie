@@ -54,7 +54,7 @@ jobs:
   # runs first (fail-open), then path detection.
   ci-path-changes:
     name: Path Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
@@ -103,7 +103,12 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: steps.graphite.outputs.skip != 'true'
         with:
+          # Blobless partial clone: full commit graph for merge-base/diff
+          # (names only), no historical file contents. Cuts the clone from
+          # ~30-40s (worse under runner throttling) to seconds on this repo;
+          # any blob that is actually needed is lazy-fetched on demand.
           fetch-depth: 0
+          filter: blob:none
       - name: Detect path changes for all job types
         if: steps.graphite.outputs.skip != 'true'
         id: detect
@@ -291,7 +296,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     name: CI Risk Classifier
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     outputs:
       risk_level: ${{ steps.classify.outputs.risk_level }}
@@ -382,7 +387,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -415,7 +420,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -446,7 +451,7 @@ jobs:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     steps:
@@ -479,7 +484,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     name: Structural Contract
     needs: [ci-path-changes]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 8
     env:
       SHELLCHECK_OPTS: >-
@@ -544,7 +549,7 @@ jobs:
     # Merge gate: keep on always-available GitHub runners. The self-hosted
     # jovie-runner pool is not highly-available (personal OrbStack host) and
     # took down this gate when it shut down mid-run.
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
@@ -663,15 +668,23 @@ jobs:
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     needs: [ci-path-changes]
-    # Runs on GitHub-hosted runners (typecheck --force means no turbo cache benefit).
-    runs-on: ubuntu-latest
+    # Runner is var-switchable: CI_FAST_RUNNER=jovie-runner offloads typecheck
+    # to the self-hosted pool when hosted concurrency is the bottleneck
+    # (free-plan orgs get ~20 concurrent hosted jobs + fair-use throttling —
+    # see gbrain jovie-ci-actions-budget-stall-2026-07-10). Typecheck uploads
+    # no artifacts, so the pool's slow egress doesn't bite.
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          # Full history needed for turbo --affected merge-base detection
+          # Full history needed for turbo --affected merge-base detection.
+          # Blobless: --affected only needs the commit graph + changed-file
+          # names; HEAD blobs are materialized at checkout, historical blobs
+          # lazy-fetch if ever needed.
           fetch-depth: 0
+          filter: blob:none
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -845,7 +858,7 @@ jobs:
     needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -1281,7 +1294,9 @@ jobs:
 
       - name: Build app fallback
         if: steps.download-build.outcome != 'success'
-        run: pnpm turbo build --filter=@jovie/web
+        # Do not accept a remote artifact from the shared mock build. The
+        # real-Clerk lane has a different compile-time auth contract.
+        run: pnpm turbo build --filter=@jovie/web --force
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -1325,7 +1340,9 @@ jobs:
             exit 1
           fi
 
-          pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line
+          # The lane uses the deterministic test-auth bypass, so use the
+          # no-auth config and avoid its unrelated legacy Clerk setup project.
+          pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           BASE_URL: http://localhost:3100
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2456,8 +2473,11 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    # 5-shard unit tests on GitHub-hosted runners for reliability (turbo remote cache works on any runner).
-    runs-on: ubuntu-latest
+    # 5-shard unit tests; runner is var-switchable (CI_UNIT_RUNNER=jovie-runner
+    # offloads all shards to the self-hosted pool when hosted concurrency is
+    # the bottleneck). Defaults to GitHub-hosted. Shards upload no artifacts on
+    # the PR path (coverage is nightly-only), so pool egress is not a concern.
+    runs-on: ${{ vars.CI_UNIT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -2470,7 +2490,8 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 0  # Full history for vitest --changed
+          fetch-depth: 0 # Full history for vitest --changed (names via commit graph)
+          filter: blob:none # historical blobs lazy-fetch; saves ~30s × 5 shards/run
 
       - name: Check for relevant changes
         id: check_changes
@@ -2997,10 +3018,10 @@ jobs:
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
 
-      - name: Build real-Clerk golden-path artifact
+      - name: Build Better Auth golden-path artifact
         # NEXT_PUBLIC_* values are compile-time inputs. Do not reuse the
         # bypass artifact consumed by smoke/mobile jobs.
-        run: pnpm turbo build --filter=@jovie/web
+        run: pnpm turbo build --filter=@jovie/web --force
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -3012,7 +3033,7 @@ jobs:
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
 
-      - name: Run Golden Path (Chromium, real Clerk)
+      - name: Run Golden Path (Chromium, Better Auth)
         run: |
           cd apps/web
 
@@ -3022,12 +3043,14 @@ jobs:
           fi
 
           # Standalone production server (not next dev) to avoid CI OOM/timeouts.
-          # REAL Clerk: no NEXT_PUBLIC_CLERK_MOCK / E2E_USE_TEST_AUTH_BYPASS here —
-          # those flags make golden-path.spec.ts self-skip.
+          # Real Better Auth signup: no test-auth bypass is permitted here.
           export DATABASE_URL="${{ env.DATABASE_URL }}"
           export NODE_ENV=test
           export CI=true
           export VERCEL_ENV=development
+          # Enables Better Auth's deterministic OTP only for the golden path's
+          # canonical +e2e test address; production hard-blocks this switch.
+          export E2E_TEST_MODE=1
           export NEXT_PUBLIC_APP_URL=http://localhost:3100
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
@@ -3059,11 +3082,10 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           BASE_URL=http://localhost:3100 E2E_SKIP_WEB_SERVER=1 pnpm --filter @jovie/web run test:e2e:golden-path:ci
         env:
-          # Duplicated on the Playwright-runner process: global-setup calls clerkSetup
-          # and the spec queries the DB + Clerk API directly, so these must be present
-          # for both the server and the runner. UPSTASH_* is optional (spec degrades to
-          # the in-memory rate-limit fallback when unset).
+          # The runner also needs the database and deterministic E2E OTP flag.
+          # UPSTASH_* is optional; the spec degrades to the in-memory limiter.
           DATABASE_URL: ${{ env.DATABASE_URL }}
+          E2E_TEST_MODE: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
@@ -3666,7 +3688,7 @@ jobs:
         ci-pr-vercel-preview,
       ]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
       - name: Evaluate required PR checks

@@ -65,6 +65,15 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/db/schema/chat', () => ({
   chatConversations: {
     id: 'conversationId',
@@ -83,6 +92,8 @@ vi.mock('@/lib/db/schema/chat', () => ({
     content: 'content',
     toolCalls: 'toolCalls',
     createdAt: 'createdAt',
+    assistantSource: 'assistantSource',
+    scriptLineKey: 'scriptLineKey',
   },
   chatTurns: {
     id: 'turnId',
@@ -99,6 +110,7 @@ vi.mock('@/lib/db/schema/chat', () => ({
     updatedAt: 'updatedAt',
     startedAt: 'startedAt',
     completedAt: 'completedAt',
+    model: 'model',
   },
 }));
 
@@ -262,6 +274,7 @@ describe('chat turn service', () => {
       id: 'msg-existing',
       conversationId: 'conv-1',
       turnId: 'turn-1',
+      clientMessageId: null,
       role: 'assistant',
       content: 'Already saved.',
       toolCalls: null,
@@ -285,8 +298,13 @@ describe('chat turn service', () => {
       content: 'A second terminal write attempt',
     });
 
-    // Returns the existing row instead of inserting a duplicate.
-    expect(result).toEqual(existingAssistant);
+    // Returns the existing row (with core-column null attribution fields)
+    // instead of inserting a duplicate.
+    expect(result).toEqual({
+      ...existingAssistant,
+      assistantSource: null,
+      scriptLineKey: null,
+    });
     // Critical JOV-2275 invariant: no chatMessages insert is issued when
     // a terminal assistant row already exists for this turn.
     expect(hoisted.insertMock).not.toHaveBeenCalled();
@@ -308,6 +326,7 @@ describe('chat turn service', () => {
         id: 'msg-new',
         conversationId: 'conv-1',
         turnId: 'turn-1',
+        clientMessageId: null,
         role: 'assistant',
         content: 'Hello!',
         toolCalls: null,
@@ -326,7 +345,57 @@ describe('chat turn service', () => {
     });
 
     expect(result.id).toBe('msg-new');
+    expect(result.assistantSource).toBeNull();
+    expect(result.scriptLineKey).toBeNull();
     expect(hoisted.insertMock).toHaveBeenCalled();
     expect(hoisted.updateMock).toHaveBeenCalled();
+  });
+
+  it('persistTerminalAssistantMessage fails soft when the DB write throws', async () => {
+    hoisted.selectOrderByMock.mockReturnValueOnce({
+      limit: vi.fn().mockRejectedValueOnce(new Error('column does not exist')),
+      then: (onFulfilled: (value: unknown) => unknown, onRejected) =>
+        Promise.reject(new Error('column does not exist')).then(
+          onFulfilled,
+          onRejected
+        ),
+    });
+
+    const { logger } = await import('@/lib/utils/logger');
+    const { persistTerminalAssistantMessage } = await import(
+      '@/lib/chat/turns'
+    );
+    const result = await persistTerminalAssistantMessage({
+      conversationId: 'conv-1',
+      turnId: 'turn-1',
+      status: 'failed_model_error',
+      content: 'Stream text still delivered.',
+      errorCode: 'CHAT_STREAM_FAILED',
+    });
+
+    // Ephemeral row so callers never throw and kill the stream.
+    expect(result.id).toBe('ephemeral-turn-1');
+    expect(result.content).toBe('Stream text still delivered.');
+    expect(logger.error).toHaveBeenCalledWith(
+      'Chat terminal assistant persist failed',
+      expect.objectContaining({ turnId: 'turn-1' }),
+      'chat/turns'
+    );
+  });
+
+  it('markChatTurnStreaming fails soft when the update throws', async () => {
+    hoisted.updateMock.mockImplementationOnce(() => {
+      throw new Error('db unavailable');
+    });
+
+    const { logger } = await import('@/lib/utils/logger');
+    const { markChatTurnStreaming } = await import('@/lib/chat/turns');
+
+    await expect(markChatTurnStreaming('turn-1')).resolves.toBeUndefined();
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Chat turn streaming mark failed',
+      expect.objectContaining({ turnId: 'turn-1' }),
+      'chat/turns'
+    );
   });
 });
