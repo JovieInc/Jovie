@@ -18,11 +18,22 @@ emits one JSON receipt; the skill makes **one** Bash call and branches on
 
 A blocked ownership/worktree run never pays the gstack upgrade tax.
 
+## Implementation
+
+| File | Role |
+|------|------|
+| `preflight-lib.mjs` | Pure evaluation + receipt builder (unit-tested) |
+| `preflight.mjs` | CLI: collect git/gbrain/gstack facts → lib → JSON |
+| `preflight.sh` | Thin `bash` wrapper for skill invocations |
+| `preflight.test.mjs` | `node:test` unit + CLI contract tests |
+
 ## Invocation
 
 ```bash
 bash scripts/agent/preflight.sh
 bash scripts/agent/preflight.sh --task "ship JOV-4183"
+node scripts/agent/preflight.mjs --task "ship JOV-4183"
+node --test scripts/agent/preflight.test.mjs
 ```
 
 Exit `0` = `verdict: go`. Exit `1` = `verdict: blocked`. Exit `2` = script error.

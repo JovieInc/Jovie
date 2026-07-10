@@ -471,7 +471,7 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'main' }}
         run: node scripts/version-fanout-guard.mjs --base "origin/${BASE_REF}"
       - name: Script unit tests
-        run: node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs
+        run: node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs
       - name: Version consistency guard
         run: node scripts/version-check.mjs
       - name: Next.js proxy guard

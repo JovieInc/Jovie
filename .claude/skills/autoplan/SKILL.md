@@ -18,6 +18,8 @@ bash scripts/agent/preflight.sh --task "${AUTOPLAN_TASK:-autoplan}"
 
 Parse the single JSON receipt from stdout. Schema: `agent-preflight/v1` —
 documented in `scripts/agent/PREFLIGHT.md`.
+Pure evaluation lives in `scripts/agent/preflight-lib.mjs` (covered by
+`node --test scripts/agent/preflight.test.mjs`, also run in CI Guardrails).
 
 ### Branching
 
