@@ -95,7 +95,11 @@ describe('RLS session contract', () => {
     for (const file of newer) {
       const content = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
       if (content.includes('CREATE POLICY "users_select_self"')) {
-        expect(content).not.toContain('clerk_id" = current_clerk_user_id()');
+        const policy = content.slice(
+          content.indexOf('CREATE POLICY "users_select_self"')
+        );
+        const usingClause = policy.slice(0, policy.indexOf(';'));
+        expect(usingClause).not.toContain('clerk_id');
       }
     }
   });
