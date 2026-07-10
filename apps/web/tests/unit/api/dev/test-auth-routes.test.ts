@@ -438,6 +438,34 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
   });
 
+  it('accepts GET /enter when URL host is the bind address but Host header is loopback', async () => {
+    // Standalone Next can surface nextUrl.hostname as 0.0.0.0 / runner HOSTNAME
+    // while Playwright still sends Host: localhost — same fallback as /session.
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: true,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
+    });
+    mockIsTrustedTestBypassRequest.mockReturnValueOnce(true);
+
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+    const response = await GET(
+      new NextRequest(
+        'http://0.0.0.0:3100/api/dev/test-auth/enter?persona=creator&redirect=/app',
+        {
+          headers: {
+            Host: 'localhost:3100',
+          },
+        }
+      )
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe('/app');
+    expect(mockIsTrustedTestBypassRequest).toHaveBeenCalled();
+    expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
+  });
+
   it('redirects through the local auth bootstrap entrypoint for creator-ready', async () => {
     mockEnsureDevTestAuthActor.mockResolvedValueOnce({
       persona: 'creator-ready',

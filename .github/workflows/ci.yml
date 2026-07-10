@@ -1269,6 +1269,20 @@ jobs:
           }
           trap cleanup EXIT
 
+          # Export before server start so the production-built standalone process
+          # inherits test-auth gates (step env alone is not enough if a wrapper
+          # strips process.env for the backgrounded Node child on some runners).
+          # HOSTNAME=localhost: GHA sets HOSTNAME to the runner machine name;
+          # Next standalone uses it for URL construction, which fails the
+          # test-auth trusted-host gate unless Host header is honored.
+          export VERCEL_ENV=development
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export E2E_TEST_AUTH_PERSONA=creator-ready
+          export NEXT_PUBLIC_E2E_MODE=1
+          export NEXT_PUBLIC_CLERK_MOCK=1
+          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export HOSTNAME=localhost
+
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
@@ -2781,6 +2795,16 @@ jobs:
             echo "::error::Standalone server not found for authenticated a11y."
             exit 1
           fi
+
+          # Same server-side env export as mobile-overflow / e2e-smoke so
+          # test-auth enter is available on the production-built standalone.
+          export VERCEL_ENV=development
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export E2E_TEST_AUTH_PERSONA=creator-ready
+          export NEXT_PUBLIC_E2E_MODE=1
+          export NEXT_PUBLIC_CLERK_MOCK=1
+          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          export HOSTNAME=localhost
 
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
