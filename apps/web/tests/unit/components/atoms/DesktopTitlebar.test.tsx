@@ -65,7 +65,7 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-traffic-light-safe-area'));
     expect(screen.getByTestId('electron-traffic-light-safe-area')).toHaveClass(
-      'w-[var(--electron-traffic-light-safe-width)]'
+      'w-(--electron-traffic-light-safe-width)'
     );
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')

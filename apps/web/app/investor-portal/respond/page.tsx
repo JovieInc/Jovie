@@ -73,15 +73,16 @@ export default async function InvestorRespondPage({
 
     // Fallback if no calendar URL configured
     return (
-      <div className='dark flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
+      <div className='dark flex min-h-screen items-center justify-center bg-(--color-bg-base)'>
         <div className='text-center'>
-          <span className='mb-6 block text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
+          <span className='mb-6 block text-[length:var(--text-lg)] font-bold tracking-tight text-(--color-text-primary-token)'>
             Jovie
           </span>
-          <h1 className='text-[length:var(--text-2xl)] font-[var(--font-weight-bold)] text-[var(--color-text-primary-token)]'>
+          <h1 className='text-[length:var(--text-2xl)] font-(--font-weight-bold) text-(--color-text-primary-token)'>
+            {/* ui-casing-allow: marketing sentence-style copy */}
             Thanks for your interest!
           </h1>
-          <p className='mt-2 text-[var(--color-text-tertiary-token)]'>
+          <p className='mt-2 text-(--color-text-tertiary-token)'>
             We&apos;ll be in touch soon to schedule a call.
           </p>
         </div>
@@ -96,15 +97,16 @@ export default async function InvestorRespondPage({
     .where(eq(investorLinks.id, link.id));
 
   return (
-    <div className='dark flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
+    <div className='dark flex min-h-screen items-center justify-center bg-(--color-bg-base)'>
       <div className='max-w-md text-center'>
-        <span className='mb-6 block text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
+        <span className='mb-6 block text-[length:var(--text-lg)] font-bold tracking-tight text-(--color-text-primary-token)'>
           Jovie
         </span>
-        <h1 className='text-[length:var(--text-2xl)] font-[var(--font-weight-bold)] text-[var(--color-text-primary-token)]'>
+        <h1 className='text-[length:var(--text-2xl)] font-(--font-weight-bold) text-(--color-text-primary-token)'>
+          {/* ui-casing-allow: marketing sentence-style copy */}
           Thanks for letting us know
         </h1>
-        <p className='mt-2 text-[var(--color-text-tertiary-token)]'>
+        <p className='mt-2 text-(--color-text-tertiary-token)'>
           No hard feelings. We appreciate you taking the time.
         </p>
       </div>

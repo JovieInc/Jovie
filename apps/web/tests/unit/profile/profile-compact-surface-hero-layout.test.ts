@@ -23,12 +23,13 @@ describe('ProfileCompactSurface home hero layout', () => {
   it('grows the home hero with flex-1 and a min-height floor', () => {
     const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
 
-    expect(contents).toMatch(/min-h-\[var\(--cover-height\)\]/);
+    expect(contents).toMatch(/min-h-\(--cover-height\)/);
     expect(contents).toMatch(/\bflex-1\b/);
     expect(contents).not.toMatch(/\bmax-h-108\b/);
     expect(contents).not.toMatch(
       /isHomeMode\s*\?\s*'h-\[var\(--cover-height\)\]'/
     );
+    expect(contents).not.toMatch(/isHomeMode\s*\?\s*'h-\(--cover-height\)'/);
   });
 
   it('locks short viewports (≤820px tall) to a 190px hero cap for the bento fold', () => {

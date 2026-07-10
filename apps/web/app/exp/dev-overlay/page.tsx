@@ -15,7 +15,7 @@ const CARBON = {
   border: '#1a1d23',
 };
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 
 // ---------------------------------------------------------------------------
 // Accent swatches — raw Tailwind color values (playground only, not locked

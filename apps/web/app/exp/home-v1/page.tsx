@@ -27,7 +27,7 @@ import {
 } from '@/components/features/home/label-logos';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_CINEMATIC = 'var(--ease-drawer)';
 
 const SUGGESTIONS = [
   'Plan a release',
@@ -584,7 +584,7 @@ function HeroCinematic({ onScrollNext }: HeroProps) {
           {EYEBROW}
         </span>
         <h1
-          className='text-[60px] sm:text-[88px] lg:text-[116px] font-bold leading-[0.96] text-white dark:text-white'
+          className='text-6xl sm:text-[88px] lg:text-[116px] font-bold leading-[0.96] text-white dark:text-white'
           style={{
             letterSpacing: '-0.038em',
             textWrap: 'balance' as React.CSSProperties['textWrap'],

@@ -39,7 +39,7 @@ export default async function InvestorLandingPage() {
     <div className='flex flex-col'>
       {investorName && (
         <p
-          className='px-4 pt-12 pb-2 text-center text-[length:var(--text-2xl)] font-[var(--font-weight-medium)] text-secondary-token sm:px-6 sm:pt-16 lg:pt-20'
+          className='px-4 pt-12 pb-2 text-center text-[length:var(--text-2xl)] font-(--font-weight-medium) text-secondary-token sm:px-6 sm:pt-16 lg:pt-20'
           style={{ letterSpacing: 'var(--tracking-normal)' }}
         >
           Hi {investorName}

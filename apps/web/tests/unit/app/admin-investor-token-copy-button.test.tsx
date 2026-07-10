@@ -35,7 +35,7 @@ describe('TokenCopyButton', () => {
     render(<TokenCopyButton token='tok_live_super_secret_value' />);
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Copy full investor token' })
+      screen.getByRole('button', { name: 'Copy Full Investor Token' })
     );
 
     await act(async () => {
