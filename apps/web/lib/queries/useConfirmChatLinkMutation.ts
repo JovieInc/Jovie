@@ -22,6 +22,8 @@ export interface ConfirmChatLinkInput {
 interface ConfirmChatLinkResponse {
   success: boolean;
   platform: string;
+  /** True create vs platform URL overwrite (JOV-3549). */
+  outcome?: 'created' | 'updated';
 }
 
 export function useConfirmChatLinkMutation() {

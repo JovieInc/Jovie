@@ -99,9 +99,14 @@ type SurfaceMode = 'empty' | 'typing' | 'root' | 'entity';
 interface SurfaceGeometry {
   readonly width: string;
   readonly maxWidth: string;
+  /** System B token px only — no off-scale magic numbers (JOV-3531 / JOV-3532). */
   readonly borderRadius: number;
 }
 
+/**
+ * Composer radius: pill for single-line hero empty state; 3xl for every docked /
+ * multiline / entity / stacked surface. Values come from SYSTEM_B_RADIUS_PX only.
+ */
 function geometryFor(
   mode: SurfaceMode,
   stacked: boolean,
@@ -240,6 +245,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const hasChips = (chips?.length ?? 0) > 0;
 
     const { setComposerFocused } = useRegisterComposerFocus();
+    // Belt-and-braces with ComposerFocusProvider pathname reset: unmounting the
+    // focused textarea does not fire blur, so always release shell focus mode
+    // when this composer leaves the tree (JOV-4043).
+    useEffect(() => {
+      return () => {
+        setComposerFocused(false);
+      };
+    }, [setComposerFocused]);
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [isViewportNarrow, setIsViewportNarrow] = useState(false);
@@ -1087,9 +1100,11 @@ function InputRow({
         transition={reducedMotion ? undefined : TRANSITION_SURFACE}
         className={cn(
           'relative',
+          // Symmetric token padding: px-4 / py-2 so placeholder + text are evenly inset
+          // (kills ad-hoc px-3 + mixed py-[1px] / px-1.5 from JOV-3531).
           useHeroPill
-            ? 'flex min-h-13 items-center gap-1.5 px-3 py-1.5 sm:min-h-14 sm:px-3'
-            : 'grid content-start gap-2 grid-rows-[auto_36px] px-3 py-1.5'
+            ? 'flex min-h-13 items-center gap-2 px-4 py-2 sm:min-h-14'
+            : 'grid content-start gap-2 grid-rows-[auto_36px] px-4 py-2'
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
@@ -1108,12 +1123,10 @@ function InputRow({
         <div
           data-testid='chat-input-inline-field'
           className={cn(
-            'flex w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1.5',
+            'flex w-full min-w-0 flex-wrap items-start gap-x-2 gap-y-1.5',
             useHeroPill
-              ? 'min-h-8 flex-1 items-center px-1.5 pt-0'
-              : isHero
-                ? 'px-2 pt-0.5'
-                : 'px-1.5 pt-0'
+              ? 'min-h-8 flex-1 items-center px-1 pt-0'
+              : 'px-1 pt-0.5'
           )}
         >
           {chips && chips.length > 0 && onRemoveChipAt ? (
@@ -1129,10 +1142,10 @@ function InputRow({
             animate={reducedMotion ? undefined : { height: measuredHeight }}
             transition={reducedMotion ? undefined : SPRING_HEIGHT}
             className={cn(
-              'system-b-chat-composer-input min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent placeholder:text-quaternary-token',
+              'system-b-chat-composer-input min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent px-1 py-1 placeholder:text-quaternary-token',
               isHero
-                ? 'min-h-7 px-2 py-0.5 text-mid font-book leading-6 text-primary-token sm:text-base'
-                : 'min-h-6 px-1.5 py-px text-mid leading-6 text-primary-token',
+                ? 'min-h-7 text-mid font-book leading-6 text-primary-token sm:text-base'
+                : 'min-h-6 text-mid leading-6 text-primary-token',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
               // isFocused→isExpanded). Using focus-visible:outline-none keeps

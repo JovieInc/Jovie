@@ -5,12 +5,16 @@ import { db } from '@/lib/db';
 import { merchCards } from '@/lib/db/schema/merch';
 import { formatMerchMoney } from '@/lib/merch/pricing';
 
-export type MerchProposeAction = 'publish' | 'archive' | 'unpause';
+export type MerchProposeAction = 'publish' | 'archive' | 'unpause' | 'pause';
 
 export type MerchActionToolResult =
   | {
       readonly success: true;
-      readonly action: 'publish_merch' | 'archive_merch' | 'unpause_merch';
+      readonly action:
+        | 'publish_merch'
+        | 'archive_merch'
+        | 'unpause_merch'
+        | 'pause_merch';
       readonly merchCardId: string;
       readonly title: string;
       readonly currentStatus: string;
@@ -24,11 +28,12 @@ export type MerchActionToolResult =
 
 const ACTION_BY_PROPOSE: Record<
   MerchProposeAction,
-  'publish_merch' | 'archive_merch' | 'unpause_merch'
+  'publish_merch' | 'archive_merch' | 'unpause_merch' | 'pause_merch'
 > = {
   publish: 'publish_merch',
   archive: 'archive_merch',
   unpause: 'unpause_merch',
+  pause: 'pause_merch',
 };
 
 export async function proposeMerchAction(params: {

@@ -4224,10 +4224,12 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
     case 'pauseMerchCard':
       return {
         success: true,
-        action: toolName,
+        action: 'pause_merch',
         merchCardId: args.merchCardId,
-        status: 'paused',
         title: 'Tour Tee',
+        currentStatus: 'live',
+        retailPrice: '$25.00',
+        primaryImageUrl: null,
       };
     case 'reorderMerchCards':
       return {

@@ -227,11 +227,12 @@ describe('ChatPageClient', () => {
     expect(chat.getAttribute('data-profile-id')).toBe('profile-1');
   });
 
-  it('passes a production-backed action card to new chat threads', () => {
+  it('passes ≥3 profile-aware action cards to new chat threads (JOV-3547)', () => {
     const { getByTestId } = renderChatPage();
     const chat = getByTestId('jovie-chat');
 
-    expect(chat.getAttribute('data-action-card-count')).toBe('1');
+    expect(chat.getAttribute('data-action-card-count')).toBe('3');
+    expect(capturedActionCards).toHaveLength(3);
     expect(capturedActionCards?.[0]).toEqual(
       expect.objectContaining({
         id: 'connect-music-catalog',
@@ -241,9 +242,14 @@ describe('ChatPageClient', () => {
           'Help me connect my music catalog for Test Artist. Use the current profile context and give me the next setup step.',
       })
     );
+    expect(capturedActionCards?.map(card => card.id)).toEqual([
+      'connect-music-catalog',
+      'plan-release',
+      'generate-album-art',
+    ]);
   });
 
-  it('derives music catalog context from selectedProfile fields', () => {
+  it('seeds starter action cards when catalog is connected and profile is complete', () => {
     const dataWithConnectedMusic: DashboardData = {
       ...baseDashboardData,
       hasMusicLinks: false,
@@ -266,7 +272,13 @@ describe('ChatPageClient', () => {
       </DashboardDataProvider>
     );
 
-    expect(capturedActionCards).toEqual([]);
+    // Fully set-up profiles still get ≥3 grounded starters (no setup-gap lead).
+    expect(capturedActionCards).toHaveLength(3);
+    expect(capturedActionCards?.map(card => card.id)).toEqual([
+      'plan-release',
+      'generate-album-art',
+      'whats-working',
+    ]);
   });
 
   it('passes conversationId to JovieChat', () => {

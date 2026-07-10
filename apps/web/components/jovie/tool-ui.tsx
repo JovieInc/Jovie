@@ -497,6 +497,7 @@ function renderSocialLinkArtifact(
       platform={event.output.platform}
       normalizedUrl={event.output.normalizedUrl}
       originalUrl={event.output.originalUrl}
+      toolCallId={event.toolCallId}
     />
   );
 }
@@ -584,7 +585,11 @@ function renderMerchSelectionArtifact(
 
 interface MerchActionToolResult {
   readonly success: true;
-  readonly action: 'publish_merch' | 'archive_merch' | 'unpause_merch';
+  readonly action:
+    | 'publish_merch'
+    | 'archive_merch'
+    | 'unpause_merch'
+    | 'pause_merch';
   readonly merchCardId: string;
   readonly title: string;
   readonly currentStatus: string;
@@ -603,12 +608,14 @@ function isMerchActionResult(result: unknown): result is MerchActionToolResult {
 
 function merchActionFromToolName(
   toolName: string
-): 'publish' | 'archive' | 'unpause' | null {
+): 'publish' | 'archive' | 'unpause' | 'pause' | null {
   switch (toolName) {
     case 'publishMerchCard':
       return 'publish';
     case 'unpauseMerchCard':
       return 'unpause';
+    case 'pauseMerchCard':
+      return 'pause';
     case 'deleteOrArchiveMerchCard':
       return 'archive';
     default:
@@ -635,6 +642,7 @@ function renderMerchActionArtifact(
       title={event.output.title}
       currentStatus={event.output.currentStatus}
       retailPrice={event.output.retailPrice}
+      toolCallId={event.toolCallId}
     />
   );
 }
@@ -676,6 +684,8 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   createMerchAlternativeItem: (event, profileId) =>
     renderMerchSelectionArtifact(event, profileId),
   publishMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
+  pauseMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),
   unpauseMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),
