@@ -164,3 +164,27 @@ export function artistResultToEntityRef(r: SpotifyArtistResult): EntityRef {
     },
   };
 }
+
+/**
+ * Map own-graph artists (claimed self + catalog collaborators) into picker
+ * EntityRefs (JOV-3717). Claimed self always reads "You"; collaborators are
+ * attributed as catalog so they rank with the recents/own-graph tier.
+ */
+export function ownGraphArtistToEntityRef(artist: {
+  readonly id: string;
+  readonly name: string;
+  readonly imageUrl?: string | null;
+  readonly isClaimedSelf: boolean;
+}): EntityRef {
+  return {
+    kind: 'artist',
+    id: artist.id,
+    label: artist.name,
+    thumbnail: artist.imageUrl ?? undefined,
+    meta: {
+      kind: 'artist',
+      subtitle: artist.isClaimedSelf ? 'You' : 'Catalog',
+      isYou: artist.isClaimedSelf,
+    },
+  };
+}

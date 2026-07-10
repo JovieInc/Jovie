@@ -340,6 +340,9 @@ export const queryKeys = {
     usage: () => [...queryKeys.chat.all, 'usage'] as const,
     capabilities: (profileId: string | null | undefined) =>
       [...queryKeys.chat.all, 'capabilities', profileId ?? 'active'] as const,
+    /** Claimed-self + catalog collaborators for the entity picker (JOV-3717). */
+    ownGraphArtists: (profileId: string) =>
+      [...queryKeys.chat.all, 'own-graph-artists', profileId] as const,
   },
 
   // Opportunity inbox (suggested_actions)
