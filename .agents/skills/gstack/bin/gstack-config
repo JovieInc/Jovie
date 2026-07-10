@@ -31,7 +31,8 @@ CONFIG_HEADER='# gstack configuration — edit freely, changes take effect on ne
 #                           #   community — usage data + stable device ID
 #
 # ─── Updates ─────────────────────────────────────────────────────────
-# auto_upgrade: false       # true = silently upgrade on session start
+# auto_upgrade: false       # upgrades run only in the Hermes nightly refresh
+# upgrade_policy: pinned    # every agent run uses its starting version
 # update_check: true        # false = suppress version check notifications
 #
 # ─── Skill naming ────────────────────────────────────────────────────

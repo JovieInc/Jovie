@@ -43,7 +43,7 @@ to the legacy multi-step preamble in the upstream skill:
 
 1. worktree go/no-go  
 2. ownership (gbrain)  
-3. gstack version/policy **read only** (never auto-upgrade on blocked runs)  
+3. pinned gstack version/policy **read only** (never update or upgrade in a run)  
 4. goal state  
 
 ## 1. Full autoplan reviews
@@ -55,8 +55,8 @@ taste gate, and restore artifacts.
 Skip any preamble steps already covered by the receipt:
 
 - Worktree cleanliness / branch name → `receipt.worktree`
-- gstack update-check / version → `receipt.gstack` (still allow intentional
-  upgrade later only if `verdict == "go"` and the user/policy requires it)
+- gstack version/policy → `receipt.gstack` (the nightly Hermes refresh is the
+  only upgrade path)
 - GBrain ownership / org-chart probe → `receipt.ownership`
 - Active goal → `receipt.goal`
 

@@ -25,8 +25,10 @@ allowed-tools:
 ## Preamble (run first)
 
 ```bash
-_UPD=$($HOME/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
-[ -n "$_UPD" ] && echo "$_UPD" || true
+_GSTACK_VERSION=$(cat "$(dirname "$HOME/.claude/skills/gstack/bin")/VERSION" 2>/dev/null || echo "unknown")
+_GSTACK_POLICY=$($HOME/.claude/skills/gstack/bin/gstack-config get upgrade_policy 2>/dev/null || echo "pinned")
+echo "GSTACK_VERSION: $_GSTACK_VERSION"
+echo "GSTACK_POLICY: ${_GSTACK_POLICY:-pinned}"
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
@@ -97,7 +99,9 @@ or invoking other gstack skills, use the `/gstack-` prefix (e.g., `/gstack-qa` i
 of `/qa`, `/gstack-ship` instead of `/ship`). Disk paths are unaffected — always use
 `~/.claude/skills/gstack/[skill-name]/SKILL.md` for reading skill files.
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+gstack is pinned for the full run. Do not run an update check or upgrade gstack
+from this skill; the Hermes nightly refresh owns upgrades. Continue with the
+recorded `GSTACK_VERSION`.
 
 If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
 Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete

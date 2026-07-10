@@ -33,6 +33,7 @@ These are machine-local Hermes jobs, not Vercel production crons. They run from 
 |------|----------|---------|--------|
 | `co.jovie.hermes.cron-pipeline-scoreboard` | every 60 min | Computes the daily codex shipping funnel, writes `pipeline-scoreboard-latest.json` + gbrain `ops/pipeline-scoreboard/latest`, and alerts on 12h shipper stalls. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
 | `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Runs bounded gbrain doctor/search probes, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack through existing ops notification helpers. | `scripts/hermes/jobs/gbrain-health-summary.ts` |
+| `co.jovie.hermes.cron-gstack-nightly-refresh` | 03:30 local daily | Refreshes gstack outside agent runs using backup/restore; failures go through the existing #product ops alert webhook. | `scripts/hermes/jobs/gstack-nightly-refresh.ts` |
 
 ## Production Schedule
 

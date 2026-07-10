@@ -207,24 +207,13 @@ function collectGstack(repoRoot) {
     }
   }
 
-  let latest = null;
-  const check = join(binPath, 'gstack-update-check');
-  if (existsSync(check)) {
-    const upd = run(check, [], { timeout: 5000 });
-    const line = (upd.stdout || '').trim();
-    if (
-      line.startsWith('UPGRADE_AVAILABLE') ||
-      line.startsWith('JUST_UPGRADED')
-    ) {
-      latest = line.split(/\s+/)[2] || null;
-    }
-  }
-
   return evaluateGstack({
     binPath,
     version,
-    latest,
-    policy,
+    // A job must use the version it started with. Network update checks (and
+    // their cache/marker writes) belong to the nightly refresh job, never
+    // preflight.
+    policy: policy || 'pinned',
     requireGstack,
     ms: nowMs() - start,
   });

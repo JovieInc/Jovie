@@ -13,10 +13,11 @@ emits one JSON receipt; the skill makes **one** Bash call and branches on
 
 1. **worktree** — dirty/not-a-repo hard-blocks before tooling
 2. **ownership** — gbrain coordination probe (optional hard-block via env)
-3. **gstack** — version/policy **read only** (never auto-upgrade here)
+3. **gstack** — pinned version/policy **read only** (never checks or upgrades here)
 4. **goal** — active goal marker if present
 
-A blocked ownership/worktree run never pays the gstack upgrade tax.
+A job always consumes the recorded gstack version. The Hermes nightly refresh
+is the only path that checks for or installs a newer version.
 
 ## Implementation
 
@@ -62,7 +63,7 @@ Exit `0` = `verdict: go`. Exit `1` = `verdict: blocked`. Exit `2` = script error
     "installed": true,
     "version": "…",
     "latest": null,
-    "policy": "unknown",
+    "policy": "pinned",
     "path": "…/gstack/bin",
     "ms": 40
   },

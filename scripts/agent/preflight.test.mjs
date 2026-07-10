@@ -141,6 +141,17 @@ test('evaluateGstack: installed carries version fields', () => {
   assert.deepEqual(r.blockers, []);
 });
 
+test('evaluateGstack: callers can record the pinned policy', () => {
+  const r = evaluateGstack({
+    binPath: '/x/bin',
+    version: '1.2.3',
+    policy: 'pinned',
+  });
+  assert.equal(r.gstack.version, '1.2.3');
+  assert.equal(r.gstack.policy, 'pinned');
+  assert.equal(r.gstack.latest, null);
+});
+
 test('evaluateGoal: inactive when no path', () => {
   const r = evaluateGoal({ goalPath: null });
   assert.equal(r.goal.active, false);
