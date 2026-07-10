@@ -93,10 +93,7 @@ describe('hasScreenshotInBody (JOV-3674)', () => {
   it.each([
     ['markdown image', '![ui](https://example.com/a.png)'],
     ['html img', '<img src="https://example.com/a.png" alt="ui" />'],
-    [
-      'user-images host',
-      'https://user-images.githubusercontent.com/1/abc.png',
-    ],
+    ['user-images host', 'https://user-images.githubusercontent.com/1/abc.png'],
     ['user-attachments', 'https://github.com/user-attachments/assets/abc'],
   ])('detects %s', (_label, body) => {
     expect(hasScreenshotInBody(body)).toBe(true);

@@ -106,7 +106,11 @@ export function hasScreenshotInBody(body = '') {
  *   `ok: false` (level `error`) means a taste label is mis-applied and should be
  *   removed so the PR can auto-flow.
  */
-export function evaluateTasteLabel({ title = '', labels = [], body = '' } = {}) {
+export function evaluateTasteLabel({
+  title = '',
+  labels = [],
+  body = '',
+} = {}) {
   const offendingLabels = tasteLabelsOn(labels);
   const commitType = conventionalCommitType(title);
 

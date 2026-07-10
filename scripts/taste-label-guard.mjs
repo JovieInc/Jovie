@@ -96,13 +96,7 @@ function processPr(pr, apply) {
 
 function loadPr(prNumber) {
   const pr = JSON.parse(
-    gh([
-      'pr',
-      'view',
-      String(prNumber),
-      '--json',
-      'number,title,labels,body',
-    ])
+    gh(['pr', 'view', String(prNumber), '--json', 'number,title,labels,body'])
   );
   return {
     number: pr.number,
