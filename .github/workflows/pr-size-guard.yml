@@ -30,7 +30,7 @@ concurrency:
 jobs:
   size:
     name: PR Size Guard
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     # Skip automated dependency / screenshot PRs — lockfile & asset churn is expected.
     if: >-
