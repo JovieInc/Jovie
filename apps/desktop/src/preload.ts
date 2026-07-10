@@ -13,6 +13,7 @@ const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
+const APP_BOOTED_CHANNEL = 'app-booted';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -171,5 +172,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const listener = (_: unknown, action: string) => cb(action);
       ipcRenderer.on(TRAY_ACTION_CHANNEL, listener);
       return () => ipcRenderer.removeListener(TRAY_ACTION_CHANNEL, listener);
+    },
+
+    /**
+     * First successful hosted-app paint (JOV-3595). Cancels the main-process
+     * boot watchdog so a 200-but-never-interactive load surfaces recovery UI
+     * instead of a permanent black window. Fire-and-forget (send, not invoke).
+     */
+    notifyAppBooted: () => {
+      ipcRenderer.send(APP_BOOTED_CHANNEL);
     },
 });
