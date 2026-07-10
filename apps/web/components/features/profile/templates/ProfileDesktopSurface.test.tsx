@@ -208,4 +208,55 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Spotify' })).toBeVisible();
   });
+
+  // Regression: JOV-4103 — desktop hero must render social media icons.
+  it('renders hero social icons when Instagram and Twitter links are present', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[
+          {
+            id: 'ig-1',
+            artist_id: artist.id,
+            platform: 'instagram',
+            url: 'https://instagram.com/timwhite',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'tw-1',
+            artist_id: artist.id,
+            platform: 'twitter',
+            url: 'https://x.com/timwhite',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'instagram' })).toHaveAttribute(
+      'href',
+      'https://instagram.com/timwhite'
+    );
+    expect(screen.getByRole('link', { name: 'twitter' })).toHaveAttribute(
+      'href',
+      'https://x.com/timwhite'
+    );
+  });
 });

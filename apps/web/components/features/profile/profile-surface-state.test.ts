@@ -166,4 +166,45 @@ describe('resolveProfileSurfaceState', () => {
       }).hasTip
     ).toBe(false);
   });
+
+  // Regression: JOV-4103 — header social icons must surface when profile has
+  // Instagram/Twitter/etc. links (not only when the sparse empty case applies).
+  it('surfaces high-priority social platforms in the hero social row', () => {
+    const instagramLink = {
+      id: 'instagram',
+      artist_id: artist.id,
+      platform: 'instagram',
+      url: 'https://instagram.com/test',
+      clicks: 0,
+      created_at: '2026-01-01T00:00:00.000Z',
+    } satisfies LegacySocialLink;
+    const twitterLink = {
+      id: 'twitter',
+      artist_id: artist.id,
+      platform: 'twitter',
+      url: 'https://x.com/test',
+      clicks: 0,
+      created_at: '2026-01-01T00:00:00.000Z',
+    } satisfies LegacySocialLink;
+    const bandcampLink = {
+      id: 'bandcamp',
+      artist_id: artist.id,
+      platform: 'bandcamp',
+      url: 'https://test.bandcamp.com',
+      clicks: 0,
+      created_at: '2026-01-01T00:00:00.000Z',
+    } satisfies LegacySocialLink;
+
+    const state = resolveProfileSurfaceState({
+      artist,
+      socialLinks: [bandcampLink, twitterLink, instagramLink, spotifyLink],
+      hasPlayableDestinations: true,
+      activeSubtitle: 'Artist profile',
+    });
+
+    expect(state.visibleSocialLinks.map(link => link.platform)).toEqual([
+      'instagram',
+      'twitter',
+    ]);
+  });
 });
