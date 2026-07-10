@@ -1,12 +1,12 @@
 # Fleet Agent Reference
 
-This document provides a reference for the fleet agents used in the Jovie system, including their roles and capabilities.
+This document provides a reference for the fleet agents used in the JovieInc/Jovie project.
 
 ## Agents
 
-- **Zoe**: Primary agent responsible for orchestrating tasks and managing workflows.
-- **Gem**: Supports Zoe in handling complex operations and data processing.
-- **Eve**: Specialized agent for monitoring and alerting.
-- **Veronica**: Agent focused on user interaction and support.
+- **Zoe**: Primary agent for general tasks and coordination.
+- **Gem**: Assistant agent for technical operations.
+- **Eve**: Supervisory agent for monitoring and oversight.
+- **Veronica**: Documentation and knowledge management agent.
 
-These agents work together to ensure efficient operation of the Jovie platform.
+These agents work together to manage and execute tasks within the fleet, ensuring efficient operation and clear communication.
