@@ -233,11 +233,11 @@ final class JovieUITests: XCTestCase {
     )
     // Profile + Audience are drawer-only — must not be primary tab buttons.
     XCTAssertFalse(
-      app.buttons["shell-tab-profile"].exists,
+      shellControlExists(app, identifier: "shell-tab-profile"),
       "Profile must not be a primary bottom tab.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
-      app.buttons["shell-tab-audience"].exists,
+      shellControlExists(app, identifier: "shell-tab-audience"),
       "Audience must not be a primary bottom tab.\n\(app.debugDescription)"
     )
     // Composer no longer hosts a mic (JOV-3636).
@@ -331,11 +331,11 @@ final class JovieUITests: XCTestCase {
     let continueButton = onboardingApp.buttons["Continue on Web"]
     XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
     XCTAssertFalse(
-      onboardingApp.buttons["shell-talk-fab"].exists,
+      shellControlExists(onboardingApp, identifier: "shell-talk-fab"),
       "Talk FAB should not render when chat is disabled.\n\(onboardingApp.debugDescription)"
     )
     XCTAssertFalse(
-      onboardingApp.buttons["shell-tab-chat"].exists,
+      shellControlExists(onboardingApp, identifier: "shell-tab-chat"),
       "Removed pill must not render in the chatEnabled == false shell.\n\(onboardingApp.debugDescription)"
     )
     attachScreenshot(named: "no-ghost-footprint-needs-onboarding", app: onboardingApp)
@@ -1155,9 +1155,9 @@ final class JovieUITests: XCTestCase {
     return element.exists && element.isHittable
   }
 
-  /// Resolve a shell control by preferred accessibility identifier, with a
-  /// label fallback for SwiftUI AX grouping regressions (seen when a parent
-  /// container identifier bled onto child buttons as `shell-tab-bar`).
+  /// Resolve a primary tab bar / Talk FAB control by accessibility identifier.
+  /// SwiftUI groups these as `Other` (not `Button`) when
+  /// `accessibilityElement(children: .ignore)` is applied on tab buttons.
   private func firstMatchingButton(
     _ app: XCUIApplication,
     identifiers: [String],
@@ -1167,7 +1167,7 @@ final class JovieUITests: XCTestCase {
     let deadline = Date().addingTimeInterval(max(0, timeout))
     repeat {
       for identifier in identifiers {
-        let byID = app.buttons[identifier]
+        let byID = app.descendants(matching: .any)[identifier]
         if byID.exists {
           return byID
         }
@@ -1182,6 +1182,17 @@ final class JovieUITests: XCTestCase {
         if leaked.exists {
           return leaked
         }
+        let byLabel = app.descendants(matching: .any)
+          .matching(NSPredicate(format: "label == %@", label))
+          .matching(
+            NSPredicate(
+              format: "identifier BEGINSWITH 'shell-tab-' OR identifier == 'shell-talk-fab'"
+            )
+          )
+          .firstMatch
+        if byLabel.exists {
+          return byLabel
+        }
       }
       if Date() >= deadline {
         break
@@ -1190,7 +1201,11 @@ final class JovieUITests: XCTestCase {
     } while Date() < deadline
 
     // Prefer the first identifier so callers can still assert on a stable query.
-    return app.buttons[identifiers.first ?? labels.first ?? ""]
+    return app.descendants(matching: .any)[identifiers.first ?? labels.first ?? ""]
+  }
+
+  private func shellControlExists(_ app: XCUIApplication, identifier: String) -> Bool {
+    app.descendants(matching: .any)[identifier].exists
   }
 
   private func openAuthCallbackURL(
