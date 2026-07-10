@@ -12,8 +12,9 @@ name: PR Size Guard
 # merge loop does this constantly) cancels the in-flight run via
 # cancel-in-progress, leaving a CANCELLED/QUEUED run as the latest for a
 # required context → GitHub pins the PR BLOCKED even though it's green
-# (JOV-3580). The big-pr/codemod opt-out is still honored on push via
-# `gh pr view` at run time. When the label lands after a failing run,
+# (JOV-3580). The big-pr/codemod opt-out is honored on push via the webhook
+# payload (no GraphQL — avoids rate-limit flakes on bypass). When the label
+# lands after a failing run,
 # pr-size-guard-label-override.yml posts a passing check-run override.
 on:
   pull_request:
@@ -42,6 +43,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
         run: |
@@ -51,13 +54,13 @@ jobs:
           # `big-pr`-bypassed member would fail size guard on the synthetic draft and
           # abort the whole merge group. Members were already size-checked individually.
           # Exit 0 (not skip) so the required "PR Size Guard" context reports success.
-          title=$(gh pr view "$PR" -R "$REPO" --json title -q '.title')
+          title="$PR_TITLE"
           case "$title" in
             '[Graphite MQ]'*)
               echo "✅ Graphite merge-queue group draft — size guard not applicable (members checked individually)"; exit 0;;
           esac
 
-          labels=$(gh pr view "$PR" -R "$REPO" --json labels -q '[.labels[].name]|join(",")')
+          labels="$PR_LABELS"
           case ",$labels," in
             *,big-pr,*|*,codemod,*)
               echo "✅ opt-out label present — PR Size Guard skipped"; exit 0;;

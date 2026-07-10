@@ -25,7 +25,7 @@ concurrency:
 jobs:
   override:
     name: PR Size Guard Label Override
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     if: >-
       github.event.pull_request.user.login != 'dependabot[bot]' &&
