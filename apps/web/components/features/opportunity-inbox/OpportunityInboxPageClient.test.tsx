@@ -134,7 +134,10 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByText('Connect Spotify')).toBeInTheDocument();
+    expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-inbox-empty-cta')).toHaveTextContent(
+      'Connect catalog'
+    );
   });
 
   it('filters cards by signal type and restores them on All', () => {

@@ -7,11 +7,17 @@ import { OpportunityInboxRoute } from './OpportunityInboxRoute';
 const DASHBOARD_DESCRIPTION =
   'Review Jovie suggestions, approve actions, and send feedback from your inbox.';
 const DASHBOARD_TITLE = 'Home';
+const INBOX_TITLE = 'Inbox';
 
 export function generateMetadata(): Metadata {
+  // Title agreement with the sidebar nav label when inbox_home is on
+  // (client copy also gates on the flag; metadata stays Inbox-forward so the
+  // flag-on surface is discoverable without a request-time flag read here).
   return {
-    title: DASHBOARD_TITLE,
+    title: INBOX_TITLE,
     description: DASHBOARD_DESCRIPTION,
+    // Keep Home as alternate for flag-off SEO continuity.
+    other: { 'x-jovie-home-title': DASHBOARD_TITLE },
   };
 }
 

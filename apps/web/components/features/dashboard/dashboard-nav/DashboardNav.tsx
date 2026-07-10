@@ -38,6 +38,7 @@ import {
   adminNavigationSections,
   artistProfileNavItem,
   artistSettingsNavigation,
+  inboxNavItem,
   newThreadNavItem,
   primaryNavigation,
   releasesNavItem,
@@ -168,6 +169,7 @@ export function DashboardNav(_: DashboardNavProps) {
     usePreviewPanelState();
   const queryClient = useQueryClient();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
@@ -266,6 +268,7 @@ export function DashboardNav(_: DashboardNavProps) {
         {
           key: 'top',
           items: [
+            ...(inboxHomeEnabled ? [decorateItem(inboxNavItem)] : []),
             decorateItem(newThreadNavItem),
             searchNavItem,
             decorateItem(releasesNavItem),
@@ -287,7 +290,10 @@ export function DashboardNav(_: DashboardNavProps) {
     return [
       {
         key: 'primary',
-        items: primaryNavigation.map(decorateItem),
+        items: [
+          ...(inboxHomeEnabled ? [decorateItem(inboxNavItem)] : []),
+          ...primaryNavigation.map(decorateItem),
+        ],
       },
     ];
   }, [
@@ -295,6 +301,7 @@ export function DashboardNav(_: DashboardNavProps) {
     isPlanGateLoading,
     artistName,
     artistSettingsLabel,
+    inboxHomeEnabled,
     isInSettings,
     shellChatV1Enabled,
     taskStats,

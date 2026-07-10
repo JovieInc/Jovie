@@ -87,14 +87,14 @@ describe('dashboard metadata generation', () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Home');
+    expect(metadata.title).toBe('Inbox');
   });
 
   it('falls back to dashboard title when profile display name is missing', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Home');
+    expect(metadata.title).toBe('Inbox');
   });
 
   it('uses conversation title for chat thread metadata when present', async () => {

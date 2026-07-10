@@ -27,6 +27,8 @@ export type ChatRequestBody = {
   source?: unknown;
   toolIntent?: unknown;
   modelRotationStep?: unknown;
+  /** Pinned opportunity card (JOV-3933) — server injects into system prompt. */
+  pinnedOpportunity?: unknown;
 };
 
 type MessagePart = { type: string; text?: string };

@@ -1,9 +1,10 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback, useMemo, useState } from 'react';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   OPPORTUNITY_SIGNAL_TYPE_META,
@@ -14,6 +15,7 @@ import {
   type OpportunityInboxData,
   type OpportunityInboxTourDateItem,
 } from '@/lib/connectors/opportunity-inbox-types';
+import { useAppFlag } from '@/lib/flags/client';
 import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxMutations';
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
@@ -83,6 +85,8 @@ export function OpportunityInboxPageClient({
   inbox,
 }: OpportunityInboxPageClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const [cards, setCards] = useState(inbox.cards);
   const [signalTypeFilter, setSignalTypeFilter] =
     useState<SignalTypeFilter>('all');
@@ -156,21 +160,44 @@ export function OpportunityInboxPageClient({
     ? (undoRejectMutation.variables ?? null)
     : null;
 
-  const handleApprove = (id: string) => {
-    approveMutation.mutate(id, {
-      onSuccess: () => {
-        setCards(current => current.filter(card => card.id !== id));
-      },
-    });
-  };
+  const handleApprove = useCallback(
+    (id: string) => {
+      const card = cards.find(candidate => candidate.id === id);
+      // Optimistic remove; restore on failure (JOV-3932).
+      setCards(current => current.filter(c => c.id !== id));
+      approveMutation.mutate(id, {
+        onError: () => {
+          if (card) {
+            setCards(current => [card, ...current]);
+          }
+        },
+      });
+    },
+    [approveMutation, cards]
+  );
 
-  const handleDismiss = (id: string) => {
-    dismissMutation.mutate(id, {
-      onSuccess: () => {
-        setCards(current => current.filter(card => card.id !== id));
-      },
-    });
-  };
+  const handleDismiss = useCallback(
+    (id: string) => {
+      const card = cards.find(candidate => candidate.id === id);
+      setCards(current => current.filter(c => c.id !== id));
+      dismissMutation.mutate(id, {
+        onError: () => {
+          if (card) {
+            setCards(current => [card, ...current]);
+          }
+        },
+      });
+    },
+    [cards, dismissMutation]
+  );
+
+  /** Open chat with the card pinned (JOV-3932/3933). */
+  const handleOpen = useCallback(
+    (id: string) => {
+      router.push(`${APP_ROUTES.CHAT}?opportunityId=${encodeURIComponent(id)}`);
+    },
+    [router]
+  );
 
   const handleFeedback = (
     id: string,
@@ -253,12 +280,12 @@ export function OpportunityInboxPageClient({
       <header className='system-b-opportunity-inbox-page-header'>
         {/* ui-casing-allow: design-locked inbox copy */}
         <h1 className='system-b-opportunity-inbox-page-title'>
-          Home — the inbox
+          {inboxHomeEnabled ? 'Inbox' : 'Home — the inbox'}
         </h1>
         <p className='system-b-opportunity-inbox-page-subtitle'>
-          One feed, mixed card types — suggestion, new song, tour date, profile
-          match. One interaction grammar. Empty is never blank; accents are
-          reserved for state.
+          {inboxHomeEnabled
+            ? 'Pending opportunities, ready to accept or dismiss.'
+            : 'One feed, mixed card types — suggestion, new song, tour date, profile match. One interaction grammar. Empty is never blank; accents are reserved for state.'}
         </p>
       </header>
 
@@ -322,11 +349,13 @@ export function OpportunityInboxPageClient({
             cards={visibleCards}
             onApprove={handleApprove}
             onDismiss={handleDismiss}
+            onOpen={handleOpen}
             onFeedback={handleFeedback}
             onNextStep={handleNextStep}
             pendingActionId={pendingActionId}
             pendingFeedbackId={pendingFeedbackId}
             pendingNextStepId={pendingNextStepId}
+            enableStackInteractions={inboxHomeEnabled}
           />
         ) : (
           <p
