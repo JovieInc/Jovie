@@ -20,6 +20,7 @@ import {
 } from '@/lib/chat/large-text-paste';
 import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
 import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
+import { SYSTEM_B_RADIUS_PX } from '@/lib/design/system-b-radius';
 import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
@@ -109,13 +110,20 @@ function geometryFor(
 ): SurfaceGeometry {
   const width = '100%';
   const maxWidth = `min(calc(100vw - 32px), ${CHAT_COMPOSER_MAX_WIDTH})`;
-  if (stacked) return { width, maxWidth, borderRadius: 28 };
-  if (mode === 'entity') return { width, maxWidth, borderRadius: 24 };
-  if (variant === 'hero' && usePillLayout) {
-    return { width, maxWidth, borderRadius: 9999 };
+  // Radius values come only from SYSTEM_B_RADIUS_PX (JOV-3532).
+  if (stacked) {
+    return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
   }
-  if (variant === 'hero') return { width, maxWidth, borderRadius: 24 };
-  return { width, maxWidth, borderRadius: 28 };
+  if (mode === 'entity') {
+    return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
+  }
+  if (variant === 'hero' && usePillLayout) {
+    return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX.pill };
+  }
+  if (variant === 'hero') {
+    return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
+  }
+  return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
 }
 
 function pickerKindNoun(kind: import('@/lib/chat/tokens').EntityKind): string {

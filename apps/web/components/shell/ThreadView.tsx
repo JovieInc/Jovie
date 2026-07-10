@@ -95,7 +95,7 @@ export function ThreadView({
         onScroll={checkAtBottom}
         className='absolute inset-0 overflow-y-auto'
       >
-        <div className='mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[9rem] pt-5 sm:pt-6'>
+        <div className='mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-(--system-b-chat-composer-thread-scroll-padding) pt-5 sm:pt-6'>
           <header>
             <h1 className='text-2xl font-semibold leading-tight text-primary-token'>
               {thread.title}
@@ -119,6 +119,7 @@ export function ThreadView({
         className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-(--linear-app-content-surface) via-(--linear-app-content-surface)/80 to-transparent'
       />
       <div className='absolute inset-x-0 bottom-0'>
+        {/* system-b-allow: safe-area inset requires calc(); no spacing token covers env() (JOV-3532) */}
         <div className='relative mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[calc(1rem+env(safe-area-inset-bottom))]'>
           {!atBottom && (
             <button
