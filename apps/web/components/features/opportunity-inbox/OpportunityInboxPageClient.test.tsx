@@ -6,6 +6,15 @@ const mutateMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app',
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
 }));
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({

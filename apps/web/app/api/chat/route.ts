@@ -501,8 +501,7 @@ function normalizePinnedOpportunity(value: unknown): {
   return {
     id: id.slice(0, 80),
     title: title.slice(0, 200),
-    why:
-      typeof record.why === 'string' ? record.why.trim().slice(0, 500) : '',
+    why: typeof record.why === 'string' ? record.why.trim().slice(0, 500) : '',
     typeLabel:
       typeof record.typeLabel === 'string'
         ? record.typeLabel.trim().slice(0, 80)

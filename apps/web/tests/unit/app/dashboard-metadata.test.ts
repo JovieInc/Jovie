@@ -28,6 +28,18 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
   ChatPageClient: () => null,
 }));
 
+vi.mock('@/components/onboarding/OnboardingInterviewModal', () => ({
+  OnboardingInterviewModal: () => null,
+}));
+
+// Keep a stable component reference so identity checks against the page tree work.
+function MockOpportunityInboxRoute() {
+  return null;
+}
+vi.mock('@/app/app/(shell)/OpportunityInboxRoute', () => ({
+  OpportunityInboxRoute: MockOpportunityInboxRoute,
+}));
+
 const mockGetDashboardShellData = vi.fn().mockResolvedValue({
   selectedProfile: null,
 });
@@ -94,7 +106,8 @@ describe('dashboard metadata generation', () => {
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Inbox');
+    // Chat route keeps the Home title; only /app root is Inbox-forward.
+    expect(metadata.title).toBe('Home');
   });
 
   it('uses conversation title for chat thread metadata when present', async () => {
