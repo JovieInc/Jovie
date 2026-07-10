@@ -10,7 +10,7 @@
     "dev": "tsc && node scripts/launch-electron.mjs",
     "prepare:assets": "node scripts/prepare-icons.mjs && node scripts/generate-dmg-background.mjs",
     "prepare:dmg-background": "node scripts/generate-dmg-background.mjs",
-    "test": "node --test scripts/desktop-icon-contract.test.mjs && pnpm run test:desktop-url-disposition && pnpm run test:desktop-renderer-recovery && pnpm run test:desktop-remote-debugging-guard && pnpm run test:desktop-hud-build-reload && pnpm run test:desktop-csp-watchdog && node --test scripts/desktop-shell-contract.test.mjs && node --test scripts/launch-electron.test.mjs && node --test scripts/generate-dmg-background.test.mjs && node --test ../../scripts/desktop-release-guard.test.mjs && node --test ../../scripts/desktop-installed-apps-audit.test.mjs",
+    "test": "node --test scripts/desktop-icon-contract.test.mjs && pnpm run test:desktop-url-disposition && pnpm run test:desktop-renderer-recovery && pnpm run test:desktop-remote-debugging-guard && pnpm run test:desktop-hud-build-reload && pnpm run test:desktop-csp-watchdog && node --test scripts/desktop-shell-contract.test.mjs && node --test scripts/validate-packaged-info-plist.test.mjs && node --test scripts/launch-electron.test.mjs && node --test scripts/generate-dmg-background.test.mjs && node --test ../../scripts/desktop-release-guard.test.mjs && node --test ../../scripts/desktop-installed-apps-audit.test.mjs",
     "test:desktop-icon": "node --test scripts/desktop-icon-contract.test.mjs",
     "test:desktop-url-disposition": "vitest run --config vitest.config.mts scripts/desktop-url-disposition.test.ts",
     "test:desktop-renderer-recovery": "vitest run --config vitest.config.mts scripts/renderer-recovery.test.ts",
@@ -32,7 +32,9 @@
     "prepackage:local": "node scripts/sync-version.mjs && cross-env ELECTRON_ENV=local node scripts/write-env.mjs && pnpm run prepare:assets",
     "package:local": "tsc && electron-builder --config electron-builder.local.yml --publish never",
     "pretypecheck": "node scripts/write-env.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:packaged-plist": "node --test scripts/validate-packaged-info-plist.test.mjs",
+    "validate:packaged-plist": "node scripts/validate-packaged-info-plist.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.3.0"
