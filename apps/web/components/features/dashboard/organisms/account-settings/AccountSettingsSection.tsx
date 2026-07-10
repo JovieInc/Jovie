@@ -44,7 +44,10 @@ function AccountIdentitySummary() {
     <dl className='space-y-3 text-app' data-testid='account-identity-summary'>
       <div className='space-y-1'>
         <dt className='text-secondary-token'>Email</dt>
-        <dd className='text-primary-token' data-testid='account-identity-email'>
+        <dd
+          className='break-all text-primary-token'
+          data-testid='account-identity-email'
+        >
           {email ?? 'No email on this account'}
         </dd>
       </div>
@@ -63,7 +66,7 @@ function AccountIdentitySummary() {
         <div className='space-y-1'>
           <dt className='text-secondary-token'>Handle</dt>
           <dd
-            className='text-primary-token'
+            className='break-all text-primary-token'
             data-testid='account-identity-username'
           >
             @{user.username}

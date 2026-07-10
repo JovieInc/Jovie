@@ -304,7 +304,12 @@ export function EmailCodeAuthForm({
 
   if (step === 'locked') {
     return (
-      <div data-auth-email-code-step='locked' className='flex flex-col gap-3'>
+      <div
+        data-auth-email-code-step='locked'
+        className='flex flex-col gap-3'
+        role='alert'
+        aria-live='assertive'
+      >
         <p className='text-center text-app text-primary-token'>
           Too many incorrect attempts.
         </p>
@@ -332,7 +337,7 @@ export function EmailCodeAuthForm({
       >
         <p className='text-center text-app text-secondary-token'>
           Enter the code sent to{' '}
-          <span className='font-medium text-primary-token'>
+          <span className='break-all font-medium text-primary-token'>
             {emailAddress.trim()}
           </span>
         </p>
@@ -353,16 +358,19 @@ export function EmailCodeAuthForm({
         >
           {isPending ? 'Verifying…' : 'Verify Code'}
         </Button>
-        <div className='flex items-center justify-center gap-3'>
+        <div className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1'>
           <button
             type='button'
             onClick={handleBackToEmail}
-            className='focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2'
+            className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2'
           >
             Use a different email
           </button>
           {resendCooldown > 0 ? (
-            <span className='text-app text-tertiary-token' aria-live='polite'>
+            <span
+              className='shrink-0 text-app text-tertiary-token'
+              aria-live='polite'
+            >
               Resend in {resendCooldown}s
             </span>
           ) : (
@@ -370,7 +378,8 @@ export function EmailCodeAuthForm({
               type='button'
               onClick={handleResendCode}
               disabled={isPending}
-              className='focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
+              aria-label='Resend verification code'
+              className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
             >
               Resend code
             </button>
@@ -393,12 +402,13 @@ export function EmailCodeAuthForm({
         inputMode='email'
         placeholder='Email address'
         aria-label='Email Address'
+        aria-describedby={errorMessage ? 'auth-email-error' : undefined}
         value={emailAddress}
         error={Boolean(errorMessage)}
         disabled={isPending}
         onChange={event => setEmailAddress(event.target.value)}
       />
-      <FormError message={errorMessage} />
+      <FormError id='auth-email-error' message={errorMessage} />
       <Button
         type='submit'
         className={AUTH_CLASSES.authCta}
