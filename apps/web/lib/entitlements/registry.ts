@@ -611,6 +611,18 @@ export function isProPlan(plan: string | null | undefined): boolean {
   );
 }
 
+/** Whether persisted billing state grants active Pro-level access. */
+export function hasActiveProAccess(params: {
+  isPro: boolean | null | undefined;
+  plan: string | null | undefined;
+  trialEndsAt: Date | null | undefined;
+  now?: Date;
+}): boolean {
+  if (params.isPro === true) return true;
+  if (params.plan !== 'trial' || !params.trialEndsAt) return false;
+  return params.trialEndsAt > (params.now ?? new Date());
+}
+
 /** Whether the plan has max-tier advanced features. */
 export function hasAdvancedFeatures(plan: string | null | undefined): boolean {
   return plan === 'max' || plan === 'growth';

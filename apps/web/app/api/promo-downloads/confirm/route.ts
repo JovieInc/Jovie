@@ -14,6 +14,7 @@ import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
+import { hasActiveProAccess } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
@@ -101,7 +102,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!user.isPro) {
+    if (
+      !hasActiveProAccess({
+        isPro: user.isPro,
+        plan: user.plan,
+        trialEndsAt: user.trialEndsAt,
+      })
+    ) {
       return NextResponse.json(
         { error: 'Pro plan required' },
         { status: 403, headers: NO_STORE_HEADERS }

@@ -12,6 +12,7 @@ import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { hasActiveProAccess } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackSmsAccessRequest } from '@/lib/notifications/providers/slack';
@@ -29,6 +30,8 @@ export async function POST() {
         name: users.name,
         email: users.email,
         isPro: users.isPro,
+        plan: users.plan,
+        trialEndsAt: users.trialEndsAt,
       })
       .from(users)
       .where(eq(users.clerkId, userId))
@@ -41,7 +44,13 @@ export async function POST() {
       );
     }
 
-    if (!user.isPro) {
+    if (
+      !hasActiveProAccess({
+        isPro: user.isPro,
+        plan: user.plan,
+        trialEndsAt: user.trialEndsAt,
+      })
+    ) {
       return NextResponse.json(
         { error: 'SMS notifications require a Pro plan' },
         { status: 403, headers: NO_STORE_HEADERS }
