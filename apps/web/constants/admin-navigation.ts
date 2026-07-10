@@ -38,6 +38,7 @@ export type AdminWorkspaceId =
   | 'investors'
   | 'screenshots'
   | 'costs'
+  | 'revenue_lift'
   | 'share_studio'
   | 'system_map'
   | 'features';
@@ -66,6 +67,7 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'screenshots',
   'share_studio',
   'costs',
+  'revenue_lift',
   'system_map',
   'features',
 ] as const satisfies readonly AdminWorkspaceId[];
@@ -133,6 +135,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_COSTS,
     description:
       'Company infra, AI gateway, Neon, and vendor spend (30-day view)',
+    section: 'utilities',
+  },
+  {
+    id: 'revenue_lift',
+    label: 'Revenue Lift',
+    href: APP_ROUTES.ADMIN_REVENUE_LIFT,
+    description:
+      'IRPAA North Star, KPI tree, cohort lift, multi-agent contribution',
     section: 'utilities',
   },
   {
