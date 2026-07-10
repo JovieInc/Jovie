@@ -286,7 +286,9 @@ jobs:
           fi
 
   ci-risk-classifier:
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    # Trusted PRs need classification before their build, smoke, and preview
+    # dependencies evaluate. Forks intentionally stay on the secret-free path.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     name: CI Risk Classifier
     needs: [ci-path-changes]
     runs-on: ubuntu-latest
@@ -502,11 +504,10 @@ jobs:
         run: pnpm ci:merge-queue:check
       - name: Verify typecheck gate uses --force (JOV-3499)
         run: pnpm ci:typecheck-gate-guard
+      # Keep this pin aligned with actionlint.yml. Downloading the latest binary
+      # from a moving branch during CI made the control-plane check non-hermetic.
       - name: Run actionlint
-        shell: bash
-        run: |
-          bash <(curl -sS https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 2>/dev/null
-          ./actionlint -color
+        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
       - name: Run structural repo guardrails
         run: |
           pnpm next:proxy-guard
@@ -2383,118 +2384,6 @@ jobs:
             apps/web/test-results/
           retention-days: 3
 
-  ci-build:
-    name: Build
-    needs: [ci-path-changes]
-    # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    # Heavy job: runs on self-hosted jovie-runner pool for ARM64 + local turbo cache.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch') }}
-    runs-on: [self-hosted, jovie-runner]
-    timeout-minutes: 15
-    outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          # Full history needed for turbo --affected merge-base detection
-          fetch-depth: 0
-
-      - name: Check for relevant changes
-        id: check_changes
-        shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_build }}" >> "$GITHUB_OUTPUT"
-
-      # Skip remaining steps if no relevant changes
-      - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
-        run: |
-          echo "Skipping full CI as no critical paths were changed."
-          echo "To force a full CI run, add the 'testing' label to the PR."
-          exit 0
-
-      # Continue with CI steps only if relevant changes detected or full-ci label present
-      - name: Setup Node.js and pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/setup-node-pnpm
-
-      # .next/cache is managed by Turbo — no separate cache step needed
-
-      - name: Build
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --affected
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          # Cloudflare Turnstile dummy keys for CI-only browser smoke tests.
-          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Bundle size comparison
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        continue-on-error: true
-        run: pnpm --filter @jovie/web compare-chunks
-
-      - name: Upload build manifest
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        continue-on-error: true
-        with:
-          name: build-manifest
-          path: apps/web/.next/build-manifest.json
-          retention-days: 7
-
-      - name: Pre-deploy Lighthouse performance check
-        if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        run: |
-          cd apps/web
-
-
-          if [ ! -f .lighthouserc.build.json ]; then
-            echo "⚠️ Lighthouse config not found; skipping."
-            exit 0
-          fi
-
-          # Start Next.js standalone server in background (monorepo places it under apps/web/)
-          node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-
-          # Wait for server to be ready (verify it actually started)
-          echo "Waiting for server to start..."
-          SERVER_READY=false
-          for i in {1..30}; do
-            if curl -s http://localhost:3000 > /dev/null; then
-              echo "Server is ready!"
-              SERVER_READY=true
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "⚠️ Server failed to start within 30s. Skipping Lighthouse."
-            kill $SERVER_PID 2>/dev/null || true
-            exit 0
-          fi
-
-          # Run Lighthouse CI with build config
-          pnpm --filter web exec lhci autorun --config=.lighthouserc.build.json || {
-            echo "⚠️ Lighthouse checks failed - performance regression detected"
-            kill $SERVER_PID 2>/dev/null || true
-            exit 1
-          }
-
-          # Clean up
-          kill $SERVER_PID 2>/dev/null || true
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          URL_ENCRYPTION_KEY: ${{ secrets.URL_ENCRYPTION_KEY }}
-          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes]
@@ -2582,7 +2471,9 @@ jobs:
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        # This suite is not sharded; running it in every web-test shard was
+        # identical duplicate work. Keep it in the existing required matrix.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/5'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload test results to Codecov
@@ -3616,10 +3507,6 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
-        with:
-          secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
         run: |
           scope_args=()
@@ -4286,137 +4173,56 @@ jobs:
       # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
       schema_drift: ${{ steps.verify.outcome == 'failure' }}
       deploy_url: ${{ steps.deploy.outputs.deploy_url }}
-    env:
-      # Migrations still run against the production database before staging
-      # verification, so they must remain additive.
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    # Reuse the existing production environment until a dedicated staging
-    # environment exists with the same deploy secrets scoped to it.
     environment:
-      name: Production – jovie
+      name: Staging – jovie
       url: https://staging.jov.ie
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
-      - name: DB safety check (production - preflight)
+      # Main deploys to staging with the isolated Doppler `stg` service token.
+      # Do not substitute production GitHub secrets in this job.
+      - uses: ./.github/actions/setup-doppler
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN_STG }}
+      - name: DB safety check (staging preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
-      - name: DB migrate (production - Drizzle)
+      - name: DB migrate (staging - Drizzle)
         id: migrate
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
       - name: DB verify (post-migration schema check)
         id: verify
         run: pnpm --filter=@jovie/web run drizzle:verify:ci
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        # Blocks deploy by default — missing columns = broken production.
+        # Blocks deploy by default — missing columns = broken staging.
         # To bypass in emergencies, include [skip-schema-verify] in the
         # merge commit message. The Slack drift notification in deploy-notify
         # fires when verify fails but deploy proceeds (bypass alert).
         continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
-      - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
-        with:
-          secrets: ${{ toJSON(secrets) }}
-      - name: Sync required production env to Vercel project
-        timeout-minutes: 8
-        run: |
-          set -euo pipefail
-          set +x
-
-          required_vercel_env=(
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-            CLERK_SECRET_KEY
-            CLERK_PUBLISHABLE_KEY_STAGING
-            CLERK_SECRET_KEY_STAGING
-            DATABASE_URL
-            SESSION_SECRET
-            AI_GATEWAY_API_KEY
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY
-            TURNSTILE_SECRET_KEY
-          )
-
-          missing_env=()
-          for key in "${required_vercel_env[@]}"; do
-            if [ -z "${!key:-}" ]; then
-              missing_env+=("$key")
-            fi
-          done
-
-          if [ "${#missing_env[@]}" -gt 0 ]; then
-            echo "Missing GitHub secrets required for Vercel production env: ${missing_env[*]}"
-            exit 1
-          fi
-
-          # Fetch current Vercel env once, then diff to avoid
-          # 24 sequential API calls when ~95% of vars are unchanged.
-          current_env=$(./node_modules/.bin/vercel env ls production --json \
-            --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID" 2>/dev/null || echo "[]")
-
-          for key in "${required_vercel_env[@]}"; do
-            current_value=$(echo "$current_env" | jq -r ".[] | select(.key == \"$key\") | .value // empty" 2>/dev/null || echo "")
-
-            if [ -n "$current_value" ] && [ "$current_value" = "${!key}" ]; then
-              echo "Skipping ${key} (unchanged)."
-              continue
-            fi
-
-            ./node_modules/.bin/vercel env rm "$key" production \
-              --yes \
-              --token "$VERCEL_TOKEN" \
-              --scope "$VERCEL_ORG_ID" >/dev/null 2>&1 || true
-            ./node_modules/.bin/vercel env add "$key" production \
-              --yes \
-              --value "${!key}" \
-              --token "$VERCEL_TOKEN" \
-              --scope "$VERCEL_ORG_ID" >/dev/null
-            echo "Synced ${key} to Vercel production env."
-          done
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
-      - name: Pull env (production)
+      - name: Pull env (staging preview)
         timeout-minutes: 5
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
-          ./node_modules/.bin/vercel pull --yes --environment=production --token "$VERCEL_TOKEN" "${scope_args[@]}"
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      - name: Strip deprecated Turbo env overrides (production)
+          ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"
+      - name: Strip deprecated Turbo env overrides (staging preview)
         run: |
-          for env_file in .vercel/.env.production.local .vercel/.env.local; do
+          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
             if [ -f "$env_file" ]; then
               grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
               mv "${env_file}.tmp" "$env_file"
             fi
           done
-      - name: Check signup readiness (production deploy env)
-        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
+      - name: Check signup readiness (staging deploy env)
+        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=stg --source=env
       - name: Build (preview target for staging verification)
         timeout-minutes: 10
         run: |
@@ -4428,9 +4234,6 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Package build output for provenance attestation
         run: tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
       - name: Attest build provenance (SLSA Level 2)
@@ -4482,28 +4285,12 @@ jobs:
             --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
             --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
         env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
-          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
       - name: Alias preview to staging.jov.ie
         timeout-minutes: 3
         run: |
-          ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
 
   canary-health-gate:
     name: Canary Health Gate (staging)

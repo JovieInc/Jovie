@@ -54,7 +54,7 @@ main.jov.ie  jov.ie
 
 - `neon-db`: Create/reuse ephemeral Neon database branch
 - `ci-drizzle-check`: Validate database schema changes
-- `ci-build`: Build Next.js application
+- `ci-build-public`: Build once and share the public-route artifact with downstream checks
 - `ci-unit-tests`: Run unit test suite
 - `ci-e2e-tests`: End-to-end Playwright tests
 - `deploy`: Deploy to main.jov.ie with migrations
@@ -242,7 +242,7 @@ Push to main
 ├── Full CI Suite
 │   ├── neon-db (ephemeral branch)
 │   ├── ci-drizzle-check
-│   ├── ci-build
+│   ├── ci-build-public
 │   ├── ci-unit-tests
 │   └── ci-e2e-tests
 ├── deploy

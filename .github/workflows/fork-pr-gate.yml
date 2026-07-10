@@ -38,19 +38,18 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
     branches: [main]
-  # NOTE: pull_request_review trigger removed — bot-submitted reviews
-  # (CodeRabbit, Copilot) create action_required runs that clog the CI
-  # queue. Fork PR approval is still enforced on PR open/sync events.
-  # Human approval for fork PRs re-triggers via the PR synchronize event.
+  # Approval is a review event, not a pull_request synchronize event. This
+  # workflow never checks out PR code, so re-evaluating metadata is safe.
+  pull_request_review:
+    types: [submitted]
   # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
   # creates a merge_group. The native-queue auto-pass step below is now inert.
 
 permissions: {}
 
 concurrency:
-  # Include the event name so pull_request and pull_request_target events for
-  # the same PR don't cancel each other (the dependabot path runs on
-  # pull_request_target, the rest runs on pull_request).
+  # Include the event name so review re-evaluation does not cancel the initial
+  # metadata gate for the same PR.
   group: fork-pr-gate-${{ github.event_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
@@ -87,7 +86,12 @@ jobs:
 
   fork-gate:
     name: Fork PR Gate
-    if: github.event_name != 'pull_request_target' && github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]'
+    # pull_request_target is safe here: this job only reads PR metadata/diffs
+    # through the API and sets a commit status; it never checks out head code.
+    # It gives fork PRs the bot credential required to update the required gate.
+    if: >-
+      (github.event_name == 'pull_request_target' && github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]') ||
+      (github.event_name == 'pull_request_review' && github.event.review.user.type != 'Bot')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
