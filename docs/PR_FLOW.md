@@ -19,8 +19,9 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
 
 ## 1. Unit of work: one small PR → `main`
 
-- **Default: a small, focused PR targeting `main`.** ≤ 400 lines / 10 files
-  (`pr-size-guard`). Independent changes are **sibling PRs off `main`** — parallel,
+- **Default: a small, focused PR targeting `main`.** ≤ 800 lines / 40 files
+  (`pr-size-guard`, repo vars `PR_MAX_LINES`/`PR_MAX_FILES`; mechanical codemods
+  use `big-pr`). Independent changes are **sibling PRs off `main`** — parallel,
   never based on each other.
 - **Dependent work → a real `gt` stack** (`gt create` per step; restacks once;
   children auto-retarget to `main` as bases land). **Never** hand-create N
@@ -58,16 +59,13 @@ Rules:
   isn't required for correctness of *this* diff, path-gate it or move it off-PR.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **`gtmq_*` batch branches run a slim lane.** Graphite's merge queue re-runs the
-  full `ci.yml` `pull_request` workflow on each batch branch. Batches keep `PR
-  Ready`'s fast/unit/build checks plus `Migration Guard` — the actual merge
-  gates — but skip Lighthouse (all four surfaces), A11y, Mobile Overflow, Layout
-  Guard, E2E Smoke, Golden Path, `DB Migrate (PR main)`, Preview Deploy, and the
-  `PR Summary` comment. None of those lanes ever gated `PR Ready`; the evidence
-  they produce was already generated on the source PR before it entered the
-  queue, so re-running them per-batch is redundant compute, not redundant
-  safety. Layout Guard also moved off PRs entirely to run once post-merge
-  (`push: main`) instead of once per PR and once per gtmq batch.
+- **There is no separate merge-queue lane.** Graphite is configured to run on
+  every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never
+  created and the gtmq slim-lane job conditions were removed from `ci.yml`
+  (#13610). The `pull_request` workflow on the PR itself is the only CI a change
+  pays for pre-merge. If Graphite's batching mode is ever re-enabled, the
+  slim-lane conditions must come back with it — see the 2026-06-22 post-mortem
+  below for why batches must never run the informational lanes.
 
 ### Does my change need the heavy lane, a preview, or taste approval?
 
@@ -184,8 +182,10 @@ Before you open a PR:
    one `big-pr` PR. Never base-on-base micro-PRs.
 2. **Don't add heavy CI to the PR path.** New scan/security/perf job → post-merge
    or nightly, not `pull_request`.
-3. **Taste-touching?** Add a screenshot to the body and let the 👍 gate handle it.
-   Otherwise expect it to auto-merge — don't add `needs-human`.
+3. **Taste-touching?** Add a screenshot to the body. The classifier applies
+   `llm-review` and the PR ships autonomously — there is no taste gate to wait
+   on (the old 👍 `taste-approve` workflow was removed 2026-07-06). Don't add
+   `needs-human`.
 4. **Verify locally** (typecheck, lint, affected tests), push, open a draft PR,
    let the fast gate run. Don't hand-merge; the queue does it.
 5. If a PR's base branch was deleted, **retarget to `main`** before debugging a
