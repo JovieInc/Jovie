@@ -4327,6 +4327,19 @@ jobs:
       - uses: ./.github/actions/setup-doppler
         with:
           doppler-token: ${{ secrets.DOPPLER_TOKEN_STG }}
+      - name: Verify staging deploy control-plane credentials
+        shell: bash
+        run: |
+          missing=()
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Doppler stg is missing required deploy credentials: ${missing[*]}"
+            exit 1
+          fi
       - name: DB safety check (staging preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
