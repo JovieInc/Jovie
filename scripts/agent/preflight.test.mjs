@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -336,4 +343,169 @@ test('CLI: --help exits 0', () => {
   });
   assert.equal(res.status, 0);
   assert.match(res.stdout, /preflight/i);
+});
+
+// ─── Pure unit: ownership sources + timeout (JOV-4185) ──────────────────────
+
+test('evaluateOwnership: records the lookup source in the receipt', () => {
+  for (const source of ['ledger', 'keyword', 'semantic']) {
+    const r = evaluateOwnership({
+      gbrainOnPath: true,
+      gbrainOutput: 'owner context',
+      source,
+      task: 'JOV-4185',
+    });
+    assert.equal(r.ownership.source, source);
+    assert.equal(r.ownership.reachable, true);
+  }
+});
+
+test('evaluateOwnership: budget-exhausted lookup records gbrain-timeout', () => {
+  const r = evaluateOwnership({
+    gbrainOnPath: true,
+    gbrainOutput: '',
+    timedOut: true,
+  });
+  assert.equal(r.ownership.source, 'gbrain-timeout');
+  assert.equal(r.ownership.reachable, false);
+  assert.deepEqual(r.blockers, []);
+});
+
+test('evaluateOwnership: timeout hard-blocks when gbrain is required', () => {
+  const r = evaluateOwnership({
+    gbrainOnPath: true,
+    gbrainOutput: '',
+    timedOut: true,
+    requireGbrain: true,
+  });
+  assert.equal(r.blockers[0].code, 'gbrain_unreachable');
+  assert.match(r.blockers[0].message, /time budget/);
+});
+
+// ─── CLI: ownership ledger/keyword-first + hard ceiling (JOV-4185) ──────────
+
+function makeGitRepo(dir) {
+  spawnSync('git', ['init', '-b', 'main'], { cwd: dir });
+  spawnSync('git', ['config', 'user.email', 't@t.com'], { cwd: dir });
+  spawnSync('git', ['config', 'user.name', 't'], { cwd: dir });
+  writeFileSync(join(dir, 'README'), 'x\n');
+  spawnSync('git', ['add', 'README'], { cwd: dir });
+  spawnSync('git', ['commit', '-m', 'init'], { cwd: dir });
+}
+
+function installFakeGbrain(dir, script) {
+  const bin = join(dir, 'fake-bin');
+  mkdirSync(bin, { recursive: true });
+  const path = join(bin, 'gbrain');
+  writeFileSync(path, `#!/usr/bin/env bash\n${script}\n`);
+  chmodSync(path, 0o755);
+  return bin;
+}
+
+test('CLI: ownership fast path reads the agent-job-ledger page first', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pf-ledger-'));
+  try {
+    makeGitRepo(dir);
+    const bin = installFakeGbrain(
+      dir,
+      `if [ "$1" = "get" ] && [ "$2" = "agent-job-ledger" ]; then
+  echo "ledger: eve owns triage"
+  exit 0
+fi
+echo "SHOULD_NOT_RUN $1" >&2
+exit 1`
+    );
+    const res = runPreflight(dir, {
+      PATH: `${bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${dirname(process.execPath)}`,
+    });
+    const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
+    assert.equal(receipt.ownership.source, 'ledger');
+    assert.equal(receipt.ownership.reachable, true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI: ownership falls back to the keyword index when ledger is empty', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pf-keyword-'));
+  try {
+    makeGitRepo(dir);
+    const bin = installFakeGbrain(
+      dir,
+      `if [ "$1" = "get" ]; then exit 0; fi
+if [ "$1" = "search" ]; then
+  echo "keyword hit: ownership claims"
+  exit 0
+fi
+echo "SEMANTIC_SHOULD_NOT_RUN" >&2
+exit 1`
+    );
+    const res = runPreflight(dir, {
+      PATH: `${bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${dirname(process.execPath)}`,
+    });
+    const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
+    assert.equal(receipt.ownership.source, 'keyword');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI: hanging semantic query is killed inside the hard budget', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pf-hang-'));
+  try {
+    makeGitRepo(dir);
+    // Every gbrain subcommand hangs — the run must still finish quickly.
+    const bin = installFakeGbrain(dir, 'sleep 30');
+    const t0 = Date.now();
+    const res = runPreflight(dir, {
+      AGENT_PREFLIGHT_OWNERSHIP_BUDGET_MS: '1500',
+      PATH: `${bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${dirname(process.execPath)}`,
+    });
+    const elapsed = Date.now() - t0;
+    assert.ok(elapsed < 10_000, `preflight took ${elapsed}ms with hung gbrain`);
+    const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
+    assert.equal(receipt.ownership.source, 'gbrain-timeout');
+    assert.equal(receipt.ownership.reachable, false);
+    // Timeout is soft unless AGENT_PREFLIGHT_REQUIRE_GBRAIN=1.
+    assert.ok(!receipt.blockers.some(b => b.code === 'gbrain_unreachable'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ─── CLI: gstack pinned / no in-run update-check (JOV-4184) ─────────────────
+
+test('CLI: gstack section never runs update-check and defaults policy to pinned', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pf-gstack-'));
+  try {
+    makeGitRepo(dir);
+    const gstackDir = join(dir, '.claude/skills/gstack');
+    const gstackBin = join(gstackDir, 'bin');
+    mkdirSync(gstackBin, { recursive: true });
+    writeFileSync(join(gstackDir, 'VERSION'), '1.2.3\n');
+    writeFileSync(join(gstackBin, 'gstack-config'), '#!/usr/bin/env bash\nexit 1\n');
+    chmodSync(join(gstackBin, 'gstack-config'), 0o755);
+    const canary = join(dir, 'update-check-ran');
+    writeFileSync(
+      join(gstackBin, 'gstack-update-check'),
+      `#!/usr/bin/env bash\ntouch "${canary}"\necho "UPGRADE_AVAILABLE 1.2.3 9.9.9"\n`
+    );
+    chmodSync(join(gstackBin, 'gstack-update-check'), 0o755);
+
+    const stateDir = join(dir, 'gstack-state');
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, 'last-update-check'), 'UPGRADE_AVAILABLE 1.2.3 2.0.0\n');
+
+    const res = runPreflight(dir, { GSTACK_STATE_DIR: stateDir });
+    const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
+    assert.equal(receipt.gstack.installed, true);
+    assert.equal(receipt.gstack.version, '1.2.3');
+    assert.equal(receipt.gstack.policy, 'pinned');
+    // latest comes from the cached state file, read-only…
+    assert.equal(receipt.gstack.latest, '2.0.0');
+    // …and the network-touching update-check binary was never invoked.
+    assert.ok(!existsSync(canary), 'gstack-update-check ran during preflight');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
