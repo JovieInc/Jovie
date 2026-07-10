@@ -3595,7 +3595,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
           # For fast preview PRs: use main secrets (no Neon dependency)
           # Fallback hierarchy for maximum compatibility
