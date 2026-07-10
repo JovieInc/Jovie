@@ -2941,7 +2941,7 @@ jobs:
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
 
-      - name: Build real-Clerk golden-path artifact
+      - name: Build Better Auth golden-path artifact
         # NEXT_PUBLIC_* values are compile-time inputs. Do not reuse the
         # bypass artifact consumed by smoke/mobile jobs.
         run: pnpm turbo build --filter=@jovie/web --force

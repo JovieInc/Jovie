@@ -244,10 +244,7 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   // server-rendered form becomes visible. Wait for React state to enable the
   // submit control before clicking so the typed address is not lost.
   await expect(continueButton).toBeEnabled({ timeout: 30_000 });
-  await Promise.all([
-    page.waitForURL(/\/(start|onboarding)/, { timeout: 30_000 }),
-    continueButton.click(),
-  ]);
+  await continueButton.click();
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout: 30_000,
   });
