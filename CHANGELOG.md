@@ -15,6 +15,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Signing in is more reliable**: fixed a bug that could bounce signed-in artists between the sign-in page and the dashboard forever, and another that could permanently lock an address out of receiving sign-in codes.
+- [internal] **Better Auth identity resolution + rate-limit TTL self-heal**: `userIdentityFilter` matches clerk_id / better_auth_user_id / app UUID in shared user queries (fixes the /app ↔ /signin streamed-redirect loop and a uuid-cast throw in `getUserByIdentity`); secondary-storage `increment` applies `EXPIRE NX` so TTL-less rate-limit counters self-heal; op timeout env-tunable via `AUTH_SECONDARY_STORAGE_TIMEOUT_MS`.
+
 - [internal] Agent preflight: one-shot JSON bootstrap for /autoplan (JOV-4183)
 - **[internal] Critical auth, activation, and billing identity hardening (JOV-4181)**: Stripe billing updates, trial activation, billing-status reads, and profile ownership checks now resolve Better Auth application users safely across the legacy Clerk-ID transition; deterministic regression tests cover the identity and compare-and-set predicates. CI now classifies onboarding, ingestion, memory, AI/workflow, enrichment, chat, and cron changes as high risk.
 - **Jovie now presents one focused, dark career operating system from hero to conversion:** the homepage leads with “Jovie runs your music career,” shows one release workspace, replaces the profile carousel with three static artist outcomes, and connects release, fan capture, routing, learning, and next actions in one closed-loop story. The floating header, CTAs, chat bubbles, motion, reduced-motion behavior, and responsive alignment now follow the same compact System B rules.

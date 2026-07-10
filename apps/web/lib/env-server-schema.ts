@@ -216,6 +216,9 @@ export const ServerEnvSchema = z.object({
   // Upstash Redis
   UPSTASH_REDIS_REST_URL: z.string().trim().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().trim().optional(),
+  // Better Auth secondary-storage op timeout (ms). Local machines can sit at
+  // ~500ms RTT to Upstash REST, racing the default; raise locally only.
+  AUTH_SECONDARY_STORAGE_TIMEOUT_MS: z.string().trim().optional(),
 
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
   SESSION_SECRET: z.string().min(32).optional(),
@@ -498,6 +501,7 @@ export const ENV_KEYS = [
   'MERCURY_ACCOUNT_ID',
   'UPSTASH_REDIS_REST_URL',
   'UPSTASH_REDIS_REST_TOKEN',
+  'AUTH_SECONDARY_STORAGE_TIMEOUT_MS',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
