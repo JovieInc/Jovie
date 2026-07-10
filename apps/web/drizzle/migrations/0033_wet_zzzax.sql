@@ -1,1 +1,0 @@
-ALTER TYPE "public"."discog_release_type" ADD VALUE IF NOT EXISTS 'music_video' BEFORE 'other';

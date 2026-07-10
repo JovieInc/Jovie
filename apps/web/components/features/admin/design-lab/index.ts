@@ -1,1 +1,0 @@
-export { DesignProposalReviewPanel } from './DesignProposalReviewPanel';

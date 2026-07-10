@@ -1,1 +1,0 @@
-ALTER TABLE "creator_profiles" ADD COLUMN "sms_access_requested_at" timestamp;

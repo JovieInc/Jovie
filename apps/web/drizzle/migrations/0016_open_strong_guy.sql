@@ -1,1 +1,0 @@
-ALTER TABLE "discog_releases" ADD COLUMN "target_playlists" text[];

@@ -1,4 +1,0 @@
-# Intentional leak-shaped strings for gitleaks coverage verification (JOV-2940).
-# This file is allowlisted in .gitleaks.toml — the verify script copies it to a temp path.
-postgresql://neondb_owner:npg_FAKE_GITLEAKS_FIXTURE@ep-example-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require # trufflehog:ignore
-CLERK_SECRET_KEY=sk_test_FAKEGITLEAKSFIXTURE1234567890ABCD # trufflehog:ignore

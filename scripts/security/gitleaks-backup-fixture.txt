@@ -1,4 +1,0 @@
-# Intentional leak-shaped strings for backup-file coverage verification (JOV-3215).
-# This file is allowlisted in .gitleaks.toml — verify script copies it to a temp *.backup path.
-CLERK_SECRET_KEY=sk_test_gitleaksJOV3215notrealABCDEFGH12 # trufflehog:ignore
-postgresql://neondb_owner:gitleaks-test-secret-JOV-3215-not-real@ep-example-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require # trufflehog:ignore

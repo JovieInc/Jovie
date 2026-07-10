@@ -1,1 +1,0 @@
-export { generateMusicStructuredData } from '@/lib/seo/structured-data';

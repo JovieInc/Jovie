@@ -1,6 +1,0 @@
-{
-  "buildCommand": "cd ../.. && pnpm turbo build --filter=@jovie/should-i-make",
-  "installCommand": "cd ../.. && corepack enable && corepack pnpm install",
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- . ../../packages/",
-  "outputDirectory": ".next"
-}

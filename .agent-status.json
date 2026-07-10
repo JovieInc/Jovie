@@ -1,8 +1,0 @@
-{
-  "batch": "library-rail-bugs",
-  "branch": "tim/todo-library-rail-bugs",
-  "issues": ["JOV-3333", "JOV-3493", "JOV-3492", "JOV-3885"],
-  "status": "implementing",
-  "updatedAt": "2026-07-09T19:30:00Z",
-  "notes": "Implemented all four issues. Lightweight unit tests green (17). Full ChatMessage/LibrarySurface RTL blocked by worktree node_modules thrash; CI will re-verify."
-}

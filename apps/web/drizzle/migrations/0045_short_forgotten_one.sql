@@ -1,1 +1,0 @@
-ALTER TABLE "chat_audit_log" ALTER COLUMN "creator_profile_id" DROP NOT NULL;

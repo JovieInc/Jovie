@@ -1,4 +1,0 @@
-{
-  "count": 0,
-  "note": "Hand-rolled shell sidebar nav-row class strings in apps/web/{components,app} outside getSidebarNavRowClassName(). Ratchet only goes down — lower when you migrate offenders to SidebarNavItem helpers. Error mode: regressions fail CI."
-}

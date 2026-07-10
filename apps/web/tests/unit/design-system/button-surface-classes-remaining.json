@@ -1,5 +1,0 @@
-{
-  "maxRemaining": 0,
-  "remaining": [],
-  "note": "DS_FOUNDATION_V1 Wave 1: system-b-*-button classes are retired from runtime TSX and design-system.css. This is shrink-only; lower maxRemaining when a future migration removes entries."
-}

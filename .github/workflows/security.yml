@@ -74,10 +74,44 @@ jobs:
           fetch-depth: 0
 
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
-        uses: trufflesecurity/trufflehog@00155c9dc586f34d189adc83d3ac2698c2ec551f # v3.95.8
-        with:
-          path: ./
-          extra_args: --no-verification --exclude-paths=.trufflehog-exclude.txt
+        shell: bash
+        env:
+          TRUFFLEHOG_VERSION: 3.95.8
+          TRUFFLEHOG_SHA256: 136c42933697ab2e09402d003ff4259086312b80cb671e7d9ab05477597bc4f0
+        run: |
+          set -euo pipefail
+
+          # The upstream action shells out to Docker. CI_FAST_RUNNER is a
+          # hardened self-hosted runner without docker.sock; run the same
+          # pinned TruffleHog binary directly instead of weakening the scan.
+          archive="trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          download_url="https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${archive}"
+          curl --fail --silent --show-error --location --retry 3 "$download_url" -o "$RUNNER_TEMP/$archive"
+          echo "${TRUFFLEHOG_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
+          trufflehog="$RUNNER_TEMP/trufflehog"
+          test -x "$trufflehog"
+
+          base=''
+          head=''
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base='${{ github.event.pull_request.base.sha }}'
+            head='${{ github.event.pull_request.head.sha }}'
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            head='${{ github.event.after }}'
+            if [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+              base='${{ github.event.before }}'
+            fi
+          fi
+
+          args=(git "file://$PWD/" --fail --no-update --github-actions --no-verification --exclude-paths=.trufflehog-exclude.txt)
+          if [[ -n "$base" ]]; then
+            args+=(--since-commit "$base")
+          fi
+          if [[ -n "$head" ]]; then
+            args+=(--branch "$head")
+          fi
+          "$trufflehog" "${args[@]}"
 
   trivy:
     name: Trivy Vulnerability Scanning

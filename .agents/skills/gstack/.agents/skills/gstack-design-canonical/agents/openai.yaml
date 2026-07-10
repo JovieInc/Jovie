@@ -1,6 +1,0 @@
-interface:
-  display_name: "gstack-design-canonical"
-  short_description: "Canonical design operating system for all Jovie agents and Ovie. Use first for any UX, product design, visual audit,..."
-  default_prompt: "Use gstack-design-canonical for this task."
-policy:
-  allow_implicit_invocation: true

@@ -1,9 +1,0 @@
-git_url(ENV["MATCH_GIT_URL"])
-storage_mode("git")
-type("appstore")
-app_identifier(["ie.jov.Jovie"])
-
-team_id(ENV["APPLE_TEAM_ID"]) if ENV["APPLE_TEAM_ID"]
-git_private_key(ENV["MATCH_GIT_PRIVATE_KEY"]) unless ENV["MATCH_GIT_PRIVATE_KEY"].to_s.strip.empty?
-git_basic_authorization(ENV["MATCH_GIT_BASIC_AUTHORIZATION"]) unless ENV["MATCH_GIT_BASIC_AUTHORIZATION"].to_s.strip.empty?
-readonly(ENV["CI"].to_s.downcase == "true")
