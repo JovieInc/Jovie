@@ -1294,7 +1294,9 @@ jobs:
 
       - name: Build app fallback
         if: steps.download-build.outcome != 'success'
-        run: pnpm turbo build --filter=@jovie/web
+        # Do not accept a remote artifact from the shared mock build. The
+        # real-Clerk lane has a different compile-time auth contract.
+        run: pnpm turbo build --filter=@jovie/web --force
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -1338,7 +1340,9 @@ jobs:
             exit 1
           fi
 
-          pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line
+          # The lane uses the deterministic test-auth bypass, so use the
+          # no-auth config and avoid its unrelated legacy Clerk setup project.
+          pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           BASE_URL: http://localhost:3100
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -3014,10 +3018,10 @@ jobs:
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
 
-      - name: Build real-Clerk golden-path artifact
+      - name: Build Better Auth golden-path artifact
         # NEXT_PUBLIC_* values are compile-time inputs. Do not reuse the
         # bypass artifact consumed by smoke/mobile jobs.
-        run: pnpm turbo build --filter=@jovie/web
+        run: pnpm turbo build --filter=@jovie/web --force
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -3029,7 +3033,7 @@ jobs:
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
 
-      - name: Run Golden Path (Chromium, real Clerk)
+      - name: Run Golden Path (Chromium, Better Auth)
         run: |
           cd apps/web
 
@@ -3039,12 +3043,14 @@ jobs:
           fi
 
           # Standalone production server (not next dev) to avoid CI OOM/timeouts.
-          # REAL Clerk: no NEXT_PUBLIC_CLERK_MOCK / E2E_USE_TEST_AUTH_BYPASS here —
-          # those flags make golden-path.spec.ts self-skip.
+          # Real Better Auth signup: no test-auth bypass is permitted here.
           export DATABASE_URL="${{ env.DATABASE_URL }}"
           export NODE_ENV=test
           export CI=true
           export VERCEL_ENV=development
+          # Enables Better Auth's deterministic OTP only for the golden path's
+          # canonical +e2e test address; production hard-blocks this switch.
+          export E2E_TEST_MODE=1
           export NEXT_PUBLIC_APP_URL=http://localhost:3100
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
@@ -3076,11 +3082,10 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           BASE_URL=http://localhost:3100 E2E_SKIP_WEB_SERVER=1 pnpm --filter @jovie/web run test:e2e:golden-path:ci
         env:
-          # Duplicated on the Playwright-runner process: global-setup calls clerkSetup
-          # and the spec queries the DB + Clerk API directly, so these must be present
-          # for both the server and the runner. UPSTASH_* is optional (spec degrades to
-          # the in-memory rate-limit fallback when unset).
+          # The runner also needs the database and deterministic E2E OTP flag.
+          # UPSTASH_* is optional; the spec degrades to the in-memory limiter.
           DATABASE_URL: ${{ env.DATABASE_URL }}
+          E2E_TEST_MODE: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
