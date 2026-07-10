@@ -460,6 +460,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    env:
+      # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
+      SHELLCHECK_OPTS: >-
+        --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -504,8 +508,6 @@ jobs:
           TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
           CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
-          SHELLCHECK_OPTS: >-
-            --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
         run: node scripts/ci-fast-lanes.mjs
       - name: Upload ci-fast lane results
         if: always()
