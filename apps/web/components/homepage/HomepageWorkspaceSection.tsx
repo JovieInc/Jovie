@@ -40,14 +40,8 @@ export function HomepageWorkspaceSection({
     offset: ['start 84%', 'end 18%'],
   });
 
-  const mediaOpacity = useTransform(scrollYProgress, [0, 0.22], [0.78, 1]);
-  const mediaY = useTransform(scrollYProgress, [0, 0.5, 1], [96, -16, 0]);
-  const mediaScale = useTransform(
-    scrollYProgress,
-    [0, 0.48, 1],
-    [0.94, 1.012, 1]
-  );
-  const mediaRotateX = useTransform(scrollYProgress, [0, 0.72], [6, 0]);
+  const mediaOpacity = useTransform(scrollYProgress, [0, 0.22], [0.88, 1]);
+  const mediaY = useTransform(scrollYProgress, [0, 0.38], [24, 0]);
   const importOpacity = useTransform(
     scrollYProgress,
     [0, 0.12, 0.32, 0.58],
@@ -63,9 +57,9 @@ export function HomepageWorkspaceSection({
     [0.48, 0.66, 0.88, 1],
     [0.62, 0.86, 1, 0.96]
   );
-  const importY = useTransform(scrollYProgress, [0, 0.26], [18, 0]);
-  const publishY = useTransform(scrollYProgress, [0.24, 0.58], [18, 0]);
-  const reviewY = useTransform(scrollYProgress, [0.56, 0.9], [18, 0]);
+  const importY = useTransform(scrollYProgress, [0, 0.26], [8, 0]);
+  const publishY = useTransform(scrollYProgress, [0.24, 0.58], [8, 0]);
+  const reviewY = useTransform(scrollYProgress, [0.56, 0.9], [8, 0]);
   const calloutMotion = [
     { opacity: importOpacity, y: importY },
     { opacity: publishOpacity, y: publishY },
@@ -102,8 +96,6 @@ export function HomepageWorkspaceSection({
               ? {
                   opacity: mediaOpacity,
                   y: mediaY,
-                  scale: mediaScale,
-                  rotateX: mediaRotateX,
                 }
               : undefined
           }
@@ -125,7 +117,7 @@ export function HomepageWorkspaceSection({
 
           <ol
             className='homepage-workspace-callouts system-b-mounted-home-workspace-callouts'
-            aria-label='Release workspace flow'
+            aria-label='Release Workspace Flow'
           >
             {HOMEPAGE_LAUNCH_COPY.workspace.callouts.map((callout, index) => (
               <motion.li

@@ -428,6 +428,10 @@ test.describe('canonical /start onboarding chat', () => {
 
     const bubble = page.getByTestId('chat-user-bubble').first();
     await expect(bubble).toBeVisible();
+    await expect(bubble.locator('.system-b-chat-user-text')).toHaveCSS(
+      'font-size',
+      '13px'
+    );
     await expect(bubble).toHaveCSS('padding-top', '6px');
     await expect(bubble).toHaveCSS('padding-right', '12px');
     await expect(bubble).toHaveCSS('padding-bottom', '6px');

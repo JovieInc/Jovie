@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
-const heroComponentPath = 'components/marketing/MarketingHero.tsx';
+const heroComponentPath = 'components/homepage/HomepagePosterHero.tsx';
 const cssPath = 'app/(home)/home.css';
 
 const forbiddenPageChromePatterns = [
@@ -23,18 +23,14 @@ const forbiddenHeroCssPatterns = [
   /#[0-9a-fA-F]{3,8}/,
   /rgba?\(/,
   /hsla?\(/,
-  /linear-gradient|radial-gradient/,
+  /background(?:-image)?:[^;]*(?:linear-gradient|radial-gradient)/,
   /box-shadow:/,
-  /letter-spacing:\s*-[^;]+/,
   /(?:background|color|border(?:-[^:]+)?|text-decoration-color):[^;]*(?<!-)\b(?:white|black)\b/,
 ] as const;
 
 function extractMountedHeroCss(source: string): string {
-  const start = source.indexOf('SYSTEM B MOUNTED HOME HERO SHELL PRIMITIVES');
-  const end = source.indexOf(
-    'SYSTEM B MOUNTED HOME HERO SHELL PRIMITIVES END',
-    start
-  );
+  const start = source.indexOf('HOMEPAGE POSTER HERO SYSTEM B START');
+  const end = source.indexOf('HOMEPAGE POSTER HERO SYSTEM B END', start);
 
   expect(start, 'mounted hero CSS block exists').toBeGreaterThanOrEqual(0);
   expect(end, 'mounted hero CSS block is bounded').toBeGreaterThan(start);
@@ -44,7 +40,7 @@ function extractMountedHeroCss(source: string): string {
 
 function extractMountedHeroPageSource(source: string): string {
   const heroStart = source.indexOf('function HomepageHero()');
-  const heroEnd = source.indexOf('function HomepageProductStatement');
+  const heroEnd = source.indexOf('function HomepageOpportunity()');
 
   expect(heroStart, 'homepage hero source exists').toBeGreaterThanOrEqual(0);
   expect(heroEnd, 'homepage hero source is bounded').toBeGreaterThan(heroStart);
@@ -70,20 +66,21 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage hero renders through the canonical MarketingHero with the
-    // trust strip as its proof element (no numeric social-proof stats).
-    expect(pageSource).toContain('<MarketingHero');
+    // The homepage owns its approved poster composition so shared marketing
+    // hero routes cannot drift when this surface iterates.
+    expect(pageSource).toContain('<HomepagePosterHero');
+    expect(pageSource).toContain('<HomepageElectricSeam');
     expect(pageSource).toContain('homepage-trust-section');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
 
     for (const className of [
-      'marketing-hero',
-      'marketing-hero-inner',
-      'marketing-hero-copy',
-      'marketing-hero-headline',
-      'marketing-hero-subtitle',
-      'marketing-hero-actions',
-      'marketing-hero-logos',
+      'homepage-poster-hero',
+      'homepage-poster-hero__copy',
+      'homepage-poster-hero__headline',
+      'homepage-poster-hero__subtitle',
+      'homepage-poster-hero__actions',
+      'homepage-poster-hero__seam',
+      'homepage-poster-hero__media',
     ]) {
       expect(heroComponentSource).toContain(className);
     }
@@ -99,17 +96,13 @@ describe('mounted homepage hero System B source contract', () => {
     }
 
     expect(css).toContain('var(--system-b-bg-page)');
-    expect(css).toContain('var(--system-b-app-frame-seam)');
-    expect(css).toContain('var(--system-b-primary-bg)');
     expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-tertiary-token)');
+    expect(css).toContain('var(--color-text-secondary-token)');
+    expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--space-');
-    expect(css).toContain('min-height: 100vh;');
-    expect(css).toContain('min-height: 100svh;');
-    expect(css).toContain('@supports (height: 100svh)');
-    expect(css).toMatch(/@supports\s*\(\s*background:\s*color-mix\(/);
-    expect(css).toContain(
-      'min-height: calc(var(--space-10) + var(--space-0-5));'
-    );
+    expect(css).toContain('var(--font-satoshi)');
+    expect(css).toContain('letter-spacing: -0.055em;');
+    expect(css).toContain('mask-image: linear-gradient(');
+    expect(css).toContain('min-height: var(--space-6);');
   });
 });

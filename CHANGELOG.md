@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Jovie now presents one focused, dark career operating system from hero to conversion:** the homepage leads with “Jovie runs your music career,” shows one release workspace, replaces the profile carousel with three static artist outcomes, and connects release, fan capture, routing, learning, and next actions in one closed-loop story. The floating header, CTAs, chat bubbles, motion, reduced-motion behavior, and responsive alignment now follow the same compact System B rules.
 - [internal] **Chat tool-card System B consolidation (JOV-3551)**: Shared `ChatToolSurface` primitive; one "Cancelled" dismiss verb; success accent uses `text-success` (no cyan-300); Make Live uses Play icon; album-art single title; nested merch action is flat (no card-in-card); analytics signal cards on surface tokens.
 - [internal] **Test reliability batch (JOV-4112, JOV-4033, JOV-1880)**: stop Playwright from importing `server-only` env helpers in E2E dashboard route resolvers; drop quarantined specs from the PR smoke manifest and add a guardrail test; seed a prebuilt claim fixture and desktop smoke for the GTM claim-link canary.
 - **Tagging knows your world (JOV-3717)**: Artist picker cold-starts with your claimed Spotify artist and catalog collaborators (with ids) above Spotify search.
