@@ -52,6 +52,12 @@ const LANES = [
     run: runGuardrails,
   },
   {
+    id: 'test-truth',
+    name: 'Test Truth Guard (dead-test detector)',
+    nextLocalCommand: 'pnpm --filter=@jovie/web run test:truth',
+    run: runTestTruth,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -190,6 +196,13 @@ function runGuardrails() {
     }
   }
   return { code: 0, output: combined };
+}
+
+function runTestTruth() {
+  // Banned-phrase scan + dead-test detector (fails when a tests/** vitest
+  // file is excluded by every CI-executed vitest config). Cheap fs walk —
+  // runs unconditionally (JOV-4195).
+  return shell('pnpm --filter=@jovie/web run test:truth');
 }
 
 function runStructural() {

@@ -67,6 +67,7 @@
     "test:reliability-detectors": "tsx scripts/check-reliability-detectors.ts",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",
+    "test:integration": "vitest run --config=vitest.config.integration.mts",
     "test:seo": "vitest run --config=vitest.config.mts tests/app/robots.test.ts tests/app/sitemap.test.ts tests/unit/ci/seo-ratchet.test.ts tests/unit/seo/guardrail-check.test.ts",
     "seo:guardrail-check": "tsx scripts/seo-guardrail-check.ts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
