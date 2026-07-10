@@ -132,7 +132,7 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
 const muted = 'text-secondary-token';
 const soft = 'text-tertiary-token';
 const legalLinkClassName =
-  'underline underline-offset-2 decoration-(--linear-border-default) transition-colors duration-subtle ease-subtle hover:text-secondary-token';
+  'underline underline-offset-2 decoration-(--color-border-default) transition-colors duration-subtle ease-subtle hover:text-secondary-token';
 
 /**
  * /download — reuses MarketingContainer, homepage-section-eyebrow,
@@ -275,7 +275,7 @@ export default function DownloadPage() {
                     {isMac ? (
                       <a
                         href={platform.href}
-                        className='public-action-primary mt-7 inline-flex h-10 items-center gap-2'
+                        className='public-action-primary mt-7 inline-flex min-h-11 items-center gap-2'
                         data-analytics-event='download_mac_dmg'
                         data-analytics-source='download_page_platform'
                       >
@@ -289,7 +289,7 @@ export default function DownloadPage() {
                       <button
                         type='button'
                         disabled
-                        className='public-action-secondary mt-7 inline-flex h-10 cursor-not-allowed items-center opacity-60'
+                        className='public-action-secondary mt-7 inline-flex min-h-11 cursor-not-allowed items-center opacity-60'
                       >
                         {platform.action}
                       </button>

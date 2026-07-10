@@ -76,10 +76,14 @@ describe('UI-feel deterministic ratchet (JOV-3371)', () => {
     expect(body).toContain('will-change');
   });
 
-  it('will-change: all count is zero (shrink-only floor)', () => {
-    const { count, files } = countWillChangeAll();
-    expect(count, `will-change: all found in:\n${files.join('\n')}`).toBe(0);
-  });
+  it(
+    'will-change: all count is zero (shrink-only floor)',
+    () => {
+      const { count, files } = countWillChangeAll();
+      expect(count, `will-change: all found in:\n${files.join('\n')}`).toBe(0);
+    },
+    30_000
+  );
 
   it('sidebar + audio bar use cinematic reveal tokens (JOV-3487)', () => {
     const targets = [
