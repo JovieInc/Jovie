@@ -25,6 +25,12 @@ interface ExistingSubscriptionResult {
 
 interface AlreadySubscribedResult {
   alreadySubscribed: true;
+  /**
+   * true when the active subscription is for a DIFFERENT plan than the one
+   * being checked out (i.e. an upgrade/downgrade that must go through the
+   * billing portal, not a brand-new second subscription).
+   */
+  planChangeRequired: boolean;
   portalSession: { id: string; url: string | null };
 }
 
@@ -33,8 +39,17 @@ type SubscriptionCheckResult =
   | AlreadySubscribedResult;
 
 /**
- * Check if customer already has an active subscription to the same plan.
- * If so, returns a billing portal session for managing the subscription.
+ * Guard against creating a second subscription for a customer who already has
+ * an active one.
+ *
+ * Stripe checkout always creates a NEW subscription — it never mutates an
+ * existing one. So if a customer with an active Pro subscription completes a
+ * Max checkout, they end up billed for BOTH plans. Plan changes must go
+ * through the billing portal (or plan-change flow) instead.
+ *
+ * Returns a portal session whenever ANY active subscription exists:
+ * - same plan  → `planChangeRequired: false` (manage current plan)
+ * - other plan → `planChangeRequired: true`  (upgrade/downgrade via portal)
  */
 export async function checkExistingPlanSubscription(
   customerId: string,
@@ -50,15 +65,20 @@ export async function checkExistingPlanSubscription(
     limit: 25,
   });
 
-  const alreadySubscribed = existingSubscriptions.data.some(
-    subscription =>
-      ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status) &&
-      hasMatchingPriceItem(subscription.items.data, planPriceIds)
+  const activeSubscriptions = existingSubscriptions.data.filter(subscription =>
+    ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status)
   );
 
-  if (!alreadySubscribed) {
+  if (activeSubscriptions.length === 0) {
     return { alreadySubscribed: false };
   }
+
+  // Any active subscription blocks a new checkout. Distinguish same-plan
+  // (manage) from cross-plan (upgrade/downgrade) purely for UI messaging —
+  // both route to the portal so no duplicate subscription is ever created.
+  const hasSamePlanSubscription = activeSubscriptions.some(subscription =>
+    hasMatchingPriceItem(subscription.items.data, planPriceIds)
+  );
 
   const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const returnUrl = `${baseUrl}/app/dashboard`;
@@ -69,6 +89,7 @@ export async function checkExistingPlanSubscription(
 
   return {
     alreadySubscribed: true,
+    planChangeRequired: !hasSamePlanSubscription,
     portalSession: { id: portalSession.id, url: portalSession.url },
   };
 }

@@ -1,17 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { mockSubscriptionsList, mockCreatePortalSession } = vi.hoisted(() => ({
+  mockSubscriptionsList: vi.fn(),
+  mockCreatePortalSession: vi.fn(),
+}));
 
 vi.mock('@/lib/env-public', () => ({
   publicEnv: { NEXT_PUBLIC_APP_URL: 'http://localhost:3000' },
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
-  createBillingPortalSession: vi.fn().mockResolvedValue({
-    id: 'bps_123',
-    url: 'https://billing.stripe.com/portal',
-  }),
+  createBillingPortalSession: mockCreatePortalSession,
   stripe: {
     subscriptions: {
-      list: vi.fn(),
+      list: mockSubscriptionsList,
     },
   },
 }));
@@ -33,9 +35,77 @@ vi.mock('@/lib/stripe/config', () => ({
   },
 }));
 
-import { getCheckoutErrorResponse } from '@/lib/stripe/checkout-helpers';
+import {
+  checkExistingPlanSubscription,
+  getCheckoutErrorResponse,
+} from '@/lib/stripe/checkout-helpers';
+
+function sub(status: string, priceId: string) {
+  return { status, items: { data: [{ price: { id: priceId } }] } };
+}
 
 describe('checkout-helpers', () => {
+  describe('checkExistingPlanSubscription (double-subscription guard)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockCreatePortalSession.mockResolvedValue({
+        id: 'bps_123',
+        url: 'https://billing.stripe.com/portal',
+      });
+    });
+
+    it('allows checkout when the customer has no active subscription', async () => {
+      mockSubscriptionsList.mockResolvedValue({
+        data: [sub('canceled', 'price_pro_monthly')],
+      });
+
+      const result = await checkExistingPlanSubscription('cus_1', 'max');
+
+      expect(result).toEqual({ alreadySubscribed: false });
+      expect(mockCreatePortalSession).not.toHaveBeenCalled();
+    });
+
+    it('routes a same-plan active subscriber to the portal (manage current plan)', async () => {
+      mockSubscriptionsList.mockResolvedValue({
+        data: [sub('active', 'price_pro_monthly')],
+      });
+
+      const result = await checkExistingPlanSubscription('cus_1', 'pro');
+
+      expect(result).toMatchObject({
+        alreadySubscribed: true,
+        planChangeRequired: false,
+      });
+      expect(mockCreatePortalSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT create a second subscription when an active DIFFERENT-plan sub exists (Pro → Max)', async () => {
+      // Regression for JOV-4196: a Pro subscriber checking out Max previously
+      // fell through to a brand-new second subscription = double billing.
+      mockSubscriptionsList.mockResolvedValue({
+        data: [sub('active', 'price_pro_monthly')],
+      });
+
+      const result = await checkExistingPlanSubscription('cus_1', 'max');
+
+      expect(result).toMatchObject({
+        alreadySubscribed: true,
+        planChangeRequired: true,
+      });
+      expect(mockCreatePortalSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats trialing/past_due/unpaid as active blockers', async () => {
+      for (const status of ['trialing', 'past_due', 'unpaid']) {
+        mockSubscriptionsList.mockResolvedValue({
+          data: [sub(status, 'price_pro_monthly')],
+        });
+        const result = await checkExistingPlanSubscription('cus_1', 'max');
+        expect(result).toMatchObject({ alreadySubscribed: true });
+      }
+    });
+  });
+
   describe('getCheckoutErrorResponse', () => {
     it('should return customer error for customer-related messages', () => {
       const error = new Error('Failed to create customer');
