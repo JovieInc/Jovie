@@ -1008,7 +1008,9 @@ jobs:
 
       - name: Build app (public routes only — no secrets needed)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --filter=@jovie/web
+        # Do not accept a remote artifact from the shared mock build. The
+        # real-Clerk lane has a different compile-time auth contract.
+        run: pnpm turbo build --filter=@jovie/web --force
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           # This shared artifact feeds bypass-based smoke/mobile evidence. The
@@ -1221,7 +1223,9 @@ jobs:
 
       - name: Build app fallback
         if: steps.download-build.outcome != 'success'
-        run: pnpm turbo build --filter=@jovie/web
+        # Do not accept a remote artifact from the shared mock build. The
+        # real-Clerk lane has a different compile-time auth contract.
+        run: pnpm turbo build --filter=@jovie/web --force
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
