@@ -2,7 +2,19 @@ import { neon } from '@neondatabase/serverless';
 import type { Page } from '@playwright/test';
 import { APP_ROUTES, buildReleaseTasksRoute } from '@/constants/routes';
 import { TEST_USER_ID_COOKIE } from '@/lib/auth/test-mode';
-import { env } from '@/lib/env-server';
+
+/**
+ * Playwright loads this helper in the Node test process. Never import
+ * `@/lib/env-server` (or any `server-only` module) here — it throws
+ * "cannot be imported from a Client Component module" during suite load
+ * and aborts the entire E2E full-matrix run (JOV-4112).
+ */
+function readEnv(name: string): string | undefined {
+  const value = process.env[name];
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
 
 interface ResolverProfile {
   id: string;
@@ -80,7 +92,7 @@ async function fetchJsonFromPage<T>(
   input: string,
   init?: PlaywrightRequestInit
 ): Promise<FetchJsonResult<T>> {
-  const baseUrl = env.BASE_URL ?? 'http://localhost:3100';
+  const baseUrl = readEnv('BASE_URL') ?? 'http://localhost:3100';
   const resolvedTarget = /^[a-z]+:\/\//i.test(input)
     ? input
     : new URL(input, baseUrl).toString();
@@ -191,8 +203,8 @@ export async function resolveReleaseTasksPathFromPage(
   const cookieUserId = authCookies.find(
     cookie => cookie.name === TEST_USER_ID_COOKIE
   )?.value;
-  const clerkUserId = cookieUserId?.trim() || env.E2E_CLERK_USER_ID?.trim();
-  const databaseUrl = env.DATABASE_URL?.trim();
+  const clerkUserId = cookieUserId?.trim() || readEnv('E2E_CLERK_USER_ID');
+  const databaseUrl = readEnv('DATABASE_URL');
   if (!clerkUserId) {
     throw new Error('E2E_CLERK_USER_ID is required to resolve release tasks');
   }

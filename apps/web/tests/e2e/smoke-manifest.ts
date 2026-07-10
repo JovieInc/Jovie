@@ -13,15 +13,21 @@
  * Adding a spec to either list makes it a deploy-gating signal. Keep the
  * lists short. Use the broader `-g @smoke` lane (`pnpm e2e:smoke:tagged`)
  * for the wider tagged-smoke discovery suite.
+ *
+ * Do NOT list specs that are active in `tests/quarantine.json` (kind: e2e).
+ * The PR Fast Feedback job does not filter quarantine — quarantined specs
+ * here re-enter the merge gate and recreate job-level flake (JOV-4033).
  */
 
 export const DESKTOP_SMOKE_SPECS = [
   'smoke-public.spec.ts',
   'golden-path.spec.ts',
-  'profile-fan-capture-golden-path.spec.ts',
+  // Quarantined (do not re-add while in apps/web/tests/quarantine.json):
+  // - profile-fan-capture-golden-path.spec.ts (e2e-fan-capture-otp-timeout)
+  // - start-onboarding-llm-failure.spec.ts (e2e-onboarding-llm-failure)
   'onboarding-robot.smoke.spec.ts',
-  'start-onboarding-llm-failure.spec.ts',
   'signup-funnel.smoke.spec.ts',
+  'claim-prebuilt.smoke.spec.ts',
   'smoke-auth.spec.ts',
   'shell-chat-v1.spec.ts',
   'shell-chat-v1-flag-off.spec.ts',
