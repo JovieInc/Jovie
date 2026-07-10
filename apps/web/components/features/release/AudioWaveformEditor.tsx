@@ -10,6 +10,11 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  pausePlaybackForInterruption,
+  resumePlaybackAfterInterruption,
+  useTrackAudioPlayer,
+} from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { decodeWaveformPeaks } from '@/lib/audio/decode-waveform-peaks';
 import {
   type AudioSnippet,
@@ -77,6 +82,8 @@ export function AudioWaveformEditor({
   const waveformRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const dragRef = useRef<TrimHandle | null>(null);
+  const holdsGlobalFocusRef = useRef(false);
+  const { playbackState: globalPlayback } = useTrackAudioPlayer();
 
   const [peaks, setPeaks] = useState<readonly number[]>([]);
   const [resolvedDurationMs, setResolvedDurationMs] = useState(durationMs ?? 0);
@@ -140,6 +147,12 @@ export function AudioWaveformEditor({
     audio.preload = 'metadata';
     audioRef.current = audio;
 
+    const releaseGlobalFocus = () => {
+      if (!holdsGlobalFocusRef.current) return;
+      holdsGlobalFocusRef.current = false;
+      resumePlaybackAfterInterruption();
+    };
+
     const handleTimeUpdate = () => {
       setCurrentTimeMs(Math.round(audio.currentTime * 1000));
       if (!snippet) return;
@@ -147,9 +160,13 @@ export function AudioWaveformEditor({
         audio.pause();
         audio.currentTime = snippet.startMs / 1000;
         setIsPlaying(false);
+        releaseGlobalFocus();
       }
     };
-    const handleEnded = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      releaseGlobalFocus();
+    };
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
@@ -159,15 +176,33 @@ export function AudioWaveformEditor({
     audio.addEventListener('pause', handlePause);
 
     return () => {
-      audio.pause();
+      try {
+        audio.pause();
+      } catch {
+        // jsdom throws Not implemented for HTMLMediaElement.pause
+      }
       audio.src = '';
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audioRef.current = null;
+      releaseGlobalFocus();
     };
   }, [audioUrl, snippet]);
+
+  // Global engine wins: if dock/right-rail starts, stop local snippet preview.
+  useEffect(() => {
+    if (!globalPlayback.isPlaying) return;
+    const audio = audioRef.current;
+    if (!audio || audio.paused) return;
+    audio.pause();
+    setIsPlaying(false);
+    if (holdsGlobalFocusRef.current) {
+      holdsGlobalFocusRef.current = false;
+      resumePlaybackAfterInterruption();
+    }
+  }, [globalPlayback.isPlaying, globalPlayback.activeTrackId]);
 
   const seekTo = useCallback(
     (nextMs: number) => {
@@ -186,6 +221,10 @@ export function AudioWaveformEditor({
 
     if (isPlaying) {
       audio.pause();
+      if (holdsGlobalFocusRef.current) {
+        holdsGlobalFocusRef.current = false;
+        resumePlaybackAfterInterruption();
+      }
       return;
     }
 
@@ -198,10 +237,21 @@ export function AudioWaveformEditor({
       }
     }
 
+    // Snippet editor keeps a local element for trim loops, but claims global
+    // audio focus so dock/right-rail cannot dual-play (JOV-3683).
+    if (!holdsGlobalFocusRef.current) {
+      pausePlaybackForInterruption();
+      holdsGlobalFocusRef.current = true;
+    }
+
     try {
       await audio.play();
     } catch {
       setIsPlaying(false);
+      if (holdsGlobalFocusRef.current) {
+        holdsGlobalFocusRef.current = false;
+        resumePlaybackAfterInterruption();
+      }
     }
   }, [isPlaying, snippet]);
 

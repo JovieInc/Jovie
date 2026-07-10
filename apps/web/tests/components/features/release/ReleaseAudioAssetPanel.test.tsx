@@ -62,6 +62,33 @@ describe('ReleaseAudioAssetPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows a named-rule message and CTA for unsupported types', async () => {
+    render(
+      <ReleaseAudioAssetPanel
+        releaseId='release-1'
+        releaseTitle='Take Me Over'
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
+      target: {
+        files: [new File(['not-audio'], 'notes.txt', { type: 'text/plain' })],
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('upload-rule')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('upload-rule').textContent).toMatch(
+      /Supported types/i
+    );
+    expect(screen.getByTestId('upload-rejection-cta')).toHaveTextContent(
+      /Choose another file/i
+    );
+    expect(screen.getByTestId('upload-request-type-cta')).toBeInTheDocument();
+    expect(blobUploadMock).not.toHaveBeenCalled();
+  });
+
   it('uploads audio and reveals the waveform editor', async () => {
     blobUploadMock.mockResolvedValue({
       url: 'https://cdn.example.com/uploaded.mp3',
