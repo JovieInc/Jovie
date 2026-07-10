@@ -1,6 +1,5 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { Mark } from '@/lib/brand';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 
 interface ProfileAeoContentProps {
@@ -64,33 +63,24 @@ export function ProfileAeoContent({
         {claimHref ? (
           <aside
             aria-labelledby='profile-aeo-claim-heading'
-            className='profile-aeo-claim-card relative overflow-hidden rounded-[2rem] border p-7 sm:p-10 lg:col-span-2 lg:p-12'
+            className='profile-aeo-claim-card relative overflow-hidden rounded-3xl border p-6 sm:p-8 lg:col-span-2 lg:p-9'
             data-testid='profile-aeo-claim-card'
           >
-            <div className='relative grid items-end gap-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.6fr)] lg:gap-16'>
-              <div className='max-w-2xl'>
-                <div className='mb-10 flex items-center gap-3'>
-                  <Mark
-                    size={46}
-                    className='profile-aeo-claim-card__mark shrink-0'
-                  />
-                  <p className='profile-aeo-claim-card__eyebrow text-xs font-semibold uppercase tracking-[0.16em]'>
-                    Jovie artist profiles
-                  </p>
-                </div>
-                {/* eslint-disable @jovie/canonical-ui-label-casing -- User-approved editorial sentence case. */}
-                <h2
-                  id='profile-aeo-claim-heading'
-                  className='profile-aeo-claim-card__heading max-w-[14ch] text-4xl font-semibold leading-[0.98] tracking-[-0.045em] text-balance sm:text-5xl lg:text-6xl'
-                >
-                  Claim yours.
-                </h2>
-                {/* eslint-enable @jovie/canonical-ui-label-casing */}
-              </div>
+            <div className='relative flex flex-col gap-8 sm:gap-10'>
+              {/* eslint-disable @jovie/canonical-ui-label-casing -- Canonical URLs are lowercase. */}
+              <h2
+                id='profile-aeo-claim-heading'
+                className='profile-aeo-claim-card__heading font-display font-semibold'
+                aria-label='jov.ie/you'
+              >
+                <span className='profile-aeo-claim-card__domain'>jov.ie/</span>
+                <span>you</span>
+              </h2>
+              {/* eslint-enable @jovie/canonical-ui-label-casing */}
 
-              <div className='flex flex-col items-start gap-6 lg:pb-1'>
-                <p className='profile-aeo-claim-card__body max-w-md text-base leading-7 text-pretty'>
-                  Music, shows, and fan updates. One place.
+              <div className='flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between'>
+                <p className='profile-aeo-claim-card__note text-xs font-medium'>
+                  Free · Spotify verified
                 </p>
                 <Link
                   href={claimHref}
@@ -102,9 +92,6 @@ export function ProfileAeoContent({
                   Claim artist profile
                   <ArrowRight className='size-4' aria-hidden='true' />
                 </Link>
-                <p className='profile-aeo-claim-card__note text-xs font-medium'>
-                  Free · Spotify verified
-                </p>
               </div>
             </div>
           </aside>

@@ -326,13 +326,22 @@
     transparent
   );
   box-shadow:
-    0 32px 90px rgba(0, 0, 0, 0.28),
+    0 22px 64px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
   color: var(--profile-aeo-claim-ink);
 }
 
-:where(.profile-aeo-claim-card__eyebrow),
-:where(.profile-aeo-claim-card__body),
+:where(.profile-aeo-claim-card__heading) {
+  font-size: clamp(3.75rem, 10vw, 7.5rem);
+  letter-spacing: -0.07em;
+  line-height: 0.8;
+  white-space: nowrap;
+}
+
+:where(.profile-aeo-claim-card__domain) {
+  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 42%, transparent);
+}
+
 :where(.profile-aeo-claim-card__note) {
   color: color-mix(in oklab, var(--profile-aeo-claim-ink) 66%, transparent);
 }

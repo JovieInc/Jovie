@@ -257,13 +257,10 @@ describe('Profile AEO content', () => {
     expect(screen.getByTestId('profile-aeo-claim-card')).toBeVisible();
     expect(
       screen.getByRole('heading', {
-        name: 'Claim yours.',
+        name: 'jov.ie/you',
       })
     ).toBeVisible();
-    expect(screen.getByText('Jovie artist profiles')).toBeVisible();
-    expect(
-      screen.getByText('Music, shows, and fan updates. One place.')
-    ).toBeVisible();
+    expect(screen.getByText('Free · Spotify verified')).toBeVisible();
     expect(
       screen.getByRole('link', {
         name: 'Claim the DJ Test profile and sign up for Jovie',
