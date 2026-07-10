@@ -7,6 +7,7 @@
  * - Audit logging
  */
 
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoisted mocks for database operations
@@ -76,6 +77,66 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
   });
 
   describe('Event Ordering', () => {
+    it('updates the resolved app user id for Better Auth Stripe metadata', async () => {
+      const { updateUserBillingStatus } = await import(
+        '@/lib/stripe/customer-sync'
+      );
+      let updatePredicate: unknown;
+
+      mockDbSelect.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve([
+                {
+                  id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+                  isPro: false,
+                  plan: 'free',
+                  stripeCustomerId: 'cus_ba',
+                  stripeSubscriptionId: null,
+                  stripePriceId: null,
+                  billingVersion: 1,
+                  lastBillingEventAt: null,
+                },
+              ]),
+          }),
+        }),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: () => ({
+          where: (predicate: unknown) => {
+            updatePredicate = predicate;
+            return {
+              returning: () =>
+                Promise.resolve([
+                  {
+                    id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+                    billingVersion: 2,
+                  },
+                ]),
+            };
+          },
+        }),
+      });
+      mockDbInsert.mockReturnValue({
+        values: () => Promise.resolve([{ id: 'audit-ba' }]),
+      });
+
+      const result = await updateUserBillingStatus({
+        clerkUserId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+        isPro: true,
+        stripeSubscriptionId: 'sub_ba',
+        eventType: 'subscription_created',
+      });
+
+      expect(result.success).toBe(true);
+      const predicateSql = new PgDialect().sqlToQuery(
+        updatePredicate as never
+      ).sql;
+      expect(predicateSql).toContain('"users"."id" =');
+      expect(predicateSql).not.toContain('"users"."clerk_id"');
+    });
+
     it('should skip events older than lastBillingEventAt', async () => {
       const { updateUserBillingStatus } = await import(
         '@/lib/stripe/customer-sync'

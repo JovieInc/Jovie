@@ -54,6 +54,7 @@ import {
   BILLING_FIELDS_FULL,
   BILLING_FIELDS_STATUS,
   fetchUserBillingData,
+  fetchUserBillingDataByIdentity,
 } from '@/lib/stripe/customer-sync';
 
 describe('fetchUserBillingData - Queries', () => {
@@ -62,6 +63,77 @@ describe('fetchUserBillingData - Queries', () => {
   });
 
   describe('successful queries', () => {
+    it('falls back from legacy Clerk id to app user id for Better Auth Stripe metadata', async () => {
+      const where = vi
+        .fn()
+        .mockReturnValueOnce({ limit: vi.fn().mockResolvedValue([]) })
+        .mockReturnValueOnce({
+          limit: vi.fn().mockResolvedValue([
+            {
+              id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+              isPro: false,
+              plan: 'free',
+              stripeCustomerId: 'cus_better_auth',
+              stripeSubscriptionId: null,
+              stripePriceId: null,
+              billingVersion: 1,
+              lastBillingEventAt: null,
+            },
+          ]),
+        });
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({ where }),
+      });
+
+      const result = await fetchUserBillingDataByIdentity({
+        userIdentity: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+        fields: BILLING_FIELDS_STATUS,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.id).toBe('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
+      expect(where).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ left: mockUsersTable.clerkId })
+      );
+      expect(where).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ left: mockUsersTable.id })
+      );
+    });
+
+    it('keeps legacy Clerk metadata on the single-query path', async () => {
+      const where = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([
+          {
+            id: 'legacy-user-uuid',
+            isPro: true,
+            plan: 'pro',
+            stripeCustomerId: 'cus_legacy',
+            stripeSubscriptionId: 'sub_legacy',
+            stripePriceId: 'price_legacy',
+            billingVersion: 4,
+            lastBillingEventAt: null,
+          },
+        ]),
+      });
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({ where }),
+      });
+
+      const result = await fetchUserBillingDataByIdentity({
+        userIdentity: 'user_legacy_clerk',
+        fields: BILLING_FIELDS_STATUS,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.id).toBe('legacy-user-uuid');
+      expect(where).toHaveBeenCalledTimes(1);
+      expect(where).toHaveBeenCalledWith(
+        expect.objectContaining({ left: mockUsersTable.clerkId })
+      );
+    });
+
     it('returns all fields with default field selection (BILLING_FIELDS_FULL)', async () => {
       const mockUser = {
         id: 'user-uuid-123',

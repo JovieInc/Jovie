@@ -61,6 +61,7 @@ describe('ci-harness manifest', () => {
       'ci-workflows',
       'agent-control-plane',
       'auth-identity',
+      'activation-automation-data',
       'billing-money',
       'db-migrations',
       'proxy-middleware',
@@ -75,6 +76,12 @@ describe('ci-harness manifest', () => {
       blocksUnattendedAutoMerge: false,
     });
     expect(byId['billing-money']).toMatchObject({
+      level: 'high',
+      requiresSmoke: true,
+      requiresPreview: true,
+      blocksUnattendedAutoMerge: false,
+    });
+    expect(byId['activation-automation-data']).toMatchObject({
       level: 'high',
       requiresSmoke: true,
       requiresPreview: true,
@@ -192,6 +199,26 @@ describe('ci-harness risk classifier', () => {
     expect(risk.requiresPreview).toBe(true);
     expect(risk.blocksUnattendedAutoMerge).toBe(false);
     expect(risk.matchedRules.map(rule => rule.id)).toContain('auth-identity');
+  });
+
+  it.each([
+    'apps/web/app/onboarding/actions/enrich-profile.ts',
+    'apps/web/lib/ingestion/processor.ts',
+    'apps/web/lib/memory/drizzle-store.ts',
+    'apps/web/app/api/cron/process-workflow-runs/route.ts',
+    'apps/web/app/api/memory/observations/route.ts',
+    'apps/web/app/api/dsp/enrichment/sync/route.ts',
+    'apps/web/app/api/dashboard/ai-crawlers/route.ts',
+    'apps/web/app/api/admin/agent-os/workflows/route.ts',
+    'apps/web/app/api/hud/ai-ops/route.ts',
+  ])('requires smoke and preview for activation/automation path %s', file => {
+    const risk = classifyCiRisk([file], manifest);
+    expect(risk.riskLevel).toBe('high');
+    expect(risk.requiresSmoke).toBe(true);
+    expect(risk.requiresPreview).toBe(true);
+    expect(risk.matchedRules.map(rule => rule.id)).toContain(
+      'activation-automation-data'
+    );
   });
 
   it('requires preview but does not block unattended auto-merge for public UI only', () => {

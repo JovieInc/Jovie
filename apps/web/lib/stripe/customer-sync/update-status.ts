@@ -10,7 +10,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
-import { fetchUserBillingData } from './queries';
+import { fetchUserBillingDataByIdentity } from './queries';
 import {
   BILLING_FIELDS_STATUS,
   type UpdateBillingStatusOptions,
@@ -99,7 +99,8 @@ function prepareUpdateData(
  * - Automatic retry with exponential backoff on lock conflicts
  *
  * @param options - Update options including clerkUserId, isPro status, and event metadata
- * @param options.clerkUserId - The Clerk user ID to update
+ * @param options.clerkUserId - Stripe metadata identity. Supports a legacy
+ * Clerk user ID or a Better Auth app `users.id` UUID.
  * @param options.isPro - The new Pro subscription status
  * @param options.stripeCustomerId - Optional Stripe customer ID to set
  * @param options.stripeSubscriptionId - Optional Stripe subscription ID (null to clear)
@@ -145,8 +146,8 @@ export async function updateUserBillingStatus(
   const effectivePlan = plan ?? (isPro ? 'pro' : 'free');
 
   try {
-    const userResult = await fetchUserBillingData({
-      clerkUserId,
+    const userResult = await fetchUserBillingDataByIdentity({
+      userIdentity: clerkUserId,
       fields: BILLING_FIELDS_STATUS,
     });
 
@@ -198,7 +199,7 @@ export async function updateUserBillingStatus(
       })
       .where(
         and(
-          eq(users.clerkId, clerkUserId),
+          eq(users.id, currentUser.id),
           eq(users.billingVersion, currentUser.billingVersion)
         )
       )
@@ -291,8 +292,8 @@ async function retryUpdateWithFreshData(
       await delay(backoffMs + jitter);
     }
 
-    const freshUserResult = await fetchUserBillingData({
-      clerkUserId,
+    const freshUserResult = await fetchUserBillingDataByIdentity({
+      userIdentity: clerkUserId,
       fields: BILLING_FIELDS_STATUS,
     });
 
@@ -324,7 +325,7 @@ async function retryUpdateWithFreshData(
       })
       .where(
         and(
-          eq(users.clerkId, clerkUserId),
+          eq(users.id, freshUser.id),
           eq(users.billingVersion, freshUser.billingVersion)
         )
       )
