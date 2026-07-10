@@ -28,7 +28,7 @@ jobs:
         contains(github.event.pull_request.head.ref, '/jov-') ||
         contains(github.event.pull_request.head.ref, 'jov-')
       )
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 3
     permissions:
       contents: read

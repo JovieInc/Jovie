@@ -52,7 +52,7 @@ jobs:
   guard:
     name: Trigger Guard
     if: github.actor != 'copilot-swe-agent[bot]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 3
     permissions:
       actions: read
@@ -413,7 +413,7 @@ jobs:
     name: Label Systemic Blocker
     needs: guard
     if: needs.guard.outputs.is_systemic == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 2
     permissions:
       contents: read
@@ -464,7 +464,7 @@ jobs:
     name: Apply Fixes (${{ needs.guard.outputs.trigger_type }})
     needs: guard
     if: needs.guard.outputs.should_fix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 20
     concurrency:
       group: agent-remediation-${{ github.repository }}
@@ -544,7 +544,7 @@ jobs:
     name: Auto-Approve Check
     needs: guard
     if: needs.guard.outputs.should_approve == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -852,7 +852,7 @@ jobs:
       needs.guard.outputs.should_approve == 'false' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 5
     permissions:
       contents: read

@@ -29,7 +29,7 @@ concurrency:
 jobs:
   guard:
     name: Taste Label Guard
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 3
     # Same-repo PRs only (fork PRs get a read-only token), and only when the
     # label just applied is actually a taste gate.

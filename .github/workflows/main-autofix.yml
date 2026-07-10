@@ -37,7 +37,7 @@ jobs:
     # Monitor exits 1 (conclusion=failure) only when main CI is unhealthy.
     # Skip evaluate on healthy monitor runs to avoid 96 no-op workflow runs/day.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     permissions:
       actions: read
       contents: read
@@ -131,7 +131,7 @@ jobs:
     name: Dispatch Claude Code fix
     needs: evaluate
     if: needs.evaluate.outputs.needs_autofix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 20
     permissions:
       actions: read

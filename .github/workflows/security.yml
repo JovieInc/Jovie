@@ -31,7 +31,7 @@ permissions:
 jobs:
   gitleaks:
     name: Gitleaks Secret Scanning
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     permissions:
       contents: read
       security-events: write
@@ -64,7 +64,7 @@ jobs:
 
   trufflehog:
     name: TruffleHog Secret Scanning
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     permissions:
       contents: read
     steps:
@@ -81,7 +81,7 @@ jobs:
 
   trivy:
     name: Trivy Vulnerability Scanning
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     # Heavy full-tree scan stays off the PR path (post-merge on main + nightly).
     # Only the fast diff-scoped secret scans (gitleaks/trufflehog) gate PRs.
     if: github.event_name != 'pull_request'
@@ -110,7 +110,7 @@ jobs:
 
   scorecard:
     name: OSSF Scorecard Supply Chain Security
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
     if: github.event_name != 'pull_request'
     permissions:
@@ -139,7 +139,7 @@ jobs:
 
   commit-signature-check:
     name: Commit Signature Verification
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     # Run on every push to main so unsigned agent-authored merges are surfaced immediately.
     # This is observability only — blocking unsigned commits requires enabling
     # "Require signed commits" in branch protection settings (human/admin action).
