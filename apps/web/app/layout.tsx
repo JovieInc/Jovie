@@ -11,6 +11,7 @@ import './globals.css';
 import '@/components/organisms/HeaderNav.css';
 import '@/components/site/MarketingFooter.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
+import { ElectronBootHeartbeat } from '@/components/desktop/ElectronBootHeartbeat';
 import { GoogleAnalytics } from '@/components/providers/GoogleAnalytics';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
@@ -224,6 +225,7 @@ export default async function RootLayout({
       {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
       <GoogleAnalytics />
       <InstantlyPixel />
+      <ElectronBootHeartbeat />
     </>
   );
 

@@ -333,6 +333,8 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
+  assert.match(preloadSource, /sendAppBooted/);
+  assert.match(preloadSource, /ipcRenderer\.send\(APP_BOOTED_CHANNEL\)/);
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {
@@ -535,6 +537,12 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   // runs before React hydration. next/script + nonce drift caused local E2E
   // console errors, so the runtime marker is injected this way intentionally.
   assert.match(rootLayout, /<script src='\/electron-runtime-init\.js' \/>/);
+  assert.match(rootLayout, /ElectronBootHeartbeat/);
+  const heartbeatSource = await readFile(
+    join(webRoot, 'components/desktop/ElectronBootHeartbeat.tsx'),
+    'utf8'
+  );
+  assert.match(heartbeatSource, /sendAppBooted/);
   assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
@@ -562,7 +570,99 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   );
   assert.match(
     titlebarSource,
-    /w-\[var\(--electron-traffic-light-safe-width\)\]/
+    /w-\(--electron-traffic-light-safe-width\)/
   );
   assert.doesNotMatch(titlebarSource, /w-\[72px\]/);
+});
+
+test('desktop shell has a renderer heartbeat watchdog for 200-but-crashed pages', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
+
+  // Heartbeat channel constant
+  assert.match(
+    mainSource,
+    /const APP_BOOTED_CHANNEL = 'app-booted'/
+  );
+  assert.match(
+    preloadSource,
+    /const APP_BOOTED_CHANNEL = 'app-booted'/
+  );
+
+  // Watchdog timer map (per-window)
+  assert.match(
+    mainSource,
+    /const appBootedWatchdogTimers = new Map/
+  );
+
+  // did-finish-load starts the 14s watchdog and clears any existing one
+  assert.match(
+    mainSource,
+    /appBootedWatchdogTimers.get\(win\.id\)/
+  );
+  assert.match(
+    mainSource,
+    /clearTimeout\(existingTimer\)/
+  );
+  assert.match(
+    mainSource,
+    /14_000/
+  );
+
+  // Watchdog expiry shows the recovery shell
+  assert.match(
+    mainSource,
+    /showing recovery shell/
+  );
+  assert.match(
+    mainSource,
+    /showDesktopLoadFailure\(win\)/
+  );
+
+  // IPC handler cancels the watchdog when renderer sends app-booted
+  assert.match(
+    mainSource,
+    /ipcMain\.on\(APP_BOOTED_CHANNEL/
+  );
+  assert.match(
+    mainSource,
+    /clearTimeout\(timer\);\s*appBootedWatchdogTimers\.delete\(win\.id\)/
+  );
+
+  // Window close cleans up the watchdog
+  assert.match(
+    mainSource,
+    /appBootedWatchdogTimers\.get\(win\.id\)/
+  );
+  assert.match(
+    mainSource,
+    /appBootedWatchdogTimers\.delete\(win\.id\)/
+  );
+
+  // unresponsive handler now shows recovery shell after a grace period
+  assert.match(
+    mainSource,
+    /Renderer unresponsive for 10s/
+  );
+  assert.match(
+    mainSource,
+    /win\.webContents\.once\('responsive'/
+  );
+
+  // Preload exposes sendAppBooted
+  assert.match(
+    preloadSource,
+    /sendAppBooted:/
+  );
+  assert.match(
+    preloadSource,
+    /\) => \{/  
+  );
+  assert.match(
+    preloadSource,
+    /ipcRenderer\.send\(APP_BOOTED_CHANNEL\)/
+  );
 });

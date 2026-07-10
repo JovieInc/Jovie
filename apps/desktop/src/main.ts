@@ -107,6 +107,7 @@ const AUTH_RETURN_PROTOCOL = `${AUTH_RETURN_SCHEME}:`;
 const AUTH_RETURN_HOST = 'auth';
 const AUTH_RETURN_COMPLETE_PATH = '/complete';
 const LEGACY_AUTH_RETURN_HOST = 'auth-return';
+const APP_BOOTED_CHANNEL = 'app-booted';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
@@ -161,6 +162,13 @@ const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
+// Maps BrowserWindow.id to the heartbeat watchdog timer. When did-finish-load
+// fires for a main-frame navigation, a 14-second timer starts. If the renderer
+// sends 'app-booted' before the timer expires, the timer is cleared. Otherwise
+// the recovery shell is shown (the page 200'd but the renderer never became
+// interactive).
+const appBootedWatchdogTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
 let mainWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let menuBarTray: MenuBarTray | null = null;
@@ -1029,6 +1037,24 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   let rendererCrashReloadCount = 0;
   win.webContents.on('did-finish-load', () => {
     rendererCrashReloadCount = 0;
+
+    // Heartbeat watchdog: if the renderer loaded (200) but the React app never
+    // signals it booted successfully (app-booted), the page may have crashed
+    // client-side after a successful HTTP load. Show the recovery shell
+    // instead of leaving a permanently black window.
+    const existingTimer = appBootedWatchdogTimers.get(win.id);
+    if (existingTimer) clearTimeout(existingTimer);
+    appBootedWatchdogTimers.set(
+      win.id,
+      setTimeout(() => {
+        appBootedWatchdogTimers.delete(win.id);
+        if (win.isDestroyed()) return;
+        console.warn(
+          '[Jovie Desktop] Renderer loaded but never signaled app-booted — showing recovery shell'
+        );
+        showDesktopLoadFailure(win);
+      }, 14_000)
+    );
   });
   win.webContents.on('render-process-gone', (_event, details) => {
     const action = decideRendererRecovery({
@@ -1052,6 +1078,18 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('unresponsive', () => {
     console.warn('[Jovie Desktop] Renderer unresponsive', {
       url: win.webContents.getURL().split('?')[0],
+    });
+    // Give the renderer a short grace period to become responsive again.
+    // If it stays unresponsive, show the recovery shell.
+    const unresponsiveTimer = setTimeout(() => {
+      if (win.isDestroyed()) return;
+      console.warn(
+        '[Jovie Desktop] Renderer unresponsive for 10s — showing recovery shell'
+      );
+      showDesktopLoadFailure(win);
+    }, 10_000);
+    win.webContents.once('responsive', () => {
+      clearTimeout(unresponsiveTimer);
     });
   });
 
@@ -1153,6 +1191,11 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.on('close', () => {
     saveWindowState(win);
+    const timer = appBootedWatchdogTimers.get(win.id);
+    if (timer) {
+      clearTimeout(timer);
+      appBootedWatchdogTimers.delete(win.id);
+    }
   });
 
   win.on('closed', () => {
@@ -1612,6 +1655,17 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+ipcMain.on(APP_BOOTED_CHANNEL, (event: IpcMainInvokeEvent) => {
+  if (!isTrustedIpcSender(event)) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return;
+  const timer = appBootedWatchdogTimers.get(win.id);
+  if (timer) {
+    clearTimeout(timer);
+    appBootedWatchdogTimers.delete(win.id);
   }
 });
 

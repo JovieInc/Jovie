@@ -10,6 +10,7 @@ const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
+const APP_BOOTED_CHANNEL = 'app-booted';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
@@ -149,6 +150,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** Probe desktop dictation support without exposing node/native APIs. */
     getDictationStatus: () => {
       return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
+    },
+
+    sendAppBooted: () => {
+      ipcRenderer.send(APP_BOOTED_CHANNEL);
     },
 
     /**

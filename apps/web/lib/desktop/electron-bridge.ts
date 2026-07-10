@@ -67,6 +67,12 @@ export interface ElectronAPI {
    * Returns an unsubscribe function.
    */
   readonly onTrayAction?: (cb: (action: string) => void) => () => void;
+  /**
+   * Signal to the Electron main process that the web app has successfully
+   * booted (React first render completed). Cancels the heartbeat watchdog
+   * timer and prevents the recovery shell from appearing.
+   */
+  readonly sendAppBooted?: () => void;
 }
 
 export interface DesktopAuthCompletion {
@@ -579,6 +585,17 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
   if (!api || typeof api.onTrayAction !== 'function') return noopUnsubscribe;
   const unsubscribe = api.onTrayAction(cb);
   return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
+}
+
+/**
+ * Signal that the web app has booted successfully. Call once on first render
+ * to cancel the Electron main process heartbeat watchdog.
+ * Silently no-ops when not in Electron or when the bridge is stale.
+ */
+export function sendAppBooted(): void {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.sendAppBooted !== 'function') return;
+  api.sendAppBooted();
 }
 
 // Exported for tests only — do not call directly from product code.
