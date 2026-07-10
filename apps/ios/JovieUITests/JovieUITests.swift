@@ -204,17 +204,31 @@ final class JovieUITests: XCTestCase {
       $0.textFields["Ask Jovie"]
     }
 
+    // Prefer the per-tab identifiers; fall back to label if AX grouping regresses.
+    let chatTab = firstMatchingButton(
+      app,
+      identifiers: ["shell-tab-chat"],
+      labels: ["Chat"],
+      timeout: 3
+    )
     XCTAssertTrue(
-      app.otherElements["shell-tab-bar"].waitForExistence(timeout: 3)
-        || app.buttons["shell-tab-chat"].waitForExistence(timeout: 3),
+      chatTab.exists,
       "Primary tab bar did not appear.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(app.buttons["shell-tab-chat"].exists, "Chat tab missing")
-    XCTAssertTrue(app.buttons["shell-tab-library"].exists, "Library tab missing")
-    XCTAssertTrue(app.buttons["shell-tab-calendar"].exists, "Calendar tab missing")
-    XCTAssertTrue(app.buttons["shell-tab-inbox"].exists, "Inbox tab missing")
     XCTAssertTrue(
-      app.buttons["shell-talk-fab"].exists,
+      firstMatchingButton(app, identifiers: ["shell-tab-library"], labels: ["Library"]).exists,
+      "Library tab missing"
+    )
+    XCTAssertTrue(
+      firstMatchingButton(app, identifiers: ["shell-tab-calendar"], labels: ["Calendar"]).exists,
+      "Calendar tab missing"
+    )
+    XCTAssertTrue(
+      firstMatchingButton(app, identifiers: ["shell-tab-inbox"], labels: ["Inbox"]).exists,
+      "Inbox tab missing"
+    )
+    XCTAssertTrue(
+      firstMatchingButton(app, identifiers: ["shell-talk-fab"], labels: ["Talk"]).exists,
       "Talk FAB missing on primary tab bar.\n\(app.debugDescription)"
     )
     // Profile + Audience are drawer-only — must not be primary tab buttons.
@@ -332,8 +346,14 @@ final class JovieUITests: XCTestCase {
       $0.textFields["Ask Jovie"]
     }
 
+    let talkFAB = firstMatchingButton(
+      app,
+      identifiers: ["shell-talk-fab"],
+      labels: ["Talk"],
+      timeout: 3
+    )
     XCTAssertTrue(
-      app.buttons["shell-talk-fab"].waitForExistence(timeout: 3),
+      talkFAB.exists,
       "Talk FAB did not appear on the primary tab bar.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
@@ -452,23 +472,47 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "chat-entity-chips", app: app)
   }
 
+  // JOV-3635: horizontal page-swipes between tabs are banned. Profile is
+  // drawer-only — open the drawer, pick Profile, then return via Chat tab.
   func testSwipeNavigatesBetweenProfileAndChat() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
     }
 
-    // Launches on Chat; swiping right reveals the Profile screen.
+    // Full-width swipe must NOT switch tabs (gesture ownership: edges only).
     app.swipeRight()
     XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Swiping right did not reveal the Profile screen.\n\(app.debugDescription)"
+      app.textFields["Ask Jovie"].waitForExistence(timeout: 2),
+      "Horizontal swipe incorrectly left Chat.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["Copy URL"].exists,
+      "Horizontal swipe must not open Profile (drawer-only surface).\n\(app.debugDescription)"
     )
 
-    // Swiping left returns to Chat.
-    app.swipeLeft()
+    app.buttons["Open navigation drawer"].tap()
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    XCTAssertTrue(
+      profileSurface.waitForExistence(timeout: 3),
+      "Drawer Profile surface missing.\n\(app.debugDescription)"
+    )
+    profileSurface.tap()
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Selecting Profile from the drawer did not reveal Profile.\n\(app.debugDescription)"
+    )
+
+    let chatTab = firstMatchingButton(
+      app,
+      identifiers: ["shell-tab-chat"],
+      labels: ["Chat"],
+      timeout: 3
+    )
+    XCTAssertTrue(chatTab.exists, "Chat tab missing after Profile.\n\(app.debugDescription)")
+    chatTab.tap()
     XCTAssertTrue(
       app.textFields["Ask Jovie"].waitForExistence(timeout: 3),
-      "Swiping left did not return to the Chat screen.\n\(app.debugDescription)"
+      "Chat tab did not return to Chat.\n\(app.debugDescription)"
     )
   }
 
@@ -1109,6 +1153,44 @@ final class JovieUITests: XCTestCase {
     }
 
     return element.exists && element.isHittable
+  }
+
+  /// Resolve a shell control by preferred accessibility identifier, with a
+  /// label fallback for SwiftUI AX grouping regressions (seen when a parent
+  /// container identifier bled onto child buttons as `shell-tab-bar`).
+  private func firstMatchingButton(
+    _ app: XCUIApplication,
+    identifiers: [String],
+    labels: [String],
+    timeout: TimeInterval = 0
+  ) -> XCUIElement {
+    let deadline = Date().addingTimeInterval(max(0, timeout))
+    repeat {
+      for identifier in identifiers {
+        let byID = app.buttons[identifier]
+        if byID.exists {
+          return byID
+        }
+      }
+      // When the parent HStack ID leaks, every primary tab shares
+      // identifier "shell-tab-bar" and only the accessibility label differs.
+      for label in labels {
+        let leaked = app.buttons
+          .matching(identifier: "shell-tab-bar")
+          .matching(NSPredicate(format: "label == %@", label))
+          .firstMatch
+        if leaked.exists {
+          return leaked
+        }
+      }
+      if Date() >= deadline {
+        break
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    } while Date() < deadline
+
+    // Prefer the first identifier so callers can still assert on a stable query.
+    return app.buttons[identifiers.first ?? labels.first ?? ""]
   }
 
   private func openAuthCallbackURL(

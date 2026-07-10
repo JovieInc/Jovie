@@ -60,6 +60,11 @@ struct AppShellTabBar: View {
         .fill(JovieColor.borderSubtle)
         .frame(height: 1)
     }
+    // Keep children as independent AX elements with their own identifiers.
+    // A bare accessibilityIdentifier on the HStack was bleeding onto every
+    // child button (all exposed as identifier "shell-tab-bar"), which broke
+    // UITests looking for shell-tab-chat / shell-talk-fab.
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("shell-tab-bar")
   }
 
@@ -81,6 +86,7 @@ struct AppShellTabBar: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(AppShellTabBarButtonStyle())
+    .accessibilityElement(children: .ignore)
     .accessibilityLabel(tab.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     .accessibilityIdentifier(tab.accessibilityID)
@@ -105,6 +111,7 @@ struct AppShellTabBar: View {
     }
     .buttonStyle(AppShellTabBarButtonStyle())
     .frame(width: AppShellTabBarLayout.talkFabSize + 8)
+    .accessibilityElement(children: .ignore)
     .accessibilityLabel("Talk")
     .accessibilityIdentifier("shell-talk-fab")
     .accessibilityHint("Opens full-screen voice capture")
