@@ -5,7 +5,6 @@ import {
   ensureSignedInUser,
   getAdminCredentials,
   hasAdminCredentials,
-  waitForClerkSignInApi,
 } from '../helpers/clerk-auth';
 
 /**
@@ -14,7 +13,7 @@ import {
  * Tests the complete new-user journey end to end with REAL data:
  * - No mocks for music fetch
  * - No pre-authenticated state
- * - Real Clerk auth (test environment)
+ * - Real Better Auth email-OTP signup (test environment)
  *
  * Jovie's pricing is a 14-day reverse trial with NO card required at signup
  * (see docs/PRICING-PHILOSOPHY.md), so the golden path's "first value" moment
@@ -30,78 +29,13 @@ import {
 /* ------------------------------------------------------------------ */
 
 const REQUIRED_ENV = {
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   DATABASE_URL: process.env.DATABASE_URL,
 } as const;
-
-const IS_LOCAL_AUTH_BYPASS =
-  process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
 
 function hasRealEnv(): boolean {
   return Object.values(REQUIRED_ENV).every(
     v => v && !v.includes('mock') && !v.includes('dummy')
   );
-}
-
-/**
- * Delete all stale golden-path test users from Clerk to stay within the
- * 100-user dev-instance cap. Each golden-path run creates a new
- * `gp-*+clerk_test@test.jovie.com` user; without cleanup the cap fills up.
- */
-async function purgeStaleClerkTestUsers() {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey || secretKey.includes('mock')) return;
-
-  try {
-    // Clerk's `query` param doesn't match emails with `+` characters, so we
-    // fetch all users (up to 500) and filter client-side.
-    const allUsers: Array<{
-      id: string;
-      email_addresses: Array<{ email_address: string }>;
-    }> = [];
-
-    for (let offset = 0; offset < 500; offset += 100) {
-      const url = new URL('https://api.clerk.com/v1/users');
-      url.searchParams.set('limit', '100');
-      url.searchParams.set('offset', String(offset));
-      const resp = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${secretKey}` },
-      });
-      if (!resp.ok) break;
-      const page = (await resp.json()) as typeof allUsers;
-      if (!Array.isArray(page) || page.length === 0) break;
-      allUsers.push(...page);
-      if (page.length < 100) break; // Last page
-    }
-
-    const toDelete = allUsers.filter(u =>
-      u.email_addresses.some(
-        e =>
-          e.email_address.startsWith('gp-') &&
-          e.email_address.endsWith('+clerk_test@test.jovie.com')
-      )
-    );
-
-    if (toDelete.length > 0) {
-      await Promise.all(
-        toDelete.map(u =>
-          fetch(`https://api.clerk.com/v1/users/${u.id}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${secretKey}` },
-          }).catch(() => {})
-        )
-      );
-      console.log(
-        `[golden-path] Purged ${toDelete.length} stale Clerk test user(s)`
-      );
-    }
-  } catch {
-    // Non-critical — if purge fails we'll still attempt to create
-  }
 }
 
 /**
@@ -132,16 +66,17 @@ async function clearOnboardingRateLimits() {
 }
 
 /**
- * Pre-create a DB user row via direct Neon HTTP query.
+ * Approve the newly provisioned Better Auth user via direct Neon HTTP query.
  *
  * The onboarding page's server component creates users via the WebSocket
  * pool, but concurrent SSR renders in Next.js can abort the pool queries.
- * Pre-creating the user avoids this race condition.
+ * Provisioning happens in the Better Auth create hook; this update makes the
+ * ephemeral test identity eligible to enter onboarding.
  *
  * Also releases the test Spotify artist ID from any previous test profiles
  * to avoid unique constraint violations on repeated runs.
  */
-async function ensureDbUser(clerkUserId: string, email: string) {
+async function ensureDbUser(betterAuthUserId: string) {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) throw new Error('DATABASE_URL required for DB user creation');
 
@@ -159,7 +94,7 @@ async function ensureDbUser(clerkUserId: string, email: string) {
     WHERE user_id IN (
       SELECT id
       FROM users
-      WHERE email LIKE ${'gp-%+clerk\\_test@test.jovie.com'} ESCAPE ${'\\'}
+      WHERE email LIKE ${'gp-%+e2e@test.jovie.com'}
     ) AND spotify_id IS NOT NULL
   `;
 
@@ -175,12 +110,9 @@ async function ensureDbUser(clerkUserId: string, email: string) {
   `;
 
   await sql`
-    INSERT INTO users (clerk_id, email, user_status)
-    VALUES (${clerkUserId}, ${email}, 'waitlist_approved')
-    ON CONFLICT (clerk_id) DO UPDATE SET
-      email = ${email},
-      user_status = 'waitlist_approved',
-      updated_at = NOW()
+    UPDATE users
+    SET user_status = 'waitlist_approved', updated_at = NOW()
+    WHERE better_auth_user_id = ${betterAuthUserId}
   `;
 }
 
@@ -194,7 +126,7 @@ async function ensureDbUser(clerkUserId: string, email: string) {
  * that DSP links render on the public profile.
  */
 async function ensureSpotifyUrlOnProfile(
-  clerkUserId: string,
+  betterAuthUserId: string,
   spotifyUrl: string,
   spotifyId: string | null
 ) {
@@ -207,7 +139,7 @@ async function ensureSpotifyUrlOnProfile(
   const profiles = await sql`
     SELECT cp.id, cp.spotify_url FROM creator_profiles cp
     INNER JOIN users u ON u.id = cp.user_id
-    WHERE u.clerk_id = ${clerkUserId}
+    WHERE u.better_auth_user_id = ${betterAuthUserId}
   `;
 
   if (profiles.length === 0) {
@@ -221,7 +153,7 @@ async function ensureSpotifyUrlOnProfile(
   const profileData = await sql`
     SELECT cp.username_normalized FROM creator_profiles cp
     INNER JOIN users u ON u.id = cp.user_id
-    WHERE u.clerk_id = ${clerkUserId}
+    WHERE u.better_auth_user_id = ${betterAuthUserId}
   `;
   const username = profileData[0]?.username_normalized;
 
@@ -236,7 +168,7 @@ async function ensureSpotifyUrlOnProfile(
         avatar_url = COALESCE(avatar_url, 'https://images.unsplash.com/placeholder'),
         onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
         updated_at = NOW()
-    WHERE user_id = (SELECT id FROM users WHERE clerk_id = ${clerkUserId})
+    WHERE user_id = (SELECT id FROM users WHERE better_auth_user_id = ${betterAuthUserId})
     RETURNING id, spotify_url, spotify_id
   `;
 
@@ -255,7 +187,7 @@ async function ensureSpotifyUrlOnProfile(
   if (redisUrl && redisToken) {
     const keysToDelete = [
       ...(username ? [`profile:data:${username}`] : []),
-      `proxy:user-state:${clerkUserId}`,
+      `proxy:user-state:${betterAuthUserId}`,
     ];
     try {
       // Upstash REST API: pipeline multiple DEL commands
@@ -293,74 +225,36 @@ async function interceptTrackingCalls(page: Page) {
 }
 
 /**
- * Create a brand-new Clerk test user session.
- * Uses `+clerk_test` email suffix which auto-verifies in Clerk test mode.
- *
- * For +clerk_test emails, Clerk requires completing email verification
- * with the magic code 424242 before a session is created.
+ * Create a brand-new Better Auth test user through the visible email-OTP
+ * signup surface. E2E_TEST_MODE supplies the deterministic 424242 code only
+ * for canonical +e2e test addresses.
  */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
-  await page.goto('/signin', {
+  const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
+  await page.goto('/signup', {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
+  await page.getByLabel('Email Address').fill(email);
+  await page.getByRole('button', { name: 'Continue with Email' }).click();
+  await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
+  await page.waitForURL(/\/(start|onboarding)/, { timeout: 30_000 });
 
-  const loaded = await waitForClerkSignInApi(page);
-
-  if (!loaded) {
-    throw new Error('Clerk sign-in API never became ready on /signin');
+  const session = await page.evaluate(async () => {
+    const response = await fetch('/api/auth/get-session');
+    if (!response.ok) return null;
+    return (await response.json()) as { user?: { id?: string } };
+  });
+  const betterAuthUserId = session?.user?.id;
+  if (!betterAuthUserId) {
+    throw new Error('Better Auth session not established after signup');
   }
 
-  const email = `gp-${Date.now().toString(36)}+clerk_test@test.jovie.com`;
-
-  // Create user and complete email verification with test code 424242
-  // NOTE: Clerk JS exposes signUp on window.Clerk.client, not window.Clerk directly
-  // Returns the Clerk user ID for DB pre-seeding
-  const clerkUserId = await page.evaluate(async (targetEmail: string) => {
-    const clerkInstance = (window as any).Clerk;
-    if (!clerkInstance) throw new Error('Clerk not initialized');
-
-    // If already signed in, return existing user ID
-    if (clerkInstance.user?.id && clerkInstance.session) {
-      return clerkInstance.user.id as string;
-    }
-
-    const client = clerkInstance.client;
-    if (!client?.signUp) throw new Error('Clerk client.signUp not available');
-
-    // Create signup
-    const signUp = await client.signUp.create({
-      emailAddress: targetEmail,
-    });
-
-    // For +clerk_test emails, we must complete email verification
-    // Clerk test mode accepts magic code 424242
-    await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-    const result = await signUp.attemptEmailAddressVerification({
-      code: '424242',
-    });
-
-    // Activate the session created by completed signup
-    if (result.createdSessionId) {
-      await clerkInstance.setActive({ session: result.createdSessionId });
-    } else {
-      throw new Error(
-        `Signup completed with status "${result.status}" but no session was created`
-      );
-    }
-
-    // Return the new user's Clerk ID
-    return clerkInstance.user?.id as string;
-  }, email);
-
-  if (!clerkUserId) {
-    throw new Error('Clerk session not established after signup');
-  }
-
-  // Pre-create DB user via direct Neon HTTP query to avoid SSR abort issues
-  await ensureDbUser(clerkUserId, email);
-
-  return { email, clerkUserId };
+  await ensureDbUser(betterAuthUserId);
+  return { email, betterAuthUserId };
 }
 
 async function createFreshUser(page: import('@playwright/test').Page) {
@@ -394,7 +288,7 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 
   throw lastError instanceof Error
     ? lastError
-    : new Error('Failed to create Clerk test user');
+    : new Error('Failed to create Better Auth test user');
 }
 
 /* ------------------------------------------------------------------ */
@@ -408,19 +302,9 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
-    if (IS_LOCAL_AUTH_BYPASS) {
-      test.skip(true, 'Golden path requires real Clerk auth');
-    }
     if (!hasRealEnv()) {
-      test.skip(true, 'Real Clerk/DB env vars not configured');
+      test.skip(true, 'Better Auth/DB env vars not configured');
     }
-    if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
-      test.skip(true, 'Clerk testing setup was not successful');
-    }
-
-    // Purge stale golden-path Clerk test users BEFORE signup to stay within
-    // the 100-user dev instance cap. Must run before createFreshUser.
-    await purgeStaleClerkTestUsers();
 
     await interceptTrackingCalls(page);
   });
@@ -460,7 +344,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
-    const { clerkUserId } = await createFreshUser(page);
+    const { betterAuthUserId } = await createFreshUser(page);
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 4: Onboarding — Handle step
@@ -549,7 +433,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
       `[golden-path] Setting spotify_url=${spotifyUrlToSave} spotify_id=${spotifyIdToSave} (captured=${capturedSpotifyUrl})`
     );
     await ensureSpotifyUrlOnProfile(
-      clerkUserId,
+      betterAuthUserId,
       spotifyUrlToSave,
       spotifyIdToSave
     );
@@ -591,7 +475,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
         SELECT cp.spotify_url, cp.spotify_id, cp.is_public
         FROM creator_profiles cp
         INNER JOIN users u ON u.id = cp.user_id
-        WHERE u.clerk_id = ${clerkUserId}
+        WHERE u.better_auth_user_id = ${betterAuthUserId}
       `;
       console.log('[golden-path] Profile DB check:', JSON.stringify(check));
     }
@@ -607,7 +491,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
                cp.onboarding_completed_at
         FROM creator_profiles cp
         INNER JOIN users u ON u.id = cp.user_id
-        WHERE u.clerk_id = ${clerkUserId}
+        WHERE u.better_auth_user_id = ${betterAuthUserId}
       `;
 
       expect(profileCheck.length, 'No profile found for test user').toBe(1);
