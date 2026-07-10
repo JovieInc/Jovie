@@ -177,7 +177,7 @@ function runGuardrails() {
   const parts = [
     `node scripts/desktop-release-guard.mjs --base ${JSON.stringify(originBase)}`,
     `node scripts/version-fanout-guard.mjs --base ${JSON.stringify(originBase)}`,
-    'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs',
+    'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs',
     'node scripts/version-check.mjs',
     'node apps/web/scripts/next-proxy-guard.mjs',
   ];
