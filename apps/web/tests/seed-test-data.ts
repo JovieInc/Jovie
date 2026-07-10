@@ -14,6 +14,11 @@ import { Redis } from '@upstash/redis';
 import { and, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { hashClaimToken } from '@/lib/security/claim-token';
+import {
+  E2E_PREBUILT_CLAIM_TOKEN,
+  E2E_PREBUILT_CLAIM_USERNAME,
+} from '@/lib/testing/e2e-prebuilt-claim';
 import {
   DEFAULT_TEST_AVATAR_URL,
   ensureCreatorProfileRecord as ensureCreatorProfile,
@@ -30,6 +35,7 @@ import { normalizeEmail } from '@/lib/utils/email';
 // Use the same HTTP driver as the app for consistency
 const {
   creatorContacts,
+  creatorProfiles,
   discogReleases,
   discogTracks,
   libraryAssetApprovalStatuses,
@@ -1466,8 +1472,8 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           await seedPublicContactsForProfile(db, createdProfileId);
         }
 
-        // Add Venmo payment link for tipping tests
-        if (profile.username === 'testartist') {
+        // Add Venmo payment link for tipping tests + GTM prebuilt claim fixture
+        if (profile.username === E2E_PREBUILT_CLAIM_USERNAME) {
           await ensureSocialLink(db, {
             creatorProfileId: createdProfileId,
             platform: 'venmo',
@@ -1479,6 +1485,29 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             state: 'active',
           });
           console.log(`    ✓ Added Venmo link for ${profile.username}`);
+
+          // Unclaimed public profile with a stable claim token + release data so
+          // claim-prebuilt.smoke can exercise the GTM claim-link canary (JOV-1880).
+          const claimTokenHash = await hashClaimToken(E2E_PREBUILT_CLAIM_TOKEN);
+          const claimTokenExpiresAt = new Date();
+          claimTokenExpiresAt.setUTCDate(claimTokenExpiresAt.getUTCDate() + 30);
+
+          await db
+            .update(creatorProfiles)
+            .set({
+              userId: null,
+              isClaimed: false,
+              isPublic: true,
+              claimToken: claimTokenHash,
+              claimTokenExpiresAt,
+              updatedAt: new Date(),
+            })
+            .where(eq(creatorProfiles.id, createdProfileId));
+
+          await seedReleasesForProfile(db, createdProfileId);
+          console.log(
+            `    ✓ Seeded prebuilt claim fixture for ${profile.username}`
+          );
         }
 
         // Invalidate Redis cache for this profile to ensure fresh data
