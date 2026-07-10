@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { fileDisplayName } from '@/lib/chat/file-display-name';
 import { cn } from '@/lib/utils';
 
 const HOVER_OPEN_DELAY_MS = 200;
@@ -84,7 +85,8 @@ export function ImageAttachmentChip({
     [clearTimers]
   );
 
-  const label = name && name.trim().length > 0 ? name : 'Image';
+  const derived = fileDisplayName(url, name?.trim() || null);
+  const label = derived === 'File' ? 'Image' : derived;
 
   const chipClass = cn(
     'system-b-image-attachment-chip',

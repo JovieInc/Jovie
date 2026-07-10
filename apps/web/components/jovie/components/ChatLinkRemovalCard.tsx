@@ -4,9 +4,9 @@ import { Check, Loader2, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useConfirmChatRemoveLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { CHAT_TOOL_CANCELLED_LABEL, ChatToolSurface } from './ChatToolSurface';
 
 interface ChatLinkRemovalCardProps {
   readonly profileId: string;
@@ -96,28 +96,28 @@ export function ChatLinkRemovalCard({
 
   if (state === 'removed') {
     return (
-      <ContentSurfaceCard className='border-subtle bg-surface-1 p-4'>
+      <ChatToolSurface tone='success'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>{platform} link removed</span>
         </div>
-      </ContentSurfaceCard>
+      </ChatToolSurface>
     );
   }
 
   if (state === 'dismissed') {
     return (
-      <ContentSurfaceCard className='border-(--system-b-app-frame-seam) bg-(--system-b-app-content-surface) p-4 opacity-60'>
+      <ChatToolSurface tone='cancelled'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
-          <span className='text-sm'>Removal cancelled</span>
+          <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
         </div>
-      </ContentSurfaceCard>
+      </ChatToolSurface>
     );
   }
 
   return (
-    <ContentSurfaceCard className='system-b-chat-link-card system-b-chat-link-card-remove'>
+    <ChatToolSurface className='system-b-chat-link-card system-b-chat-link-card-remove'>
       <div className='flex items-center gap-3'>
         <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-remove'>
           <SocialIcon
@@ -170,6 +170,6 @@ export function ChatLinkRemovalCard({
           </button>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </ChatToolSurface>
   );
 }

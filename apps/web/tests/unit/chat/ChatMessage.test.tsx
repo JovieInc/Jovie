@@ -163,6 +163,35 @@ describe('ChatMessage', () => {
     ).toHaveAttribute('data-has-message', 'true');
   });
 
+  it('renders non-image file parts as rich file chips without raw blob URLs (JOV-3492)', () => {
+    const blobUrl =
+      'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/Never%20Say%20A%20Word_Instrumental.wav';
+    const messageProps = {
+      id: 'user-file-chip',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'file' as const,
+          mediaType: 'audio/wav',
+          url: blobUrl,
+        },
+        { type: 'text' as const, text: 'Here is the instrumental' },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const bubble = screen.getByTestId('chat-user-bubble');
+    const chip = within(bubble).getByTestId('file-attachment-chip');
+    expect(chip).toHaveTextContent('Never Say A Word_Instrumental.wav');
+    expect(chip.textContent).not.toContain('blob.vercel-storage.com');
+    expect(chip.textContent).not.toContain('%20');
+    expect(
+      within(bubble).getByTestId('file-attachment-chip-trigger')
+    ).toHaveAttribute('href', blobUrl);
+    expect(bubble.textContent).not.toContain('blob.vercel-storage.com');
+  });
+
   it('renders thinking with stable System B loading hooks', () => {
     const messageProps = {
       id: 'assistant-thinking',

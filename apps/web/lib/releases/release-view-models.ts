@@ -43,6 +43,12 @@ export function mapReleaseToViewModel(
     artistNames: release.artistNames,
     releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
     status: (release.status as ReleaseStatusValue) ?? 'released',
+    sourceType:
+      release.sourceType === 'manual' ||
+      release.sourceType === 'admin' ||
+      release.sourceType === 'ingested'
+        ? release.sourceType
+        : 'ingested',
     revealDate: toISOStringOrNull(release.revealDate) ?? undefined,
     deletedAt: toISOStringOrNull(release.deletedAt) ?? undefined,
     artworkUrl: release.artworkUrl ?? undefined,

@@ -132,6 +132,8 @@ export interface ReleaseViewModel {
   artistNames?: string[];
   releaseDate?: string;
   status: 'draft' | 'scheduled' | 'released';
+  /** Origin of the release row: manual (Jovie-created) vs provider-ingested. */
+  sourceType?: 'manual' | 'admin' | 'ingested';
   revealDate?: string;
   deletedAt?: string;
   artworkUrl?: string;

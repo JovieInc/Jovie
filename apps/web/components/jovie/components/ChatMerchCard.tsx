@@ -356,7 +356,7 @@ export function ChatMerchSelectionCard({
         data-testid='chat-merch-selection-card'
         className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-0 p-3'
       >
-        <span className='grid h-9 w-9 shrink-0 place-items-center rounded-md bg-cyan-400/[0.08] text-cyan-300'>
+        <span className='grid h-9 w-9 shrink-0 place-items-center rounded-md bg-success-subtle text-success'>
           <CheckCircle2 className='h-4 w-4' strokeWidth={2.25} />
         </span>
         <div className='min-w-0 flex-1'>
@@ -429,6 +429,7 @@ export function ChatMerchSelectionCard({
             title={result.publishProposal.title}
             currentStatus={result.publishProposal.currentStatus}
             retailPrice={result.publishProposal.retailPrice}
+            nested
           />
         </div>
       ) : null}

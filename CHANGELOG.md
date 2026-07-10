@@ -16,11 +16,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ## [Unreleased]
 
 - **Jovie now presents one focused, dark career operating system from hero to conversion:** the homepage leads with “Jovie runs your music career,” shows one release workspace, replaces the profile carousel with three static artist outcomes, and connects release, fan capture, routing, learning, and next actions in one closed-loop story. The floating header, CTAs, chat bubbles, motion, reduced-motion behavior, and responsive alignment now follow the same compact System B rules.
+- [internal] **Chat tool-card System B consolidation (JOV-3551)**: Shared `ChatToolSurface` primitive; one "Cancelled" dismiss verb; success accent uses `text-success` (no cyan-300); Make Live uses Play icon; album-art single title; nested merch action is flat (no card-in-card); analytics signal cards on surface tokens.
 - [internal] **Test reliability batch (JOV-4112, JOV-4033, JOV-1880)**: stop Playwright from importing `server-only` env helpers in E2E dashboard route resolvers; drop quarantined specs from the PR smoke manifest and add a guardrail test; seed a prebuilt claim fixture and desktop smoke for the GTM claim-link canary.
 - **Tagging knows your world (JOV-3717)**: Artist picker cold-starts with your claimed Spotify artist and catalog collaborators (with ids) above Spotify search.
 
 - **Public artist profiles now feel native at every size (JOV-2018)**: Square artwork stays square, portraits keep a face-safe crop, profile rails use one consistent card size, scrollbars stay out of sight, and sparse or subscription states no longer leave awkward gaps.
 - **Unclaimed artist profiles now include a concise claim card (JOV-2018)**: Desktop AEO pages end with an editorial Jovie prompt and a single Spotify-verified claim action.
+- **Library status badges no longer call released items "Draft" (JOV-3333)**: Grid cards and the release rail hero show Release Status only; Approval Status stays as a single editable control in Details.
+- **Chat release right-rail System B polish (JOV-3493)**: Section cards use Library elevation, DSP rows show provider icons, and typography drops oversized/all-caps chrome.
+- **Chat file attachments render as rich chips (JOV-3492)**: Uploaded audio/docs show a filetype icon + clean filename instead of raw Vercel blob URLs.
+- **Provider-ingested released music can only be archived (JOV-3885)**: Soft-hide via `deleted_at` for ingested published releases; Jovie-created releases still hard-delete.
+
+
 
 - [internal] **Single machine-readable design-token source, wave 1 (GH-12009, GH-10158)**: New `apps/web/design/tokens.json` compiled by `scripts/build-design-tokens.mjs` (`pnpm tokens:build` / `tokens:check`) into generated CSS (`--gray1..12` now resolve app-wide), a typed TS export, and an agent manifest. `--linear-*` namespace is now shrink-only ratcheted (`linear-namespace-ratchet.test.ts`, baseline 2242), and a source-vs-emitter divergence guard locks tokens.json to the live accent palette. No visual changes.
 - [internal] **One EmptyState primitive (GH-12638)**: Canonical molecule at `components/molecules/EmptyState` (greyscale icon + Title Case heading + one sentence + primary CTA + optional text-link secondary). Migrated DSP presence/matches, insights, release tasks, and table empty surfaces onto it; deleted 5 bespoke `*EmptyState` components; component-family ratchet emptyState 14→9.

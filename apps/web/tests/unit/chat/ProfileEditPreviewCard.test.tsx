@@ -121,7 +121,7 @@ describe('ProfileEditPreviewCard', () => {
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     fireEvent.click(cancelButton);
 
-    expect(screen.getByText('Edit cancelled')).toBeInTheDocument();
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
 
     // Apply button should no longer be present
     expect(screen.queryByRole('button', { name: /apply/i })).toBeNull();
