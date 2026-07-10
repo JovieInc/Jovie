@@ -187,7 +187,9 @@ describe('sync-skills-catalog', () => {
         }),
       ])
     );
-    expect(mockOnConflictDoUpdate.mock.calls[toolCallIndex]?.[0]).toEqual(
+    // Version history insert uses onConflictDoNothing, so values-call index
+    // no longer lines up with onConflictDoUpdate calls — match by payload.
+    expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         set: expect.objectContaining({
           inputSchemaZodPath: expect.anything(),
