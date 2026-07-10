@@ -241,7 +241,7 @@ export function AlertGrowthLanding({
         <div className='mb-4 flex items-center justify-between gap-3'>
           <Link
             href={profileHref}
-            className='inline-flex h-10 items-center gap-1.5 rounded-full px-1 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+            className='inline-flex h-10 items-center gap-1.5 rounded-full px-1 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             data-testid='alerts-landing-back'
             aria-label={`Back To ${artistName}`}
           >
@@ -250,7 +250,7 @@ export function AlertGrowthLanding({
           </Link>
           <Link
             href={profileHref}
-            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             data-testid='alerts-landing-close'
             aria-label='Close Alerts Capture'
           >

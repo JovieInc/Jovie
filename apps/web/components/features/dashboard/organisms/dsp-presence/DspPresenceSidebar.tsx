@@ -135,6 +135,8 @@ function getMatchSourceLabel(matchSource: string | null): string {
 }
 
 function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
+  const dashboardData = useDashboardData();
+  const profileId = dashboardData.selectedProfile?.id;
   const isSuggested = item.status === 'suggested';
   const isLinked =
     item.status === 'confirmed' ||
@@ -201,12 +203,13 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           )}
 
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
-          {isLinked && !isSuggested && (
+          {isLinked && !isSuggested && profileId ? (
             <RemovePlatformAction
               matchId={item.matchId}
               providerLabel={label}
+              profileId={profileId}
             />
-          )}
+          ) : null}
         </div>
       </DrawerSection>
     </div>
@@ -253,16 +256,16 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
 function RemovePlatformAction({
   matchId,
   providerLabel,
+  profileId,
 }: {
   readonly matchId: string;
   readonly providerLabel: string;
+  readonly profileId: string;
 }) {
-  const dashboardData = useDashboardData();
-  const profileId = dashboardData.selectedProfile?.id;
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { rejectMatch, isRejecting } = useDspMatchActions({
-    profileId: profileId ?? '',
+    profileId,
     onRejectSuccess: () => {
       toast.success(`${providerLabel} removed`);
       setConfirmOpen(false);
@@ -273,9 +276,8 @@ function RemovePlatformAction({
   });
 
   const handleConfirm = useCallback(() => {
-    if (!profileId) return;
     rejectMatch(matchId, 'user_disconnected');
-  }, [matchId, profileId, rejectMatch]);
+  }, [matchId, rejectMatch]);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -284,8 +286,6 @@ function RemovePlatformAction({
     },
     [isRejecting]
   );
-
-  if (!profileId) return null;
 
   return (
     <>
