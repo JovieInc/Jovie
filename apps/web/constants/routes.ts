@@ -114,6 +114,8 @@ export const APP_ROUTES = {
   ADMIN_AGENT_RUN: '/app/admin/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
   ADMIN_COSTS: '/app/admin/costs',
+  /** VC/ops revenue-lift dashboard (IRPAA North Star + KPI tree). */
+  ADMIN_REVENUE_LIFT: '/app/admin/revenue-lift',
   ADMIN_SYSTEM: '/app/admin/system',
   ADMIN_FEATURES: '/app/admin/features',
   FEATURE_FLAGS: '/app/feature-flags',
