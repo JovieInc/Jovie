@@ -15,15 +15,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-### Changed
-- [internal] Agent preflight: one-shot JSON bootstrap for /autoplan (JOV-4183)
-
+- **[internal] Critical auth, activation, and billing identity hardening (JOV-4181)**: Stripe billing updates, trial activation, billing-status reads, and profile ownership checks now resolve Better Auth application users safely across the legacy Clerk-ID transition; deterministic regression tests cover the identity and compare-and-set predicates. CI now classifies onboarding, ingestion, memory, AI/workflow, enrichment, chat, and cron changes as high risk.
+- **Jovie now presents one focused, dark career operating system from hero to conversion:** the homepage leads with “Jovie runs your music career,” shows one release workspace, replaces the profile carousel with three static artist outcomes, and connects release, fan capture, routing, learning, and next actions in one closed-loop story. The floating header, CTAs, chat bubbles, motion, reduced-motion behavior, and responsive alignment now follow the same compact System B rules.
 - [internal] **Chat tool-card System B consolidation (JOV-3551)**: Shared `ChatToolSurface` primitive; one "Cancelled" dismiss verb; success accent uses `text-success` (no cyan-300); Make Live uses Play icon; album-art single title; nested merch action is flat (no card-in-card); analytics signal cards on surface tokens.
 - [internal] **Test reliability batch (JOV-4112, JOV-4033, JOV-1880)**: stop Playwright from importing `server-only` env helpers in E2E dashboard route resolvers; drop quarantined specs from the PR smoke manifest and add a guardrail test; seed a prebuilt claim fixture and desktop smoke for the GTM claim-link canary.
 - **Tagging knows your world (JOV-3717)**: Artist picker cold-starts with your claimed Spotify artist and catalog collaborators (with ids) above Spotify search.
 
 - **Public artist profiles now feel native at every size (JOV-2018)**: Square artwork stays square, portraits keep a face-safe crop, profile rails use one consistent card size, scrollbars stay out of sight, and sparse or subscription states no longer leave awkward gaps.
-- **Unclaimed artist profiles now include a concise claim card (JOV-2018)**: Desktop AEO pages end with an editorial Jovie prompt and a single Spotify-verified claim action.
+- **Unclaimed artist profiles now close with a cleaner claim poster (JOV-2018)**: Desktop AEO content uses a tighter editorial rhythm, then ends on oversized `jov.ie/you` type, one Spotify-verified proof line, and one claim action.
 - **Library status badges no longer call released items "Draft" (JOV-3333)**: Grid cards and the release rail hero show Release Status only; Approval Status stays as a single editable control in Details.
 - **Chat release right-rail System B polish (JOV-3493)**: Section cards use Library elevation, DSP rows show provider icons, and typography drops oversized/all-caps chrome.
 - **Chat file attachments render as rich chips (JOV-3492)**: Uploaded audio/docs show a filetype icon + clean filename instead of raw Vercel blob URLs.

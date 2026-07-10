@@ -233,7 +233,10 @@ test('buildReceipt uses decideVerdict from blockers only', () => {
 function runPreflight(cwd, env = {}) {
   // Keep PATH minimal so CLI tests don't block on a live gbrain (5s timeout each).
   // Include common git locations; exclude hermes/gbrain bins to avoid 5s timeouts.
-  const basePath = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+  // Append the running node's own bin dir so `node` resolves on runners where it
+  // is not installed under a standard prefix (e.g. hosted toolcache/sandboxes).
+  const nodeBinDir = dirname(process.execPath);
+  const basePath = `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${nodeBinDir}`;
   return spawnSync('bash', [PREFLIGHT_SH], {
     cwd,
     env: {
