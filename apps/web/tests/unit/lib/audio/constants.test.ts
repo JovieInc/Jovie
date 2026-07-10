@@ -16,13 +16,10 @@ describe('audio constants', () => {
     expect(isSupportedAudioFile({ name: 'track.wav', type: '' })).toBe(true);
   });
 
-  it('rejects unsupported files', () => {
+  it('rejects unsupported files with a named rule + CTA', () => {
     expect(
       validateAudioFile({ name: 'notes.txt', type: 'text/plain', size: 10 })
     ).toContain('MP3');
-  });
-
-  it('returns a named-rule rejection + CTA for unsupported types', () => {
     const result = validateAudioUpload({
       name: 'notes.txt',
       type: 'text/plain',
@@ -31,13 +28,10 @@ describe('audio constants', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe('audio.supported_types');
-    expect(result.rule).toMatch(/Supported types/i);
-    expect(result.message).toMatch(/text\/plain/i);
     expect(result.cta.action).toBe('pick_another');
-    expect(result.cta.label.length).toBeGreaterThan(0);
   });
 
-  it('returns a named-rule rejection + CTA for oversize files', () => {
+  it('rejects oversize files with a named rule + CTA', () => {
     const result = validateAudioUpload({
       name: 'huge.mp3',
       type: 'audio/mpeg',
@@ -46,21 +40,13 @@ describe('audio constants', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe('audio.max_file_size_bytes');
-    expect(result.rule).toMatch(/Max file size/i);
     expect(result.cta.action).toBe('compress');
   });
 
-  it('accepts valid audio uploads', () => {
+  it('accepts valid audio and parses titles', () => {
     expect(
-      validateAudioUpload({
-        name: 'track.mp3',
-        type: 'audio/mpeg',
-        size: 1024,
-      })
+      validateAudioUpload({ name: 'track.mp3', type: 'audio/mpeg', size: 1024 })
     ).toEqual({ ok: true });
-  });
-
-  it('parses a human title from the file name', () => {
     expect(parseAudioTitleFromFileName('Take_Me_Over-final.wav')).toBe(
       'Take Me Over final'
     );

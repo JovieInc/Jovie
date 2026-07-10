@@ -472,14 +472,6 @@ export function resumePlaybackAfterInterruption(
   });
 }
 
-export function getPlaybackEngineSnapshot(): PlaybackState {
-  return state;
-}
-
-export function isPlaybackInterrupted(): boolean {
-  return _interruptionDepth > 0;
-}
-
 export function useTrackAudioPlayer() {
   const [playbackState, setPlaybackState] = useState<PlaybackState>(state);
 

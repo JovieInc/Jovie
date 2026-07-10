@@ -85,9 +85,6 @@ export function SeekBar({
       onPointerCancel={endScrub}
       onBlur={endScrub}
       aria-label='Seek track'
-      aria-valuemin={0}
-      aria-valuemax={duration > 0 ? duration : 0}
-      aria-valuenow={displayTime}
       disabled={isDisabled}
       className={cn(
         'seek-range cursor-pointer appearance-none rounded-full accent-(--linear-accent) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:cursor-default disabled:opacity-50',
