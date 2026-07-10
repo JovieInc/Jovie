@@ -1,6 +1,6 @@
 'use client';
 
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play, X } from 'lucide-react';
 import Link from 'next/link';
 import {
   type FormEvent,
@@ -16,7 +16,6 @@ import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { track } from '@/lib/analytics';
 import type {
   ProfilePacAssignment,
   ProfilePacCopyArm,
@@ -25,10 +24,12 @@ import type { PublicMerchCard } from '@/lib/merch/types';
 import { subscribeToNotifications } from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import type { PacState as PacEventState } from '@/lib/tracking/pac-events-contract';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import type { Artist } from '@/types/db';
+import { usePacEvents } from '../usePacEvents';
 import {
   hasReachedListenThreshold,
   type PacContext,
@@ -264,6 +265,19 @@ export function ProfilePacCard({
     setState(prev => pacReducer(prev, event, ctxRef.current));
   }, []);
 
+  // PAC instrumentation (JOV-3905 / spec §8): consent-aware, variant-keyed.
+  const eventState = state.kind as PacEventState;
+  const { exposureRef, emit, createPlayTracker } = usePacEvents({
+    profileId: artist.id,
+    assignment,
+    state: eventState,
+    enabled: isInteractive,
+  });
+  const playTrackerRef = useRef(createPlayTracker());
+  useEffect(() => {
+    playTrackerRef.current = createPlayTracker();
+  }, [createPlayTracker, pacTrackId]);
+
   // Re-resolve when visitor context lands/changes (jv_aid bootstrap flips
   // the assignment prop upstream; subscription state flips isSubscribed).
   useEffect(() => {
@@ -301,9 +315,35 @@ export function ProfilePacCard({
   // surface started playback, the track ended, an error fired).
   useEffect(() => {
     if (state.kind === 'playing' && !isPacPlaying) {
+      playTrackerRef.current.onPause();
       dispatch({ type: 'PAUSE' });
     }
   }, [dispatch, isPacPlaying, state.kind]);
+
+  // Play milestone ticks while the PAC track is active (pac_play_30s).
+  useEffect(() => {
+    if (!isPacTrackActive || !isPacPlaying) return;
+    playTrackerRef.current.onTick();
+  }, [isPacPlaying, isPacTrackActive, playbackState.currentTime]);
+
+  // Track completion → pac_play_complete + machine pause.
+  const lastDurationRef = useRef(0);
+  useEffect(() => {
+    if (!isPacTrackActive || playbackState.duration <= 0) return;
+    lastDurationRef.current = playbackState.duration;
+    if (
+      playbackState.currentTime > 0 &&
+      playbackState.currentTime >= playbackState.duration - 0.25 &&
+      !playbackState.isPlaying
+    ) {
+      playTrackerRef.current.onComplete();
+    }
+  }, [
+    isPacTrackActive,
+    playbackState.currentTime,
+    playbackState.duration,
+    playbackState.isPlaying,
+  ]);
 
   // Capture moment trigger: listen threshold per experiment arm.
   const thresholdFiredRef = useRef(false);
@@ -318,13 +358,8 @@ export function ProfilePacCard({
     ) {
       thresholdFiredRef.current = true;
       dispatch({ type: 'LISTEN_THRESHOLD' });
-      track('profile_pac_capture_moment', {
-        artist_id: artist.id,
-        trigger: assignment.triggerThreshold,
-      });
     }
   }, [
-    artist.id,
     assignment.triggerThreshold,
     dispatch,
     isPacTrackActive,
@@ -332,20 +367,28 @@ export function ProfilePacCard({
     playbackState.duration,
   ]);
 
-  // Exposure analytics — once per stage.
-  const lastTrackedStageRef = useRef<string | null>(null);
+  // capture_prompt_shown once per entry into the prompt state.
+  const lastPromptShownRef = useRef(false);
   useEffect(() => {
-    if (!isInteractive) return;
-    if (lastTrackedStageRef.current === state.stage) return;
-    lastTrackedStageRef.current = state.stage;
-    track('profile_pac_exposure', {
-      artist_id: artist.id,
-      state: state.kind,
-      stage: state.stage,
-      copy_arm: assignment.copyArm,
-      degraded: state.degraded,
-    });
-  }, [artist.id, assignment.copyArm, isInteractive, state]);
+    if (state.kind === 'prompt') {
+      if (!lastPromptShownRef.current) {
+        lastPromptShownRef.current = true;
+        emit('capture_prompt_shown', {
+          trigger: assignment.triggerThreshold,
+          dismiss_affordance: assignment.dismissAffordance,
+        });
+      }
+      return;
+    }
+    if (state.kind !== 'submitting' && state.kind !== 'error') {
+      lastPromptShownRef.current = false;
+    }
+  }, [
+    assignment.dismissAffordance,
+    assignment.triggerThreshold,
+    emit,
+    state.kind,
+  ]);
 
   const handlePlayClick = useCallback(
     (event: MouseEvent<HTMLElement>) => {
@@ -359,13 +402,15 @@ export function ProfilePacCard({
         artistName: artist.name,
         artworkUrl: release.artworkUrl,
       });
-      dispatch({ type: isPacPlaying ? 'PAUSE' : 'PLAY' });
-      if (!isPacPlaying) {
-        track('profile_pac_play', { artist_id: artist.id });
+      if (isPacPlaying) {
+        playTrackerRef.current.onPause();
+        dispatch({ type: 'PAUSE' });
+      } else {
+        playTrackerRef.current.onPlay();
+        dispatch({ type: 'PLAY' });
       }
     },
     [
-      artist.id,
       artist.name,
       dispatch,
       isInteractive,
@@ -390,14 +435,16 @@ export function ProfilePacCard({
       if (!email) {
         setFieldError('Enter a valid email address.');
         emailRef.current?.focus();
+        emit(
+          'capture_error',
+          { rule: 'invalid_email', channel: 'email' },
+          'error'
+        );
         return;
       }
       setFieldError(null);
       dispatch({ type: 'CAPTURE_SUBMIT' });
-      track('profile_pac_capture_submitted', {
-        artist_id: artist.id,
-        copy_arm: assignment.copyArm,
-      });
+      emit('capture_submit', { channel: 'email' }, 'submitting');
       subscribeToNotifications({
         artistId: artist.id,
         channel: 'email',
@@ -411,13 +458,15 @@ export function ProfilePacCard({
       })
         .then(() => {
           dispatch({ type: 'CAPTURE_SUCCESS' });
-          track('profile_pac_capture_success', {
-            artist_id: artist.id,
-            copy_arm: assignment.copyArm,
-          });
+          emit('capture_success', { channel: 'email' }, 'success');
         })
         .catch(() => {
           dispatch({ type: 'CAPTURE_FAILURE' });
+          emit(
+            'capture_error',
+            { rule: 'subscribe_failed', channel: 'email' },
+            'error'
+          );
         });
     },
     [
@@ -426,6 +475,7 @@ export function ProfilePacCard({
       assignment.triggerThreshold,
       dispatch,
       emailInput,
+      emit,
       isInteractive,
     ]
   );
@@ -433,10 +483,11 @@ export function ProfilePacCard({
   const handleDismiss = useCallback(() => {
     dispatch({ type: 'DISMISS' });
     setCaptureSuppressed(true);
-    track('profile_pac_capture_dismissed', {
-      artist_id: artist.id,
-      copy_arm: assignment.copyArm,
-    });
+    emit(
+      'capture_dismiss',
+      { dismiss_affordance: assignment.dismissAffordance },
+      'dismissed'
+    );
     void fetch('/api/profile/capture-dismissal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -445,7 +496,14 @@ export function ProfilePacCard({
     }).catch(() => {
       // Best-effort — suppression is also held in memory for this session.
     });
-  }, [artist.id, assignment.copyArm, dispatch]);
+  }, [artist.id, assignment.dismissAffordance, dispatch, emit]);
+
+  const handleSecondaryClick = useCallback(
+    (slot: string) => {
+      emit('pac_secondary_click', { slot }, state.kind as PacEventState);
+    },
+    [emit, state.kind]
+  );
 
   // --- Zero-CLS height reservation + 420ms self-height animation.
   const innerRef = useRef<HTMLDivElement>(null);
@@ -536,15 +594,30 @@ export function ProfilePacCard({
     case 'submitting':
     case 'error': {
       contextLabel = 'Stay In The Loop';
-      contextAside = (
-        <button
-          type='button'
-          onClick={handleDismiss}
-          className='shrink-0 text-xs font-medium text-white/50 transition-colors duration-subtle hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
-        >
-          Not now
-        </button>
-      );
+      // JOV-3908: text "Not now" (control) vs borderless icon-X (candidate).
+      contextAside =
+        assignment.dismissAffordance === 'icon' ? (
+          <button
+            type='button'
+            onClick={handleDismiss}
+            aria-label='Dismiss'
+            data-testid='pac-capture-dismiss'
+            data-affordance='icon'
+            className='-mr-1.5 -mt-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/50 transition-colors duration-subtle hover:bg-white/10 hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+          >
+            <X className='h-4 w-4' aria-hidden='true' />
+          </button>
+        ) : (
+          <button
+            type='button'
+            onClick={handleDismiss}
+            data-testid='pac-capture-dismiss'
+            data-affordance='text'
+            className='shrink-0 text-xs font-medium text-white/50 transition-colors duration-subtle hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+          >
+            Not now
+          </button>
+        );
       subject = (
         <div className='min-w-0 flex-1'>
           <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
@@ -622,7 +695,14 @@ export function ProfilePacCard({
           }
         />
       );
-      action = <PrimaryPill href={`/${artist.handle}/shop`}>Shop</PrimaryPill>;
+      action = (
+        <PrimaryPill
+          href={`/${artist.handle}/shop`}
+          onClick={() => handleSecondaryClick('merch')}
+        >
+          Shop
+        </PrimaryPill>
+      );
       break;
     }
 
@@ -638,7 +718,14 @@ export function ProfilePacCard({
           </p>
         </div>
       );
-      action = <PrimaryPill href={`/${artist.handle}/tip`}>Tip</PrimaryPill>;
+      action = (
+        <PrimaryPill
+          href={`/${artist.handle}/tip`}
+          onClick={() => handleSecondaryClick('tip')}
+        >
+          Tip
+        </PrimaryPill>
+      );
       break;
     }
 
@@ -660,11 +747,20 @@ export function ProfilePacCard({
       );
       action =
         state.kind === 'tickets' && nextShow?.ticketUrl ? (
-          <PrimaryPill href={nextShow.ticketUrl} external>
+          <PrimaryPill
+            href={nextShow.ticketUrl}
+            external
+            onClick={() => handleSecondaryClick('tickets')}
+          >
             Tickets
           </PrimaryPill>
         ) : (
-          <PrimaryPill href={`/${artist.handle}/tour`}>RSVP</PrimaryPill>
+          <PrimaryPill
+            href={`/${artist.handle}/tour`}
+            onClick={() => handleSecondaryClick('rsvp')}
+          >
+            RSVP
+          </PrimaryPill>
         );
       break;
     }
@@ -682,7 +778,10 @@ export function ProfilePacCard({
         </div>
       );
       action = (
-        <PrimaryPill href={`/${artist.handle}?mode=subscribe`}>
+        <PrimaryPill
+          href={`/${artist.handle}?mode=subscribe`}
+          onClick={() => handleSecondaryClick('following')}
+        >
           Manage
         </PrimaryPill>
       );
@@ -690,13 +789,24 @@ export function ProfilePacCard({
     }
   }
 
+  // Merge exposure + height refs on the outer section (callback refs).
+  const sectionRef = useCallback(
+    (node: HTMLElement | null) => {
+      exposureRef(node);
+      // height measurement lives on the inner content node, not the section.
+    },
+    [exposureRef]
+  );
+
   return (
     <section
+      ref={sectionRef}
       aria-label={`${artist.name} primary action`}
       data-testid='profile-pac'
       data-state={state.kind}
       data-stage={state.stage}
       data-degraded={state.degraded ? 'true' : undefined}
+      data-dismiss-affordance={assignment.dismissAffordance}
       className={cn(
         'w-full overflow-hidden border border-white/10 bg-white/5 backdrop-blur-2xl',
         className

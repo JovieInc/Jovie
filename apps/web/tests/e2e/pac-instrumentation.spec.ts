@@ -21,7 +21,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const PROFILE_HANDLE = process.env.SMOKE_PROFILE_HANDLE ?? 'timwhite';
 
-const VARIANT_ID = 'copy:default|trigger:30s|s2:merch';
+const VARIANT_ID = 'copy:default|trigger:30s|s2:merch|tab:visible|dismiss:text';
 
 type ScriptedEvent = {
   readonly event: string;
