@@ -4322,13 +4322,18 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
-      # Main deploys to staging with the isolated Doppler `stg` service token.
-      # Do not substitute production GitHub secrets in this job.
+      # Application/runtime secrets stay isolated in Doppler `stg`. Vercel
+      # control-plane credentials are repository-managed GitHub Actions secrets,
+      # matching the preview and production deployment lanes.
       - uses: ./.github/actions/setup-doppler
         with:
           doppler-token: ${{ secrets.DOPPLER_TOKEN_STG }}
       - name: Verify staging deploy control-plane credentials
         shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           missing=()
           for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
@@ -4337,7 +4342,7 @@ jobs:
             fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Doppler stg is missing required deploy credentials: ${missing[*]}"
+            echo "::error::Staging is missing required Vercel deploy credentials: ${missing[*]}"
             exit 1
           fi
       - name: DB safety check (staging preflight)
@@ -4395,6 +4400,10 @@ jobs:
         # Always pull project metadata/env; needed even when prebuilt output is restored
         # (deploy CLI reads .vercel/project.json).
         timeout-minutes: 10
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
@@ -4438,6 +4447,9 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - name: Package build output for provenance attestation
         run: |
           set -euo pipefail
@@ -4503,9 +4515,16 @@ jobs:
           done
         env:
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Alias preview to staging.jov.ie
         timeout-minutes: 3
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
 
