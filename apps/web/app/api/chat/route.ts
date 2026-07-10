@@ -2512,18 +2512,38 @@ export async function POST(req: Request) {
       );
     }
 
-    const reservation = await reserveChatTurn({
-      conversationId: resolvedConversationId,
-      clientTurnId,
-      clientMessageId,
-      source,
-      toolIntent,
-      userMessage: userText || '(image attachment)',
-      userId: sessionContext.user.id,
-      creatorProfileId: resolvedProfileId,
-    });
+    // Turn reservation is durable bookkeeping. If it fails (DB blip,
+    // migration drift on optional columns), still answer the user —
+    // do not convert every web chat turn into CHAT_STREAM_FAILED.
+    let reservation: Awaited<ReturnType<typeof reserveChatTurn>> | null = null;
+    try {
+      reservation = await reserveChatTurn({
+        conversationId: resolvedConversationId,
+        clientTurnId,
+        clientMessageId,
+        source,
+        toolIntent,
+        userMessage: userText || '(image attachment)',
+        userId: sessionContext.user.id,
+        creatorProfileId: resolvedProfileId,
+      });
+    } catch (error) {
+      await captureError(
+        'Chat turn reserve failed; continuing without durable turn',
+        error,
+        {
+          feature: 'ai-chat',
+          mode: 'reserve-fail-soft',
+          requestId,
+          userId,
+          profileId: resolvedProfileId,
+          clientTurnId,
+        }
+      );
+      reservation = null;
+    }
 
-    if (reservation.outcome === 'duplicate_in_progress') {
+    if (reservation?.outcome === 'duplicate_in_progress') {
       return NextResponse.json(
         {
           error: TURN_IN_PROGRESS_ERROR_CODE,
@@ -2545,7 +2565,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (reservation.outcome === 'duplicate_completed') {
+    if (reservation?.outcome === 'duplicate_completed') {
       const assistantMessage = [...reservation.messages]
         .reverse()
         .find(message => message.role === 'assistant');
@@ -2582,20 +2602,23 @@ export async function POST(req: Request) {
       });
     }
 
-    reservedTurn = {
-      conversationId: reservation.conversationId,
-      turnId: reservation.turn.id,
-    };
+    if (reservation?.outcome === 'reserved') {
+      reservedTurn = {
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+      };
+    }
 
     if (
+      reservedTurn &&
       albumArtCapability.availability !== 'available' &&
       detectAlbumArtGenerationIntent({ text: userText, toolIntent })
     ) {
       const replyText =
         buildAlbumArtUnavailableAssistantMessage(albumArtCapability);
       await persistTerminalAssistantMessage({
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
         status: 'failed_tool_unavailable',
         content: replyText,
         errorCode: albumArtCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
@@ -2608,26 +2631,27 @@ export async function POST(req: Request) {
         corsHeaders,
         headers: {
           'x-chat-preflight': 'album-art-unavailable',
-          'x-conversation-id': reservation.conversationId,
-          'x-chat-turn-id': reservation.turn.id,
+          'x-conversation-id': reservedTurn.conversationId,
+          'x-chat-turn-id': reservedTurn.turnId,
         },
         metadata: buildChatTurnMetadata({
-          conversationId: reservation.conversationId,
-          turnId: reservation.turn.id,
+          conversationId: reservedTurn.conversationId,
+          turnId: reservedTurn.turnId,
           requestId,
         }),
       });
     }
 
     if (
+      reservedTurn &&
       retouchCapability.availability !== 'available' &&
       detectRetouchIntent({ text: userText, toolIntent })
     ) {
       const replyText =
         buildRetouchUnavailableAssistantMessage(retouchCapability);
       await persistTerminalAssistantMessage({
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
         status: 'failed_tool_unavailable',
         content: replyText,
         errorCode: retouchCapability.reasonCode ?? 'TOOL_UNAVAILABLE',
@@ -2640,14 +2664,50 @@ export async function POST(req: Request) {
         corsHeaders,
         headers: {
           'x-chat-preflight': 'retouch-unavailable',
-          'x-conversation-id': reservation.conversationId,
-          'x-chat-turn-id': reservation.turn.id,
+          'x-conversation-id': reservedTurn.conversationId,
+          'x-chat-turn-id': reservedTurn.turnId,
         },
         metadata: buildChatTurnMetadata({
-          conversationId: reservation.conversationId,
-          turnId: reservation.turn.id,
+          conversationId: reservedTurn.conversationId,
+          turnId: reservedTurn.turnId,
           requestId,
         }),
+      });
+    }
+
+    // Preflight unavailability when reservation failed soft: still answer
+    // without durable turn headers so the client gets a clear stream.
+    if (
+      !reservedTurn &&
+      albumArtCapability.availability !== 'available' &&
+      detectAlbumArtGenerationIntent({ text: userText, toolIntent })
+    ) {
+      const replyText =
+        buildAlbumArtUnavailableAssistantMessage(albumArtCapability);
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'album-art-unavailable',
+        },
+      });
+    }
+
+    if (
+      !reservedTurn &&
+      retouchCapability.availability !== 'available' &&
+      detectRetouchIntent({ text: userText, toolIntent })
+    ) {
+      const replyText =
+        buildRetouchUnavailableAssistantMessage(retouchCapability);
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'retouch-unavailable',
+        },
       });
     }
   }

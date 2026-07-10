@@ -682,6 +682,46 @@ describe('limiters.ts', () => {
         'You have reached your daily AI message limit. Your quota resets tomorrow.'
       );
     });
+
+    it('fails open when the burst limit is denied by a degraded backend', async () => {
+      mockLimit
+        .mockResolvedValueOnce(makeDeniedResult({ degraded: true }))
+        .mockResolvedValueOnce(makeAllowedResult());
+
+      const { checkAiChatRateLimitForPlan } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAiChatRateLimitForPlan('user-1', 'pro');
+
+      expect(result.success).toBe(true);
+      // burst (degraded → allow) + daily
+      expect(mockLimit).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails open when the daily limit is denied by an unavailable backend', async () => {
+      mockLimit
+        .mockResolvedValueOnce(makeAllowedResult())
+        .mockResolvedValueOnce(makeDeniedResult({ unavailable: true }));
+
+      const { checkAiChatRateLimitForPlan } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAiChatRateLimitForPlan('user-1', 'free');
+
+      expect(result.success).toBe(true);
+    });
+
+    it('fails open when the limiter throws unexpectedly', async () => {
+      mockLimit.mockRejectedValue(new Error('redis circuit exploded'));
+
+      const { checkAiChatRateLimitForPlan } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAiChatRateLimitForPlan('user-1', 'pro');
+
+      expect(result.success).toBe(true);
+      expect(result.degraded).toBe(true);
+    });
   });
 
   // =========================================================================
