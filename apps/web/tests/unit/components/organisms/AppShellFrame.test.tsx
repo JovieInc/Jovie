@@ -67,6 +67,9 @@ describe('AppShellFrame', () => {
       'legacy'
     );
     expect(mainContent).toHaveClass('lg:border-l');
+    // Guard against the production Tailwind v4 token form (not the legacy
+    // [var(...)] spelling) so this negative assert actually tracks the class
+    // AppShellFrame emits for shellChatV1.
     expect(mainContent).not.toHaveClass(
       'lg:shadow-(--linear-app-shell-shadow)'
     );

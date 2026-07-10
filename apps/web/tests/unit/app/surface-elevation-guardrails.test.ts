@@ -422,6 +422,9 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(shellFrame).toContain('lg:shadow-(--linear-app-shell-shadow)');
+    // AppShellFrame uses Tailwind v4 bare-var syntax for the shell gap/padding.
+    // Guardrails must match production classes exactly — [var(...)] form drifts
+    // and fails Unit Tests after #13831.
     expect(shellFrame).toContain(
       'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
     );
@@ -433,8 +436,13 @@ describe('surface elevation guardrails', () => {
     // Mobile overlay retains shadow; desktop drawer is flat so elevation
     // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.
     expect(rightDrawer).toContain('shadow-(--linear-app-drawer-shadow)');
-    // Desktop-only classes: no border, no radius — flat inline sidebar
+    // Desktop-only classes: no border, no radius — flat inline sidebar.
+    // Assert the production Tailwind v4 token form so this negative check
+    // tracks the class AppShellFrame / RightRail actually emit.
     expect(rightDrawer).not.toContain('lg:rounded-(--linear-app-shell-radius)');
+    expect(rightDrawer).not.toContain(
+      'lg:rounded-[var(--linear-app-shell-radius)]'
+    );
     expect(rightDrawer).not.toContain('lg:border');
     expect(adminTableShell).toContain('bg-(--linear-app-content-surface)/96');
   });
