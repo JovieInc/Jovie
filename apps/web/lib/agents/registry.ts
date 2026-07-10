@@ -25,6 +25,8 @@ export const SKILL_REGISTRY = {
       'Draft a destination-aware release pitch for playlists, radio, Sirius XM, installs, playback, editorial posts, record labels, or collaborators.',
     kind: 'tool',
     version: '1.0.0',
+    lifecycle: 'ga',
+    activeVersion: '1.0.0',
     entitlement: 'aiCanUseTools',
     model: 'anthropic/claude-haiku-4-5-20251001',
     inputSchemaZodPath: 'apps/web/lib/chat/tool-schemas.ts',
@@ -42,6 +44,8 @@ export const SKILL_REGISTRY = {
       'Extract transcript summary, title/thumbnail promise, first-30s hook, and niche priors for a YouTube video.',
     kind: 'tool',
     version: '1.0.0',
+    lifecycle: 'ga',
+    activeVersion: '1.0.0',
     entitlement: 'aiCanUseTools',
     model: 'anthropic/claude-haiku-4-5-20251001',
     inputSchemaZodPath: 'apps/web/lib/services/packaging-intelligence/types.ts',
@@ -53,6 +57,40 @@ export const SKILL_REGISTRY = {
       connector: 'youtube',
     },
   },
+  // Playbook-facing tool stubs (catalog + compile resolution). Executors may
+  // land in follow-up PRs; unresolved references must fail at compile time.
+  smart_link_switch_live: {
+    id: 'smart_link_switch_live',
+    name: 'Switch smart link live',
+    description:
+      'Flip a release smart link from pre-save/countdown mode to live DSP links.',
+    kind: 'tool',
+    version: '1.0.0',
+    lifecycle: 'ga',
+    activeVersion: '1.0.0',
+    entitlement: 'canEditSmartLinks',
+    model: 'anthropic/claude-haiku-4-5-20251001',
+    metadata: {
+      surface: 'smart_link',
+      action: 'switch_live',
+    },
+  },
+  fan_email_send: {
+    id: 'fan_email_send',
+    name: 'Send fan email',
+    description:
+      'Queue a fan-list email for a release announcement with the live smart link.',
+    kind: 'tool',
+    version: '1.0.0',
+    lifecycle: 'ga',
+    activeVersion: '1.0.0',
+    entitlement: 'canAccessEmailCampaigns',
+    model: 'anthropic/claude-haiku-4-5-20251001',
+    metadata: {
+      surface: 'email',
+      action: 'fan_send',
+    },
+  },
   retouch: {
     id: 'retouch',
     name: 'Retouch image',
@@ -60,6 +98,8 @@ export const SKILL_REGISTRY = {
       'AI retouching using the White Space style (Kodak Portra cinematic editorial). Hard identity-preservation guardrails.',
     kind: 'vertical_agent',
     version: '1.0.0',
+    lifecycle: 'ga',
+    activeVersion: '1.0.0',
     entitlement: 'canAccessAiRetouching',
     model: 'google/gemini-2.5-flash-image',
     promptPath: 'apps/web/lib/services/retouching/styles/white-space.md',

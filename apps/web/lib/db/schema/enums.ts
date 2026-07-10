@@ -793,6 +793,16 @@ export const skillKindEnum = pgEnum('skill_kind', [
   'style',
 ]);
 
+/** Staged rollout states for skills_catalog (JOV-3944). */
+export const skillLifecycleEnum = pgEnum('skill_lifecycle', [
+  'draft',
+  'dogfood',
+  'cohort',
+  'ga',
+  'deprecated',
+  'disabled',
+]);
+
 export const retouchJobStatusEnum = pgEnum('retouch_job_status', [
   'queued',
   'running',
