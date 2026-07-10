@@ -15,14 +15,10 @@ interface EntityCarouselProps {
 }
 
 /**
- * One horizontal snap track. The featured (first) item renders `big`; the rest
- * render `compact`. This is the single card section for a public-profile home —
- * no stacked sections.
- *
- * ponytail: treatment is SSR-stable (position-only), not a client breakpoint —
- * a JS media-query switch would flip content on hydration and shift layout,
- * which the layout-shift rule bans. Revealing the `detailed` treatment on wide
- * viewports is a CSS container-query enhancement → JOV follow-up, not a hook.
+ * One horizontal snap track with one stable card geometry. Ordering can make an
+ * item prominent, but its dimensions must not change: mixed card sizes create a
+ * false hierarchy, crop the trailing cards, and make the rail look vertically
+ * scrollable inside the fixed profile shell.
  */
 export function EntityCarousel({
   items,
@@ -95,13 +91,12 @@ export function EntityCarousel({
   return (
     <ul
       className={cn(
-        'flex snap-x snap-mandatory list-none gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'profile-horizontal-rail flex snap-x snap-mandatory list-none gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain',
         className
       )}
       data-testid={dataTestId ?? 'entity-carousel'}
     >
       {items.map((model, index) => {
-        const isFeatured = index === 0;
         return (
           <li
             key={`${model.kind}-${model.id}`}
@@ -111,21 +106,17 @@ export function EntityCarousel({
             data-carousel-index={index}
             // items-start keeps the deterministic shape in charge: a stretched
             // cross-axis would override the card's fixed aspect ratio.
-            className={cn(
-              'flex shrink-0 snap-start items-start',
-              isFeatured ? 'w-65' : 'w-45'
-            )}
+            className='flex h-96 w-56 shrink-0 snap-start items-start'
           >
             <EntityCard
               model={model}
-              treatment={isFeatured ? 'big' : 'compact'}
-              // Composition rule (#11899): profile cards render as the fixed
-              // standard 4:5 shape — height derives from width, never from
-              // content flow, so no "monster vertical" cards.
-              shape='standard'
+              treatment='detailed'
+              // Square art plus metadata and a 44px control cannot fit inside
+              // the old 4:5 shell. The rail owns one explicit 224x384 footprint
+              // so every card stays equal without clipping its useful content.
               surface={surface}
-              priority={isFeatured}
-              className='w-full'
+              priority={index === 0}
+              className='h-full w-full overflow-hidden'
               onClick={
                 onCardClick ? () => onCardClick(index, model) : undefined
               }

@@ -271,11 +271,13 @@ export function TourDrawerContent({
   tourDates,
   emptyStateSourceContext,
   renderMode = 'interactive',
+  className,
 }: Readonly<{
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
   readonly emptyStateSourceContext?: NotificationSourceContext;
   readonly renderMode?: ProfileRenderMode;
+  readonly className?: string;
 }>) {
   const { location } = useUserLocation();
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
@@ -290,7 +292,7 @@ export function TourDrawerContent({
     };
 
   return (
-    <div data-testid='tour-drawer-content'>
+    <div className={cn(className)} data-testid='tour-drawer-content'>
       <TourDatesContent
         artist={artist}
         nearby={nearbyDates}

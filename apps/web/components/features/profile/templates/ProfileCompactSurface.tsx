@@ -428,7 +428,7 @@ export function ProfileCompactSurface({
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
-    'h-9! w-9! border-white/14 bg-black/24 text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
+    'h-11! w-11! border-white/14 bg-black/24 text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   // Composition rule (#11899, lib/profile/composition.ts): hero media has
@@ -580,7 +580,7 @@ export function ProfileCompactSurface({
                     fill
                     priority
                     sizes='(max-width: 767px) 100vw, 430px'
-                    className='object-cover object-[50%_34%]'
+                    className='object-cover object-[50%_20%]'
                     fallbackVariant='avatar'
                     fallbackClassName='bg-surface-2'
                   />
@@ -660,10 +660,13 @@ export function ProfileCompactSurface({
           </div>
 
           {isHomeMode ? (
-            <div className='absolute inset-x-0 bottom-0 z-10 px-(--page-pad) pb-5 [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'>
+            <div
+              className='profile-hero-identity-scrim absolute inset-x-0 bottom-0 z-10 px-(--page-pad) pb-5 pt-8 backdrop-blur-[2px] [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'
+              data-testid='profile-hero-identity-block'
+            >
               <div
-                className='min-w-0 rounded-2xl bg-black/18 px-3 py-2.5 shadow-[0_16px_38px_-24px_rgba(0,0,0,0.72)] backdrop-blur-[2px] [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
-                data-testid='profile-hero-identity-block'
+                className='min-w-0 px-3 py-2.5 [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
+                data-testid='profile-hero-identity-content'
               >
                 <IdentityHeading
                   className='min-w-0'
@@ -745,14 +748,14 @@ export function ProfileCompactSurface({
             isHomeMode ? 'pt-0' : 'pt-2'
           )}
         >
-          {shouldRenderInteractiveOverlays ? (
+          {shouldRenderInteractiveOverlays &&
+          activeVisiblePrimaryTab !== 'subscribe' ? (
             <ProfileInlineNotificationsCTA
               artist={artist}
               onManageNotifications={onManageNotifications}
               onRegisterReveal={registerNotificationsReveal}
               portalContainer={notificationsPortalContainer ?? undefined}
               variant='hero'
-              autoOpen={activeVisiblePrimaryTab === 'subscribe'}
               hideTrigger
               experimentVariant={alertOptInVariant}
               source={activeNotificationSourceContext.ctaLocation}
@@ -773,7 +776,7 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [touch-action:pan-y]',
+              'profile-content-scroll-region overflow-y-auto overscroll-contain',
               homeContentScrollClassName,
               showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
               !isHomeMode &&
