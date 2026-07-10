@@ -30,7 +30,7 @@ describe('threads page System B source contract', () => {
       "className='shrink-0 border-b border-subtle px-4 py-3 sm:px-6'"
     );
     expect(source).toContain(
-      "className='grid min-h-[18rem] place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'"
+      "className='grid min-h-72 place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'"
     );
   });
 

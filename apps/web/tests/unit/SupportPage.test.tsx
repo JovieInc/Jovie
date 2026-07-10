@@ -24,7 +24,7 @@ describe('SupportPage', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toBeInTheDocument();
-    expect(heading).toHaveTextContent("We're here to help.");
+    expect(heading).toHaveTextContent("We're Here To Help.");
   });
 
   it('renders the contact support button as a link', () => {
@@ -89,15 +89,23 @@ describe('SupportPage', () => {
     render(<SupportPage />);
 
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveClass('marketing-h1-linear');
+    expect(heading).toHaveClass(
+      'mt-6',
+      'text-4xl',
+      'font-semibold',
+      'tracking-tight',
+      'text-balance',
+      'text-primary-token',
+      'sm:text-5xl',
+      'lg:text-6xl'
+    );
 
     const sectionHeadings = screen.getAllByRole('heading', { level: 2 });
     expect(sectionHeadings).toHaveLength(3);
     for (const sectionHeading of sectionHeadings) {
-      expect(sectionHeading).toHaveClass('marketing-h2-linear');
       expect(sectionHeading).toHaveClass('text-primary-token');
-      expect(sectionHeading).not.toHaveClass('text-2xl');
-      expect(sectionHeading).not.toHaveClass('font-semibold');
+      expect(sectionHeading).toHaveClass('text-2xl');
+      expect(sectionHeading).toHaveClass('font-semibold');
     }
   });
 
@@ -112,7 +120,7 @@ describe('SupportPage', () => {
     render(<SupportPage />);
 
     expect(
-      screen.getByRole('heading', { level: 2, name: 'How can we help?' })
+      screen.getByRole('heading', { level: 2, name: 'How Can We Help?' })
     ).toBeInTheDocument();
 
     for (const title of ['Documentation', 'Email Support', 'Getting Started']) {
