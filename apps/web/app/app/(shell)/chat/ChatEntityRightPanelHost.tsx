@@ -1102,14 +1102,19 @@ export function ChatEntityRightPanelHost({
       }
     }
 
-    // Only render the profile preview card when the preview panel is actually
-    // open. A closed RightDrawer collapses to zero width *inside* the card, so
-    // keeping this wrapper mounted registers a non-null right panel and leaves
-    // a ghost empty card + reserved rail width in the app shell (gh-12134).
+    // Only render the profile preview when the preview panel is actually open.
+    // A closed RightDrawer collapses to zero width *inside* a host wrapper, so
+    // keeping this mounted registers a non-null right panel and leaves a ghost
+    // reserved rail width in the app shell (gh-12134).
+    // Host class is a full-height flex column (no card chrome) so the LIVE
+    // phone preview stays clipped to the rail below the shell header (JOV-3958).
     const liveProfilePreview =
       enablePreviewPanel && isPreviewPanelOpen ? (
         <ErrorBoundary fallback={null}>
-          <div className='system-b-chat-profile-preview-card'>
+          <div
+            className='system-b-chat-profile-preview-card'
+            data-testid='chat-profile-preview-rail'
+          >
             <ProfileContactSidebar />
           </div>
         </ErrorBoundary>

@@ -334,7 +334,13 @@ describe('ChatEntityRightPanelHost', () => {
     );
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
-    expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+
+    // Full-height rail host (no decorative card chrome) — JOV-3958
+    render(registeredPanel as React.ReactElement);
+    expect(screen.getByTestId('chat-profile-preview-rail')).toBeInTheDocument();
+    expect(screen.getByTestId('dynamic-import-stub')).toBeInTheDocument();
   });
 
   it('registers the live profile sidebar when preview opens with profile context', () => {

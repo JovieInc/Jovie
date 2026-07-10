@@ -4537,15 +4537,20 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   font-size: var(--text-nav);
 }
 
+/* Host for live ProfileContactSidebar in the chat right rail.
+   Full-height flex column — no card chrome. EntitySidebarShell / RightDrawer
+   own width, elevation, and internal scroll. Decorative padding/border here
+   was clipping the LIVE phone preview under the header seam and making the
+   panel float over the transcript (JOV-3958). */
 :where(.system-b-chat-profile-preview-card) {
   position: relative;
-  min-height: 18.75rem;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-2xl);
-  background: var(--color-bg-surface-1);
-  padding: var(--space-5) var(--space-4);
-  box-shadow: var(--shadow-card);
+  background: transparent;
 }
 
 :where(.system-b-chat-profile-preview-header) {
