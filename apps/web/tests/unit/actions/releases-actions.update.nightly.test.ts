@@ -309,7 +309,7 @@ function setupDbUpdateChain() {
   });
 }
 
-function setupDbSelectJoinChain(result: unknown[]) {
+function _setupDbSelectJoinChain(result: unknown[]) {
   mockDbSelect.mockReturnValueOnce({
     from: vi.fn().mockReturnValue({
       innerJoin: vi.fn().mockReturnValue({
@@ -585,9 +585,34 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
   // deleteRelease
   // =========================================================================
   describe('deleteRelease', () => {
-    it('deletes a release owned by the user', async () => {
-      mockGetReleaseById.mockResolvedValue(makeRelease());
-      setupDbSelectJoinChain([]);
+    it('hard-deletes a manual Jovie-created release', async () => {
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({ sourceType: 'manual', status: 'draft' })
+      );
+      const deleteWhere = vi.fn().mockResolvedValue(undefined);
+      mockDbDelete.mockReturnValue({ where: deleteWhere });
+
+      const { deleteRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await deleteRelease({ releaseId: 'rel_001' });
+
+      expect(result.success).toBe(true);
+      expect(result.mode).toBe('delete');
+      expect(mockDbDelete).toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockRevalidateTag).toHaveBeenCalled();
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+    });
+
+    it('archives provider-ingested released music instead of hard-deleting', async () => {
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({
+          sourceType: 'ingested',
+          status: 'released',
+          releaseDate: new Date('2020-01-01'),
+        })
+      );
       setupDbUpdateChain();
 
       const { deleteRelease } = await import(
@@ -596,9 +621,9 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
       const result = await deleteRelease({ releaseId: 'rel_001' });
 
       expect(result.success).toBe(true);
+      expect(result.mode).toBe('archive');
       expect(mockDbUpdate).toHaveBeenCalled();
-      expect(mockRevalidateTag).toHaveBeenCalled();
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      expect(mockDbDelete).not.toHaveBeenCalled();
     });
 
     it('rejects unauthenticated calls', async () => {

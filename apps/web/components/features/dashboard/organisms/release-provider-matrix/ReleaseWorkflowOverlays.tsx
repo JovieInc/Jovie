@@ -138,24 +138,22 @@ export function ReleaseWorkflowOverlays({
           }}
           title={
             isDistributedRelease(deleteTarget)
-              ? 'Release is distributed'
+              ? `Archive "${deleteTarget.title}"?`
               : `Delete "${deleteTarget.title}"?`
           }
           description={
             isDistributedRelease(deleteTarget)
-              ? 'Remove this release from distribution before deleting it.'
-              : 'This will remove the release from your dashboard and public profile.'
+              ? 'This release was ingested from a provider and is already released. It will be archived (hidden from your dashboard and public profile), not permanently deleted.'
+              : 'This will permanently remove the release from your dashboard and public profile.'
           }
-          confirmLabel={isDistributedRelease(deleteTarget) ? 'OK' : 'Delete'}
+          confirmLabel={
+            isDistributedRelease(deleteTarget) ? 'Archive' : 'Delete'
+          }
           variant={
             isDistributedRelease(deleteTarget) ? 'default' : 'destructive'
           }
           isLoading={isDeleting}
-          onConfirm={
-            isDistributedRelease(deleteTarget)
-              ? closeDeleteDialog
-              : onDeleteConfirm
-          }
+          onConfirm={onDeleteConfirm}
         />
       )}
     </>

@@ -351,35 +351,77 @@ describe('LibrarySurface', () => {
     expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
-  it('renders approval status badges and supports filtering by approval status', async () => {
+  it('shows release status on cards/rows and never conflates approval Draft with release state', async () => {
     renderLibraryWithSidebarOverride([
-      buildAsset({ approvalStatus: 'needs_review' }),
+      buildAsset({
+        status: 'released',
+        approvalStatus: 'draft',
+      }),
       buildAsset({
         id: 'release-2',
         title: 'Second Track',
+        status: 'released',
+        approvalStatus: 'needs_review',
+      }),
+      buildAsset({
+        id: 'release-3',
+        title: 'Third Track',
+        status: 'released',
         approvalStatus: 'approved',
       }),
     ]);
     clickGridView();
 
+    // Grid cards surface Release Status (not Approval) so a Released item never
+    // reads as a bare "Draft" (JOV-3333).
     expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Needs Review');
+      screen.getByTestId('library-release-status-release-1')
+    ).toHaveTextContent('Released');
     expect(
-      screen.getByTestId('library-approval-status-release-2')
-    ).toHaveTextContent('Approved');
+      screen.getByTestId('library-release-status-release-1')
+    ).toHaveAccessibleName('Release Status: Released');
+    expect(
+      screen.queryByTestId('library-approval-status-release-1')
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     fireEvent.click(screen.getByRole('button', { name: /Needs Review/u }));
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-approval-status-release-1')
+        screen.getByTestId('library-release-status-release-2')
       ).toBeInTheDocument();
       expect(
-        screen.queryByTestId('library-approval-status-release-2')
+        screen.queryByTestId('library-release-status-release-1')
+      ).toBeNull();
+      expect(
+        screen.queryByTestId('library-release-status-release-3')
       ).toBeNull();
     });
+  });
+
+  it('keeps Approval Status once in the detail rail editor only', () => {
+    renderLibrary([
+      buildAsset({ status: 'released', approvalStatus: 'draft' }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    // Hero shows release status only — no duplicate approval pill.
+    expect(
+      drawer.getByTestId('library-release-status-release-1')
+    ).toHaveTextContent('Released');
+    expect(
+      drawer.queryByTestId('library-approval-status-release-1')
+    ).not.toBeInTheDocument();
+    // Editable approval lives exactly once under Details.
+    expect(
+      drawer.getByRole('button', { name: 'Approval Status' })
+    ).toBeInTheDocument();
+    expect(
+      drawer.getAllByRole('button', { name: 'Approval Status' })
+    ).toHaveLength(1);
   });
 
   it('keeps the approval status inline control labelled after the details refactor', () => {

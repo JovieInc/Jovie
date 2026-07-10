@@ -491,10 +491,13 @@ const StatusCell = memo(function StatusCell({
 }) {
   return (
     <span
+      role='status'
       className={cn(
         'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
         releaseStatusClasses(asset.status)
       )}
+      data-testid={`library-release-status-${asset.id}`}
+      aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
     >
       {formatLibraryStatus(asset)}
     </span>
@@ -508,11 +511,13 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
 }) {
   return (
     <span
+      role='status'
       className={cn(
         'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
         libraryApprovalStatusClasses(asset.approvalStatus)
       )}
       data-testid={`library-approval-status-${asset.id}`}
+      aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
     >
       {formatLibraryApprovalStatus(asset.approvalStatus)}
     </span>
@@ -557,7 +562,7 @@ const ProvidersCell = memo(function ProvidersCell({
     return (
       <span
         role='img'
-        aria-label='No providers'
+        aria-label='No Providers'
         className='system-b-library-meta-text text-quaternary-token'
       >
         &mdash;
@@ -1393,13 +1398,15 @@ const AssetCard = memo(function AssetCard({
           >
             <LibraryMediaThumbnail asset={asset} size='card' />
             <span
+              role='status'
               className={cn(
                 'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
-                libraryApprovalStatusClasses(asset.approvalStatus)
+                releaseStatusClasses(asset.status)
               )}
-              data-testid={`library-approval-status-${asset.id}`}
+              data-testid={`library-release-status-${asset.id}`}
+              aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
             >
-              {formatLibraryApprovalStatus(asset.approvalStatus)}
+              {formatLibraryStatus(asset)}
             </span>
           </div>
           <div className='min-w-0 p-3'>
@@ -2045,20 +2052,19 @@ function AssetDrawer({
                   </div>
 
                   <div className='flex flex-wrap gap-1.5'>
+                    {/*
+                      Release Status only in the hero pills. Approval Status is
+                      editable once in Details (ApprovalStatusEditor) — never
+                      duplicate the axes side-by-side (JOV-3333).
+                    */}
                     <span
-                      className={cn(
-                        'system-b-library-status-pill inline-flex h-6 items-center border px-2',
-                        libraryApprovalStatusClasses(current.approvalStatus)
-                      )}
-                      data-testid={`library-approval-status-${current.id}`}
-                    >
-                      {formatLibraryApprovalStatus(current.approvalStatus)}
-                    </span>
-                    <span
+                      role='status'
                       className={cn(
                         'system-b-library-status-pill inline-flex h-6 items-center border px-2',
                         releaseStatusClasses(current.status)
                       )}
+                      data-testid={`library-release-status-${current.id}`}
+                      aria-label={`Release Status: ${formatLibraryStatus(current)}`}
                     >
                       {formatLibraryStatus(current)}
                     </span>

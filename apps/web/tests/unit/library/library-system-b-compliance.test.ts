@@ -71,4 +71,15 @@ describe('library right-rail System B structural compliance', () => {
     expect(surface).not.toMatch(/<select[^>]*library-approval-status-select/);
     expect(surface).toContain('TOOLBAR_MENU_CONTENT_CLASS');
   });
+
+  it('surfaces Release Status on cards/hero and Approval Status once in Details (JOV-3333)', () => {
+    // Grid card badge must use release status classes, not approval.
+    expect(surface).toContain('library-release-status-');
+    expect(surface).toContain('Release Status: ${formatLibraryStatus');
+    // Drawer hero must not render a second approval pill next to release.
+    // Approval lives only in ApprovalStatusEditor under Details.
+    expect(surface).toContain('ApprovalStatusEditor');
+    // Card status data-testid is release, not approval.
+    expect(surface).toContain('library-release-status-${asset.id}');
+  });
 });
