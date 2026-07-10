@@ -238,8 +238,7 @@ function collectGstack(repoRoot) {
   // hits the network and performs one-time migrations (mutations), which are
   // exactly the per-run upgrade tax JOV-4184 removes from the job hot path.
   let latest = null;
-  const stateDir =
-    process.env.GSTACK_STATE_DIR || join(homedir(), '.gstack');
+  const stateDir = process.env.GSTACK_STATE_DIR || join(homedir(), '.gstack');
   const cacheFile = join(stateDir, 'last-update-check');
   if (existsSync(cacheFile)) {
     try {

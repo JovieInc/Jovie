@@ -483,7 +483,10 @@ test('CLI: gstack section never runs update-check and defaults policy to pinned'
     const gstackBin = join(gstackDir, 'bin');
     mkdirSync(gstackBin, { recursive: true });
     writeFileSync(join(gstackDir, 'VERSION'), '1.2.3\n');
-    writeFileSync(join(gstackBin, 'gstack-config'), '#!/usr/bin/env bash\nexit 1\n');
+    writeFileSync(
+      join(gstackBin, 'gstack-config'),
+      '#!/usr/bin/env bash\nexit 1\n'
+    );
     chmodSync(join(gstackBin, 'gstack-config'), 0o755);
     const canary = join(dir, 'update-check-ran');
     writeFileSync(
@@ -494,7 +497,10 @@ test('CLI: gstack section never runs update-check and defaults policy to pinned'
 
     const stateDir = join(dir, 'gstack-state');
     mkdirSync(stateDir, { recursive: true });
-    writeFileSync(join(stateDir, 'last-update-check'), 'UPGRADE_AVAILABLE 1.2.3 2.0.0\n');
+    writeFileSync(
+      join(stateDir, 'last-update-check'),
+      'UPGRADE_AVAILABLE 1.2.3 2.0.0\n'
+    );
 
     const res = runPreflight(dir, { GSTACK_STATE_DIR: stateDir });
     const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
