@@ -94,6 +94,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   let chatEnabled: Bool
   let audienceEnabled: Bool
   let recentConversations: [MobileConversationSummary]
+  let isLoadingConversations: Bool
   let activeConversationID: String?
   let onSelectConversation: (String) -> Void
   let onStartNewChat: () -> Void
@@ -123,6 +124,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     chatEnabled: Bool = false,
     audienceEnabled: Bool = true,
     recentConversations: [MobileConversationSummary] = [],
+    isLoadingConversations: Bool = false,
     activeConversationID: String? = nil,
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onStartNewChat: @escaping () -> Void = {},
@@ -139,6 +141,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     self.chatEnabled = chatEnabled
     self.audienceEnabled = audienceEnabled
     self.recentConversations = recentConversations
+    self.isLoadingConversations = isLoadingConversations
     self.activeConversationID = activeConversationID
     self.onSelectConversation = onSelectConversation
     self.onStartNewChat = onStartNewChat
@@ -172,6 +175,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
             recentConversations: recentConversations,
+            isLoadingConversations: isLoadingConversations,
             activeConversationID: activeConversationID,
             drawerWidth: drawerWidth,
             onSelectTab: { tab in
@@ -350,7 +354,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
     }
 
     if state.selectedTab != previousTab {
-      withAnimation(.easeInOut(duration: 0.25)) {
+      withAnimation(JovieMotion.easeOut(duration: JovieMotion.slowDuration)) {
         selectedTab = state.selectedTab
       }
     } else {
@@ -359,7 +363,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   }
 
   private func selectTab(_ tab: AppShellTab) {
-    withAnimation(.easeInOut(duration: 0.25)) {
+    withAnimation(JovieMotion.easeOut(duration: JovieMotion.slowDuration)) {
       selectedTab = tab
     }
   }
@@ -388,7 +392,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
   }
 
   private var drawerAnimation: Animation {
-    reduceMotion ? .easeInOut(duration: 0.2) : JovieMotion.cinematic
+    reduceMotion ? JovieMotion.subtle : JovieMotion.cinematic
   }
 
   private func drawerOpenOffset(safeAreaLeading: CGFloat) -> CGFloat {
@@ -494,7 +498,7 @@ struct AppShellView<ProfileContent: View, AudienceContent: View, ChatContent: Vi
               value.startLocation.x >= 28 || horizontal < 0
         else { return }
 
-        withAnimation(.easeInOut(duration: 0.28)) {
+        withAnimation(JovieMotion.easeOut(duration: JovieMotion.slowDuration)) {
           if horizontal < 0, selectedTab == .profile {
             selectedTab = .chat
           } else if horizontal > 0, selectedTab == .chat {
