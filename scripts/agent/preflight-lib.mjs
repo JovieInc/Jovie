@@ -89,8 +89,7 @@ export function evaluateOwnership(input) {
     if (requireGbrain) {
       blockers.push({
         code: 'gbrain_missing',
-        message:
-          'gbrain CLI not on PATH (AGENT_PREFLIGHT_REQUIRE_GBRAIN=1).',
+        message: 'gbrain CLI not on PATH (AGENT_PREFLIGHT_REQUIRE_GBRAIN=1).',
       });
     }
     return {

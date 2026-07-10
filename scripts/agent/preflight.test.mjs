@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
-  SCHEMA,
   assembleReceipt,
   buildReceipt,
   decideVerdict,
@@ -16,10 +15,10 @@ import {
   evaluateOwnership,
   evaluateWorktree,
   exitCodeForReceipt,
+  SCHEMA,
 } from './preflight-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = join(HERE, '..', '..');
 const PREFLIGHT_SH = join(HERE, 'preflight.sh');
 
 // ─── Pure unit: worktree ────────────────────────────────────────────────────
@@ -205,7 +204,13 @@ test('buildReceipt / assembleReceipt schema and merge', () => {
 
 test('buildReceipt uses decideVerdict from blockers only', () => {
   const r = buildReceipt({
-    ownership: { owner: null, scope: null, source: 'none', reachable: false, ms: 0 },
+    ownership: {
+      owner: null,
+      scope: null,
+      source: 'none',
+      reachable: false,
+      ms: 0,
+    },
     worktree: {
       clean: true,
       detached: false,
@@ -277,7 +282,7 @@ test('CLI: emits valid schema JSON from a clean git worktree', () => {
     assert.equal(receipt.worktree.clean, true);
     assert.equal(typeof receipt.ms_total, 'number');
     // If only worktree mattered and gbrain not required, should be go unless gbrain forced empty with require.
-    if (receipt.blockers.every((b) => b.code !== 'worktree_dirty')) {
+    if (receipt.blockers.every(b => b.code !== 'worktree_dirty')) {
       assert.equal(receipt.worktree.dirty_paths, 0);
     }
   } finally {
@@ -303,7 +308,7 @@ test('CLI: dirty worktree exits 1 with worktree_dirty', () => {
     assert.equal(res.status, 1, res.stdout + res.stderr);
     const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
     assert.equal(receipt.verdict, 'blocked');
-    assert.ok(receipt.blockers.some((b) => b.code === 'worktree_dirty'));
+    assert.ok(receipt.blockers.some(b => b.code === 'worktree_dirty'));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -319,7 +324,7 @@ test('CLI: non-git directory exits 1 with not_a_git_repo', () => {
     assert.equal(res.status, 1);
     const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
     assert.equal(receipt.verdict, 'blocked');
-    assert.ok(receipt.blockers.some((b) => b.code === 'not_a_git_repo'));
+    assert.ok(receipt.blockers.some(b => b.code === 'not_a_git_repo'));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
