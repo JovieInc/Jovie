@@ -102,10 +102,9 @@ describe('ci-harness manifest', () => {
       'Fork PR Gate',
     ]);
     // Individual harness merge-gate job names must stay in the forbidden pin list
-    // so a batch failure bisects instead of evicting siblings.
+    // so a batch failure bisects instead of evicting siblings. ci-fast is a real
+    // collapsed job (JOV-3464) but must never be pinned alone — only PR Ready is.
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
-      // ci-fast appears in the manifest for docs/remediation; the aggregator was
-      // removed from the workflow but the name remains a forbidden pin.
       expect(
         FORBIDDEN_PINNED_JOB_CONTEXTS.includes(name) ||
           FORBIDDEN_PINNED_JOB_CONTEXTS.includes(`CI / ${name}`),
@@ -339,6 +338,47 @@ describe('ci-harness artifact formatter', () => {
     expect(
       artifact.nextLocalCommands.some(command =>
         command.includes('pnpm doc:freshness:check')
+      )
+    ).toBe(true);
+  });
+
+  it('includes intra-job lane results for ci-fast collapse (JOV-3464)', () => {
+    const artifact = buildCiHarnessArtifact({
+      runId: '456',
+      runAttempt: '1',
+      repository: 'JovieInc/Jovie',
+      prNumber: '100',
+      sha: 'def456',
+      previewUrl: null,
+      manifest,
+      risk: null,
+      jobResults: [{ id: 'ci-fast', status: 'failure' }],
+      laneResults: [
+        {
+          lane: 'typecheck',
+          status: 'failure',
+          nextLocalCommand: 'pnpm run typecheck',
+          log_excerpt: "error TS2304: Cannot find name 'x'",
+        },
+        {
+          id: 'biome',
+          status: 'success',
+          nextLocalCommand: 'pnpm run biome:check',
+        },
+      ],
+    });
+
+    expect(artifact.lanes).toHaveLength(2);
+    expect(artifact.lanes[0]).toMatchObject({
+      lane: 'typecheck',
+      status: 'failure',
+      nextLocalCommand: 'pnpm run typecheck',
+    });
+    expect(artifact.nextLocalCommands).toContain('pnpm run typecheck');
+    // Job-level remediation from ci-fast still present
+    expect(
+      artifact.nextLocalCommands.some(command =>
+        command.includes('pnpm run typecheck')
       )
     ).toBe(true);
   });

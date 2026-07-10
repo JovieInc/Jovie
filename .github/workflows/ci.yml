@@ -449,164 +449,72 @@ jobs:
       - name: Verify backup-file fixture coverage
         run: ./scripts/security/verify-gitleaks-coverage.sh
 
-  ci-guardrails:
-    name: Guardrails (proxy)
-    # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
+  ci-fast:
+    name: ci-fast
+    # JOV-3464: fold cheap cluster into one job (checkout+install once).
+    # Lanes: biome, eslint server-boundaries, typecheck --force, guardrails,
+    # structural (path-gated). Per-lane PASS/FAIL via scripts/ci-fast-lanes.mjs
+    # (--continue semantics; never set -e out on first failure). Heavy lanes
+    # (build / Lighthouse / e2e / preview) stay separate.
     needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: '22'
-      - name: Desktop release guard
-        env:
-          BASE_REF: ${{ github.base_ref || 'main' }}
-        run: node scripts/desktop-release-guard.mjs --base "origin/${BASE_REF}"
-      - name: Version fan-out guard (main-only stamping)
-        env:
-          BASE_REF: ${{ github.base_ref || 'main' }}
-        run: node scripts/version-fanout-guard.mjs --base "origin/${BASE_REF}"
-      - name: Script unit tests
-        run: node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs
-      - name: Version consistency guard
-        run: node scripts/version-check.mjs
-      - name: Next.js proxy guard
-        # next-proxy-guard.mjs only uses Node built-ins (fs, path) — no pnpm install needed.
-        # Running node directly avoids ERR_PNPM_OUTDATED_LOCKFILE on dependabot PRs that
-        # bump package.json without regenerating pnpm-lock.yaml.
-        working-directory: apps/web
-        run: node scripts/next-proxy-guard.mjs
-
-  ci-structural-contract:
-    # Path-gated: only runs when CI harness/.github files change or on push/dispatch.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
-    name: Structural Contract
-    needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 8
-    env:
-      SHELLCHECK_OPTS: >-
-        --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with: { fetch-depth: 1 }
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-      - name: Validate CI harness manifest and generated docs
-        run: pnpm ci:harness:check
-      - name: CI control-plane characterization suite
-        # Locks merge-gate set, risk smoke/preview flags, and merge-queue aggregate
-        # required-check contracts before any YAML refactor can silently change them.
-        run: pnpm ci:control:test
-      - name: Validate CI branching policy
-        run: pnpm ci:branching-guard:validate
-      - name: Validate Graphite merge queue config
-        run: pnpm ci:merge-queue:check
-      - name: Verify typecheck gate uses --force (JOV-3499)
-        run: pnpm ci:typecheck-gate-guard
-      # Keep this pin aligned with actionlint.yml. Downloading the latest binary
-      # from a moving branch during CI made the control-plane check non-hermetic.
-      - name: Run actionlint
-        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
-      - name: Run structural repo guardrails
-        run: |
-          pnpm next:proxy-guard
-          pnpm tailwind:check
-          pnpm --filter=@jovie/web run lint:no-native-dialogs
-          pnpm --filter=@jovie/web run lint:seo
-          pnpm --filter=@jovie/web run lint:contrast-ratchet
-          pnpm doc:freshness:check
-      - name: Validate flaky quarantine ledger
-        run: node .github/scripts/quarantine-ledger.mjs validate
-      - name: Validate reliability detector registry
-        run: pnpm --filter @jovie/web run test:reliability-detectors
-      - name: Run merge-queue drain regression tests
-        run: pip install pytest --quiet && pytest scripts/tests/test_gh_retry.py -v
-      - name: Write remediation summary
-        if: always()
-        run: |
-          {
-            echo "### Structural Contract"
-            echo
-            echo "This lane enforces the CI harness manifest, generated docs, Graphite merge-queue config, workflow syntax, proxy guard, Tailwind contract, native-dialog ban, SEO/AEO ratchet, contrast ratchet, and reliability detector registry."
-            echo
-            echo "Next local command:"
-            echo
-            echo '```bash'
-            echo "pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  ci-biome:
-    name: Lint
-    # Single consolidated job for all Biome checks (lint + format)
-    needs: [ci-path-changes]
-    # Merge gate: keep on always-available GitHub runners. The self-hosted
-    # jovie-runner pool is not highly-available (personal OrbStack host) and
-    # took down this gate when it shut down mid-run.
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with: { fetch-depth: 2 }
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Run Biome CI (lint + format)
-        run: |
-          # For PRs: only lint changed files (faster, pre-commit already ran on local)
-          # For pushes to main: full lint to catch any issues
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            DIFF_BASE="HEAD^1"
-            if ! git rev-parse --verify "$DIFF_BASE" >/dev/null 2>&1; then
-              git fetch origin "${{ github.base_ref }}" --depth=1
-              DIFF_BASE="origin/${{ github.base_ref }}"
-            fi
-            # Use diff-filter=d to exclude deleted files (biome can't lint deleted files)
-            # Include .mts/.mjs extensions for ESM config files
-            mapfile -t CHANGED_FILES < <(
-              git diff --diff-filter=d --name-only "$DIFF_BASE" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' ':(exclude).claude/skills/**'
-            )
-            if (( ${#CHANGED_FILES[@]} > 0 )); then
-              echo "Linting changed files only:"
-              printf '  %s\n' "${CHANGED_FILES[@]}"
-              pnpm biome ci --reporter=github --no-errors-on-unmatched "${CHANGED_FILES[@]}"
-            else
-              echo "No lintable files changed"
-            fi
-          else
-            pnpm biome ci --reporter=github .
-          fi
-      - name: Run ESLint server boundary checks
+      - name: Cache Turbo
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+      - name: Decide structural lane
+        id: structural
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            DIFF_BASE="HEAD^1"
-            if ! git rev-parse --verify "$DIFF_BASE" >/dev/null 2>&1; then
-              git fetch origin "${{ github.base_ref }}" --depth=1
-              DIFF_BASE="origin/${{ github.base_ref }}"
-            fi
-            mapfile -t CHANGED_FILES < <(
-              git diff --diff-filter=d --name-only "$DIFF_BASE" HEAD -- \
-                'apps/web/*.ts' \
-                'apps/web/*.tsx' \
-                'apps/web/**/*.ts' \
-                'apps/web/**/*.tsx'
-            )
-            if (( ${#CHANGED_FILES[@]} > 0 )); then
-              pnpm --filter=@jovie/web run lint:server-boundaries -- "${CHANGED_FILES[@]}"
-            else
-              echo "No server-boundary TypeScript files changed"
-            fi
-          else
-            pnpm --filter=@jovie/web run lint:server-boundaries
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-)'; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install actionlint (structural)
+        if: steps.structural.outputs.skip != 'true'
+        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+      - name: Set up Python (structural drain tests)
+        if: steps.structural.outputs.skip != 'true'
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+      - name: Install pytest (structural drain tests)
+        if: steps.structural.outputs.skip != 'true'
+        run: pip install pytest --quiet
+      - name: Run ci-fast lanes
+        id: lanes
+        env:
+          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}
+          CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
+          SHELLCHECK_OPTS: >-
+            --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Upload ci-fast lane results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-fast-lanes-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-fast-lanes.json
+          retention-days: 7
+          if-no-files-found: warn
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
@@ -664,48 +572,6 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Knip (unused files, deps & exports)
         run: pnpm knip
-
-  ci-typecheck:
-    name: Typecheck
-    # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
-    # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
-    needs: [ci-path-changes]
-    # Runner is var-switchable: CI_FAST_RUNNER=jovie-runner offloads typecheck
-    # to the self-hosted pool when hosted concurrency is the bottleneck
-    # (free-plan orgs get ~20 concurrent hosted jobs + fair-use throttling —
-    # see gbrain jovie-ci-actions-budget-stall-2026-07-10). Typecheck uploads
-    # no artifacts, so the pool's slow egress doesn't bite.
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          # Full history needed for turbo --affected merge-base detection.
-          # Blobless: --affected only needs the commit graph + changed-file
-          # names; HEAD blobs are materialized at checkout, historical blobs
-          # lazy-fetch if ever needed.
-          fetch-depth: 0
-          filter: blob:none
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache Turbo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .turbo
-          # Use content hash for better cache hit rates (not commit SHA which changes every commit)
-          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      # NOTE: tsbuildinfo restore intentionally removed (JOV-3499).
-      # A stale tsbuildinfo from GH Actions cache can convince tsc --incremental that no
-      # types changed, producing a false green even after --force bypasses the Turbo cache.
-      # The merge gate must be a fresh tsc run; the cost is ~1–2 extra minutes per PR.
-      - name: Run typecheck
-        env:
-          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
-        # --force bypasses Turbo's remote cache so a stale SUCCESS from a prior commit
-        # cannot be replayed as the merge gate result. See JOV-3499.
-        run: pnpm turbo typecheck --affected --force
 
   neon-db:
     name: Neon DB
@@ -3719,10 +3585,7 @@ jobs:
       [
         ci-path-changes,
         ci-risk-classifier,
-        ci-typecheck,
-        ci-biome,
-        ci-guardrails,
-        ci-structural-contract,
+        ci-fast,
         ci-unit-tests,
         ci-build-public,
         ci-pr-vercel-preview,
@@ -3733,10 +3596,7 @@ jobs:
     steps:
       - name: Evaluate required PR checks
         run: |
-          TYPECHECK_RESULT="${{ needs.ci-typecheck.result }}"
-          BIOME_RESULT="${{ needs.ci-biome.result }}"
-          GUARDRAILS_RESULT="${{ needs.ci-guardrails.result }}"
-          STRUCTURAL_RESULT="${{ needs.ci-structural-contract.result }}"
+          FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
@@ -3746,10 +3606,7 @@ jobs:
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
           IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
-          echo "ci-typecheck: $TYPECHECK_RESULT"
-          echo "ci-biome: $BIOME_RESULT"
-          echo "ci-guardrails: $GUARDRAILS_RESULT"
-          echo "ci-structural-contract: $STRUCTURAL_RESULT"
+          echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
@@ -3760,10 +3617,7 @@ jobs:
             echo
             echo "| Gate | Result | Next local command |"
             echo "| --- | --- | --- |"
-            echo "| Typecheck | $TYPECHECK_RESULT | \`pnpm run typecheck\` |"
-            echo "| Biome | $BIOME_RESULT | \`pnpm run biome:check\` |"
-            echo "| Guardrails | $GUARDRAILS_RESULT | \`pnpm next:proxy-guard\` |"
-            echo "| Structural Contract | $STRUCTURAL_RESULT | \`pnpm ci:harness:check\` |"
+            echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
             echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
@@ -3778,23 +3632,10 @@ jobs:
             exit 1
           fi
 
-          # Fast leaves must each succeed (or be skipped when path-gated with
-          # no relevant files changed).
-          FAST_LEAF_NAMES=(ci-typecheck ci-biome ci-guardrails ci-structural-contract)
-          FAST_LEAF_RESULTS=("$TYPECHECK_RESULT" "$BIOME_RESULT" "$GUARDRAILS_RESULT" "$STRUCTURAL_RESULT")
-          FAST_LEAF_FAILED=false
-          for i in "${!FAST_LEAF_NAMES[@]}"; do
-            leaf_result="${FAST_LEAF_RESULTS[$i]}"
-            if [[ "$leaf_result" != "success" && "$leaf_result" != "skipped" ]]; then
-              FAST_LEAF_FAILED=true
-            fi
-          done
-          if [[ "$FAST_LEAF_FAILED" == "true" ]]; then
-            echo "❌ One or more fast checks did not pass:"
-            for i in "${!FAST_LEAF_NAMES[@]}"; do
-              echo "   - ${FAST_LEAF_NAMES[$i]}: ${FAST_LEAF_RESULTS[$i]}"
-            done
-            echo "Likely fix: run pnpm run typecheck && pnpm run biome:check, then inspect the failing fast-check job."
+          # ci-fast may be skipped on docs-only PRs (has_code_changes=false).
+          if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
+            echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
+            echo "Likely fix: pnpm run typecheck && pnpm run biome:check (see ci-fast step summary for the failing lane)."
             exit 1
           fi
 
@@ -3840,11 +3681,9 @@ jobs:
       - ci-path-changes
       - ci-env-example-guard
       - ci-secret-scan
-      - ci-guardrails
+      - ci-fast
+      - ci-pr-ready
       - ci-risk-classifier
-      - ci-structural-contract
-      - ci-typecheck
-      - ci-biome
       - neon-db
       - drizzle-migration-guard
       - ci-drizzle-check
@@ -3879,7 +3718,8 @@ jobs:
           RISK_BLOCKS_UNATTENDED: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
           RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
           CI_HARNESS_JOB_CI_RISK_CLASSIFIER: ${{ needs.ci-risk-classifier.result }}
-          CI_HARNESS_JOB_CI_STRUCTURAL_CONTRACT: ${{ needs.ci-structural-contract.result }}
+          CI_HARNESS_JOB_CI_FAST: ${{ needs.ci-fast.result }}
+          CI_HARNESS_JOB_CI_STRUCTURAL_CONTRACT: ${{ needs.ci-fast.result }}
           CI_HARNESS_JOB_CI_UNIT_TESTS: ${{ needs.ci-unit-tests.result }}
           CI_HARNESS_JOB_CI_BUILD_PUBLIC: ${{ needs.ci-build-public.result }}
           CI_HARNESS_JOB_CI_LIGHTHOUSE_PR: ${{ needs.ci-lighthouse-pr.result }}

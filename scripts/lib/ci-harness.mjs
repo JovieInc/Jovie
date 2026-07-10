@@ -493,6 +493,22 @@ export function generateDocsFiles(manifest, { write = false } = {}) {
   return results;
 }
 
+/**
+ * Normalize intra-job lane records (JOV-3464 ci-fast collapse).
+ * @param {Array<{ lane?: string, id?: string, status?: string, nextLocalCommand?: string, log_excerpt?: string, logExcerpt?: string }>} lanes
+ */
+export function normalizeLaneResults(lanes = []) {
+  return (lanes ?? []).map(lane => {
+    const id = lane.lane ?? lane.id ?? 'unknown';
+    return {
+      lane: id,
+      status: lane.status ?? 'not_run',
+      nextLocalCommand: lane.nextLocalCommand ?? null,
+      log_excerpt: lane.log_excerpt ?? lane.logExcerpt ?? null,
+    };
+  });
+}
+
 export function buildCiHarnessArtifact({
   runId,
   runAttempt,
@@ -503,6 +519,9 @@ export function buildCiHarnessArtifact({
   jobResults,
   risk,
   manifest,
+  // Intra-job lane results (e.g. ci-fast biome/typecheck/guardrails lanes).
+  // Accepts either a flat array or a map of jobId → lanes[].
+  laneResults,
 }) {
   const jobsById = new Map((manifest.jobs ?? []).map(job => [job.id, job]));
   const normalizedJobs = (jobResults ?? []).map(result => {
@@ -520,6 +539,23 @@ export function buildCiHarnessArtifact({
     };
   });
 
+  /** @type {Array<{ lane: string, status: string, nextLocalCommand: string|null, log_excerpt: string|null, jobId?: string }>} */
+  let normalizedLanes = [];
+  if (Array.isArray(laneResults)) {
+    normalizedLanes = normalizeLaneResults(laneResults);
+  } else if (laneResults && typeof laneResults === 'object') {
+    for (const [jobId, lanes] of Object.entries(laneResults)) {
+      for (const lane of normalizeLaneResults(lanes)) {
+        normalizedLanes.push({ ...lane, jobId });
+      }
+    }
+  }
+
+  const laneCommands = normalizedLanes
+    .filter(lane => lane.status !== 'success' && lane.status !== 'skipped')
+    .map(lane => lane.nextLocalCommand)
+    .filter(Boolean);
+
   return {
     schemaVersion: HARNESS_SCHEMA_VERSION,
     run: {
@@ -535,12 +571,15 @@ export function buildCiHarnessArtifact({
       risk: risk ?? null,
     },
     jobs: normalizedJobs,
+    // Intra-job lanes (JOV-3464) — fixer agents read nextLocalCommand per lane.
+    lanes: normalizedLanes,
     nextLocalCommands: [
-      ...new Set(
-        normalizedJobs
+      ...new Set([
+        ...normalizedJobs
           .filter(job => job.status !== 'success' && job.nextLocalCommand)
-          .map(job => job.nextLocalCommand)
-      ),
+          .map(job => job.nextLocalCommand),
+        ...laneCommands,
+      ]),
     ],
     generatedAt: new Date().toISOString(),
   };
