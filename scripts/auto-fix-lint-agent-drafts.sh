@@ -91,8 +91,10 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     m: .mergeable,
     ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
-    headOwner: (.headRepositoryOwner.login // ""),
-    headRepo: (.headRepository.name // ""),
+    # GitHub returns headRepositoryOwner as false for some deleted/invalid heads.
+    # Keep the snapshot valid so one malformed PR cannot abort the whole scan.
+    headOwner: (.headRepositoryOwner | if type == "object" then (.login // "") else "" end),
+    headRepo: (.headRepository | if type == "object" then (.name // "") else "" end),
     L: [.labels[].name],
     fail: []
   } ]')"

@@ -163,6 +163,25 @@ class TestGhRetryHelper:
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
 
 
+class TestAutoFixLintWiring:
+    def test_snapshot_handles_non_object_head_repository_fields(self) -> None:
+        content = (_REPO_ROOT / "scripts" / "auto-fix-lint-agent-drafts.sh").read_text(
+            encoding="utf-8"
+        )
+        assert 'headRepositoryOwner | if type == "object"' in content
+        assert 'headRepository | if type == "object"' in content
+
+
+class TestRunnerCapacityWiring:
+    def test_runner_health_never_rewrites_fast_runner_to_hosted_label(self) -> None:
+        content = (_REPO_ROOT / ".github" / "workflows" / "agent-tick.yml").read_text(
+            encoding="utf-8"
+        )
+        assert "Flip to GitHub-hosted fallback" not in content
+        assert "No online jovie-runner capacity" in content
+        assert "value=ubuntu-latest" not in content
+
+
 class TestDrainPrQueueWiring:
     def test_drain_script_avoids_bulk_status_rollup_and_uses_per_pr_checks(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
