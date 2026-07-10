@@ -4592,6 +4592,7 @@ jobs:
             exit 1
           fi
       - name: Promote specific deployment for this SHA
+        timeout-minutes: 10
         id: promote
         env:
           GITHUB_SHA: ${{ github.sha }}
