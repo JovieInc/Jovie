@@ -10,6 +10,7 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  linkVariants: () => 'link-bare',
 }));
 
 vi.mock('next/link', () => ({

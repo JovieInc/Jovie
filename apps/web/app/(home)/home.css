@@ -706,8 +706,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-bento-pairs-section {
-  background: var(--system-b-bg-page);
-  color: var(--color-text-primary-token);
+  /* Light band on the dark homepage shell — scopes tokens so black marketing
+     copy and white cards keep WCAG contrast when html.dark is active. */
+  color-scheme: light;
+  --color-bg-base: #f5f5f7;
+  --color-text-primary-token: #000;
+  --color-text-secondary-token: rgb(0 0 0 / 0.58);
+  --color-text-tertiary-token: rgb(0 0 0 / 0.45);
+  background: var(--color-bg-base);
+  color: #000;
 }
 
 .homepage-outcome-section {

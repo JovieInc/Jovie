@@ -17,6 +17,7 @@ describe('Link', () => {
     expect(link).toHaveAttribute('data-state', 'idle');
     expect(link.className).toContain('text-(--color-link-default)');
     expect(link.className).toContain('visited:text-(--color-link-visited)');
+    expect(link.className).toContain('active:opacity-80');
   });
 
   it('marks visited preview state', () => {
@@ -30,5 +31,30 @@ describe('Link', () => {
       'data-state',
       'visited'
     );
+  });
+
+  it('supports disabled state without navigation', () => {
+    render(
+      <Link href='/disabled' disabled data-testid='disabled-link'>
+        Disabled
+      </Link>
+    );
+
+    const link = screen.getByTestId('disabled-link');
+    expect(link).toHaveAttribute('data-state', 'disabled');
+    expect(link).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('supports asChild composition', () => {
+    render(
+      <Link asChild variant='subtle' data-testid='slot-link'>
+        <a href='/composed'>Composed</a>
+      </Link>
+    );
+
+    const link = screen.getByTestId('slot-link');
+    expect(link.tagName).toBe('A');
+    expect(link).toHaveAttribute('href', '/composed');
+    expect(link.className).toContain('text-(--linear-text-secondary)');
   });
 });

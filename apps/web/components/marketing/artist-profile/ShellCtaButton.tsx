@@ -1,3 +1,4 @@
+import { Link as UiLink } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -56,6 +57,7 @@ export function shellCtaClassName({
   );
 }
 
+/** CTA anchor composed on the canonical Link primitive (JOV-3574). */
 export function ShellCtaButton({
   href,
   children,
@@ -67,13 +69,14 @@ export function ShellCtaButton({
   'aria-label': ariaLabel,
 }: Readonly<ShellCtaButtonProps>) {
   return (
-    <Link
-      href={href}
+    <UiLink
+      asChild
+      variant='bare'
       data-testid={testId}
       aria-label={ariaLabel}
       className={cn(shellCtaClassName({ tone, size, context }), className)}
     >
-      {children}
-    </Link>
+      <Link href={href}>{children}</Link>
+    </UiLink>
   );
 }

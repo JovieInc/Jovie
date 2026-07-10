@@ -38,6 +38,9 @@ const SCALE_ZERO_CLASS_REGEX = /\bscale-0\b/;
 const SCALE_ZERO_TRANSFORM_REGEX = /\bscale\(\s*0(?:\.0+)?\s*\)/;
 // `transition: all` / `transitionProperty: 'all'` in inline styles.
 const TRANSITION_ALL_INLINE_REGEX = /(?:^|[\s,])all(?:[\s,]|$)/;
+// `will-change: all` (and Tailwind `will-change-auto` is fine; ban only all).
+const WILL_CHANGE_ALL_CLASS_REGEX = /\bwill-change-\[all\]\b/;
+const WILL_CHANGE_ALL_INLINE_REGEX = /\bwill-change\s*:\s*all\b/i;
 // Keyframe animations bound to interruptible interaction states restart
 // from frame 0 on every re-trigger; CSS transitions interpolate from the
 // current value. Looping loaders (animate-spin, infinite keyframes) and
@@ -170,6 +173,12 @@ function checkClassNameLiteral(node, value, context) {
       messageId: 'decorativeHoverMotion',
     });
   }
+  if (WILL_CHANGE_ALL_CLASS_REGEX.test(value)) {
+    context.report({
+      node,
+      messageId: 'willChangeAll',
+    });
+  }
 }
 
 function checkInlineStyleValue(node, value, context, options = {}) {
@@ -192,6 +201,12 @@ function checkInlineStyleValue(node, value, context, options = {}) {
       node,
       messageId: 'rawSecondsDuration',
       data: { value: value.match(RAW_SECONDS_DURATION_REGEX)?.[0] ?? '' },
+    });
+  }
+  if (WILL_CHANGE_ALL_INLINE_REGEX.test(value)) {
+    context.report({
+      node,
+      messageId: 'willChangeAll',
     });
   }
   if (EASE_IN_INLINE_REGEX.test(value)) {
@@ -419,6 +434,8 @@ module.exports = {
         'Keyframe animations bound to interaction states restart from frame 0 on every re-trigger. Use a CSS transition (which interpolates from the current value) for hover/focus/active/state-driven motion.',
       hoverWithoutMediaGuard:
         'CSS `:hover` blocks must be wrapped in `@media (hover: hover) and (pointer: fine)` so touch devices don’t get sticky hover states.',
+      willChangeAll:
+        'Avoid `will-change: all` — it promotes every property and burns GPU memory. Name only the properties you animate (e.g. `transform, opacity`) or omit will-change entirely (JOV-3371).',
     },
     schema: [],
   },

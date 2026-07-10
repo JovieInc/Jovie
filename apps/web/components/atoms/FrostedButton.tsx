@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, type ButtonProps } from '@jovie/ui';
+import { Button, type ButtonProps, linkVariants } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,11 @@ const toneToVariant: Record<
   outline: 'frosted-outline',
 };
 
+/**
+ * Frosted control. When `href` is set, the anchor carries the canonical
+ * Link state contract (data-variant=link + active/disabled tokens) via
+ * `linkVariants({ variant: 'bare' })` (JOV-3574).
+ */
 export const FrostedButton = React.forwardRef<
   HTMLButtonElement | HTMLAnchorElement,
   FrostedButtonProps
@@ -46,6 +51,9 @@ export const FrostedButton = React.forwardRef<
             prefetch={prefetch}
             target={external ? '_blank' : undefined}
             rel={external ? 'noopener noreferrer' : undefined}
+            data-variant='link'
+            data-state='idle'
+            className={linkVariants({ variant: 'bare' })}
           >
             {children}
           </Link>

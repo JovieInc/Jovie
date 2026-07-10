@@ -10,7 +10,7 @@ const meta: Meta<typeof Link> = {
     docs: {
       description: {
         component:
-          'Canonical inline link primitive with default, subtle, and inline variants. Visited styling uses :visited and optional data-state="visited".',
+          'Canonical inline link primitive with default/hover/focus-visible/active/visited/disabled states. Compose Next.js routing via asChild.',
       },
     },
   },
@@ -21,6 +21,9 @@ const meta: Meta<typeof Link> = {
       options: ['default', 'subtle', 'inline'],
     },
     visited: {
+      control: { type: 'boolean' },
+    },
+    disabled: {
       control: { type: 'boolean' },
     },
   },
@@ -63,6 +66,59 @@ export const Visited: Story = {
       description: {
         story:
           'Documents visited link styling via data-state="visited" and :visited token --color-link-visited.',
+      },
+    },
+  },
+};
+
+export const Active: Story = {
+  args: {
+    href: '#active-example',
+    children: 'Press and hold to preview active opacity',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Active uses tokenized opacity press feedback (active:opacity-80) without layout motion.',
+      },
+    },
+  },
+};
+
+export const Disabled: Story = {
+  args: {
+    href: '#disabled-example',
+    disabled: true,
+    children: 'Unavailable link',
+  },
+};
+
+export const AllStates: Story = {
+  render: () => (
+    <div className='flex flex-col gap-3'>
+      <Link href='#default'>Default</Link>
+      <Link href='#hover' className='hover:underline'>
+        Hover (use pointer)
+      </Link>
+      <Link href='#visited' visited>
+        Visited
+      </Link>
+      <Link href='#disabled' disabled>
+        Disabled
+      </Link>
+      <Link href='#inline' variant='inline'>
+        Inline
+      </Link>
+      <Link href='#subtle' variant='subtle'>
+        Subtle
+      </Link>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Worked example for the component state-matrix (JOV-3574).',
       },
     },
   },

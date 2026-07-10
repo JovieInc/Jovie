@@ -1,6 +1,7 @@
 'use client';
 
 import './MarketingFooter.css';
+import { Link as UiLink } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -77,15 +78,17 @@ const footerLegalLinkClassName =
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
-    <Link
-      href={link.href}
-      prefetch={link.external ? undefined : false}
+    <UiLink
+      asChild
+      variant='bare'
       className={footerLinkClassName}
       target={link.external ? '_blank' : undefined}
       rel={link.external ? 'noreferrer' : undefined}
     >
-      {link.label}
-    </Link>
+      <Link href={link.href} prefetch={link.external ? undefined : false}>
+        {link.label}
+      </Link>
+    </UiLink>
   );
 }
 
