@@ -3,9 +3,12 @@
 import { Button } from '@jovie/ui';
 
 import Image from 'next/image';
+import { useCallback, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { toast } from '@/components/feedback';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
@@ -92,7 +95,7 @@ function SidebarEntityHeader({
               <div
                 className='absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'
                 role='img'
-                aria-label='Profile image missing'
+                aria-label='Profile Image Missing'
               >
                 <Icon
                   name='Camera'
@@ -133,6 +136,10 @@ function getMatchSourceLabel(matchSource: string | null): string {
 
 function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
   const isSuggested = item.status === 'suggested';
+  const isLinked =
+    item.status === 'confirmed' ||
+    item.status === 'auto_confirmed' ||
+    item.matchSource === 'manual';
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
@@ -188,12 +195,18 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
                 className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
               >
                 <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
-                View on {label}
+                View On {label}
               </Button>
             </a>
           )}
 
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
+          {isLinked && !isSuggested && (
+            <RemovePlatformAction
+              matchId={item.matchId}
+              providerLabel={label}
+            />
+          )}
         </div>
       </DrawerSection>
     </div>
@@ -234,5 +247,68 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         {isConfirming ? 'Confirming...' : 'Confirm Match'}
       </Button>
     </div>
+  );
+}
+
+function RemovePlatformAction({
+  matchId,
+  providerLabel,
+}: {
+  readonly matchId: string;
+  readonly providerLabel: string;
+}) {
+  const dashboardData = useDashboardData();
+  const profileId = dashboardData.selectedProfile?.id;
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const { rejectMatch, isRejecting } = useDspMatchActions({
+    profileId: profileId ?? '',
+    onRejectSuccess: () => {
+      toast.success(`${providerLabel} removed`);
+      setConfirmOpen(false);
+    },
+    onError: () => {
+      toast.error(`Failed to remove ${providerLabel}. Please try again.`);
+    },
+  });
+
+  const handleConfirm = useCallback(() => {
+    if (!profileId) return;
+    rejectMatch(matchId, 'user_disconnected');
+  }, [matchId, profileId, rejectMatch]);
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (isRejecting) return;
+      setConfirmOpen(open);
+    },
+    [isRejecting]
+  );
+
+  if (!profileId) return null;
+
+  return (
+    <>
+      <Button
+        variant='ghost'
+        size='sm'
+        onClick={() => setConfirmOpen(true)}
+        disabled={isRejecting}
+        className='h-8 w-full justify-start rounded-full border border-subtle bg-surface-0 px-3 text-xs font-caption text-error-token'
+        data-testid='presence-remove-platform'
+      >
+        <Icon name='Trash2' className='mr-1.5 h-3.5 w-3.5' />
+        {isRejecting ? 'Removing...' : 'Remove Platform'}
+      </Button>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={handleOpenChange}
+        title={`Remove ${providerLabel}?`}
+        description='Removing this platform link stops sync updates until you add it again.'
+        confirmLabel='Remove'
+        variant='destructive'
+        onConfirm={handleConfirm}
+      />
+    </>
   );
 }

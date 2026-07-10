@@ -38,6 +38,17 @@ describe('<AlertGrowthLanding>', () => {
     expect(screen.getByText(/Get alerts first/i)).toBeDefined();
   });
 
+  it('always exposes in-page escape hatches back to the profile', () => {
+    render(<AlertGrowthLanding artist={ARTIST} />);
+    const back = screen.getByTestId('alerts-landing-back');
+    const close = screen.getByTestId('alerts-landing-close');
+    const later = screen.getByTestId('alerts-landing-maybe-later');
+    expect(back).toHaveAttribute('href', '/tim');
+    expect(close).toHaveAttribute('href', '/tim');
+    expect(later).toHaveAttribute('href', '/tim');
+    expect(screen.getByText(/Maybe later/i)).toBeDefined();
+  });
+
   it('defaults to SMS, submits with E.164 phone + US country code', async () => {
     render(<AlertGrowthLanding artist={ARTIST} />);
 

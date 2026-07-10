@@ -154,3 +154,35 @@ export async function buildLibraryAssetSharePublicViewBySlug(input: {
     visibility: 'public',
   });
 }
+
+/**
+ * Resolve a public-slug entity even when visibility is still private.
+ * Used to turn "not live yet" into an alerts opt-in instead of a 404.
+ */
+export async function buildLibraryAssetSharePendingViewBySlug(input: {
+  readonly artistHandle: string;
+  readonly shareSlug: string;
+}): Promise<LibraryAssetSharePublicView | null> {
+  const resolved = await resolveLibraryAssetShareByPublicSlug({
+    ...input,
+    publicOnly: false,
+  });
+  if (!resolved) return null;
+  if (resolved.settings.visibility === 'public') {
+    return buildPublicViewForSettings({
+      creatorProfileId: resolved.settings.creatorProfileId,
+      assetId: resolved.settings.assetId,
+      itemKind: resolved.settings.itemKind,
+      artistHandle: resolved.artistHandle,
+      visibility: 'public',
+    });
+  }
+
+  return buildPublicViewForSettings({
+    creatorProfileId: resolved.settings.creatorProfileId,
+    assetId: resolved.settings.assetId,
+    itemKind: resolved.settings.itemKind,
+    artistHandle: resolved.artistHandle,
+    visibility: 'private',
+  });
+}

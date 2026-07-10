@@ -339,11 +339,25 @@ export async function resolveLibraryAssetShareByToken(
 export async function resolveLibraryAssetShareByPublicSlug(input: {
   readonly artistHandle: string;
   readonly shareSlug: string;
+  /**
+   * When true (default), only public share rows resolve — private rows 404
+   * at the call site so they can render an alerts opt-in instead (JOV-3682).
+   */
+  readonly publicOnly?: boolean;
 }): Promise<{
   readonly settings: typeof libraryAssetShareSettings.$inferSelect;
   readonly artistHandle: string;
 } | null> {
   const normalizedHandle = input.artistHandle.trim().toLowerCase();
+  const publicOnly = input.publicOnly !== false;
+
+  const filters = [
+    eq(creatorProfiles.usernameNormalized, normalizedHandle),
+    eq(libraryAssetShareSettings.shareSlug, input.shareSlug),
+  ];
+  if (publicOnly) {
+    filters.push(eq(libraryAssetShareSettings.visibility, 'public'));
+  }
 
   const [row] = await db
     .select({
@@ -355,13 +369,7 @@ export async function resolveLibraryAssetShareByPublicSlug(input: {
       creatorProfiles,
       eq(libraryAssetShareSettings.creatorProfileId, creatorProfiles.id)
     )
-    .where(
-      and(
-        eq(creatorProfiles.usernameNormalized, normalizedHandle),
-        eq(libraryAssetShareSettings.shareSlug, input.shareSlug),
-        eq(libraryAssetShareSettings.visibility, 'public')
-      )
-    )
+    .where(and(...filters))
     .limit(1);
 
   if (!row?.settings || !row.artistHandle) return null;
