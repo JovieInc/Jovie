@@ -30,9 +30,14 @@ queue, not this command, is what keeps `main` green.
 ## Phase 0 — Classify + enroll the clean bucket
 
 ```bash
-DRY_RUN=1 bash scripts/drain-pr-queue.sh   # preview the buckets
-bash scripts/drain-pr-queue.sh             # apply: -merge-queue on hard gates, +merge-queue on clean PRs, +needs-conflict-resolution on conflicts
+DRY_RUN=1 DRAIN_MAX_SECONDS=900 bash scripts/drain-pr-queue.sh   # preview for at most 15 minutes
+DRAIN_MAX_SECONDS=900 bash scripts/drain-pr-queue.sh             # apply; defer remainder at the budget
 ```
+
+`DRAIN_MAX_SECONDS` defaults to `900` (15 minutes). The script checks the budget
+before each per-PR GitHub operation, so a scheduled drain cannot expand without
+bound as the backlog grows. A single in-flight API call may finish after the
+budget; the next operation is deferred to the next tick.
 
 The script enrolls every non-draft, `MERGEABLE`, green, non-opted-out PR and
 prints five work buckets: **DEQUEUE**, **CONFLICT**, **BLOCKED**, **SURFACE**,

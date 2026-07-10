@@ -17,6 +17,7 @@
 #
 # Env:
 #   DRY_RUN=1   classify and print only; apply no labels
+#   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
 set -euo pipefail
 
 # shellcheck source=./scripts/lib/gh-retry.sh
@@ -24,6 +25,18 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
 DRY_RUN="${DRY_RUN:-0}"
+DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
+DRAIN_STARTED_AT="$SECONDS"
+
+# Keep one scheduled tick bounded. A single in-flight GitHub call may finish
+# after the deadline, but no subsequent per-PR operation is started.
+stop_if_budget_exhausted() {
+  if (( SECONDS - DRAIN_STARTED_AT >= DRAIN_MAX_SECONDS )); then
+    echo "=== drain budget exhausted after ${DRAIN_MAX_SECONDS}s; deferring remaining PRs ==="
+    return 0
+  fi
+  return 1
+}
 # Branches that are agent-owned (safe to rebase/force-push in a fix agent).
 AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/)'
 
@@ -114,6 +127,7 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
 
 ENRICHED="[]"
 while IFS= read -r pr; do
+  stop_if_budget_exhausted && break
   n="$(jq -r '.n' <<<"$pr")"
   fail="[]"
   if jq -e '
@@ -202,74 +216,32 @@ echo "$SNAP" | jq -c '.[]
 # CLEAN meant those PRs never entered the queue. Enrolling a not-yet-green PR is
 # safe — Graphite re-validates and the dequeue step above removes any that truly
 # fail. `.fail` only counts terminal failing checks, not pending/queued ones.
-echo "=== ENROLL (mergeable + not failing → +merge-queue + auto-merge) ==="
-# Honor GRAPHITE_QUEUE_POLICY.maxQueueDepth: this is the primary enrollment
-# path, and until 2026-07-09 it was the only one that ignored the cap the
-# agent-pipeline/landing-sweep/tick paths all enforce — a mass-green event
-# (CI outage recovery, post-rebase wave) could enqueue an unbounded batch and
-# saturate Graphite + the runner pool in one pass.
+echo "=== ENROLL (mergeable + not failing → +merge-queue) ==="
+# Honor GRAPHITE_QUEUE_POLICY.maxQueueDepth. Use process substitution rather
+# than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
+# actually enforced.
 MAX_QUEUE_DEPTH=$(node scripts/ci-merge-queue-check.mjs max-queue-depth 2>/dev/null || echo 16)
 QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select([.L[]] | index("merge-queue"))] | length')
 ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 [[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
 echo "  queue depth: $QUEUED_NOW/$MAX_QUEUE_DEPTH ($ENROLL_SLOTS slots)"
 ENROLLED_THIS_RUN=0
-echo "$SNAP" | jq -c '.[]
+while read -r pr; do
+  stop_if_budget_exhausted && break
+  n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+  if [[ "$ENROLLED_THIS_RUN" -ge "$ENROLL_SLOTS" ]]; then
+    echo "  #$n  $t  ⏸ deferred (queue at depth cap; next drain pass enrolls)"
+    continue
+  fi
+  ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
+  echo "  #$n  $t"
+  label "$n" merge-queue
+done < <(echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
   | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)' \
-| while read -r pr; do
-    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
-    if [[ "$ENROLLED_THIS_RUN" -ge "$ENROLL_SLOTS" ]]; then
-      echo "  #$n  $t  ⏸ deferred (queue at depth cap; next drain pass enrolls)"
-      continue
-    fi
-    ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
-    echo "  #$n  $t"
-    label "$n" merge-queue
-    # Enable GitHub native auto-merge (squash) so the PR merges as soon as
-    # CI goes green. The `merge-queue` label alone is a status marker, not a
-    # merge trigger — the old mq-guard.sh cron controlled actual auto-merge.
-    # Since that cron was disabled during CI consolidation (2026-07-08),
-    # this step closes the pipeline gap inline.
-    if [[ "$DRY_RUN" == "1" ]]; then
-      echo "    [dry-run] would enable auto-merge on #$n"
-    else
-      gh_retry pr merge "$n" -R "$REPO" --auto --squash >/dev/null 2>&1 \
-        && echo "    +auto-merge on #$n" \
-        || echo "    !! failed to enable auto-merge on #$n"
-    fi
-  done
-
-# --- CATCH-UP: labeled but no auto-merge ---
-# PRs that got the `merge-queue` label from an earlier drain run (before this
-# auto-merge step existed) or from manual labeling need auto-merge enabled too.
-echo "=== CATCH-UP (+auto-merge on labeled PRs missing it) ==="
-echo "$SNAP" | jq -c '.[]
-  | select(.draft|not)
-  | select(.m=="MERGEABLE")
-  | select(.fail|length==0)
-  | select(.head|startswith("gtmq_")|not)
-  | select([.L[]] | index("merge-queue"))
-  | select(.ms == "CLEAN" or .ms == "UNSTABLE")' \
-| while read -r pr; do
-    n=$(jq -r '.n' <<<"$pr")
-    t=$(jq -r '.t' <<<"$pr")
-    if [[ "$DRY_RUN" == "1" ]]; then
-      echo "    [dry-run] would check auto-merge on #$n $t"
-    else
-      if gh pr view "$n" -R "$REPO" --json autoMergeRequest --jq '.autoMergeRequest' 2>/dev/null | grep -q 'mergeMethod'; then
-        echo "  #$n  $t  auto-merge already enabled"
-      else
-        echo "  #$n  $t  enabling auto-merge (catch-up)"
-        gh_retry pr merge "$n" -R "$REPO" --auto --squash >/dev/null 2>&1 \
-          && echo "    +auto-merge on #$n" \
-          || echo "    !! failed to enable auto-merge on #$n"
-      fi
-    fi
-  done
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)')
 
 # --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---
 echo "=== CONFLICT (needs rebase → fix agent) ==="
