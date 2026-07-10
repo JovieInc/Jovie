@@ -6,6 +6,12 @@ struct AudienceHighlightsView: View {
   let onRetry: () async -> Void
   let onAskJovie: (String) -> Void
 
+  // Guards the stat-tile entrance stagger to the very first successful load
+  // only -- subsequent revalidates (pull-to-refresh, background refetch) must
+  // never replay the animation on data the user is already looking at.
+  @State private var didAnimateStatTilesIn = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
   private static let numberFormatter: NumberFormatter = {
     let formatter = NumberFormatter()
     formatter.numberStyle = .decimal
@@ -98,11 +104,30 @@ struct AudienceHighlightsView: View {
         ],
         spacing: JovieSpacing.medium
       ) {
-        ForEach(response.statTiles) { tile in
+        ForEach(Array(response.statTiles.enumerated()), id: \.element.id) { index, tile in
           statTile(tile)
+            .statTileReveal(
+              isRevealed: didAnimateStatTilesIn,
+              delay: reduceMotion ? 0 : Double(index) * 0.05,
+              reduceMotion: reduceMotion
+            )
         }
       }
       .accessibilityIdentifier("audience-highlights-stat-tiles")
+      .task {
+        guard !didAnimateStatTilesIn else { return }
+
+        if reduceMotion {
+          didAnimateStatTilesIn = true
+          return
+        }
+
+        // Let the grid lay out at opacity 0 for one frame before revealing,
+        // otherwise SwiftUI coalesces the false->true state change and the
+        // tiles never visibly animate in.
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        didAnimateStatTilesIn = true
+      }
 
       Button {
         onAskJovie(response.chatPrompt)
@@ -219,5 +244,32 @@ struct AudienceHighlightsView: View {
 
   private func format(_ value: Int) -> String {
     Self.numberFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
+  }
+}
+
+// Decorative first-load stagger for stat tiles: fades + rises a short
+// distance in, `delay` apart per tile. Opacity-only (no offset) and
+// undelayed under Reduce Motion per motion.md §6. Guarded by the caller
+// (`didAnimateStatTilesIn`) to first-load only -- never replays on
+// revalidate/refresh.
+private struct StatTileRevealModifier: ViewModifier {
+  let isRevealed: Bool
+  let delay: Double
+  let reduceMotion: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .opacity(isRevealed ? 1 : 0)
+      .offset(y: (reduceMotion || isRevealed) ? 0 : 8)
+      .animation(
+        reduceMotion ? nil : JovieMotion.easeOut().delay(delay),
+        value: isRevealed
+      )
+  }
+}
+
+private extension View {
+  func statTileReveal(isRevealed: Bool, delay: Double, reduceMotion: Bool) -> some View {
+    modifier(StatTileRevealModifier(isRevealed: isRevealed, delay: delay, reduceMotion: reduceMotion))
   }
 }

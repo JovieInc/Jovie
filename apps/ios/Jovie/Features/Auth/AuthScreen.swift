@@ -20,6 +20,13 @@ struct AuthScreen: View {
 
   @State private var authCoordinator = MobileAuthCoordinator()
   @State private var didRequestBrowserAuth = false
+  @State private var hasAppeared = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  /// Staggered first-appearance entrance: logo -> tagline -> button, 50ms
+  /// apart (within the 30-80ms stagger band, .claude/rules/motion.md section 4).
+  private static let entranceStagger: Double = 0.05
+  private static let entranceOffset: CGFloat = 8
 
   var body: some View {
     ZStack {
@@ -29,14 +36,39 @@ struct AuthScreen: View {
         Spacer(minLength: 96)
 
         VStack(spacing: JovieSpacing.xxLarge) {
-          JovieLogoMark(size: 76)
-            .accessibilityIdentifier("auth-jovie-logo")
+          VStack(spacing: JovieSpacing.medium) {
+            JovieLogoMark(size: 76)
+              .accessibilityIdentifier("auth-jovie-logo")
+              .authEntrance(
+                hasAppeared: hasAppeared,
+                reduceMotion: reduceMotion,
+                delay: 0,
+                offset: Self.entranceOffset
+              )
+
+            Text("Your Music, One Link")
+              .font(JovieFont.body(size: 14, weight: .medium))
+              .foregroundStyle(JovieColor.textTertiary)
+              .accessibilityIdentifier("auth-tagline")
+              .authEntrance(
+                hasAppeared: hasAppeared,
+                reduceMotion: reduceMotion,
+                delay: Self.entranceStagger,
+                offset: Self.entranceOffset
+              )
+          }
 
           BrowserAuthActions(
             isOpening: didRequestBrowserAuth,
             isDisabled: isSignInUnavailable,
             errorMessage: errorMessage,
             action: startBrowserAuth
+          )
+          .authEntrance(
+            hasAppeared: hasAppeared,
+            reduceMotion: reduceMotion,
+            delay: Self.entranceStagger * 2,
+            offset: Self.entranceOffset
           )
         }
         .frame(maxWidth: 430)
@@ -47,6 +79,10 @@ struct AuthScreen: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .accessibilityIdentifier("auth-screen")
+    .onAppear {
+      guard !hasAppeared else { return }
+      hasAppeared = true
+    }
   }
 
   private func startBrowserAuth() {
@@ -453,5 +489,29 @@ private struct AuthErrorText: View {
       .frame(minHeight: 36)
       .frame(maxWidth: .infinity)
       .accessibilityHidden(message == nil)
+  }
+}
+
+/// Staged first-appearance entrance: opacity 0->1 + translateY <=8pt->0 on
+/// ease-out. Reduce Motion drops the offset and animates opacity only
+/// (.claude/rules/motion.md section 6). Opacity/offset never affect layout,
+/// so this cannot introduce layout shift.
+private struct AuthEntranceModifier: ViewModifier {
+  let hasAppeared: Bool
+  let reduceMotion: Bool
+  let delay: Double
+  let offset: CGFloat
+
+  func body(content: Content) -> some View {
+    content
+      .opacity(hasAppeared ? 1 : 0)
+      .offset(y: reduceMotion ? 0 : (hasAppeared ? 0 : offset))
+      .animation(JovieMotion.easeOut().delay(delay), value: hasAppeared)
+  }
+}
+
+private extension View {
+  func authEntrance(hasAppeared: Bool, reduceMotion: Bool, delay: Double, offset: CGFloat) -> some View {
+    modifier(AuthEntranceModifier(hasAppeared: hasAppeared, reduceMotion: reduceMotion, delay: delay, offset: offset))
   }
 }

@@ -17,7 +17,11 @@ export const GRAPHITE_QUEUE_POLICY = Object.freeze({
   optimisticBatching: true,
   parallelBatchSize: 4,
   bisectOnBatchFailure: true,
-  maxQueueDepth: 12,
+  // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
+  // vs 15m target after one week live; queue-depth deferral was a binding
+  // constraint during merge waves). Re-evaluate if runner-pool saturation
+  // (per-job queue wait >3m) returns.
+  maxQueueDepth: 16,
   perAgentEnqueueLimitPerHour: 6,
   ciOptimization: true,
   queueTimeoutMinutes: 60,

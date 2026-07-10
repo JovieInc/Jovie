@@ -143,8 +143,21 @@ struct SettingsView: View {
         isLoggingOut = false
       }
     } label: {
-      Label(isLoggingOut ? "Logging Out" : "Log Out", systemImage: "rectangle.portrait.and.arrow.right")
-        .frame(maxWidth: .infinity)
+      // Reserve a stable footprint across the Log Out / Logging Out states:
+      // fixed-height spinner slot + single-line, non-wrapping label so the
+      // pill's content never reflows (layout-shift prevention, .claude/rules/ui.md).
+      HStack(spacing: JovieSpacing.small) {
+        if isLoggingOut {
+          ProgressView()
+            .controlSize(.small)
+            .tint(JovieColor.textPrimary)
+        }
+
+        Label(isLoggingOut ? "Logging Out" : "Log Out", systemImage: "rectangle.portrait.and.arrow.right")
+          .lineLimit(1)
+          .minimumScaleFactor(0.85)
+      }
+      .frame(maxWidth: .infinity)
     }
     .buttonStyle(JoviePillButtonStyle(filled: false))
     .disabled(isLoggingOut)
@@ -191,7 +204,19 @@ private struct SettingsLinkRow: View {
       .padding(.horizontal, JovieSpacing.medium)
       .padding(.vertical, 12)
     }
-    .buttonStyle(.plain)
+    .buttonStyle(SettingsRowButtonStyle())
+  }
+}
+
+/// Subtle tactile press feedback for tappable settings rows: opacity + the
+/// canonical 0.96 press scale on the SUBTLE (150ms) curve. Interruptible via
+/// SwiftUI's isPressed-driven animation (.claude/rules/motion.md section 4).
+private struct SettingsRowButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .opacity(configuration.isPressed ? 0.7 : 1)
+      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
+      .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }
 

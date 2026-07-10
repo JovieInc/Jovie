@@ -46,11 +46,12 @@ Graphite and branch protection must wait on **aggregate** contexts only — neve
 
 | Context | Role |
 | --- | --- |
-| `CI / PR Ready` | Single merge gate — aggregates ci-fast, unit tests, build, Lighthouse, risk-triggered smoke/preview |
+| `CI / PR Ready` | Single merge gate — fans in typecheck, biome, guardrails, structural contract, unit tests, risk classifier, and risk-triggered preview evidence (build is advisory) |
 | `CI / Migration Guard` | Path-gated schema/migration safety (independent aggregate) |
 | `Fork PR Gate` | Blocks unreviewed fork PRs (auto-passes for agents + team) |
+| `PR Size Guard` | Caps PR size (800 lines / 40 files); `big-pr` label opts out |
 
-**Queue CI runs the same workflow file and trigger as PR CI, with a reduced job set on `gtmq_*` batches.** Graphite does not use GitHub `merge_group` events. Speculative queue runs trigger the same `pull_request` workflow (`ci.yml`). `gtmq_*`-based PRs still get the real merge gates (`PR Ready`'s fast/unit/build checks, `Migration Guard`), but job-level `if:` conditions skip informational/preview-evidence lanes (Lighthouse, A11y, Mobile Overflow, Layout Guard, E2E Smoke, Golden Path, `DB Migrate (PR main)`, Preview Deploy, `PR Summary`) that never gated `PR Ready` and whose evidence was already produced on the source PR pre-enqueue. See `docs/PR_FLOW.md` §2 for the full rationale. There is no separate slim merge-queue *workflow file* — the reduction happens via existing job conditions in `ci.yml`.
+**Queue CI is the PR's own CI.** Graphite runs on every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never created and the former slim-lane `if:` conditions were removed from `ci.yml` (#13610). Graphite does not use GitHub `merge_group` events. If batching mode is ever re-enabled, the slim-lane conditions must be restored with it — see `docs/PR_FLOW.md` §2 and the 2026-06-22 post-mortem.
 
 ### Graphite dashboard (`app.graphite.com/settings/merge-queue`) — OWL/human verify
 
@@ -74,7 +75,7 @@ Bisection behavior is also unit-tested in `scripts/lib/__tests__/merge-queue-gua
 
 ### GitHub (ruleset `Main Branch Protection`, id `10512119`) — `gh`-configurable
 
-- Required status checks: `CI / PR Ready`, `CI / Migration Guard`, `Fork PR Gate` (strict / up-to-date).
+- Required status checks: `PR Ready`, `Migration Guard`, `Fork PR Gate`, `PR Size Guard` (strict / up-to-date). Verify live: `gh api repos/JovieInc/Jovie/rulesets/10512119 --jq '.rules[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'`
 - `required_linear_history`, `required_signatures`, `non_fast_forward`, `deletion`, `pull_request` (0 approvals).
 - **No `merge_queue` rule** (retired).
 - **Bypass actor: `graphite-app` (App ID `158384`), `bypass_mode: always`** — required so Graphite can merge through the protected branch. Source-of-record: `.github/rulesets/branch-protection.yml`.
