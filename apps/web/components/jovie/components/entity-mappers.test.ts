@@ -108,7 +108,8 @@ describe('rankRecentsFirst', () => {
       'spotify-hit',
     ]);
     expect(result[0]?.meta?.subtitle).toBe('You');
-    expect(result[0]?.meta?.isYou).toBe(true);
+    // Narrow the EntityRefMeta discriminated union before reading isYou.
+    expect(result[0]?.meta).toMatchObject({ kind: 'artist', isYou: true });
   });
 });
 

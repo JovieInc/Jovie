@@ -423,7 +423,7 @@ describe('surface elevation guardrails', () => {
 
     expect(shellFrame).toContain('lg:shadow-(--linear-app-shell-shadow)');
     expect(shellFrame).toContain(
-      'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
+      'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
     );
     expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
     expect(sidebar).not.toContain(
