@@ -6,18 +6,22 @@ import {
 } from './profile-pac';
 
 describe('parseProfilePacAssignment', () => {
-  it('accepts only the three locked PAC slots from Statsig config', () => {
+  it('accepts the five PAC experiment slots from Statsig config', () => {
     expect(
       parseProfilePacAssignment({
         copy_arm: 'alternate',
         trigger_threshold: 'track_complete',
         s2_slot: 'tickets',
+        tab_bar: 'hidden',
+        dismiss_affordance: 'icon',
         rendering: 'not-allowed',
       })
     ).toEqual({
       copyArm: 'alternate',
       triggerThreshold: 'track_complete',
       s2Slot: 'tickets',
+      tabBar: 'hidden',
+      dismissAffordance: 'icon',
     });
   });
 
@@ -27,8 +31,26 @@ describe('parseProfilePacAssignment', () => {
         copyArm: 'icon-x',
         triggerThreshold: '5s',
         s2Slot: 'video',
+        tabBar: 'maybe',
+        dismissAffordance: 'ghost',
       })
     ).toEqual(DEFAULT_PROFILE_PAC_ASSIGNMENT);
+  });
+
+  it('defaults component arms when only the original three slots are set', () => {
+    expect(
+      parseProfilePacAssignment({
+        copyArm: 'alternate',
+        triggerThreshold: '30s',
+        s2Slot: 'merch',
+      })
+    ).toEqual({
+      copyArm: 'alternate',
+      triggerThreshold: '30s',
+      s2Slot: 'merch',
+      tabBar: 'visible',
+      dismissAffordance: 'text',
+    });
   });
 });
 
@@ -140,6 +162,98 @@ describe('evaluateProfilePacPromotion', () => {
           revenueCents: 20_100,
         },
         minRewardLiftCents: 1,
+      })
+    ).toBeNull();
+  });
+
+  it('promotes tab-bar arm only when play + capture both win and engagement holds', () => {
+    expect(
+      evaluateProfilePacPromotion({
+        slot: 'tabBar',
+        control: {
+          arm: 'visible',
+          exposures: 1000,
+          captures: 100,
+          dismissals: 90,
+          plays: 200,
+          engagements: 600,
+        },
+        candidate: {
+          arm: 'hidden',
+          exposures: 1000,
+          captures: 150,
+          dismissals: 80,
+          plays: 280,
+          engagements: 620,
+        },
+      })
+    ).toMatchObject({
+      reason: 'play_and_capture_rate_significant',
+      configPatch: { tabBar: 'hidden' },
+    });
+
+    // Engagement floor violated → no promote.
+    expect(
+      evaluateProfilePacPromotion({
+        slot: 'tabBar',
+        control: {
+          arm: 'visible',
+          exposures: 1000,
+          captures: 100,
+          dismissals: 90,
+          plays: 200,
+          engagements: 600,
+        },
+        candidate: {
+          arm: 'hidden',
+          exposures: 1000,
+          captures: 150,
+          dismissals: 80,
+          plays: 280,
+          engagements: 500,
+        },
+      })
+    ).toBeNull();
+  });
+
+  it('promotes dismiss affordance on capture lift without raising dismissals', () => {
+    expect(
+      evaluateProfilePacPromotion({
+        slot: 'dismissAffordance',
+        control: {
+          arm: 'text',
+          exposures: 1000,
+          captures: 100,
+          dismissals: 90,
+        },
+        candidate: {
+          arm: 'icon',
+          exposures: 1000,
+          captures: 150,
+          dismissals: 80,
+        },
+      })
+    ).toMatchObject({
+      reason: 'capture_rate_significant',
+      configPatch: { dismissAffordance: 'icon' },
+    });
+
+    // Dark pattern: capture up but dismissals up → blocked.
+    expect(
+      evaluateProfilePacPromotion({
+        slot: 'dismissAffordance',
+        control: {
+          arm: 'text',
+          exposures: 1000,
+          captures: 100,
+          dismissals: 90,
+        },
+        candidate: {
+          arm: 'icon',
+          exposures: 1000,
+          captures: 150,
+          dismissals: 120,
+        },
       })
     ).toBeNull();
   });

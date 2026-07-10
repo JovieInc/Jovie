@@ -72,7 +72,7 @@ function buildPayload(overrides: Record<string, unknown> = {}) {
     jv_aid: null,
     profile_id: PROFILE_ID,
     pac_state: 'idle',
-    variant_id: 'copy:default|trigger:30s|s2:merch',
+    variant_id: 'copy:default|trigger:30s|s2:merch|tab:visible|dismiss:text',
     session_id: SESSION_ID,
     consent: 'undecided',
     ts: 1_751_000_000_000,
@@ -116,7 +116,7 @@ describe('POST /api/profile/pac-event', () => {
     expect(mockLogStatsigEvent).toHaveBeenCalledWith(
       JV_AID,
       'pac_exposure',
-      'copy:default|trigger:30s|s2:merch',
+      'copy:default|trigger:30s|s2:merch|tab:visible|dismiss:text',
       expect.objectContaining({
         profile_id: PROFILE_ID,
         pac_state: 'idle',

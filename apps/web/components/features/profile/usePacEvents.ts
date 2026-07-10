@@ -89,9 +89,19 @@ export function usePacEvents({
   const variantId = useMemo(() => buildPacVariantId(assignment), [assignment]);
 
   const stateRef = useRef<PacState>(state);
+  const isVisibleRef = useRef(false);
   useEffect(() => {
     stateRef.current = state;
-  }, [state]);
+    // When the PAC state machine advances while already ≥50% visible,
+    // re-emit exposure for the new state (once-per-state dedup still applies).
+    if (enabled && isVisibleRef.current) {
+      trackPacExposure({
+        profileId,
+        variantId,
+        pacState: state,
+      });
+    }
+  }, [enabled, profileId, state, variantId]);
 
   const emit = useCallback(
     (
@@ -119,6 +129,7 @@ export function usePacEvents({
     (node: Element | null) => {
       observerRef.current?.disconnect();
       observerRef.current = null;
+      isVisibleRef.current = false;
 
       if (!node || !enabled) return;
       if (typeof IntersectionObserver === 'undefined') return;
@@ -126,7 +137,9 @@ export function usePacEvents({
       const observer = new IntersectionObserver(
         entries => {
           for (const entry of entries) {
-            if (isPacExposureVisible(entry)) {
+            const visible = isPacExposureVisible(entry);
+            isVisibleRef.current = visible;
+            if (visible) {
               // Once-per-state-per-session dedup lives in trackPacExposure.
               trackPacExposure({
                 profileId,

@@ -38,7 +38,7 @@ historical console cleanup.
 |---|---|---|---|---|
 | `experiment_subscribe_cta_variant` | `LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT` | `'two_step'` | Subscription CTA experiment | Setup |
 | `profile_alert_optin_cta_variant` | `LEGACY_STATSIG_GATE_KEYS.PROFILE_ALERT_OPTIN_EXPERIMENT` | `'button'` | Public profile alert opt-in CTA variant | Setup |
-| `profile_pac_variant_slots` | `LEGACY_STATSIG_GATE_KEYS.PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT` | `{ copyArm: 'default', triggerThreshold: '30s', s2Slot: 'merch' }` | Public profile Primary Action Card slot assignment: S1 copy, S1 trigger threshold, S2 monetization slot | Setup |
+| `profile_pac_variant_slots` | `LEGACY_STATSIG_GATE_KEYS.PROFILE_PAC_VARIANT_SLOTS_EXPERIMENT` | `{ copyArm: 'default', triggerThreshold: '30s', s2Slot: 'merch', tabBar: 'visible', dismissAffordance: 'text' }` | Public profile Primary Action Card slot assignment: S1 copy, S1 trigger threshold, S2 monetization slot, cold-visitor tab bar (JOV-3907), capture dismiss affordance (JOV-3908) | Setup |
 | `experiment_teleprompter_showcase` | `LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_SHOWCASE_EXPERIMENT` | `'direct'` | Teleprompter showcase interstitial vs direct recorder | Setup |
 
 ## Operational Notes

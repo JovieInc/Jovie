@@ -36,6 +36,11 @@ import {
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
+import {
+  markPacTabBarReturnVisit,
+  readPacTabBarReturnVisit,
+  shouldShowColdVisitorTabBar,
+} from '@/lib/profile/pac-tab-bar-experiment';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -342,7 +347,26 @@ export function ProfileCompactSurface({
   const activeNotificationSourceContext =
     notificationSourceContext ?? defaultNotificationSourceContext;
   const isHomeMode = activeVisiblePrimaryTab === 'profile';
-  const showBottomNav = true;
+  // JOV-3907: cold-visitor tab bar experiment — hide vs visible 50/50.
+  // Tab bar always restored after first interaction or on return visits.
+  const [tabBarRestoredThisSession, setTabBarRestoredThisSession] =
+    useState(false);
+  const [isTabBarReturnVisit, setIsTabBarReturnVisit] = useState(false);
+  useEffect(() => {
+    setIsTabBarReturnVisit(readPacTabBarReturnVisit(globalThis.localStorage));
+  }, []);
+  const restoreTabBar = useCallback(() => {
+    setTabBarRestoredThisSession(true);
+    markPacTabBarReturnVisit(globalThis.localStorage);
+    setIsTabBarReturnVisit(true);
+  }, []);
+  const showBottomNav = shouldShowColdVisitorTabBar({
+    tabBarArm: profilePacAssignment.tabBar,
+    isSubscribed,
+    restoredThisSession: tabBarRestoredThisSession,
+    isReturnVisit: isTabBarReturnVisit,
+    isInteractive: renderMode === 'interactive',
+  });
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
   const surfaceState = useMemo(
@@ -470,6 +494,7 @@ export function ProfileCompactSurface({
   );
   const handleTabSelect = useCallback(
     (tab: ProfilePrimaryTab) => {
+      restoreTabBar();
       const nextTab = mapPrimaryTabToAnalyticsTab(tab);
       track('profile_tab_click', {
         artist_id: artist.id,
@@ -482,7 +507,7 @@ export function ProfileCompactSurface({
       });
       onModeSelect(tab);
     },
-    [artist.handle, artist.id, currentAnalyticsTab, onModeSelect]
+    [artist.handle, artist.id, currentAnalyticsTab, onModeSelect, restoreTabBar]
   );
   const handleSocialClick = useCallback(
     (link: LegacySocialLink) => {
@@ -513,6 +538,15 @@ export function ProfileCompactSurface({
       data-testid={dataTestId}
       data-render-mode={renderMode}
       data-profile-mode={activeMode}
+      data-tab-bar-arm={profilePacAssignment.tabBar}
+      data-tab-bar-visible={showBottomNav ? 'true' : 'false'}
+      onPointerDownCapture={
+        showBottomNav
+          ? undefined
+          : () => {
+              restoreTabBar();
+            }
+      }
     >
       <div
         ref={setNotificationsPortalContainer}

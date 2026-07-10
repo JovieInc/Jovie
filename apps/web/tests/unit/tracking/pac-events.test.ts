@@ -44,7 +44,7 @@ const PROFILE_ID = '3f9c2f6a-8f1e-4b6a-9a44-1c2d3e4f5a6b';
 
 const CONTEXT = {
   profileId: PROFILE_ID,
-  variantId: 'copy:default|trigger:30s|s2:merch',
+  variantId: 'copy:default|trigger:30s|s2:merch|tab:visible|dismiss:text',
   pacState: 'idle',
 } as const;
 
@@ -73,14 +73,18 @@ describe('PAC event schema (spec §8)', () => {
     expect(PAC_SERVER_EVENTS).toEqual(['pac_s2_convert']);
   });
 
-  it('builds the combined variant key from all three assignment slots', () => {
+  it('builds the combined variant key from all five assignment slots', () => {
     expect(
       buildPacVariantId({
         copyArm: 'alternate',
         triggerThreshold: 'track_complete',
         s2Slot: 'tip',
+        tabBar: 'hidden',
+        dismissAffordance: 'icon',
       })
-    ).toBe('copy:alternate|trigger:track_complete|s2:tip');
+    ).toBe(
+      'copy:alternate|trigger:track_complete|s2:tip|tab:hidden|dismiss:icon'
+    );
   });
 
   it('emits every client event with the full payload contract', () => {
