@@ -105,7 +105,7 @@ export const PROFILE_PAC_VARIANT_SLOTS_FLAG = flag<
     ...DEFAULT_PROFILE_PAC_ASSIGNMENT,
   },
   description:
-    'Public profile Primary Action Card variant slots: S1 copy arm, S1 trigger threshold, S2 monetization slot',
+    'Public profile Primary Action Card variant slots: S1 copy/trigger, S2 monetization, cold-visitor tab bar, capture dismiss affordance',
   options: [{ label: 'Default', value: DEFAULT_PROFILE_PAC_ASSIGNMENT }],
   async decide({ entities }) {
     return getProfilePacAssignmentValue(entities?.userId ?? null);

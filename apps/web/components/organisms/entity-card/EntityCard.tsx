@@ -79,7 +79,7 @@ function EntityCtaControl({
 }>) {
   const className = cn(
     'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
-    block ? 'h-11 w-full' : 'h-8 min-w-0 flex-1',
+    block ? 'h-11 w-full' : 'h-11 min-w-0 flex-1',
     cta.disabled &&
       'cursor-not-allowed border-subtle bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-0'
   );
@@ -190,13 +190,17 @@ export function EntityCard({
   onClick,
 }: EntityCardProps) {
   const size = SIZE[treatment];
-  // Composition shape (#11899): fixed card aspect + fixed 16:9 media zone.
+  // Composition shape (#11899): fixed card aspect + semantic media geometry.
+  // Album/product/show artwork is square; video thumbnails stay landscape.
   // Text truncates inside the shape; the CTA footer never moves.
   const shapeClassName = shape
     ? cn(getProfileCardShapeClassName(shape), 'overflow-hidden')
     : null;
   const artClassName = shape
-    ? cn('aspect-video', treatment === 'big' ? 'rounded-2xl' : 'rounded-xl')
+    ? cn(
+        model.kind === 'video' ? 'aspect-video' : 'aspect-square',
+        treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
+      )
     : size.artClass;
   const titleClampClassName =
     shape && treatment !== 'big' ? 'line-clamp-1' : 'line-clamp-2';
@@ -248,7 +252,9 @@ export function EntityCard({
             fill
             priority={priority}
             sizes={treatment === 'big' ? '320px' : '180px'}
-            className='object-cover'
+            className={
+              model.kind === 'music' ? 'object-contain' : 'object-cover'
+            }
             fallbackVariant={preset.fallbackVariant}
             fallbackClassName='bg-transparent'
           />

@@ -209,6 +209,13 @@ describe('Public Profile Page Logic', () => {
     it('delegates claim banner query handling to the client wrapper', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
     });
+
+    it('offers the editorial AEO claim card only for unclaimed direct-claim profiles', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        '!profile.is_claimed && directClaimSupported'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('/claim?next=auth');
+    });
   });
 
   describe('profile accent handling', () => {

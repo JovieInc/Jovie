@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -124,6 +126,20 @@ function buildContent(): ProfileAeoContentModel {
 describe('Profile AEO content', () => {
   afterEach(cleanup);
 
+  it('keeps dark AEO and light claim-card colors stable across app themes', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'styles', 'design-system.css'),
+      'utf8'
+    );
+
+    expect(css).toMatch(
+      /\.profile-aeo-content\)[\s\S]*?--profile-aeo-text:\s*var\(--color-text-tooltip\)/
+    );
+    expect(css).toMatch(
+      /\.profile-aeo-claim-card\)[\s\S]*?--profile-aeo-claim-ink:\s*var\(--system-b-cinematic-black\)/
+    );
+  });
+
   it('builds per-artist description and the four sourced canonical FAQ answers', () => {
     const content = buildContent();
 
@@ -227,5 +243,34 @@ describe('Profile AEO content', () => {
     expect(html).toContain('data-testid="profile-aeo-content"');
     expect(html).toContain('Where can I buy DJ Test merch?');
     expect(html).toContain('Source: Official merch card');
+  });
+
+  it('renders the editorial claim card only when a claim destination is provided', () => {
+    const content = buildContent();
+    const { rerender } = render(
+      <ProfileAeoContent
+        content={content}
+        claimHref='/dj-test/claim?next=auth'
+      />
+    );
+
+    expect(screen.getByTestId('profile-aeo-claim-card')).toBeVisible();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Claim yours.',
+      })
+    ).toBeVisible();
+    expect(screen.getByText('Jovie artist profiles')).toBeVisible();
+    expect(
+      screen.getByText('Music, shows, and fan updates. One place.')
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', {
+        name: 'Claim the DJ Test profile and sign up for Jovie',
+      })
+    ).toHaveAttribute('href', '/dj-test/claim?next=auth');
+
+    rerender(<ProfileAeoContent content={content} />);
+    expect(screen.queryByTestId('profile-aeo-claim-card')).toBeNull();
   });
 });

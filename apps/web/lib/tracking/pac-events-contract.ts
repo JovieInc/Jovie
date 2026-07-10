@@ -125,12 +125,14 @@ export interface PacEventPayload {
 
 /**
  * Builds the combined variant key for the visitor's PAC assignment.
- * Keys every event to all three experiment slots so any slot's arms can be
- * compared without re-deriving assignment server-side.
+ * Keys every event to all experiment slots (S1 copy/trigger, S2, plus
+ * component arms for tab-bar + dismiss) so any slot's arms can be compared
+ * without re-deriving assignment server-side.
  */
 export function buildPacVariantId(assignment: ProfilePacAssignment): string {
-  const { copyArm, triggerThreshold, s2Slot } = assignment;
-  return `copy:${copyArm}|trigger:${triggerThreshold}|s2:${s2Slot}`;
+  const { copyArm, triggerThreshold, s2Slot, tabBar, dismissAffordance } =
+    assignment;
+  return `copy:${copyArm}|trigger:${triggerThreshold}|s2:${s2Slot}|tab:${tabBar}|dismiss:${dismissAffordance}`;
 }
 
 /**

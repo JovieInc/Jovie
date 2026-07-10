@@ -361,7 +361,14 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         releases={releases}
         merchCards={merchCards}
       />
-      <ProfileAeoContent content={aeoContent} />
+      <ProfileAeoContent
+        content={aeoContent}
+        claimHref={
+          !profile.is_claimed && directClaimSupported
+            ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
+            : undefined
+        }
+      />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}

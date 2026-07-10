@@ -23,6 +23,7 @@ import {
   Share2,
   ShieldCheck,
   SquarePen,
+  TrendingUp,
   UserCircle,
   Users,
 } from 'lucide-react';
@@ -232,6 +233,7 @@ const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   investors: Briefcase,
   screenshots: ImageIcon,
   costs: Banknote,
+  revenue_lift: TrendingUp,
   share_studio: Share2,
   system_map: Map,
   features: Flag,

@@ -54,7 +54,7 @@ jobs:
   # runs first (fail-open), then path detection.
   ci-path-changes:
     name: Path Changes
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}

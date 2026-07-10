@@ -29,6 +29,7 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
+import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import { generatePrintGraphic } from './graphic-engine';
 import { attachMockupsToDesignOption, generateProductMockups } from './mockups';
@@ -115,7 +116,7 @@ function buildImagePrompt(
   ].join(' ');
 }
 
-function defaultPricing() {
+function fallbackPricing() {
   return buildMerchPricingSnapshot({
     retailPriceCents: calculateRecommendedSalePriceCents(
       MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
@@ -126,6 +127,45 @@ function defaultPricing() {
     printfulCostSource: 'jovie_default',
     printfulCostUpdatedAt: null,
   });
+}
+
+/**
+ * Prefer live Printful catalog economics so generated options can publish.
+ * Falls back to jovie_default (draft-only) when Printful is unavailable.
+ */
+async function resolveGenerationPricing(prompt: string) {
+  try {
+    const catalog = await resolveMerchCatalogSelection(prompt);
+    return {
+      pricing: catalog.pricing,
+      productionWarnings: catalog.providerWarnings,
+      productType: catalog.productType,
+      productName: catalog.productName,
+      catalogProductId: catalog.catalogProductId,
+      catalogVariantIds: catalog.catalogVariantIds,
+      variantMap: catalog.variantMap,
+      colorway: catalog.colorway,
+      sizes: catalog.sizes,
+      placements: catalog.placements,
+      technique: catalog.technique,
+    };
+  } catch {
+    return {
+      pricing: fallbackPricing(),
+      productionWarnings: [] as string[],
+      productType: MERCH_DEFAULT_PRINTFUL_PRODUCT.productType,
+      productName: MERCH_DEFAULT_PRINTFUL_PRODUCT.productName,
+      catalogProductId: MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
+      catalogVariantIds: Object.values(
+        MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
+      ),
+      variantMap: MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap,
+      colorway: MERCH_DEFAULT_PRINTFUL_PRODUCT.colorway,
+      sizes: MERCH_DEFAULT_PRINTFUL_PRODUCT.sizes,
+      placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
+      technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
+    };
+  }
 }
 
 /**
@@ -234,7 +274,10 @@ export async function generateMerchDesigns(params: {
   const name = await artistName(params.profileId);
   const generationId = randomUUID();
   const count = Math.min(Math.max(params.count ?? DEFAULT_DESIGN_COUNT, 1), 4);
-  const pricing = defaultPricing();
+  // Resolve live Printful economics up front so selected designs can go live
+  // without a separate cost-hydration step (JOV-3393 demo path).
+  const catalog = await resolveGenerationPricing(params.prompt);
+  const pricing = catalog.pricing;
 
   await db.insert(merchGenerationBatches).values({
     id: generationId,
@@ -282,18 +325,15 @@ export async function generateMerchDesigns(params: {
             status: 'candidate',
             designLane: 'fashion_graphic_item',
             designName,
-            productType: MERCH_DEFAULT_PRINTFUL_PRODUCT.productType,
-            printfulProductName: MERCH_DEFAULT_PRINTFUL_PRODUCT.productName,
-            printfulCatalogProductId:
-              MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-            printfulCatalogVariantIds: Object.values(
-              MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
-            ),
-            variantMap: MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap,
-            colorway: MERCH_DEFAULT_PRINTFUL_PRODUCT.colorway,
-            availableSizes: MERCH_DEFAULT_PRINTFUL_PRODUCT.sizes,
-            placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-            technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
+            productType: catalog.productType,
+            printfulProductName: catalog.productName,
+            printfulCatalogProductId: catalog.catalogProductId,
+            printfulCatalogVariantIds: catalog.catalogVariantIds,
+            variantMap: catalog.variantMap,
+            colorway: catalog.colorway,
+            availableSizes: catalog.sizes,
+            placements: catalog.placements,
+            technique: catalog.technique,
             retailPriceCents: pricing.retailPriceCents,
             estimatedPrintfulProductCostCents:
               pricing.estimatedPrintfulProductCostCents,
@@ -306,7 +346,13 @@ export async function generateMerchDesigns(params: {
             whyItFits: 'Illustrated graphic generated for this artist.',
             mockupUrls: [previewUrl],
             printFileUrls: [previewUrl],
-            productionWarnings: [],
+            // Catalog warnings about unavailability stay; cost-source warnings
+            // that mark draft-only should not block when Printful is healthy.
+            productionWarnings: catalog.productionWarnings.filter(
+              warning =>
+                !warning.toLowerCase().includes('printful is not configured') &&
+                !warning.toLowerCase().includes('catalog pricing unavailable')
+            ),
             qualityReview: {
               copyrightRisk: 'low',
               typography: 'generated',
@@ -316,7 +362,7 @@ export async function generateMerchDesigns(params: {
               styleLane: 'fashion_graphic_item',
               typographyStyle: direction.label,
               graphicDensity: 'medium',
-              garmentColor: MERCH_DEFAULT_PRINTFUL_PRODUCT.colorway,
+              garmentColor: catalog.colorway,
               motifs: [direction.label],
               selectedOverOptionIds: [],
               rejectedAttributes: [],

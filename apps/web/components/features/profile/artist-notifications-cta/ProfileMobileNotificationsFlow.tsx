@@ -347,7 +347,7 @@ function InlineCaptureField({
           type='button'
           onClick={onSubmit}
           disabled={isSubmitting}
-          className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
+          className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
           aria-label='Submit'
         >
           <Send className='size-4' />
@@ -519,7 +519,7 @@ export function ProfileMobileNotificationsFlow({
                   type='button'
                   onClick={() => onChannelChange(isSms ? 'email' : 'sms')}
                   disabled={isSubmitting}
-                  className='inline-flex h-9 items-center gap-1.5 rounded-full px-1 text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
+                  className='inline-flex h-11 items-center gap-1.5 rounded-full px-1 text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
                 >
                   {isSms ? (
                     <Mail className='size-3.5' />
@@ -533,7 +533,7 @@ export function ProfileMobileNotificationsFlow({
                     type='button'
                     onClick={onDismissCapture}
                     disabled={isSubmitting}
-                    className='inline-flex h-9 items-center rounded-full px-1 text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='inline-flex h-11 items-center rounded-full px-1 text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
                   >
                     Not Now
                   </button>
@@ -926,7 +926,7 @@ export function ProfileMobileNotificationsFlow({
       </div>
     ) : (
       <div
-        className='relative min-h-150 rounded-(--profile-card-radius) bg-[color:var(--profile-stage-bg)] dark:text-white'
+        className='relative flex h-full min-h-full flex-1 flex-col rounded-(--profile-card-radius) bg-[color:var(--profile-stage-bg)] dark:text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

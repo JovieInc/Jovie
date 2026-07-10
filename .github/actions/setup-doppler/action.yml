@@ -26,10 +26,27 @@ runs:
       env:
         DOPPLER_TOKEN: ${{ inputs.doppler-token }}
       run: |
-        # Export all Doppler secrets as environment variables for subsequent steps
-        if doppler secrets download --no-file --format env >> $GITHUB_ENV; then
-          echo "✅ Doppler secrets loaded into environment"
-        else
+        set -euo pipefail
+        secrets_json="$(mktemp)"
+        trap 'rm -f "$secrets_json"' EXIT
+
+        # Export all Doppler secrets as environment variables for subsequent
+        # steps. Use JSON + heredoc writes so multiline secrets (for example
+        # PEM/private-key material) do not break GitHub's GITHUB_ENV parser.
+        if ! doppler secrets download --no-file --format json > "$secrets_json"; then
           echo "❌ Failed to download Doppler secrets. Check token validity and project/config."
           exit 1
         fi
+
+        while IFS= read -r entry; do
+          decoded="$(printf '%s' "$entry" | base64 -d)"
+          key="$(printf '%s' "$decoded" | jq -r '.key')"
+          value="$(printf '%s' "$decoded" | jq -r '.value // \"\"')"
+          marker="EOF_${RANDOM}_$(date +%s%N)"
+          {
+            echo "${key}<<${marker}"
+            printf '%s\n' "$value"
+            echo "$marker"
+          } >> "$GITHUB_ENV"
+        done < <(jq -r 'to_entries[] | @base64' "$secrets_json")
+        echo "✅ Doppler secrets loaded into environment"

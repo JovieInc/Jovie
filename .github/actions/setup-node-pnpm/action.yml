@@ -21,9 +21,20 @@ runs:
             || git config --global --add safe.directory "$GITHUB_WORKSPACE"
         fi
 
+    # Per-job pnpm install dir (JOV-4175). Two prior failure modes on the
+    # self-hosted pool, both from a shared persistent dest:
+    #   1. default ~/setup-pnpm carried a pnpm v11 layout that crashed pinned
+    #      9.15.4 ("Worker pnpm exited with code 1", run 29070623310)
+    #   2. version-scoped ~/setup-pnpm-v9 raced between CONCURRENT runner
+    #      processes on the same machine (shared $HOME) — ENOTEMPTY rmdir
+    #      during action-setup's reinstall (job 86298003824)
+    # runner.temp is per-job, so no sharing is possible; the pnpm tarball
+    # re-download costs seconds. The package store stays shared and safe.
     - name: Setup pnpm
       uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      
+      with:
+        dest: ${{ runner.temp }}/setup-pnpm
+
     # Actions-cache-backed pnpm caching is GitHub-hosted only. Self-hosted
     # runners (jovie-runner) keep a persistent pnpm store on disk, so the
     # restore is pointless and the post-run save uploads ~1.2 GB — observed
