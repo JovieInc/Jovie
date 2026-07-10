@@ -103,7 +103,12 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: steps.graphite.outputs.skip != 'true'
         with:
+          # Blobless partial clone: full commit graph for merge-base/diff
+          # (names only), no historical file contents. Cuts the clone from
+          # ~30-40s (worse under runner throttling) to seconds on this repo;
+          # any blob that is actually needed is lazy-fetched on demand.
           fetch-depth: 0
+          filter: blob:none
       - name: Detect path changes for all job types
         if: steps.graphite.outputs.skip != 'true'
         id: detect
@@ -663,15 +668,23 @@ jobs:
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     needs: [ci-path-changes]
-    # Runs on GitHub-hosted runners (typecheck --force means no turbo cache benefit).
-    runs-on: ubuntu-latest
+    # Runner is var-switchable: CI_FAST_RUNNER=jovie-runner offloads typecheck
+    # to the self-hosted pool when hosted concurrency is the bottleneck
+    # (free-plan orgs get ~20 concurrent hosted jobs + fair-use throttling —
+    # see gbrain jovie-ci-actions-budget-stall-2026-07-10). Typecheck uploads
+    # no artifacts, so the pool's slow egress doesn't bite.
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          # Full history needed for turbo --affected merge-base detection
+          # Full history needed for turbo --affected merge-base detection.
+          # Blobless: --affected only needs the commit graph + changed-file
+          # names; HEAD blobs are materialized at checkout, historical blobs
+          # lazy-fetch if ever needed.
           fetch-depth: 0
+          filter: blob:none
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -2456,8 +2469,11 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    # 5-shard unit tests on GitHub-hosted runners for reliability (turbo remote cache works on any runner).
-    runs-on: ubuntu-latest
+    # 5-shard unit tests; runner is var-switchable (CI_UNIT_RUNNER=jovie-runner
+    # offloads all shards to the self-hosted pool when hosted concurrency is
+    # the bottleneck). Defaults to GitHub-hosted. Shards upload no artifacts on
+    # the PR path (coverage is nightly-only), so pool egress is not a concern.
+    runs-on: ${{ vars.CI_UNIT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -2470,7 +2486,8 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 0  # Full history for vitest --changed
+          fetch-depth: 0 # Full history for vitest --changed (names via commit graph)
+          filter: blob:none # historical blobs lazy-fetch; saves ~30s × 5 shards/run
 
       - name: Check for relevant changes
         id: check_changes
