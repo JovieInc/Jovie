@@ -22,13 +22,15 @@ concurrency:
   # cancel each other's deploy pipelines. GitHub evaluates cancel-in-progress
   # expressions as strings and treats "false" as truthy, which was cancelling
   # every main CI run when the next merge landed and starving production
-  # promotion. Using github.sha in the group on main sidesteps the issue
-  # entirely. PRs share a group per ref so stale runs are superseded as usual.
+  # promotion. PRs use a simple pr-N group so stale runs are auto-cancelled
+  # as soon as new commits push (JOV-4201).
   group: >-
-    ci-${{ github.workflow }}-${{
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        && github.sha
-        || github.ref
+    ${{ github.workflow }}-${{
+      (github.event_name == 'pull_request')
+        && format('pr-{0}', github.event.pull_request.number)
+        || ((github.event_name == 'push' && github.ref == 'refs/heads/main')
+           && github.sha
+           || github.ref)
     }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
@@ -1067,14 +1069,21 @@ jobs:
         id: vercel_pull
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           set -euo pipefail
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
-          ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"
+          for i in {1..3}; do
+            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel pull attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
           for env_file in .vercel/.env.preview.local .vercel/.env.local; do
             if [ -f "$env_file" ]; then
               grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
@@ -1099,8 +1108,15 @@ jobs:
           fi
           # Do NOT inherit NEXT_PUBLIC_CLERK_MOCK from the turbo build step —
           # deploy artifact must match staging preview compile flags.
-          env -u TURBO_REMOTE_ONLY -u NEXT_PUBLIC_CLERK_MOCK -u NEXT_PUBLIC_CLERK_PROXY_DISABLED \
-            ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"
+          for i in {1..3}; do
+            if env -u TURBO_REMOTE_ONLY -u NEXT_PUBLIC_CLERK_MOCK -u NEXT_PUBLIC_CLERK_PROXY_DISABLED \
+              ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel build attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
           tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
           echo "vercel_artifact=true" >> "$GITHUB_OUTPUT"
         env:
@@ -3596,12 +3612,20 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Pull env (preview)
+        timeout-minutes: 10
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
-          ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"
+          for i in {1..3}; do
+            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel pull attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -3615,12 +3639,20 @@ jobs:
             fi
           done
       - name: Build (PR preview)
+        timeout-minutes: 10
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
-          env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"
+          for i in {1..3}; do
+            if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel build attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
@@ -3629,6 +3661,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
+        timeout-minutes: 10
         run: |
           # For fast preview PRs: use main secrets (no Neon dependency)
           # Fallback hierarchy for maximum compatibility
@@ -3641,13 +3674,20 @@ jobs:
             echo "Using fallback database URL"
           else
             # Provide cheap stub for UI-only deployments that might not need DB
-            POOLED_URL="postgresql://stub:stub@localhost:5432/main_stub"
+            POOLED_URL="postgresql://stub:***@localhost:5432/main_stub"
             echo "Using stub database URL for UI-only deployment"
           fi
 
-          bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
-            --env DATABASE_URL="$POOLED_URL" \
-            --env GIT_BRANCH="${GIT_BRANCH}"
+          for i in {1..3}; do
+            if bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
+              --env DATABASE_URL="$POOLED_URL" \
+              --env GIT_BRANCH="${GIT_BRANCH}"; then
+              break
+            fi
+            echo "Vercel deploy attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -4451,13 +4491,20 @@ jobs:
       - name: Pull env (staging preview)
         # Always pull project metadata/env; needed even when prebuilt output is restored
         # (deploy CLI reads .vercel/project.json).
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
-          ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"
+          for i in {1..3}; do
+            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel pull attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
       - name: Strip deprecated Turbo env overrides (staging preview)
         run: |
           for env_file in .vercel/.env.preview.local .vercel/.env.local; do
@@ -4477,7 +4524,14 @@ jobs:
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
-          env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"
+          for i in {1..3}; do
+            if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel build attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
@@ -4498,7 +4552,7 @@ jobs:
           # runner + signed provenance). L3 requires hermetic build — upgrade when
           # Vercel builds become reproducible/isolated.
       - name: Deploy (staging preview, prebuilt)
-        timeout-minutes: 8
+        timeout-minutes: 10
         id: deploy
         run: |
           required_runtime_env=(
@@ -4526,17 +4580,24 @@ jobs:
             exit 1
           fi
 
-          bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
-            --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-            --env NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
-            --env CLERK_SECRET_KEY="${CLERK_SECRET_KEY}" \
-            --env DATABASE_URL="${DATABASE_URL}" \
-            --env SESSION_SECRET="${SESSION_SECRET}" \
-            --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
-            --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
-            --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}" \
-            --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
-            --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
+          for i in {1..3}; do
+            if bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
+              --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+              --env NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
+              --env CLERK_SECRET_KEY="${CLERK_SECRET_KEY}" \
+              --env DATABASE_URL="${DATABASE_URL}" \
+              --env SESSION_SECRET="${SESSION_SECRET}" \
+              --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
+              --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
+              --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}" \
+              --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
+              --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"; then
+              break
+            fi
+            echo "Vercel deploy attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
         env:
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
