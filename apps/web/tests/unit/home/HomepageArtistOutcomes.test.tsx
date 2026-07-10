@@ -49,7 +49,7 @@ describe('HomepageArtistOutcomes', () => {
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('list', { name: 'Artist outcomes' })
+      screen.getByRole('list', { name: 'Artist Outcomes' })
     ).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
 

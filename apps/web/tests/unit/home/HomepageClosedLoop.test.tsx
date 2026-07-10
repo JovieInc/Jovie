@@ -15,7 +15,7 @@ describe('HomepageClosedLoop', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('list')).toHaveAttribute(
       'aria-label',
-      'The Jovie closed loop'
+      'The Jovie Closed Loop'
     );
     expect(screen.getAllByTestId('homepage-closed-loop-step')).toHaveLength(5);
     expect(
