@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
+
+const homeCss = readFileSync(
+  path.resolve(__dirname, '../../../app/(home)/home.css'),
+  'utf8'
+);
 
 describe('HomepageClosedLoop', () => {
   it('renders one ordered, semantic five-step story', () => {
@@ -57,5 +64,14 @@ describe('HomepageClosedLoop', () => {
     expect(
       container.querySelector('.homepage-closed-loop-visual')
     ).toBeTruthy();
+  });
+
+  it('keeps the closed-loop label on a WCAG-readable text token', () => {
+    const labelRule = homeCss.match(
+      /\.homepage-closed-loop-copy > p:first-child\s*\{[^}]*\}/
+    )?.[0];
+
+    expect(labelRule).toContain('var(--color-text-tertiary-token)');
+    expect(labelRule).not.toContain('var(--color-text-quaternary-token)');
   });
 });

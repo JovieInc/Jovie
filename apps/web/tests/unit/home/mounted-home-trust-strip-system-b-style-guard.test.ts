@@ -76,5 +76,11 @@ describe('mounted homepage trust strip System B source contract', () => {
     expect(css).toContain('padding-inline: 0;');
     expect(css).toContain('@media (max-width: 767px)');
     expect(css).toContain('letter-spacing: 0;');
+    expect(css).toMatch(
+      /\.system-b-mounted-home-trust-strip \.system-b-mounted-home-trust-strip-label\s*\{[^}]*color: var\(--color-text-tertiary-token\)/
+    );
+    expect(css).not.toMatch(
+      /\.system-b-mounted-home-trust-strip \.system-b-mounted-home-trust-strip-label\s*\{[^}]*color: var\(--color-text-quaternary-token\)/
+    );
   });
 });
