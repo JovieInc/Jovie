@@ -497,7 +497,10 @@ export function JovieChat({
     showEmptyScaffolding &&
     !showEmptyOpportunityCards &&
     visibleActionCards.length > 0;
-  const showEmptyPromptRail = showEmptyScaffolding;
+  // Prompt rail is the zero-opportunity scaffolding path (JOV-3547). Hide it
+  // when opportunity cards own the empty state so the rail does not compete.
+  const showEmptyPromptRail =
+    showEmptyScaffolding && !showEmptyOpportunityCards;
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -162,14 +163,16 @@ export function ChatLinkConfirmationCard({
             <X className='h-4 w-4' />
             <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
           </div>
-          <button
+          <Button
             type='button'
+            variant='link'
+            size='sm'
             onClick={handleUndoDismiss}
-            className='text-xs font-medium text-primary-token underline-offset-2 hover:underline'
+            className='h-auto px-0 text-xs font-medium text-primary-token underline-offset-2'
             data-testid='chat-link-dismiss-undo'
           >
             Undo
-          </button>
+          </Button>
         </div>
       </ChatToolSurface>
     );

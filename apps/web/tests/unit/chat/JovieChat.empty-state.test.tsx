@@ -410,11 +410,13 @@ describe('JovieChat empty state', () => {
   });
 
   it('does not render opportunity cards when there are none pending', () => {
-    const { queryByTestId } = renderWithQueryClient(
+    const { queryByTestId, getByTestId } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
     expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
-    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    // Zero pending opportunities → first-run prompt rail scaffolding (JOV-3547).
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-soft-suggestions-slot')).toBeTruthy();
   });
 });

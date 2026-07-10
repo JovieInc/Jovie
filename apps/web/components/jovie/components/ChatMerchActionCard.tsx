@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Archive, Check, Loader2, Pause, Play, Rocket, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import {
@@ -140,14 +141,16 @@ export function ChatMerchActionCard({
             <X className='h-4 w-4' />
             <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
           </div>
-          <button
+          <Button
             type='button'
+            variant='link'
+            size='sm'
             onClick={handleUndoDismiss}
-            className='text-xs font-medium text-primary-token underline-offset-2 hover:underline'
+            className='h-auto px-0 text-xs font-medium text-primary-token underline-offset-2'
             data-testid='chat-merch-dismiss-undo'
           >
             Undo
-          </button>
+          </Button>
         </div>
       </ChatToolSurface>
     );
