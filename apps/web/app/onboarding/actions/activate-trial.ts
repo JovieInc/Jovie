@@ -54,9 +54,19 @@ export async function activateTrial(appUserId: string): Promise<boolean> {
       .returning({ id: users.id, plan: users.plan });
 
     if (result.length === 0) {
-      logger.warn('Trial activation skipped: user ineligible or not found', {
-        appUserId,
-      });
+      // Distinguish "user missing" (data-integrity warning) from the normal
+      // skip path (paid plan or prior trial — e.g. re-running onboarding).
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, appUserId))
+        .limit(1);
+
+      if (!existing) {
+        logger.warn('Trial activation: user not found', { appUserId });
+      } else {
+        logger.info('Trial activation skipped: not eligible', { appUserId });
+      }
       return false;
     }
 
