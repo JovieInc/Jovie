@@ -35,4 +35,44 @@ describe('ChatMerchActionCard', () => {
       expect.any(Object)
     );
   });
+
+  it('uses Play icon for Make Live and Cancelled dismiss copy', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ChatMerchActionCard
+        profileId='profile-1'
+        merchCardId='card-1'
+        action='unpause'
+        title='Tour Tee'
+        currentStatus='paused'
+        retailPrice='$25.00'
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Make Live/i })).toBeTruthy();
+    // lucide Play renders a triangle path; Pause would be two rects — assert no Pause label
+    expect(container.querySelector('svg.lucide-pause')).toBeNull();
+    expect(container.querySelector('svg.lucide-play')).not.toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /Cancel Action/i }));
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
+  });
+
+  it('nested mode uses flat surface (no card-in-card)', () => {
+    render(
+      <ChatMerchActionCard
+        profileId='profile-1'
+        merchCardId='card-1'
+        action='publish'
+        title='Tour Tee'
+        currentStatus='draft'
+        retailPrice='$25.00'
+        nested
+      />
+    );
+
+    expect(screen.getByTestId('chat-tool-surface')).toHaveClass(
+      'system-b-chat-tool-surface-flat'
+    );
+  });
 });

@@ -280,7 +280,7 @@ function ToolActivityRow({
           isRunning && 'text-secondary-token',
           isError && 'text-red-500',
           isLocked && 'text-secondary-token',
-          !isRunning && !isError && !isLocked && 'text-cyan-300'
+          !isRunning && !isError && !isLocked && 'text-success'
         )}
       >
         <Icon

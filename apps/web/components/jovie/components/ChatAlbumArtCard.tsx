@@ -121,14 +121,8 @@ function ChatAlbumArtCardSuccess({
 
   if (result.state === 'needs_release_target') {
     return (
-      <ChatGenerationArtifactSurface
-        title='Album Art'
-        subtitle='Choose a release'
-      >
-        <div className='text-app font-medium text-primary-token'>
-          Choose Release
-        </div>
-        <div className='mt-2 flex flex-wrap gap-2'>
+      <ChatGenerationArtifactSurface title='Choose Release'>
+        <div className='flex flex-wrap gap-2'>
           {result.suggestedReleases.map(release => (
             <Button
               key={release.id}

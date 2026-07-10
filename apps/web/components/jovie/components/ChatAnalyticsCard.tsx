@@ -75,23 +75,23 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
           <li
             key={insight.id}
             className={cn(
-              'flex min-h-34 min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-lg border border-black/10 bg-white dark:bg-surface-1 p-4 text-black dark:text-white shadow-[0_18px_60px_-48px_rgba(0,0,0,0.7)] md:min-w-0'
+              'flex min-h-34 min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-lg border border-subtle bg-surface-1 p-4 text-primary-token shadow-card md:min-w-0'
             )}
             data-testid='chat-analytics-signal-card'
           >
             <div className='flex items-center gap-2'>
-              <span className='flex h-4 w-4 shrink-0 items-center justify-center text-black/55'>
+              <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
                 <InsightCategoryIcon category={insight.category} size='sm' />
               </span>
-              <span className='text-2xs font-medium capitalize leading-4 text-black/55'>
+              <span className='text-2xs font-medium capitalize leading-4 text-tertiary-token'>
                 {insight.category.replaceAll('_', ' ')}
               </span>
             </div>
             <div className='mt-4 min-w-0'>
-              <p className='text-pretty text-base font-semibold leading-[1.18] text-black dark:text-white'>
+              <p className='text-pretty text-base font-semibold leading-[1.18] text-primary-token'>
                 {insight.title}
               </p>
-              <p className='mt-3 line-clamp-2 text-xs leading-5 text-black/60'>
+              <p className='mt-3 line-clamp-2 text-xs leading-5 text-secondary-token'>
                 {insight.actionSuggestion ?? insight.description}
               </p>
             </div>
