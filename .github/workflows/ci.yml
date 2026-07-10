@@ -3505,6 +3505,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Pull env (preview)
         timeout-minutes: 10
+        timeout-minutes: 10
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
@@ -3532,6 +3533,7 @@ jobs:
           done
       - name: Build (PR preview)
         timeout-minutes: 10
+        timeout-minutes: 10
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
@@ -3552,6 +3554,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
+        timeout-minutes: 10
         id: pr_deploy
         timeout-minutes: 10
         run: |
@@ -4392,6 +4395,7 @@ jobs:
           fi
 
       - name: Pull env (staging preview)
+        timeout-minutes: 10
         # Always pull project metadata/env; needed even when prebuilt output is restored
         # (deploy CLI reads .vercel/project.json).
         timeout-minutes: 10
@@ -4419,6 +4423,7 @@ jobs:
       - name: Check signup readiness (staging deploy env)
         run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=stg --source=env
       - name: Build (preview target for staging verification)
+        timeout-minutes: 10
         # Skip when JOV-4087 artifact restored successfully.
         if: steps.restore_vercel_build.outputs.restored != 'true'
         timeout-minutes: 10
@@ -4455,6 +4460,7 @@ jobs:
           # runner + signed provenance). L3 requires hermetic build — upgrade when
           # Vercel builds become reproducible/isolated.
       - name: Deploy (staging preview, prebuilt)
+        timeout-minutes: 10
         timeout-minutes: 10
         id: deploy
         run: |
@@ -4566,6 +4572,7 @@ jobs:
             exit 1
           fi
       - name: Promote specific deployment for this SHA
+        timeout-minutes: 10
         id: promote
         env:
           GITHUB_SHA: ${{ github.sha }}
