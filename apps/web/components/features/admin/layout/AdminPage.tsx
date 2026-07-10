@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   type WorkspaceTabOption,
@@ -24,6 +23,11 @@ export interface AdminPageProps<
   TPrimary extends string = string,
   TSecondary extends string = never,
 > {
+  /**
+   * Route title. Used for tab aria labels and as a semantic page name for
+   * callers — **not** rendered as a visible page heading. The shell
+   * `DashboardHeader` breadcrumb is the single visible title source (JOV-3527).
+   */
   readonly title: string;
   readonly description?: string;
   /**
@@ -45,11 +49,12 @@ export interface AdminPageProps<
  *
  * Replaces the legacy `AdminToolPage` (header-in-card) and `AdminWorkspacePage`
  * (always-on tabs) wrappers. Provides:
- * - Flat page header (title + description + actions), no `ContentSurfaceCard`
- *   wrapper — the route already lives inside the dashboard shell.
- * - Optional `hero` slot directly under the header for primary metrics.
+ * - Description + actions only when needed. Route title lives in the shell
+ *   breadcrumb (`DashboardHeader`) — never re-rendered here (avoids the
+ *   double-"Ops" regression class).
+ * - Optional `hero` slot for primary metrics.
  * - Optional `tabs` slot that delegates to `WorkspaceTabsSurface`. The parent
- *   header owns the route title/description, so the tabs surface renders
+ *   owns the route title in the shell breadcrumb, so the tabs surface renders
  *   headerless to avoid duplicate page titles.
  * - `space-y-6` outer rhythm matching the canonical dashboard.
  *
@@ -71,6 +76,8 @@ export function AdminPage<
   className,
 }: Readonly<AdminPageProps<TPrimary, TSecondary>>) {
   const tabsHeaderless = Boolean(tabs);
+  // Breadcrumb owns the page title; only surface description + actions here.
+  const showMetaHeader = Boolean(description || actions);
 
   return (
     <PageShell>
@@ -82,15 +89,25 @@ export function AdminPage<
           )}
           data-testid={testId}
         >
-          <ContentSectionHeader
-            title={title}
-            subtitle={description}
-            actions={actions}
-            variant='plain'
-            density='compact'
-            className='min-h-0'
-            actionsClassName='shrink-0'
-          />
+          {showMetaHeader ? (
+            <div
+              className='flex min-w-0 items-start justify-between gap-2'
+              data-testid='admin-page-meta'
+            >
+              {description ? (
+                <p className='min-w-0 flex-1 text-2xs leading-[15px] text-tertiary-token'>
+                  {description}
+                </p>
+              ) : (
+                <span className='min-w-0 flex-1' aria-hidden='true' />
+              )}
+              {actions ? (
+                <div className='ml-auto flex shrink-0 items-center justify-end gap-1'>
+                  {actions}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {hero ? <div data-testid='admin-page-hero'>{hero}</div> : null}
 
