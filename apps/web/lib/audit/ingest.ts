@@ -40,7 +40,8 @@ export type IngestEventType =
   | 'SPOTIFY_OAUTH_START'
   | 'SPOTIFY_OAUTH_CALLBACK'
   | 'SPOTIFY_OAUTH_SUCCESS'
-  | 'SPOTIFY_OAUTH_FAILED';
+  | 'SPOTIFY_OAUTH_FAILED'
+  | 'HUD_TASTE_ACTION';
 
 /**
  * Base structure for all ingest audit events.

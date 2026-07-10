@@ -1,12 +1,24 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, GitBranch, Loader2, Ship } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  GitBranch,
+  KeyRound,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  Ship,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
+import type { TasteInboxPayload } from '@/lib/hud/taste-inbox';
 import type { HudTone } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
@@ -252,7 +264,7 @@ function GithubRateLimitsPanel({
           valueClassName='text-2xl font-[620] leading-none tracking-[-0.03em]'
         />
         <ContentMetricCard
-          label='GraphQL'
+          label='Graphql'
           value={payload.graphql?.remaining.toLocaleString('en-US') ?? '—'}
           subtitle={rateLimitSubtitle(payload.graphql)}
           className='p-3'
@@ -267,6 +279,237 @@ function GithubRateLimitsPanel({
       {payload.errorMessage ? (
         <p className='text-app text-secondary-token'>{payload.errorMessage}</p>
       ) : null}
+    </ContentSurfaceCard>
+  );
+}
+
+function TasteInboxPanel({
+  payload,
+  onRefresh,
+}: Readonly<{
+  readonly payload: TasteInboxPayload;
+  readonly onRefresh: () => void;
+}>) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [commentId, setCommentId] = useState<string | null>(null);
+  const [comment, setComment] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function act(
+    issueId: string,
+    action: 'approve' | 'reject' | 'comment'
+  ) {
+    setBusyId(issueId);
+    setMessage(null);
+    try {
+      const response = await fetch('/api/admin/hud/taste-inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issueId,
+          action,
+          comment: action === 'comment' ? comment : undefined,
+        }),
+      });
+      if (!response.ok) throw new Error('Could not save');
+      setComment('');
+      setCommentId(null);
+      setMessage('Saved');
+      onRefresh();
+    } catch {
+      setMessage('Could not save that decision');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <ContentSurfaceCard
+      surface='details'
+      className='space-y-3 p-3'
+      data-testid='hud-taste-inbox-panel'
+    >
+      <div className='flex items-center justify-between gap-3'>
+        <div>
+          <SectionLabel>Taste Inbox</SectionLabel>
+          <p className='mt-1 text-2xs text-tertiary-token'>
+            Human decisions stay in the loop.
+          </p>
+        </div>
+        <button
+          type='button'
+          onClick={onRefresh}
+          className='rounded-md p-1.5 text-tertiary-token hover:bg-surface-0 hover:text-primary-token'
+          aria-label='Refresh Taste Inbox'
+        >
+          <RefreshCw className='h-3.5 w-3.5' aria-hidden='true' />
+        </button>
+      </div>
+      {!payload.available ? (
+        <p className='text-app text-secondary-token'>
+          {payload.error ?? 'Taste Inbox unavailable.'}
+        </p>
+      ) : null}
+      {payload.error ? (
+        <p className='text-app text-secondary-token'>{payload.error}</p>
+      ) : null}
+      {payload.issues.length === 0 && payload.available && !payload.error ? (
+        <p className='text-app text-secondary-token'>No open decisions.</p>
+      ) : null}
+      <div className='grid gap-2'>
+        {payload.issues.map(issue => (
+          <div
+            key={issue.id}
+            className='rounded-md border border-subtle bg-surface-0 px-3 py-2'
+          >
+            <div className='flex items-start justify-between gap-3'>
+              <div className='min-w-0'>
+                <p className='text-app font-semibold text-primary-token'>
+                  {issue.identifier} · {issue.title}
+                </p>
+                <p className='mt-1 text-2xs text-tertiary-token'>
+                  {issue.label === 'needs:taste'
+                    ? 'Taste call'
+                    : 'Human action'}{' '}
+                  · Priority {issue.priorityLabel}
+                </p>
+              </div>
+              <Link
+                href={issue.url}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='shrink-0 text-2xs text-secondary-token underline-offset-2 hover:underline'
+              >
+                Open
+              </Link>
+            </div>
+            <div className='mt-2 flex flex-wrap items-center gap-1.5'>
+              <button
+                type='button'
+                disabled={busyId === issue.id}
+                onClick={() => void act(issue.id, 'approve')}
+                className='inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1 text-2xs text-secondary-token hover:bg-surface-1 disabled:opacity-50'
+              >
+                <Check className='h-3 w-3' aria-hidden='true' />
+                Approve
+              </button>
+              <button
+                type='button'
+                disabled={busyId === issue.id}
+                onClick={() => void act(issue.id, 'reject')}
+                className='inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1 text-2xs text-secondary-token hover:bg-surface-1 disabled:opacity-50'
+              >
+                <X className='h-3 w-3' aria-hidden='true' />
+                Reject
+              </button>
+              <button
+                type='button'
+                disabled={busyId === issue.id}
+                onClick={() =>
+                  setCommentId(commentId === issue.id ? null : issue.id)
+                }
+                className='inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1 text-2xs text-secondary-token hover:bg-surface-1 disabled:opacity-50'
+              >
+                <MessageSquare className='h-3 w-3' aria-hidden='true' />
+                Comment
+              </button>
+            </div>
+            {commentId === issue.id ? (
+              <div className='mt-2 flex gap-2'>
+                <input
+                  value={comment}
+                  onChange={event => setComment(event.target.value)}
+                  placeholder='Add a decision note'
+                  className='min-w-0 flex-1 rounded-md border border-subtle bg-surface-1 px-2 py-1.5 text-app text-primary-token outline-none focus:border-accent'
+                />
+                <button
+                  type='button'
+                  disabled={!comment.trim() || busyId === issue.id}
+                  onClick={() => void act(issue.id, 'comment')}
+                  className='rounded-md bg-primary-token px-2 py-1 text-2xs text-surface-0 disabled:opacity-50'
+                >
+                  Save
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {message ? (
+        <p className='min-h-4 text-2xs text-tertiary-token' role='status'>
+          {message}
+        </p>
+      ) : (
+        <p
+          className='min-h-4 text-2xs text-tertiary-token'
+          aria-hidden='true'
+        />
+      )}
+    </ContentSurfaceCard>
+  );
+}
+
+function CliAuthPanel() {
+  const authQuery = useQuery({
+    queryKey: ['hud', 'cli-auth'],
+    queryFn: ({ signal }) =>
+      fetchJson<{
+        providers: Array<{
+          provider: string;
+          available: boolean;
+          detail: string;
+        }>;
+      }>('/api/admin/hud/cli-auth', signal),
+    staleTime: 30_000,
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+  async function reauthenticate(provider: string) {
+    setBusy(provider);
+    try {
+      await fetch('/api/admin/hud/cli-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider }),
+      });
+    } finally {
+      setBusy(null);
+      void authQuery.refetch();
+    }
+  }
+  return (
+    <ContentSurfaceCard
+      surface='details'
+      className='space-y-3 p-3'
+      data-testid='hud-cli-auth-panel'
+    >
+      <div className='flex items-center gap-2'>
+        <KeyRound className='h-4 w-4 text-secondary-token' aria-hidden='true' />
+        <SectionLabel>Local Sign-In</SectionLabel>
+      </div>
+      <p className='text-2xs text-tertiary-token'>
+        Status only. Reauthentication opens a local terminal flow; secrets never
+        enter the browser.
+      </p>
+      <div className='grid gap-2 sm:grid-cols-3'>
+        {(authQuery.data?.providers ?? []).map(item => (
+          <div
+            key={item.provider}
+            className='flex items-center justify-between gap-2 rounded-md border border-subtle bg-surface-0 px-2.5 py-2'
+          >
+            <span className='text-app capitalize text-primary-token'>
+              {item.provider}
+            </span>
+            <button
+              type='button'
+              onClick={() => void reauthenticate(item.provider)}
+              disabled={busy === item.provider}
+              className='text-2xs text-secondary-token underline-offset-2 hover:underline disabled:opacity-50'
+            >
+              {item.available ? 'Reauthenticate' : 'Sign in'}
+            </button>
+          </div>
+        ))}
+      </div>
     </ContentSurfaceCard>
   );
 }
@@ -315,6 +558,15 @@ export function HudShipperPanels() {
     refetchOnWindowFocus: true,
   });
 
+  const tasteInboxQuery = useQuery({
+    queryKey: ['hud', 'taste-inbox'],
+    queryFn: ({ signal }) =>
+      fetchJson<TasteInboxPayload>('/api/admin/hud/taste-inbox', signal),
+    ...FREQUENT_CACHE,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
   return (
     <div className='flex flex-col gap-3' data-testid='hud-shipper-panels'>
       <div className='flex flex-wrap items-center justify-between gap-2'>
@@ -328,6 +580,18 @@ export function HudShipperPanels() {
         >
           Open full Ops surface
         </Link>
+      </div>
+
+      <div className='grid gap-3 xl:grid-cols-2'>
+        {tasteInboxQuery.data ? (
+          <TasteInboxPanel
+            payload={tasteInboxQuery.data}
+            onRefresh={() => void tasteInboxQuery.refetch()}
+          />
+        ) : (
+          <PanelSkeleton />
+        )}
+        <CliAuthPanel />
       </div>
 
       <div className='grid gap-3 xl:grid-cols-2'>
