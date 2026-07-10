@@ -4475,15 +4475,14 @@ jobs:
         run: |
           required_runtime_env=(
             VERCEL_AUTOMATION_BYPASS_SECRET
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-            CLERK_SECRET_KEY
+            NEXT_PUBLIC_BETTER_AUTH_URL
+            BETTER_AUTH_SECRET
+            BETTER_AUTH_URL
             DATABASE_URL
             SESSION_SECRET
             AI_GATEWAY_API_KEY
             NEXT_PUBLIC_TURNSTILE_SITE_KEY
             TURNSTILE_SECRET_KEY
-            CLERK_PUBLISHABLE_KEY_STAGING
-            CLERK_SECRET_KEY_STAGING
           )
 
           missing_runtime_env=()
@@ -4501,15 +4500,14 @@ jobs:
           for i in {1..3}; do
             if bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
               --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-              --env NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
-              --env CLERK_SECRET_KEY="${CLERK_SECRET_KEY}" \
+              --env NEXT_PUBLIC_BETTER_AUTH_URL="${NEXT_PUBLIC_BETTER_AUTH_URL}" \
+              --env BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET}" \
+              --env BETTER_AUTH_URL="${BETTER_AUTH_URL}" \
               --env DATABASE_URL="${DATABASE_URL}" \
               --env SESSION_SECRET="${SESSION_SECRET}" \
               --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
               --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
-              --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}" \
-              --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
-              --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"; then
+              --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}"; then
               break
             fi
             echo "Vercel deploy attempt $i failed, retrying in 10s..."
