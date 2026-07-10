@@ -83,7 +83,7 @@ export function RevenueLiftDashboardView({
           id='revenue-lift-irpaa-heading'
           className='mt-1 text-sm font-medium text-primary-token'
         >
-          Incremental Revenue per Active Artist (IRPAA)
+          Incremental Revenue Per Active Artist (IRPAA)
         </h2>
         <p className='mt-3 min-h-10 text-4xl font-semibold tracking-tight text-primary-token'>
           {irpaa ? formatAmount(irpaa.irpaaCents) : '—'}
@@ -133,7 +133,7 @@ export function RevenueLiftDashboardView({
         </h2>
         <div className='overflow-x-auto rounded-md border border-subtle bg-surface-1'>
           <table className='w-full min-w-[40rem] text-left text-sm'>
-            <thead className='border-b border-subtle bg-(--linear-app-content-surface) text-xs text-secondary-token'>
+            <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
                 <th className='px-3 py-2 font-medium'>Metric</th>
                 <th className='px-3 py-2 font-medium'>Value</th>
@@ -179,7 +179,7 @@ export function RevenueLiftDashboardView({
           id='revenue-lift-cohort-heading'
           className='mb-3 text-sm font-medium text-primary-token'
         >
-          Per-Artist Cohort
+          Per Artist Cohort
         </h2>
         <div className='mb-3 grid gap-3 sm:grid-cols-2'>
           <div className='rounded-md border border-subtle bg-surface-1 p-4'>
@@ -212,7 +212,7 @@ export function RevenueLiftDashboardView({
         <SourceLine source={data.cohorts.source} />
         <div className='mt-3 overflow-x-auto rounded-md border border-subtle bg-surface-1'>
           <table className='w-full min-w-[32rem] text-left text-sm'>
-            <thead className='border-b border-subtle bg-(--linear-app-content-surface) text-xs text-secondary-token'>
+            <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
                 <th className='px-3 py-2 font-medium'>User</th>
                 <th className='px-3 py-2 font-medium'>Cohort</th>
@@ -265,17 +265,17 @@ export function RevenueLiftDashboardView({
         </div>
       </section>
 
-      {/* Multi-agent contribution */}
+      {/* Multi agent contribution */}
       <section aria-labelledby='revenue-lift-agents-heading'>
         <h2
           id='revenue-lift-agents-heading'
           className='mb-3 text-sm font-medium text-primary-token'
         >
-          Multi-Agent Contribution
+          Multi Agent Contribution
         </h2>
         <div className='overflow-x-auto rounded-md border border-subtle bg-surface-1'>
           <table className='w-full min-w-[36rem] text-left text-sm'>
-            <thead className='border-b border-subtle bg-(--linear-app-content-surface) text-xs text-secondary-token'>
+            <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
                 <th className='px-3 py-2 font-medium'>Agent</th>
                 <th className='px-3 py-2 font-medium'>Tasks</th>
