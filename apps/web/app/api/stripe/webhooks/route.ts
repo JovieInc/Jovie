@@ -23,7 +23,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { db } from '@/lib/db';
@@ -43,6 +43,7 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const WEBHOOK_PROCESSING_LEASE_MS = 5 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -96,11 +97,12 @@ export async function POST(request: NextRequest) {
 
     const stripeCreatedAt = stripeTimestampToDate(event.created);
 
-    // Sequential webhook processing with idempotency via unique constraint:
+    // Durable webhook processing lease with idempotency via unique constraint:
     // 1. Insert-or-skip webhook record (unique on stripe_event_id)
     // 2. Check if already processed
-    // 3. Process the event
-    // 4. Mark as processed
+    // 3. Atomically claim an unprocessed or expired lease
+    // 4. Process the event
+    // 5. Mark as processed
     // NOTE: Neon HTTP driver does not support transactions. If step 3 fails,
     // the unprocessed record remains and Stripe's retry will re-attempt.
     try {
@@ -151,15 +153,57 @@ export async function POST(request: NextRequest) {
         webhookRecordId = existingEvent.id;
       }
 
+      // A unique insert prevents duplicate records, but it does not prevent
+      // two requests from both reading the same unprocessed record. Claiming
+      // with a compare-and-set lease closes that race without requiring a
+      // transaction, which the Neon HTTP driver does not support.
+      const leaseCutoff = new Date(Date.now() - WEBHOOK_PROCESSING_LEASE_MS);
+      const [claimedRecord] = await db
+        .update(stripeWebhookEvents)
+        .set({ processingStartedAt: new Date() })
+        .where(
+          and(
+            eq(stripeWebhookEvents.id, webhookRecordId),
+            isNull(stripeWebhookEvents.processedAt),
+            or(
+              isNull(stripeWebhookEvents.processingStartedAt),
+              lt(stripeWebhookEvents.processingStartedAt, leaseCutoff)
+            )
+          )
+        )
+        .returning({ id: stripeWebhookEvents.id });
+
+      if (!claimedRecord) {
+        // Another request owns the active lease. Acknowledge the duplicate so
+        // Stripe does not retry while the original request is still running.
+        return NextResponse.json(
+          { received: true },
+          { headers: NO_STORE_HEADERS }
+        );
+      }
+
       // Process the event (handlers throw on failure)
       await processWebhookEvent(event, stripeCreatedAt);
 
       // Mark event as processed
       await db
         .update(stripeWebhookEvents)
-        .set({ processedAt: new Date() })
+        .set({ processedAt: new Date(), processingStartedAt: null })
         .where(eq(stripeWebhookEvents.id, webhookRecordId));
     } catch (processingError) {
+      // Release the lease on handled failures so Stripe retries immediately;
+      // an abrupt process exit still self-heals when the lease expires.
+      try {
+        await db
+          .update(stripeWebhookEvents)
+          .set({ processingStartedAt: null })
+          .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+      } catch (leaseReleaseError) {
+        logger.warn('Stripe webhook lease release failed', {
+          eventId: event.id,
+          error: leaseReleaseError,
+        });
+      }
       await captureCriticalError(
         'Stripe webhook processing failed',
         processingError,
