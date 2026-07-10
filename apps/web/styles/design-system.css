@@ -9623,6 +9623,30 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   background: var(--surface-1);
 }
 
+/* JOV-3551: shared chat tool/confirm surface tones */
+:where(.system-b-chat-tool-surface) {
+  padding: var(--space-4);
+}
+
+:where(.system-b-chat-tool-surface-success) {
+  border-color: var(--color-border-subtle);
+  background: var(--surface-1);
+}
+
+:where(.system-b-chat-tool-surface-cancelled) {
+  border-color: var(--system-b-app-frame-seam);
+  background: var(--system-b-app-content-surface);
+  opacity: 0.6;
+}
+
+:where(.system-b-chat-tool-surface-flat) {
+  /* Nested inside ChatGenerationArtifactSurface — no second card chrome */
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
 :where(.system-b-chat-link-card) {
   padding: var(--space-4);
 }

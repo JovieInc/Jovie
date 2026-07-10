@@ -4,9 +4,9 @@ import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useConfirmChatLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { CHAT_TOOL_CANCELLED_LABEL, ChatToolSurface } from './ChatToolSurface';
 
 interface ChatLinkConfirmationCardProps {
   readonly profileId: string;
@@ -123,30 +123,30 @@ export function ChatLinkConfirmationCard({
 
   if (state === 'added') {
     return (
-      <ContentSurfaceCard className='border-subtle bg-surface-1 p-4'>
+      <ChatToolSurface tone='success'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>
             {platform.name} link added
           </span>
         </div>
-      </ContentSurfaceCard>
+      </ChatToolSurface>
     );
   }
 
   if (state === 'dismissed') {
     return (
-      <ContentSurfaceCard className='border-(--system-b-app-frame-seam) bg-(--system-b-app-content-surface) p-4 opacity-60'>
+      <ChatToolSurface tone='cancelled'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
-          <span className='text-sm'>Link dismissed</span>
+          <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
         </div>
-      </ContentSurfaceCard>
+      </ChatToolSurface>
     );
   }
 
   return (
-    <ContentSurfaceCard className='system-b-chat-link-card system-b-chat-link-card-add'>
+    <ChatToolSurface className='system-b-chat-link-card system-b-chat-link-card-add'>
       <div className='flex items-center gap-3'>
         <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-add'>
           <SocialIcon
@@ -201,6 +201,6 @@ export function ChatLinkConfirmationCard({
           </button>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </ChatToolSurface>
   );
 }

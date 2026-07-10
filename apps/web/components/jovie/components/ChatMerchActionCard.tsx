@@ -1,13 +1,13 @@
 'use client';
 
-import { Archive, Check, Loader2, Pause, Rocket, X } from 'lucide-react';
+import { Archive, Check, Loader2, Play, Rocket, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   type ConfirmChatMerchActionType,
   useConfirmChatMerchActionMutation,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { CHAT_TOOL_CANCELLED_LABEL, ChatToolSurface } from './ChatToolSurface';
 
 interface ChatMerchActionCardProps {
   readonly profileId: string;
@@ -16,6 +16,11 @@ interface ChatMerchActionCardProps {
   readonly title: string;
   readonly currentStatus: string;
   readonly retailPrice: string;
+  /**
+   * When nested under ChatGenerationArtifactSurface (or another card),
+   * drop the outer card chrome to avoid card-in-card (JOV-3551).
+   */
+  readonly nested?: boolean;
 }
 
 type CardState = 'pending' | 'confirming' | 'confirmed' | 'dismissed';
@@ -40,7 +45,8 @@ const ACTION_CONFIG: Record<
     label: 'Make Merch Live',
     confirmLabel: 'Make Live',
     successLabel: 'Merch is live',
-    Icon: Pause,
+    // Play (not Pause) — "Make Live" is a resume action (JOV-3551)
+    Icon: Play,
   },
   archive: {
     label: 'Archive Merch',
@@ -58,12 +64,14 @@ export function ChatMerchActionCard({
   title,
   currentStatus,
   retailPrice,
+  nested = false,
 }: ChatMerchActionCardProps) {
   const [state, setState] = useState<CardState>('pending');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmAction = useConfirmChatMerchActionMutation();
   const config = ACTION_CONFIG[action];
   const ActionIcon = config.Icon;
+  const surfaceTone = nested ? 'flat' : 'default';
 
   const handleConfirm = useCallback(() => {
     setErrorMessage(null);
@@ -86,28 +94,31 @@ export function ChatMerchActionCard({
 
   if (state === 'confirmed') {
     return (
-      <ContentSurfaceCard className='border-subtle bg-surface-1 p-4'>
+      <ChatToolSurface tone={nested ? 'flat' : 'success'}>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>{config.successLabel}</span>
         </div>
-      </ContentSurfaceCard>
+      </ChatToolSurface>
     );
   }
 
   if (state === 'dismissed') {
     return (
-      <ContentSurfaceCard className='border-(--system-b-app-frame-seam) bg-(--system-b-app-content-surface) p-4 opacity-60'>
+      <ChatToolSurface tone={nested ? 'flat' : 'cancelled'}>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
-          <span className='text-sm'>Action cancelled</span>
+          <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
         </div>
-      </ContentSurfaceCard>
+      </ChatToolSurface>
     );
   }
 
   return (
-    <ContentSurfaceCard className='system-b-chat-link-card'>
+    <ChatToolSurface
+      tone={surfaceTone}
+      className={nested ? undefined : 'system-b-chat-link-card'}
+    >
       <div className='flex items-center gap-3'>
         <span
           className={cn(
@@ -165,6 +176,6 @@ export function ChatMerchActionCard({
           </button>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </ChatToolSurface>
   );
 }

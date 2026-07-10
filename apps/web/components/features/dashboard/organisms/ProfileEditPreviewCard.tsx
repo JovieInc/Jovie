@@ -132,7 +132,7 @@ export function ProfileEditPreviewCard({
     );
   }
 
-  // Show cancelled state
+  // Show cancelled state — single "Cancelled" verb (JOV-3551); keep field label + badge only
   if (cancelled) {
     return (
       <ContentSurfaceCard className='p-3 opacity-70'>
@@ -141,7 +141,6 @@ export function ProfileEditPreviewCard({
             <p className='truncate text-app font-semibold tracking-tight text-primary-token'>
               {preview.fieldLabel}
             </p>
-            <p className='text-xs text-secondary-token'>Edit cancelled</p>
           </div>
           <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-surface-0 px-1.5 py-0.5 text-2xs font-caption tracking-tight text-secondary-token'>
             <X className='h-3.5 w-3.5' />
