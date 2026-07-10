@@ -216,11 +216,76 @@
 
 :where(.profile-aeo-content) {
   --profile-aeo-text: var(--color-text-tooltip);
-  --profile-aeo-muted: var(--color-text-tooltip);
-  --profile-aeo-border: var(--color-border-subtle);
-  background: var(--system-b-cinematic-black);
+  --profile-aeo-muted: color-mix(
+    in oklab,
+    var(--color-text-tooltip) 70%,
+    transparent
+  );
+  --profile-aeo-border: color-mix(
+    in oklab,
+    var(--color-text-tooltip) 14%,
+    transparent
+  );
+  background:
+    linear-gradient(180deg, var(--profile-stage-bg) 0, transparent 12rem),
+    var(--system-b-cinematic-black);
   color: var(--profile-aeo-text);
   color-scheme: dark;
+}
+
+:where(.profile-aeo-content__inner) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__heading) {
+  max-inline-size: 18ch;
+}
+
+:where(.profile-aeo-content__body) {
+  max-inline-size: 58ch;
+}
+
+@media (min-width: 1024px) {
+  :where(.profile-aeo-content__inner) {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  }
+}
+
+@media (min-width: 640px) {
+  :where(.profile-aeo-content__faq-item) {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+}
+
+:where(.profile-hero-identity-scrim) {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 28%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+}
+
+:where(.profile-horizontal-rail) {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+:where(.profile-horizontal-rail::-webkit-scrollbar) {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+:where(.profile-content-scroll-region) {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+:where(.profile-content-scroll-region::-webkit-scrollbar) {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 :where(.profile-aeo-content__heading),
@@ -250,6 +315,41 @@
 :where(.profile-aeo-content__source:hover) {
   color: var(--profile-aeo-text);
   text-decoration-color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-claim-card) {
+  --profile-aeo-claim-ink: var(--system-b-cinematic-black);
+  background: var(--color-bg-paper);
+  border-color: color-mix(
+    in oklab,
+    var(--profile-aeo-claim-ink) 14%,
+    transparent
+  );
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  color: var(--profile-aeo-claim-ink);
+}
+
+:where(.profile-aeo-claim-card__eyebrow),
+:where(.profile-aeo-claim-card__body),
+:where(.profile-aeo-claim-card__note) {
+  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 66%, transparent);
+}
+
+:where(.profile-aeo-claim-card__cta) {
+  background: var(--profile-aeo-claim-ink);
+  color: var(--color-bg-paper);
+}
+
+@media (hover: hover) {
+  :where(.profile-aeo-claim-card__cta:hover) {
+    background: color-mix(
+      in oklab,
+      var(--profile-aeo-claim-ink) 86%,
+      transparent
+    );
+  }
 }
 
 /* Mobile public profiles are a fixed one-screen shell. Keep the AEO copy in the

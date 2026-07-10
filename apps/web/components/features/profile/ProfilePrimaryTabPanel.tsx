@@ -210,7 +210,10 @@ function SubscribePanel({
   if (!isSubscribed || keepSubscribeFlowMounted) {
     return (
       <div
-        className={NATIVE_PANEL_CLASS_NAME}
+        className={cn(
+          NATIVE_PANEL_CLASS_NAME,
+          'flex h-full min-h-full flex-col'
+        )}
         data-testid='profile-primary-tab-subscribe'
       >
         {subscribeTwoStep ? (
@@ -288,7 +291,10 @@ function ProfileMusicEmptyState({
     );
 
   return (
-    <div className='px-4 pb-4' data-testid='profile-primary-tab-music-empty'>
+    <div
+      className='flex flex-1 items-center px-4 pb-4'
+      data-testid='profile-primary-tab-music-empty'
+    >
       <ProfileEmptyBentoCard
         accent='music'
         icon={Music2}
@@ -538,7 +544,7 @@ export function ProfilePrimaryTabPanel({
 
     return (
       <div
-        className={NATIVE_PANEL_CLASS_NAME}
+        className={cn(NATIVE_PANEL_CLASS_NAME, 'flex min-h-full flex-col')}
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>
@@ -558,7 +564,7 @@ export function ProfilePrimaryTabPanel({
   if (mode === 'tour') {
     return (
       <div
-        className={NATIVE_PANEL_CLASS_NAME}
+        className={cn(NATIVE_PANEL_CLASS_NAME, 'flex min-h-full flex-col')}
         data-testid='profile-primary-tab-tour'
       >
         <div className='px-4 pb-2 pt-3'>
@@ -571,6 +577,11 @@ export function ProfilePrimaryTabPanel({
           tourDates={[...tourDates]}
           emptyStateSourceContext={eventsEmptySourceContext}
           renderMode={renderMode}
+          className={
+            tourDates.length === 0
+              ? 'flex flex-1 flex-col justify-center'
+              : undefined
+          }
         />
       </div>
     );

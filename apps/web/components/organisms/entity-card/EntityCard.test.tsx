@@ -106,14 +106,15 @@ describe('EntityCard', () => {
       },
     };
 
-    render(<EntityCard model={interactive} treatment='big' />);
+    render(<EntityCard model={interactive} treatment='detailed' />);
     const card = screen.getByTestId('entity-card-show');
     expect(card.tagName).toBe('DIV');
-    expect(screen.getByRole('link', { name: 'Get Tickets' })).toHaveAttribute(
-      'href',
-      'https://tickets.test/show'
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Add To Calendar' }));
+    const tickets = screen.getByRole('link', { name: 'Get Tickets' });
+    const calendar = screen.getByRole('button', { name: 'Add To Calendar' });
+    expect(tickets).toHaveAttribute('href', 'https://tickets.test/show');
+    expect(tickets.className).toContain('h-11');
+    expect(calendar.className).toContain('h-11');
+    fireEvent.click(calendar);
     expect(onCalendar).toHaveBeenCalledTimes(1);
   });
 
