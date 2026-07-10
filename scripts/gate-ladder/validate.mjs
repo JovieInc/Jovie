@@ -53,13 +53,19 @@ function main() {
     ? read('.husky/pre-commit')
     : '';
   if (!preCommit.includes('scan-secrets.sh')) {
-    errors.push('.husky/pre-commit must invoke scripts/security/scan-secrets.sh');
+    errors.push(
+      '.husky/pre-commit must invoke scripts/security/scan-secrets.sh'
+    );
   }
   if (!preCommit.includes('check-conflict-markers.sh')) {
-    errors.push('.husky/pre-commit must invoke scripts/check-conflict-markers.sh');
+    errors.push(
+      '.husky/pre-commit must invoke scripts/check-conflict-markers.sh'
+    );
   }
   if (!preCommit.includes('lint-staged')) {
-    errors.push('.husky/pre-commit must invoke lint-staged (format/lint/typecheck)');
+    errors.push(
+      '.husky/pre-commit must invoke lint-staged (format/lint/typecheck)'
+    );
   }
 
   const prePush = existsSync(resolve(REPO_ROOT, '.husky/pre-push'))
@@ -75,7 +81,9 @@ function main() {
   const ciYml = existsSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'))
     ? read('.github/workflows/ci.yml')
     : '';
-  const mergeQueue = existsSync(resolve(REPO_ROOT, 'scripts/lib/merge-queue-guard.mjs'))
+  const mergeQueue = existsSync(
+    resolve(REPO_ROOT, 'scripts/lib/merge-queue-guard.mjs')
+  )
     ? read('scripts/lib/merge-queue-guard.mjs')
     : '';
   const hasPrReadyJob =
@@ -89,7 +97,9 @@ function main() {
 
   // iOS adapter surfaces
   if (!existsSync(resolve(REPO_ROOT, 'scripts/ios-best-practices-lint.sh'))) {
-    errors.push('missing scripts/ios-best-practices-lint.sh (ios lint adapter)');
+    errors.push(
+      'missing scripts/ios-best-practices-lint.sh (ios lint adapter)'
+    );
   }
   if (!existsSync(resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'))) {
     errors.push('missing .github/workflows/ios-ci.yml');

@@ -30,7 +30,13 @@ function usage(code = 0) {
 }
 
 function parseArgs(argv) {
-  const out = { list: false, strict: false, rung: null, app: 'web', phase: 'preCommit' };
+  const out = {
+    list: false,
+    strict: false,
+    rung: null,
+    app: 'web',
+    phase: 'preCommit',
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--list') out.list = true;
