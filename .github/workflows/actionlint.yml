@@ -16,7 +16,8 @@ concurrency:
 
 jobs:
   actionlint:
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # rhysd/actionlint is a Docker action, so it needs a Docker-capable hosted runner.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       SHELLCHECK_OPTS: >-
