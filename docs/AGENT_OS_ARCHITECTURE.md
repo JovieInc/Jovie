@@ -85,7 +85,7 @@ Only non-overlapping docs/schema/UI chunks may run in parallel. Shared infrastru
 
 ## Admin Ops Boundary
 
-The private operator surface belongs under `/app/admin/ops`. The current `/hud` route remains a readable kiosk/status board and must not become a dense command center.
+The private operator surface belongs under `/app/admin/ops`. Ovie/HUD/TV are presentation modes of that same Ops surface; `/hud` is a compatibility redirect and must not own metrics or a duplicate command center.
 
 Admin Ops v1 should use compact admin-shell patterns. Feature-specific components live under `apps/web/components/features/admin/agent-os/*`. Components should move to shared workflow organisms only after a second product surface actually reuses them.
 

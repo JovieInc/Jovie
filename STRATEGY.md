@@ -40,7 +40,9 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 - `docs/decisions/`: Architecture decision records
 
 ### Routes
-- `/hud`: Admin ops dashboard
+- `/app/admin/ops`: canonical admin Ops surface (Ovie shipping cockpit)
+- `/hud`: legacy compatibility redirect to `/app/admin/ops`
+- `/hud-tv?kiosk=...`: thin token-authenticated fullscreen wrapper
 - `/hud/wiki`: Company wiki backed by gbrain
 - `/signin`, `/signup`: Auth flows
 - `/app/`: Authenticated app shell

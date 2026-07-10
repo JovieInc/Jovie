@@ -22,9 +22,9 @@ if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; th
   exit 2
 fi
 
-# /hud is the authenticated admin surface. /hud-tv is the token-only kiosk
-# surface and is the deterministic local route probe because it renders its
-# access fallback without requiring a Clerk session.
+# /hud is a legacy compatibility alias. Canonical admin Ops is /app/admin/ops;
+# /hud-tv is the token-only kiosk wrapper and remains the deterministic local
+# route probe because it renders its access fallback without a Clerk session.
 kiosk_url() {
   if [ -n "${HUD_KIOSK_TOKEN:-}" ]; then
     local encoded_token
@@ -72,7 +72,7 @@ health() {
 
   rm -f "$body_file"
   echo "OK Ovie/HUD route: $(display_kiosk_url) (HTTP 200)"
-  echo "Admin route: ${BASE_URL}/hud (requires an authenticated admin session)"
+  echo "Admin route: ${BASE_URL}/app/admin/ops (canonical; requires an authenticated admin session)"
   if [ -z "${HUD_KIOSK_TOKEN:-}" ]; then
     echo "Kiosk mode: not configured in this shell; use Doppler or export HUD_KIOSK_TOKEN without printing it."
   else
@@ -130,7 +130,8 @@ start() {
 status() {
   echo "Repo: $REPO_ROOT"
   echo "Port: $PORT"
-  echo "Admin URL: ${BASE_URL}/hud"
+  echo "Admin URL: ${BASE_URL}/app/admin/ops"
+  echo "Legacy alias: ${BASE_URL}/hud"
   echo "Kiosk URL: ${BASE_URL}/hud-tv?kiosk=<HUD_KIOSK_TOKEN>"
   if server_is_up; then
     echo "Server: reachable"

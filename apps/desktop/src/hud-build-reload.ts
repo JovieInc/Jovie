@@ -56,5 +56,12 @@ export function decideHudBuildReload(input: {
 }
 
 export function isHudRoutePath(pathname: string): boolean {
-  return pathname === '/hud' || pathname.startsWith('/hud/');
+  return (
+    pathname === '/hud' ||
+    pathname.startsWith('/hud/') ||
+    pathname === '/hud-tv' ||
+    pathname.startsWith('/hud-tv/') ||
+    pathname === '/app/admin/ops' ||
+    pathname.startsWith('/app/admin/ops/')
+  );
 }

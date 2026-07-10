@@ -6,6 +6,7 @@ import type {
   DailyBucket,
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
+import { HudShipperPanels } from '@/components/features/admin/hud/HudShipperPanels';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { APP_ROUTES } from '@/constants/routes';
@@ -176,6 +177,7 @@ export default async function AdminOpsPage({
   if (presentationMode === 'admin-kiosk') {
     return (
       <div className='-mx-(--linear-app-content-padding-x) -my-(--linear-app-content-padding-y)'>
+        <HudShipperPanels />
         <HudDashboardClient
           initialMetrics={metrics}
           density='kiosk'
@@ -289,6 +291,8 @@ export default async function AdminOpsPage({
       <OperationalControlPanel />
 
       <ReleaseToRevenueGmvPanel />
+
+      <HudShipperPanels />
 
       <HudDashboardClient
         initialMetrics={metrics}

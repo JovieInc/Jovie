@@ -2,13 +2,19 @@
 
 ## Canonical routes
 
-The Ovie menu-bar/operator surface is the web app's `/hud` route. It requires an authenticated admin session.
+Ovie is a presentation mode of the canonical Ops surface:
 
-The wallboard/kiosk surface is `/hud-tv?kiosk=...`. It requires `HUD_KIOSK_TOKEN`; without a token it intentionally renders a 200 access-help page rather than the cockpit. Do not put the token in source control or paste it into logs.
+- Admin: `/app/admin/ops` (authenticated admin; source of truth)
+- Admin kiosk: `/app/admin/ops?mode=kiosk` (fullscreen shell presentation)
+- TV/wallboard: `/hud-tv?kiosk=...` (thin token-authenticated wrapper)
+- Legacy `/hud`: compatibility redirect to `/app/admin/ops`; kiosk bookmarks redirect to `/hud-tv`
+
+The wallboard/kiosk surface requires `HUD_KIOSK_TOKEN`; without a token it intentionally renders a 200 access-help page rather than the cockpit. Do not put the token in source control or paste it into logs.
 
 For the local dev server, the deterministic URLs are:
 
-- Admin: `http://127.0.0.1:3100/hud`
+- Admin: `http://127.0.0.1:3100/app/admin/ops`
+- Legacy alias: `http://127.0.0.1:3100/hud`
 - Kiosk: `http://127.0.0.1:3100/hud-tv?kiosk=<HUD_KIOSK_TOKEN>`
 
 - Port `3100` is the launcher default so it reuses the existing web dev server on this Mac when available. If `3100` is occupied by an unrelated service, override it with `OVIE_HUD_PORT=3110` (or another free port).
@@ -32,7 +38,13 @@ For a real kiosk cockpit, run the launcher in a shell with the dev secret availa
 doppler run --project jovie-web --config dev -- ./scripts/ovie-hud.sh start
 ```
 
-The script confirms that kiosk mode is configured without printing the secret. `health` verifies the kiosk route returns HTTP 200 and contains HUD content; it also prints the admin URL and the exact process log path if startup is needed.
+The script confirms that kiosk mode is configured without printing the secret. `health` verifies the TV wrapper returns HTTP 200 and contains HUD content; it also prints the canonical admin URL and the exact process log path if startup is needed.
+
+## Migration / deprecation notes
+
+- `apps/console` `taste-inbox` is deprecated as a product screen. Keep `apps/console/scripts/taste-inbox-sweep.ts` as ingestion until usage reaches zero; do not add new decision UI there. Taste decisions now belong to the canonical Ops decision API at `/api/admin/hud/taste-inbox` and its Ops drill-in.
+- The archived `JovieInc/ovie` Swift app is launcher-only and read-only. Do not add product UI or metrics there. New Ovie/HUD work belongs in `apps/web/app/app/(shell)/admin/ops`.
+- Shared read models remain the source of truth: `/api/admin/hud/shipper`, `/api/admin/hud/shipping-velocity`, and `/api/hud/metrics`. The TV wrapper must not derive a second set of metrics.
 
 ## Existing process discovery
 

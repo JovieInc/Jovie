@@ -64,9 +64,12 @@ test('hud reload decision keeps baseline on failed or empty polls', () => {
   });
 });
 
-test('hud route path matches only the operator HUD surface', () => {
+test('hud route path matches the canonical operator surfaces', () => {
   expect(isHudRoutePath('/hud')).toBe(true);
   expect(isHudRoutePath('/hud/wiki')).toBe(true);
+  expect(isHudRoutePath('/app/admin/ops')).toBe(true);
+  expect(isHudRoutePath('/app/admin/ops/kiosk')).toBe(true);
+  expect(isHudRoutePath('/hud-tv')).toBe(true);
   expect(isHudRoutePath('/app/chat')).toBe(false);
   expect(isHudRoutePath('/desktop-auth')).toBe(false);
 });

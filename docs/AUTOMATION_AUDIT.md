@@ -18,7 +18,7 @@ Accepted direction:
 - Keep GitHub Actions and GStack as the required PR, review, ship, and deploy gates.
 - Treat Hermes and Ruflo as execution adapters, not source of truth.
 - Introduce a canonical `AgentRunArtifact` contract before adding runtime integrations.
-- Keep `/hud` as a readable status board; mount dense operator workflows under `/app/admin/ops`.
+- Keep `/app/admin/ops` as the canonical dense operator surface; `/hud` is redirect-only and `/hud-tv` is the token wrapper.
 
 No cron or workflow triggers were changed by this decision note.
 

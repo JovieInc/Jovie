@@ -26,6 +26,10 @@ const OPERATIONAL_CONTROL_PANEL = join(
   TEST_DIR,
   '../../../components/features/admin/OperationalControlPanel.tsx'
 );
+const HUD_SHIPPER_PANELS = join(
+  TEST_DIR,
+  '../../../components/features/admin/hud/HudShipperPanels.tsx'
+);
 
 const OPS_COMPONENT_FILES = [
   OPS_PAGE,
@@ -56,6 +60,18 @@ describe('admin ops shell normalization', () => {
 
     expect(source).toContain('OperationalControlPanel');
     expect(source).toContain('<OperationalControlPanel');
+  });
+
+  it('mounts the shipping cockpit panels on canonical Ops', () => {
+    const source = readSource(OPS_PAGE);
+
+    expect(source).toContain(
+      "import { HudShipperPanels } from '@/components/features/admin/hud/HudShipperPanels';"
+    );
+    expect(source).toContain('<HudShipperPanels />');
+    expect(readSource(HUD_SHIPPER_PANELS)).toContain(
+      "fetch('/api/admin/hud/taste-inbox'"
+    );
   });
 
   it('surfaces nightly testing agent health on the shell ops page', () => {
