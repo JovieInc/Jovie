@@ -4,7 +4,8 @@
 #
 # Keep this as a thin wrapper. The canonical bootstrap lives in scripts/setup.sh
 # so Codex, Conductor, Claude, and humans all exercise the same setup path.
-set -euo pipefail
+# Codex hook mode must be resilient: setup failures don't block agent sessions.
+set -uo pipefail
 
 CODEX_HOOK=0
 if [[ "${1:-}" == "--codex-hook" ]]; then
@@ -36,7 +37,7 @@ NODE
 }
 
 if [[ "$CODEX_HOOK" == "1" ]]; then
-  bash "$REPO_ROOT/scripts/setup.sh" "$@" >&2
+  bash "$REPO_ROOT/scripts/setup.sh" "$@" >&2 || true
   GBRAIN_CONTEXT=""
   if [[ -f "$REPO_ROOT/scripts/codex-gbrain-sync.sh" ]]; then
     GBRAIN_CONTEXT="$(bash "$REPO_ROOT/scripts/codex-gbrain-sync.sh" session-start 2>&1 || true)"
