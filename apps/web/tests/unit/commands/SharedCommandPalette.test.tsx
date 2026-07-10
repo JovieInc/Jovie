@@ -29,8 +29,18 @@ vi.mock('next/image', () => ({
 vi.mock('@jovie/ui', () => ({
   Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
     open ? <div role='dialog'>{children}</div> : null,
-  DialogContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
+  DialogContent: ({
+    children,
+    className,
+    testId,
+  }: {
+    children: ReactNode;
+    className?: string;
+    testId?: string;
+  }) => (
+    <div data-testid={testId ?? 'dialog-content'} className={className}>
+      {children}
+    </div>
   ),
 }));
 
@@ -178,6 +188,21 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(sectionLabels).toContain('Skills');
     expect(sectionLabels).toContain('Releases');
     expect(screen.getByText('Midnight Run')).toBeInTheDocument();
+  });
+
+  it('opens as a full-viewport search surface (JOV-2982)', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    const shell = screen.getByTestId('cmdk-full-page');
+    expect(shell.className).toContain('h-dvh');
+    expect(shell.className).toContain('w-screen');
+    expect(shell.className).toContain('max-w-none');
+    expect(shell.className).not.toContain('sm:max-w-140');
+    // Results region fills remaining height (not a fixed max-h card)
+    const listbox = screen.getByRole('listbox', {
+      name: 'Command Palette Results',
+    });
+    expect(listbox.className).toContain('flex-1');
+    expect(listbox.className).not.toContain('max-h-105');
   });
 
   it('shows aligned numbered shortcuts for the first three visible rows', () => {
