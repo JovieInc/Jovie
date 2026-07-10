@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000001 /* AppShellTabBar.swift */; };
+		A0J0V3632A00000000000004 /* TalkOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000003 /* TalkOverlayView.swift */; };
+		A0J0V3632A00000000000006 /* EntityContextSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000005 /* EntityContextSheet.swift */; };
+		A0J0V3632A00000000000008 /* LibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000007 /* LibraryModels.swift */; };
+		A0J0V3632A0000000000000A /* LibrarySurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000009 /* LibrarySurfaceView.swift */; };
+		A0J0V3632A0000000000000C /* CalendarSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000B /* CalendarSurfaceView.swift */; };
+		A0J0V3632A0000000000000E /* InboxSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000D /* InboxSurfaceView.swift */; };
+		A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */; };
 		045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71445144CE0970267C0508C6 /* AppState.swift */; };
 		19328D236A7AE57920138038 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 47976CA8BC5B309FDB2B6215 /* Assets.xcassets */; };
 		296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */; };
@@ -114,6 +122,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A0J0V3632A00000000000001 /* AppShellTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBar.swift; sourceTree = "<group>"; };
+		A0J0V3632A00000000000003 /* TalkOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TalkOverlayView.swift; sourceTree = "<group>"; };
+		A0J0V3632A00000000000005 /* EntityContextSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EntityContextSheet.swift; sourceTree = "<group>"; };
+		A0J0V3632A00000000000007 /* LibraryModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryModels.swift; sourceTree = "<group>"; };
+		A0J0V3632A00000000000009 /* LibrarySurfaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibrarySurfaceView.swift; sourceTree = "<group>"; };
+		A0J0V3632A0000000000000B /* CalendarSurfaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarSurfaceView.swift; sourceTree = "<group>"; };
+		A0J0V3632A0000000000000D /* InboxSurfaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InboxSurfaceView.swift; sourceTree = "<group>"; };
+		A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBarTests.swift; sourceTree = "<group>"; };
 		000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
 		00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieApp.swift; sourceTree = "<group>"; };
 		0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntents.swift; sourceTree = "<group>"; };
@@ -275,14 +291,45 @@
 			path = Audience;
 			sourceTree = "<group>";
 		};
+		A0J0V3632C00000000000001 /* Calendar */ = {
+			isa = PBXGroup;
+			children = (
+				A0J0V3632A0000000000000B /* CalendarSurfaceView.swift */,
+			);
+			name = Calendar;
+			path = Calendar;
+			sourceTree = "<group>";
+		};
+		A0J0V3632I00000000000001 /* Inbox */ = {
+			isa = PBXGroup;
+			children = (
+				A0J0V3632A0000000000000D /* InboxSurfaceView.swift */,
+			);
+			name = Inbox;
+			path = Inbox;
+			sourceTree = "<group>";
+		};
+		A0J0V3632L00000000000001 /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				A0J0V3632A00000000000007 /* LibraryModels.swift */,
+				A0J0V3632A00000000000009 /* LibrarySurfaceView.swift */,
+			);
+			name = Library;
+			path = Library;
+			sourceTree = "<group>";
+		};
 		38A521B77CFB8C49A552F2BF /* Features */ = {
 			isa = PBXGroup;
 			children = (
 				A0J0V36380000000000000007 /* Audience */,
 				44CFD0078FC64A56A527EB88 /* AppShell */,
 				D38B16D4420C99A6D206BF5B /* Auth */,
+				A0J0V3632C00000000000001 /* Calendar */,
 				A0J0V25490000000000000010 /* Chat */,
 				A5A8CD9F74C3AE8AD7332D93 /* Dashboard */,
+				A0J0V3632I00000000000001 /* Inbox */,
+				A0J0V3632L00000000000001 /* Library */,
 				3BE73A70044C889546FD4A64 /* NeedsOnboarding */,
 				876FD84B7A3B40CAA0DDDBC8 /* Settings */,
 				D8C70D614390928784D627FC /* Splash */,
@@ -314,6 +361,7 @@
 				A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */,
 				A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */,
 				A0GH12170000000000000003 /* AppShellChatFirstTests.swift */,
+				A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */,
 				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
 				A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */,
 				A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */,
@@ -347,7 +395,10 @@
 			children = (
 				A0A344000000000000000001 /* AppShellIntentNavigation.swift */,
 				A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */,
+				A0J0V3632A00000000000001 /* AppShellTabBar.swift */,
 				4C2C97BF3A0B42C58A62529F /* AppShellView.swift */,
+				A0J0V3632A00000000000005 /* EntityContextSheet.swift */,
+				A0J0V3632A00000000000003 /* TalkOverlayView.swift */,
 			);
 			name = AppShell;
 			path = AppShell;
@@ -673,6 +724,7 @@
 				A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */,
 				A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */,
 				A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */,
+				A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */,
 				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
 				A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */,
 				A0GH12706000000000000006 /* MobileActionLoopResponseTests.swift in Sources */,
@@ -722,6 +774,13 @@
 				6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */,
 				A0A344000000000000000002 /* AppShellIntentNavigation.swift in Sources */,
 				A0J0V36330000000000000002 /* AppShellLeftDrawer.swift in Sources */,
+				A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */,
+				A0J0V3632A00000000000004 /* TalkOverlayView.swift in Sources */,
+				A0J0V3632A00000000000006 /* EntityContextSheet.swift in Sources */,
+				A0J0V3632A00000000000008 /* LibraryModels.swift in Sources */,
+				A0J0V3632A0000000000000A /* LibrarySurfaceView.swift in Sources */,
+				A0J0V3632A0000000000000C /* CalendarSurfaceView.swift in Sources */,
+				A0J0V3632A0000000000000E /* InboxSurfaceView.swift in Sources */,
 				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
