@@ -27,9 +27,12 @@ export const HOMEPAGE_LAUNCH_COPY = {
       'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'The release system for independent artists.',
-    subhead: 'Jovie runs the business of your career. You make the music.',
-    primaryCta: HOMEPAGE_FRONT_DOOR_CTA.primary,
+    headline: 'Jovie runs your music career.',
+    subhead: 'You make the music.',
+    primaryCta: {
+      ...HOMEPAGE_FRONT_DOOR_CTA.primary,
+      label: 'Get started',
+    },
     secondaryCta: {
       label: 'See a live profile',
       href: APP_ROUTES.ARTIST_PROFILES,
@@ -69,6 +72,8 @@ export const HOMEPAGE_LAUNCH_COPY = {
     eyebrow: '',
     lead: '',
     body: 'Your always-on AI artist manager.',
+    description:
+      'Jovie finds the next opportunity across every release, fan signal, and playlist move.',
     cards: [
       {
         number: '',

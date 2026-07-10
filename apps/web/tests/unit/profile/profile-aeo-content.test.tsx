@@ -138,6 +138,9 @@ describe('Profile AEO content', () => {
     expect(css).toMatch(
       /\.profile-aeo-claim-card\)[\s\S]*?--profile-aeo-claim-ink:\s*var\(--system-b-cinematic-black\)/
     );
+    expect(css).toMatch(
+      /\.profile-aeo-claim-card__domain\)[\s\S]*?var\(--profile-aeo-claim-ink\)\s+(?:4[8-9]|[5-9]\d|100)%/
+    );
   });
 
   it('builds per-artist description and the four sourced canonical FAQ answers', () => {
@@ -257,13 +260,10 @@ describe('Profile AEO content', () => {
     expect(screen.getByTestId('profile-aeo-claim-card')).toBeVisible();
     expect(
       screen.getByRole('heading', {
-        name: 'Claim yours.',
+        name: 'jov.ie/you',
       })
     ).toBeVisible();
-    expect(screen.getByText('Jovie artist profiles')).toBeVisible();
-    expect(
-      screen.getByText('Music, shows, and fan updates. One place.')
-    ).toBeVisible();
+    expect(screen.getByText('Free · Spotify verified')).toBeVisible();
     expect(
       screen.getByRole('link', {
         name: 'Claim the DJ Test profile and sign up for Jovie',

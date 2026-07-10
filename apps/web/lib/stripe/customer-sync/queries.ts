@@ -244,6 +244,37 @@ export async function fetchUserBillingData<
 }
 
 /**
+ * Resolve a Stripe metadata identity across both auth generations.
+ *
+ * Legacy Stripe objects store a Clerk user id in `clerk_user_id`. Better Auth
+ * checkout sessions store the app `users.id` UUID in the same metadata field.
+ * Try the legacy lookup first, then fall back to the app id so existing Stripe
+ * subscriptions keep working while new checkouts activate the correct user.
+ */
+export async function fetchUserBillingDataByIdentity<
+  T extends readonly UserBillingFieldKey[] = typeof BILLING_FIELDS_FULL,
+>(options: {
+  userIdentity: string;
+  fields?: T;
+}): Promise<FetchUserBillingDataResult<T>> {
+  const { userIdentity, fields = BILLING_FIELDS_FULL as unknown as T } =
+    options;
+
+  const legacyResult = await fetchUserBillingData({
+    clerkUserId: userIdentity,
+    fields,
+  });
+  if (legacyResult.success || legacyResult.error !== 'User not found') {
+    return legacyResult;
+  }
+
+  return fetchUserBillingDataByAppId({
+    appUserId: userIdentity,
+    fields,
+  });
+}
+
+/**
  * Same contract as {@link fetchUserBillingData} but keyed on the app
  * `users.id` UUID (the value returned by `getCachedAuth().userId`
  * post-cutover) instead of `users.clerk_id`. Used by the auth-aware

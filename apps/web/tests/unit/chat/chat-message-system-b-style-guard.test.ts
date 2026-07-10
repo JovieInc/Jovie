@@ -69,6 +69,8 @@ describe('ChatMessage System B source contract', () => {
     const styles = readFileSync(resolve(appRoot, designSystemPath), 'utf8');
 
     expect(styles).toContain('--system-b-chat-user-bubble-text');
+    expect(styles).toContain('--system-b-chat-body-size: var(--text-app);');
+    expect(styles).not.toMatch(/--system-b-chat-body-size:\s*[\d.]+rem/);
     expect(styles).not.toContain('var(--system-b-chat-user-bubble-text, #');
   });
 });

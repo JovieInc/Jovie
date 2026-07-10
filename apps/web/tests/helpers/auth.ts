@@ -45,7 +45,7 @@ function isTestAuthBypassEnabled(): boolean {
   return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 }
 
-function isProductionTarget(): boolean {
+export function isProductionTarget(): boolean {
   const vercelEnv = process.env.VERCEL_ENV?.trim();
   return vercelEnv === 'production';
 }

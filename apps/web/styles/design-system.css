@@ -119,7 +119,7 @@
   --system-b-opportunity-inbox-card-min-height: 168px;
   --system-b-opportunity-inbox-comment-shell-height: 5.75rem;
   --system-b-chat-message-content-max: 66ch;
-  --system-b-chat-body-size: 1rem;
+  --system-b-chat-body-size: var(--text-app);
   --system-b-chat-body-line-height: 1.5;
   --system-b-chat-composer-max-width: 45rem;
   --system-b-chat-composer-thread-scroll-padding: 9rem;
@@ -326,13 +326,22 @@
     transparent
   );
   box-shadow:
-    0 32px 90px rgba(0, 0, 0, 0.28),
+    0 22px 64px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
   color: var(--profile-aeo-claim-ink);
 }
 
-:where(.profile-aeo-claim-card__eyebrow),
-:where(.profile-aeo-claim-card__body),
+:where(.profile-aeo-claim-card__heading) {
+  font-size: clamp(3.75rem, 10vw, 7.5rem);
+  letter-spacing: -0.07em;
+  line-height: 0.8;
+  white-space: nowrap;
+}
+
+:where(.profile-aeo-claim-card__domain) {
+  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 48%, transparent);
+}
+
 :where(.profile-aeo-claim-card__note) {
   color: color-mix(in oklab, var(--profile-aeo-claim-ink) 66%, transparent);
 }
@@ -8381,7 +8390,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 @media (min-width: 640px) {
   :root {
-    --system-b-chat-body-size: 1.0625rem;
     --system-b-chat-body-line-height: 1.6;
   }
 }

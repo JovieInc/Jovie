@@ -5,6 +5,7 @@
  * segment size + product assumptions.
  */
 
+import { formatAmount } from '@/lib/utils/format-number';
 import type {
   CampaignOption,
   CampaignRecommendationInput,
@@ -84,8 +85,8 @@ function buildAssumptions(
   return [
     `Segment "${input.segmentName}" size ${input.segmentSize}`,
     `Conversion rate ${(product.expectedConversionRate * 100).toFixed(2)}%`,
-    `Unit price $${(product.unitPriceCents / 100).toFixed(2)}`,
-    `Expected path: ${expectedOrders} orders × $${(product.unitPriceCents / 100).toFixed(2)}`,
+    `Unit price ${formatAmount(product.unitPriceCents)}`,
+    `Expected path: ${expectedOrders} orders × ${formatAmount(product.unitPriceCents)}`,
     `Campaign window ${input.windowHours}h`,
     `Opportunity confidence ${(input.opportunity.confidence * 100).toFixed(0)}%`,
   ];

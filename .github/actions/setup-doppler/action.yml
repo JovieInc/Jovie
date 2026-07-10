@@ -41,7 +41,18 @@ runs:
         while IFS= read -r entry; do
           decoded="$(printf '%s' "$entry" | base64 -d)"
           key="$(printf '%s' "$decoded" | jq -r '.key')"
-          value="$(printf '%s' "$decoded" | jq -r '.value // \"\"')"
+          value="$(printf '%s' "$decoded" | jq -r '.value // ""')"
+
+          # Values downloaded at runtime are not registered GitHub secrets, so
+          # Actions will not redact them automatically when it prints a later
+          # step's environment. Register each value before writing GITHUB_ENV.
+          if [ -n "$value" ]; then
+            masked_value="${value//'%'/'%25'}"
+            masked_value="${masked_value//$'\r'/'%0D'}"
+            masked_value="${masked_value//$'\n'/'%0A'}"
+            printf '::add-mask::%s\n' "$masked_value"
+          fi
+
           marker="EOF_${RANDOM}_$(date +%s%N)"
           {
             echo "${key}<<${marker}"

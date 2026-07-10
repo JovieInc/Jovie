@@ -47,6 +47,7 @@ export { ensureStripeCustomer } from './customer';
 // Query functions
 export {
   fetchUserBillingData,
+  fetchUserBillingDataByIdentity,
   fetchUserBillingDataWithAuth,
 } from './queries';
 // Types and constants

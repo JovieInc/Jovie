@@ -8,7 +8,7 @@ import { RevenueLiftDashboardView } from './RevenueLiftDashboardView';
 export const metadata: Metadata = {
   title: 'Revenue Lift | Admin',
   description:
-    'North Star IRPAA + KPI tree from the canonical metrics layer (ops/VC).',
+    'North star IRPAA + KPI tree from the canonical metrics layer (ops/VC).',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -29,7 +29,7 @@ export default async function AdminRevenueLiftPage() {
   return (
     <AdminPage
       title='Revenue Lift'
-      description='North Star IRPAA and KPI tree from the canonical metrics layer. Internal ops / VC surface — every tile names its source.'
+      description='North star IRPAA and KPI tree from the canonical metrics layer. Internal ops / VC surface — every tile names its source.'
       testId='admin-revenue-lift-page'
       viewTestId='admin-revenue-lift-content'
     >
