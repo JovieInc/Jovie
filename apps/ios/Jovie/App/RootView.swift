@@ -173,6 +173,10 @@ private struct AppContentView: View {
   @State private var chatRepository: ChatRepository?
   @State private var chatDraft = ""
   @State private var audienceHighlightsState: AudienceHighlightsLoadState
+  @State private var calendarResponse: MobileActionLoopCalendarResponse?
+  @State private var inboxResponse: MobileActionLoopInboxResponse?
+  @State private var isLoadingCalendar = false
+  @State private var isLoadingInbox = false
 
   init(
     appState: AppState,
@@ -250,7 +254,13 @@ private struct AppContentView: View {
           NeedsOnboardingView(continueURL: appState.continueOnWebURL)
         } audienceContent: { _ in
           EmptyView()
-        } chatContent: { draft, voiceCaptureTrigger in
+        } libraryContent: { _ in
+          EmptyView()
+        } calendarContent: { _ in
+          EmptyView()
+        } inboxContent: { _ in
+          EmptyView()
+        } chatContent: { draft, voiceCaptureTrigger, _ in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
@@ -304,13 +314,35 @@ private struct AppContentView: View {
             onRetry: { await reloadAudienceHighlights(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
-        } chatContent: { draft, voiceCaptureTrigger in
+        } libraryContent: { onSelectAsset in
+          LibrarySurfaceView(
+            assets: LibraryFeed.previewAssets,
+            onSelectAsset: onSelectAsset
+          )
+        } calendarContent: { askJovie in
+          CalendarSurfaceView(
+            response: calendarResponse ?? (usesPreviewActionLoops ? .preview : nil),
+            isLoading: isLoadingCalendar && calendarResponse == nil,
+            isOffline: appState.isOffline,
+            onRetry: { await reloadActionLoops(for: appState.activeUserID) },
+            onAskJovie: askJovie
+          )
+        } inboxContent: { askJovie in
+          InboxSurfaceView(
+            response: inboxResponse ?? (usesPreviewActionLoops ? .preview : nil),
+            isLoading: isLoadingInbox && inboxResponse == nil,
+            isOffline: appState.isOffline,
+            onRetry: { await reloadActionLoops(for: appState.activeUserID) },
+            onAskJovie: askJovie
+          )
+        } chatContent: { draft, voiceCaptureTrigger, onEntityTap in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
               draft: draft,
               voiceCaptureTrigger: voiceCaptureTrigger,
-              webBaseURL: appState.configuration.webBaseURL
+              webBaseURL: appState.configuration.webBaseURL,
+              onEntityTap: onEntityTap
             )
           } else {
             MobileChatPlaceholderView(isOffline: appState.isOffline, draft: draft)
@@ -326,6 +358,7 @@ private struct AppContentView: View {
     .task(id: "\(appState.route)-\(appState.launchMode)") {
       guard appState.route == .ready else { return }
       await reloadAudienceHighlights(for: appState.activeUserID)
+      await reloadActionLoops(for: appState.activeUserID)
     }
     .task(id: appState.activeUserID) {
       guard let activeUserID = appState.activeUserID else {
@@ -373,6 +406,62 @@ private struct AppContentView: View {
 
   private func handleAutoSendMessage(_ text: String) {
     Task { await chatRepository?.send(text: text) }
+  }
+
+  private var usesPreviewActionLoops: Bool {
+    switch appState.launchMode {
+    case .uiTestingAudience,
+         .uiTestingReady,
+         .uiTestingChat,
+         .uiTestingChatOffline,
+         .uiTestingChatEntityFixture,
+         .uiTestingSettings,
+         .uiTestingVenueMode,
+         .uiTestingAuthCallback:
+      return true
+    default:
+      return !appState.launchMode.usesLiveClerk
+    }
+  }
+
+  @MainActor
+  private func reloadActionLoops(for userID: String?) async {
+    if usesPreviewActionLoops {
+      calendarResponse = .preview
+      inboxResponse = .preview
+      isLoadingCalendar = false
+      isLoadingInbox = false
+      return
+    }
+
+    guard let userID, appState.route == .ready else {
+      calendarResponse = nil
+      inboxResponse = nil
+      return
+    }
+
+    _ = userID
+    let client = APIClient(
+      baseURL: appState.configuration.apiBaseURL,
+      tokenProvider: NativeSessionTokenProvider()
+    )
+
+    isLoadingCalendar = calendarResponse == nil
+    isLoadingInbox = inboxResponse == nil
+
+    do {
+      calendarResponse = try await client.fetchActionLoopCalendar()
+    } catch {
+      // Keep stale calendar if revalidation fails.
+    }
+    isLoadingCalendar = false
+
+    do {
+      inboxResponse = try await client.fetchActionLoopInbox()
+    } catch {
+      // Keep stale inbox if revalidation fails.
+    }
+    isLoadingInbox = false
   }
 
   @MainActor
@@ -468,7 +557,6 @@ private struct ChatComposerPreview: View {
   @Binding var draft: String
   let isOffline: Bool
   @FocusState private var isComposerFocused: Bool
-  @State private var voiceCaptureService = VoiceCaptureService()
 
   var body: some View {
     ChatComposerBar(
@@ -477,10 +565,6 @@ private struct ChatComposerPreview: View {
       placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
       isSending: false,
       isPlusEnabled: true,
-      voiceCaptureService: voiceCaptureService,
-      onVoiceStart: {},
-      onVoiceFinish: {},
-      onVoiceCancel: {},
       onSend: { draft = "" },
       onSelectWorkflow: { action in
         draft = action.prompt

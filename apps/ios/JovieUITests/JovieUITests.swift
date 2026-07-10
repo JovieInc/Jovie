@@ -198,47 +198,45 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "drawer-base-plane-occluded-closed", app: app)
   }
 
-  // JOV-3670 evidence (a): the drawer is the SOLE surface switcher. The former
-  // bottom QR/sparkle pill (shell-tab-* buttons, no drawer prefix) must not
-  // exist anywhere in the shell, whether the drawer is closed or open.
-  func testDrawerIsSoleSurfaceSwitcherNoPillRemains() {
+  // JOV-3632: primary bottom tabs + Talk FAB. Profile is drawer-only (no shell-tab-profile).
+  func testPrimaryTabBarAndTalkFAB() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
     }
 
-    // Closed-drawer state: no bare shell-tab-* pill buttons anywhere in the shell.
-    XCTAssertFalse(
-      app.buttons["shell-tab-chat"].exists,
-      "Removed bottom pill chat button still exists with drawer closed.\n\(app.debugDescription)"
+    XCTAssertTrue(
+      app.otherElements["shell-tab-bar"].waitForExistence(timeout: 3)
+        || app.buttons["shell-tab-chat"].waitForExistence(timeout: 3),
+      "Primary tab bar did not appear.\n\(app.debugDescription)"
     )
+    XCTAssertTrue(app.buttons["shell-tab-chat"].exists, "Chat tab missing")
+    XCTAssertTrue(app.buttons["shell-tab-library"].exists, "Library tab missing")
+    XCTAssertTrue(app.buttons["shell-tab-calendar"].exists, "Calendar tab missing")
+    XCTAssertTrue(app.buttons["shell-tab-inbox"].exists, "Inbox tab missing")
+    XCTAssertTrue(
+      app.buttons["shell-talk-fab"].exists,
+      "Talk FAB missing on primary tab bar.\n\(app.debugDescription)"
+    )
+    // Profile + Audience are drawer-only — must not be primary tab buttons.
     XCTAssertFalse(
       app.buttons["shell-tab-profile"].exists,
-      "Removed bottom pill profile button still exists with drawer closed.\n\(app.debugDescription)"
+      "Profile must not be a primary bottom tab.\n\(app.debugDescription)"
     )
-
-    // Voice control is present inside the composer and unrelated to the removed pill.
-    XCTAssertTrue(
-      app.buttons["chat-voice-button"].waitForExistence(timeout: 3),
-      "Voice button did not appear on the chat tab.\n\(app.debugDescription)"
+    XCTAssertFalse(
+      app.buttons["shell-tab-audience"].exists,
+      "Audience must not be a primary bottom tab.\n\(app.debugDescription)"
+    )
+    // Composer no longer hosts a mic (JOV-3636).
+    XCTAssertFalse(
+      app.buttons["chat-voice-button"].exists,
+      "Composer mic should be removed; Talk FAB is the only voice entry.\n\(app.debugDescription)"
     )
 
     app.buttons["Open navigation drawer"].tap()
-
-    // Open-drawer state: only the drawer-namespaced surface switcher exists.
     let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
-    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
     XCTAssertTrue(
       profileSurface.waitForExistence(timeout: 3),
-      "Drawer surface switcher did not appear.\n\(app.debugDescription)"
-    )
-    XCTAssertTrue(chatSurface.exists)
-    XCTAssertFalse(
-      app.buttons["shell-tab-chat"].exists,
-      "Bare (non-drawer) chat pill button still exists with drawer open.\n\(app.debugDescription)"
-    )
-    XCTAssertFalse(
-      app.buttons["shell-tab-profile"].exists,
-      "Bare (non-drawer) profile pill button still exists with drawer open.\n\(app.debugDescription)"
+      "Drawer still exposes Profile surface.\n\(app.debugDescription)"
     )
   }
 
@@ -293,10 +291,11 @@ final class JovieUITests: XCTestCase {
     let composerInput = chatApp.textFields["Ask Jovie"]
     XCTAssertTrue(waitForHittable(composerInput, timeout: 3))
     let chatWindowMaxY = chatApp.windows.firstMatch.frame.maxY
+    // Composer sits above the primary tab bar (~56pt) + home indicator.
     XCTAssertGreaterThan(
       composerInput.frame.maxY,
-      chatWindowMaxY - 160,
-      "Chat composer left a ghost gap where the removed bottom pill used to sit.\n\(chatApp.debugDescription)"
+      chatWindowMaxY - 220,
+      "Chat composer left an unexpected gap above the tab bar.\n\(chatApp.debugDescription)"
     )
     attachScreenshot(named: "no-ghost-footprint-chat", app: chatApp)
 
@@ -328,14 +327,18 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "no-ghost-footprint-needs-onboarding", app: onboardingApp)
   }
 
-  func testVoiceButtonAppearsOnChatComposer() {
+  func testTalkFABAppearsOnPrimaryTabBar() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
     }
 
     XCTAssertTrue(
-      app.buttons["chat-voice-button"].waitForExistence(timeout: 3),
-      "Voice button did not appear on the chat tab.\n\(app.debugDescription)"
+      app.buttons["shell-talk-fab"].waitForExistence(timeout: 3),
+      "Talk FAB did not appear on the primary tab bar.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["chat-voice-button"].exists,
+      "Composer mic must stay removed (FAB-only voice).\n\(app.debugDescription)"
     )
     XCTAssertFalse(app.staticTexts["STT"].exists)
     XCTAssertFalse(app.staticTexts["Transcription"].exists)

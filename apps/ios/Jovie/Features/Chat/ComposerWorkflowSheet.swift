@@ -143,17 +143,11 @@ struct ChatComposerBar: View {
   let placeholder: String
   let isSending: Bool
   let isPlusEnabled: Bool
-  @Bindable var voiceCaptureService: VoiceCaptureService
-  let onVoiceStart: () async -> Void
-  let onVoiceFinish: () async -> Void
-  let onVoiceCancel: () -> Void
   let onSend: () -> Void
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
   let onDraftEdited: () -> Void
 
   @State private var isShowingWorkflowSheet = false
-  @State private var didStartVoiceDrag = false
-  @State private var isVoiceDragCancelled = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
@@ -164,44 +158,44 @@ struct ChatComposerBar: View {
     } ?? []
     let isSlashPaletteVisible = slashQuery != nil && !slashItems.isEmpty
 
-    VStack(spacing: 0) {
-      waveformStrip
+    // JOV-3636: composer is text-only. Voice is shell Talk FAB → full-screen
+    // overlay. OS keyboard mic still handles dictate-to-text.
+    HStack(spacing: JovieSpacing.medium) {
+      Button {
+        isShowingWorkflowSheet = true
+      } label: {
+        Image(systemName: "plus")
+          .font(.system(size: 18, weight: .semibold))
+          .foregroundStyle(
+            isPlusEnabled ? JovieColor.textPrimary : JovieColor.textTertiary
+          )
+          .frame(width: 36, height: 36)
+          .background(JovieColor.surface2, in: Circle())
+      }
+      .buttonStyle(.plain)
+      .disabled(!isPlusEnabled)
+      .accessibilityLabel("Open workflow sheet")
+      .accessibilityIdentifier("chat-composer-plus")
+      .accessibilityElement(children: .ignore)
 
-      HStack(spacing: JovieSpacing.medium) {
-        Button {
-          isShowingWorkflowSheet = true
-        } label: {
-          Image(systemName: "plus")
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(
-              isPlusEnabled ? JovieColor.textPrimary : JovieColor.textTertiary
-            )
-            .frame(width: 36, height: 36)
-            .background(JovieColor.surface2, in: Circle())
+      TextField(placeholder, text: $draft)
+        .focused($isFocused)
+        .textInputAutocapitalization(.sentences)
+        .disableAutocorrection(false)
+        .font(JovieFont.body(size: 16))
+        .foregroundStyle(JovieColor.textPrimary)
+        .frame(height: 52)
+        .onChange(of: draft) {
+          onDraftEdited()
         }
-        .buttonStyle(.plain)
-        .disabled(!isPlusEnabled)
-        .accessibilityLabel("Open workflow sheet")
-        .accessibilityIdentifier("chat-composer-plus")
-        .accessibilityElement(children: .ignore)
 
-        TextField(placeholder, text: $draft)
-          .focused($isFocused)
-          .textInputAutocapitalization(.sentences)
-          .disableAutocorrection(false)
-          .font(JovieFont.body(size: 16))
-          .foregroundStyle(JovieColor.textPrimary)
-          .frame(height: 52)
-          .onChange(of: draft) {
-            onDraftEdited()
-          }
-
-        if trimmedDraft.isEmpty {
-          voiceButton
-        } else {
+      // Reserve a stable trailing 52pt slot so empty → typed never shifts layout.
+      ZStack {
+        if !trimmedDraft.isEmpty {
           sendButton(trimmedDraft: trimmedDraft)
         }
       }
+      .frame(width: 52, height: 52)
     }
     .padding(.horizontal, JovieSpacing.large)
     .frame(height: 76)
@@ -270,72 +264,6 @@ struct ChatComposerBar: View {
     }
   }
 
-  @ViewBuilder
-  private var waveformStrip: some View {
-    HStack(spacing: 3) {
-      ForEach(0..<14, id: \.self) { index in
-        RoundedRectangle(cornerRadius: 2, style: .continuous)
-          .fill(isVoiceDragCancelled ? JovieColor.textTertiary : JovieColor.textPrimary)
-          .frame(width: 3, height: waveformHeight(at: index))
-          .opacity(voiceCaptureService.isRecording ? 0.9 : 0)
-      }
-    }
-    .frame(height: 12)
-    .frame(maxWidth: .infinity)
-    .accessibilityHidden(true)
-  }
-
-  private var voiceButton: some View {
-    Button(action: {}) {
-      ZStack {
-        Circle()
-          .fill(voiceCaptureService.isRecording ? Color.white : JovieColor.surface2)
-        Image(systemName: isVoiceDragCancelled ? "xmark" : "mic.fill")
-          .font(.system(size: 16, weight: .bold))
-          .foregroundStyle(
-            voiceCaptureService.isRecording ? JovieColor.backgroundBase : JovieColor.textPrimary
-          )
-      }
-      .frame(width: 52, height: 52)
-    }
-    .buttonStyle(.plain)
-    .disabled(isSending)
-    .contentShape(Circle())
-    .gesture(voiceDragGesture)
-    .accessibilityLabel(voiceCaptureService.isRecording ? "Release to send" : "Hold to talk")
-    .accessibilityIdentifier("chat-voice-button")
-    .accessibilityHint("Slide away to cancel")
-    .accessibilityElement(children: .ignore)
-  }
-
-  private var voiceDragGesture: some Gesture {
-    DragGesture(minimumDistance: 0)
-      .onChanged { value in
-        if !didStartVoiceDrag {
-          didStartVoiceDrag = true
-          isVoiceDragCancelled = false
-          UIImpactFeedbackGenerator(style: .light).impactOccurred()
-          Task { await onVoiceStart() }
-        }
-
-        isVoiceDragCancelled = abs(value.translation.width) > 72 || value.translation.height < -72
-      }
-      .onEnded { _ in
-        guard didStartVoiceDrag else { return }
-        didStartVoiceDrag = false
-
-        if isVoiceDragCancelled {
-          UINotificationFeedbackGenerator().notificationOccurred(.warning)
-          onVoiceCancel()
-          isVoiceDragCancelled = false
-          return
-        }
-
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        Task { await onVoiceFinish() }
-      }
-  }
-
   private func sendButton(trimmedDraft: String) -> some View {
     Button(action: onSend) {
       Image(systemName: isSending ? "ellipsis" : "arrow.up")
@@ -354,13 +282,6 @@ struct ChatComposerBar: View {
     .buttonStyle(.plain)
     .disabled(trimmedDraft.isEmpty || isSending)
     .accessibilityLabel("Send")
-  }
-
-  private func waveformHeight(at index: Int) -> CGFloat {
-    let base = [4, 7, 10, 6, 12, 8, 5, 11, 7, 10, 6, 12, 8, 5][index]
-    guard voiceCaptureService.isRecording else { return CGFloat(base) }
-    let boosted = Double(base) + voiceCaptureService.audioLevel * Double((index % 4) + 5)
-    return CGFloat(min(14, max(4, boosted)))
   }
 }
 

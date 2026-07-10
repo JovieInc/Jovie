@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum MobileChatKeyboardPolicy {
   /// Dismiss when the assistant starts streaming only if the user has not typed since send.
@@ -12,11 +13,25 @@ struct MobileChatView: View {
   @Binding var draft: String
   @Binding var voiceCaptureTrigger: Int
   let webBaseURL: URL
+  let onEntityTap: (EntityContextItem) -> Void
 
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
-  @State private var voiceCaptureService = VoiceCaptureService()
+
+  init(
+    repository: ChatRepository,
+    draft: Binding<String>,
+    voiceCaptureTrigger: Binding<Int>,
+    webBaseURL: URL,
+    onEntityTap: @escaping (EntityContextItem) -> Void = { _ in }
+  ) {
+    self.repository = repository
+    _draft = draft
+    _voiceCaptureTrigger = voiceCaptureTrigger
+    self.webBaseURL = webBaseURL
+    self.onEntityTap = onEntityTap
+  }
 
   var body: some View {
     ZStack {
@@ -37,10 +52,9 @@ struct MobileChatView: View {
     .task {
       await repository.refreshConversations()
     }
-    .task(id: voiceCaptureTrigger) {
-      guard voiceCaptureTrigger > 0 else { return }
-      await startVoiceCapture()
-    }
+    // voiceCaptureTrigger is owned by the shell Talk FAB / App Intents path
+    // (JOV-3636). Chat no longer starts capture itself — the shell opens
+    // TalkOverlayView when the trigger increments.
   }
 
   @ViewBuilder
@@ -58,7 +72,8 @@ struct MobileChatView: View {
               },
               onSubmitPrompt: { prompt in
                 Task { await repository.send(text: prompt) }
-              }
+              },
+              onEntityTap: onEntityTap
             )
             .transition(.opacity.combined(with: .offset(y: 6)))
           }
@@ -103,8 +118,6 @@ struct MobileChatView: View {
       .onChange(of: isComposerFocused) {
         scrollToBottomIfPinned(using: proxy, animated: true)
       }
-      // Bottom-center, above the composer: the shell-level Talk FAB now owns
-      // bottom-trailing (JOV-3670), so this button relocates to avoid overlap.
       .overlay(alignment: .bottom) {
         if !isAtBottom {
           Button {
@@ -141,7 +154,6 @@ struct MobileChatView: View {
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
         isOffline: repository.isOffline,
-        voiceCaptureService: voiceCaptureService,
         onSend: {
           let text = draft
           draft = ""
@@ -154,15 +166,6 @@ struct MobileChatView: View {
         },
         onDraftEdited: {
           userEditedSinceSend = true
-        },
-        onVoiceStart: {
-          await startVoiceCapture()
-        },
-        onVoiceFinish: {
-          await finishVoiceCapture()
-        },
-        onVoiceCancel: {
-          voiceCaptureService.cancel()
         }
       )
       .padding(.horizontal, JovieSpacing.large)
@@ -216,26 +219,6 @@ struct MobileChatView: View {
     }
   }
 
-  private func startVoiceCapture() async {
-    guard !repository.isSending else { return }
-    isComposerFocused = false
-    do {
-      try await voiceCaptureService.start()
-    } catch {
-      voiceCaptureService.cancel()
-    }
-  }
-
-  private func finishVoiceCapture() async {
-    do {
-      let result = try await voiceCaptureService.finish()
-      userEditedSinceSend = false
-      draft = ""
-      await repository.send(text: result.transcript)
-    } catch {
-      voiceCaptureService.cancel()
-    }
-  }
 }
 
 private struct MobileChatMessageRow: View {
@@ -243,6 +226,7 @@ private struct MobileChatMessageRow: View {
   let webBaseURL: URL
   let onRetry: () -> Void
   let onSubmitPrompt: (String) -> Void
+  let onEntityTap: (EntityContextItem) -> Void
 
   private var isStreamingAssistant: Bool {
     item.role == .assistant && item.status == .streaming
@@ -282,7 +266,8 @@ private struct MobileChatMessageRow: View {
   private var userMessageBubble: some View {
     MobileChatProseText(
       runs: MobileChatProseTokenizer.tokenize(item.content, isStreaming: false),
-      tone: .onLight
+      tone: .onLight,
+      onEntityTap: onEntityTap
     )
     .font(JovieFont.body(size: 16))
     .padding(.horizontal, JovieSpacing.large)
@@ -317,12 +302,21 @@ private struct MobileChatMessageRow: View {
       VStack(alignment: .leading, spacing: JovieSpacing.small) {
         let proseRuns = assistantProseRuns(from: segments)
         if !proseRuns.isEmpty {
-          MobileChatProseText(runs: proseRuns, tone: .onDark)
+          MobileChatProseText(runs: proseRuns, tone: .onDark, onEntityTap: onEntityTap)
             .font(JovieFont.body(size: 16))
             .padding(.horizontal, JovieSpacing.large)
             .padding(.vertical, JovieSpacing.medium)
             .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .frame(maxWidth: 320, alignment: .leading)
+            .contextMenu {
+              Button("Copy") {
+                UIPasteboard.general.string = item.content
+              }
+              Button("Share") {
+                // Share sheet is host-level; copy keeps this menu discoverable.
+                UIPasteboard.general.string = item.content
+              }
+            }
         }
 
         ForEach(segments) { segment in
@@ -411,13 +405,9 @@ private struct ChatComposerView: View {
   @FocusState.Binding var isComposerFocused: Bool
   let isSending: Bool
   let isOffline: Bool
-  @Bindable var voiceCaptureService: VoiceCaptureService
   let onSend: () -> Void
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
   let onDraftEdited: () -> Void
-  let onVoiceStart: () async -> Void
-  let onVoiceFinish: () async -> Void
-  let onVoiceCancel: () -> Void
 
   var body: some View {
     ChatComposerBar(
@@ -426,10 +416,6 @@ private struct ChatComposerView: View {
       placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
       isSending: isSending,
       isPlusEnabled: !isSending,
-      voiceCaptureService: voiceCaptureService,
-      onVoiceStart: onVoiceStart,
-      onVoiceFinish: onVoiceFinish,
-      onVoiceCancel: onVoiceCancel,
       onSend: onSend,
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
@@ -520,27 +506,44 @@ private struct MobileChatEntityChipView: View {
   let id: String
   let label: String
   let tone: MobileChatProseTone
+  let onTap: (EntityContextItem) -> Void
 
   private static let mediaSize: CGFloat = 16
   private static let maxChipWidth: CGFloat = 220
 
+  private var entityItem: EntityContextItem {
+    EntityContextItem(kind: kind, entityID: id, label: label)
+  }
+
   var body: some View {
-    HStack(spacing: 6) {
-      mediaSlot
-      Text(label)
-        .lineLimit(1)
-        .truncationMode(.tail)
+    Button {
+      onTap(entityItem)
+    } label: {
+      HStack(spacing: 6) {
+        mediaSlot
+        Text(label)
+          .lineLimit(1)
+          .truncationMode(.tail)
+      }
+      .font(JovieFont.body(size: 16))
+      .foregroundStyle(chipTextColor)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
+      .frame(maxWidth: Self.maxChipWidth)
+      .background(chipBackground, in: Capsule())
+      .overlay(
+        Capsule().stroke(chipBorderColor, lineWidth: 1)
+      )
     }
-    .font(JovieFont.body(size: 16))
-    .foregroundStyle(chipTextColor)
-    .padding(.horizontal, 8)
-    .padding(.vertical, 4)
-    .frame(maxWidth: Self.maxChipWidth)
-    .background(chipBackground, in: Capsule())
-    .overlay(
-      Capsule().stroke(chipBorderColor, lineWidth: 1)
-    )
+    .buttonStyle(.plain)
+    .contextMenu {
+      // Long-press peek (JOV-3635): quick open into the entity sheet.
+      Button("Open") { onTap(entityItem) }
+      Button("Copy Label") { UIPasteboard.general.string = label }
+    }
     .accessibilityLabel("\(kindPrefix): \(label)")
+    .accessibilityHint("Opens entity context")
+    .accessibilityIdentifier("entity-chip-\(kind.rawValue)-\(id)")
   }
 
   @ViewBuilder
@@ -607,6 +610,7 @@ private struct MobileChatEntityChipView: View {
 struct MobileChatProseText: View {
   let runs: [MobileChatProseRun]
   let tone: MobileChatProseTone
+  var onEntityTap: (EntityContextItem) -> Void = { _ in }
 
   var body: some View {
     let tokens = Self.flowTokens(from: runs)
@@ -624,7 +628,13 @@ struct MobileChatProseText: View {
       Text(verbatim: value)
         .foregroundStyle(primaryTextColor)
     case let .entity(kind, id, label):
-      MobileChatEntityChipView(kind: kind, id: id, label: label, tone: tone)
+      MobileChatEntityChipView(
+        kind: kind,
+        id: id,
+        label: label,
+        tone: tone,
+        onTap: onEntityTap
+      )
     case let .skill(_, label):
       Text(label)
         .foregroundStyle(skillLabelColor)
