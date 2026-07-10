@@ -45,7 +45,7 @@ concurrency:
 jobs:
   sweep:
     name: Sweep Eligible Agent PRs
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 8
     permissions:
       contents: read

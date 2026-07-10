@@ -32,7 +32,7 @@ jobs:
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
         (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
       )
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     permissions:
       contents: write # Required for Claude to commit and push changes
       pull-requests: write # Required for Claude to create/update PRs

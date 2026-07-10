@@ -43,7 +43,7 @@ on:
 jobs:
   canary-health-gate:
     name: Canary health gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 20
     outputs:
       canary_status: ${{ steps.canary-status.outputs.canary_status || steps.canary-check.outputs.canary_status }}

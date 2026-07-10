@@ -30,7 +30,7 @@ concurrency:
 jobs:
   classify:
     name: Classify PR taste
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 5
     steps:
       # Dedup guard (#13348): classify once per head SHA, not once per event.

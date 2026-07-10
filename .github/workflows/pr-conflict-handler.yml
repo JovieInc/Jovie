@@ -46,7 +46,7 @@ defaults:
 jobs:
   plan:
     name: Classify and plan PR freshness
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     concurrency:
       group: pr-conflict-handler-${{ github.repository }}
       cancel-in-progress: false

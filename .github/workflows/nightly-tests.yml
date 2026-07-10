@@ -50,7 +50,7 @@ jobs:
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -71,7 +71,7 @@ jobs:
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -110,7 +110,7 @@ jobs:
       github.event.inputs.suite == 'e2e' ||
       github.event.inputs.suite == 'design-v1'
     environment: Preview – jovie
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -346,7 +346,7 @@ jobs:
     name: Notify Results
     needs: [knip, unit-tests, e2e-tests]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     steps:
       - name: Slack notification on Knip failure
         if: ${{ needs.knip.result == 'failure' }}

@@ -29,7 +29,7 @@ concurrency:
 jobs:
   context:
     name: Build Agent Context
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -60,7 +60,7 @@ jobs:
     name: Deterministic Unit Telemetry
     needs: [context]
     if: ${{ github.event_name == 'schedule' || inputs.run_unit }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -103,7 +103,7 @@ jobs:
     name: Mutation Hotspots
     needs: [context]
     if: ${{ github.event_name == 'schedule' || inputs.run_mutation }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -147,7 +147,7 @@ jobs:
     name: Candidate Test Validation
     needs: [context]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_candidates }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -173,7 +173,7 @@ jobs:
     name: Emit Agent Report
     needs: [context, deterministic, mutation-hotspots, candidate-validation]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
       contents: write

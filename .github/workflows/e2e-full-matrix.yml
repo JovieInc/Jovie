@@ -18,7 +18,7 @@ jobs:
   e2e-full-matrix:
     name: E2E (Chrome + Firefox)
     environment: Preview – jovie
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 60
     env:
       E2E_FULL_MATRIX: '1'
@@ -144,7 +144,7 @@ jobs:
     name: Notify Results
     needs: [e2e-full-matrix]
     if: ${{ always() && github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     steps:
       - name: Slack notification on failure
         if: ${{ needs.e2e-full-matrix.result == 'failure' }}

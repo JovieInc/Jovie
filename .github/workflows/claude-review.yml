@@ -30,7 +30,7 @@ concurrency:
 jobs:
   review:
     name: Claude Review
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 15
     # Real PRs only: skip drafts, dependabot, and mechanical codemods.
     if: >-

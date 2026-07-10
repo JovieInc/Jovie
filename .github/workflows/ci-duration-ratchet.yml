@@ -28,7 +28,7 @@ concurrency:
 jobs:
   measure:
     name: Measure p95 gate duration + check ratchet
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 8
     steps:
       - name: Checkout

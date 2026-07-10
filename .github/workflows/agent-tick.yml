@@ -39,7 +39,7 @@ jobs:
   # --------------------------------------------------------------------------
   landing-sweep:
     name: Landing Sweep
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 8
     permissions:
       contents: read
@@ -181,7 +181,7 @@ jobs:
   # --------------------------------------------------------------------------
   auto-ready:
     name: Auto-Ready Agent Drafts
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
       pull-requests: write
@@ -213,7 +213,7 @@ jobs:
   # --------------------------------------------------------------------------
   cost-anomaly:
     name: Cost Anomaly Gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -331,7 +331,7 @@ jobs:
   # --------------------------------------------------------------------------
   dispatch:
     name: Dispatch Ready Issues
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -396,7 +396,7 @@ jobs:
   # --------------------------------------------------------------------------
   main-ci-health:
     name: Main CI Health
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 8
     permissions:
       actions: read
@@ -438,7 +438,7 @@ jobs:
     name: Auto-Rerun Failed Deploy
     needs: main-ci-health
     if: ${{ always() && needs.main-ci-health.outputs.should_alert == 'true' && needs.main-ci-health.outputs.failed_run_id != '' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     permissions:
       actions: write
     steps:
@@ -461,7 +461,7 @@ jobs:
   # --------------------------------------------------------------------------
   neon-cleanup:
     name: Neon Branch Cleanup
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -487,7 +487,7 @@ jobs:
   # --------------------------------------------------------------------------
   runner-health:
     name: Runner Health
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 2
     permissions:
       contents: read
@@ -559,7 +559,7 @@ jobs:
   # --------------------------------------------------------------------------
   synthetic-monitoring:
     name: Production Synthetic Monitoring
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 20
     permissions:
       contents: read
