@@ -66,13 +66,21 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
   otp_expired: 'That code has expired. Send a new one and try again.',
   max_attempts_reached:
     'Too many incorrect attempts. Request a new code to try again.',
+  too_many_attempts:
+    'Too many incorrect attempts. Request a new code to try again.',
   rate_limit_exceeded: 'Too many attempts. Please wait a moment and try again.',
 };
 
 function readErrorCode(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') return undefined;
-  const candidate = error as { code?: unknown; message?: unknown };
-  if (typeof candidate.code === 'string') return candidate.code;
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+    status?: unknown;
+  };
+  // Better Auth rate-limit rejections are bare 429s with no error code.
+  if (candidate.status === 429) return 'rate_limit_exceeded';
+  if (typeof candidate.code === 'string') return candidate.code.toLowerCase();
   if (typeof candidate.message === 'string') {
     // Better Auth errors sometimes carry the code in `message` as
     // `"code: ..."` — fall through to that.
@@ -95,7 +103,8 @@ function getVerifyErrorMessage(error: unknown): string {
 }
 
 function isMaxAttemptsError(error: unknown): boolean {
-  return readErrorCode(error) === 'max_attempts_reached';
+  const code = readErrorCode(error);
+  return code === 'max_attempts_reached' || code === 'too_many_attempts';
 }
 
 // ============================================================================
@@ -176,10 +185,15 @@ export function EmailCodeAuthForm({
       // code via Resend. In E2E test mode (`E2E_TEST_MODE=1`, test-email
       // pattern only) the server returns the deterministic `424242` and
       // nothing is sent.
-      await authClient.emailOtp.sendVerificationOtp({
-        email: trimmedEmail,
-        type: 'sign-in',
-      });
+      // Better Auth client calls resolve with `{ data, error }` instead of
+      // throwing — an unchecked error here silently advances to the code
+      // step with no OTP in flight.
+      const { error: sendError } =
+        await authClient.emailOtp.sendVerificationOtp({
+          email: trimmedEmail,
+          type: 'sign-in',
+        });
+      if (sendError) throw sendError;
 
       setCode('');
       setStep('code');
@@ -218,10 +232,14 @@ export function EmailCodeAuthForm({
         // the session. Auto-creates the user if not existing (plan design
         // row 17 — waitlist gates downstream). On success the session cookie
         // is set and we hard-navigate to `redirectUrl`.
-        await authClient.signIn.emailOtp({
+        // Better Auth client calls resolve with `{ data, error }` instead of
+        // throwing — an unchecked error here navigates away signed-out, so a
+        // wrong or rate-limited code looks like a successful signup.
+        const { error: verifyError } = await authClient.signIn.emailOtp({
           email: emailAddress.trim(),
           otp: submittedCode,
         });
+        if (verifyError) throw verifyError;
 
         globalThis.location?.assign(redirectUrl);
       } catch (error) {
