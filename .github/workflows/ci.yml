@@ -1294,10 +1294,14 @@ jobs:
           BASE_URL: http://localhost:3100
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          # Match ci-e2e-smoke: standalone is production-built; VERCEL_ENV=development
+          # unlocks isExplicitDevelopmentEnvironment + test-auth enter on loopback.
+          VERCEL_ENV: development
           CI: true
           E2E_SKIP_WEB_SERVER: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
+          NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -2793,8 +2797,15 @@ jobs:
           BASE_URL: http://localhost:3100
           CI: true
           DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          # Match ci-e2e-smoke standalone auth env (see mobile-overflow).
+          VERCEL_ENV: development
+          E2E_SKIP_WEB_SERVER: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           URL_ENCRYPTION_KEY: a11y-authed-ci-url-encryption-key
           AI_GATEWAY_API_KEY: a11y-authed-ci
