@@ -47,7 +47,27 @@ const HomepageWorkspaceSectionImpl = dynamic(
               ))}
             </h2>
           </div>
-          <div className='homepage-workspace-visual system-b-mounted-home-workspace-visual' />
+          <div className='homepage-workspace-visual system-b-mounted-home-workspace-visual'>
+            <div className='homepage-workspace-media system-b-mounted-home-workspace-media' />
+            <ol className='homepage-workspace-callouts system-b-mounted-home-workspace-callouts'>
+              {HOMEPAGE_LAUNCH_COPY.workspace.callouts.map(callout => (
+                <li
+                  className='homepage-workspace-callout system-b-mounted-home-workspace-callout invisible'
+                  key={callout.title}
+                >
+                  <span className='system-b-mounted-home-workspace-callout-label'>
+                    {callout.number}
+                  </span>
+                  <h3 className='system-b-mounted-home-workspace-callout-title'>
+                    {callout.title}
+                  </h3>
+                  <p className='system-b-mounted-home-workspace-callout-body'>
+                    {callout.body}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </section>
     ),
