@@ -26,6 +26,7 @@ import {
   mockGetPlanFromPriceId,
   mockHandlerHandle,
   mockStripeTimestampToDate,
+  setSimulateActiveLease,
   setSimulateRaceDisappear,
   setSimulateUnprocessedRetry,
   setSkipProcessing,
@@ -39,6 +40,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     setSkipProcessing(false);
     setSimulateRaceDisappear(false);
     setSimulateUnprocessedRetry(false);
+    setSimulateActiveLease(false);
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockGetHandler.mockReturnValue(null);
   });
@@ -155,6 +157,32 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
         eventId: 'evt_disappear',
       })
     );
+  });
+
+  it('acknowledges a duplicate while another request holds the processing lease', async () => {
+    const event = {
+      id: 'evt_active_lease',
+      type: 'checkout.session.completed',
+      created: Math.floor(Date.now() / 1000),
+      data: { object: { id: 'cs_active_lease' } },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+    setSimulateActiveLease(true);
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/stripe/webhooks',
+      {
+        method: 'POST',
+        body: 'test-body',
+        headers: { 'stripe-signature': 'sig_test' },
+      }
+    );
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect((await response.json()).received).toBe(true);
+    expect(mockHandlerHandle).not.toHaveBeenCalled();
   });
 });
 
