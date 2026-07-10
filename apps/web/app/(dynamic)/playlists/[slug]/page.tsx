@@ -242,7 +242,7 @@ export default async function PlaylistPage({
         <div className='mx-auto flex flex-col items-center'>
           {/* Cover Art */}
           {playlist.coverImageUrl && (
-            <div className='aspect-square w-[300px] overflow-hidden rounded-lg shadow-2xl'>
+            <div className='aspect-square w-75 overflow-hidden rounded-lg shadow-2xl'>
               <Image
                 src={playlist.coverImageUrl}
                 alt={playlist.title}

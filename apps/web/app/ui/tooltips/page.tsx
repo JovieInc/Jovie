@@ -11,7 +11,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+      <h2 className='mb-4 text-2xs font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-6'>{children}</div>
@@ -20,7 +20,7 @@ function Section({
 }
 
 function Label({ children }: { readonly children: React.ReactNode }) {
-  return <span className='text-[11px] text-tertiary-token'>{children}</span>;
+  return <span className='text-2xs text-tertiary-token'>{children}</span>;
 }
 
 function Stack({
@@ -42,7 +42,7 @@ export default function TooltipsPage() {
   return (
     <div>
       <h1 className='mb-1 text-lg font-semibold text-primary-token'>Tooltip</h1>
-      <p className='mb-8 text-[13px] text-tertiary-token'>
+      <p className='mb-8 text-app text-tertiary-token'>
         Matches Linear.app — 4px radius, surface-0 bg, 12px font, instant 100ms
         animation
       </p>
@@ -51,7 +51,7 @@ export default function TooltipsPage() {
       <Section title='Basic'>
         <Stack title='default (top)'>
           <SimpleTooltip content='Save changes'>
-            <Button variant='secondary'>Hover me</Button>
+            <Button variant='secondary'>Hover Me</Button>
           </SimpleTooltip>
         </Stack>
       </Section>
@@ -112,7 +112,7 @@ export default function TooltipsPage() {
       <Section title='Long Description'>
         <Stack title='max-width 220px'>
           <SimpleTooltip content='This is a longer tooltip description that demonstrates how text wraps within the 220px max-width constraint.'>
-            <Button variant='secondary'>Hover for details</Button>
+            <Button variant='secondary'>Hover For Details</Button>
           </SimpleTooltip>
         </Stack>
       </Section>
