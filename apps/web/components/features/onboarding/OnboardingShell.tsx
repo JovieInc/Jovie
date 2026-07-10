@@ -1,6 +1,5 @@
 'use client';
 
-import { Skeleton } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
@@ -143,9 +142,10 @@ export function OnboardingShell({
   // On success, this hook navigates away to
   // /onboarding/checkout, so the rest of the shell never gets a chance to
   // render a "now what?" state. Idle for unauthenticated visitors.
-  const claimStatus = useOnboardingClaim(claimTrigger);
-  const isLinking =
-    claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
+  // Claim runs in the background (JOV-3561 Phase 0). No "Linking…" toast —
+  // retries for the auth→DB mirror race stay invisible and hand off to
+  // /onboarding/checkout on success.
+  useOnboardingClaim(claimTrigger);
   const sideProfileRail = profileBuilderState.artist ? (
     <OnboardingProfileRail state={profileBuilderState} />
   ) : null;
@@ -175,15 +175,9 @@ export function OnboardingShell({
               onTurnstileRejected={handleTurnstileRejected}
             />
 
-            <OnboardingShellStatus
-              kind='error'
+            <OnboardingShellErrorToast
               message={turnstileFailureMessage}
               visible={Boolean(turnstileFailureMessage)}
-            />
-            <OnboardingShellStatus
-              kind='status'
-              message='Linking your conversation...'
-              visible={isLinking}
             />
           </div>
         }
@@ -193,31 +187,14 @@ export function OnboardingShell({
   );
 }
 
-function OnboardingShellStatus({
-  kind,
+function OnboardingShellErrorToast({
   message,
   visible,
 }: Readonly<{
-  kind: 'error' | 'status';
   message: string | null;
   visible: boolean;
 }>) {
   if (!visible || !message) return null;
-
-  if (kind === 'status') {
-    return (
-      <div
-        className='pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border border-subtle bg-surface-0 px-3 py-1.5 shadow-card sm:right-4 sm:top-4'
-        role='status'
-        aria-live='polite'
-        aria-busy='true'
-        data-testid='onboarding-linking-skeleton'
-      >
-        <Skeleton className='h-3.5 w-44 rounded' />
-        <span className='sr-only'>{message}</span>
-      </div>
-    );
-  }
 
   return (
     <p

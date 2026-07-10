@@ -85,10 +85,10 @@ describe('bodyContainsInitializedInterview', () => {
     ).toBe(true);
   });
 
-  it('passes when the composer initialized', () => {
+  it('passes when the docked composer initialized', () => {
     expect(
       bodyContainsInitializedInterview(
-        '<div data-testid="onboarding-chat"><div data-testid="onboarding-centered-composer"></div></div>'
+        '<div data-testid="onboarding-chat"><div data-testid="onboarding-composer-dock"></div></div>'
       )
     ).toBe(true);
   });

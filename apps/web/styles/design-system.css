@@ -2962,9 +2962,18 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
   opacity: 0.92;
 }
 
+/* Bottom-docked composer skeleton — matches always-docked OnboardingChat. */
+:where(.system-b-start-loading-composer-dock) {
+  flex-shrink: 0;
+  padding-block: var(--space-2) var(--space-4);
+  padding-inline: clamp(var(--space-4), 4vw, var(--space-8));
+  background: var(--system-b-app-content-surface);
+}
+
 :where(.system-b-start-loading-composer-wrap) {
   width: 100%;
   max-width: var(--app-shell-content-max-form);
+  margin-inline: auto;
 }
 
 :where(.system-b-start-loading-composer) {

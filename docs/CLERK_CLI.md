@@ -135,6 +135,6 @@ doppler run --project jovie-web --config dev -- \
 
 See `scripts/clerk-config.ts --help` (or --self-test) and the script source for the full Jovie Doppler mapping + pure helper exports (`extractAuthRelevantConfigKeys`, `hasMatchingRedirect` — unit-testable).
 
-All operations are auditable via the `[clerk-config-audit ...]` lines. This delivers the self-serve path for auth config without manual Clerk dashboard access.
+All operations are auditable via structured `[clerk-config ...]` log lines from `scripts/clerk-config.ts`. This delivers the self-serve path for auth config without manual Clerk dashboard access. The retired `/api/cron/clerk-config-audit` SSO-only enforcer (JOV-2763) is not part of this tooling.
 
 **gstack principles applied (gh-9805):** completeness (inspect + safe mutate), boil lakes (HOT ZONE: this + CLI only), pragmatic (immediate iOS pain), DRY (existing scripts), explicit (guards + docs), bias to action (ship small, iterate).

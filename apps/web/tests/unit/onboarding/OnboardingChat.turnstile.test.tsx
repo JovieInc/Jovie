@@ -238,11 +238,11 @@ describe('OnboardingChat Turnstile gating', () => {
     errorMocks.metadata = {};
   });
 
-  it('keeps the first turn stable before docking follow-up turns', () => {
+  it('keeps the composer docked from the empty state through follow-up turns', () => {
     const { rerender } = render(<TurnstileHarness />);
 
-    expect(screen.getByTestId('onboarding-centered-composer')).toBeVisible();
-    expect(screen.queryByTestId('onboarding-composer-dock')).toBeNull();
+    expect(screen.getByTestId('onboarding-composer-dock')).toBeVisible();
+    expect(screen.queryByTestId('onboarding-centered-composer')).toBeNull();
 
     chatMocks.messages = [
       {
@@ -253,8 +253,8 @@ describe('OnboardingChat Turnstile gating', () => {
     ];
     rerender(<TurnstileHarness />);
 
-    expect(screen.getByTestId('onboarding-centered-composer')).toBeVisible();
-    expect(screen.queryByTestId('onboarding-composer-dock')).toBeNull();
+    expect(screen.getByTestId('onboarding-composer-dock')).toBeVisible();
+    expect(screen.queryByTestId('onboarding-centered-composer')).toBeNull();
 
     chatMocks.messages = [
       ...chatMocks.messages,
@@ -271,8 +271,8 @@ describe('OnboardingChat Turnstile gating', () => {
     ];
     rerender(<TurnstileHarness />);
 
-    expect(screen.queryByTestId('onboarding-centered-composer')).toBeNull();
     expect(screen.getByTestId('onboarding-composer-dock')).toBeVisible();
+    expect(screen.queryByTestId('onboarding-centered-composer')).toBeNull();
   });
 
   it('renders a starter prompt and reserves verification space before effects run', () => {

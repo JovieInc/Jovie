@@ -237,13 +237,13 @@ describe('@critical gate.ts (Better Auth)', () => {
     mockResolveProfileState.mockReturnValue({
       state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: null,
-      redirectTo: '/start?fresh_signup=true',
+      redirectTo: '/start',
     });
 
     const result = await resolveUserState();
 
     expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
-    expect(result.redirectTo).toContain('/start');
+    expect(result.redirectTo).toBe('/start');
   });
 
   it('returns BANNED when status-checker marks the user blocked', async () => {

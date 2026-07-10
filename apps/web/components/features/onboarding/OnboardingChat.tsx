@@ -9,11 +9,7 @@ import {
   readHomepageIntent,
   sanitizeHomepagePrompt,
 } from '@/components/homepage/intent-store';
-import {
-  ChatEmptyStateComposerRegion,
-  ChatInput,
-  ChatMessage,
-} from '@/components/jovie/components';
+import { ChatInput, ChatMessage } from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import {
   composeMessage,
@@ -688,16 +684,18 @@ interface OnboardingMessageRegionProps {
   readonly isBusy: boolean;
   readonly isStreaming: boolean;
   readonly lastAssistantMessageId: string | null;
-  readonly onboardingComposerSurface: ReactNode;
   readonly onHandleCandidateChange: (handle: string | null) => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly onSelectStarterSuggestion: (prompt: string) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
-  readonly shouldDockComposer: boolean;
   readonly showEmptyIntro: boolean;
   readonly composerPickerOpen: boolean;
 }
 
+/**
+ * Scroll-region content only. The composer is always docked below this region
+ * (JOV-3561 Phase 0) so empty → first send never jumps the hero control.
+ */
 function OnboardingMessageRegion({
   composerPickerOpen,
   displayMessages,
@@ -705,53 +703,28 @@ function OnboardingMessageRegion({
   isBusy,
   isStreaming,
   lastAssistantMessageId,
-  onboardingComposerSurface,
   onHandleCandidateChange,
   onSelectArtist,
   onSelectStarterSuggestion,
   profileBuilderState,
-  shouldDockComposer,
   showEmptyIntro,
 }: OnboardingMessageRegionProps) {
-  if (shouldDockComposer) {
+  if (!hasConversationStarted) {
     return (
-      <div className='flex flex-col gap-4'>
-        <OnboardingMessageList
-          displayMessages={displayMessages}
-          isStreaming={isStreaming}
-          lastAssistantMessageId={lastAssistantMessageId}
-          isBusy={isBusy}
-          onHandleCandidateChange={onHandleCandidateChange}
-          onSelectArtist={onSelectArtist}
-          selectedArtistId={profileBuilderState.artist?.id ?? null}
-        />
-        <OnboardingProfileRail placement='inline' state={profileBuilderState} />
+      <div className='flex min-h-full flex-col justify-center gap-4'>
+        {showEmptyIntro ? (
+          <OnboardingChatEmptyIntro
+            onSelectSuggestion={onSelectStarterSuggestion}
+            dimmed={composerPickerOpen}
+            isBusy={isBusy}
+          />
+        ) : null}
       </div>
     );
   }
 
-  if (!hasConversationStarted) {
-    return (
-      <ChatEmptyStateComposerRegion
-        above={
-          showEmptyIntro ? (
-            <OnboardingChatEmptyIntro
-              onSelectSuggestion={onSelectStarterSuggestion}
-              dimmed={composerPickerOpen}
-              isBusy={isBusy}
-            />
-          ) : undefined
-        }
-      >
-        <div className='w-full' data-testid='onboarding-centered-composer'>
-          {onboardingComposerSurface}
-        </div>
-      </ChatEmptyStateComposerRegion>
-    );
-  }
-
-  const conversationAboveComposer = (
-    <div className='mx-auto flex w-full max-w-[44rem] flex-col gap-4'>
+  return (
+    <div className='flex flex-col gap-4'>
       <OnboardingMessageList
         displayMessages={displayMessages}
         isStreaming={isStreaming}
@@ -763,14 +736,6 @@ function OnboardingMessageRegion({
       />
       <OnboardingProfileRail placement='inline' state={profileBuilderState} />
     </div>
-  );
-
-  return (
-    <ChatEmptyStateComposerRegion above={conversationAboveComposer}>
-      <div className='w-full' data-testid='onboarding-centered-composer'>
-        {onboardingComposerSurface}
-      </div>
-    </ChatEmptyStateComposerRegion>
   );
 }
 
@@ -1122,24 +1087,10 @@ export function OnboardingChat({
     />
   ) : null;
 
-  const userTurnCount = messages.filter(
-    message => message.role === 'user'
-  ).length;
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
-  const shouldDockComposer =
-    chatError !== null || userTurnCount > 1 || selectedArtist !== null;
+  // Composer is fixed-docked from frame one (JOV-3561 Phase 0). Empty intro
+  // lives in the scroll region above; never undock/center the composer.
   const showEmptyIntro = !intentId && !starterPrompt;
-
-  useEffect(() => {
-    if (shouldDockComposer) return;
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-    if (typeof scrollContainer.scrollTo === 'function') {
-      scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
-      return;
-    }
-    scrollContainer.scrollTop = 0;
-  }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
 
   const onboardingChatInputProps = {
     value: input,
@@ -1174,7 +1125,7 @@ export function OnboardingChat({
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
-      {/* Scroll area (flex-1) — upper content morphs on first message */}
+      {/* Scroll area (flex-1) — messages + empty intro only; composer stays docked */}
       <div
         ref={scrollContainerRef}
         onScroll={onScroll}
@@ -1182,13 +1133,10 @@ export function OnboardingChat({
         aria-live='polite'
       >
         <div
-          ref={shouldDockComposer ? totalSizeRef : undefined}
+          ref={totalSizeRef}
           className={cn(
             'mx-auto flex min-h-full w-full flex-col',
-            hasConversationStarted || shouldDockComposer
-              ? 'max-w-[44rem]'
-              : 'max-w-[52rem]',
-            !shouldDockComposer && 'justify-center'
+            hasConversationStarted ? 'max-w-[44rem]' : 'max-w-[52rem]'
           )}
         >
           <OnboardingMessageRegion
@@ -1198,25 +1146,21 @@ export function OnboardingChat({
             isBusy={isBusy}
             isStreaming={isStreaming}
             lastAssistantMessageId={lastAssistantMessageId}
-            onboardingComposerSurface={onboardingComposerSurface}
             onHandleCandidateChange={setHandleDraft}
             onSelectArtist={handleArtistSelect}
             onSelectStarterSuggestion={submitText}
             profileBuilderState={profileBuilderState}
-            shouldDockComposer={shouldDockComposer}
             showEmptyIntro={showEmptyIntro}
           />
         </div>
       </div>
 
-      {shouldDockComposer ? (
-        <div
-          className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'
-          data-testid='onboarding-composer-dock'
-        >
-          {onboardingComposerSurface}
-        </div>
-      ) : null}
+      <div
+        className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'
+        data-testid='onboarding-composer-dock'
+      >
+        {onboardingComposerSurface}
+      </div>
     </section>
   );
 }

@@ -11,16 +11,15 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  * Auto-claim the anonymous onboarding conversation when the visitor
  * authenticates mid-flow (JOV-2132 PR 4).
  *
- * Fires on mount and after completed chat turns while Clerk reports the user
+ * Fires on mount and after completed chat turns while auth reports the user
  * is signed in. Calls POST /api/onboarding/claim — the server reads the signed
  * `jovie_onboarding_session` cookie and attaches matching anonymous
  * conversations to the freshly created user.
  *
- * Handles the Clerk → DB user-mirror race: the claim endpoint returns
- * `{ retryAfterWebhook: true }` when Clerk has authenticated the user but
- * the Clerk webhook hasn't yet written them into our `users` table. We
- * retry up to 3 times with a 1.5s gap before giving up — the webhook
- * almost always lands in under 2s.
+ * Handles the auth → DB user-mirror race: the claim endpoint returns
+ * `{ retryAfterWebhook: true }` when the user is authenticated but their
+ * `users` row is not ready yet. Retries up to 3× with a 1.5s gap (invisible —
+ * no "Linking…" toast; JOV-3561 Phase 0).
  *
  * On success (claimed >= 1) the hook navigates to `/onboarding/checkout`
  * so the existing post-claim path takes over. If the claim returned

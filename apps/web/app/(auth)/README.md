@@ -1,21 +1,15 @@
 # Auth & Onboarding (App Router)
 
-This directory contains the App Router auth pages for Jovie. The primary auth UI is SSO-only: Jovie renders first-party Google and Apple buttons, then starts Clerk OAuth through `useSignIn()` / `useSignUp()`.
+This directory contains the App Router auth pages for Jovie. The primary auth UI is **SSO + email OTP**: Jovie renders first-party Google and Apple buttons plus an email one-time-code form via the shared `AuthShell` (Better Auth). Password auth is intentionally unsupported.
 
 ## Runtime Model
 
-- `/signin` renders `AuthShell` inside the existing `AuthLayout` and starts Clerk sign-in redirects from app-owned provider buttons.
-- `/signup` renders `AuthShell` inside the existing `AuthLayout` and starts Clerk sign-up redirects from app-owned provider buttons.
-- Auth pages use the bundled Core 3 Clerk UI via `AuthClientProviders`, rather than relying on the CDN-loaded default auth styling path.
-- Auth pages use an auth-only Clerk appearance config with the Core 3 `simple` theme baseline, while non-auth Clerk surfaces keep the shared base appearance.
-- Host-to-instance mapping is strict:
-  - local/dev uses the account A development instance from Doppler `jovie-web/dev`
-  - `staging.jov.ie` uses the account B production instance via `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
-  - `jov.ie` uses the account A production instance via `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
-- Staging auth must never fall back to production Clerk keys. If the staging pair is unavailable at runtime, auth pages must render the auth-unavailable state instead of a `500`.
-- Clerk traffic stays on the current origin and proxies through `/__clerk`; do not switch auth pages to direct `clerk.*` URLs.
-- Both pages use Clerk redirect OAuth and return through `/signin/sso-callback` or `/signup/sso-callback`.
-- The app is the rendering source of truth for allowed providers. Clerk Dashboard configuration must stay SSO-only, but credential inputs must not mount even if the dashboard regresses.
+- `/signin` renders `AuthShell` (`mode="sign-in"`) inside `AuthLayout`.
+- `/signup` renders `AuthShell` (`mode="sign-up"`) inside `AuthLayout`.
+- Soft navigations to `/signin` / `/signup` can be intercepted by the root `@auth` modal slot, which wraps the same `AuthShell` in `AuthModalShell` (JOV-2064 / JOV-2089).
+- OAuth providers are gated by `getEnabledAuthOAuthProviders()` — Apple is omitted unless production credentials are valid.
+- Email OTP (`emailOtp`) is intentional and supported (founder decision 2026-06; JOV-2763 supersedes the SSO-only contract from JOV-2446).
+- Password fields must never mount on these surfaces.
 
 ## Route Behavior
 

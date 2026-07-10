@@ -373,7 +373,7 @@ async function handleMissingDbUser(
       clerkUserId: betterAuthUserId,
       dbUserId: null,
       profileId: null,
-      redirectTo: '/start?fresh_signup=true',
+      redirectTo: '/start',
       context: { ...baseContext, email },
     };
   }

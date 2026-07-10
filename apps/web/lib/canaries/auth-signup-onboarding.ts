@@ -87,7 +87,8 @@ export function bodyContainsOnboardingChat(body: string): boolean {
 export const INITIALIZED_INTERVIEW_MARKERS = [
   'data-testid="onboarding-empty-intro"',
   'data-testid="onboarding-starter-suggestions"',
-  'data-testid="onboarding-centered-composer"',
+  // Always-docked composer (JOV-3561 Phase 0) — no centered-composer undock.
+  'data-testid="onboarding-composer-dock"',
 ] as const;
 
 /**

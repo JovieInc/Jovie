@@ -18,7 +18,7 @@ describe('gate.ts pure helpers (Better Auth era)', () => {
   it('maps ACTIVE to no redirect and NEEDS_ONBOARDING to /start', () => {
     expect(getRedirectForState(CanonicalUserState.ACTIVE)).toBeNull();
     expect(getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
-      '/start?fresh_signup=true'
+      '/start'
     );
   });
 

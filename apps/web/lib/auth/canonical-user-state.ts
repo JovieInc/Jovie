@@ -148,10 +148,11 @@ export function resolveCanonicalState(
 
 const STATE_REDIRECT_MAP: Record<CanonicalUserState, string | null> = {
   [CanonicalUserState.UNAUTHENTICATED]: '/signin',
-  [CanonicalUserState.NEEDS_DB_USER]: '/start?fresh_signup=true',
+  // Forward-only: land on /start without a query bounce that re-mounts the shell.
+  [CanonicalUserState.NEEDS_DB_USER]: '/start',
   [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
   [CanonicalUserState.WAITLIST_PENDING]: '/waitlist',
-  [CanonicalUserState.NEEDS_ONBOARDING]: '/start?fresh_signup=true',
+  [CanonicalUserState.NEEDS_ONBOARDING]: '/start',
   [CanonicalUserState.BANNED]: '/unavailable',
   [CanonicalUserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
   [CanonicalUserState.ACTIVE]: null,

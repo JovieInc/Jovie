@@ -34,10 +34,10 @@ describe('access route matrix (JOV-3087)', () => {
 
     it.each([
       [CanonicalUserState.UNAUTHENTICATED, APP_ROUTES.SIGNIN],
-      [CanonicalUserState.NEEDS_DB_USER, '/start?fresh_signup=true'],
+      [CanonicalUserState.NEEDS_DB_USER, '/start'],
       [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION, APP_ROUTES.WAITLIST],
       [CanonicalUserState.WAITLIST_PENDING, APP_ROUTES.WAITLIST],
-      [CanonicalUserState.NEEDS_ONBOARDING, '/start?fresh_signup=true'],
+      [CanonicalUserState.NEEDS_ONBOARDING, '/start'],
       [CanonicalUserState.ACTIVE, APP_ROUTES.DASHBOARD],
       [CanonicalUserState.BANNED, APP_ROUTES.UNAVAILABLE],
       [CanonicalUserState.USER_CREATION_FAILED, APP_ROUTES.USER_CREATION_ERROR],

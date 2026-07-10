@@ -95,7 +95,7 @@ export default async function WaitlistInvitePage({
   });
 
   if (result.outcome === 'approved') {
-    redirect(`${APP_ROUTES.START}?fresh_signup=true`);
+    redirect(APP_ROUTES.START);
   }
 
   if (result.outcome === 'signed_up') {

@@ -15,7 +15,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Test reliability batch (JOV-4112, JOV-4033, JOV-1880)**: stop Playwright from importing `server-only` env helpers in E2E dashboard route resolvers; drop quarantined specs from the PR smoke manifest and add a guardrail test; seed a prebuilt claim fixture and desktop smoke for the GTM claim-link canary.
+- **Start chat no longer jumps the composer or bounces after signup (JOV-3561 Phase 0)**: `/start` keeps the message composer docked from the first frame, drops the post-auth "Linking your conversation…" toast and `?fresh_signup=true` round-trip, and matches the loading skeleton to the docked empty shell.
+- [internal] **Retire SSO-only clerk-config-audit noise (JOV-2763)**: Document that email OTP + SSO is the intentional auth surface; remove the retired cron from the registry so it is not re-added as a false-positive P0.
+- **Tagging knows your world (JOV-3717)**: Artist picker cold-starts with your claimed Spotify artist and catalog collaborators (with ids) above Spotify search.
 
 - [internal] **Single machine-readable design-token source, wave 1 (GH-12009, GH-10158)**: New `apps/web/design/tokens.json` compiled by `scripts/build-design-tokens.mjs` (`pnpm tokens:build` / `tokens:check`) into generated CSS (`--gray1..12` now resolve app-wide), a typed TS export, and an agent manifest. `--linear-*` namespace is now shrink-only ratcheted (`linear-namespace-ratchet.test.ts`, baseline 2242), and a source-vs-emitter divergence guard locks tokens.json to the live accent palette. No visual changes.
 - [internal] **One EmptyState primitive (GH-12638)**: Canonical molecule at `components/molecules/EmptyState` (greyscale icon + Title Case heading + one sentence + primary CTA + optional text-link secondary). Migrated DSP presence/matches, insights, release tasks, and table empty surfaces onto it; deleted 5 bespoke `*EmptyState` components; component-family ratchet emptyState 14→9.
