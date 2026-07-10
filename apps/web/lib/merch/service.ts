@@ -726,6 +726,127 @@ async function getOptionForSelection(params: {
   return option;
 }
 
+/**
+ * Ensure a design option carries live Printful economics before card create /
+ * publish. Phase-A carousel used to stamp jovie_default costs, which hard-blocks
+ * sellability forever (JOV-3393). Idempotent when already printful-sourced.
+ */
+async function hydrateOptionPrintfulEconomics(
+  option: MerchDesignOption
+): Promise<MerchDesignOption> {
+  if (option.pricing.printfulCostSource === 'printful') {
+    return option;
+  }
+
+  const catalog = await resolveMerchCatalogSelection(
+    option.productType || option.printfulProductName || option.designName
+  );
+  if (catalog.pricing.printfulCostSource !== 'printful') {
+    return option;
+  }
+
+  const pricing = catalog.pricing;
+  const grossMargin =
+    pricing.retailPriceCents -
+    pricing.estimatedPrintfulProductCostCents -
+    pricing.stripeFeeEstimateCents -
+    pricing.refundReserveCents;
+
+  const [updated] = await db
+    .update(merchDesignOptions)
+    .set({
+      productType: catalog.productType,
+      printfulProductName: catalog.productName,
+      printfulCatalogProductId: catalog.catalogProductId,
+      printfulCatalogVariantIds: catalog.catalogVariantIds,
+      variantMap: catalog.variantMap,
+      colorway: catalog.colorway,
+      availableSizes: catalog.sizes,
+      placements: catalog.placements,
+      technique: catalog.technique,
+      retailPriceCents: pricing.retailPriceCents,
+      estimatedPrintfulProductCostCents:
+        pricing.estimatedPrintfulProductCostCents,
+      estimatedShippingCostCents: pricing.estimatedShippingCostCents,
+      estimatedGrossMarginCents: grossMargin,
+      artistShareCents: pricing.artistPayoutPerUnitEstimateCents,
+      jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
+      pricing,
+      // Drop draft-only cost warnings once real Printful costs land.
+      productionWarnings: option.productionWarnings.filter(
+        warning =>
+          !warning.toLowerCase().includes('printful is not configured') &&
+          !warning.toLowerCase().includes('catalog pricing unavailable') &&
+          !warning.toLowerCase().includes('draft-only')
+      ),
+      updatedAt: new Date(),
+    })
+    .where(eq(merchDesignOptions.id, option.id))
+    .returning();
+
+  return updated ?? option;
+}
+
+/**
+ * Refresh merch card economics from Printful when still on jovie_default so
+ * publish / checkout sellability can pass (JOV-3393).
+ */
+async function hydrateMerchCardPrintfulEconomics(
+  card: MerchCard
+): Promise<MerchCard> {
+  if (card.printful.catalogCostSource === 'printful') {
+    return card;
+  }
+
+  const catalog = await resolveMerchCatalogSelection(
+    card.productType || card.title
+  );
+  if (catalog.pricing.printfulCostSource !== 'printful') {
+    return card;
+  }
+
+  const pricing = catalog.pricing;
+  const printful: MerchPrintfulSnapshot = {
+    ...card.printful,
+    catalogProductId: catalog.catalogProductId,
+    catalogVariantIds: catalog.catalogVariantIds,
+    variantMap: catalog.variantMap,
+    placements: catalog.placements,
+    techniques: [catalog.technique],
+    catalogCostSource: 'printful',
+    catalogCostUpdatedAt:
+      pricing.printfulCostUpdatedAt ?? new Date().toISOString(),
+    catalogProductName: catalog.productName,
+    providerWarnings: (card.printful.providerWarnings ?? []).filter(
+      warning =>
+        !warning.toLowerCase().includes('printful is not configured') &&
+        !warning.toLowerCase().includes('catalog pricing unavailable') &&
+        !warning.toLowerCase().includes('draft-only')
+    ),
+  };
+
+  const [updated] = await db
+    .update(merchCards)
+    .set({
+      productType: catalog.productType,
+      printful,
+      retailPriceCents: pricing.retailPriceCents,
+      estimatedPrintfulProductCostCents:
+        pricing.estimatedPrintfulProductCostCents,
+      estimatedShippingCostCents: pricing.estimatedShippingCostCents,
+      artistRoyaltyRateBps: pricing.artistRoyaltyRateBps,
+      artistPayoutPerUnitEstimateCents:
+        pricing.artistPayoutPerUnitEstimateCents,
+      jovieMarginPerUnitEstimateCents: pricing.jovieMarginPerUnitEstimateCents,
+      pricing,
+      updatedAt: new Date(),
+    })
+    .where(eq(merchCards.id, card.id))
+    .returning();
+
+  return updated ?? card;
+}
+
 export async function selectMerchDesign(params: {
   readonly generationId: string;
   readonly clerkUserId: string;
@@ -733,11 +854,12 @@ export async function selectMerchDesign(params: {
   readonly optionNumber?: number | null;
   readonly publish?: boolean;
 }): Promise<MerchSelectionResult> {
-  const selected = await getOptionForSelection(params);
+  const rawSelected = await getOptionForSelection(params);
   await assertCanManageMerchProfile(
-    selected.creatorProfileId,
+    rawSelected.creatorProfileId,
     params.clerkUserId
   );
+  const selected = await hydrateOptionPrintfulEconomics(rawSelected);
   const profile = await getCreatorProfileForMerch(selected.creatorProfileId);
   const publishSellability = getDesignOptionSellability(selected);
   const shouldPublish = params.publish === true && publishSellability.sellable;
@@ -1083,7 +1205,9 @@ export async function publishMerchCard(params: {
     )
     .limit(1);
   if (!current) throw new Error('Merch card not found');
-  validateMerchCardForPublishing(current);
+  // Cards generated before Printful cost hydration can still publish once costs refresh.
+  const hydrated = await hydrateMerchCardPrintfulEconomics(current);
+  validateMerchCardForPublishing(hydrated);
 
   const [card] = await db
     .update(merchCards)
