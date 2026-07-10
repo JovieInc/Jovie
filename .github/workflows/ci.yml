@@ -56,24 +56,29 @@ jobs:
   # runs first (fail-open), then path detection.
   ci-path-changes:
     name: Path Changes
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Hosted-only root of the PR DAG. Self-hosted cancel/hang here cascades into
+    # SKIPPED risk/ci-fast/unit leaves and a red PR Ready (JOV-3464 drain).
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      # Prefer real path detect; fall back to graphite-skip defaults so job
+      # outputs are never empty when Path Changes succeeds (empty has_code_changes
+      # was treated as docs-only and skip-cascaded ci-fast / unit leaves).
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
-      run_build: ${{ steps.detect.outputs.run_build }}
-      run_test: ${{ steps.detect.outputs.run_test }}
-      run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
-      run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
-      run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
-      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse }}
-      run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse }}
-      run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals }}
-      run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set }}
-      run_e2e: ${{ steps.detect.outputs.run_e2e }}
-      run_golden_path: ${{ steps.detect.outputs.run_golden_path }}
-      run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
-      run_neon: ${{ steps.detect.outputs.run_neon }}
-      has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
+      run_build: ${{ steps.detect.outputs.run_build || steps.graphite_skip.outputs.run_build || 'false' }}
+      run_test: ${{ steps.detect.outputs.run_test || steps.graphite_skip.outputs.run_test || 'false' }}
+      run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || steps.graphite_skip.outputs.run_public_lighthouse || 'false' }}
+      run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || steps.graphite_skip.outputs.run_dashboard_lighthouse || 'false' }}
+      run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || steps.graphite_skip.outputs.run_onboarding_lighthouse || 'false' }}
+      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse || steps.graphite_skip.outputs.run_admin_lighthouse || 'false' }}
+      run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse || steps.graphite_skip.outputs.run_chat_lighthouse || 'false' }}
+      run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals || steps.graphite_skip.outputs.run_promptfoo_evals || 'false' }}
+      run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || steps.graphite_skip.outputs.run_golden_eval_set || 'false' }}
+      run_e2e: ${{ steps.detect.outputs.run_e2e || steps.graphite_skip.outputs.run_e2e || 'false' }}
+      run_golden_path: ${{ steps.detect.outputs.run_golden_path || steps.graphite_skip.outputs.run_golden_path || 'false' }}
+      run_drizzle: ${{ steps.detect.outputs.run_drizzle || steps.graphite_skip.outputs.run_drizzle || 'false' }}
+      run_neon: ${{ steps.detect.outputs.run_neon || steps.graphite_skip.outputs.run_neon || 'false' }}
+      has_code_changes: ${{ steps.detect.outputs.has_code_changes || steps.graphite_skip.outputs.has_code_changes || 'false' }}
     steps:
       - id: graphite-token
         name: Check Graphite token configuration
@@ -95,6 +100,7 @@ jobs:
           graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
 
       - name: Skip CI (Graphite optimizer)
+        id: graphite_skip
         if: steps.graphite.outputs.skip == 'true'
         run: |
           echo "Graphite CI optimizer requested skip — CI will be skipped."
@@ -116,11 +122,26 @@ jobs:
         id: detect
         shell: bash
         run: |
+          set -euo pipefail
           IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
           # Determine changed files
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}"
-            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+            # Fail closed on base resolution: a failed fetch used to leave an
+            # empty CHANGED_FILES list that looked like docs-only and skip-
+            # cascaded ci-fast / unit leaves while risk still ran.
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            if ! git rev-parse --verify "origin/${{ github.base_ref }}" >/dev/null 2>&1; then
+              echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
+              exit 1
+            fi
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD || true)
+            if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
+              echo "Empty changed-file list vs origin/${{ github.base_ref }} — no path triggers"
+              for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+                echo "$t=false" >> "$GITHUB_OUTPUT"
+              done
+              exit 0
+            fi
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
@@ -3595,12 +3616,16 @@ jobs:
         ci-build-public,
         ci-pr-vercel-preview,
       ]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') }}
+    # always() so we still evaluate when a leaf fails. !cancelled() avoids a
+    # second red PR Ready when the whole run is concurrency-cancelled mid-DAG
+    # (Path Changes cancel → leaves SKIPPED → risk "skipped" noise).
+    if: ${{ always() && !cancelled() && needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
       - name: Evaluate required PR checks
         run: |
+          PATH_RESULT="${{ needs.ci-path-changes.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
@@ -3611,6 +3636,8 @@ jobs:
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
           IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
+          HAS_CODE_CHANGES="${{ needs.ci-path-changes.outputs.has_code_changes }}"
+          echo "ci-path-changes: $PATH_RESULT (has_code_changes=$HAS_CODE_CHANGES)"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
@@ -3622,6 +3649,7 @@ jobs:
             echo
             echo "| Gate | Result | Next local command |"
             echo "| --- | --- | --- |"
+            echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
             echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
@@ -3631,14 +3659,31 @@ jobs:
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          # Fail closed first when the path DAG root never completed — leaves
+          # (including risk classifier) are SKIPPED in that case, which must not
+          # look like a docs-only green path.
+          if [[ "$PATH_RESULT" != "success" ]]; then
+            echo "❌ Path Changes did not succeed (result: $PATH_RESULT)"
+            echo "Leaf gates (CI Risk Classifier, ci-fast, Unit Tests, …) were skipped because the path DAG root did not finish."
+            echo "Likely fix: re-run the failed jobs / workflow. Path Changes is hosted ubuntu-latest to avoid self-hosted cancel cascades."
+            exit 1
+          fi
+
           if [[ "$RISK_RESULT" != "success" ]]; then
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
             echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
             exit 1
           fi
 
-          # ci-fast may be skipped on docs-only PRs (has_code_changes=false).
-          if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
+          # Code PRs must run ci-fast (not skip). Docs-only may skip when
+          # has_code_changes=false from a successful Path Changes detect.
+          if [[ "$HAS_CODE_CHANGES" == "true" ]]; then
+            if [[ "$FAST_RESULT" != "success" ]]; then
+              echo "❌ ci-fast did not pass (result: $FAST_RESULT) on a code-changing PR"
+              echo "Likely fix: pnpm run typecheck && pnpm run biome:check (see ci-fast step summary for the failing lane)."
+              exit 1
+            fi
+          elif [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
             echo "Likely fix: pnpm run typecheck && pnpm run biome:check (see ci-fast step summary for the failing lane)."
             exit 1
