@@ -31,7 +31,10 @@ permissions:
 jobs:
   gitleaks:
     name: Gitleaks Secret Scanning
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Secret scans are merge gates. Keep them on the hosted runner so the
+    # TruffleHog action's Docker dependency and a clean checkout are available;
+    # CI_FAST_RUNNER remains the routing convention for normal CI jobs.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
@@ -64,7 +67,8 @@ jobs:
 
   trufflehog:
     name: TruffleHog Secret Scanning
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # The action runs Docker; use a runner with the supported Docker service.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
