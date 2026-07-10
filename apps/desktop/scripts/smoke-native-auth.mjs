@@ -156,16 +156,28 @@ async function signInWithEmailOtp(page, email, redirectUrl = null) {
 
   const emailInput = page.getByLabel(/email address/i).first();
   await emailInput.waitFor({ state: 'visible', timeout: 60_000 });
-  await emailInput.fill(email);
 
+  // Hydration-safe: a fill that lands before React hydrates gets reset,
+  // leaving the send button disabled forever. Refill and retry.
+  await page
+    .waitForLoadState('networkidle', { timeout: 45_000 })
+    .catch(() => {});
   const sendButton = page.getByRole('button', {
     name: /email me a code|continue with email|sending code/i,
   });
-  await sendButton.click();
-
-  await page
-    .locator('[data-auth-email-code-step="code"]')
-    .waitFor({ state: 'visible', timeout: 60_000 });
+  let codeStepVisible = false;
+  for (let attempt = 0; attempt < 3 && !codeStepVisible; attempt++) {
+    await emailInput.fill(email);
+    await sendButton.click({ timeout: 15_000 }).catch(() => {});
+    codeStepVisible = await page
+      .locator('[data-auth-email-code-step="code"]')
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+  if (!codeStepVisible) {
+    throw new Error('email OTP code step never appeared after 3 attempts');
+  }
 
   const otpAutofill = page.getByTestId('otp-autofill-input');
   if (await otpAutofill.count()) {
