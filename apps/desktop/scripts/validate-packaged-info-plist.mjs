@@ -218,11 +218,35 @@ export function validatePackagedApps(appPaths) {
     results.push(validatePackagedApp(appPath, expectation));
   }
 
-  // When all three variants are present, confirm isolated containers.
+  // When multiple roles are present, confirm isolated containers.
+  // Dedupe by role so validating both /Applications and dist copies of the
+  // same variant does not false-positive as a collision.
   if (usedRoles.size >= 2) {
-    const ids = results.map(result => result.identifier).filter(Boolean);
-    const unique = new Set(ids);
-    if (unique.size !== ids.length) {
+    const idByRole = new Map();
+    for (const result of results) {
+      if (
+        !result.identifier ||
+        result.role === 'unknown' ||
+        result.role === 'matrix'
+      ) {
+        continue;
+      }
+      const existing = idByRole.get(result.role);
+      if (existing && existing !== result.identifier) {
+        results.push({
+          ok: false,
+          appPath: '(matrix)',
+          role: 'matrix',
+          findings: [
+            `role ${result.role} has conflicting CFBundleIdentifier values (${existing} vs ${result.identifier})`,
+          ],
+        });
+        break;
+      }
+      idByRole.set(result.role, result.identifier);
+    }
+    const ids = [...idByRole.values()];
+    if (new Set(ids).size !== ids.length) {
       results.push({
         ok: false,
         appPath: '(matrix)',
@@ -307,12 +331,13 @@ function main() {
     process.exit(0);
   }
 
-  const discovered = [
-    ...apps,
-    ...discoverAppBundles(
-      distDirs.length > 0 ? distDirs : [path.join(desktopRoot, 'dist')]
-    ),
-  ];
+  // Explicit --app paths only; --dist-dir (or default dist) only when no --app.
+  const discovered =
+    apps.length > 0
+      ? [...apps]
+      : discoverAppBundles(
+          distDirs.length > 0 ? distDirs : [path.join(desktopRoot, 'dist')]
+        );
 
   if (discovered.length === 0) {
     console.error(
