@@ -335,6 +335,49 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
+  // Regression: JOV-4103 — public profile hero must show social media icons
+  // when the artist has Instagram/Twitter links (missed-ship recovery).
+  it('renders hero social icons for Instagram and Twitter profile links', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[
+          {
+            id: 'ig-1',
+            artist_id: mockArtist.id,
+            platform: 'instagram',
+            url: 'https://instagram.com/test-artist',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'tw-1',
+            artist_id: mockArtist.id,
+            platform: 'twitter',
+            url: 'https://x.com/test-artist',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+        contacts={[]}
+      />
+    );
+
+    const socialRow = await screen.findByTestId('profile-hero-social-row');
+    expect(socialRow).toBeInTheDocument();
+
+    const instagram = within(socialRow).getByRole('link', {
+      name: 'instagram',
+    });
+    const twitter = within(socialRow).getByRole('link', { name: 'twitter' });
+    expect(instagram).toHaveAttribute(
+      'href',
+      'https://instagram.com/test-artist'
+    );
+    expect(twitter).toHaveAttribute('href', 'https://x.com/test-artist');
+  });
+
   it('links the artist name back to the canonical profile route', async () => {
     render(
       <ProfileCompactTemplate
