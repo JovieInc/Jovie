@@ -13,6 +13,7 @@ import { getMessageText } from '../utils';
 import { AssistantMessageText } from './AssistantMessageText';
 import { ChatFeedbackControl } from './ChatFeedbackControl';
 import { ChatStepLimitAffordance } from './ChatStepLimitAffordance';
+import { FileAttachmentChip } from './FileAttachmentChip';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
 
@@ -119,20 +120,28 @@ export const ChatMessage = memo(function ChatMessage({
   const shouldReduceMotion = useReducedMotion();
   const toolEvents = getRenderableToolEvents(parts);
   const fileParts = parts.filter(
-    (p): p is MessagePart & { url: string; mediaType: string; name?: string } =>
-      p.type === 'file' &&
-      typeof p.url === 'string' &&
-      typeof p.mediaType === 'string' &&
-      p.mediaType.startsWith('image/')
+    (
+      p
+    ): p is MessagePart & { url: string; mediaType?: string; name?: string } =>
+      p.type === 'file' && typeof p.url === 'string'
   );
-  const imageChips = (() => {
+  const attachmentChips = (() => {
     const seenFileKeys = new Map<string, number>();
     return fileParts.map(file => {
       const seenCount = seenFileKeys.get(file.url) ?? 0;
       seenFileKeys.set(file.url, seenCount + 1);
       const dedupeKey =
         seenCount === 0 ? file.url : `${file.url}-${seenCount + 1}`;
-      return { dedupeKey, url: file.url, name: file.name };
+      const mediaType =
+        typeof file.mediaType === 'string' ? file.mediaType : '';
+      const isImage = mediaType.startsWith('image/');
+      return {
+        dedupeKey,
+        url: file.url,
+        name: file.name,
+        mediaType,
+        isImage,
+      };
     });
   })();
   const hasAssistantContent =
@@ -145,7 +154,7 @@ export const ChatMessage = memo(function ChatMessage({
     (!isUser && Boolean(isStreaming) && !hasAssistantContent);
   const useUserPillBubble =
     isUser &&
-    imageChips.length === 0 &&
+    attachmentChips.length === 0 &&
     !messageText.includes('\n') &&
     messageText.length <= 44;
 
@@ -167,19 +176,29 @@ export const ChatMessage = memo(function ChatMessage({
           data-bubble-shape={useUserPillBubble ? 'pill' : 'rectangle'}
           className='system-b-chat-user-bubble'
         >
-          {imageChips.length > 0 && (
+          {attachmentChips.length > 0 && (
             <div
               className='system-b-chat-user-attachments'
               data-has-message={messageText ? 'true' : 'false'}
             >
-              {imageChips.map(chip => (
-                <ImageAttachmentChip
-                  key={chip.dedupeKey}
-                  url={chip.url}
-                  name={chip.name}
-                  tone='onLight'
-                />
-              ))}
+              {attachmentChips.map(chip =>
+                chip.isImage ? (
+                  <ImageAttachmentChip
+                    key={chip.dedupeKey}
+                    url={chip.url}
+                    name={chip.name}
+                    tone='onLight'
+                  />
+                ) : (
+                  <FileAttachmentChip
+                    key={chip.dedupeKey}
+                    url={chip.url}
+                    name={chip.name}
+                    mediaType={chip.mediaType}
+                    tone='onLight'
+                  />
+                )
+              )}
             </div>
           )}
           {messageText && (

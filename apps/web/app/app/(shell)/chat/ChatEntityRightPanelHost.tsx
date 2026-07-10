@@ -28,8 +28,10 @@ import {
   useState,
 } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks/ReleaseTaskChecklist';
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import type { EntityCardModel } from '@/components/organisms/entity-card';
@@ -48,13 +50,14 @@ import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { resolveChatRailContextLabel } from '@/lib/chat/context-label';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
 import { prefetchChatEntityPanelData } from '@/lib/queries/prefetch-dashboard';
 import { useContactsQuery } from '@/lib/queries/useContactsQuery';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
 import { cn } from '@/lib/utils';
+import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { DashboardContact } from '@/types/contacts';
 import {
   type ChatEntityTarget,
@@ -543,11 +546,16 @@ function ChatEntityPanelSection({
 }>) {
   return (
     <section className='system-b-chat-entity-panel-section'>
-      <div className='system-b-chat-entity-section-heading'>
-        {icon}
-        <h3>{title}</h3>
-      </div>
-      {children}
+      <DrawerSurfaceCard
+        variant='card'
+        className='system-b-chat-entity-panel-card'
+      >
+        <div className='system-b-chat-entity-section-heading'>
+          {icon}
+          <h3>{title}</h3>
+        </div>
+        {children}
+      </DrawerSurfaceCard>
     </section>
   );
 }
@@ -688,7 +696,7 @@ function ChatReleaseEntityPanel({
                       </span>
                     ) : null}
                     <span className='system-b-chat-entity-meta-pill'>
-                      {release.status}
+                      {capitalizeFirst(release.status)}
                     </span>
                   </div>
                 </div>
@@ -751,7 +759,11 @@ function ChatReleaseEntityPanel({
                           rel='noreferrer'
                           className='system-b-chat-entity-provider-link'
                         >
-                          <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                          <ProviderIcon
+                            provider={provider.key as ProviderKey}
+                            className='h-3.5 w-3.5 shrink-0'
+                            aria-label={provider.label}
+                          />
                           <span className='min-w-0 flex-1 truncate'>
                             {provider.label}
                           </span>

@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, inArray, isNotNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -15,7 +15,6 @@ import { isUniqueViolation } from '@/lib/db/errors';
 import {
   discogRecordings,
   discogReleases,
-  discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
@@ -67,6 +66,7 @@ import {
   checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
+import { shouldArchiveOnlyRelease } from '@/lib/releases/release-archive-policy';
 import {
   loadReleaseEntity as loadReleaseEntityFromLoader,
   loadReleaseMatrixForProfile as loadReleaseMatrixForProfileFromLoader,
@@ -1878,12 +1878,17 @@ interface DeleteReleaseParams {
 }
 
 /**
- * Soft-delete a release (sets deleted_at instead of removing the row).
- * Blocks deletion of actively distributed releases (ISRC + past release date).
+ * Delete or archive a release (JOV-3885).
+ *
+ * - Provider-ingested + already released → archive only (soft-hide via deleted_at).
+ *   Provider data is the canonical source; we never hard-delete it.
+ * - Jovie-created / manual (or not-yet-released) → hard delete the row.
  */
-export async function deleteRelease(
-  params: DeleteReleaseParams
-): Promise<{ success: boolean; message?: string }> {
+export async function deleteRelease(params: DeleteReleaseParams): Promise<{
+  success: boolean;
+  message?: string;
+  mode?: 'archive' | 'delete';
+}> {
   noStore();
 
   const { userId } = await getCachedAuth();
@@ -1899,37 +1904,22 @@ export async function deleteRelease(
     throw new TypeError('Release not found');
   }
 
-  // Distribution gate: block if release has ISRC and is past release date
-  if (release.releaseDate && new Date(release.releaseDate) <= new Date()) {
-    const [hasIsrc] = await db
-      .select({ id: discogRecordings.id })
-      .from(discogRecordings)
-      .innerJoin(
-        discogReleaseTracks,
-        eq(discogReleaseTracks.recordingId, discogRecordings.id)
-      )
-      .where(
-        and(
-          eq(discogReleaseTracks.releaseId, params.releaseId),
-          isNotNull(discogRecordings.isrc)
-        )
-      )
-      .limit(1);
+  const archiveOnly = shouldArchiveOnlyRelease({
+    status: (release.status as ReleaseViewModel['status']) ?? 'released',
+    sourceType: release.sourceType,
+    releaseDate: release.releaseDate,
+  });
 
-    if (hasIsrc) {
-      return {
-        success: false,
-        message:
-          'This release appears to be distributed. Remove it from distribution first.',
-      };
-    }
+  if (archiveOnly) {
+    await db
+      .update(discogReleases)
+      .set({ deletedAt: new Date() })
+      .where(eq(discogReleases.id, params.releaseId));
+  } else {
+    await db
+      .delete(discogReleases)
+      .where(eq(discogReleases.id, params.releaseId));
   }
-
-  // Soft delete: set deleted_at instead of removing the row
-  await db
-    .update(discogReleases)
-    .set({ deletedAt: new Date() })
-    .where(eq(discogReleases.id, params.releaseId));
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
@@ -1937,13 +1927,19 @@ export async function deleteRelease(
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
-  void trackServerEvent('release_deleted', {
+  void trackServerEvent(archiveOnly ? 'release_archived' : 'release_deleted', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
   });
 
-  return { success: true };
+  return {
+    success: true,
+    mode: archiveOnly ? 'archive' : 'delete',
+    message: archiveOnly
+      ? 'Release archived. Provider-ingested catalog is soft-hidden only.'
+      : undefined,
+  };
 }
 
 /**

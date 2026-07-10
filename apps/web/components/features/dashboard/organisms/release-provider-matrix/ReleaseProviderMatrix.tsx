@@ -40,6 +40,7 @@ import { captureError } from '@/lib/error-tracking';
 import { useAppFlag } from '@/lib/flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
+import { shouldArchiveOnlyRelease } from '@/lib/releases/release-archive-policy';
 import { buildReleasePitchChatPrompt } from '@/lib/services/pitch/targets';
 import { cn } from '@/lib/utils';
 import { useImportPolling } from './hooks/useImportPolling';
@@ -193,11 +194,14 @@ function buildReleaseLockState(
 }
 
 function isDistributedRelease(release: ReleaseViewModel) {
-  if (!release.primaryIsrc || !release.releaseDate) {
-    return false;
-  }
-
-  return new Date(release.releaseDate) <= new Date();
+  // Shared policy: provider-ingested + published → archive-only (JOV-3885).
+  return (
+    shouldArchiveOnlyRelease(release) ||
+    (release.sourceType == null &&
+      Boolean(release.primaryIsrc) &&
+      Boolean(release.releaseDate) &&
+      new Date(release.releaseDate as string) <= new Date())
+  );
 }
 
 function ReleaseImportProgressNotice({
@@ -484,11 +488,11 @@ function DeleteReleaseConfirmation({
 
   const isDistributed = isDistributedRelease(target);
   const title = isDistributed
-    ? 'Release is distributed'
+    ? `Archive "${target.title}"?`
     : `Delete "${target.title}"?`;
   const description = isDistributed
-    ? 'Remove this release from distribution before deleting it.'
-    : 'This will remove the release from your dashboard and public profile.';
+    ? 'This release was ingested from a provider and is already released. It will be archived (hidden from your dashboard and public profile), not permanently deleted.'
+    : 'This will permanently remove the release from your dashboard and public profile.';
 
   return (
     <ConfirmDialog
@@ -498,10 +502,10 @@ function DeleteReleaseConfirmation({
       }}
       title={title}
       description={description}
-      confirmLabel={isDistributed ? 'OK' : 'Delete'}
+      confirmLabel={isDistributed ? 'Archive' : 'Delete'}
       variant={isDistributed ? 'default' : 'destructive'}
       isLoading={isDeleting}
-      onConfirm={isDistributed ? onClose : onConfirm}
+      onConfirm={onConfirm}
     />
   );
 }
@@ -587,17 +591,29 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
+    const archiveOnly = isDistributedRelease(deleteTarget);
     setIsDeleting(true);
     try {
       const result = await deleteRelease({ releaseId: deleteTarget.id });
       if (result.success) {
         setRows(prev => prev.filter(r => r.id !== deleteTarget.id));
-        toast.success(`"${deleteTarget.title}" deleted.`);
+        toast.success(
+          archiveOnly || result.mode === 'archive'
+            ? `"${deleteTarget.title}" archived.`
+            : `"${deleteTarget.title}" deleted.`
+        );
       } else {
-        toast.error(result.message ?? 'Failed to delete release.');
+        toast.error(
+          result.message ??
+            (archiveOnly
+              ? 'Failed to archive release.'
+              : 'Failed to delete release.')
+        );
       }
     } catch {
-      toast.error('Failed to delete release.');
+      toast.error(
+        archiveOnly ? 'Failed to archive release.' : 'Failed to delete release.'
+      );
     } finally {
       setIsDeleting(false);
       setDeleteTarget(null);

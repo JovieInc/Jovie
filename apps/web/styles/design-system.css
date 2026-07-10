@@ -4231,9 +4231,15 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-chat-entity-panel-section) {
-  padding: var(--space-4);
-  border-top: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
+  padding: var(--space-3) var(--space-3) 0;
+}
+
+:where(.system-b-chat-entity-panel-section:last-child) {
+  padding-bottom: var(--space-3);
+}
+
+:where(.system-b-chat-entity-panel-card) {
+  padding: var(--space-3);
 }
 
 :where(.system-b-chat-entity-panel-header-copy) {
@@ -4242,17 +4248,20 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-chat-entity-panel-eyebrow) {
   color: var(--color-text-tertiary-token);
-  font-size: var(--text-3xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
+  font-family: var(--font-body, inherit);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.01em;
   line-height: 1rem;
-  text-transform: uppercase;
+  /* Title Case via content; no all-caps (System B / ui.md). */
+  text-transform: none;
 }
 
 :where(.system-b-chat-entity-panel-title) {
   overflow: hidden;
   color: var(--color-text-primary-token);
-  font-size: var(--text-app);
+  font-family: var(--font-body, inherit);
+  font-size: var(--text-nav);
   font-weight: var(--font-weight-semibold);
   line-height: 1.25rem;
   text-overflow: ellipsis;
@@ -4280,10 +4289,18 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2-5);
   color: var(--color-text-secondary-token);
-  font-size: var(--text-nav);
+  font-family: var(--font-body, inherit);
+  font-size: var(--text-2xs);
   font-weight: var(--font-weight-semibold);
+  line-height: 1rem;
+}
+
+:where(.system-b-chat-entity-section-heading h3) {
+  margin: 0;
+  font: inherit;
+  color: inherit;
 }
 
 :where(.system-b-chat-entity-context-card) {
@@ -4393,7 +4410,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.system-b-chat-release-title) {
   color: var(--color-text-primary-token);
-  font-size: 0.9375rem;
+  font-family: var(--font-body, inherit);
+  font-size: var(--text-nav);
   font-weight: var(--font-weight-semibold);
   line-height: 1.25rem;
 }
@@ -4417,10 +4435,11 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   background: var(--color-bg-surface-0);
   padding: var(--space-0-5) var(--space-2);
   color: var(--color-text-secondary-token);
-  font-size: var(--text-3xs);
+  font-family: var(--font-body, inherit);
+  font-size: var(--text-2xs);
   font-weight: var(--font-weight-medium);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 :where(.system-b-chat-entity-action-link) {
@@ -9486,6 +9505,16 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   object-fit: cover;
+}
+
+:where(.system-b-file-attachment-icon) {
+  display: inline-flex;
+  width: var(--space-4);
+  height: var(--space-4);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary-token);
 }
 
 :where(.system-b-image-attachment-label) {

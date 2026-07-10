@@ -9,11 +9,12 @@ import {
 import { deleteRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { toast } from '@/components/feedback';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import {
+  isDistributedRelease,
+  shouldArchiveOnlyRelease,
+} from '@/lib/releases/release-archive-policy';
 
-export function isDistributedRelease(release: ReleaseViewModel): boolean {
-  if (!release.primaryIsrc || !release.releaseDate) return false;
-  return new Date(release.releaseDate) <= new Date();
-}
+export { isDistributedRelease, shouldArchiveOnlyRelease };
 
 interface UseReleaseDeletionOptions {
   readonly rows: readonly ReleaseViewModel[];
@@ -46,17 +47,29 @@ export function useReleaseDeletion({
   const confirmReleaseDelete = useCallback(async () => {
     if (!deleteTarget) return;
 
+    const archiveOnly = shouldArchiveOnlyRelease(deleteTarget);
     setIsDeleting(true);
     try {
       const result = await deleteRelease({ releaseId: deleteTarget.id });
       if (result.success) {
         setRows(prev => prev.filter(r => r.id !== deleteTarget.id));
-        toast.success(`"${deleteTarget.title}" deleted.`);
+        toast.success(
+          archiveOnly || result.mode === 'archive'
+            ? `"${deleteTarget.title}" archived.`
+            : `"${deleteTarget.title}" deleted.`
+        );
       } else {
-        toast.error(result.message ?? 'Failed to delete release.');
+        toast.error(
+          result.message ??
+            (archiveOnly
+              ? 'Failed to archive release.'
+              : 'Failed to delete release.')
+        );
       }
     } catch {
-      toast.error('Failed to delete release.');
+      toast.error(
+        archiveOnly ? 'Failed to archive release.' : 'Failed to delete release.'
+      );
     } finally {
       setIsDeleting(false);
       setDeleteTarget(null);
