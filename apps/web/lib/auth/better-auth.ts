@@ -66,9 +66,15 @@ export const AUTH_RATE_LIMIT_RULES = {
 export const STATIC_TRUSTED_ORIGINS = [
   'https://jov.ie',
   'https://staging.jov.ie',
+  // Local web defaults + desktop local shell (APP_URL=http://localhost:3112).
   'http://localhost:3100',
+  'http://localhost:3112',
+  'http://127.0.0.1:3100',
+  'http://127.0.0.1:3112',
   'ie.jov.jovie://',
   'jovie://',
+  'jovie-local://',
+  'jovie-staging://',
 ] as const;
 
 function resolveTrustedOrigins(): (string | undefined)[] {
@@ -76,7 +82,14 @@ function resolveTrustedOrigins(): (string | undefined)[] {
     env.VERCEL_ENV === 'preview' && env.VERCEL_URL
       ? `https://${env.VERCEL_URL}`
       : undefined;
-  return [...STATIC_TRUSTED_ORIGINS, previewOrigin];
+  // Allow the process-bound local origin when agents/desktop pick a non-default
+  // PORT (still loopback-only — never a public host).
+  const port = process.env.PORT?.trim();
+  const dynamicLocal =
+    port && /^\d+$/.test(port)
+      ? [`http://localhost:${port}`, `http://127.0.0.1:${port}`]
+      : [];
+  return [...STATIC_TRUSTED_ORIGINS, ...dynamicLocal, previewOrigin];
 }
 
 /**
