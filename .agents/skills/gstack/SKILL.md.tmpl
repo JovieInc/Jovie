@@ -51,6 +51,41 @@ Invoke the skill first. If no skill matches, answer directly as usual.
 If the user opts out of suggestions, run `gstack-config set proactive false`.
 If they opt back in, run `gstack-config set proactive true`.
 
+## Narration Convention
+
+> This rule applies to ALL gstack skills — it is the shared preamble convention.
+> Phased rollout: applied to /autoplan first, then all skills.
+
+**Terse mode (unattended/scheduled runs):** emit ONE terse status line per phase.
+Format: `[phase-name] key1=val1 key2=val2 ...`
+
+Example phase transitions:
+```
+[preflight] verdict=go gstack=1.60.1 owner=none
+[ceo] status=complete score=clean voices=codex+subagent
+[eng] status=complete score=issues_found(1) critical_gaps=0
+[gate] approval=pending taste_decisions=2 user_challenges=0
+[gate] approval=accepted
+```
+
+**Verbose mode (interactive sessions):** full multi-sentence narration is expected.
+Explain what you did, found, and decided. The user is actively engaged.
+
+**Always log (both modes):**
+- Phase transitions (entering/leaving a phase)
+- Blockers (hard failures, missing dependencies, auth errors)
+- Final report/summary (full detail delivered at end regardless of mode)
+
+**Never narrate (both modes):**
+- Internal reasoning chains, deliberation, or intermediate "thinking aloud"
+  about what to do next. Keep reasoning internal / in scratch files.
+
+**Sub-probes / fan-outs** (skills invoked from within a phase) inherit this
+convention. When spawning a sub-probe, pin it to a cheap model with a bounded
+scope. Full verbose narration from a sub-probe defeats the purpose.
+
+---
+
 # gstack browse: QA Testing & Dogfooding
 
 Persistent headless Chromium. First call auto-starts (~3s), then ~100-200ms per command.

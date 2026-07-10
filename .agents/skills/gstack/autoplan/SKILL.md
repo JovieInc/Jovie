@@ -530,6 +530,29 @@ DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head
 If a design doc is now found, read it and continue the review.
 If none was produced (user may have cancelled), proceed with standard review.
 
+## Narration Convention
+
+> Inherited from the shared gstack preamble convention.
+
+**Terse mode (unattended/scheduled runs):** emit ONE terse status line per phase.
+Format: `[phase-name] key1=val1 key2=val2 ...`
+
+Example phase transitions:
+```
+[preflight] verdict=go gstack=1.60.1 owner=none
+[ceo] status=complete score=clean voices=codex+subagent
+[eng] status=complete score=issues_found(1) critical_gaps=0
+[gate] approval=pending taste_decisions=2 user_challenges=0
+[gate] approval=accepted
+```
+
+**Verbose mode (interactive sessions):** full multi-sentence narration.
+
+**Always log (both modes):** phase transitions, blockers, final report.
+**Never narrate:** internal reasoning chains. Keep deliberation in scratch files.
+
+**Sub-probes / fan-outs** inherit this convention. Pin to cheap models with bounded scope.
+
 # /autoplan — Auto-Review Pipeline
 
 One command. Rough plan in, fully reviewed plan out.
