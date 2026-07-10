@@ -528,6 +528,7 @@ jobs:
         run: |
           echo "::error::No online jovie-runner capacity; CI_FAST_RUNNER routing is unchanged so required checks cannot silently move to an unapproved pool."
           echo "Scale or recover the jovie-runner pool, then re-run affected workflows."
+          exit 1
 
       - name: Restore self-hosted runners when they come back
         if: steps.runners.outputs.health == 'up'

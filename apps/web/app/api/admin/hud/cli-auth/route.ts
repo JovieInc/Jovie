@@ -44,7 +44,7 @@ function statusFor(provider: Provider): {
   };
 }
 
-function launch(provider: Provider): void {
+function launch(provider: Provider): Promise<void> {
   const command =
     provider === 'grok' ? 'grok' : provider === 'codex' ? 'codex' : 'claude';
   const args =
@@ -53,8 +53,14 @@ function launch(provider: Provider): void {
       : provider === 'codex'
         ? ['login']
         : ['auth', 'login'];
-  const child = spawn(command, args, { detached: true, stdio: 'ignore' });
-  child.unref();
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
+  });
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -87,9 +93,19 @@ export async function POST(request: Request): Promise<Response> {
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
-  launch(provider as Provider);
-  return NextResponse.json(
-    { ok: true, message: 'The local sign-in window is opening.' },
-    { headers: NO_STORE_HEADERS }
-  );
+  try {
+    await launch(provider as Provider);
+    return NextResponse.json(
+      { ok: true, message: 'The local sign-in window is opening.' },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch {
+    return NextResponse.json(
+      {
+        error:
+          'The local sign-in tool is not installed or could not be started.',
+      },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
 }

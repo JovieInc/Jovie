@@ -8,7 +8,7 @@
 #   ./scripts/ovie-hud.sh open
 #
 # The launcher never kills an existing process. It reuses a healthy local web
-# server, otherwise starts an isolated server on OVIE_HUD_PORT (default 3110).
+# server, otherwise starts an isolated server on OVIE_HUD_PORT (default 3100).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,7 +27,9 @@ fi
 # access fallback without requiring a Clerk session.
 kiosk_url() {
   if [ -n "${HUD_KIOSK_TOKEN:-}" ]; then
-    printf '%s/hud-tv?kiosk=%s\n' "$BASE_URL" "$HUD_KIOSK_TOKEN"
+    local encoded_token
+    encoded_token="$(jq -nr --arg token "$HUD_KIOSK_TOKEN" '$token | @uri')"
+    printf '%s/hud-tv?kiosk=%s\n' "$BASE_URL" "$encoded_token"
   else
     printf '%s/hud-tv\n' "$BASE_URL"
   fi
@@ -57,13 +59,13 @@ health() {
   url="$(kiosk_url)"
   status="$(probe "$url" "$body_file")"
   if [ "$status" != "200" ]; then
-    echo "FAIL Ovie/HUD route: $url (HTTP $status)" >&2
+    echo "FAIL Ovie/HUD route: $(display_kiosk_url) (HTTP $status)" >&2
     rm -f "$body_file"
     return 1
   fi
 
-  if ! grep -qE 'HUD|hud|kiosk' "$body_file"; then
-    echo "FAIL Ovie/HUD route returned an unexpected page: $url" >&2
+  if ! grep -q 'hud-kiosk-viewport' "$body_file"; then
+    echo "FAIL Ovie/HUD route did not render the kiosk cockpit: $(display_kiosk_url)" >&2
     rm -f "$body_file"
     return 1
   fi
