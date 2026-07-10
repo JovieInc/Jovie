@@ -138,6 +138,9 @@ describe('Profile AEO content', () => {
     expect(css).toMatch(
       /\.profile-aeo-claim-card\)[\s\S]*?--profile-aeo-claim-ink:\s*var\(--system-b-cinematic-black\)/
     );
+    expect(css).toMatch(
+      /\.profile-aeo-claim-card__domain\)[\s\S]*?var\(--profile-aeo-claim-ink\)\s+(?:4[8-9]|[5-9]\d|100)%/
+    );
   });
 
   it('builds per-artist description and the four sourced canonical FAQ answers', () => {

@@ -339,7 +339,7 @@
 }
 
 :where(.profile-aeo-claim-card__domain) {
-  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 42%, transparent);
+  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 48%, transparent);
 }
 
 :where(.profile-aeo-claim-card__note) {
