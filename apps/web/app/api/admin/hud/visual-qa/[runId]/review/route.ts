@@ -12,11 +12,11 @@ import {
   VisualQaReviewError,
 } from '@/lib/agent-os/visual-qa/review';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import {
   dispatchHermesWorker,
   getHermesDispatchAvailability,
 } from '@/lib/hermes/dispatch';
-import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -85,6 +85,46 @@ async function triggerFollowUpDispatch(params: {
   return result.dispatchId;
 }
 
+async function dispatchRejectedFollowUp(params: {
+  readonly runId: string;
+  readonly surfaceId: string;
+  readonly decision: 'accepted' | 'rejected';
+  readonly requestedAction: VisualQaFollowUpAction | undefined;
+  readonly notes: string | null;
+  readonly reviewer: string;
+}): Promise<{
+  readonly followUpAction: VisualQaFollowUpAction | null;
+  readonly dispatchId: string | null;
+}> {
+  if (params.decision !== 'rejected') {
+    return { followUpAction: null, dispatchId: null };
+  }
+
+  const followUpAction = params.requestedAction ?? 'd2_review';
+  try {
+    const dispatchId = await triggerFollowUpDispatch({
+      runId: params.runId,
+      surfaceId: params.surfaceId,
+      followUpAction,
+      notes: params.notes,
+      requestedBy: params.reviewer,
+    });
+    return { followUpAction, dispatchId };
+  } catch (dispatchError) {
+    // Persist the review even when follow-up routing fails; surface it in logs.
+    logger.error(
+      '[api/admin/hud/visual-qa] Follow-up dispatch failed',
+      dispatchError
+    );
+    await captureError('Visual QA follow-up dispatch failed', dispatchError, {
+      route: '/api/admin/hud/visual-qa/[runId]/review',
+      runId: params.runId,
+      surfaceId: params.surfaceId,
+    });
+    return { followUpAction, dispatchId: null };
+  }
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ runId: string }> }
@@ -120,34 +160,14 @@ export async function POST(
     const reviewer =
       entitlements.email ?? entitlements.userId ?? 'admin@jovie.local';
     const notes = parsedBody.notes?.trim() ? parsedBody.notes.trim() : null;
-    const followUpAction =
-      parsedBody.decision === 'rejected'
-        ? (parsedBody.followUpAction ?? 'd2_review')
-        : null;
-
-    let dispatchId: string | null = null;
-    if (parsedBody.decision === 'rejected' && followUpAction) {
-      try {
-        dispatchId = await triggerFollowUpDispatch({
-          runId: params.runId,
-          surfaceId: parsedBody.surfaceId,
-          followUpAction,
-          notes,
-          requestedBy: reviewer,
-        });
-      } catch (dispatchError) {
-        // Persist the review even when follow-up routing fails; surface it in logs.
-        logger.error(
-          '[api/admin/hud/visual-qa] Follow-up dispatch failed',
-          dispatchError
-        );
-        await captureError('Visual QA follow-up dispatch failed', dispatchError, {
-          route: '/api/admin/hud/visual-qa/[runId]/review',
-          runId: params.runId,
-          surfaceId: parsedBody.surfaceId,
-        });
-      }
-    }
+    const { followUpAction, dispatchId } = await dispatchRejectedFollowUp({
+      runId: params.runId,
+      surfaceId: parsedBody.surfaceId,
+      decision: parsedBody.decision,
+      requestedAction: parsedBody.followUpAction,
+      notes,
+      reviewer,
+    });
 
     const review = await reviewVisualQaSurface({
       runId: params.runId,
@@ -200,7 +220,10 @@ export async function POST(
       );
     }
 
-    logger.error('[api/admin/hud/visual-qa/[runId]/review] Review failed', error);
+    logger.error(
+      '[api/admin/hud/visual-qa/[runId]/review] Review failed',
+      error
+    );
     await captureError('Visual QA review failed', error, {
       route: '/api/admin/hud/visual-qa/[runId]/review',
       method: 'POST',

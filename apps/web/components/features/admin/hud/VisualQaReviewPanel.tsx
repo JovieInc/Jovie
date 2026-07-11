@@ -1,6 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
+import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -65,10 +66,12 @@ function SurfaceScreenshot({
       </figcaption>
       {src ? (
         <a href={src} target='_blank' rel='noopener noreferrer'>
-          <img
+          <Image
             src={src}
             alt={`${label} screenshot`}
-            loading='lazy'
+            width={640}
+            height={360}
+            unoptimized
             className='max-h-48 w-full rounded-md border border-subtle bg-surface-1 object-contain object-top'
           />
         </a>
@@ -212,7 +215,7 @@ export function VisualQaReviewPanel() {
   }, []);
 
   useEffect(() => {
-    void loadRuns();
+    loadRuns().catch(() => undefined);
   }, [loadRuns]);
 
   const submitReview = useCallback(
@@ -242,16 +245,18 @@ export function VisualQaReviewPanel() {
         };
 
         if (!response.ok) {
-          throw new Error(payload.error ?? `Review failed (${response.status})`);
+          throw new Error(
+            payload.error ?? `Review failed (${response.status})`
+          );
         }
 
-        toast.success(
-          decision === 'accepted'
-            ? 'Visual drift accepted.'
-            : payload.review?.dispatchId
-              ? 'Visual drift rejected; follow-up dispatched.'
-              : 'Visual drift rejected.'
-        );
+        let successMessage = 'Visual drift rejected.';
+        if (decision === 'accepted') {
+          successMessage = 'Visual drift accepted.';
+        } else if (payload.review?.dispatchId) {
+          successMessage = 'Visual drift rejected; follow-up dispatched.';
+        }
+        toast.success(successMessage);
         await loadRuns();
       } catch (error) {
         toast.error(

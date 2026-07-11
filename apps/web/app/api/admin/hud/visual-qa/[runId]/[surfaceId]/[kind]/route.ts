@@ -24,6 +24,19 @@ function stripRunPrefix(runId: string, relativePath: string): string {
     : relativePath;
 }
 
+function imagePathForKind(
+  kind: 'baseline' | 'after' | 'overlay',
+  surface: {
+    readonly baselinePath: string;
+    readonly afterPath: string;
+    readonly overlayPath: string | null;
+  }
+): string | null {
+  if (kind === 'baseline') return surface.baselinePath;
+  if (kind === 'after') return surface.afterPath;
+  return surface.overlayPath;
+}
+
 export async function GET(
   _request: NextRequest,
   context: {
@@ -67,12 +80,7 @@ export async function GET(
       );
     }
 
-    const relativePath =
-      kind === 'baseline'
-        ? surface.baselinePath
-        : kind === 'after'
-          ? surface.afterPath
-          : surface.overlayPath;
+    const relativePath = imagePathForKind(kind, surface);
 
     if (!relativePath) {
       return NextResponse.json(
