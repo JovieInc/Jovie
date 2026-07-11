@@ -708,6 +708,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .home-bento-pairs-section {
   /* Light band on the dark homepage shell — scopes tokens so black marketing
      copy and white cards keep WCAG contrast when html.dark is active. */
+  overflow-x: clip;
   color-scheme: light;
   --color-bg-base: #f5f5f7;
   --color-text-primary-token: #000;

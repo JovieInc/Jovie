@@ -6,7 +6,7 @@ import {
   test,
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import {
   type ResolvedPublicSurfaceSpec,
@@ -319,13 +319,31 @@ async function enterAuthenticatedRoute(
     'Authenticated mobile overflow routes require E2E_USE_TEST_AUTH_BYPASS=1'
   );
 
-  await setTestAuthBypassSession(page, 'creator-ready');
-  const response = await gotoRouteWithRetry(page, route);
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const persona =
+    (process.env.E2E_TEST_AUTH_PERSONA as DevTestAuthPersona | undefined) ??
+    'creator-ready';
+  const enterUrl = `${baseUrl}/api/dev/test-auth/enter?persona=${persona}&redirect=${encodeURIComponent(route.path)}`;
+
+  // Cookie-only bypass no longer boots the app shell under Better Auth — the
+  // enter route provisions the persona and mints a real ba_sessions cookie.
+  const response = await page.goto(enterUrl, {
+    waitUntil: 'domcontentloaded',
+  });
 
   expect(
     response?.status() ?? 200,
     `${route.id} auth bootstrap should not server-error`
   ).toBeLessThan(500);
+
+  const expectedPath = route.path.split('?')[0] ?? route.path;
+  await page.waitForURL(
+    url => {
+      const pathname = new URL(url).pathname;
+      return pathname === expectedPath || pathname.startsWith(expectedPath);
+    },
+    { timeout: 60_000 }
+  );
 
   await waitForHydration(page, { timeout: 60_000 });
   await waitForAnySelector(page, route.readySelectors, 60_000);
