@@ -15,8 +15,12 @@ name: Merge Queue Auto-Enroll
 #
 # Two jobs run (not at the same time — concurrency group serializes):
 #   enroll    — classify open PRs, enroll green ones, dequeue broken ones,
-#               flag conflicts for the fix agent
+#               flag conflicts for the fix agent (no pytest/Python setup;
+#               drain regression tests run in CI Structural Contract instead)
 #   rebase    — mechanically rebase blocked agent PRs onto latest main
+#
+# GH-13630 scope boundary: pr-conflict-handler debounce + lighter model are
+# follow-ups — handler lacks a durable "recently resolved" marker contract.
 #
 # No schedule. No watchdog label-cycling. No polling.
 

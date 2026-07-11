@@ -6,6 +6,7 @@ import {
   GRAPHITE_QUEUE_POLICY,
   MERGE_QUEUE_REPO_PATHS,
   validateLiveMergeQueueRuleset,
+  validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
 } from './lib/merge-queue-guard.mjs';
 
@@ -52,10 +53,14 @@ function runValidate({ checkLive = false } = {}) {
     MERGE_QUEUE_REPO_PATHS.branchProtection
   );
   const ciWorkflowYaml = readRepoFile(MERGE_QUEUE_REPO_PATHS.ciWorkflow);
+  const autoenrollWorkflowYaml = readRepoFile(
+    MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow
+  );
   const repoValidation = validateMergeQueueRepoConfig({
     branchProtectionYaml,
     ciWorkflowYaml,
   });
+  const enrollHotPath = validateMergeQueueEnrollHotPath(autoenrollWorkflowYaml);
 
   if (repoValidation.warnings.length > 0) {
     console.warn('Merge queue repo-config warnings:');
@@ -64,10 +69,18 @@ function runValidate({ checkLive = false } = {}) {
     }
   }
 
-  if (!repoValidation.ok) {
-    console.error('Merge queue repo-config validation failed:');
-    for (const error of repoValidation.errors) {
-      console.error(`- ${error}`);
+  if (!repoValidation.ok || !enrollHotPath.ok) {
+    if (!repoValidation.ok) {
+      console.error('Merge queue repo-config validation failed:');
+      for (const error of repoValidation.errors) {
+        console.error(`- ${error}`);
+      }
+    }
+    if (!enrollHotPath.ok) {
+      console.error('Merge queue enroll hot-path validation failed:');
+      for (const error of enrollHotPath.errors) {
+        console.error(`- ${error}`);
+      }
     }
     process.exitCode = 1;
     return;
@@ -76,6 +89,7 @@ function runValidate({ checkLive = false } = {}) {
   console.log(
     `Repo config OK — required aggregates: ${repoValidation.contexts.join(', ')}`
   );
+  console.log('Enroll hot path OK — no test-only dependency bootstrap');
 
   if (!checkLive) {
     return;
