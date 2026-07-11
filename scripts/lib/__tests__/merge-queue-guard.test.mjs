@@ -6,8 +6,10 @@ import {
   compareRatchetCounts,
   detectChangedFileOverlap,
   detectIssueOverlap,
+  extractWorkflowJobBlock,
   fastTrackPolicy,
   isAutonomousBranch,
+  MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
   parseMergeQueueTimeline,
   parseRequiredStatusChecksFromYaml,
@@ -16,6 +18,7 @@ import {
   uiFastTrackPolicy,
   validateAggregateRequiredChecks,
   validateLiveMergeQueueRuleset,
+  validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
 } from '../merge-queue-guard.mjs';
 
@@ -379,6 +382,23 @@ describe('aggregate required checks', () => {
       'Fork PR Gate',
       'PR Size Guard',
     ]);
+  });
+
+  it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
+    const autoenrollYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
+      'utf8'
+    );
+    const enrollBlock = extractWorkflowJobBlock(autoenrollYaml, 'enroll');
+
+    expect(enrollBlock).toMatch(/drain-pr-queue\.sh/);
+    for (const rule of MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN) {
+      expect(rule.pattern.test(enrollBlock), rule.id).toBe(false);
+    }
+
+    const result = validateMergeQueueEnrollHotPath(autoenrollYaml);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it('validates the live ruleset shape used by Graphite merge queue', () => {
