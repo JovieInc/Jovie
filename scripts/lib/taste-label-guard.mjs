@@ -46,13 +46,6 @@ export const NON_TASTE_COMMIT_TYPES = new Set([
 ]);
 
 /**
- * Markdown / HTML image attachment patterns Tim can review from the PR body.
- * JOV-3674: no taste label without a visual.
- */
-const PR_BODY_SCREENSHOT_RE =
-  /!\[[^\]]*\]\(|<img[\s>]|user-images\.githubusercontent|github\.com\/user-attachments|\/assets\/[0-9a-f-]+/i;
-
-/**
  * Extract the lowercased conventional-commit type from a PR title.
  * Returns null when the title has no conventional-commit prefix (in which case
  * the guard stays conservative and does not strip the label).
@@ -84,18 +77,9 @@ export function hasMaterialUxMarker(labels = []) {
 }
 
 /**
- * True when the PR body includes an attached screenshot / image Tim can judge.
- * @param {string} body
- */
-export function hasScreenshotInBody(body = '') {
-  if (typeof body !== 'string' || body.trim().length === 0) return false;
-  return PR_BODY_SCREENSHOT_RE.test(body);
-}
-
-/**
  * Decide whether a PR's taste label is correctly applied.
  *
- * @param {{ title?: string, labels?: readonly string[], body?: string }} input
+ * @param {{ title?: string, labels?: readonly string[] }} input
  * @returns {{
  *   ok: boolean,
  *   level: 'pass' | 'error',
@@ -106,11 +90,7 @@ export function hasScreenshotInBody(body = '') {
  *   `ok: false` (level `error`) means a taste label is mis-applied and should be
  *   removed so the PR can auto-flow.
  */
-export function evaluateTasteLabel({
-  title = '',
-  labels = [],
-  body = '',
-} = {}) {
+export function evaluateTasteLabel({ title = '', labels = [] }) {
   const offendingLabels = tasteLabelsOn(labels);
   const commitType = conventionalCommitType(title);
 
@@ -124,26 +104,13 @@ export function evaluateTasteLabel({
     };
   }
 
-  // JOV-3674: taste labels without a screenshot auto-flow (ship; correct post-merge).
-  // Material marker alone is not enough — Tim cannot judge a visual without a visual.
-  if (!hasScreenshotInBody(body)) {
-    return {
-      ok: false,
-      level: 'error',
-      commitType,
-      offendingLabels,
-      reason:
-        'Taste label requires an attached screenshot in the PR body (markdown image, `<img>`, or GitHub user-attachment). Without a visual, auto-flow instead (JOV-3674).',
-    };
-  }
-
   if (hasMaterialUxMarker(labels)) {
     return {
       ok: true,
       level: 'pass',
       commitType,
       offendingLabels: [],
-      reason: `Taste label retained — screenshot present and \`${MATERIAL_UX_MARKER}\` marker present.`,
+      reason: `Taste label retained — \`${MATERIAL_UX_MARKER}\` marker present.`,
     };
   }
 
@@ -162,6 +129,6 @@ export function evaluateTasteLabel({
     level: 'pass',
     commitType,
     offendingLabels: [],
-    reason: `Taste label retained — screenshot present; "${commitType ?? 'untyped'}" change may carry a material UX judgment.`,
+    reason: `Taste label retained — "${commitType ?? 'untyped'}" change may carry a material UX judgment.`,
   };
 }
