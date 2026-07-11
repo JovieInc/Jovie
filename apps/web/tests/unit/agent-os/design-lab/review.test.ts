@@ -15,7 +15,7 @@ vi.mock('@/lib/agent-os/design-lab/proposals', () => ({
   deriveProposalStatus: (decision: string | null) => {
     if (decision === 'no') return 'rejected';
     if (decision === 'yes' || decision === 'yes-with-notes') return 'approved';
-    return 'pending';
+    return 'proposed';
   },
 }));
 
@@ -33,6 +33,7 @@ vi.mock('@/lib/agent-os/design-lab/dispatch', () => ({
 
 const baseProposal: DesignProposal = {
   id: 'profile-page-quiet-hero',
+  kind: 'section-gap',
   surfaceId: 'profile-page',
   surfaceName: 'Public profile page',
   proposalText: 'Use a restrained surface-1 header band.',
@@ -40,7 +41,66 @@ const baseProposal: DesignProposal = {
   scoring: { weight: 0.9, score: 0.82 },
   linearIssueId: 'JOV-1951',
   linearIssueUrl: 'https://linear.app/jovie/issue/JOV-1951',
-  status: 'pending',
+  status: 'proposed',
+  designGap: {
+    reviewId: 'PROPOSED-SECTION-0001',
+    proposedName: 'Quiet hero',
+    problem: 'The current hero is too loud.',
+    affectedRoutes: ['/'],
+    audience: 'Artists',
+    conversionGoal: 'Profile visits',
+    requiredContentFields: ['title'],
+    requiredMedia: [],
+    responsiveBehavior: 'Stack on mobile.',
+    ctaBehavior: 'One primary CTA.',
+    similarSections: [],
+    insufficiencyReason: 'No canonical section matches.',
+    priority: 'high',
+    sectionType: 'hero',
+    wireframes: {
+      desktop: {
+        viewport: 'desktop',
+        width: 1440,
+        hierarchy: ['title'],
+        layout: 'split',
+        contentDensity: 'medium',
+        mediaPlacement: 'right',
+        responsiveBehavior: 'stack',
+        interactionModel: 'static',
+        tokens: ['surface'],
+        placeholderContent: 'grayscale-only',
+      },
+      mobile: {
+        viewport: 'mobile',
+        width: 390,
+        hierarchy: ['title'],
+        layout: 'stack',
+        contentDensity: 'medium',
+        mediaPlacement: 'below',
+        responsiveBehavior: 'stack',
+        interactionModel: 'static',
+        tokens: ['surface'],
+        placeholderContent: 'grayscale-only',
+      },
+    },
+    openQuestions: [],
+    comments: [],
+    registryTask: {
+      trigger: 'after-approved',
+      targetSectionId: 'quiet-hero',
+      requiredChanges: ['Implement registry variant'],
+      exactFiles: ['apps/web/components/sections/QuietHero.tsx'],
+      forbiddenPatterns: ['one-off route JSX'],
+      acceptanceCriteria: ['Typed registry component'],
+      validationCommands: [
+        'pnpm --filter @jovie/web run typecheck -- --pretty false',
+      ],
+      evidenceRequired: ['desktop screenshot'],
+      implementedAt: null,
+      evidenceRefs: [],
+    },
+    modelUsage: [],
+  },
   createdAt: '2026-06-08T12:00:00.000Z',
   reviewedAt: null,
   reviewer: null,
@@ -77,7 +137,11 @@ describe('reviewDesignProposal', () => {
     });
 
     expect(triggerDesignLabDispatch).toHaveBeenCalledWith({
-      proposal: baseProposal,
+      proposal: expect.objectContaining({
+        id: baseProposal.id,
+        status: 'approved',
+        reviewDecision: 'yes',
+      }),
       amendmentNotes: null,
       requestedBy: 'tim@jovie.com',
     });
@@ -149,7 +213,11 @@ describe('reviewDesignProposal', () => {
     });
 
     expect(triggerDesignLabDispatch).toHaveBeenCalledWith({
-      proposal: baseProposal,
+      proposal: expect.objectContaining({
+        id: baseProposal.id,
+        status: 'approved',
+        reviewDecision: 'yes-with-notes',
+      }),
       amendmentNotes: 'Keep the underline but reduce accent saturation.',
       requestedBy: 'tim@jovie.com',
     });
@@ -162,7 +230,7 @@ describe('reviewDesignProposal', () => {
     );
   });
 
-  it('throws when proposal was already reviewed', async () => {
+  it('rejects a conflicting decision after review', async () => {
     getDesignProposal.mockResolvedValue({
       ...baseProposal,
       status: 'approved',
@@ -176,10 +244,57 @@ describe('reviewDesignProposal', () => {
       reviewDesignProposal({
         dayBucket: '2026-06-08',
         proposalId: baseProposal.id,
-        decision: 'yes',
+        decision: 'no',
         notes: null,
         reviewer: 'tim@jovie.com',
       })
     ).rejects.toThrow('Design proposal has already been reviewed.');
+  });
+
+  it('persists approval before dispatch and resumes dispatch idempotently', async () => {
+    getDesignProposal.mockResolvedValue({
+      ...baseProposal,
+      status: 'approved',
+      reviewDecision: 'yes',
+    });
+    const { reviewDesignProposal } = await import(
+      '@/lib/agent-os/design-lab/review'
+    );
+    const result = await reviewDesignProposal({
+      dayBucket: '2026-06-08',
+      proposalId: baseProposal.id,
+      decision: 'yes',
+      notes: null,
+      reviewer: 'tim@jovie.com',
+    });
+    expect(triggerDesignLabDispatch).toHaveBeenCalledOnce();
+    expect(appendDesignTasteMemoryEntry).not.toHaveBeenCalled();
+    expect(result.dispatchTriggered).toBe(true);
+  });
+
+  it('keeps approval durable when dispatch is unavailable', async () => {
+    triggerDesignLabDispatch.mockResolvedValue({
+      triggered: false,
+      dispatchId: null,
+    });
+    const { reviewDesignProposal } = await import(
+      '@/lib/agent-os/design-lab/review'
+    );
+    const result = await reviewDesignProposal({
+      dayBucket: '2026-06-08',
+      proposalId: baseProposal.id,
+      decision: 'yes',
+      notes: null,
+      reviewer: 'tim@jovie.com',
+    });
+    expect(saveDesignProposal.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ status: 'reviewing' })
+    );
+    expect(saveDesignProposal.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({ status: 'approved' })
+    );
+    expect(result.proposal.status).toBe('approved');
+    expect(result.dispatchTriggered).toBe(false);
+    expect(result.dispatchId).toBeNull();
   });
 });
