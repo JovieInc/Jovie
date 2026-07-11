@@ -34,7 +34,9 @@ concurrency:
 jobs:
   open-pr:
     name: Open PR
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Fleet controller: use the hosted image contract so `gh` is always
+    # available and persistent runner workspaces cannot supply stale helpers.
+    runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions:
       contents: read
@@ -57,18 +59,29 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
-      - name: Checkout
+      - name: Checkout main policy code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          # The pushed branch is data for this controller, not its source code.
+          # Older agent branches may not contain current workflow helpers.
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify GitHub CLI
+        run: gh --version
 
       - name: Check for code changes
         id: diff
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
+          # Materialize the triggering branch explicitly while keeping current
+          # main checked out as the fleet controller source of truth.
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+
           # Compare this branch against main to get all changed files
-          CHANGED=$(git diff --name-only origin/main...HEAD)
+          CHANGED=$(git diff --name-only "origin/main...origin/$BRANCH")
 
           if [[ -z "$CHANGED" ]]; then
             echo "No files changed vs main. Skipping PR."

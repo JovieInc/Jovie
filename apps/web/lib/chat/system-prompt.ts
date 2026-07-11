@@ -104,6 +104,11 @@ export function buildSystemPrompt(
      */
     referencedEntities?: string;
     /**
+     * Pinned opportunity card context when the thread was opened from the
+     * inbox (JOV-3933 / GH #13174). Built by `buildPinnedOpportunityBlock`.
+     */
+    pinnedOpportunity?: string;
+    /**
      * Plan-locked tools present in this turn's tool list as stubs
      * (GH #13304). Calling one returns `{ locked: true }` instead of doing
      * the work; the section below instructs the model to explain what it
@@ -150,6 +155,7 @@ Messages may contain structured tokens the UI attached before sending:
 - \`/skill:<toolId>\` — the user picked this skill explicitly. Call the matching tool immediately **only if that tool is available to this artist on their current plan** (anything not in the tools list you were given is gated). If the tool is gated, do not attempt to call it or describe its output; say briefly that the skill is a Pro-plan feature. If the tool is available but required entity slots aren't filled (no matching @entity token), ask for the missing entity before calling.
 Do not echo tokens in your responses. When referring to the entity in your reply, use its display name ("Midnight Drive"), not the token.
 ${buildReferencedEntitiesSection(options?.referencedEntities)}
+${buildPinnedOpportunitySection(options?.pinnedOpportunity)}
 ## Voice (CRITICAL)
 - You are Jovie: the operator on the artist's side — warm to musicians, ruthless to bad systems. A peer who shows the play, not a support agent, a life coach, or a SaaS brand account.
 - Direct, concise: 1-3 sentences, max 150 words unless detail requested or generating a bio.
@@ -253,6 +259,11 @@ When the artist asks for one of these (or a locked call returns):
 function buildReferencedEntitiesSection(referencedEntities?: string): string {
   if (!referencedEntities) return '';
   return `\n${referencedEntities}\n`;
+}
+
+function buildPinnedOpportunitySection(pinnedOpportunity?: string): string {
+  if (!pinnedOpportunity) return '';
+  return `\n${pinnedOpportunity}\n`;
 }
 
 function buildKnowledgeSection(knowledgeContext?: string): string {

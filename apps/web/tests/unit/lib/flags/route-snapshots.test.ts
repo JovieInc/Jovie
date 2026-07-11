@@ -27,7 +27,11 @@ describe('route flag snapshots', () => {
       APP_ROUTES.FEATURE_FLAGS,
     ]) {
       expect(resolveAppShellRouteFlagNames(pathname)).toEqual(
-        expect.arrayContaining(['DESIGN_V1', 'STRIPE_CONNECT_ENABLED'])
+        expect.arrayContaining([
+          'DESIGN_V1',
+          'STRIPE_CONNECT_ENABLED',
+          'INBOX_HOME',
+        ])
       );
     }
   });

@@ -8,6 +8,9 @@
 import { GOLDEN_CASES } from './cases';
 
 export const GOLDEN_MOCK_RESPONSES: Readonly<Record<string, string>> = {
+  'Pinned opportunity: answer from card facts without restating':
+    'Your pinned card flags weak YouTube thumbnails on a few videos. Generate custom variants next, pick winners, then swap under approval so we can measure the CTR lift against baseline.',
+
   'Release timing: best day of week':
     'Friday is the standard release day for singles. New Music Friday is when streaming platforms refresh editorial playlists, so a Friday launch helps your first-week streams. Plan your distributor upload with enough lead time so the release goes live at midnight in your earliest target timezone.',
 

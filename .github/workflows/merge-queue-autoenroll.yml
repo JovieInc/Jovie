@@ -15,8 +15,12 @@ name: Merge Queue Auto-Enroll
 #
 # Two jobs run (not at the same time — concurrency group serializes):
 #   enroll    — classify open PRs, enroll green ones, dequeue broken ones,
-#               flag conflicts for the fix agent
+#               flag conflicts for the fix agent (no pytest/Python setup;
+#               drain regression tests run in CI Structural Contract instead)
 #   rebase    — mechanically rebase blocked agent PRs onto latest main
+#
+# GH-13630 scope boundary: pr-conflict-handler debounce + lighter model are
+# follow-ups — handler lacks a durable "recently resolved" marker contract.
 #
 # No schedule. No watchdog label-cycling. No polling.
 
@@ -42,9 +46,17 @@ jobs:
   enroll:
     if: >-
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # API-only fleet controller. ubuntu-latest deterministically includes gh;
+    # the heterogeneous self-hosted fast pool does not.
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Checkout main policy code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify GitHub CLI
+        run: gh --version
       - name: Enroll clean PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,9 +68,15 @@ jobs:
   rebase:
     if: >-
       github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Checkout main policy code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify GitHub CLI
+        run: gh --version
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:

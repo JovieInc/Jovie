@@ -4,12 +4,14 @@ import { OpportunityRow } from '@/components/organisms/opportunity-card/Opportun
 import type { OpportunityRowState } from '@/components/organisms/opportunity-card/types';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
+import { OpportunityCardStack } from './OpportunityCardStack';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
 
 export interface OpportunityInboxFeedProps {
   readonly cards: readonly OpportunityInboxCardViewModel[];
   readonly onApprove: (id: string) => void;
   readonly onDismiss: (id: string) => void;
+  readonly onOpen?: (id: string) => void;
   readonly onFeedback: (
     id: string,
     rating: 'positive' | 'negative',
@@ -19,6 +21,8 @@ export interface OpportunityInboxFeedProps {
   readonly pendingActionId?: string | null;
   readonly pendingFeedbackId?: string | null;
   readonly pendingNextStepId?: string | null;
+  /** When true, render the swipe/keyboard card stack (JOV-3932). */
+  readonly enableStackInteractions?: boolean;
   readonly className?: string;
 }
 
@@ -36,13 +40,30 @@ export function OpportunityInboxFeed({
   cards,
   onApprove,
   onDismiss,
+  onOpen,
   onFeedback: _onFeedback,
   onNextStep,
   pendingActionId = null,
   pendingFeedbackId: _pendingFeedbackId = null,
   pendingNextStepId = null,
+  enableStackInteractions = false,
   className,
 }: OpportunityInboxFeedProps) {
+  if (enableStackInteractions) {
+    return (
+      <OpportunityCardStack
+        cards={cards}
+        onAccept={onApprove}
+        onReject={onDismiss}
+        onOpen={onOpen ?? onApprove}
+        onNextStep={onNextStep}
+        pendingActionId={pendingActionId}
+        pendingNextStepId={pendingNextStepId}
+        className={className}
+      />
+    );
+  }
+
   return (
     <section
       className={cn('system-b-opportunity-inbox-feed', className)}

@@ -484,6 +484,37 @@ function normalizeClientId(value: unknown): string | null {
   return /^[a-zA-Z0-9:_-]{8,160}$/.test(trimmed) ? trimmed : null;
 }
 
+/** Accept a client-supplied pinned opportunity for server-side system injection (JOV-3933). */
+function normalizePinnedOpportunity(value: unknown): {
+  readonly id: string;
+  readonly title: string;
+  readonly why: string;
+  readonly typeLabel: string;
+  readonly primaryActionLabel?: string;
+  readonly signalType?: string;
+} | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === 'string' ? record.id.trim() : '';
+  const title = typeof record.title === 'string' ? record.title.trim() : '';
+  if (!id || !title) return null;
+  return {
+    id: id.slice(0, 80),
+    title: title.slice(0, 200),
+    why: typeof record.why === 'string' ? record.why.trim().slice(0, 500) : '',
+    typeLabel:
+      typeof record.typeLabel === 'string'
+        ? record.typeLabel.trim().slice(0, 80)
+        : '',
+    ...(typeof record.primaryActionLabel === 'string'
+      ? { primaryActionLabel: record.primaryActionLabel.trim().slice(0, 120) }
+      : {}),
+    ...(typeof record.signalType === 'string'
+      ? { signalType: record.signalType.trim().slice(0, 80) }
+      : {}),
+  };
+}
+
 function createAssistantTextStreamResponse(input: {
   readonly text: string;
   readonly requestId: string;
@@ -2462,6 +2493,7 @@ export async function POST(req: Request) {
   const source = normalizeChatTurnSource(body.source);
   const toolIntent = normalizeToolIntent(body.toolIntent);
   const modelRotationStep = normalizeModelRotationStep(body.modelRotationStep);
+  const pinnedOpportunity = normalizePinnedOpportunity(body.pinnedOpportunity);
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
   const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
@@ -2932,6 +2964,7 @@ export async function POST(req: Request) {
       forceLightModel,
       modelRotationStep,
       lastUserText: userText,
+      pinnedOpportunity,
       tools: wrapToolSetFailSoft(tools),
       signal: req.signal,
       requestId,

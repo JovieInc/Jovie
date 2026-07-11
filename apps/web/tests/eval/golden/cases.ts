@@ -33,6 +33,19 @@ export interface GoldenCase {
 
 export const GOLDEN_CASES: readonly GoldenCase[] = [
   {
+    name: 'Pinned opportunity: answer from card facts without restating',
+    userPrompt:
+      'What should I do about the opportunity you pinned? Summarize the evidence.',
+    mustSay: ['thumbnail', 'youtube'],
+    mustNotSay: [],
+    harmfulBlacklist: [
+      'i do not know what card you mean',
+      'please paste the opportunity again',
+    ],
+    groundTruth:
+      'When a Pinned opportunity system block is injected (title/evidence about weak YouTube thumbnails), the model must answer from those facts without asking the artist to restate them. JOV-3933 / GH #13174.',
+  },
+  {
     name: 'Release timing: best day of week',
     userPrompt: 'What day should I release my next single?',
     mustSay: ['friday'],

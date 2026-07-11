@@ -7,9 +7,16 @@ import {
   ClerkSafeValuesProvider,
 } from '@/hooks/useClerkSafe';
 import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
+import { useDesktopAppBootSignal } from '@/lib/desktop/electron-bridge';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
 import { QueryProvider } from './QueryProvider';
+
+/** Cancels the Electron shell boot watchdog after React mounts (JOV-3595). */
+function DesktopAppBootSignal() {
+  useDesktopAppBootSignal();
+  return null;
+}
 
 interface ClientProvidersProps {
   readonly children: React.ReactNode;
@@ -87,9 +94,17 @@ export function ClientProviders({
   // BA session cookie that `authClient.useSession()` observes directly.
   if (forceBypassClerk && !authBootstrap?.isAuthenticated) {
     return (
-      <ClerkSafeDefaultsProvider>{wrappedChildren}</ClerkSafeDefaultsProvider>
+      <ClerkSafeDefaultsProvider>
+        <DesktopAppBootSignal />
+        {wrappedChildren}
+      </ClerkSafeDefaultsProvider>
     );
   }
 
-  return <ClerkSafeValuesProvider>{wrappedChildren}</ClerkSafeValuesProvider>;
+  return (
+    <ClerkSafeValuesProvider>
+      <DesktopAppBootSignal />
+      {wrappedChildren}
+    </ClerkSafeValuesProvider>
+  );
 }

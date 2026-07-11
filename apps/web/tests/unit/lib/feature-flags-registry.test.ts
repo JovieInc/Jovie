@@ -74,7 +74,12 @@ function readRepoFile(relativePath: string): string {
 
 describe('feature flag registry integrity', () => {
   it('keeps runtime app flags default-on for internal v1 access', () => {
-    expect(Object.values(APP_FLAG_DEFAULTS).every(Boolean)).toBe(true);
+    // INBOX_HOME is an intentional default-off rollout gate (JOV-3931 / GH #13171).
+    const defaultsExcludingRolloutGates = Object.entries(APP_FLAG_DEFAULTS)
+      .filter(([name]) => name !== 'INBOX_HOME')
+      .map(([, value]) => value);
+    expect(defaultsExcludingRolloutGates.every(Boolean)).toBe(true);
+    expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {

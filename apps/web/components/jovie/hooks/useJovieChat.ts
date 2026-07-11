@@ -71,6 +71,19 @@ interface UseJovieChatOptions {
   ) => void;
   /** Artist username — used by deterministic commands (e.g. "preview my profile") */
   readonly username?: string;
+  /**
+   * Pinned opportunity card for server-side context injection (JOV-3933).
+   * Sent on every turn while the pin is active so executeChatTurn can inject
+   * a "Pinned opportunity" system block.
+   */
+  readonly pinnedOpportunity?: {
+    readonly id: string;
+    readonly title: string;
+    readonly why: string;
+    readonly typeLabel: string;
+    readonly primaryActionLabel?: string;
+    readonly signalType?: string;
+  } | null;
 }
 
 /** Fast interval (ms) to poll for auto-generated title after first message. */
@@ -256,6 +269,7 @@ export function useJovieChat({
   conversationId,
   onConversationCreate,
   username,
+  pinnedOpportunity = null,
 }: UseJovieChatOptions) {
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -393,6 +407,7 @@ export function useJovieChat({
           ...(activeConversationId
             ? { conversationId: activeConversationId }
             : {}),
+          ...(pinnedOpportunity ? { pinnedOpportunity } : {}),
         },
         prepareSendMessagesRequest: ({ messages, body }) => {
           const staticBody =
@@ -403,6 +418,7 @@ export function useJovieChat({
             body: {
               ...staticBody,
               messages: trimMessagesForChatRequest(messages, staticBody),
+              ...(pinnedOpportunity ? { pinnedOpportunity } : {}),
             },
           };
         },
@@ -434,7 +450,13 @@ export function useJovieChat({
           return response;
         },
       }),
-    [profileId, artistContext, activeConversationId, dispatchTimelineEvent]
+    [
+      profileId,
+      artistContext,
+      activeConversationId,
+      pinnedOpportunity,
+      dispatchTimelineEvent,
+    ]
   );
 
   // Convert loaded messages to canonical timeline input. Query data feeds the

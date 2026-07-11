@@ -45,7 +45,11 @@ import {
   type UrlDisposition,
 } from './navigation';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
-import { decideRendererRecovery } from './renderer-recovery';
+import {
+  decideRendererRecovery,
+  RENDERER_BOOT_WATCHDOG_MS,
+  shouldArmRendererBootWatchdog,
+} from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
 
@@ -110,6 +114,8 @@ const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
+/** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
+const APP_BOOTED_CHANNEL = 'app-booted';
 const DESKTOP_RUNTIME_LABEL_BY_PLATFORM: Partial<
   Record<NodeJS.Platform, string>
 > = {
@@ -170,6 +176,19 @@ let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
+
+/**
+ * Per-webContents boot-watchdog controllers (JOV-3595). The hosted web app
+ * must call `notifyAppBooted` after first successful paint; otherwise the
+ * shell shows the recovery page instead of a permanent black window.
+ */
+const rendererBootControllers = new Map<
+  number,
+  {
+    readonly markBooted: () => void;
+    readonly dispose: () => void;
+  }
+>();
 
 function getDesktopAppDisplayName(): string {
   if (APP_ENV === 'staging') return 'Jovie Staging';
@@ -1026,11 +1045,73 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // blank black window with no recovery, which strands the user. Reload the
   // view on a crash, capped to avoid a crash loop, then fall back to the
   // visible load-failure page (Retry) instead of black.
+  //
+  // JOV-3595 also covers the "HTTP 200 but never interactive" path: after a
+  // real hosted load finishes, the web app must ping APP_BOOTED_CHANNEL within
+  // RENDERER_BOOT_WATCHDOG_MS. If it never does (React crash / hung hydrate),
+  // show the recovery shell instead of a permanent black canvas.
   let rendererCrashReloadCount = 0;
+  let rendererBooted = false;
+  let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  const webContentsId = win.webContents.id;
+
+  const clearBootWatchdog = (): void => {
+    if (bootWatchdogTimer !== null) {
+      clearTimeout(bootWatchdogTimer);
+      bootWatchdogTimer = null;
+    }
+  };
+
+  const markRendererBooted = (): void => {
+    rendererBooted = true;
+    clearBootWatchdog();
+  };
+
+  const armBootWatchdog = (): void => {
+    clearBootWatchdog();
+    rendererBooted = false;
+    if (win.isDestroyed()) return;
+    const url = win.webContents.getURL();
+    if (!shouldArmRendererBootWatchdog(url)) return;
+
+    bootWatchdogTimer = setTimeout(() => {
+      bootWatchdogTimer = null;
+      if (win.isDestroyed() || rendererBooted) return;
+      // Main window may sit on a transitional URL while the dedicated auth
+      // handoff window is the interactive surface — do not false-alarm.
+      if (win === mainWindow && isAuthHandoffOpen()) return;
+
+      console.error('[Jovie Desktop] Renderer boot watchdog expired', {
+        url: url.split('?')[0],
+        timeoutMs: RENDERER_BOOT_WATCHDOG_MS,
+      });
+      showDesktopLoadFailure(win);
+    }, RENDERER_BOOT_WATCHDOG_MS);
+  };
+
+  rendererBootControllers.set(webContentsId, {
+    markBooted: markRendererBooted,
+    dispose: () => {
+      clearBootWatchdog();
+      rendererBootControllers.delete(webContentsId);
+    },
+  });
+
+  win.on('closed', () => {
+    rendererBootControllers.get(webContentsId)?.dispose();
+  });
+
+  win.webContents.on('did-start-loading', () => {
+    clearBootWatchdog();
+    rendererBooted = false;
+  });
+
   win.webContents.on('did-finish-load', () => {
     rendererCrashReloadCount = 0;
+    armBootWatchdog();
   });
   win.webContents.on('render-process-gone', (_event, details) => {
+    clearBootWatchdog();
     const action = decideRendererRecovery({
       reason: details.reason,
       reloadCount: rendererCrashReloadCount,
@@ -1053,6 +1134,10 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     console.warn('[Jovie Desktop] Renderer unresponsive', {
       url: win.webContents.getURL().split('?')[0],
     });
+    if (win.isDestroyed()) return;
+    if (win === mainWindow && isAuthHandoffOpen()) return;
+    clearBootWatchdog();
+    showDesktopLoadFailure(win);
   });
 
   win.webContents.session.setPermissionRequestHandler(
@@ -1396,6 +1481,14 @@ ipcMain.handle(
     return { ok: true };
   }
 );
+
+// Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
+// missing main handler on a stale binary cannot reject the renderer promise.
+ipcMain.on(APP_BOOTED_CHANNEL, event => {
+  const parsed = parseUrl(event.senderFrame?.url ?? event.sender.getURL());
+  if (parsed?.origin !== APP_ORIGIN) return;
+  rendererBootControllers.get(event.sender.id)?.markBooted();
+});
 
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;

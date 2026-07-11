@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowLeft, X } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useId, useMemo, useState } from 'react';
@@ -25,6 +26,11 @@ interface AlertGrowthLandingProps {
    * `useSearchParams`, which lets the page render statically.
    */
   readonly sourceCode?: string;
+  /**
+   * In-page exit target. Defaults to the artist profile so visitors always
+   * have a non-browser-chrome way out of the capture surface (JOV-3513).
+   */
+  readonly exitHref?: string;
 }
 
 type SubmitState =
@@ -112,6 +118,7 @@ function getInputValidationError(
 export function AlertGrowthLanding({
   artist,
   sourceCode: sourceCodeProp,
+  exitHref,
 }: AlertGrowthLandingProps) {
   const [channel, setChannel] = useState<NotificationChannel>('sms');
   const [phoneInput, setPhoneInput] = useState('');
@@ -136,6 +143,8 @@ export function AlertGrowthLanding({
   );
 
   const artistName = artist.name?.trim() || artist.handle;
+  const profileHref =
+    exitHref ?? `/${encodeURIComponent(artist.handle.trim().toLowerCase())}`;
 
   const handleChannelChange = useCallback((next: NotificationChannel) => {
     setChannel(next);
@@ -228,7 +237,27 @@ export function AlertGrowthLanding({
 
   return (
     <main className='min-h-dvh bg-(--linear-app-content-surface) text-primary-token'>
-      <div className='mx-auto flex min-h-dvh max-w-108 flex-col px-5 py-10 sm:py-12'>
+      <div className='mx-auto flex min-h-dvh max-w-108 flex-col px-5 py-6 sm:py-10'>
+        <div className='mb-4 flex items-center justify-between gap-3'>
+          <Link
+            href={profileHref}
+            className='inline-flex h-10 items-center gap-1.5 rounded-full px-1 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            data-testid='alerts-landing-back'
+            aria-label={`Back To ${artistName}`}
+          >
+            <ArrowLeft className='h-4 w-4' aria-hidden='true' />
+            <span>Back</span>
+          </Link>
+          <Link
+            href={profileHref}
+            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            data-testid='alerts-landing-close'
+            aria-label='Close Alerts Capture'
+          >
+            <X className='h-4 w-4' aria-hidden='true' />
+          </Link>
+        </div>
+
         <header className='mb-6'>
           <p className='text-secondary-token text-app'>{APP_LABEL}</p>
           <h1 className='mt-2 text-2xl font-semibold leading-[1.08] tracking-normal'>
@@ -358,6 +387,16 @@ export function AlertGrowthLanding({
             </li>
           ))}
         </ul>
+
+        <div className='mt-6 text-center'>
+          <Link
+            href={profileHref}
+            className='text-secondary-token text-sm underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline'
+            data-testid='alerts-landing-maybe-later'
+          >
+            Maybe Later
+          </Link>
+        </div>
 
         <footer className='text-secondary-token mt-auto pt-10 text-xs'>
           Powered by{' '}

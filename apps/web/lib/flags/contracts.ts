@@ -66,6 +66,11 @@ export const APP_FLAG_DEFAULTS = {
   DESIGN_V1_LIBRARY: true,
   DESIGN_V1_AUTH: true,
   DESIGN_V1_ONBOARDING: true,
+  /**
+   * Opportunity Inbox as named /app home (GH #13171 / JOV-3931).
+   * Default off in prod; enable via env override, admin dogfood, or FEATURE gate.
+   */
+  INBOX_HOME: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -98,6 +103,7 @@ export const APP_FLAG_KEYS = {
   DESIGN_V1_LIBRARY: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_AUTH: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_ONBOARDING: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
+  INBOX_HOME: 'inbox_home',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -125,6 +131,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   DESIGN_V1_LIBRARY: 'code:DESIGN_V1',
   DESIGN_V1_AUTH: 'code:DESIGN_V1',
   DESIGN_V1_ONBOARDING: 'code:DESIGN_V1',
+  INBOX_HOME: 'code:INBOX_HOME',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -174,6 +181,8 @@ export const APP_FLAG_DESCRIPTIONS = {
   DESIGN_V1_LIBRARY: 'New production design alias for library',
   DESIGN_V1_AUTH: 'New production design alias for auth',
   DESIGN_V1_ONBOARDING: 'New production design alias for onboarding',
+  INBOX_HOME:
+    'Opportunity Inbox as the named /app home surface (nav item + title agreement)',
 } as const satisfies Record<AppFlagName, string>;
 
 export const DESIGN_V1_ALIAS_FLAGS = [
@@ -212,4 +221,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'DESIGN_V1_LIBRARY', // alias of DESIGN_V1 — permanently enabled
   'DESIGN_V1_AUTH', // alias of DESIGN_V1 — permanently enabled
   'DESIGN_V1_ONBOARDING', // alias of DESIGN_V1 — permanently enabled
+  'INBOX_HOME', // rollout gate for Inbox-as-home IA; default off in prod (JOV-3931)
 ]);

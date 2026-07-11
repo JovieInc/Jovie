@@ -859,10 +859,83 @@ export function bisectBatchFailure(batch, batchPasses) {
   };
 }
 
+export const MERGE_QUEUE_AUTOENROLL_WORKFLOW_PATH =
+  '.github/workflows/merge-queue-autoenroll.yml';
+
+/** Test-only patterns forbidden on the merge-queue enroll hot path (GH-13630). */
+export const MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN = Object.freeze([
+  { id: 'setup-python', pattern: /uses:\s*actions\/setup-python@/i },
+  { id: 'pip-install-pytest', pattern: /pip install pytest/i },
+  { id: 'pytest-run', pattern: /\bpytest\s+scripts\//i },
+]);
+
 export const MERGE_QUEUE_REPO_PATHS = Object.freeze({
   branchProtection: BRANCH_PROTECTION_RULESET_PATH,
   ciWorkflow: CI_WORKFLOW_PATH,
+  autoenrollWorkflow: MERGE_QUEUE_AUTOENROLL_WORKFLOW_PATH,
 });
+
+/**
+ * Extract a `jobs.<name>` block from a workflow YAML file (indent-based).
+ *
+ * @param {string} workflowYaml
+ * @param {string} jobName
+ */
+export function extractWorkflowJobBlock(workflowYaml = '', jobName = '') {
+  const lines = workflowYaml.split('\n');
+  const jobHeader = `  ${jobName}:`;
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === jobHeader) {
+      start = i;
+      break;
+    }
+  }
+  if (start < 0) {
+    return '';
+  }
+
+  const block = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^  \S/.test(line) && !line.startsWith('    ')) {
+      break;
+    }
+    block.push(line);
+  }
+  return block.join('\n');
+}
+
+/**
+ * Enroll hot path must stay lean: no pytest/Python bootstrap before drain.
+ * Drain regression coverage lives in CI Structural Contract (ci-fast lanes).
+ *
+ * @param {string} workflowYaml
+ */
+export function validateMergeQueueEnrollHotPath(workflowYaml = '') {
+  const errors = [];
+  const enrollBlock = extractWorkflowJobBlock(workflowYaml, 'enroll');
+  if (!enrollBlock) {
+    errors.push(
+      `${MERGE_QUEUE_AUTOENROLL_WORKFLOW_PATH} is missing enroll job`
+    );
+    return { ok: false, errors };
+  }
+
+  for (const rule of MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN) {
+    if (rule.pattern.test(enrollBlock)) {
+      errors.push(
+        `enroll hot path must not include ${rule.id} (test-only; run in Structural Contract instead)`
+      );
+    }
+  }
+
+  if (!/drain-pr-queue\.sh/.test(enrollBlock)) {
+    errors.push('enroll hot path must invoke scripts/drain-pr-queue.sh');
+  }
+
+  return { ok: errors.length === 0, errors };
+}
 
 export function requiredStatusDecision(statuses) {
   const byName = new Map();

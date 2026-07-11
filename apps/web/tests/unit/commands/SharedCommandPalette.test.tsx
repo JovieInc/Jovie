@@ -194,7 +194,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     const shell = screen.getByTestId('cmdk-full-page');
     expect(shell.className).toContain('h-dvh');
-    expect(shell.className).toContain('w-screen');
+    expect(shell.className).toContain('w-full');
     expect(shell.className).toContain('max-w-none');
     expect(shell.className).not.toContain('sm:max-w-140');
     // Results region fills remaining height (not a fixed max-h card)

@@ -143,16 +143,44 @@ async function enableTestAuthBypass(
   // The enter route mints a real BA session cookie and redirects to the
   // target path. Navigate to it directly — the cookie is set on the
   // same origin, so subsequent navigations are authenticated.
-  await page.goto(enterUrl, { waitUntil: 'domcontentloaded' });
+  const response = await page.goto(enterUrl, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  // Fail closed with a typed error when the proxy rewrites /api/dev/* to
+  // 404 or the route returns JSON (missing VERCEL_ENV=development /
+  // E2E_USE_TEST_AUTH_BYPASS on the standalone server). auth.setup treats
+  // CLERK_SETUP_FAILED as soft-fail and writes empty storage state.
+  const landedPath = new URL(page.url()).pathname;
+  if (
+    landedPath.startsWith('/api/dev/test-auth/') ||
+    (response !== null && response.status() >= 400)
+  ) {
+    const body = await page
+      .locator('body')
+      .innerText()
+      .catch(() => '');
+    throw new ClerkTestError(
+      `Test auth enter did not redirect (url=${page.url()}, status=${response?.status() ?? 'n/a'}): ${body.slice(0, 240)}`,
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   // The route returns a 303 redirect to the target path. Wait for it.
-  await page.waitForURL(
-    url => {
-      const pathname = new URL(url).pathname;
-      return pathname.startsWith('/app') || pathname.startsWith('/start');
-    },
-    { timeout: AUTH_BOOTSTRAP_TIMEOUT_MS }
-  );
+  try {
+    await page.waitForURL(
+      url => {
+        const pathname = new URL(url).pathname;
+        return pathname.startsWith('/app') || pathname.startsWith('/start');
+      },
+      { timeout: AUTH_BOOTSTRAP_TIMEOUT_MS }
+    );
+  } catch {
+    throw new ClerkTestError(
+      `Test auth enter timed out waiting for /app|/start (url=${page.url()})`,
+      'CLERK_SETUP_FAILED'
+    );
+  }
 }
 
 async function waitForShellReadyAfterAuth(page: Page): Promise<void> {

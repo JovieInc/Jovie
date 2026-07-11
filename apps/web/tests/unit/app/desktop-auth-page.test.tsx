@@ -20,6 +20,9 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   closeDesktopAuthWindow: () => closeDesktopAuthWindowMock(),
   isElectronRuntime: () => isElectronRuntimeMock(),
   openDesktopAuthUrl: (authUrl: string) => openDesktopAuthUrlMock(authUrl),
+  // JOV-3595: DesktopAuthClient clears the shell boot watchdog on mount
+  useDesktopAppBootSignal: vi.fn(),
+  notifyDesktopAppBooted: vi.fn(),
 }));
 
 function getAuthUrlParam(): string | null {

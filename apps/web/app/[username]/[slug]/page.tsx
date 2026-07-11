@@ -10,12 +10,14 @@
 import { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import type React from 'react';
+import { Suspense } from 'react';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { PreserveSearchRedirect } from '@/app/[username]/[slug]/PreserveSearchRedirect';
 import {
   type FeaturedArtist,
   ReleaseLandingPage,
 } from '@/app/r/[slug]/ReleaseLandingPage';
+import { UnpublishedEntityAlerts } from '@/components/features/alerts/UnpublishedEntityAlerts';
 import { BASE_URL } from '@/constants/app';
 import {
   MysteryReleasePage,
@@ -39,12 +41,14 @@ import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import type { Artist } from '@/types/db';
 import {
   checkPromoDownloads,
   getContentBySlug,
   getCreatorByUsername,
   getFeaturedSmartLinkStaticParams,
   getReleaseTrackList,
+  getUnpublishedReleasePresence,
 } from './_lib/data';
 import { generateMusicStructuredData } from './_lib/structured-data';
 
@@ -69,7 +73,7 @@ type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
 async function resolveContentOrRedirect(
   creator: Creator,
   slug: string
-): Promise<Content> {
+): Promise<Content | null> {
   const content = await getContentBySlug(creator.id, slug);
   if (content) return content;
 
@@ -79,7 +83,23 @@ async function resolveContentOrRedirect(
       `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`
     );
   }
-  notFound();
+  return null;
+}
+
+function creatorToArtist(creator: Creator): Artist {
+  return {
+    id: creator.id,
+    owner_user_id: creator.userId ?? '',
+    handle: creator.usernameNormalized,
+    spotify_id: '',
+    name: creator.displayName ?? creator.username,
+    image_url: creator.avatarUrl ?? undefined,
+    published: true,
+    is_verified: false,
+    is_featured: false,
+    marketing_opt_out: false,
+    created_at: new Date().toISOString(),
+  };
 }
 
 export default async function ContentSmartLinkPage({
@@ -99,6 +119,21 @@ export default async function ContentSmartLinkPage({
   }
 
   const content = await resolveContentOrRedirect(creator, slug);
+  if (!content) {
+    // Real-but-unpublished entity → alerts opt-in instead of 404 (JOV-3682).
+    const unpublished = await getUnpublishedReleasePresence(creator.id, slug);
+    if (!unpublished) {
+      notFound();
+    }
+    return (
+      <Suspense fallback={null}>
+        <UnpublishedEntityAlerts
+          artist={creatorToArtist(creator)}
+          entityTitle={unpublished.title}
+        />
+      </Suspense>
+    );
+  }
 
   // Tracks use a client redirect here to preserve query params like dsp/UTM
   // while keeping this route prerendered. Metadata points crawlers at the
@@ -587,6 +622,15 @@ export async function generateMetadata({
 
   const content = await getContentBySlug(creator.id, slug);
   if (!content) {
+    const unpublished = await getUnpublishedReleasePresence(creator.id, slug);
+    if (unpublished) {
+      const artistName = creator.displayName ?? creator.username;
+      return {
+        title: `Coming soon · ${artistName}`,
+        description: `Something new from ${artistName} is still in the works. Get alerts the moment it drops.`,
+        robots: { index: false, follow: false },
+      };
+    }
     return { title: 'Not Found' };
   }
 

@@ -6,6 +6,7 @@ import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
   openDesktopAuthUrl,
+  useDesktopAppBootSignal,
 } from '@/lib/desktop/electron-bridge';
 
 type BrowserOpenState = 'idle' | 'opening' | 'opened' | 'error';
@@ -61,6 +62,9 @@ function getAppOrigin(): string {
 }
 
 export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
+  // Auth handoff is a dedicated BrowserWindow outside ClientProviders.
+  // Still clear any shell boot watchdog if this surface owns the view.
+  useDesktopAppBootSignal();
   const [openState, setOpenState] = useState<BrowserOpenState>('idle');
   const [openError, setOpenError] = useState<string | null>(null);
   const appOrigin = getAppOrigin();

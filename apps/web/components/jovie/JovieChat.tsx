@@ -1,6 +1,7 @@
 'use client';
 
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useSearchParams } from 'next/navigation';
 import {
   useCallback,
   useEffect,
@@ -70,7 +71,11 @@ export function JovieChat({
   const initialSkillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
-  /** Pinned opportunity card for empty-thread → card-open mode (GH #13177 / #13174). */
+  /**
+   * Pinned opportunity card for empty-thread → card-open mode
+   * (GH #13177 / #13174 / JOV-3933). Declared before useJovieChat so the
+   * server receives card facts on every turn.
+   */
   const [pinnedOpportunity, setPinnedOpportunity] =
     useState<OpportunityInboxCardViewModel | null>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
@@ -103,6 +108,7 @@ export function JovieChat({
     conversationId,
     onConversationCreate,
     username,
+    pinnedOpportunity,
   });
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
@@ -396,16 +402,23 @@ export function JovieChat({
   const lastAssistantIndex = findLastAssistantIndex(messages);
 
   const isStreaming = status === 'streaming';
+  const searchParams = useSearchParams();
+  const deepLinkOpportunityId = searchParams.get('opportunityId');
+
   // Empty-thread opportunity cards (GH #13177): only when there is no active
   // conversation content yet. Zero pending → leave empty state as-is (no pills).
+  // Also load when deep-linking a pin from the inbox (JOV-3933).
   const shouldLoadOpportunityCards =
-    !hasMessages && !conversationId && !isLoadingConversation;
+    (!hasMessages && !conversationId && !isLoadingConversation) ||
+    Boolean(deepLinkOpportunityId && !pinnedOpportunity);
   const { data: pendingOpportunityCards = [] } =
     usePendingOpportunityCardsQuery({
-      enabled: shouldLoadOpportunityCards && !pinnedOpportunity,
+      enabled: shouldLoadOpportunityCards,
     });
   const showEmptyOpportunityCards =
-    shouldLoadOpportunityCards &&
+    !hasMessages &&
+    !conversationId &&
+    !isLoadingConversation &&
     !pinnedOpportunity &&
     pendingOpportunityCards.length > 0;
 
@@ -419,12 +432,23 @@ export function JovieChat({
     setPinnedOpportunity(null);
   }, []);
 
-  // Clear pin when navigating to a different conversation.
+  // Deep-link: /app/chat?opportunityId=<uuid> pins the matching card.
   useEffect(() => {
-    if (conversationId) {
+    if (!deepLinkOpportunityId || pinnedOpportunity) return;
+    const match = pendingOpportunityCards.find(
+      card => card.id === deepLinkOpportunityId
+    );
+    if (match) {
+      setPinnedOpportunity(match);
+    }
+  }, [deepLinkOpportunityId, pendingOpportunityCards, pinnedOpportunity]);
+
+  // Clear pin when navigating to a different conversation (not for new empty threads).
+  useEffect(() => {
+    if (conversationId && !deepLinkOpportunityId) {
       setPinnedOpportunity(null);
     }
-  }, [conversationId]);
+  }, [conversationId, deepLinkOpportunityId]);
 
   // Pin mode uses the thread chrome (docked composer + header) so the card
   // stays above the transcript, matching inbox → pinned-card behavior.

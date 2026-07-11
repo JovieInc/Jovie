@@ -3,6 +3,7 @@ export {
   artistProfileNavItem,
   artistSettingsNavigation,
   dashboardHome,
+  inboxNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,

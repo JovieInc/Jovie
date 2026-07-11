@@ -289,6 +289,70 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(result.dbUserId).toBe('db_user_1');
   });
 
+  it('creates a DB user when waitlist gate is disabled and no waitlist entry exists', async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: 'ba_new_user', email: 'new@example.com' },
+      session: { id: 'sess_new' },
+    });
+    mockIsWaitlistGateEnabled.mockResolvedValue(false);
+
+    mockDbSelect
+      // loadAuthGateRecord: no existing DB user
+      .mockReturnValueOnce(chainLimit([]))
+      // createUserWithRetry: no existing row for betterAuthUserId
+      .mockReturnValueOnce(chainLimit([]))
+      // post-create status read
+      .mockReturnValueOnce(
+        chainLimit([{ userStatus: 'waitlist_approved', deletedAt: null }])
+      );
+
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 'new_db_user_1' }]),
+        }),
+      }),
+    });
+
+    const result = await resolveUserState();
+
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
+    expect(result.redirectTo).toBe('/start?fresh_signup=true');
+    expect(result.dbUserId).toBe('new_db_user_1');
+    expect(mockDbInsert).toHaveBeenCalled();
+  });
+
+  it('redirects to waitlist when gate is enabled and user has no waitlist entry', async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: 'ba_waitlist', email: 'waitlist@example.com' },
+      session: { id: 'sess_waitlist' },
+    });
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
+
+    const waitlistLookupChain = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+    };
+
+    mockDbSelect
+      // loadAuthGateRecord: no existing DB user
+      .mockReturnValueOnce(chainLimit([]))
+      // checkWaitlistAccessInternal: no waitlist entry
+      .mockReturnValueOnce(waitlistLookupChain);
+
+    const result = await resolveUserState();
+
+    expect(result.state).toBe(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION);
+    expect(result.redirectTo).toBe('/waitlist');
+    expect(result.dbUserId).toBeNull();
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
   it('prefetches waitlist gate before the auth gate DB query finishes', async () => {
     mockGetSession.mockResolvedValue({
       user: { id: 'ba_parallel', email: 'p@example.com' },

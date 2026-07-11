@@ -70,6 +70,23 @@ describe('electron-bridge — defensive guards', () => {
     expect(isDesktopEnvironment()).toBe(true);
   });
 
+  it('notifyDesktopAppBooted no-ops without a bridge and does not warn', () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    __testing.notifyDesktopAppBooted();
+    expect(captureWarningMock).not.toHaveBeenCalled();
+    Reflect.deleteProperty(document.documentElement.dataset, 'desktopRuntime');
+  });
+
+  it('notifyDesktopAppBooted sends once when bridge method exists', () => {
+    const notifyAppBooted = vi.fn();
+    setElectronAPI({ notifyAppBooted });
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    __testing.notifyDesktopAppBooted();
+    __testing.notifyDesktopAppBooted();
+    expect(notifyAppBooted).toHaveBeenCalledTimes(1);
+    Reflect.deleteProperty(document.documentElement.dataset, 'desktopRuntime');
+  });
+
   it('safeOnUpdateAvailable does NOT throw when bridge is missing the method (stale binary)', () => {
     setElectronAPI({
       versions: { app: '0.1.0' },

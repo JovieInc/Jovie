@@ -11,6 +11,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
+import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
@@ -22,13 +23,24 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function POST(_request: Request, { params }: RouteParams) {
+export async function POST(request: Request, { params }: RouteParams) {
   const { id } = await params;
   const { userId, error } = await requireAuth();
   if (error) return error;
 
+  // Optional reject reason — never blocks the gesture (JOV-3934).
+  let reason: string | null = null;
   try {
-    // CAS transition: pending → dismissed (WHERE status='pending' AND userId=:userId)
+    const body = (await request.json()) as { reason?: unknown };
+    if (typeof body.reason === 'string' && body.reason.trim()) {
+      reason = body.reason.trim().slice(0, 200);
+    }
+  } catch {
+    // Empty body is fine — reject still proceeds.
+  }
+
+  try {
+    // CAS transition: pending → rejected (WHERE status='pending' AND userId=:userId)
     const updated = await db
       .update(suggestedActions)
       .set({ status: 'rejected' })
@@ -39,7 +51,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
           eq(suggestedActions.status, 'pending')
         )
       )
-      .returning({ id: suggestedActions.id });
+      .returning({ id: suggestedActions.id, kind: suggestedActions.kind });
 
     if (updated.length === 0) {
       return NextResponse.json(
@@ -51,6 +63,16 @@ export async function POST(_request: Request, { params }: RouteParams) {
     logger.info('[reject] suggested_action dismissed', {
       approvalId: id,
       userId,
+    });
+
+    // Taste writeback (JOV-3934) — non-blocking. userId is already users.id.
+    void recordInboxDecision({
+      suggestedActionId: id,
+      userId,
+      verdict: 'rejected',
+      reason,
+      cardKind: updated[0]?.kind ?? null,
+      surface: 'opportunity-inbox',
     });
 
     return NextResponse.json(

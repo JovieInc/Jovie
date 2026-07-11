@@ -48,6 +48,8 @@ export interface StaticArtistPageProps {
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly showClaimFooter?: boolean;
+  readonly claimFooterHref?: string | null;
 }
 
 export function StaticArtistPage({
@@ -81,6 +83,8 @@ export function StaticArtistPage({
   merchCards,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  showClaimFooter = false,
+  claimFooterHref = null,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -142,6 +146,8 @@ export function StaticArtistPage({
       merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
+      showClaimFooter={showClaimFooter}
+      claimFooterHref={claimFooterHref}
     />
   );
 }

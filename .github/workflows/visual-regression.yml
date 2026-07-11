@@ -1,0 +1,319 @@
+# Visual regression for public marketing/auth surfaces + admin chrome (JOV-4060/4062).
+#
+# Two modes, one job:
+#   - compare (pull_request): runs tests/e2e/visual-regression.spec.ts against the
+#     committed baselines in apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts/.
+#     Informational for now (continue-on-error) — flip to blocking once the baseline
+#     set is complete and fresh (see the follow-up issue linked in the PR that added
+#     this workflow). Diff artifacts upload on failure.
+#   - refresh (push:main / schedule / dispatch): re-runs the suite with
+#     --update-snapshots and opens/updates a single auto-PR when baselines change
+#     (same JOVIE_BOT + merge-queue pattern as screenshots.yml). This is what heals
+#     the currently stale/missing baseline set without a human in the loop.
+#
+# Functional assertions in the spec (horizontal scroll, CTA clipping) still fail the
+# refresh run — a broken layout never silently becomes the new baseline.
+name: Visual Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/app/(marketing)/**'
+      - 'apps/web/app/(home)/**'
+      - 'apps/web/app/(auth)/**'
+      - 'apps/web/app/layout.tsx'
+      - 'apps/web/app/globals.css'
+      - 'apps/web/components/**'
+      - 'apps/web/features/**'
+      - 'apps/web/styles/**'
+      - 'apps/web/tailwind.config.*'
+      - 'packages/ui/**'
+      - 'apps/web/tests/e2e/visual-regression.spec.ts'
+      - 'apps/web/tests/e2e/admin-visual-regression.spec.ts'
+      - 'apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts/**'
+      - '.github/workflows/visual-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/app/(marketing)/**'
+      - 'apps/web/app/(home)/**'
+      - 'apps/web/app/(auth)/**'
+      - 'apps/web/app/layout.tsx'
+      - 'apps/web/app/globals.css'
+      - 'apps/web/components/**'
+      - 'apps/web/features/**'
+      - 'apps/web/styles/**'
+      - 'apps/web/tailwind.config.*'
+      - 'packages/ui/**'
+      - 'apps/web/tests/e2e/visual-regression.spec.ts'
+      - 'apps/web/tests/e2e/admin-visual-regression.spec.ts'
+      - '.github/workflows/visual-regression.yml'
+  schedule:
+    # Daily catch-up so baselines never drift more than a day behind main.
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: visual-regression-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'baseline-refresh' }}
+  cancel-in-progress: true
+
+jobs:
+  visual-regression:
+    name: Visual Regression (${{ github.event_name == 'pull_request' && 'compare' || 'baseline refresh' }})
+    # Fork PRs are excluded (no secrets). Dependabot PRs are excluded (no Neon access).
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]') }}
+    environment: Preview – jovie
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      REFRESH_MODE: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
+      SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__
+    steps:
+      - name: Generate Jovie Bot token (refresh only)
+        id: app-token
+        if: env.REFRESH_MODE == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+
+      - name: Create ephemeral Neon database branch
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: visual-regression-${{ github.run_id }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '3'
+
+      - name: Resolve DATABASE_URL from Neon branch (early)
+        id: resolve-visual-neon-db-url-early
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          connection_file: ${{ steps.neon-branch.outputs.connection_file }}
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        run: echo "DATABASE_URL=${{ steps.resolve-visual-neon-db-url-early.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Fail if Neon DB URL is missing
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available."
+            exit 1
+          fi
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: visual-regression-${{ github.run_id }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed public QA fixtures
+        run: pnpm --filter=@jovie/web run seed:test-data
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
+      - name: Build app (public routes)
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Run visual regression suite
+        id: visual
+        # Informational on PRs until the baseline set is complete — see workflow header.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        run: |
+          cd apps/web
+
+          # Empty auth state so Playwright's auth-setup project doesn't crash.
+          # The public suite tests anonymous visitor routes only.
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found — visual regression cannot start."
+            exit 1
+          fi
+
+          PORT=3100 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+
+          SERVER_READY=false
+          for _attempt in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "::error::Standalone server failed to start within 30s."
+            exit 1
+          fi
+
+          UPDATE_FLAG=""
+          if [ "$REFRESH_MODE" = "true" ]; then
+            UPDATE_FLAG="--update-snapshots"
+          fi
+
+          # Public marketing/auth baselines (JOV-4060)
+          pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
+
+          # Admin surfaces (JOV-4062) — same server, refresh heals stale admin baselines.
+          # Compare stays informational with the public suite (continue-on-error on PRs).
+          E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=admin \
+            pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
+        env:
+          BASE_URL: http://localhost:3100
+          SMOKE_ONLY: '1'
+          CI: true
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: admin
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: visual-regression-ci
+
+      - name: Upload Playwright report on failure
+        if: steps.visual.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+      - name: Check for baseline changes (refresh only)
+        id: diff
+        if: env.REFRESH_MODE == 'true' && steps.visual.outcome == 'success'
+        run: |
+          if [ -z "$(git status --porcelain "$SNAPSHOT_DIR")" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No baseline changes detected."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Baselines changed:"
+            git status --short "$SNAPSHOT_DIR"
+          fi
+
+      - name: Create or update baseline PR (refresh only)
+        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="visual-baselines/auto-update"
+
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
+            -q '.[0].number' 2>/dev/null || true)
+
+          git checkout -b "$BRANCH"
+          git add "$SNAPSHOT_DIR"
+          git commit -m "chore: refresh visual regression baselines [auto]
+
+          Triggered by ${GITHUB_SHA::8} (run ${GITHUB_RUN_ID})"
+
+          # Dedicated bot branch: always force-push the latest generated baselines.
+          # Gracefully skip when the branch is merge-queue locked; retry transient 500s.
+          PUSHED=false
+          for ATTEMPT in 1 2 3; do
+            set +e
+            PUSH_OUTPUT=$(git push --force origin "$BRANCH" 2>&1)
+            PUSH_EXIT=$?
+            set -e
+
+            if [ "$PUSH_EXIT" -eq 0 ]; then
+              PUSHED=true
+              break
+            fi
+
+            if [[ "$PUSH_OUTPUT" == *"A pull request for this branch has been added to a merge queue"* ]] || [[ "$PUSH_OUTPUT" == *"cannot be updated"* ]]; then
+              echo "$PUSH_OUTPUT"
+              echo "Baseline branch is queued for merge; skipping update for this run."
+              exit 0
+            fi
+
+            if [[ "$PUSH_OUTPUT" == *"The requested URL returned error: 500"* ]] && [ "$ATTEMPT" -lt 3 ]; then
+              echo "$PUSH_OUTPUT"
+              echo "Transient GitHub 500 during push; retrying..."
+              sleep $((ATTEMPT * 4))
+              continue
+            fi
+
+            echo "$PUSH_OUTPUT"
+            exit "$PUSH_EXIT"
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "Failed to push baseline update branch after retries."
+            exit 1
+          fi
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Updated existing PR #$EXISTING_PR via force-push"
+            gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
+          else
+            PR_URL=$(gh pr create \
+              --title "chore: refresh visual regression baselines" \
+              --body "Auto-generated baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm), same environment the compare lane runs in.")
+            gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
+          fi
+
+      - name: Cleanup Neon branch
+        if: always()
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_NAME: visual-regression-${{ github.run_id }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "Neon credentials missing; skipping branch cleanup." >&2
+            exit 0
+          fi
+
+          echo "Deleting Neon branch '$BRANCH_NAME' for run ${{ github.run_id }}..."
+          pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
+            echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
+          }
+
+      - name: Surface compare outcome (PR only)
+        if: github.event_name == 'pull_request' && steps.visual.outcome == 'failure'
+        run: |
+          echo "::warning::Visual regression compare failed — informational for now. Download the visual-regression-report artifact to inspect diffs. This lane flips to blocking once the baseline set is complete."

@@ -138,27 +138,91 @@ run_trufflehog_pre_commit() {
     $(trufflehog_exclude_args)
 }
 
+# trufflehog `git file://…` internally clones the local repo. On persistent
+# CI runners the workdir can be a partial (promisor) clone whose object store
+# stops serving local clones — upload-pack dies with "could not fetch <sha>
+# from promisor remote" before any scanning happens (#13994). That signature
+# is infrastructure corruption, never a secret finding, so it is safe to
+# repair the object store and retry once. Findings failures never match the
+# signature and propagate unchanged.
+CLONE_CORRUPTION_SIGNATURE='promisor remote|repository corruption on the remote side|failed to clone file Git repo'
+
+repair_partial_clone() {
+  echo "Partial-clone corruption detected — repairing workdir (#13994)..."
+  git config --unset-all remote.origin.promisor || true
+  git config --unset-all remote.origin.partialclonefilter || true
+  # trufflehog's internal `git clone file://…` makes upload-pack serve every
+  # advertised ref, and persistent runner workdirs accumulate stale refs whose
+  # objects were promisor-elided long ago. Drop every ref the diff scan does
+  # not need (detached HEAD survives — its objects arrived with this job's own
+  # checkout fetch), then transfer a complete pack for the scan base.
+  local base_branch keep_ref ref
+  base_branch="${BASE_REF#origin/}"
+  keep_ref="refs/remotes/origin/${base_branch}"
+  # Ref pruning is CI-only (persistent runner workdirs); never touch a
+  # developer clone's refs. refs/heads is left alone everywhere.
+  if [[ -n "${CI:-}" ]]; then
+    while IFS= read -r ref; do
+      [[ "$ref" == "$keep_ref" ]] && continue
+      git update-ref -d "$ref" 2>/dev/null || true
+    done < <(git for-each-ref --format='%(refname)' refs/remotes refs/tags refs/replace refs/prefetch)
+  fi
+  # Refetch must cover HEAD's own history too: incremental checkouts on a
+  # blob:none workdir leave the PR branch's older objects promisor-elided, so
+  # repairing only the base branch still fails on the next unreadable object.
+  # Fetching the commit id directly is the same trick actions/checkout uses.
+  local head_sha
+  head_sha="$(git rev-parse HEAD)"
+  # --refetch needs git >= 2.36; older runner images fall back to a noop
+  # negotiation fetch, which also transfers a complete unfiltered pack.
+  git fetch --refetch origin \
+    "+refs/heads/${base_branch}:${keep_ref}" "$head_sha" \
+    || git -c fetch.negotiationAlgorithm=noop fetch origin \
+      "+refs/heads/${base_branch}:${keep_ref}" "$head_sha"
+}
+
+run_trufflehog_git() {
+  local log status
+  log="$(mktemp)"
+  status=0
+  # shellcheck disable=SC2046
+  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
+    >"$log" 2>&1 || status=$?
+  cat "$log"
+  if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
+    echo "::error title=Secret scan checkout corruption::TruffleHog could not read the runner's Git object store; repairing the checkout and retrying once." >&2
+    repair_partial_clone || {
+      status=$?
+      echo "::error title=Secret scan checkout repair failed::Unable to fetch a complete Git object store; secret scanning did not run." >&2
+      rm -f "$log"
+      return "$status"
+    }
+    status=0
+    # shellcheck disable=SC2046
+    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
+      || status=$?
+  fi
+  rm -f "$log"
+  return $status
+}
+
 run_trufflehog_ci_pr() {
   local base_commit
   base_commit="$(git rev-parse "$BASE_REF")"
 
   echo "Running trufflehog git since ${BASE_REF} (${base_commit})..."
-  # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" \
+  run_trufflehog_git \
     --since-commit "$base_commit" \
     --branch HEAD \
     --no-verification \
-    --fail \
-    $(trufflehog_exclude_args)
+    --fail
 }
 
 run_trufflehog_full() {
   echo "Running trufflehog git on full history..."
-  # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" \
+  run_trufflehog_git \
     --no-verification \
-    --fail \
-    $(trufflehog_exclude_args)
+    --fail
 }
 
 usage() {
