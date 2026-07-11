@@ -41,6 +41,8 @@ That script verifies Node.js 22.x, pnpm 9.15.4, ripgrep, Doppler, GitHub CLI aut
 
 ## Cleanup
 
+Codex stop hooks run the deterministic worktree lifecycle inventory/reaper policy as described in [`docs/WORKTREE_LIFECYCLE.md`](docs/WORKTREE_LIFECYCLE.md). They must register owner/run metadata at worktree creation and never use ad-hoc deletion.
+
 Codex stop hooks run:
 
 ```bash

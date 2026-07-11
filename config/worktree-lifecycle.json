@@ -1,0 +1,9 @@
+{
+  "ttl_days": 14,
+  "emergency_ttl_days": 3,
+  "critical_ttl_days": 1,
+  "emergency_free_gb": 20,
+  "critical_free_gb": 10,
+  "metadata_file": ".worktree-owner.json",
+  "report_file": "~/.cache/jovie/worktree-lifecycle/latest.json"
+}

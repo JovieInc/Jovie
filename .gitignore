@@ -112,6 +112,7 @@ doppler.yaml
 
 # Local git worktrees (should never be committed)
 .worktrees/
+.worktree-owner.json
 /.issues/
 # GBrain per-worktree source state
 /.gbrain-source

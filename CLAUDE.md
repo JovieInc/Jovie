@@ -21,6 +21,12 @@ Set `JOVIE_AGENT_PROFILE` before editing. Non-coding profiles (`default`, Chief,
 
 Before starting any task, agents must query gbrain for both the org chart and existing work in the area. Fetch `gbrain:agent-org-chart` when available, read `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted ownership/current-priorities query for the task. If another agent owns the area, delegate through the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`; do not proceed without the coordination check.
 
+## Worktree Lifecycle (Required)
+
+Every agent worktree must be registered immediately after creation with `scripts/worktree-lifecycle.mjs register`, recording `owner`, `run_id`, `created_at`, and `last_activity_at`. Use `--named-user` for persistent user-named worktrees. Before cleanup, run the deterministic JSON inventory; only clean, unclaimed, inactive worktrees past the configured TTL may be removed. Never remove dirty, locked, active-process, named-user, claimed, metadata-missing, or current-main worktrees. Cleanup must use `scripts/worktree-lifecycle-cron.sh` or `worktree-lifecycle.mjs reap --apply`, never ad-hoc `rm -rf`; the reaper runs `git worktree prune` only after confirmed removals. Disk-pressure alerts in the JSON report must be surfaced to Summer.
+
+Detailed policy: [`docs/WORKTREE_LIFECYCLE.md`](docs/WORKTREE_LIFECYCLE.md).
+
 ## Instruction Architecture
 
 - `AGENTS.md` → symlink to this file. Host wrappers (`CODEX.md`, Copilot, etc.) point here — never duplicate policy.
