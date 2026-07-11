@@ -469,10 +469,120 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "gtmq: 1" in result.stdout
-        assert "=== GRAPHITE MQ in-flight (leave) ===" in result.stdout
+        assert "=== GRAPHITE MQ synthetic drafts ===" in result.stdout
         assert "#999" in result.stdout
+        assert "ACTIVE/PRESERVE (synthetic branch is not a draft)" in result.stdout
         assert "[dry-run] would -merge-queue on #999" not in result.stdout
         assert "[dry-run] would +needs-conflict-resolution on #999" not in result.stdout
+
+    def test_gtmq_orphan_dry_run_reports_without_mutation(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                echo "$*" >> "{tmp_path}/calls.log"
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":1001,"t":"Graphite orphan","body":"Sources: https://app.graphite.com/github/pr/JovieInc/Jovie/41 and https://github.com/JovieInc/Jovie/pull/42","draft":true,"m":"CONFLICTING","ms":"DIRTY","head":"gtmq_spec_orphan","L":[],"fail":[]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  [[ "$3" == "41" ]] && echo MERGED || echo CLOSED
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "#1001  Graphite orphan  ORPHAN (#41=MERGED, #42=CLOSED)" in result.stdout
+        assert "[dry-run] would comment root cause and close orphaned Graphite draft #1001" in result.stdout
+        calls = (tmp_path / "calls.log").read_text(encoding="utf-8")
+        assert "pr comment" not in calls
+        assert "pr close" not in calls
+
+    def test_gtmq_active_source_preserves_draft(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                echo "$*" >> "{tmp_path}/calls.log"
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":1002,"t":"Graphite active","body":"* https://app.graphite.com/github/pr/JovieInc/Jovie/51\\n* https://app.graphite.com/github/pr/JovieInc/Jovie/52","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"gtmq_spec_active","L":[],"fail":[]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  [[ "$3" == "51" ]] && echo CLOSED || echo OPEN
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=0 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "ACTIVE/PRESERVE (#51=CLOSED, #52=OPEN)" in result.stdout
+        calls = (tmp_path / "calls.log").read_text(encoding="utf-8")
+        assert "pr comment" not in calls
+        assert "pr close" not in calls
+
+    def test_gtmq_orphan_live_mode_comments_before_close(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                echo "$*" >> "{tmp_path}/calls.log"
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":1003,"t":"Graphite orphan","body":"https://app.graphite.com/github/pr/JovieInc/Jovie/61","draft":true,"m":"CONFLICTING","ms":"DIRTY","head":"gtmq_spec_closed","L":[],"fail":[]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then echo MERGED; exit 0; fi
+                if [[ "$1 $2" == "pr comment" || "$1 $2" == "pr close" ]]; then exit 0; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=0 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "closed orphaned Graphite draft #1003" in result.stdout
+        calls = (tmp_path / "calls.log").read_text(encoding="utf-8").splitlines()
+        comment_index = next(i for i, call in enumerate(calls) if call.startswith("pr comment 1003"))
+        close_index = next(i for i, call in enumerate(calls) if call.startswith("pr close 1003"))
+        assert comment_index < close_index
+        assert "Root cause: this Graphite merge-queue synthetic draft is orphaned" in calls[comment_index]
 
 
 class TestMergeQueueWatchdog:

@@ -9,7 +9,12 @@
 #   - run `gh pr merge` (branch protection lets only the Graphite app push to
 #     main; Graphite rebase-merges enrolled PRs server-side)
 #   - retarget to integration/loop-* (agents ship straight to main now)
-#   - close PRs (surfaced for a human instead — see the SURFACE bucket)
+#   - close ordinary PRs (surfaced for a human instead — see the SURFACE bucket)
+#
+# The sole close path is a Graphite synthetic-draft reaper. It closes a
+# `gtmq_*` draft only after every source PR named by Graphite's generated body
+# is confirmed closed or merged. Missing/malformed source metadata and GitHub
+# lookup failures always preserve the draft.
 #
 # Buckets that need code work (CONFLICT / BLOCKED) are printed for the
 # /drain command to fan out per-PR worktree agents (cheap model for mechanical
@@ -50,6 +55,48 @@ unlabel() {  # unlabel <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would -$2 on #$1"; return 0; }
   gh_retry pr edit "$1" -R "$REPO" --remove-label "$2" >/dev/null 2>&1 \
     && echo "    -$2 on #$1" || echo "    !! failed to remove $2 on #$1"
+}
+
+graphite_source_prs() {  # graphite_source_prs <generated-body>
+  # Graphite currently links sources through app.graphite.com. Accept GitHub
+  # pull URLs too so a harmless body-template change does not strand drafts.
+  # Do not fall back to arbitrary #123 references: generated bodies may gain
+  # issue links, and false positives would make closing unsafe.
+  grep -Eo '(app\.graphite\.com/github/pr/[^/[:space:])]+/[^/[:space:])]+/[0-9]+|github\.com/[^/[:space:])]+/[^/[:space:])]+/pull/[0-9]+)' <<<"$1" \
+    | grep -Eo '[0-9]+$' \
+    | sort -nu \
+    || true
+}
+
+graphite_source_state() {  # graphite_source_state <num>
+  local n="$1" state
+  state="$(gh_retry pr view "$n" -R "$REPO" --json state --jq '.state' 2>/dev/null || true)"
+  case "$state" in
+    CLOSED | MERGED) echo "$state" ;;
+    OPEN) echo "OPEN" ;;
+    *) echo "UNKNOWN" ;;
+  esac
+}
+
+reap_graphite_orphan() {  # reap_graphite_orphan <synthetic-num> <source-summary>
+  local n="$1" source_summary="$2"
+  local comment="Root cause: this Graphite merge-queue synthetic draft is orphaned because every source PR listed in its generated body is already closed or merged (${source_summary}). Closing the synthetic queue artifact; no source PR is being modified."
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would comment root cause and close orphaned Graphite draft #$n"
+    return 0
+  fi
+
+  # Do not close without leaving the diagnostic trail requested by the queue
+  # drain contract. A comment failure therefore preserves the draft.
+  if ! gh_retry pr comment "$n" -R "$REPO" --body "$comment" >/dev/null; then
+    echo "    !! failed to record orphan root cause on #$n; preserving draft"
+    return 0
+  fi
+  if gh_retry pr close "$n" -R "$REPO" >/dev/null; then
+    echo "    closed orphaned Graphite draft #$n"
+  else
+    echo "    !! root cause recorded but failed to close #$n"
+  fi
 }
 
 check_failures_for_pr() {  # check_failures_for_pr <num>
@@ -113,7 +160,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
 }
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
+  --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
@@ -121,6 +168,7 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     m: .mergeable,
     ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
+    body: (.body // ""),
     L: [.labels[].name],
     fail: []
   } ]')"
@@ -271,8 +319,51 @@ echo "$SNAP" | jq -r '.[]
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated"))
   | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
 
-# --- Graphite MQ working drafts (the queue itself; leave alone) ---
-echo "=== GRAPHITE MQ in-flight (leave) ==="
-echo "$SNAP" | jq -r '.[] | select(.head|startswith("gtmq_")) | "  #\(.n)  \(.t)"'
+# --- Graphite MQ synthetic drafts: reap only proven orphans ---
+echo "=== GRAPHITE MQ synthetic drafts ==="
+gtmq_orphans=0
+gtmq_active=0
+while IFS= read -r pr; do
+  stop_if_budget_exhausted && break
+  n="$(jq -r '.n' <<<"$pr")"
+  t="$(jq -r '.t' <<<"$pr")"
+  draft="$(jq -r '.draft' <<<"$pr")"
+  body="$(jq -r '.body' <<<"$pr")"
+
+  # A gtmq-named non-draft is unexpected and is never a safe reaper target.
+  if [[ "$draft" != "true" ]]; then
+    echo "  #$n  $t  ACTIVE/PRESERVE (synthetic branch is not a draft)"
+    gtmq_active=$((gtmq_active + 1))
+    continue
+  fi
+
+  sources="$(graphite_source_prs "$body")"
+  if [[ -z "$sources" ]]; then
+    echo "  #$n  $t  ACTIVE/PRESERVE (no parseable Graphite source PRs)"
+    gtmq_active=$((gtmq_active + 1))
+    continue
+  fi
+
+  all_terminal=1
+  source_summary=""
+  for source in $sources; do
+    state="$(graphite_source_state "$source")"
+    [[ -n "$source_summary" ]] && source_summary+=", "
+    source_summary+="#${source}=${state}"
+    if [[ "$state" != "CLOSED" && "$state" != "MERGED" ]]; then
+      all_terminal=0
+    fi
+  done
+
+  if [[ "$all_terminal" -eq 1 ]]; then
+    echo "  #$n  $t  ORPHAN ($source_summary)"
+    reap_graphite_orphan "$n" "$source_summary"
+    gtmq_orphans=$((gtmq_orphans + 1))
+  else
+    echo "  #$n  $t  ACTIVE/PRESERVE ($source_summary)"
+    gtmq_active=$((gtmq_active + 1))
+  fi
+done < <(echo "$SNAP" | jq -c '.[] | select(.head|startswith("gtmq_"))')
+echo "  Graphite orphans: $gtmq_orphans; active/preserved: $gtmq_active"
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="
