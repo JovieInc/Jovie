@@ -19,6 +19,7 @@ FULL_CHECKOUT_JOBS = (
 )
 
 FLEET_CONTROLLER_JOBS = (
+    ("auto-pr-on-push.yml", "open-pr"),
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("merge-queue-autoenroll.yml", "enroll"),
     ("merge-queue-autoenroll.yml", "rebase"),
@@ -96,3 +97,11 @@ def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
         block = _job_block(workflow, job_name)
         assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
         assert "run: gh --version" in block, (workflow, job_name)
+
+
+def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:
+    """The pushed branch is controller input; current main supplies helpers."""
+    block = _job_block("auto-pr-on-push.yml", "open-pr")
+    assert 'git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"' in block
+    assert 'git diff --name-only "origin/main...origin/$BRANCH"' in block
+    assert "origin/main...HEAD" not in block
