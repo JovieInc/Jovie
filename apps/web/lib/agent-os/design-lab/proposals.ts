@@ -9,7 +9,9 @@ import {
   resolveDesignProposalFilePath,
 } from './paths';
 import {
+  DESIGN_PROPOSAL_STATUSES,
   type DesignProposal,
+  type DesignProposalComment,
   DesignProposalSchema,
   type DesignProposalStatus,
 } from './types';
@@ -22,7 +24,7 @@ function isMissingFileError(error: unknown): boolean {
   );
 }
 
-function parseProposalRecord(
+export function parseProposalRecord(
   raw: unknown,
   dayBucket: string
 ): DesignProposal | null {
@@ -117,9 +119,26 @@ export async function ensureDesignLabDevFixtures(): Promise<void> {
   }
 }
 
-export async function listPendingDesignProposals(): Promise<
-  readonly DesignProposal[]
-> {
+export interface DesignProposalFilters {
+  readonly statuses?: readonly DesignProposalStatus[];
+  readonly kinds?: readonly DesignProposal['kind'][];
+  readonly affectedRoute?: string;
+}
+
+export function matchesDesignProposalFilters(
+  proposal: DesignProposal,
+  filters: DesignProposalFilters
+): boolean {
+  const statuses = new Set(filters.statuses ?? DESIGN_PROPOSAL_STATUSES);
+  if (!statuses.has(proposal.status)) return false;
+  if (filters.kinds && !filters.kinds.includes(proposal.kind)) return false;
+  const route = filters.affectedRoute?.trim();
+  return !route || proposal.designGap?.affectedRoutes.includes(route) === true;
+}
+
+export async function listDesignProposals(
+  filters: DesignProposalFilters = {}
+): Promise<readonly DesignProposal[]> {
   await ensureDesignLabDevFixtures();
 
   const dayBuckets = await listDayBuckets();
@@ -129,8 +148,14 @@ export async function listPendingDesignProposals(): Promise<
 
   return proposals
     .flat()
-    .filter(proposal => proposal.status === 'pending')
+    .filter(proposal => matchesDesignProposalFilters(proposal, filters))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export async function listPendingDesignProposals(): Promise<
+  readonly DesignProposal[]
+> {
+  return listDesignProposals({ statuses: ['proposed', 'reviewing'] });
 }
 
 export async function getDesignProposal(
@@ -166,5 +191,61 @@ export function deriveProposalStatus(
     return 'approved';
   }
 
-  return 'pending';
+  return 'proposed';
+}
+
+const COMPACT_FEEDBACK_PATTERN =
+  /^(PROPOSED-SECTION-\d{4}):\s*(\S[\s\S]{0,3999})$/;
+
+export interface ParsedCompactFeedback {
+  readonly reviewId: string;
+  readonly body: string;
+}
+
+export function parseCompactFeedback(
+  input: string
+): ParsedCompactFeedback | null {
+  const match = COMPACT_FEEDBACK_PATTERN.exec(input.trim());
+  if (!match?.[1] || !match[2]) return null;
+  return { reviewId: match[1], body: match[2].trim() };
+}
+
+export function appendDesignProposalComment(
+  proposal: DesignProposal,
+  comment: DesignProposalComment
+): DesignProposal {
+  if (!proposal.designGap) {
+    throw new Error('Design proposal does not have a design-gap record.');
+  }
+  return DesignProposalSchema.parse({
+    ...proposal,
+    designGap: {
+      ...proposal.designGap,
+      comments: [...proposal.designGap.comments, comment],
+    },
+  });
+}
+
+export function transitionProposalToImplemented(
+  proposal: DesignProposal,
+  evidence: { readonly implementedAt: string; readonly evidenceRefs: string[] }
+): DesignProposal {
+  if (proposal.status !== 'approved') {
+    throw new Error('Only approved proposals can be implemented.');
+  }
+  if (!proposal.designGap?.registryTask) {
+    throw new Error('Registry task is required before implementation.');
+  }
+  return DesignProposalSchema.parse({
+    ...proposal,
+    status: 'implemented',
+    designGap: {
+      ...proposal.designGap,
+      registryTask: {
+        ...proposal.designGap.registryTask,
+        implementedAt: evidence.implementedAt,
+        evidenceRefs: evidence.evidenceRefs,
+      },
+    },
+  });
 }
