@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   EXEMPTION_RATCHET_BASELINE,
+  getRouteRecipeParity,
   MARKETING_RECIPE_IDS,
   MARKETING_RECIPES,
   MARKETING_ROUTE_MANIFEST,
@@ -35,6 +36,7 @@ import {
   MarketingBriefSchema,
   MarketingCompositionSchema,
   type MarketingSectionId,
+  PROPOSED_SECTIONS,
   type RecipeId,
   resolveComposition,
 } from '@/data/marketing';
@@ -388,6 +390,151 @@ describe('marketing route manifest integrity', () => {
       }
     }
   });
+
+  it('every rendered binding resolves to an approved section or approved proposal', () => {
+    for (const entry of MARKETING_ROUTE_MANIFEST) {
+      for (const binding of entry.renderedSections) {
+        if (binding.kind === 'approved-section') {
+          const section = MARKETING_SECTIONS.find(
+            candidate => candidate.id === binding.sectionId
+          );
+          expect(section?.status, `${entry.url}: ${binding.sectionId}`).toBe(
+            'approved'
+          );
+          expect(binding.componentPath.trim()).toBeTruthy();
+          continue;
+        }
+
+        const proposal = PROPOSED_SECTIONS.find(
+          candidate => candidate.id === binding.proposalId
+        );
+        expect(proposal, `${entry.url}: ${binding.proposalId}`).toBeDefined();
+        expect(
+          proposal && ['approved', 'implemented'].includes(proposal.status),
+          `${entry.url} cannot ship proposal ${binding.proposalId} with status ${proposal?.status}`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('every route has bindings or an explicit non-composable exemption', () => {
+    for (const entry of MARKETING_ROUTE_MANIFEST) {
+      if (entry.renderedSections.length === 0) {
+        const hasExemption = Boolean(entry.exempt?.reason.trim());
+        const isExplicitlyUnverified =
+          entry.bindingEvidence.status === 'unverified' &&
+          Boolean(entry.bindingEvidence.notes?.trim());
+        expect(hasExemption || isExplicitlyUnverified, entry.url).toBe(true);
+      } else {
+        expect(entry.recipeId, entry.url).toBeDefined();
+      }
+    }
+  });
+
+  it('keeps audited route-to-recipe parity gaps visible', () => {
+    const launchPricing = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/launch/pricing'
+    );
+    const artistProfiles = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/artist-profiles'
+    );
+    expect(launchPricing).toBeDefined();
+    expect(artistProfiles).toBeDefined();
+
+    const launchReport = getRouteRecipeParity(launchPricing!);
+    expect(launchReport.actualSectionIds).toEqual(['hero', 'pricing']);
+    expect(launchReport.expectedSectionIds).toEqual([
+      'hero',
+      'pricing',
+      'social-proof',
+      'comparison',
+      'faq',
+      'cta',
+    ]);
+    expect(launchReport.matches).toBe(false);
+
+    const artistReport = getRouteRecipeParity(artistProfiles!);
+    expect(artistReport.actualSectionIds).toEqual([
+      'hero',
+      'logo-cloud',
+      'feature-split',
+      'social-proof',
+      'capture',
+      'feature-split',
+      'monetization',
+      'spec-wall',
+      'how-it-works',
+      'social-proof',
+      'faq',
+      'cta',
+    ]);
+    expect(artistReport.evidenceStatus).toBe('verified');
+    expect(artistReport.matches).toBe(false);
+  });
+
+  it('does not claim parity for unaudited route bodies', () => {
+    const pay = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/pay');
+    expect(pay).toBeDefined();
+    expect(getRouteRecipeParity(pay!).matches).toBeNull();
+  });
+});
+
+describe('proposed section governance', () => {
+  it('uses unique stable proposal ids and complete review records', () => {
+    const ids = PROPOSED_SECTIONS.map(proposal => proposal.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    for (const proposal of PROPOSED_SECTIONS) {
+      expect(proposal.id).toMatch(/^PROPOSED-SECTION-\d{4}$/);
+      expect(proposal.proposedSectionName.trim()).toBeTruthy();
+      expect(proposal.problem.trim()).toBeTruthy();
+      expect(proposal.affectedRoutes.length).toBeGreaterThan(0);
+      expect(proposal.intendedAudience.length).toBeGreaterThan(0);
+      expect(proposal.conversionGoal.trim()).toBeTruthy();
+      expect(proposal.requiredContentFields.length).toBeGreaterThan(0);
+      expect(proposal.requiredMedia.length).toBeGreaterThan(0);
+      expect(proposal.proposedResponsiveBehavior.trim()).toBeTruthy();
+      expect(proposal.proposedCtaBehavior.trim()).toBeTruthy();
+      expect(proposal.similarExistingSections.length).toBeGreaterThan(0);
+      expect(proposal.existingApprovedVariantInsufficiency.trim()).toBeTruthy();
+      expect(proposal.openDesignQuestions.length).toBeGreaterThan(0);
+      expect(proposal.comments.length).toBeGreaterThan(0);
+      expect(proposal.registryTask.trigger).toBe('after-approved');
+      expect(proposal.registryTask.requiredChanges.length).toBeGreaterThan(0);
+      expect(proposal.registryTask.exactFiles.length).toBeGreaterThan(0);
+      expect(proposal.registryTask.forbiddenPatterns.length).toBeGreaterThan(0);
+      expect(proposal.registryTask.acceptanceCriteria.length).toBeGreaterThan(
+        0
+      );
+      expect(proposal.registryTask.validationCommands.length).toBeGreaterThan(
+        0
+      );
+      expect(proposal.registryTask.evidenceRequired.length).toBeGreaterThan(0);
+      expect(proposal.registryTask.implementedAt).toBeNull();
+      expect(proposal.registryTask.evidenceRefs).toEqual([]);
+
+      for (const wireframe of [
+        proposal.wireframes.desktop,
+        proposal.wireframes.mobile,
+      ]) {
+        expect(wireframe.hierarchy.length).toBeGreaterThan(0);
+        expect(wireframe.layout.trim()).toBeTruthy();
+        expect(wireframe.mediaPlacement.trim()).toBeTruthy();
+        expect(wireframe.responsiveBehavior.trim()).toBeTruthy();
+        expect(wireframe.interactionModel.trim()).toBeTruthy();
+        expect(wireframe.placeholderContent).toBe('grayscale-only');
+      }
+    }
+  });
+
+  it('seeds only the four audited variant-level design gaps', () => {
+    expect(PROPOSED_SECTIONS.map(proposal => proposal.id)).toEqual([
+      'PROPOSED-SECTION-0001',
+      'PROPOSED-SECTION-0002',
+      'PROPOSED-SECTION-0003',
+      'PROPOSED-SECTION-0004',
+    ]);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -395,6 +542,32 @@ describe('marketing route manifest integrity', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('marketing decision engine determinism (golden fixtures)', () => {
+  it('applies nested brief defaults when asset and brand objects are omitted', () => {
+    const parsed = MarketingBriefSchema.parse({
+      businessObjective: 'Exercise Zod input defaults',
+      targetAudience: 'general',
+      desiredConversion: 'start',
+      intent: 'category',
+    });
+
+    expect(parsed.availableAssets).toEqual({
+      socialProofVerified: false,
+      statsVerified: false,
+      logoCloudVerified: false,
+      productScreenshots: true,
+      artistFaces: false,
+      artistFacesTwoRung: false,
+      takeRateReal: false,
+      phoneProfileAsset: false,
+      videoAsset: false,
+    });
+    expect(parsed.brandConstraints).toEqual({
+      darkOnly: true,
+      fullyStatic: true,
+      waitlistEnabled: false,
+    });
+  });
+
   const briefFiles = [
     'brief-01-artist-claim.json',
     'brief-02-homepage-general.json',

@@ -14,7 +14,40 @@
  * waitlist recipe (currently stub tier).
  */
 
+import type { ProposedSectionId } from './designGaps';
 import type { RecipeId } from './recipes';
+import { getMarketingRecipe } from './recipes';
+import type { MarketingSectionId } from './sections';
+import { getMarketingSection } from './sections';
+
+export type RenderedSectionBinding =
+  | {
+      readonly kind: 'approved-section';
+      readonly sectionId: MarketingSectionId;
+      readonly componentPath: string;
+    }
+  | {
+      readonly kind: 'proposal';
+      readonly proposalId: ProposedSectionId;
+    };
+
+const approvedBindings = (
+  componentPath: string,
+  ...sectionIds: readonly MarketingSectionId[]
+): readonly RenderedSectionBinding[] =>
+  sectionIds.map(sectionId => {
+    const section = getMarketingSection(sectionId);
+    if (section.status !== 'approved') {
+      throw new Error(
+        `Route manifest cannot bind non-approved section ${sectionId}`
+      );
+    }
+    return {
+      kind: 'approved-section' as const,
+      sectionId,
+      componentPath,
+    };
+  });
 
 /** A route entry — either bound to a recipe or exempt with a sanctioned reason. */
 export interface RouteManifestEntry {
@@ -22,6 +55,13 @@ export interface RouteManifestEntry {
   readonly glob: string;
   /** Recipe this route implements — required unless `exempt`. */
   readonly recipeId?: RecipeId;
+  /** Ordered production bindings. Repeated section ids are legal recipe beats. */
+  readonly renderedSections: readonly RenderedSectionBinding[];
+  readonly bindingEvidence: {
+    readonly status: 'verified' | 'unverified' | 'exempt';
+    readonly source: string;
+    readonly notes?: string;
+  };
   /**
    * Exemption — when present, the route is NOT a recipe-composable page.
    * DX2 escape hatch: requires Linear ID + approvedBy + prUrl + optional expires.
@@ -69,6 +109,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(home)/page.tsx',
     recipeId: 'homepage',
+    renderedSections: approvedBindings('apps/web/app/(home)/page.tsx', 'hero'),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+      notes:
+        'Live route audit; feature-flagged story variants are not certified as recipe parity.',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/',
@@ -76,6 +123,22 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/new/page.tsx',
     recipeId: 'homepage',
+    renderedSections: approvedBindings(
+      'components/marketing/homepage-v2/HomepageV2Route.tsx',
+      'hero',
+      'logo-cloud',
+      'feature-split',
+      'feature-split',
+      'feature-split',
+      'spec-wall',
+      'social-proof',
+      'pricing',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/new',
@@ -84,6 +147,19 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/pricing/page.tsx',
     recipeId: 'pricing',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/pricing/page.tsx',
+      'hero',
+      'pricing',
+      'social-proof',
+      'comparison',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+      notes: 'FAQ recipe beat is not rendered.',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/pricing',
@@ -91,6 +167,16 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/launch/pricing/page.tsx',
     recipeId: 'pricing',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/launch/pricing/page.tsx',
+      'hero',
+      'pricing'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+      notes: 'Hand-built plan cards; later pricing recipe beats are absent.',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/launch/pricing',
@@ -98,6 +184,25 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/artist-profiles/page.tsx',
     recipeId: 'artist-lp',
+    renderedSections: approvedBindings(
+      'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
+      'hero',
+      'logo-cloud',
+      'feature-split',
+      'social-proof',
+      'capture',
+      'feature-split',
+      'monetization',
+      'spec-wall',
+      'how-it-works',
+      'social-proof',
+      'faq',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-profiles',
@@ -105,6 +210,26 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/artist-profile/page.tsx',
     recipeId: 'artist-lp',
+    renderedSections: approvedBindings(
+      'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
+      'hero',
+      'logo-cloud',
+      'feature-split',
+      'social-proof',
+      'capture',
+      'feature-split',
+      'monetization',
+      'spec-wall',
+      'how-it-works',
+      'social-proof',
+      'faq',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+      notes: 'Alias renders the same route component as /artist-profiles.',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-profile',
@@ -113,6 +238,21 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/artist-notifications/page.tsx',
     recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'components/marketing/artist-notifications/ArtistNotificationsLanding.tsx',
+      'hero',
+      'logo-cloud',
+      'capture',
+      'feature-split',
+      'feature-grid',
+      'spec-wall',
+      'faq',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-notifications',
@@ -120,6 +260,19 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/download/page.tsx',
     recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/download/page.tsx',
+      'hero',
+      'feature-grid',
+      'how-it-works',
+      'feature-grid',
+      'faq',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/download',
@@ -127,6 +280,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/pay/page.tsx',
     recipeId: 'feature',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'route audit 2026-07-11',
+      notes:
+        'PayLanding body was outside the bounded route audit; no parity is asserted.',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/pay',
@@ -134,6 +294,17 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/voice/page.tsx',
     recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/voice/page.tsx',
+      'hero',
+      'feature-grid',
+      'feature-split',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/voice',
@@ -142,6 +313,24 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/launch/page.tsx',
+      'hero',
+      'logo-cloud',
+      'feature-split',
+      'feature-split',
+      'feature-split',
+      'feature-split',
+      'feature-split',
+      'feature-split',
+      'content-prose',
+      'comparison',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/launch',
@@ -149,6 +338,17 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/about/page.tsx',
     recipeId: 'seo',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/about/page.tsx',
+      'hero',
+      'content-prose',
+      'content-prose',
+      'faq'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/about',
@@ -156,6 +356,19 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/support/page.tsx',
     recipeId: 'seo',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/support/page.tsx',
+      'hero',
+      'content-prose',
+      'faq',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'route audit 2026-07-11',
+      notes:
+        'SupportChannels maps conceptually to content-prose or feature-grid; exact section type requires migration review.',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/support',
@@ -163,6 +376,17 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/compare/[slug]/page.tsx',
+      'hero',
+      'comparison',
+      'cta',
+      'faq'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/compare/*',
@@ -170,6 +394,18 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/alternatives/[slug]/page.tsx',
     recipeId: 'comparison',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+      'hero',
+      'content-prose',
+      'feature-grid',
+      'cta',
+      'faq'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/alternatives/*',
@@ -177,6 +413,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/blog/page.tsx',
     recipeId: 'blog-landing',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/blog/page.tsx',
+      'hero',
+      'blog-feed'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/blog',
@@ -184,6 +429,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/blog/category/[slug]/page.tsx',
     recipeId: 'blog-landing',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/blog/category/[slug]/page.tsx',
+      'hero',
+      'blog-feed'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-07-11',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/blog/category/*',
@@ -192,6 +446,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: 'waitlist/page.tsx',
     recipeId: 'waitlist',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'route audit 2026-07-11',
+      notes:
+        'Route renders an authenticated success view or redirects; canonical recipe mapping is not verified.',
+    },
     status: 'active',
     specVersion: '1.0.0',
     url: '/waitlist',
@@ -200,6 +461,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   // ── Exemptions (sanctioned per DX2 — linearId + approvedBy + prUrl required) ──
   {
     glob: '(marketing)/ai/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'noindex public brief — hand-rolled <main> layout, no marketing shell; not recipe-composable',
@@ -214,6 +480,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/blog/[slug]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'dynamic content page — article body via BlogPostPage organism; not section-composed',
@@ -227,6 +498,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/blog/authors/[username]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'dynamic content page — author card + post list; not section-composed',
@@ -240,6 +516,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/changelog/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'generated content page — rendered from repo CHANGELOG.md via lib/changelog-parser.ts; not recipe-composable',
@@ -253,6 +534,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/demo/video/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'noindex demo surface — renders features/demo/DemoVideoPage; not section-composed',
@@ -267,6 +553,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/demovideo/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason: 'noindex duplicate of /demo/video — identical body; legacy route',
       linearId: 'JOV-4063',
@@ -280,6 +571,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/investors/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'noindex investor brief — hand-rolled layout; not recipe-composable',
@@ -294,6 +590,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/renders/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'internal render surface — screenshot-capture index for marketing renders',
@@ -307,6 +608,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/renders/[state]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'internal render surface — profile showcase states; dynamicParams = false',
@@ -320,6 +626,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   },
   {
     glob: '(marketing)/renders/surfaces/[surface]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
     exempt: {
       reason:
         'internal render surface — MarketingRenderSurface capture targets',
@@ -352,6 +663,39 @@ export function isExempt(glob: string): boolean {
 
 export function isRecipeRoute(glob: string): boolean {
   return MANIFEST_BY_GLOB[glob]?.recipeId !== undefined;
+}
+
+export interface RouteRecipeParityReport {
+  readonly url: string;
+  readonly evidenceStatus: RouteManifestEntry['bindingEvidence']['status'];
+  readonly expectedSectionIds: readonly MarketingSectionId[];
+  readonly actualSectionIds: readonly MarketingSectionId[];
+  readonly matches: boolean | null;
+}
+
+export function getRouteRecipeParity(
+  entry: RouteManifestEntry
+): RouteRecipeParityReport {
+  const expectedSectionIds = entry.recipeId
+    ? getMarketingRecipe(entry.recipeId).sectionOrder
+    : [];
+  const actualSectionIds = entry.renderedSections.flatMap(binding =>
+    binding.kind === 'approved-section' ? [binding.sectionId] : []
+  );
+  const canCompare =
+    entry.bindingEvidence.status === 'verified' && entry.recipeId !== undefined;
+  return {
+    url: entry.url,
+    evidenceStatus: entry.bindingEvidence.status,
+    expectedSectionIds,
+    actualSectionIds,
+    matches: canCompare
+      ? expectedSectionIds.length === actualSectionIds.length &&
+        expectedSectionIds.every((sectionId, index) =>
+          Object.is(sectionId, actualSectionIds[index])
+        )
+      : null,
+  };
 }
 
 /**
