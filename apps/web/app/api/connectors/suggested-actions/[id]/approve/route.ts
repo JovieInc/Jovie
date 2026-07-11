@@ -21,6 +21,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
+import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import {
   enqueueApprovedActionWorkflow,
   recoverOrphanedApprovedAction,
@@ -65,6 +66,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
       .returning({
         id: suggestedActions.id,
         payload: suggestedActions.payload,
+        kind: suggestedActions.kind,
       });
 
     if (updated.length === 0) {
@@ -115,6 +117,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
       approvalId: id,
       userId,
       enqueueResult,
+    });
+
+    // Taste writeback (JOV-3934) — non-blocking. userId is already users.id.
+    void recordInboxDecision({
+      suggestedActionId: id,
+      userId,
+      verdict: 'approved',
+      cardKind: updated[0]?.kind ?? null,
+      surface: 'opportunity-inbox',
     });
 
     return NextResponse.json(

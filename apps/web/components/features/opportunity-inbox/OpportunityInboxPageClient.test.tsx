@@ -6,6 +6,15 @@ const mutateMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app',
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
 }));
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
@@ -134,7 +143,10 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByText('Connect Spotify')).toBeInTheDocument();
+    expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-inbox-empty-cta')).toHaveTextContent(
+      'Connect catalog'
+    );
   });
 
   it('filters cards by signal type and restores them on All', () => {

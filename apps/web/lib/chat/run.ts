@@ -14,6 +14,10 @@ import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guar
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { extractLastUserText } from '@/lib/chat/message-text';
 import {
+  buildPinnedOpportunityBlock,
+  type PinnedOpportunityContext,
+} from '@/lib/chat/pinned-opportunity';
+import {
   createStaticTextLanguageModel,
   detectSystemPromptLeak,
   isPromptDisclosureRequest,
@@ -158,6 +162,11 @@ export interface ExecuteChatTurnInput {
     readonly planRequired: string;
   }[];
   /**
+   * Opportunity card pinned when the thread was opened from the inbox
+   * (JOV-3933). Injected into the system prompt as ground truth.
+   */
+  pinnedOpportunity?: PinnedOpportunityContext | null;
+  /**
    * Pre-built tools for the turn. The caller composes free + paid tool sets
    * based on plan and feature flags before invoking. For `mode='onboarding'`,
    * the caller passes the ONBOARDING_TOOLS palette.
@@ -231,6 +240,7 @@ export async function executeChatTurn(
     modelRotationStep,
     lastUserText,
     lockedTools,
+    pinnedOpportunity,
     tools,
     signal,
     requestId,
@@ -266,6 +276,8 @@ export async function executeChatTurn(
         username: artistContext.username,
       },
     });
+    const pinnedOpportunityBlock =
+      buildPinnedOpportunityBlock(pinnedOpportunity);
     systemPrompt = buildSystemPrompt(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
@@ -273,6 +285,7 @@ export async function executeChatTurn(
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
       accountContext,
       referencedEntities,
+      pinnedOpportunity: pinnedOpportunityBlock,
       lockedTools,
     });
   }

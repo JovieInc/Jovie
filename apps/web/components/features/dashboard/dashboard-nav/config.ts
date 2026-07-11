@@ -12,6 +12,7 @@ import {
   Home,
   IdCard,
   Image as ImageIcon,
+  Inbox,
   LayoutDashboard,
   Lock,
   type LucideIcon,
@@ -48,6 +49,18 @@ export const dashboardHome: NavItem = {
   id: 'overview',
   icon: Home,
   description: 'Start a new chat',
+};
+
+/**
+ * Named Inbox home (JOV-3931 / GH #13171). Points at `/app` which renders the
+ * opportunity card stack. Only shown when the `INBOX_HOME` flag is on.
+ */
+export const inboxNavItem: NavItem = {
+  name: 'Inbox',
+  href: APP_ROUTES.DASHBOARD,
+  id: 'inbox',
+  icon: Inbox,
+  description: 'Review pending opportunities',
 };
 
 export const newThreadNavItem: NavItem = {
