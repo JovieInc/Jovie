@@ -32,7 +32,9 @@ The browser observations below were captured on the browser-evidence origin abov
 
 ## Current Narrow Browser Attempt
 
-The filtered Chromium run for the pitch spec, canonical public axe audit, and public exhaustive gate completed with 3 passed, 3 failed, and 8 unrelated authenticated axe cases skipped. The local test server returned the legacy static “Jovie Pitch Deck” surface at `/pitch` rather than the current `InvestorBrief`: the pitch assertion received that legacy H1 instead of “operating layer,” while axe and exhaustive checks could not find the current page’s `main` element. This is an exact environment/result report, not evidence that the current component passed browser validation. The manifest and unit gates are committed so CI can exercise the current route in its authoritative environment.
+The first filtered Chromium run reused port 3100 from an unrelated `/private/tmp/jovie-auth-a11y` worktree and therefore returned that worktree’s legacy “Jovie Pitch Deck” surface. Its 3 passed, 3 failed, and 8 skipped result was an environment mismatch, not a current-route result; the unrelated server was not terminated.
+
+A fresh branch-owned server on isolated port 3217 returned the current Next `InvestorBrief` at `/pitch`. The pitch spec, canonical public axe audit, and public exhaustive console/network gate completed with **6 passed and 8 unrelated authenticated axe cases skipped**. A second fresh server on port 3218 ran the filtered public boundary overflow gate at 320px and 430px with **3/3 passed**. Fresh runtime evidence therefore confirms that `public/pitch/index.html` does not shadow the App Router page; the legacy asset remains available at `/pitch/index.html` and required no relocation.
 
 The responsive and slide screenshots below were refreshed from the reviewed public `/pitch` implementation after the safe-appendix and claim-contract fixes.
 
