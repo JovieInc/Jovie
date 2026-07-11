@@ -142,6 +142,11 @@ export async function publishInvestorReviewDraft(
           `${failure(push, 'Draft branch push failed.').message} Recoverable state: remote branch ${branch} points to different SHA ${observedOid}; it was retained.`
         );
       }
+      if (observed.status !== 0 && observed.status !== 2) {
+        throw new Error(
+          `${failure(push, 'Draft branch push failed.').message} Recoverable state: remote branch ${branch} ownership at local SHA ${localCommitSha} is indeterminate; verify the remote ref manually before retrying. ${observed.stderr.trim()}`
+        );
+      }
       throw failure(push, 'Draft branch push failed.');
     }
     const pushedRemote = run('git', [

@@ -205,6 +205,28 @@ describe('investor review publisher', () => {
     expect(state.remoteSha).toBe(OTHER_SHA);
   });
 
+  it('reports indeterminate ownership when post-push remote lookup fails', async () => {
+    const { state, dependencies } = harness('push');
+    const originalRun = dependencies.run;
+    dependencies.run = (command, args) => {
+      if (
+        command === 'git' &&
+        args[0] === 'ls-remote' &&
+        state.artifactWritten &&
+        state.remoteSha
+      ) {
+        return { status: 128, stdout: '', stderr: 'remote unavailable' };
+      }
+      return originalRun(command, args);
+    };
+    await expect(
+      publishInvestorReviewDraft(options(), dependencies)
+    ).rejects.toThrow(
+      `remote branch codex/investor-review-test ownership at local SHA ${LOCAL_SHA} is indeterminate`
+    );
+    expect(state.remoteSha).toBe(LOCAL_SHA);
+  });
+
   it('never deletes a remote ref changed after ownership was established', async () => {
     const { state, dependencies } = harness('gh');
     const originalRun = dependencies.run;
