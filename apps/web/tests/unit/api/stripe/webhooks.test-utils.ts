@@ -16,6 +16,7 @@ export function setSkipProcessing(value: boolean) {
 export let simulateRaceDisappear = false;
 export let simulateUnprocessedRetry = false;
 export let simulateActiveLease = false;
+export let simulateLeaseClaimFailure = false;
 
 export function setSimulateRaceDisappear(value: boolean) {
   simulateRaceDisappear = value;
@@ -27,6 +28,10 @@ export function setSimulateUnprocessedRetry(value: boolean) {
 
 export function setSimulateActiveLease(value: boolean) {
   simulateActiveLease = value;
+}
+
+export function setSimulateLeaseClaimFailure(value: boolean) {
+  simulateLeaseClaimFailure = value;
 }
 
 export async function getPost() {
@@ -80,9 +85,13 @@ const hoisted = vi.hoisted(() => {
     set: vi.fn(() => ({
       where: vi.fn(() => ({
         returning: vi.fn(async () => {
-          const { simulateActiveLease: activeLease } = await import(
-            './webhooks.test-utils'
-          );
+          const {
+            simulateActiveLease: activeLease,
+            simulateLeaseClaimFailure: claimFailure,
+          } = await import('./webhooks.test-utils');
+          if (claimFailure && dbUpdate.mock.calls.length === 1) {
+            throw new Error('lease claim failed');
+          }
           return activeLease && dbUpdate.mock.calls.length === 1
             ? []
             : [{ id: 'webhook-1' }];

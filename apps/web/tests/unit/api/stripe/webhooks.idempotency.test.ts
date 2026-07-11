@@ -27,6 +27,7 @@ import {
   mockHandlerHandle,
   mockStripeTimestampToDate,
   setSimulateActiveLease,
+  setSimulateLeaseClaimFailure,
   setSimulateRaceDisappear,
   setSimulateUnprocessedRetry,
   setSkipProcessing,
@@ -41,6 +42,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     setSimulateRaceDisappear(false);
     setSimulateUnprocessedRetry(false);
     setSimulateActiveLease(false);
+    setSimulateLeaseClaimFailure(false);
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockGetHandler.mockReturnValue(null);
   });
@@ -182,6 +184,30 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     const response = await POST(request);
     expect(response.status).toBe(200);
     expect((await response.json()).received).toBe(true);
+    expect(mockHandlerHandle).not.toHaveBeenCalled();
+  });
+
+  it('does not clear another worker lease when its own claim fails', async () => {
+    const event = {
+      id: 'evt_failed_claim',
+      type: 'checkout.session.completed',
+      created: Math.floor(Date.now() / 1000),
+      data: { object: { id: 'cs_failed_claim' } },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+    setSimulateLeaseClaimFailure(true);
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/stripe/webhooks', {
+        method: 'POST',
+        body: 'test-body',
+        headers: { 'stripe-signature': 'sig_test' },
+      })
+    );
+
+    expect(response.status).toBe(500);
+    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
     expect(mockHandlerHandle).not.toHaveBeenCalled();
   });
 });

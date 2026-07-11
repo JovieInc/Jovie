@@ -103,8 +103,9 @@ export async function POST(request: NextRequest) {
     // 3. Atomically claim an unprocessed or expired lease
     // 4. Process the event
     // 5. Mark as processed
-    // NOTE: Neon HTTP driver does not support transactions. If step 3 fails,
-    // the unprocessed record remains and Stripe's retry will re-attempt.
+    // If the claim fails, the unprocessed record remains and Stripe's retry
+    // will re-attempt without requiring a transaction.
+    let leaseClaimed = false;
     try {
       // Attempt insert; unique constraint on stripeEventId handles duplicates
       const [insertedRecord] = await db
@@ -181,6 +182,7 @@ export async function POST(request: NextRequest) {
           { headers: NO_STORE_HEADERS }
         );
       }
+      leaseClaimed = true;
 
       // Process the event (handlers throw on failure)
       await processWebhookEvent(event, stripeCreatedAt);
@@ -193,16 +195,18 @@ export async function POST(request: NextRequest) {
     } catch (processingError) {
       // Release the lease on handled failures so Stripe retries immediately;
       // an abrupt process exit still self-heals when the lease expires.
-      try {
-        await db
-          .update(stripeWebhookEvents)
-          .set({ processingStartedAt: null })
-          .where(eq(stripeWebhookEvents.stripeEventId, event.id));
-      } catch (leaseReleaseError) {
-        logger.warn('Stripe webhook lease release failed', {
-          eventId: event.id,
-          error: leaseReleaseError,
-        });
+      if (leaseClaimed) {
+        try {
+          await db
+            .update(stripeWebhookEvents)
+            .set({ processingStartedAt: null })
+            .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+        } catch (leaseReleaseError) {
+          logger.warn('Stripe webhook lease release failed', {
+            eventId: event.id,
+            error: leaseReleaseError,
+          });
+        }
       }
       await captureCriticalError(
         'Stripe webhook processing failed',
