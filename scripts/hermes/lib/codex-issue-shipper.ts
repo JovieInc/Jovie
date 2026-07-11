@@ -787,6 +787,10 @@ export interface IssueScopeVerdict {
   readonly changedPaths: ReadonlyArray<string>;
 }
 
+export interface ContaminatedPrContainment {
+  readonly containedBy: 'closed' | 'drafted' | 'merge-eligibility-removed';
+}
+
 const PATH_TOKEN = /`([^`\n]+)`/g;
 const TITLE_PATH_TOKEN = /[\w.@-]+(?:\/[\w.@*?-]+)+/g;
 const PATHISH_EXTENSION = /\.[a-z0-9]+(?:\.[a-z0-9]+)*$/i;
@@ -885,6 +889,129 @@ export function describeIssueScopeMismatch(verdict: IssueScopeVerdict): string {
     `Expected: ${verdict.expectedPaths.join(', ') || '(none)'}`,
     `Changed: ${verdict.changedPaths.join(', ') || '(none)'}`,
   ].join('\n');
+}
+
+/**
+ * Close a contaminated PR, or fail closed by removing at least one merge path.
+ * Drafting and merge-queue label removal are attempted independently so a
+ * transient failure in one GitHub mutation cannot leave the PR mergeable.
+ */
+export function containContaminatedPr(
+  run: FinisherRunner,
+  input: {
+    readonly repo: string;
+    readonly prNumber: number;
+    readonly reason: string;
+  }
+): ContaminatedPrContainment {
+  try {
+    run([
+      'gh',
+      'pr',
+      'close',
+      String(input.prNumber),
+      '--repo',
+      input.repo,
+      '--comment',
+      input.reason,
+    ]);
+    return { containedBy: 'closed' };
+  } catch (closeError) {
+    try {
+      run([
+        'gh',
+        'pr',
+        'ready',
+        String(input.prNumber),
+        '--undo',
+        '--repo',
+        input.repo,
+      ]);
+    } catch {
+      // Independent merge-eligibility removal below may still contain it.
+    }
+    for (const label of ['merge-queue', 'fast']) {
+      try {
+        run([
+          'gh',
+          'pr',
+          'edit',
+          String(input.prNumber),
+          '--repo',
+          input.repo,
+          '--remove-label',
+          label,
+        ]);
+      } catch {
+        // A missing label is already safe; final state is verified below.
+      }
+    }
+    try {
+      run([
+        'gh',
+        'pr',
+        'merge',
+        String(input.prNumber),
+        '--repo',
+        input.repo,
+        '--disable-auto',
+      ]);
+    } catch {
+      // Auto-merge may already be disabled; final state is verified below.
+    }
+    try {
+      const state = JSON.parse(
+        run([
+          'gh',
+          'pr',
+          'view',
+          String(input.prNumber),
+          '--repo',
+          input.repo,
+          '--json',
+          'isDraft,labels,autoMergeRequest',
+        ])
+      ) as {
+        isDraft?: boolean;
+        labels?: ReadonlyArray<{ name?: string }>;
+        autoMergeRequest?: unknown;
+      };
+      if (state.isDraft === true) return { containedBy: 'drafted' };
+      const labels = new Set((state.labels ?? []).map(label => label.name));
+      if (
+        !labels.has('merge-queue') &&
+        !labels.has('fast') &&
+        state.autoMergeRequest == null
+      ) {
+        return { containedBy: 'merge-eligibility-removed' };
+      }
+    } catch {
+      // Unverifiable state is not containment.
+    }
+    throw closeError;
+  }
+}
+
+export function changedPathsForScope(
+  runInWorktree: FinisherRunner,
+  revision: string
+): readonly string[] {
+  const tracked = runInWorktree(['git', 'diff', '--name-only', revision]);
+  const untracked = runInWorktree([
+    'git',
+    'ls-files',
+    '--others',
+    '--exclude-standard',
+  ]);
+  return [
+    ...new Set(
+      `${tracked}\n${untracked}`
+        .trim()
+        .split('\n')
+        .map(path => path.trim())
+        .filter(Boolean)
+    ),
+  ];
 }
 
 /** Uncommitted changes or unpushed commits count as shippable work. */
@@ -1019,15 +1146,7 @@ export function finishDispatch(
     readonly statePath?: string;
   }
 ): void {
-  const changedPaths = runInWorktree([
-    'git',
-    'diff',
-    '--name-only',
-    'origin/main',
-  ])
-    .trim()
-    .split('\n')
-    .filter(Boolean);
+  const changedPaths = changedPathsForScope(runInWorktree, 'origin/main');
   const scopeVerdict = validateIssueScopeOverlap(input.issue, changedPaths);
   if (!scopeVerdict.matches) {
     throw new Error(describeIssueScopeMismatch(scopeVerdict));

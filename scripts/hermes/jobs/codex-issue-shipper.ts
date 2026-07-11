@@ -41,6 +41,7 @@ import {
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  containContaminatedPr,
   countRetryReleases,
   type DispatchPlan,
   describeIssueScopeMismatch,
@@ -1472,27 +1473,32 @@ async function dispatchPlan(
     if (!scopeVerdict.matches) {
       const reason = describeIssueScopeMismatch(scopeVerdict);
       try {
-        run(
-          [
-            'gh',
-            'pr',
-            'close',
-            String(pr.number),
-            '--repo',
-            config.repo,
-            '--comment',
-            reason,
-          ],
-          config
-        );
+        const containment = containContaminatedPr(args => run(args, config), {
+          repo: config.repo,
+          prNumber: pr.number,
+          reason,
+        });
+        logJobEvent({
+          job: JOB,
+          event: 'scope_mismatch_pr_contained',
+          issue: dispatch.issue.number,
+          pr: pr.number,
+          containedBy: containment.containedBy,
+        });
       } catch (err) {
         logJobEvent({
           job: JOB,
-          event: 'scope_mismatch_pr_close_failed',
+          event: 'scope_mismatch_pr_containment_failed',
           issue: dispatch.issue.number,
           pr: pr.number,
           error: shortError(err),
         });
+        markBlocked(
+          config,
+          dispatch,
+          `${reason}\n\nAutomatic PR containment failed; manual closure is required for PR #${pr.number}.`
+        );
+        return;
       }
       markBlocked(config, dispatch, reason);
       logJobEvent({

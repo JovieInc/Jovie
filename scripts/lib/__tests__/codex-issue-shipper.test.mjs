@@ -11,6 +11,7 @@ import {
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
   classifyCheckout,
+  containContaminatedPr,
   countRetryReleases,
   describeCheckout,
   describeIssueScopeMismatch,
@@ -743,13 +744,14 @@ describe('deterministic finisher', () => {
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
     expect(cmds).toEqual([
       'git diff',
+      'git ls-files',
       'git status',
       'git add',
       'git -c',
       'git push',
       'gh pr',
     ]);
-    const commit = calls[3].args;
+    const commit = calls[4].args;
     expect(commit).toContain('commit');
     const msg = commit[commit.indexOf('-m') + 1];
     expect(msg).toMatch(
@@ -757,8 +759,8 @@ describe('deterministic finisher', () => {
     );
     expect(msg).toContain('(#12721)');
     // hooks get a long timeout
-    expect(calls[3].opts?.timeoutMs).toBeGreaterThan(60_000);
-    const prCreate = calls[5].args;
+    expect(calls[4].opts?.timeoutMs).toBeGreaterThan(60_000);
+    const prCreate = calls[6].args;
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
@@ -788,7 +790,13 @@ describe('deterministic finisher', () => {
       logPath: '/tmp/agent.log',
     });
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
-    expect(cmds).toEqual(['git diff', 'git status', 'git push', 'gh pr']);
+    expect(cmds).toEqual([
+      'git diff',
+      'git ls-files',
+      'git status',
+      'git push',
+      'gh pr',
+    ]);
   });
 
   it('finishDispatch propagates a failing step (caller releases the claim)', () => {
@@ -830,7 +838,87 @@ describe('deterministic finisher', () => {
     ).toThrow('Issue scope contamination');
     expect(calls.map(call => call.args.slice(0, 2).join(' '))).toEqual([
       'git diff',
+      'git ls-files',
     ]);
+  });
+
+  it('includes valid untracked files in the scope verdict', () => {
+    const scopedIssue = {
+      ...issue,
+      title: 'Add `apps/web/new-route.ts`',
+    };
+    const { run, calls } = fakeRunner({
+      'git diff --name-only': '',
+      'git ls-files --others': 'apps/web/new-route.ts\n',
+      'git status --porcelain': '?? apps/web/new-route.ts\n',
+    });
+
+    expect(() =>
+      finishDispatch(run, {
+        repo: 'JovieInc/Jovie',
+        branchName: 'codex/gh-12721-new-route',
+        issue: scopedIssue,
+        logPath: '/tmp/agent.log',
+      })
+    ).not.toThrow();
+    expect(calls.some(call => call.args[1] === 'add')).toBe(true);
+  });
+});
+
+describe('contaminated PR containment', () => {
+  const input = {
+    repo: 'JovieInc/Jovie',
+    prNumber: 13981,
+    reason: 'Issue scope contamination',
+  };
+
+  it('drafts and removes every merge path when closing fails', () => {
+    const calls = [];
+    const result = containContaminatedPr(args => {
+      calls.push(args);
+      if (args[2] === 'close') throw new Error('close failed');
+      if (args[2] === 'view')
+        return JSON.stringify({
+          isDraft: true,
+          labels: [],
+          autoMergeRequest: null,
+        });
+      return '';
+    }, input);
+    expect(result).toEqual({ containedBy: 'drafted' });
+    expect(calls.map(args => `${args[1]} ${args[2]}`)).toEqual([
+      'pr close',
+      'pr ready',
+      'pr edit',
+      'pr edit',
+      'pr merge',
+      'pr view',
+    ]);
+  });
+
+  it('accepts verified containment when draft and one label removal fail', () => {
+    const result = containContaminatedPr(args => {
+      if (args[2] === 'close' || args[2] === 'ready')
+        throw new Error('mutation failed');
+      if (args[2] === 'edit' && args.at(-1) === 'fast')
+        throw new Error('label was already absent');
+      if (args[2] === 'view')
+        return JSON.stringify({
+          isDraft: false,
+          labels: [],
+          autoMergeRequest: null,
+        });
+      return '';
+    }, input);
+    expect(result).toEqual({ containedBy: 'merge-eligibility-removed' });
+  });
+
+  it('escalates when close and both containment fallbacks fail', () => {
+    expect(() =>
+      containContaminatedPr(() => {
+        throw new Error('GitHub unavailable');
+      }, input)
+    ).toThrow('GitHub unavailable');
   });
 });
 
@@ -875,6 +963,14 @@ describe('issue scope overlap gate', () => {
     ]);
     expect(verdict.enforce).toBe(true);
     expect(verdict.matches).toBe(true);
+  });
+
+  it('allows bounded ancillary changes when one explicit path overlaps', () => {
+    const verdict = validateIssueScopeOverlap(integrationIssue, [
+      'apps/web/tests/integration/rls-access-control.test.ts',
+      'scripts/test-truth-guard.mjs',
+    ]);
+    expect(verdict).toMatchObject({ enforce: true, matches: true });
   });
 
   it('does not guess when an issue has no explicit path manifest', () => {
