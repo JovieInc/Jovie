@@ -8,6 +8,7 @@ import { DesignProposalReviewRequestSchema } from '@/lib/agent-os/design-lab/typ
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { getOrMaterializeCatalogProposal } from '../../catalog';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,11 @@ export async function POST(
     const reviewer =
       entitlements.email ?? entitlements.userId ?? 'admin@jovie.local';
 
+    await getOrMaterializeCatalogProposal(
+      parsedBody.dayBucket,
+      params.proposalId
+    );
+
     const result = await reviewDesignProposal({
       dayBucket: parsedBody.dayBucket,
       proposalId: params.proposalId,
@@ -88,6 +94,13 @@ export async function POST(
       }
 
       if (error.message === 'Design proposal has already been reviewed.') {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (error.message === 'Design proposal review is already in progress.') {
         return NextResponse.json(
           { error: error.message },
           { status: 409, headers: NO_STORE_HEADERS }
