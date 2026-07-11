@@ -531,12 +531,13 @@ describe('CI mobile overflow workflow', () => {
 });
 
 describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
-  const neonBranchCreateJobs = [
-    'neon-db',
-    'ci-lighthouse-dashboard-pr',
-    'ci-e2e-smoke',
-    'ci-admin-smoke',
-  ] as const;
+  const neonBranchCreateJobs = {
+    'neon-db': 'neon-endpoint-pool-neon-db-',
+    'ci-lighthouse-dashboard-pr':
+      'neon-endpoint-pool-ci-lighthouse-dashboard-pr-',
+    'ci-e2e-smoke': 'neon-endpoint-pool-ci-e2e-smoke-',
+    'ci-admin-smoke': 'neon-endpoint-pool-ci-admin-smoke-',
+  } as const;
 
   const neonArtifactConsumerJobs = [
     'ci-lighthouse-pr',
@@ -550,46 +551,49 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   it('caps cross-PR Neon branch creation with a four-slot queue', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    for (const jobKey of neonBranchCreateJobs) {
+    for (const [jobKey, groupPrefix] of Object.entries(neonBranchCreateJobs)) {
       const job = getJobBlock(workflow, jobKey);
       expect(job).toContain('concurrency:');
-      expect(job).toContain('group: neon-endpoint-pool-${{ github.job }}-');
+      expect(job).toContain(`group: ${groupPrefix}`);
+      expect(job).not.toContain('${{ github.job }}');
+      expect(job).toContain('${{ github.run_id }}');
       expect(job).toContain('cancel-in-progress: false');
     }
   });
 
-  // ci-golden-path deliberately uses ONE constant repo-wide group: it must
-  // serialize the Clerk dev instance (purgeStaleClerkTestUsers deletes ALL
-  // gp-* users, so two concurrent runs would delete each other's sessions)
-  // as well as the Neon pool. See the concurrency comment on the
-  // ci-golden-path job in ci.yml — do not parameterize that group. Every
-  // other pool group must stay per-job scoped per JOV-2497.
-  const intentionallySerializedPoolGroups = [
-    'group: neon-endpoint-pool-ci-golden-path',
+  const runScopedPoolGroups = [
+    'group: neon-endpoint-pool-ci-golden-path-${{ github.run_id }}',
   ] as const;
 
-  it('scopes branch-creation pool per job so siblings in one workflow are not cancelled', () => {
+  it('uses unique static job keys so scheduling-time evaluation cannot collapse groups', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const poolGroups =
-      workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ?? [];
+    const groupPrefixes = Object.entries(neonBranchCreateJobs).map(
+      ([jobKey, expectedPrefix]) => {
+        const groupLine = getJobBlock(workflow, jobKey)
+          .split('\n')
+          .find(line => line.trim().startsWith('group:'));
 
-    expect(poolGroups.length).toBeGreaterThan(0);
-    for (const group of poolGroups) {
-      if (
-        intentionallySerializedPoolGroups.includes(
-          group.trim() as (typeof intentionallySerializedPoolGroups)[number]
-        )
-      ) {
-        continue;
+        expect(groupLine).toBeDefined();
+        expect(groupLine).toContain(expectedPrefix);
+        expect(groupLine).not.toContain('${{ github.job }}');
+        return groupLine?.split('${{', 1)[0]?.trim();
       }
-      expect(group).toContain('${{ github.job }}');
+    );
+
+    expect(new Set(groupPrefixes).size).toBe(groupPrefixes.length);
+    expect(workflow).not.toContain(
+      'group: neon-endpoint-pool-${{ github.job }}'
+    );
+    for (const group of workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ??
+      []) {
+      expect(group).toContain('${{ github.run_id }}');
     }
   });
 
-  it('keeps the serialized-group allowlist accurate against the workflow', () => {
+  it('keeps the run-scoped group allowlist accurate against the workflow', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    for (const group of intentionallySerializedPoolGroups) {
+    for (const group of runScopedPoolGroups) {
       expect(workflow).toContain(group);
     }
   });

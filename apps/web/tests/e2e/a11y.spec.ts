@@ -39,6 +39,8 @@ interface AxeViolationSummary {
   readonly impact: string | null;
   readonly help: string;
   readonly nodes: number;
+  readonly targets: readonly string[];
+  readonly failureSummaries: readonly string[];
 }
 
 function summarizeViolations(
@@ -49,6 +51,8 @@ function summarizeViolations(
     impact: v.impact ?? null,
     help: v.help,
     nodes: v.nodes.length,
+    targets: v.nodes.map(node => node.target.join(' ')),
+    failureSummaries: v.nodes.map(node => node.failureSummary ?? 'Unavailable'),
   }));
 }
 

@@ -21,7 +21,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
-const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
 const CHAT_CONTENT = '[data-testid="chat-content"]';
 const SLASH_MENU = '[data-testid="slash-command-menu"]';
 
@@ -46,6 +46,8 @@ interface AxeViolationSummary {
   readonly impact: string | null;
   readonly help: string;
   readonly nodes: number;
+  readonly targets: readonly string[];
+  readonly failureSummaries: readonly string[];
 }
 
 function summarizeViolations(
@@ -56,6 +58,10 @@ function summarizeViolations(
     impact: violation.impact ?? null,
     help: violation.help,
     nodes: violation.nodes.length,
+    targets: violation.nodes.map(node => node.target.join(' ')),
+    failureSummaries: violation.nodes.map(
+      node => node.failureSummary ?? 'Unavailable'
+    ),
   }));
 }
 
