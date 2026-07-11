@@ -492,6 +492,8 @@ class TestMergeQueueWatchdog:
         timeline_by_pr: dict[int, str] | None = None,
         comments_by_pr: dict[int, str] | None = None,
         checks_by_pr: dict[int, tuple[str, int]] | None = None,
+        add_label_failures: int = 0,
+        comment_failures: int = 0,
     ) -> Path:
         """Write a fake `gh` that answers pr list / api timeline / api comments /
         pr checks / pr edit for the watchdog script's exact call shapes."""
@@ -558,10 +560,26 @@ JSON
             fi
             if [[ "$1 $2" == "pr edit" ]]; then
               echo "edit $*" >> "{tmp_path}/edits.log"
+              if [[ " $* " == *" --add-label merge-queue "* ]]; then
+                count=$(cat "{tmp_path}/add-label-count" 2>/dev/null || echo 0)
+                count=$((count + 1))
+                echo "$count" > "{tmp_path}/add-label-count"
+                if [[ "$count" -le {add_label_failures} ]]; then
+                  echo "simulated add-label failure" >&2
+                  exit 1
+                fi
+              fi
               exit 0
             fi
             if [[ "$1 $2" == "pr comment" ]]; then
               echo "comment $*" >> "{tmp_path}/edits.log"
+              count=$(cat "{tmp_path}/comment-count" 2>/dev/null || echo 0)
+              count=$((count + 1))
+              echo "$count" > "{tmp_path}/comment-count"
+              if [[ "$count" -le {comment_failures} ]]; then
+                echo "simulated comment failure" >&2
+                exit 1
+              fi
               exit 0
             fi
             echo "unexpected gh args: $*" >&2
@@ -622,6 +640,91 @@ JSON
         assert "[dry-run] would -merge-queue on #100" in result.stdout
         assert "[dry-run] would +merge-queue on #100" in result.stdout
         assert "kicked (label-cycled): 1" in result.stdout
+
+    def test_successful_real_cycle_removes_readds_and_records(self, tmp_path: Path) -> None:
+        stale_ts = self._stale_ts()
+        pr_list = (
+            '[{"n":108,"t":"Successful cycle","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-108","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={108: timeline},
+            comments_by_pr={108: "[]"},
+            checks_by_pr={108: ("[]", 0)},
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45", dry_run=False)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        edits = (tmp_path / "edits.log").read_text(encoding="utf-8")
+        assert edits.count("--remove-label merge-queue") == 1
+        assert edits.count("--add-label merge-queue") == 1
+        assert edits.count("comment pr comment 108") == 1
+        assert "kicked (label-cycled): 1" in result.stdout
+        assert "mutation failures: 0" in result.stdout
+
+    def test_readd_failure_restores_label_and_returns_failure(self, tmp_path: Path) -> None:
+        stale_ts = self._stale_ts()
+        pr_list = (
+            '[{"n":109,"t":"Re-add fails once","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-109","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={109: timeline},
+            comments_by_pr={109: "[]"},
+            checks_by_pr={109: ("[]", 0)},
+            add_label_failures=1,
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45", dry_run=False)
+
+        assert result.returncode != 0
+        edits = (tmp_path / "edits.log").read_text(encoding="utf-8")
+        assert edits.count("--remove-label merge-queue") == 1
+        assert edits.count("--add-label merge-queue") == 2
+        assert "compensating by restoring merge-queue" in result.stderr
+        assert "mutation failures: 1" in result.stdout
+
+    def test_comment_failure_confirms_label_and_returns_failure(self, tmp_path: Path) -> None:
+        stale_ts = self._stale_ts()
+        pr_list = (
+            '[{"n":110,"t":"Comment fails","m":"MERGEABLE","ms":"CLEAN",'
+            '"head":"tim/jov-110","L":["merge-queue"]}]'
+        )
+        timeline = (
+            f'[{{"event":"labeled","label":{{"name":"merge-queue"}},'
+            f'"created_at":"{stale_ts}"}}]'
+        )
+        self._fake_gh(
+            tmp_path,
+            pr_list_json=pr_list,
+            timeline_by_pr={110: timeline},
+            comments_by_pr={110: "[]"},
+            checks_by_pr={110: ("[]", 0)},
+            comment_failures=1,
+        )
+
+        result = self._run_watchdog(tmp_path, extra_env="STALL_MINUTES=45", dry_run=False)
+
+        assert result.returncode != 0
+        edits = (tmp_path / "edits.log").read_text(encoding="utf-8")
+        assert edits.count("--remove-label merge-queue") == 1
+        assert edits.count("--add-label merge-queue") == 2
+        assert edits.count("comment pr comment 110") == 1
+        assert "confirming merge-queue remains restored" in result.stderr
+        assert "mutation failures: 1" in result.stdout
 
     def test_freshly_labeled_pr_is_skipped(self, tmp_path: Path) -> None:
         fresh_ts = subprocess.run(
