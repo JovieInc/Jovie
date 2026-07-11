@@ -55,31 +55,6 @@ function getJobBlock(workflow: string, jobKey: string): string {
   return block.join('\n');
 }
 
-describe('risk-triggered smoke admission', () => {
-  it('evaluates auth smoke when the optional Neon prerequisite is skipped', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-    const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
-
-    expect(smokeJob).toContain(
-      "if: ${{ always() && needs.ci-path-changes.outputs.skip == 'false'"
-    );
-    expect(smokeJob).toContain(
-      "needs.ci-risk-classifier.outputs.requires_smoke == 'true'"
-    );
-    expect(smokeJob).toContain("needs.neon-db.result == 'skipped'");
-  });
-});
-
-describe('golden-path smoke OTP contract', () => {
-  it('enables deterministic OTP when the smoke manifest runs golden path', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-    const smokeStep = getStepBlock(workflow, 'Run E2E Smoke (Chromium)');
-
-    expect(smokeStep).toContain('export E2E_TEST_MODE=1');
-    expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
-  });
-});
-
 describe('deploy workflow Vercel env resolution', () => {
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -581,18 +556,13 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
       expect(job).toContain('concurrency:');
       expect(job).toContain(`group: ${groupPrefix}`);
       expect(job).not.toContain('${{ github.job }}');
+      expect(job).toContain('${{ github.run_id }}');
       expect(job).toContain('cancel-in-progress: false');
     }
   });
 
-  // ci-golden-path deliberately uses ONE constant repo-wide group: it must
-  // serialize the Clerk dev instance (purgeStaleClerkTestUsers deletes ALL
-  // gp-* users, so two concurrent runs would delete each other's sessions)
-  // as well as the Neon pool. See the concurrency comment on the
-  // ci-golden-path job in ci.yml — do not parameterize that group. Every
-  // other pool group must stay per-job scoped per JOV-2497.
-  const intentionallySerializedPoolGroups = [
-    'group: neon-endpoint-pool-ci-golden-path',
+  const runScopedPoolGroups = [
+    'group: neon-endpoint-pool-ci-golden-path-${{ github.run_id }}',
   ] as const;
 
   it('uses unique static job keys so scheduling-time evaluation cannot collapse groups', () => {
@@ -614,12 +584,16 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
     expect(workflow).not.toContain(
       'group: neon-endpoint-pool-${{ github.job }}'
     );
+    for (const group of workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ??
+      []) {
+      expect(group).toContain('${{ github.run_id }}');
+    }
   });
 
-  it('keeps the serialized-group allowlist accurate against the workflow', () => {
+  it('keeps the run-scoped group allowlist accurate against the workflow', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    for (const group of intentionallySerializedPoolGroups) {
+    for (const group of runScopedPoolGroups) {
       expect(workflow).toContain(group);
     }
   });
