@@ -242,20 +242,6 @@ function escalationForPlan(plan: DispatchPlan): {
       artifactPath,
       `${buildEscalationArtifact(plan.issue.number, decision, ESCALATION_STATE_PATH)}\n`
     );
-    writeEscalationState(
-      ESCALATION_STATE_PATH,
-      recordEscalationAttempt(
-        state,
-        plan.issue.number,
-        {
-          at: new Date().toISOString(),
-          route: decision.route,
-          outcome: decision.escalate ? 'failure' : 'no-diff',
-          artifactPath,
-        },
-        decision.cooldownUntil
-      )
-    );
   } catch (err) {
     logJobEvent({
       job: JOB,
@@ -274,6 +260,39 @@ function escalationForPlan(plan: DispatchPlan): {
     artifactPath,
   });
   return { decision, artifactPath };
+}
+
+function recordEscalationOutcome(
+  plan: DispatchPlan,
+  decision: EscalationDecision,
+  artifactPath: string,
+  outcome: 'success' | 'failure' | 'no-diff'
+): void {
+  try {
+    const state = readEscalationState(ESCALATION_STATE_PATH);
+    writeEscalationState(
+      ESCALATION_STATE_PATH,
+      recordEscalationAttempt(
+        state,
+        plan.issue.number,
+        {
+          at: new Date().toISOString(),
+          route: decision.route,
+          outcome,
+          artifactPath,
+        },
+        decision.cooldownUntil
+      )
+    );
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'escalation_outcome_write_failed',
+      issue: plan.issue.number,
+      outcome,
+      error: shortError(err),
+    });
+  }
 }
 
 function unquoteEnvValue(value: string): string {
@@ -1439,7 +1458,23 @@ async function dispatchPlan(
       if (isSystemKilled) break;
 
       pr = findPrForBranch(config, dispatch.branchName);
-      if (pr || safeHasWork()) break;
+      const hasWork = safeHasWork();
+      if (agentResult.ok) {
+        recordEscalationOutcome(
+          dispatch,
+          escalation.decision,
+          escalation.artifactPath,
+          pr || hasWork ? 'success' : 'no-diff'
+        );
+      } else {
+        recordEscalationOutcome(
+          dispatch,
+          escalation.decision,
+          escalation.artifactPath,
+          'failure'
+        );
+      }
+      if (pr || hasWork) break;
 
       if (attempt < chain.length - 1) {
         logJobEvent({

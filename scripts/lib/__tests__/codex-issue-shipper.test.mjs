@@ -1089,6 +1089,25 @@ describe('checkout freshness gate', () => {
 });
 
 describe('model escalation policy', () => {
+  it('records the actual outcome rather than a pre-run failure', () => {
+    const decision = evaluateEscalation(
+      { text: 'docs-only issue' },
+      new Date('2026-07-10T00:00:00Z')
+    );
+    const recorded = recordEscalationAttempt(
+      emptyEscalationState(),
+      42,
+      {
+        at: '2026-07-10T00:00:00Z',
+        route: decision.route,
+        outcome: 'success',
+        artifactPath: '/tmp/a.json',
+      },
+      decision.cooldownUntil
+    );
+    expect(recorded.records['42'].attempts[0].outcome).toBe('success');
+  });
+
   it('escalates on measurable triggers and emits machine-readable evidence', () => {
     const decision = evaluateEscalation(
       {
