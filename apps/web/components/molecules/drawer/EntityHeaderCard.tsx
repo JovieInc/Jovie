@@ -202,7 +202,7 @@ export function EntityHeaderCard({
             lineCount={resolvedSubtitleLineClamp}
             size='xs'
             className={cn(
-              'text-xs leading-[16px] tracking-[-0.005em] text-secondary-token',
+              'text-xs leading-4 tracking-[-0.005em] text-secondary-token',
               subtitleClassName
             )}
           >

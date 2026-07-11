@@ -304,7 +304,7 @@ export function AnalyticsSidebarView({
                 <p className='whitespace-nowrap text-mid font-semibold tracking-[-0.016em] text-primary-token'>
                   Audience funnel
                 </p>
-                <p className='text-xs leading-[16px] text-secondary-token'>
+                <p className='text-xs leading-4 text-secondary-token'>
                   Views, clicks, and top traffic sources.
                 </p>
               </div>

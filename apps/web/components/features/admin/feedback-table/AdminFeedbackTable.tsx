@@ -110,8 +110,8 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
     <span
       className={
         status === 'dismissed'
-          ? 'inline-flex min-h-6 items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-tertiary-token'
-          : 'inline-flex min-h-6 items-center rounded bg-surface-1 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-secondary-token'
+          ? 'inline-flex min-h-6 items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium tracking-tight text-tertiary-token'
+          : 'inline-flex min-h-6 items-center rounded bg-surface-1 px-1.5 py-0.5 text-2xs font-medium tracking-tight text-secondary-token'
       }
     >
       {status}

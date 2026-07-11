@@ -190,7 +190,7 @@ function PrimarySummaryCard({
       </div>
 
       <div className='space-y-1'>
-        <p className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
+        <p className='text-sm font-semibold tracking-tight text-primary-token'>
           {statusTitle}
         </p>
         <p className='text-xs leading-[18px] text-secondary-token'>
