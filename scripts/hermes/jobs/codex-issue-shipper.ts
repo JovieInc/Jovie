@@ -52,6 +52,7 @@ import {
   gbrainContextBlocker,
   HUMAN_REVIEW_LABEL,
   type IssueComment,
+  isAlreadyClaimedOrBlocked,
   labelNames,
   loadShipperConfig,
   NO_AUTO_LABEL,
@@ -714,7 +715,54 @@ function commentIssue(
   );
 }
 
-function claimIssue(config: ShipperConfig, plan: DispatchPlan): void {
+function claimIssue(config: ShipperConfig, plan: DispatchPlan): boolean {
+  // Re-read the issue immediately before claiming. The planner snapshot can be
+  // stale while another shipper tick (or a human) claims the same issue.
+  let current: { state?: string; labels?: ReadonlyArray<{ name: string }> };
+  try {
+    current = JSON.parse(
+      run(
+        [
+          'gh',
+          'issue',
+          'view',
+          String(plan.issue.number),
+          '--repo',
+          config.repo,
+          '--json',
+          'state,labels',
+        ],
+        config
+      )
+    ) as typeof current;
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'claim_revalidation_failed',
+      issue: plan.issue.number,
+      error: shortError(err),
+    });
+    return false;
+  }
+
+  const currentIssue: GithubIssue = {
+    ...plan.issue,
+    labels: current.labels ?? [],
+  };
+  if (
+    current.state?.toUpperCase() !== 'OPEN' ||
+    isAlreadyClaimedOrBlocked(currentIssue)
+  ) {
+    logJobEvent({
+      job: JOB,
+      event: 'claim_deduped',
+      issue: plan.issue.number,
+      state: current.state,
+      labels: labelNames(currentIssue),
+    });
+    return false;
+  }
+
   run(
     [
       'gh',
@@ -729,20 +777,57 @@ function claimIssue(config: ShipperConfig, plan: DispatchPlan): void {
     config
   );
 
+  // Confirm the shared claim signal landed before starting an agent. This
+  // avoids a false local claim when GitHub accepted neither the edit nor the
+  // token's permission to mutate labels.
+  const confirmed = JSON.parse(
+    run(
+      [
+        'gh',
+        'issue',
+        'view',
+        String(plan.issue.number),
+        '--repo',
+        config.repo,
+        '--json',
+        'state,labels',
+      ],
+      config
+    )
+  ) as typeof current;
+  const confirmedIssue: GithubIssue = {
+    ...plan.issue,
+    labels: confirmed.labels ?? [],
+  };
+  if (
+    confirmed.state?.toUpperCase() !== 'OPEN' ||
+    !labelNames(confirmedIssue).includes(CODEX_CLAIM_LABEL)
+  ) {
+    logJobEvent({
+      job: JOB,
+      event: 'claim_confirmation_failed',
+      issue: plan.issue.number,
+      state: confirmed.state,
+      labels: labelNames(confirmedIssue),
+    });
+    return false;
+  }
+
   commentIssue(
     config,
     plan.issue.number,
     [
       `Jovie agent (codex issue shipper) claimed this issue.`,
       '',
-      `Branch: \`${plan.branchName}\``,
-      `Risk: \`${plan.route.riskLevel}\``,
-      `Model route: \`${plan.route.modelProfile}\` using \`${plan.route.sessionModel}\``,
+      `Branch: ${plan.branchName}`,
+      `Risk: ${plan.route.riskLevel}`,
+      `Model route: ${plan.route.modelProfile} using ${plan.route.sessionModel}`,
       plan.integrationBranch
-        ? `Integration branch: \`${plan.integrationBranch}\``
+        ? `Integration branch: ${plan.integrationBranch}`
         : 'Integration branch: not used for this issue',
     ].join('\n')
   );
+  return true;
 }
 
 function markBlocked(
@@ -1164,7 +1249,12 @@ async function dispatchPlan(
   const prepared = prepareWorktree(config, plan);
   const dispatch = prepared.plan;
   try {
-    claimIssue(config, dispatch);
+    if (!claimIssue(config, dispatch)) {
+      // Another active shipper/human won the race, or GitHub did not confirm
+      // our label mutation. Do not mark the issue blocked or release a claim
+      // we do not own; the next tick will re-evaluate it.
+      return;
+    }
     journalStart({
       job: JOB,
       repo: config.repo,

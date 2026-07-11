@@ -3,7 +3,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { listBlockedAgentPrs } from './lib/pr-check-failures.mjs';
@@ -171,9 +171,21 @@ async function labelPr(repo, prNumber, labelName) {
 
 async function commentPr(repo, prNumber, body) {
   await execFileAsync(
-    'gh',
-    ['pr', 'comment', String(prNumber), '-R', repo, '--body', body],
-    { encoding: 'utf8' }
+    'bash',
+    [
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        'lib',
+        'upsert-pr-comment.sh'
+      ),
+      String(prNumber),
+      'drain-auto-rebase',
+      body,
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_REPOSITORY: repo },
+    }
   );
 }
 
