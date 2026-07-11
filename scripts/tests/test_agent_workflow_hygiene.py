@@ -1,6 +1,8 @@
 """Regression tests for self-hosted agent workflow hygiene."""
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
@@ -15,8 +17,6 @@ HOT_PATH_WORKFLOWS = (
 )
 
 FULL_CHECKOUT_JOBS = (
-    ("security.yml", "gitleaks"),
-    ("security.yml", "trufflehog"),
     ("ci.yml", "ci-build-public"),
     ("ci.yml", "ci-summary"),
 )
@@ -53,3 +53,14 @@ def test_trufflehog_job_does_not_require_docker() -> None:
     content = (WORKFLOWS / "security.yml").read_text(encoding="utf-8")
     assert "trufflesecurity/trufflehog@" not in content
     assert "ci-pr-trufflehog" in content
+
+
+def test_merge_gated_secret_scans_use_clean_hosted_runners() -> None:
+    """Secret scanners need a fresh, authoritative Git object store."""
+    workflow = yaml.safe_load(
+        (WORKFLOWS / "security.yml").read_text(encoding="utf-8")
+    )
+    jobs = workflow["jobs"]
+
+    assert jobs["gitleaks"]["runs-on"] == "ubuntu-latest"
+    assert jobs["trufflehog"]["runs-on"] == "ubuntu-latest"

@@ -31,7 +31,10 @@ permissions:
 jobs:
   gitleaks:
     name: Gitleaks Secret Scanning
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Secret scanning requires an authoritative Git object store. Persistent
+    # self-hosted workspaces can retain shallow/promisor state that survives
+    # checkout cleanup and makes intermediate PR commits unreadable.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
@@ -97,7 +100,9 @@ jobs:
 
   trufflehog:
     name: TruffleHog Secret Scanning
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # TruffleHog clones the checkout internally, so it must start from a clean
+    # hosted object store rather than a reused partial-clone workspace.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
