@@ -70,6 +70,7 @@ OBJECTION | strategy | critical | The buyer is unclear.`)
     const forward = buildInvestorNoteReviewArtifact([first, second]);
     const reverse = buildInvestorNoteReviewArtifact([second, first]);
     expect(reverse).toEqual(forward);
+    expect(forward.asOf).toBe('2026-07-11');
     expect(forward.candidates[0]).toMatchObject({
       text: 'What traction is proven!',
       gapClassifications: ['communication', 'evidence'],
