@@ -157,4 +157,18 @@ test('maps known file families and exposes current coverage gaps', () => {
     rootTest.ci.mappingProvenance,
     /runner and lane remain unproven/
   );
+
+  const deterministicEval = byPath('apps/web/lib/eval/calibration.test.ts');
+  assert.deepEqual(deterministicEval.ci.suiteCandidates, [
+    'pnpm test:evals:deterministic',
+  ]);
+  assert.equal(deterministicEval.classification, 'deterministic eval');
+  assert.equal(deterministicEval.ci.mappingConfidence, 'high');
+
+  const liveEval = byPath(
+    'apps/web/tests/eval/golden/golden-eval-set.real.test.ts'
+  );
+  assert.deepEqual(liveEval.ci.suiteCandidates, ['pnpm test:evals:live']);
+  assert.equal(liveEval.classification, 'live eval');
+  assert.equal(liveEval.ci.mappingConfidence, 'high');
 });

@@ -21,6 +21,12 @@ Classification follows the strongest real boundary crossed, never the filename o
 | iOS unit | No numeric target in brief |
 | iOS integration/UI | No numeric target in brief |
 
+## Canonical eval lanes
+
+- `pnpm test:evals:deterministic` runs deterministic Promptfoo validation/evaluation, the mocked golden gate, and manifest-listed fixture/scorer/calibration/leak/promote Vitest coverage. It rejects enabled live flags and strips provider credentials.
+- `pnpm test:evals:live` is exhaustive and opt-in: Promptfoo all, all HTTP fault lanes, real-model golden evaluation, and knowledge accuracy. It requires every live opt-in flag and is never invoked by the deterministic lane.
+- `apps/web/tests/eval/eval-lanes.json` is the non-overlapping source of truth for eval entry points and file membership.
+
 ## Evidence policy
 
 - High confidence requires direct imports or API use proving the boundary.
