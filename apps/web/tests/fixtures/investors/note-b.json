@@ -1,0 +1,22 @@
+{
+  "source": {
+    "kind": "local-note",
+    "label": "Sample investor conversation B",
+    "capturedAt": "2026-07-11"
+  },
+  "transcript": "Synthetic fixture. No real investor or deal information.",
+  "signals": [
+    {
+      "kind": "question",
+      "text": "What customer traction is proven?",
+      "gapClassification": "evidence",
+      "severity": "critical"
+    },
+    {
+      "kind": "question",
+      "text": "How will this reach the right investors?",
+      "gapClassification": "investor-fit",
+      "severity": "medium"
+    }
+  ]
+}
