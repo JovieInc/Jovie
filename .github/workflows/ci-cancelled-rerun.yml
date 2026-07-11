@@ -1,0 +1,53 @@
+name: CI Cancelled DAG Retry
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: ci-cancelled-rerun-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  rerun-cancelled:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.run_attempt <= 2 &&
+      (github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main retry policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Classify cancelled DAG
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          jobs="$(gh api --paginate --slurp "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '[.[].jobs[]]')"
+          decision="$(printf '%s' "$jobs" | node scripts/lib/ci-cancelled-retry.mjs)"
+          echo "decision=$decision"
+          echo "should_rerun=$(jq -r '.shouldRerun' <<<"$decision")" >> "$GITHUB_OUTPUT"
+          echo "reason=$(jq -r '.reason' <<<"$decision")" >> "$GITHUB_OUTPUT"
+
+      - name: Rerun failed and cancelled jobs once
+        if: steps.classify.outputs.should_rerun == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          echo "${{ steps.classify.outputs.reason }}"
+          gh api --method POST "repos/$REPO/actions/runs/$RUN_ID/rerun-failed-jobs"

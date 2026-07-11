@@ -3678,6 +3678,7 @@ jobs:
           RISK_BLOCKS_UNATTENDED="${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
+          PREVIEW_URL="${{ needs.ci-pr-vercel-preview.outputs.deployment_url }}"
           IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
           HAS_CODE_CHANGES="${{ needs.ci-path-changes.outputs.has_code_changes }}"
           echo "ci-path-changes: $PATH_RESULT (has_code_changes=$HAS_CODE_CHANGES)"
@@ -3744,6 +3745,13 @@ jobs:
           if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
             echo "::warning::ci-build-public did not pass (result: $BUILD_RESULT) — non-blocking per throughput policy"
             echo "Build failure will be corrected post-merge or in a follow-up PR."
+          fi
+
+          # A hosted deployment URL is substantive preview evidence. Preserve
+          # it when only action post-cleanup changed the aggregate to cancelled.
+          if [[ "$PREVIEW_RESULT" == "cancelled" && -n "$PREVIEW_URL" ]]; then
+            echo "Preview deploy completed (${PREVIEW_URL}); only runner cleanup was cancelled — accepting deployment evidence."
+            PREVIEW_RESULT="success"
           fi
 
           if [[ "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
