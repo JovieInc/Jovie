@@ -167,12 +167,18 @@ repair_partial_clone() {
       git update-ref -d "$ref" 2>/dev/null || true
     done < <(git for-each-ref --format='%(refname)' refs/remotes refs/tags refs/replace refs/prefetch)
   fi
+  # Refetch must cover HEAD's own history too: incremental checkouts on a
+  # blob:none workdir leave the PR branch's older objects promisor-elided, so
+  # repairing only the base branch still fails on the next unreadable object.
+  # Fetching the commit id directly is the same trick actions/checkout uses.
+  local head_sha
+  head_sha="$(git rev-parse HEAD)"
   # --refetch needs git >= 2.36; older runner images fall back to a noop
   # negotiation fetch, which also transfers a complete unfiltered pack.
   git fetch --refetch origin \
-    "+refs/heads/${base_branch}:${keep_ref}" \
+    "+refs/heads/${base_branch}:${keep_ref}" "$head_sha" \
     || git -c fetch.negotiationAlgorithm=noop fetch origin \
-      "+refs/heads/${base_branch}:${keep_ref}"
+      "+refs/heads/${base_branch}:${keep_ref}" "$head_sha"
 }
 
 run_trufflehog_git() {
