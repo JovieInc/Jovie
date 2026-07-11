@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { type FormEvent, type ReactNode, useState } from 'react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
@@ -296,6 +297,30 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('keeps send disabled until runtime interaction policy resolves', async () => {
+    const serverMarkup = renderToString(
+      <OnboardingChat turnstileStatus='interactive' turnstileToken={null} />
+    );
+    expect(serverMarkup).toContain('data-interaction-ready="false"');
+    expect(serverMarkup).toMatch(
+      /<button[^>]*aria-label="Send message"[^>]*disabled=""/
+    );
+
+    render(
+      <OnboardingChat turnstileStatus='interactive' turnstileToken={null} />
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+        'data-interaction-ready',
+        'true'
+      )
+    );
+    expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+      'data-automation-bypass',
+      'false'
+    );
+  });
+
   it('keeps the first message local and shows verification guidance until a token exists', () => {
     const onTurnstileRequired = vi.fn();
     render(
@@ -348,6 +373,10 @@ describe('OnboardingChat Turnstile gating', () => {
     );
 
     await waitFor(() => expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+      'data-automation-bypass',
+      'true'
+    );
     expect(chatMocks.sendMessage).toHaveBeenCalledWith({
       text: 'Hey, I want to get access to Jovie.',
     });

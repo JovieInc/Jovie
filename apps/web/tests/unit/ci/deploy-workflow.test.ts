@@ -55,6 +55,16 @@ function getJobBlock(workflow: string, jobKey: string): string {
   return block.join('\n');
 }
 
+describe('golden-path smoke OTP contract', () => {
+  it('enables deterministic OTP when the smoke manifest runs golden path', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeStep = getStepBlock(workflow, 'Run E2E Smoke (Chromium)');
+
+    expect(smokeStep).toContain('export E2E_TEST_MODE=1');
+    expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
+  });
+});
+
 describe('deploy workflow Vercel env resolution', () => {
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');

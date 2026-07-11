@@ -881,6 +881,7 @@ export function OnboardingChat({
   const isSubmitted = status === 'submitted';
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
+  const isComposerInitializing = localAutomationBypass === null;
   const requiresTurnstile =
     process.env.NODE_ENV !== 'development' && localAutomationBypass !== true;
   const isAwaitingFirstToken =
@@ -1146,7 +1147,10 @@ export function OnboardingChat({
     onChange: handleInputChange,
     onSubmit: handleSubmit,
     isLoading: isBusy,
-    isSubmitting: isSubmitted,
+    // Keep the action inert until runtime Turnstile/automation policy has
+    // resolved. submitText intentionally rejects turns in this window, so an
+    // enabled button would acknowledge a click without sending anything.
+    isSubmitting: isSubmitted || isComposerInitializing,
     isStreaming,
     onStop: stop,
     // Raw "Securing chat..." text is replaced in follow-up pass with
@@ -1172,6 +1176,14 @@ export function OnboardingChat({
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
+      data-interaction-ready={isComposerInitializing ? 'false' : 'true'}
+      data-automation-bypass={
+        localAutomationBypass === null
+          ? 'pending'
+          : localAutomationBypass
+            ? 'true'
+            : 'false'
+      }
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}
