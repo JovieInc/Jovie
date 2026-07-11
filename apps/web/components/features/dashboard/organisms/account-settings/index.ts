@@ -1,16 +1,26 @@
 /**
  * Account Settings Components
  *
- * Better Auth identity summary + supported preference sections.
- * Full account-management parity (email/provider/session mutation) is tracked
- * separately — do not reintroduce Clerk resource cast UIs here.
+ * Modular components for account settings management.
  */
 
 export { AccountSettingsSection } from './AccountSettingsSection';
+export { ConnectedAccountsCard } from './ConnectedAccountsCard';
+export { EmailManagementCard } from './EmailManagementCard';
+export { SessionManagementCard } from './SessionManagementCard';
+
+export type {
+  ClerkEmailAddressResource,
+  ClerkEmailVerification,
+  ClerkExternalAccountResource,
+  ClerkSessionActivity,
+  ClerkSessionResource,
+  ClerkUserResource,
+  EmailStatus,
+} from './types';
 
 export {
   extractErrorMessage,
   formatRelativeDate,
-  formatSessionDeviceName,
   syncEmailToDatabase,
 } from './utils';

@@ -511,18 +511,8 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
   assert.match(smokeSource, /captureElectronAuthEvidence/);
   assert.match(smokeSource, /async function signOutOrClearElectronAuth/);
   assert.match(smokeSource, /window\.localStorage\.setItem/);
-  assert.match(smokeSource, /evidenceSource: 'better-auth-session'/);
-  assert.doesNotMatch(smokeSource, /evidenceSource: 'clerk-token'/);
-  assert.doesNotMatch(smokeSource, /api\.clerk\.com/);
-  assert.doesNotMatch(smokeSource, /window\.Clerk/);
+  assert.match(smokeSource, /evidenceSource: 'clerk-token'/);
   assert.match(smokeSource, /function getElectronStorageOrigins\(\)/);
-  assert.match(smokeSource, /code_challenge_method/);
-  assert.match(smokeSource, /\/api\/auth\/get-session/);
-  assert.match(
-    smokeSource,
-    /\/api\/auth\/one-time-token\/verify|one-time-token|better-auth-session/
-  );
-  assert.match(smokeSource, /SETTINGS_ACCOUNT_PATH|\/app\/settings\/account/);
   assert.match(smokeSource, /Network\.clearBrowserCookies/);
   assert.match(smokeSource, /Storage\.clearDataForOrigin/);
   assert.match(
