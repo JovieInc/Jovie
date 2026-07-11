@@ -4,6 +4,15 @@ Design system, component hierarchy, surfaces, taste rules. Always read `DESIGN.m
 
 ## Component Architecture
 
+### Shared implementation, configured shells
+
+Jovie and Ovie use the same UI implementation. Jovie is the
+external/consumer shell; Ovie is the internal/personal/ops shell. Select
+shell, route, entitlement, and presentation mode through configuration. Do
+not fork components, create Ovie-only copies of shared UI, or define separate
+metric widgets for the same underlying metric. `/app/admin/ops` is canonical
+Ops; HUD/Ovie/TV are presentation modes.
+
 Components follow atomic design with feature-based grouping:
 
 ```

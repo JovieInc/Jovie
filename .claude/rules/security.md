@@ -39,6 +39,14 @@ These registries are the **single source of truth** consumed by the CSP builder,
 
 ## Entitlements: Single Source of Truth
 
+### Private capability boundary
+
+Personal finance is a shared module, not a separate shell implementation.
+Keep raw Gmail/Amazon receipts local and encrypted; only normalized facts may
+cross into gbrain. Gate the module through the canonical entitlement chain and
+keep it out of consumer/public surfaces by default. Do not add account
+connections or money movement without a separate architecture decision.
+
 Entitlements behavior must stay centralized and predictable. Use these files as the canonical chain:
 
 1. `apps/web/lib/entitlements/registry.ts` — plan matrix (features, limits, marketing metadata)

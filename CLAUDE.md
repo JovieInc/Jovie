@@ -1,16 +1,16 @@
 # Jovie — Agent Operating Manual
 
-Controller map for AI agents. `AGENTS.md` symlinks here. Read the scoped rule for your topic before editing. Detail lives in `.claude/rules/*` and `docs/`.
+Controller map for AI agents. `AGENTS.md` symlinks here. Read scoped rules before editing. Detail lives in `.claude/rules/*` and `docs/`.
 
 ## Operating Principles
 
+- **One codebase, two shells:** Jovie is external/consumer; Ovie is internal/personal/ops. Shared packages, components, contracts, clients, auth, ledger models, interaction patterns, and metrics are canonical; use shell/route/entitlement/presentation configuration, never forks or duplicate metrics. `/app/admin/ops` is canonical Ops; HUD/Ovie/TV are presentation modes.
 - Smallest correct change; inspect existing patterns first.
 - Server-side code, typed contracts, existing package boundaries.
 - Don't invent commands, env vars, routes, tables, services, or tokens.
 - Report exact check failures — don't hide them.
 - Ask before destructive ops (data deletion, irreversible migrations without CI guard, credential changes, prod scripts). Auth/payment edits do **not** need human merge approval — CI + Migration Guard own that.
 - **Decisions are systems, not events** when quantifiable: **Ship now / Re-evaluate when / Then** with unit-economics triggers; tag `EVENT:` for taste/identity/security permanence. No "later"/"future work" without a Linear ID → [`.claude/rules/code-style.md`](.claude/rules/code-style.md).
-
 Canon principles: [`docs/company/operating-principles.md`](docs/company/operating-principles.md) (supersede [`docs/company/core-values.md`](docs/company/core-values.md)).
 
 ## Agent Role Boundary

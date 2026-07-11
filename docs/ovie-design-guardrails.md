@@ -1,6 +1,11 @@
 # Ovie Design Guardrails
 
-Ovie is Jovie's local macOS ops cockpit. Treat Ovie UI work as product/admin UI, not marketing or landing-page work: dense but calm, fast, native-feeling, and stripped of AI-slop decoration.
+Ovie is Jovie's internal/personal/ops shell in the shared web codebase, not a
+separate UI implementation. Treat Ovie UI work as product/admin UI, not
+marketing or landing-page work: dense but calm, fast, and stripped of AI-slop
+decoration. Reuse shared components and metrics; vary only shell, route,
+entitlement, and presentation configuration. `/app/admin/ops` remains the
+canonical Ops surface, with HUD/Ovie/TV as presentation modes.
 
 ## Required Routing
 
@@ -9,7 +14,8 @@ Any Ovie UI or UX task must run through the existing make-interfaces-better guar
 - Load gstack `/design-review` before marking visual work complete.
 - Load `design-taste-frontend` where available and run its audit checklist.
 - Read `DESIGN.md` and this file before changing Ovie UI.
-- Preserve Ovie's local dirty state first. If `~/JovieInc/ovie` has uncommitted changes, inspect them and avoid overwriting unrelated work.
+- Preserve unrelated local work first. The archived `JovieInc/ovie` Swift
+  repository is not the current Ovie surface.
 
 ## Design Read
 

@@ -6,6 +6,25 @@
 
 ## Decision
 
+### One Codebase, Two Shells
+
+Jovie and Ovie are shells over one shared codebase. Jovie is the
+external/consumer shell; Ovie is the internal/personal/ops shell. Shared
+packages and components are canonical, including the design system, data
+contracts, API clients, auth primitives, ledger models, interaction patterns,
+and metric definitions.
+
+Agents must express differences through shell, route, entitlement, and
+presentation configuration. Do not fork UI, create duplicate components or
+metrics, or introduce a second implementation of a shared contract. The
+`/app/admin/ops` route remains canonical Ops; Ovie/HUD/TV are presentation
+modes, not separate products.
+
+Personal finance follows the same shared-module rule with a strict private
+capability boundary: raw Gmail/Amazon receipts remain local and encrypted,
+only normalized facts may be sent to gbrain, and the module is private and
+entitlement-gated. Do not add account connections or money movement yet.
+
 Jovie AgentOS v1 uses Vercel Workflow/WDK as the first durable coordinator, not Trigger.dev. Trigger stays the fallback if WDK cannot satisfy local durability, retries, queues, or operator visibility after the dry-run proof.
 
 The control plane is intentionally Jovie-owned:
