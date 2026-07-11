@@ -15,6 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Investors can understand Jovie in one focused brief (JOV-3538):** public and personalized investor links now share a responsive, accessible seven-part narrative with a product demo, founder letter, evidence boundaries, key risks, and a collapsed diligence appendix.
+- **Personalized investor links now preserve private engagement context (JOV-3538):** allowlisted demo, narrative, and meeting actions are attributed through HttpOnly server-side tracking without exposing investor identity to the browser, with automated QA and responsive screenshot proof covering the experience.
 - **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
 - [internal] **Desktop renderer recovery (JOV-3595)**: recover from hosted loads that return HTTP 200 but never boot React, and route crashed or unresponsive renderers to the visible recovery shell instead of a permanent black window.
 - [internal] Agent preflight: one-shot JSON bootstrap for /autoplan (JOV-4183)
