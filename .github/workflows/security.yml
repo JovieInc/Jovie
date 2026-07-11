@@ -36,10 +36,43 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d .git ]]; then exit 0; fi
+          git sparse-checkout disable 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+          rm -f .git/info/sparse-checkout
+          git config --local --unset-all extensions.partialClone 2>/dev/null || true
+          git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+          clean: true
+
+      - name: Materialize full tree (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable 2>/dev/null || true
+          git reset --hard HEAD
+          git checkout-index -a -f
+
+      - name: Verify checkout sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel="scripts/security/scan-secrets.sh"
+          if [[ ! -f "$sentinel" ]]; then
+            echo "::error::Incomplete checkout — missing ${sentinel}"
+            exit 1
+          fi
 
       - name: Run secret scan (gitleaks + trufflehog)
         shell: bash
@@ -68,16 +101,61 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d .git ]]; then exit 0; fi
+          git sparse-checkout disable 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+          rm -f .git/info/sparse-checkout
+          git config --local --unset-all extensions.partialClone 2>/dev/null || true
+          git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+          clean: true
+
+      - name: Materialize full tree (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable 2>/dev/null || true
+          git reset --hard HEAD
+          git checkout-index -a -f
+
+      - name: Verify checkout sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel="scripts/security/scan-secrets.sh"
+          if [[ ! -f "$sentinel" ]]; then
+            echo "::error::Incomplete checkout — missing ${sentinel}"
+            exit 1
+          fi
 
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
-        uses: trufflesecurity/trufflehog@00155c9dc586f34d189adc83d3ac2698c2ec551f # v3.95.8
-        with:
-          path: ./
-          extra_args: --no-verification --exclude-paths=.trufflehog-exclude.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}"
+            ./scripts/security/scan-secrets.sh ci-pr-trufflehog "origin/${{ github.base_ref }}"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+              git fetch origin main --depth=1
+              ./scripts/security/scan-secrets.sh ci-pr-trufflehog "origin/main"
+            else
+              ./scripts/security/scan-secrets.sh ci-pr-trufflehog "${{ github.event.before }}"
+            fi
+          else
+            ./scripts/security/scan-secrets.sh full-trufflehog
+          fi
 
   trivy:
     name: Trivy Vulnerability Scanning

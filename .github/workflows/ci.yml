@@ -887,9 +887,42 @@ jobs:
     outputs:
       has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d .git ]]; then exit 0; fi
+          git sparse-checkout disable 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+          rm -f .git/info/sparse-checkout
+          git config --local --unset-all extensions.partialClone 2>/dev/null || true
+          git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
+          clean: true
+
+      - name: Materialize full tree (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable 2>/dev/null || true
+          git reset --hard HEAD
+          git checkout-index -a -f
+
+      - name: Verify checkout sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel=".github/actions/setup-node-pnpm/action.yml"
+          if [[ ! -f "$sentinel" ]]; then
+            echo "::error::Incomplete checkout — missing ${sentinel}"
+            exit 1
+          fi
 
       - name: Check for relevant changes
         id: check_changes
@@ -3763,8 +3796,43 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 5
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d .git ]]; then exit 0; fi
+          git sparse-checkout disable 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+          rm -f .git/info/sparse-checkout
+          git config --local --unset-all extensions.partialClone 2>/dev/null || true
+          git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with: { fetch-depth: 1 }
+        with:
+          fetch-depth: 1
+          clean: true
+
+      - name: Materialize full tree (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable 2>/dev/null || true
+          git reset --hard HEAD
+          git checkout-index -a -f
+
+      - name: Verify checkout sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel=".github/actions/setup-node-pnpm/action.yml"
+          if [[ ! -f "$sentinel" ]]; then
+            echo "::error::Incomplete checkout — missing ${sentinel}"
+            exit 1
+          fi
+
       - uses: ./.github/actions/setup-node-pnpm
       - name: Build CI harness artifact
         env:
