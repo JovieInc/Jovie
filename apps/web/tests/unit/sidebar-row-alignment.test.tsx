@@ -158,7 +158,7 @@ describe('Sidebar row alignment', () => {
       'text-xs',
       'font-normal',
       'hover:bg-sidebar-accent',
-      'text-sidebar-muted/80',
+      'text-sidebar-item-foreground',
     ]) {
       expect(
         settingsRow,
@@ -212,7 +212,8 @@ describe('Sidebar row alignment', () => {
     expect(rowClassName).toContain('text-xs');
     expect(rowClassName).toContain('font-normal');
     expect(rowClassName).toContain('hover:bg-sidebar-accent');
-    expect(rowClassName).toContain('text-sidebar-muted/80');
+    expect(rowClassName).toContain('text-sidebar-item-foreground');
+    expect(rowClassName).not.toContain('text-sidebar-muted/80');
     expect(activeRowClassName).toContain('bg-sidebar-accent-active');
     expect(activeRowClassName).toContain('text-primary-token');
     expect(activeRowClassName).toContain('font-medium');
