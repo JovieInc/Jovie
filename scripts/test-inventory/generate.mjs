@@ -265,16 +265,7 @@ function fileCiMapping(record, lanes) {
     suiteCandidates = ['pnpm --filter @jovie/desktop test'];
     confidence = 'high';
     provenance =
-      'apps/desktop/package.json test script; no workflow invokes the desktop test suite.';
-    if (
-      /apps\/desktop\/scripts\/(?:desktop-auth-security\.test\.ts|desktop-tray-contract\.test\.mjs)$/.test(
-        record.path
-      )
-    ) {
-      suiteCandidates = [];
-      provenance =
-        'Known orphan: this desktop test is omitted from apps/desktop/package.json test and no CI workflow invokes it.';
-    }
+      'apps/desktop/scripts/run-test-lane.mjs recursively discovers every scripts/**/*.test.{mjs,ts} file and adds the two root desktop guards; no workflow invokes the desktop test suite.';
   } else if (/^(?:scripts|packages|tests|workers)\//.test(record.path)) {
     suiteCandidates = [];
     confidence = 'low';
