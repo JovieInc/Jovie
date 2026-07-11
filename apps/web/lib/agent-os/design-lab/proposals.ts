@@ -177,7 +177,84 @@ export async function saveDesignProposal(
   const parsed = DesignProposalSchema.parse(proposal);
   const filePath = resolveDesignProposalFilePath(dayBucket, parsed.id);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+  const temporaryPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  await fs.writeFile(
+    temporaryPath,
+    `${JSON.stringify(parsed, null, 2)}\n`,
+    'utf8'
+  );
+  await fs.rename(temporaryPath, filePath);
+}
+
+const PROPOSAL_LOCK_RETRY_MS = 25;
+const PROPOSAL_LOCK_TIMEOUT_MS = 10_000;
+
+async function acquireProposalLock(
+  filePath: string
+): Promise<() => Promise<void>> {
+  const lockPath = `${filePath}.lock`;
+  const deadline = Date.now() + PROPOSAL_LOCK_TIMEOUT_MS;
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  while (true) {
+    try {
+      const handle = await fs.open(lockPath, 'wx');
+      return async () => {
+        await handle.close();
+        await fs.rm(lockPath, { force: true });
+      };
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !('code' in error) ||
+        (error as NodeJS.ErrnoException).code !== 'EEXIST'
+      ) {
+        throw error;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error('Timed out waiting for the design proposal lock.');
+      }
+      await new Promise(resolve => setTimeout(resolve, PROPOSAL_LOCK_RETRY_MS));
+    }
+  }
+}
+
+export async function mutateDesignProposal<T>(params: {
+  readonly dayBucket: string;
+  readonly proposalId: string;
+  readonly mutate: (proposal: DesignProposal) => Promise<{
+    readonly proposal: DesignProposal;
+    readonly result: T;
+  }>;
+}): Promise<T> {
+  const filePath = resolveDesignProposalFilePath(
+    params.dayBucket,
+    params.proposalId
+  );
+  const release = await acquireProposalLock(filePath);
+  try {
+    const existing = await readProposalFile(filePath, params.dayBucket);
+    if (!existing) throw new Error('Design proposal not found.');
+    const mutation = await params.mutate(existing);
+    await saveDesignProposal(mutation.proposal);
+    return mutation.result;
+  } finally {
+    await release();
+  }
+}
+
+export async function withDesignProposalLock<T>(
+  dayBucket: string,
+  proposalId: string,
+  action: () => Promise<T>
+): Promise<T> {
+  const filePath = resolveDesignProposalFilePath(dayBucket, proposalId);
+  const release = await acquireProposalLock(filePath);
+  try {
+    return await action();
+  } finally {
+    await release();
+  }
 }
 
 export function deriveProposalStatus(
