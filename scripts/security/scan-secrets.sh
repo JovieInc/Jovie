@@ -138,27 +138,58 @@ run_trufflehog_pre_commit() {
     $(trufflehog_exclude_args)
 }
 
+# trufflehog `git file://…` internally clones the local repo. On persistent
+# CI runners the workdir can be a partial (promisor) clone whose object store
+# stops serving local clones — upload-pack dies with "could not fetch <sha>
+# from promisor remote" before any scanning happens (#13994). That signature
+# is infrastructure corruption, never a secret finding, so it is safe to
+# repair the object store and retry once. Findings failures never match the
+# signature and propagate unchanged.
+CLONE_CORRUPTION_SIGNATURE='promisor remote|repository corruption on the remote side|failed to clone file Git repo'
+
+repair_partial_clone() {
+  echo "Partial-clone corruption detected — refetching full objects (#13994)..."
+  git config --unset-all remote.origin.promisor || true
+  git config --unset-all remote.origin.partialclonefilter || true
+  git fetch --refetch origin '+refs/heads/*:refs/remotes/origin/*'
+}
+
+run_trufflehog_git() {
+  local log status
+  log="$(mktemp)"
+  status=0
+  # shellcheck disable=SC2046
+  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
+    >"$log" 2>&1 || status=$?
+  cat "$log"
+  if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
+    repair_partial_clone
+    status=0
+    # shellcheck disable=SC2046
+    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
+      || status=$?
+  fi
+  rm -f "$log"
+  return $status
+}
+
 run_trufflehog_ci_pr() {
   local base_commit
   base_commit="$(git rev-parse "$BASE_REF")"
 
   echo "Running trufflehog git since ${BASE_REF} (${base_commit})..."
-  # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" \
+  run_trufflehog_git \
     --since-commit "$base_commit" \
     --branch HEAD \
     --no-verification \
-    --fail \
-    $(trufflehog_exclude_args)
+    --fail
 }
 
 run_trufflehog_full() {
   echo "Running trufflehog git on full history..."
-  # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" \
+  run_trufflehog_git \
     --no-verification \
-    --fail \
-    $(trufflehog_exclude_args)
+    --fail
 }
 
 usage() {
