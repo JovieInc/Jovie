@@ -175,6 +175,10 @@ function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
     env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
     publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    // The fail-closed injection handshake is request-scoped, so the exact
+    // deterministic CI turn may bypass the challenge without opening the
+    // standalone server to unrelated anonymous requests.
+    isLlmFailureInjected(req) ||
     (env.PUBLIC_NOAUTH_SMOKE === '1' &&
       isLocalDevelopmentAutomationHostname(extractRequestHostname(req)))
   );
@@ -578,13 +582,13 @@ export async function tryHandleAnonymousOnboardingChat(
 
 /**
  * E2E-only LLM failure injection. Fails closed: the header is inert unless
- * the server was started with `CHAT_LLM_FAILURE_INJECTION=1`, and production
- * deploys ignore it unconditionally.
+ * the server was started with `CHAT_LLM_FAILURE_INJECTION=1`, and secure
+ * preview/production deploys ignore it unconditionally.
  */
 function isLlmFailureInjected(req: Request): boolean {
   return (
+    !isSecureTurnstileEnvironment(req) &&
     env.CHAT_LLM_FAILURE_INJECTION === '1' &&
-    env.VERCEL_ENV !== 'production' &&
     req.headers.get('x-jovie-e2e-llm-failure') === '1'
   );
 }

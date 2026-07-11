@@ -9,12 +9,15 @@ import {
 } from '../helpers/clerk-auth';
 
 /**
- * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Live Profile
+ * Golden Path E2E — Anonymous Chat -> Signup -> Claim -> Live Profile
  *
  * Tests the complete new-user journey end to end with REAL data:
- * - No mocks for music fetch
+ * - Real anonymous conversation persistence and Better Auth signup
+ * - Deterministic confirmed artist/handle tool-call fixtures
+ * - Real claim endpoint and public profile activation
  * - No pre-authenticated state
- * - Real Better Auth email-OTP signup (test environment)
+ *
+ * MusicFetch integration coverage remains in musicfetch-coverage.spec.ts.
  *
  * Jovie's pricing is a 14-day reverse trial with NO card required at signup
  * (see docs/PRICING-PHILOSOPHY.md), so the golden path's "first value" moment
@@ -307,11 +310,103 @@ async function createFreshUser(page: import('@playwright/test').Page) {
     : new Error('Failed to create Better Auth test user');
 }
 
+async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error('DATABASE_URL required for onboarding seed');
+
+  // The real-Clerk artifact intentionally omits compile-time E2E flags. Mark
+  // only this browser as local automation before React initializes so the
+  // anonymous turn bypasses Turnstile without enabling auth bypass.
+  await page.addInitScript(() => {
+    document.documentElement.dataset.e2eMode = '1';
+  });
+  await page.route('**/api/chat', async route => {
+    await route.continue({
+      headers: {
+        ...route.request().headers(),
+        'x-jovie-e2e-llm-failure': '1',
+      },
+    });
+  });
+  await page.goto('/start', { waitUntil: 'domcontentloaded' });
+  await expect(
+    page.getByTestId('onboarding-chat'),
+    'Onboarding runtime policy did not finish initializing'
+  ).toHaveAttribute('data-interaction-ready', 'true', { timeout: 30_000 });
+  await expect(
+    page.getByTestId('onboarding-chat'),
+    'Golden path browser did not activate the local automation bypass'
+  ).toHaveAttribute('data-automation-bypass', 'true');
+  await expect(
+    page.locator('[aria-label="Chat message input" i]')
+  ).toBeVisible();
+
+  await page
+    .locator('[aria-label="Chat message input" i]')
+    .fill('I am Tim White');
+  const sendButton = page.getByRole('button', { name: 'Send message' });
+  await expect(sendButton).toBeEnabled();
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      response =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/chat'
+    ),
+    sendButton.click(),
+  ]);
+  expect(response.status()).toBe(200);
+  const conversationId = response.headers()['x-conversation-id'];
+  expect(
+    conversationId,
+    'Anonymous chat did not reserve a conversation'
+  ).toBeTruthy();
+
+  const sql = neon(dbUrl);
+  const toolCalls = [
+    {
+      schemaVersion: 2,
+      toolCallId: `golden-artist-${Date.now()}`,
+      toolName: 'confirmSpotifyArtist',
+      state: 'succeeded',
+      output: {
+        action: 'spotify_artist_confirmed',
+        spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+        artist: {
+          id: '4Uwpa6zW3zzCSQvooQNksm',
+          name: 'Tim White',
+          url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+        },
+      },
+      uiHint: 'artifact',
+    },
+    {
+      schemaVersion: 2,
+      toolCallId: `golden-handle-${Date.now()}`,
+      toolName: 'checkHandle',
+      state: 'succeeded',
+      output: { action: 'check_handle', handle },
+      uiHint: 'artifact',
+    },
+  ];
+  const updated = await sql`
+    UPDATE chat_messages
+    SET tool_calls = ${JSON.stringify(toolCalls)}::jsonb
+    WHERE id = (
+      SELECT id FROM chat_messages
+      WHERE conversation_id = ${conversationId}
+      ORDER BY created_at DESC LIMIT 1
+    )
+    RETURNING id
+  `;
+  expect(updated.length, 'Anonymous chat message was not persisted').toBe(1);
+  return conversationId;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
 
-test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile', () => {
+test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', () => {
   test.describe.configure({ mode: 'serial' });
 
   // Fresh browser — no inherited auth state
@@ -339,102 +434,44 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
       timeout: 30_000,
     });
 
-    // The collapsed homepage (#11988) is hero + minimal footer: no claim
-    // input, no signup links — the funnel routes through the hero command
-    // center into /start chat. Assert the hero rendered, then enter the
-    // classic signup path directly (this spec's scope is signup →
-    // onboarding → live profile, not the chat funnel).
+    // The collapsed homepage routes onboarding through /start chat.
     await expect(page.getByTestId('homepage-hero-command-center')).toBeVisible({
       timeout: 20_000,
     });
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 2: Initiate signup
+    // STEP 2: Start the canonical anonymous chat journey
     // ──────────────────────────────────────────────────────────────────
-    await page.goto('/signup', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
-    await page.waitForURL(/\/(signup|onboarding)/, { timeout: 30_000 });
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
+    const conversationId = await seedAnonymousOnboardingJourney(
+      page,
+      uniqueHandle
+    );
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
     const { betterAuthUserId } = await createFreshUser(page);
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 4: Onboarding — Handle step
-    // ──────────────────────────────────────────────────────────────────
-    // Generate a unique handle and pass it via search param.
-    // When the handle is pre-filled via ?handle=, the validation hook's
-    // fast path marks it as available immediately (skips API check),
-    // avoiding the TanStack Pacer debouncer state race condition.
-    const randomSuffix = Math.random().toString(36).slice(2, 8);
-    const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
-
-    // Navigate to onboarding with pre-filled handle, submit handle step,
-    // and advance to DSP step. Retry the whole sequence since the Neon
-    // WebSocket pool can fail during SSR or server action execution.
-    await expect(async () => {
-      await page.goto(`/onboarding?handle=${uniqueHandle}`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-      await expect(
-        page.locator('[data-testid="onboarding-form-wrapper"]')
-      ).toBeVisible({ timeout: 10_000 });
-
-      // Handle input should be pre-filled
-      const handleEl = page.getByLabel('Claim Your Handle');
-      const handleVisible = await handleEl
-        .isVisible({ timeout: 3_000 })
-        .catch(() => false);
-
-      if (handleVisible) {
-        // Still on handle step — submit it through the icon-only claim button.
-        await expect
-          .poll(async () => (await handleEl.inputValue()).trim(), {
-            timeout: 20_000,
-          })
-          .toBe(uniqueHandle);
-
-        const claimHandleButton = page.getByTestId('onboarding-handle-submit');
-        await expect(claimHandleButton).toBeEnabled({ timeout: 30_000 });
-        await claimHandleButton.click();
-      }
-
-      // Must reach DSP step (artist search)
-      await expect(
-        page.getByPlaceholder(/search by artist name or paste a spotify link/i)
-      ).toBeVisible({ timeout: 60_000 });
-    }).toPass({
-      timeout: 180_000,
-      intervals: [3_000, 5_000, 10_000, 15_000],
-    });
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 5: Onboarding — Artist search (Music Fetch)
-    // ──────────────────────────────────────────────────────────────────
-    const artistInput = page.getByPlaceholder(
-      /search by artist name or paste a spotify link/i
-    );
-    await expect(artistInput).toBeVisible({ timeout: 5_000 });
-
     const TEST_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
     const testSpotifyUrl = `https://open.spotify.com/artist/${TEST_SPOTIFY_ID}`;
-    const capturedSpotifyUrl: string | null = testSpotifyUrl;
-    const capturedSpotifyId: string | null = TEST_SPOTIFY_ID;
 
-    await artistInput.fill(testSpotifyUrl);
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 6: Current onboarding V2 — verify import and finish path
-    // ──────────────────────────────────────────────────────────────────
-
-    const importCompleteHeading = page.getByRole('heading', {
-      name: /^(Spotify connected|Your Link Is Live)$/i,
-    });
-    await expect(importCompleteHeading).toBeVisible({ timeout: 180_000 });
+    // Exercise the real activation endpoint. Signup may already have called it;
+    // the endpoint is intentionally idempotent, so assert its durable outcome.
+    const claim = await page.request.post('/api/onboarding/claim');
+    expect(claim.status()).toBe(200);
+    const sql = neon(process.env.DATABASE_URL!);
+    await expect
+      .poll(async () => {
+        const rows = await sql`
+          SELECT cp.id FROM creator_profiles cp
+          INNER JOIN users u ON u.id = cp.user_id
+          WHERE u.better_auth_user_id = ${betterAuthUserId}
+            AND cp.username_normalized = ${uniqueHandle}
+        `;
+        return rows.length;
+      })
+      .toBe(1);
 
     // Ensure Spotify URL is saved on the profile via direct DB write.
     // The fire-and-forget connectSpotifyArtist uses the flaky WebSocket pool
@@ -443,10 +480,10 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
     //
     // Fallback uses a known real Spotify artist ID for "Tim White" in case
     // the response interceptor didn't capture the URL (e.g. search cached).
-    const spotifyIdToSave = capturedSpotifyId || TEST_SPOTIFY_ID;
-    const spotifyUrlToSave = capturedSpotifyUrl || testSpotifyUrl;
+    const spotifyIdToSave = TEST_SPOTIFY_ID;
+    const spotifyUrlToSave = testSpotifyUrl;
     console.log(
-      `[golden-path] Setting spotify_url=${spotifyUrlToSave} spotify_id=${spotifyIdToSave} (captured=${capturedSpotifyUrl})`
+      `[golden-path] Activated conversation=${conversationId}; setting spotify_url=${spotifyUrlToSave}`
     );
     await ensureSpotifyUrlOnProfile(
       betterAuthUserId,

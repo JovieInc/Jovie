@@ -278,7 +278,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
   it('honors LLM failure injection only when the server env enables it', async () => {
     vi.resetModules();
-    stubRuntimeEnv();
+    stubRuntimeEnv({ nodeEnv: 'test' });
     vi.stubEnv('CHAT_LLM_FAILURE_INJECTION', '1');
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'
@@ -293,6 +293,8 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-fallback-reason')).toBe('injected');
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.isTurnstileConfiguredMock).not.toHaveBeenCalled();
+    expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
   });
 
   it('ignores the injection header when the env flag is not set', async () => {
@@ -362,6 +364,54 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-fallback-reason')).toBeNull();
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores injection and dispatches normally on preview deploys', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ nodeEnv: 'test', vercelEnv: 'preview' });
+    vi.stubEnv('CHAT_LLM_FAILURE_INJECTION', '1');
+    hoisted.checkGateForUserMock.mockResolvedValue(false);
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+    hoisted.verifyTurnstileTokenMock.mockResolvedValue({ success: true });
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: {
+        toUIMessageStreamResponse: ({
+          headers,
+        }: {
+          headers: Record<string, string>;
+        }) => new Response('normal-preview-response', { status: 200, headers }),
+      },
+      selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      {
+        mode: 'onboarding',
+        turnstileToken: 'valid-preview-token',
+        messages: [userMessage('hi')],
+      },
+      '',
+      { 'x-jovie-e2e-llm-failure': '1' }
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-preview-inject'
+    );
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBeNull();
+    expect(await result?.text()).toBe('normal-preview-response');
+    expect(hoisted.isTurnstileConfiguredMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledWith(
+      'valid-preview-token',
+      '203.0.113.5'
+    );
     expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
   });
 
