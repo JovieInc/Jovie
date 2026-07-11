@@ -136,10 +136,12 @@ test('maps known file families and exposes current coverage gaps', () => {
     'apps/desktop/scripts/desktop-auth-security.test.ts',
     'apps/desktop/scripts/desktop-tray-contract.test.mjs',
   ]) {
-    const orphan = byPath(path);
-    assert.deepEqual(orphan.ci.jobs, []);
-    assert.deepEqual(orphan.ci.suiteCandidates, []);
-    assert.match(orphan.ci.mappingProvenance, /Known orphan/);
+    const covered = byPath(path);
+    assert.deepEqual(covered.ci.jobs, []);
+    assert.deepEqual(covered.ci.suiteCandidates, [
+      'pnpm --filter @jovie/desktop test',
+    ]);
+    assert.match(covered.ci.mappingProvenance, /recursively discovers/);
   }
 
   const desktop = byPath('apps/desktop/scripts/desktop-icon-contract.test.mjs');
@@ -147,7 +149,7 @@ test('maps known file families and exposes current coverage gaps', () => {
   assert.deepEqual(desktop.ci.suiteCandidates, [
     'pnpm --filter @jovie/desktop test',
   ]);
-  assert.match(desktop.ci.mappingProvenance, /package\.json test script/);
+  assert.match(desktop.ci.mappingProvenance, /recursively discovers/);
 
   const rootTest = byPath('scripts/test-inventory/generate.test.mjs');
   assert.deepEqual(rootTest.ci.suiteCandidates, []);
