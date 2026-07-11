@@ -3,12 +3,12 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/lib/admin';
 import { listDesignProposals } from '@/lib/agent-os/design-lab/proposals';
 import {
   DESIGN_PROPOSAL_KINDS,
   DESIGN_PROPOSAL_STATUSES,
 } from '@/lib/agent-os/design-lab/types';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { mergeCatalogDesignProposals } from './catalog';
@@ -26,8 +26,13 @@ const QuerySchema = z.object({
 });
 
 export async function GET(request: NextRequest): Promise<Response> {
-  const authError = await requireAdmin();
-  if (authError) return authError;
+  const entitlements = await getCurrentUserEntitlements();
+  if (!entitlements.isAuthenticated) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!entitlements.isAdmin) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   try {
     const query = QuerySchema.parse({

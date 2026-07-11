@@ -24,17 +24,19 @@ function buildDispatchPrompt(payload: DesignLabDispatchPayload): string {
     : '';
 
   return [
-    'Design Lab D5 dispatch: build an HTML artifact for the approved proposal.',
+    'Design Lab dispatch: implement the approved section gap in the canonical marketing registry.',
     `Surface: ${payload.surfaceName} (${payload.surfaceId})`,
     `Linear issue: ${payload.linearIssueId}`,
     `Proposal:\n${payload.proposalText.trim()}`,
+    `Required changes:\n${payload.registryTask.requiredChanges.join('\n')}`,
     `Exact files:\n${payload.registryTask.exactFiles.join('\n')}`,
     `Forbidden patterns:\n${payload.registryTask.forbiddenPatterns.join('\n')}`,
     `Acceptance criteria:\n${payload.registryTask.acceptanceCriteria.join('\n')}`,
     `Required evidence:\n${payload.registryTask.evidenceRequired.join('\n')}`,
     notesBlock,
     tasteBlock,
-    'Store the resulting HTML artifact under agentos/runs/design-lab/ and link it back to the Linear issue.',
+    `Validation commands:\n${payload.registryTask.validationCommands.join('\n')}`,
+    'Implement the typed registry contract and shared component, migrate every affected route, add deterministic fixtures/tests, and attach the required evidence to the Linear issue. Do not mark the proposal implemented until every validation command passes and implementation evidence has been recorded through the Design Lab API.',
   ]
     .filter(part => part.length > 0)
     .join('\n\n');

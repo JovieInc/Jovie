@@ -3,8 +3,9 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { updateDesignLabLinearIssueStatus } from '@/lib/agent-os/design-lab/linear';
 import {
-  saveDesignProposal,
+  mutateDesignProposal,
   transitionProposalToImplemented,
 } from '@/lib/agent-os/design-lab/proposals';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -39,21 +40,33 @@ export async function POST(
   try {
     const params = ParamsSchema.parse(await context.params);
     const body = BodySchema.parse(await request.json());
-    const proposal = await getOrMaterializeCatalogProposal(
+    const materialized = await getOrMaterializeCatalogProposal(
       body.dayBucket,
       params.proposalId
     );
-    if (!proposal) {
+    if (!materialized) {
       return NextResponse.json(
         { error: 'Design proposal not found.' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
-    const updated = transitionProposalToImplemented(proposal, {
-      implementedAt: new Date().toISOString(),
-      evidenceRefs: body.evidenceRefs,
+    const updated = await mutateDesignProposal({
+      dayBucket: body.dayBucket,
+      proposalId: params.proposalId,
+      mutate: async proposal => {
+        const next = transitionProposalToImplemented(proposal, {
+          implementedAt: new Date().toISOString(),
+          evidenceRefs: body.evidenceRefs,
+        });
+        return { proposal: next, result: next };
+      },
     });
-    await saveDesignProposal(updated);
+    if (updated.linearIssueId !== 'UNASSIGNED') {
+      await updateDesignLabLinearIssueStatus(
+        updated.linearIssueId,
+        'completed'
+      );
+    }
     return NextResponse.json(
       { ok: true, proposal: updated },
       { status: 200, headers: NO_STORE_HEADERS }
