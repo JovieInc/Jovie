@@ -96,8 +96,12 @@ temporary git worktree, leaving the caller's checkout and branch untouched. It
 commits only the tracked proposal Markdown under
 `docs/fundraising/reviews/proposals/`, pushes that branch, and opens a GitHub
 **draft** PR. Pre-push failures remove the temporary worktree, artifact, and
-new local branch. If draft-PR creation fails after push, the newly-created
-remote branch is deleted; a failed deletion reports the exact recoverable
-remote state. The command never deletes a preexisting branch, edits registry,
+new local branch. Remote ownership is bound to the exact locally-recorded
+commit SHA, and rollback deletion uses an expected-OID lease, so a ref changed
+by another actor is never deleted. If draft-PR creation reports failure, the
+command first queries the exact repository, head, and base: an observable PR
+is reported with its URL/state and the branch is retained; an indeterminate
+query also retains the branch with explicit recovery instructions. The command
+never deletes a preexisting or different-SHA branch, edits registry,
 portal, deck, claims, numbers, ask, or positioning; marks a PR ready; merges;
 or deploys.

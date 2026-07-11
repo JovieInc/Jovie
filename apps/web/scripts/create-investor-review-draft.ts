@@ -78,12 +78,27 @@ async function main() {
     );
     return;
   }
+  const repositoryResult = run('gh', [
+    'repo',
+    'view',
+    '--json',
+    'nameWithOwner',
+    '--jq',
+    '.nameWithOwner',
+  ]);
+  if (repositoryResult.status !== 0 || !repositoryResult.stdout.trim()) {
+    throw new Error(
+      repositoryResult.stderr.trim() || 'GitHub repository is required.'
+    );
+  }
+  const repository = repositoryResult.stdout.trim();
   const draftPr = await publishInvestorReviewDraft(
     {
       repoRoot,
       branch,
       base,
       title: rendered.title,
+      repository,
       relativeOutput,
       markdown: rendered.markdown,
     },

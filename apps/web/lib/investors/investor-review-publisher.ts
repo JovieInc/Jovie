@@ -22,6 +22,7 @@ interface PublishOptions {
   readonly branch: string;
   readonly base: string;
   readonly title: string;
+  readonly repository: string;
   readonly relativeOutput: string;
   readonly markdown: string;
 }
@@ -34,7 +35,15 @@ export async function publishInvestorReviewDraft(
   options: PublishOptions,
   dependencies: InvestorReviewPublisherDependencies
 ): Promise<string> {
-  const { repoRoot, branch, base, title, relativeOutput, markdown } = options;
+  const {
+    repoRoot,
+    branch,
+    base,
+    title,
+    repository,
+    relativeOutput,
+    markdown,
+  } = options;
   const run = (
     command: 'git' | 'gh',
     args: readonly string[],
@@ -77,7 +86,9 @@ export async function publishInvestorReviewDraft(
   }
 
   const temporaryWorktree = await dependencies.createTempDirectory();
-  let remoteCreated = false;
+  let localCommitSha: string | null = null;
+  let remoteOwned = false;
+  let prCreateFailed = false;
   let primaryError: Error | null = null;
   try {
     const add = run('git', [
@@ -103,18 +114,54 @@ export async function publishInvestorReviewDraft(
       const result = run('git', args, temporaryWorktree);
       if (result.status !== 0) throw failure(result, `git ${args[0]} failed.`);
     }
+    const revision = run('git', ['rev-parse', 'HEAD'], temporaryWorktree);
+    if (
+      revision.status !== 0 ||
+      !/^[a-f0-9]{40}$/u.test(revision.stdout.trim())
+    ) {
+      throw failure(revision, 'Could not record the proposal commit SHA.');
+    }
+    localCommitSha = revision.stdout.trim();
     const push = run(
       'git',
       ['push', '-u', 'origin', `${branch}:${branch}`],
       temporaryWorktree
     );
     if (push.status !== 0) {
-      remoteCreated =
-        run('git', ['ls-remote', '--exit-code', '--heads', 'origin', branch])
-          .status === 0;
+      const observed = run('git', [
+        'ls-remote',
+        '--exit-code',
+        '--heads',
+        'origin',
+        branch,
+      ]);
+      const observedOid = observed.stdout.trim().split(/\s+/u)[0];
+      remoteOwned = observed.status === 0 && observedOid === localCommitSha;
+      if (observed.status === 0 && observedOid !== localCommitSha) {
+        throw new Error(
+          `${failure(push, 'Draft branch push failed.').message} Recoverable state: remote branch ${branch} points to different SHA ${observedOid}; it was retained.`
+        );
+      }
       throw failure(push, 'Draft branch push failed.');
     }
-    remoteCreated = true;
+    const pushedRemote = run('git', [
+      'ls-remote',
+      '--exit-code',
+      '--heads',
+      'origin',
+      branch,
+    ]);
+    const pushedOid = pushedRemote.stdout.trim().split(/\s+/u)[0];
+    remoteOwned = pushedRemote.status === 0 && pushedOid === localCommitSha;
+    if (!remoteOwned) {
+      const detail =
+        pushedRemote.status === 0
+          ? `points to different SHA ${pushedOid}`
+          : 'could not be read';
+      throw new Error(
+        `Recoverable state: pushed remote branch ${branch} ${detail}; ownership was not established and the branch was retained.`
+      );
+    }
     const pr = run(
       'gh',
       [
@@ -132,15 +179,65 @@ export async function publishInvestorReviewDraft(
       ],
       temporaryWorktree
     );
-    if (pr.status !== 0) throw failure(pr, 'Draft PR creation failed.');
+    if (pr.status !== 0) {
+      prCreateFailed = true;
+      throw failure(pr, 'Draft PR creation failed.');
+    }
     return pr.stdout.trim();
   } catch (error) {
     primaryError = error instanceof Error ? error : new Error(String(error));
-    if (remoteCreated) {
-      const rollback = run('git', ['push', 'origin', '--delete', branch]);
+    if (remoteOwned && prCreateFailed) {
+      const existingPr = run('gh', [
+        'pr',
+        'list',
+        '--repo',
+        repository,
+        '--head',
+        branch,
+        '--base',
+        base,
+        '--state',
+        'all',
+        '--json',
+        'url,state',
+      ]);
+      if (existingPr.status !== 0) {
+        primaryError = new Error(
+          `${primaryError.message} Recoverable state: PR existence for ${repository}:${branch}->${base} could not be determined; owned remote branch ${branch} at ${localCommitSha} was retained.`
+        );
+        remoteOwned = false;
+      } else {
+        try {
+          const matches = JSON.parse(existingPr.stdout) as Array<{
+            url: string;
+            state: string;
+          }>;
+          if (!Array.isArray(matches)) throw new Error('Expected PR list.');
+          if (matches.length > 0) {
+            const match = matches[0]!;
+            primaryError = new Error(
+              `${primaryError.message} Draft PR exists at ${match.url} (${match.state}); remote branch retained.`
+            );
+            remoteOwned = false;
+          }
+        } catch {
+          primaryError = new Error(
+            `${primaryError.message} Recoverable state: PR query returned invalid data; owned remote branch ${branch} at ${localCommitSha} was retained.`
+          );
+          remoteOwned = false;
+        }
+      }
+    }
+    if (remoteOwned && localCommitSha) {
+      const rollback = run('git', [
+        'push',
+        `--force-with-lease=refs/heads/${branch}:${localCommitSha}`,
+        'origin',
+        `:refs/heads/${branch}`,
+      ]);
       if (rollback.status !== 0) {
         primaryError = new Error(
-          `${primaryError.message} Recoverable state: remote branch ${branch} exists; delete it manually before retrying. ${rollback.stderr.trim()}`
+          `${primaryError.message} Recoverable state: leased deletion of remote branch ${branch} at expected SHA ${localCommitSha} failed; the branch was retained. ${rollback.stderr.trim()}`
         );
       }
     }
